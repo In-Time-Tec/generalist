@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "batonfx",
+  "description": "Standalone, non-durable, Effect-native agent framework",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.14",
+  "scripts": {
+    "build": "bun turbo build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "oxlint packages && ast-grep scan --config sgconfig.yml",
+    "test": "bun turbo test",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "bun turbo typecheck"
+  },
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ],
+    "catalog": {
+      "@ast-grep/cli": "0.44.0",
+      "@effect/vitest": "4.0.0-beta.90",
+      "@modelcontextprotocol/sdk": "1.29.0",
+      "@tsconfig/bun": "1.0.9",
+      "@types/bun": "1.3.13",
+      "@types/node": "24.12.2",
+      "@vitest/coverage-v8": "4.0.16",
+      "effect": "4.0.0-beta.90",
+      "oxlint": "1.60.0",
+      "oxlint-tsgolint": "0.21.0",
+      "prettier": "3.6.2",
+      "turbo": "2.8.13",
+      "typescript": "5.8.2",
+      "vitest": "4.0.16"
+    }
+  },
+  "dependencies": {
+    "@batonfx/core": "workspace:*",
+    "@batonfx/mcp": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@ast-grep/cli": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@tsconfig/bun": "catalog:",
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "prettier": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "prettier": {
+    "printWidth": 120,
+    "semi": false
+  }
+}

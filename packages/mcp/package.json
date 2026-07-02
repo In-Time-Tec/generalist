@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@batonfx/mcp",
+  "version": "0.0.0",
+  "private": false,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./baton": "./src/baton.ts"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts ./src/baton.ts --outdir dist --target bun --format esm",
+    "lint": "bun --cwd ../.. oxlint packages/mcp/src packages/mcp/test",
+    "test": "bun --cwd ../.. vitest run packages/mcp/test --passWithNoTests",
+    "typecheck": "bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@batonfx/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

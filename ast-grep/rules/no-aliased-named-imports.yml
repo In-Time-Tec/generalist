@@ -1,0 +1,15 @@
+id: no-aliased-named-imports
+language: TypeScript
+severity: error
+message: Do not alias named imports. Import the exported name directly or use namespace access that preserves the upstream name.
+rule:
+  all:
+    - kind: import_specifier
+    - regex: "\\bas\\b"
+files:
+  - "**/*.ts"
+  - "**/*.tsx"
+ignores:
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "node_modules/**"

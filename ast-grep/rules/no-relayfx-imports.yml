@@ -1,0 +1,21 @@
+id: no-relayfx-imports
+language: TypeScript
+severity: error
+message: BatonFX must never depend on Relay. Do not import or re-export from '@relayfx/*'.
+rule:
+  any:
+    - kind: import_statement
+      has:
+        field: source
+        regex: "@relayfx/"
+    - kind: export_statement
+      has:
+        field: source
+        regex: "@relayfx/"
+files:
+  - "**/*.ts"
+  - "**/*.tsx"
+ignores:
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "node_modules/**"

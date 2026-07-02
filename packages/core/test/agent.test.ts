@@ -1,0 +1,450 @@
+import { describe, expect, it } from "@effect/vitest"
+import { Effect, Layer, Schema, Stream } from "effect"
+import * as Ai from "effect/unstable/ai"
+import { Agent, Approvals, ModelMiddleware, ToolExecutor, TurnPolicy } from "../src/index"
+
+type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+
+const modelLayer = (streamText: ModelParams["streamText"]) =>
+  Layer.effect(
+    Ai.LanguageModel.LanguageModel,
+    Ai.LanguageModel.make({
+      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+      streamText,
+    }),
+  )
+
+const echoTool = Ai.Tool.make("echo", {
+  description: "Echo input for tests",
+  parameters: Schema.Struct({ text: Schema.String }),
+  success: Schema.Unknown,
+})
+
+const gatedTool = Ai.Tool.make("gated", {
+  description: "Requires approval",
+  parameters: Schema.Struct({ text: Schema.String }),
+  success: Schema.Unknown,
+  needsApproval: true,
+})
+
+const echoExecutor = ToolExecutor.testLayer({
+  execute: (request) =>
+    Effect.succeed({
+      _tag: "Success",
+      result: { echoed: request.call.params },
+      encodedResult: { echoed: request.call.params },
+    }),
+})
+
+const unusedExecutor = ToolExecutor.testLayer({
+  execute: () => Effect.die("unexpected tool execution"),
+})
+
+const toolCallPart = (id: string, name: string, params: unknown) =>
+  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+
+const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+
+describe("Agent", () => {
+  it.effect("runs an agent turn and emits loop events", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "loop-test-agent",
+        instructions: "Always mention relay input when you answer.",
+      })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "relay input" }))
+
+      expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "TurnCompleted", "Completed"])
+      const completed = events.at(-1)
+      expect(completed?._tag).toBe("Completed")
+      if (completed?._tag === "Completed") {
+        expect(completed.text).toBe("saw system and input")
+        expect(completed.turns).toBe(1)
+      }
+      const modelPart = events[1]
+      if (modelPart?._tag === "ModelPart") {
+        expect(modelPart.part.type).toBe("text-delta")
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) =>
+            Stream.make(
+              textDelta(
+                JSON.stringify(options.prompt.content).includes("Always mention relay input") &&
+                  JSON.stringify(options.prompt.content).includes("relay input")
+                  ? "saw system and input"
+                  : "missing system or input",
+              ),
+            ),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    ),
+  )
+
+  it.effect("executes tool-call stream parts through ToolExecutor", () => {
+    let calls = 0
+    let secondCallSawToolResult = false
+    return Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "tool-test-agent",
+        toolkit: Ai.Toolkit.make(echoTool),
+      })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+
+      expect(calls).toBe(2)
+      expect(secondCallSawToolResult).toBe(true)
+      expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(2)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+      expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
+      const completed = events.at(-1)
+      expect(completed?._tag).toBe("Completed")
+      if (completed?._tag === "Completed") {
+        expect(completed.text).toBe("after tool")
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 1) {
+              return Stream.make(toolCallPart("tool-call-1", "echo", { text: "from model" }))
+            }
+            secondCallSawToolResult = JSON.stringify(options.prompt.content).includes("from model")
+            return Stream.make(textDelta("after tool"))
+          }),
+          echoExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("fails typed on in-band stream error parts", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "error-agent" })
+
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "relay input" })))
+
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toContain("stream exploded")
+      expect(failure._tag === "@batonfx/core/AgentError" && failure.turn).toBe(0)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() =>
+            Stream.fromIterable([
+              textDelta("partial"),
+              Ai.Response.makePart("error", { error: new Error("stream exploded") }),
+            ]),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    ),
+  )
+
+  it.effect("fails typed when the stream channel fails", () => {
+    const streamFailure = Ai.AiError.make({
+      module: "TestLanguageModel",
+      method: "streamText",
+      reason: new Ai.AiError.UnknownError({ description: "stream channel exploded" }),
+    })
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "channel-error-agent" })
+
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "relay input" })))
+
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toContain("stream channel exploded")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.fail(streamFailure)))),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("fails typed when the turn policy stops with pending tool results", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "policy-stop-agent",
+        toolkit: Ai.Toolkit.make(echoTool),
+        policy: TurnPolicy.recurs(1),
+      })
+
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "loop forever" })))
+
+      expect(calls).toBe(2)
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
+        "Turn policy stopped with pending tool results",
+      )
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.make(toolCallPart(`tool-call-${calls}`, "echo", { text: `call ${calls}` }))
+          }),
+          echoExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("applies per-turn instruction overrides from the policy", () => {
+    let calls = 0
+    let secondCallSawInjectedSystem = false
+    return Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "override-agent",
+        toolkit: Ai.Toolkit.make(echoTool),
+        policy: TurnPolicy.make(() =>
+          Effect.succeed(TurnPolicy.decision.continue({ instructions: "injected system content" })),
+        ),
+      })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+
+      expect(secondCallSawInjectedSystem).toBe(true)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 1) {
+              return Stream.make(toolCallPart("tool-call-override", "echo", { text: "from model" }))
+            }
+            secondCallSawInjectedSystem = JSON.stringify(options.prompt.content).includes("injected system content")
+            return Stream.make(textDelta("after override"))
+          }),
+          echoExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("suspends when the executor returns Suspend", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "suspend-agent",
+        toolkit: Ai.Toolkit.make(echoTool),
+      })
+
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "wait please" })))
+
+      expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
+      if (failure._tag === "@batonfx/core/AgentSuspended") {
+        expect(failure.token).toBe("wait-1")
+        expect(failure.reason).toBe("tool-wait")
+        expect(failure.tool_call_id).toBe("tool-call-wait")
+        expect(failure.tool_name).toBe("echo")
+        expect(failure.tool_params).toEqual({ text: "hold" })
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => Stream.make(toolCallPart("tool-call-wait", "echo", { text: "hold" }))),
+          ToolExecutor.testLayer({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    ),
+  )
+
+  it.effect("resumes a suspended run by executing the pending call first", () => {
+    let calls = 0
+    let sawOriginalPrompt = false
+    let sawResumedToolResult = false
+    return Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "resume-agent",
+        toolkit: Ai.Toolkit.make(echoTool),
+      })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, {
+          prompt: "ignored original prompt",
+          history: [
+            { role: "system", content: "resume history system" },
+            { role: "user", content: [{ type: "text", text: "earlier user input" }] },
+          ],
+          resume: { call: { id: "tool-call-resume", name: "echo", params: { text: "resumed" } } },
+        }),
+      )
+
+      expect(calls).toBe(1)
+      expect(sawOriginalPrompt).toBe(false)
+      expect(sawResumedToolResult).toBe(true)
+      expect(events.map((event) => event._tag)).toEqual([
+        "ToolExecutionStarted",
+        "ToolExecutionCompleted",
+        "TurnCompleted",
+        "TurnStarted",
+        "ModelPart",
+        "TurnCompleted",
+        "Completed",
+      ])
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") {
+        expect(completed.text).toBe("after resume")
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            const content = JSON.stringify(options.prompt.content)
+            sawOriginalPrompt = sawOriginalPrompt || content.includes("ignored original prompt")
+            sawResumedToolResult = sawResumedToolResult || content.includes("resumed")
+            return Stream.make(textDelta("after resume"))
+          }),
+          echoExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("executes needsApproval tools when approvals auto-approve", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "approval-agent",
+        toolkit: Ai.Toolkit.make(gatedTool),
+      })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the gated tool" }))
+
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-gated", "gated", { text: "please" }))
+              : Stream.make(textDelta("after approval"))
+          }),
+          echoExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("re-feeds a failed tool result when approvals deny", () => {
+    let calls = 0
+    let secondCallSawDenial = false
+    return Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "denied-agent",
+        toolkit: Ai.Toolkit.make(gatedTool),
+      })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the gated tool" }))
+
+      expect(secondCallSawDenial).toBe(true)
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 1) {
+              return Stream.make(toolCallPart("tool-call-denied", "gated", { text: "please" }))
+            }
+            secondCallSawDenial = JSON.stringify(options.prompt.content).includes("Tool call denied")
+            return Stream.make(textDelta("saw denial"))
+          }),
+          unusedExecutor,
+          Approvals.denyAll,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("suspends with reason approval when approvals return Pending", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "pending-agent",
+        toolkit: Ai.Toolkit.make(gatedTool),
+      })
+
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use the gated tool" })))
+
+      expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
+      if (failure._tag === "@batonfx/core/AgentSuspended") {
+        expect(failure.token).toBe("approval-1")
+        expect(failure.reason).toBe("approval")
+        expect(failure.tool_name).toBe("gated")
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => Stream.make(toolCallPart("tool-call-pending", "gated", { text: "please" }))),
+          unusedExecutor,
+          Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-1" }) }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    ),
+  )
+
+  it.effect("never consults approvals for tools without needsApproval", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "ungated-agent",
+        toolkit: Ai.Toolkit.make(echoTool),
+      })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(false)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-ungated", "echo", { text: "please" }))
+              : Stream.make(textDelta("done"))
+          }),
+          echoExecutor,
+          Approvals.testLayer({ check: () => Effect.die("approvals must not be consulted") }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+})
