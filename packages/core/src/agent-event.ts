@@ -69,6 +69,15 @@ export interface TurnCompleted {
   readonly metadata?: Metadata
 }
 
+/** @experimental Terminal structured turn produced a schema-validated value. */
+export interface StructuredOutput {
+  readonly _tag: "StructuredOutput"
+  readonly turn: number
+  readonly value: unknown
+  readonly content: ReadonlyArray<Ai.Response.Part<Record<string, Ai.Tool.Any>>>
+  readonly metadata?: Metadata
+}
+
 /** @experimental Terminal event: the run finished without suspension. */
 export interface Completed {
   readonly _tag: "Completed"
@@ -107,6 +116,7 @@ export type Event =
   | ToolExecutionCompleted
   | ApprovalRequested
   | TurnCompleted
+  | StructuredOutput
   | Completed
 
 /** @experimental The loop failed. `turn` is the 0-based turn that failed. */

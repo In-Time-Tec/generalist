@@ -10,7 +10,7 @@ Compatibility: this spec is tested against `effect` and `@effect/vitest` `4.0.0-
 
 Baton owns:
 
-- the model-turn loop: build an `Ai.Chat`, call `chat.streamText({ prompt, toolkit, disableToolCallResolution: true })`, fold stream parts, execute tool calls, re-feed tool results via `Ai.Prompt.fromResponseParts(...)`, repeat per policy;
+- the model-turn loop: build an `Ai.Chat`, call `chat.streamText({ prompt, toolkit, disableToolCallResolution: true })`, fold stream parts, execute tool calls, re-feed tool results via `Ai.Prompt.fromResponseParts(...)`, repeat per policy, and optionally run one terminal structured-output turn;
 - the closed loop-event union (`AgentEvent.Event`) that hosts observe and optionally persist;
 - the loop seams: `ToolExecutor`, `ToolContext`, `ToolOutputStore`, `ModelResilience`, `Approvals`, and `TurnPolicy` (a plain value, not a service);
 - the suspension contract (`AgentSuspended` on the error channel, resumable via `RunOptions.resume`);
@@ -26,18 +26,18 @@ Baton does not own (deferred, see ADR-0001): UI helpers, memory abstractions, ev
 
 `packages/core/src` contains these modules, each namespace-per-file, re-exported from `src/index.ts`:
 
-| Module                | Export namespace  | Purpose                                                                                       |
-| --------------------- | ----------------- | --------------------------------------------------------------------------------------------- |
-| `agent.ts`            | `Agent`           | Agent definition value, `make`, the `stream` primitive, and `generate` derived from it.       |
-| `agent-event.ts`      | `AgentEvent`      | Closed union of loop events plus tagged run errors.                                           |
-| `approvals.ts`        | `Approvals`       | Enforcement point for `Ai.Tool.needsApproval`; `autoApprove`, `denyAll`, and `testLayer`.     |
-| `model-middleware.ts` | `ModelMiddleware` | Interceptor seam for model input (prompt) and output (stream parts); `identityLayer` default. |
-| `model-registry.ts`   | `ModelRegistry`   | Provider-agnostic `LanguageModel` registration/selection.                                     |
-| `model-resilience.ts` | `ModelResilience` | Optional retry seam for model-call failures inside the loop.                                  |
-| `tool-context.ts`     | `ToolContext`     | Per-tool-call ambient context: abort signal, progress emitter, and session identity.          |
-| `tool-executor.ts`    | `ToolExecutor`    | Tool-call execution seam; `fromToolkit` default executor and `testLayer`.                     |
-| `tool-output.ts`      | `ToolOutput`      | Optional spill seam for oversized successful tool outputs.                                    |
-| `turn-policy.ts`      | `TurnPolicy`      | Schedule-inspired turn continuation policy values: `recurs`, `untilToolCall`, `both`, `make`. |
+| Module                | Export namespace  | Purpose                                                                                                   |
+| --------------------- | ----------------- | --------------------------------------------------------------------------------------------------------- |
+| `agent.ts`            | `Agent`           | Agent definition value, `make`, text `stream`/`generate`, and structured `streamObject`/`generateObject`. |
+| `agent-event.ts`      | `AgentEvent`      | Closed union of loop events, including `StructuredOutput`, plus tagged run errors.                        |
+| `approvals.ts`        | `Approvals`       | Enforcement point for `Ai.Tool.needsApproval`; `autoApprove`, `denyAll`, and `testLayer`.                 |
+| `model-middleware.ts` | `ModelMiddleware` | Interceptor seam for model input (prompt) and output (stream parts); `identityLayer` default.             |
+| `model-registry.ts`   | `ModelRegistry`   | Provider-agnostic `LanguageModel` registration/selection.                                                 |
+| `model-resilience.ts` | `ModelResilience` | Optional retry seam for model-call failures inside the loop.                                              |
+| `tool-context.ts`     | `ToolContext`     | Per-tool-call ambient context: abort signal, progress emitter, and session identity.                      |
+| `tool-executor.ts`    | `ToolExecutor`    | Tool-call execution seam; `fromToolkit` default executor and `testLayer`.                                 |
+| `tool-output.ts`      | `ToolOutput`      | Optional spill seam for oversized successful tool outputs.                                                |
+| `turn-policy.ts`      | `TurnPolicy`      | Schedule-inspired turn continuation policy values: `recurs`, `untilToolCall`, `both`, `make`.             |
 
 Module conventions: `Service`/`Interface`/`layer`/`testLayer` pattern; every exported symbol carries an `@experimental` JSDoc tag; errors are `Schema.TaggedErrorClass`; no `Date.now()` anywhere (callers pass timestamps if ever needed — v1 needs none).
 
@@ -51,12 +51,13 @@ Module conventions: `Service`/`Interface`/`layer`/`testLayer` pattern; every exp
 - Successful tool outcomes may be bounded before they become tool-result parts. If `RunOptions.toolOutputMaxBytes` is set, `encodedResult` exceeds that byte limit, and a `ToolOutputStore` is present and chooses to store the overflow, Baton stores `{ result, encodedResult }` out of context and replaces both `result` and `encodedResult` with `ToolOutput { inline, outputPaths }`. Absent/no-op stores and under-limit outputs preserve today's full inline result exactly. Failures are never spilled.
 - After each turn, `TurnCompleted { turn, transcript, usage?, finishReason? }` is emitted with the full chat history — hosts that persist conversation state read it from here. `usage`/`finishReason` come from that turn's transformed `finish` part when the model reported one.
 - If `pendingToolResults` is empty after a turn, the loop emits `Completed { turns, text, transcript, usage? }` and ends — the policy is **not** consulted. `Completed.usage` is the fieldwise cumulative usage across all turns that reported usage.
+- In structured mode (`Agent.streamObject` / `Agent.generateObject`), Baton first runs the normal tool loop unchanged. When the loop would otherwise complete, Baton runs one additional terminal structured turn on the same live `Ai.Chat` using `chat.generateObject({ prompt: objectPrompt, schema, objectName, toolChoice: "none" })`. The terminal turn emits `StructuredOutput { turn, value, content }` immediately before `Completed`. `value` is `unknown` in the event union because the union is closed and non-generic; `Agent.generateObject` returns it typed as the caller's schema type. `content` is the raw structured response parts, including any `finish` part. `Completed.text` remains the accumulated normal streamed text; `Completed.transcript` and `Completed.usage` include the structured exchange. No `TurnStarted`, `ModelPart`, or `TurnCompleted` event is emitted for the non-streaming structured turn; it is represented by `StructuredOutput`.
 - If `pendingToolResults` is non-empty, the loop calls `policy.decide(info)`. `Continue` runs the next turn with `Ai.Prompt.fromResponseParts(pendingToolResults)` as prompt, applying that decision's `overrides` (instructions, model layer, active tools) for that turn only. `Stop` fails the stream with `TurnLimitExceeded { turn, pending }` — pending results are never silently dropped.
 - The default policy is `TurnPolicy.recurs(8)` (an eight-follow-up-turn cap).
 
 ## Usage & telemetry
 
-`AgentEvent.addUsage(a, b)` fieldwise-sums upstream `Ai.Response.Usage` values. Numeric leaves that are absent on both sides stay absent; a value present on either side is summed with the other side treated as zero.
+`AgentEvent.addUsage(a, b)` fieldwise-sums upstream `Ai.Response.Usage` values. Numeric leaves that are absent on both sides stay absent; a value present on either side is summed with the other side treated as zero. Structured-output finish usage contributes to `Completed.usage`; per-turn usage remains on normal `TurnCompleted` events while the structured turn's raw usage remains available in `StructuredOutput.content`.
 
 Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run` with attribute `baton.agent.name`, and each model turn in `Baton.Agent.turn` with attribute `baton.turn`. When a `finish` part is captured, Baton annotates the current turn span with Effect AI GenAI attributes for operation `chat`, reported input/output token totals, and the finish reason.
 
@@ -65,6 +66,7 @@ Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run
 `Agent.RunError` is the error channel of `Agent.stream` and `Agent.generate`: `AgentError | AgentSuspended | TurnLimitExceeded | MiddlewareViolation`. `AgentError` keeps the stable tag `@batonfx/core/AgentError`; `AgentSuspended` keeps the stable tag `@batonfx/core/AgentSuspended`. Consumers match typed tags and structured fields rather than diagnostic strings.
 
 - **`AgentError`** carries `{ message, turn, cause? }` for general loop failures and wrapped external failures. `cause` is an optional `Schema.Defect()` value preserving the live underlying error for host classification.
+- Structured-output generation or schema-decoding failures map to `AgentError` at the terminal structured turn index.
 - **`AgentSuspended`** carries `{ token, reason, tool_call_id, tool_name, tool_params }` when the run must be resumed out-of-band.
 - **`TurnLimitExceeded`** carries `{ turn, pending }` when the policy stops while tool results are pending. `pending` is an array of `{ tool_call_id, tool_name }`.
 - **`MiddlewareViolation`** carries `{ turn, detail }` for host middleware contract bugs such as dropping a `tool-call` part.
@@ -91,6 +93,7 @@ Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run
 - **Tool-call-drop prohibition** — `tool-call` parts may be transformed but MUST NOT be dropped. Dropping a tool-call is a middleware bug; the loop fails the run with `MiddlewareViolation { turn, detail }`.
 - **Error semantics** — a hook that fails on the error channel fails the whole run with that `AgentError` (middleware are host bugs, not model failures). A `transformPrompt` failure fails the turn **before** the model is called — no model call happens.
 - **Placement** — middleware runs **before** the fold that dispatches tool calls and accumulates text, so middleware sees raw model output and everything downstream (`AgentEvent`s, tool dispatch, and any host-side persistence) sees the transformed stream. A durable host that persists model output after this fold therefore persists exactly the transformed/dropped parts: guardrails act **before** durability.
+- **Structured output** — `transformPrompt` applies to the terminal `objectPrompt` with the structured turn index. `transformPart` does not apply to the structured response because the terminal turn uses non-streaming `chat.generateObject`; consumers observe that response via `StructuredOutput.content`.
 
 ## Suspension contract
 

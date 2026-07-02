@@ -15,11 +15,14 @@ import {
 
 type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
 
-const modelLayer = (streamText: ModelParams["streamText"]) =>
+const modelLayer = (
+  streamText: ModelParams["streamText"],
+  generateText: ModelParams["generateText"] = () => Effect.succeed([{ type: "text", text: "unused" }]),
+) =>
   Layer.effect(
     Ai.LanguageModel.LanguageModel,
     Ai.LanguageModel.make({
-      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+      generateText,
       streamText,
     }),
   )
@@ -78,6 +81,8 @@ const usage = (
 
 const finishPart = (reason: Ai.Response.FinishReason, reportedUsage: Ai.Response.Usage) =>
   Ai.Response.makePart("finish", { reason, usage: reportedUsage, response: undefined })
+
+const objectSchema = Schema.Struct({ ok: Schema.Boolean })
 
 const transientModelError = Ai.AiError.make({
   module: "AgentTestLanguageModel",
@@ -506,6 +511,241 @@ describe("Agent", () => {
           }),
           echoExecutor,
           Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("emits StructuredOutput immediately before Completed", () => {
+    const structuredUsage = usage({ total: 3 }, { total: 1, text: 1 })
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "structured-agent" })
+
+      const events = yield* Stream.runCollect(
+        Agent.streamObject(agent, { prompt: "make object", schema: objectSchema }),
+      )
+
+      expect(events.map((event) => event._tag)).toEqual([
+        "TurnStarted",
+        "ModelPart",
+        "TurnCompleted",
+        "StructuredOutput",
+        "Completed",
+      ])
+      const structuredIndex = events.findIndex((event) => event._tag === "StructuredOutput")
+      expect(structuredIndex).toBe(events.length - 2)
+      const structured = events[structuredIndex]
+      if (structured?._tag === "StructuredOutput") {
+        expect(structured.turn).toBe(1)
+        expect(structured.value).toEqual({ ok: true })
+        expect(structured.content.some((part) => part.type === "finish")).toBe(true)
+      }
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") {
+        expect(completed.text).toBe("normal answer")
+        expect(completed.turns).toBe(2)
+        expect(completed.usage).toEqual(structuredUsage)
+        expect(JSON.stringify(completed.transcript.content)).toContain(Agent.defaultObjectPrompt)
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            () => Stream.make(textDelta("normal answer")),
+            () => Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)]),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("generateObject returns the typed structured value", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "generate-object-agent" })
+
+      const result = yield* Agent.generateObject(agent, { prompt: "make typed object", schema: objectSchema })
+
+      expect(result.text).toBe("normal answer")
+      expect(result.turns).toBe(2)
+      expect(result.value).toEqual({ ok: true })
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            () => Stream.make(textDelta("normal answer")),
+            () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    ),
+  )
+
+  it.effect("runs the tool loop before the terminal structured turn", () => {
+    let streamCalls = 0
+    let structuredPrompt = ""
+    const structuredUsage = usage({ total: 5 }, { total: 2 })
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "structured-tool-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(Agent.streamObject(agent, { prompt: "use tool", schema: objectSchema }))
+
+      expect(streamCalls).toBe(2)
+      expect(structuredPrompt).toContain("from model")
+      expect(events.findIndex((event) => event._tag === "ToolExecutionCompleted")).toBeLessThan(
+        events.findIndex((event) => event._tag === "StructuredOutput"),
+      )
+      const structured = events.find((event) => event._tag === "StructuredOutput")
+      if (structured?._tag === "StructuredOutput") {
+        expect(structured.turn).toBe(2)
+        expect(structured.content.some((part) => part.type === "finish")).toBe(true)
+      }
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") {
+        expect(completed.text).toBe("after tool")
+        expect(completed.turns).toBe(3)
+        expect(completed.usage).toEqual(structuredUsage)
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            () => {
+              streamCalls += 1
+              return streamCalls === 1
+                ? Stream.make(toolCallPart("tool-call-structured", "echo", { text: "from model" }))
+                : Stream.make(textDelta("after tool"))
+            },
+            (options) => {
+              structuredPrompt = JSON.stringify(options.prompt.content)
+              return Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)])
+            },
+          ),
+          echoExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("fails AgentError at the structured turn when schema decoding fails", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "structured-decode-agent" })
+
+      const failure = yield* Effect.flip(
+        Stream.runCollect(Agent.streamObject(agent, { prompt: "bad object", schema: objectSchema })),
+      )
+
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      if (failure._tag === "@batonfx/core/AgentError") {
+        expect(failure.turn).toBe(1)
+        expect(Ai.AiError.isAiError(failure.cause)).toBe(true)
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            () => Stream.make(textDelta("normal answer")),
+            () => Effect.succeed([{ type: "text", text: '{"ok":"nope"}' }]),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    ),
+  )
+
+  it.effect("performs the terminal structured turn after resume", () => {
+    let calls = 0
+    let sawResumedToolResult = false
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "resume-structured-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(
+        Agent.streamObject(agent, {
+          prompt: "ignored original prompt",
+          history: [
+            { role: "system", content: "resume history system" },
+            { role: "user", content: [{ type: "text", text: "earlier user input" }] },
+          ],
+          resume: { call: { id: "tool-call-resume-structured", name: "echo", params: { text: "resumed" } } },
+          schema: objectSchema,
+        }),
+      )
+
+      expect(calls).toBe(1)
+      expect(sawResumedToolResult).toBe(true)
+      expect(events.map((event) => event._tag)).toEqual([
+        "ToolExecutionStarted",
+        "ToolExecutionCompleted",
+        "TurnCompleted",
+        "TurnStarted",
+        "ModelPart",
+        "TurnCompleted",
+        "StructuredOutput",
+        "Completed",
+      ])
+      const structured = events.find((event) => event._tag === "StructuredOutput")
+      if (structured?._tag === "StructuredOutput") expect(structured.turn).toBe(2)
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") {
+        expect(completed.text).toBe("after resume")
+        expect(completed.turns).toBe(3)
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            (options) => {
+              calls += 1
+              sawResumedToolResult = sawResumedToolResult || JSON.stringify(options.prompt.content).includes("resumed")
+              return Stream.make(textDelta("after resume"))
+            },
+            () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
+          ),
+          echoExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("uses ModelResilience for the terminal structured turn", () => {
+    let structuredCalls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "resilient-structured-agent" })
+
+      const events = yield* Stream.runCollect(
+        Agent.streamObject(agent, { prompt: "retry object", schema: objectSchema }),
+      )
+
+      expect(structuredCalls).toBe(2)
+      const structured = events.find((event) => event._tag === "StructuredOutput")
+      if (structured?._tag === "StructuredOutput") expect(structured.value).toEqual({ ok: true })
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            () => Stream.make(textDelta("normal answer")),
+            () => {
+              structuredCalls += 1
+              return structuredCalls === 1
+                ? Effect.fail(transientModelError)
+                : Effect.succeed([{ type: "text", text: '{"ok":true}' }])
+            },
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          retryTransientModelError,
           ModelMiddleware.identityLayer,
         ),
       ),

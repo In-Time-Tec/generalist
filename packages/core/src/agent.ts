@@ -1,4 +1,4 @@
-import { Cause, type Duration, Effect, Fiber, Option, Queue, Ref, Stream } from "effect"
+import { Cause, type Duration, Effect, Fiber, Option, Queue, Ref, type Schema, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
 import * as AgentEvent from "./agent-event"
 import * as Approvals from "./approvals"
@@ -70,6 +70,24 @@ export interface RunOptions {
     readonly chatId: string
     readonly timeToLive?: Duration.Input
   }
+}
+
+type ObjectSchema = Schema.Codec<unknown, Record<string, any>, unknown, unknown>
+
+/** @experimental Default prompt for the terminal structured-output turn. */
+export const defaultObjectPrompt = "Return the final structured output for the task above."
+
+/** @experimental Options for a run that ends in a schema-validated result. */
+export interface ObjectRunOptions<StructuredOutputSchema extends ObjectSchema> extends RunOptions {
+  readonly schema: StructuredOutputSchema
+  readonly objectName?: string
+  readonly objectPrompt?: Ai.Prompt.RawInput
+}
+
+interface StructuredRunConfig<StructuredOutputSchema extends ObjectSchema> {
+  readonly schema: StructuredOutputSchema
+  readonly objectName: string
+  readonly objectPrompt: Ai.Prompt.RawInput
 }
 
 /** @experimental The error channel of `stream` and `generate`. */
@@ -172,11 +190,11 @@ const applyPartChain = (
     return current
   })
 
-/** @experimental The one primitive; everything else derives from it. */
-export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
+const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
   agent: Agent<Tools>,
   options: RunOptions,
-): Stream.Stream<AgentEvent.Event, RunError, RunServices> =>
+  structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
+): Stream.Stream<AgentEvent.Event, RunError, RunServices | StructuredOutputSchema["DecodingServices"]> =>
   Stream.unwrap(
     Effect.gen(function* () {
       const executor = yield* ToolExecutor.ToolExecutor
@@ -410,6 +428,26 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
           })
         }).pipe(Effect.orDie)
 
+      const captureStructuredUsage = (content: ReadonlyArray<Ai.Response.Part<any>>): Effect.Effect<void> =>
+        Effect.sync(() => {
+          for (const part of content) {
+            if (part.type === "finish") {
+              state.usage = state.usage === undefined ? part.usage : AgentEvent.addUsage(state.usage, part.usage)
+            }
+          }
+        })
+
+      const withModelResilience = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+        Option.match(resilienceService, {
+          onNone: () => effect,
+          onSome: (resilience) =>
+            Effect.flatMap(Ai.LanguageModel.LanguageModel, (model) =>
+              effect.pipe(
+                Effect.provideService(Ai.LanguageModel.LanguageModel, ModelResilience.apply(model, resilience)),
+              ),
+            ),
+        })
+
       const partEvents = (
         turn: number,
         part: Ai.Response.StreamPart<Record<string, Ai.Tool.Any>>,
@@ -522,11 +560,56 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         ...(state.usage === undefined ? {} : { usage: state.usage }),
       })
 
+      const structuredFinalEvents = (
+        turn: number,
+        config: StructuredRunConfig<StructuredOutputSchema>,
+      ): Stream.Stream<
+        AgentEvent.Event,
+        RunError,
+        Ai.LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
+      > =>
+        Stream.fromEffect(
+          Effect.gen(function* () {
+            const structuredTurn = turn + 1
+            const transformedPrompt = yield* applyPromptChain(chain, Ai.Prompt.make(config.objectPrompt), {
+              agentName: agent.name,
+              turn: structuredTurn,
+            })
+            const response = yield* withModelResilience(
+              chat.generateObject({
+                prompt: transformedPrompt,
+                schema: config.schema,
+                objectName: config.objectName,
+                toolChoice: "none",
+              }),
+            ).pipe(
+              Effect.mapError(
+                (error) =>
+                  new AgentEvent.AgentError({ message: errorMessage(error), turn: structuredTurn, cause: error }),
+              ),
+            )
+            yield* captureStructuredUsage(response.content)
+            yield* savePersisted
+            const transcript = yield* Ref.get(chat.history)
+            const structuredOutput: AgentEvent.StructuredOutput = {
+              _tag: "StructuredOutput",
+              turn: structuredTurn,
+              value: response.value,
+              content: response.content as ReadonlyArray<Ai.Response.Part<Record<string, Ai.Tool.Any>>>,
+            }
+            return [structuredOutput, terminalCompletedEvent(structuredTurn, transcript)]
+          }),
+        ).pipe(Stream.flatMap((events) => Stream.fromIterable<AgentEvent.Event>(events)))
+
       const afterTurn = (
         turn: number,
       ): Effect.Effect<
         {
-          readonly events: Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel>
+          readonly events: Stream.Stream<
+            AgentEvent.Event,
+            RunError,
+            Ai.LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
+          >
           readonly next?: {
             readonly prompt: Ai.Prompt.RawInput
             readonly overrides?: TurnPolicy.TurnOverrides
@@ -539,6 +622,14 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
           const completed: AgentEvent.Event = turnCompletedEvent(turn, transcript)
           const pending = state.pending
           if (pending.length === 0) {
+            if (structured !== undefined) {
+              return {
+                events: Stream.concat(
+                  Stream.fromIterable<AgentEvent.Event>([completed]),
+                  structuredFinalEvents(turn, structured),
+                ),
+              }
+            }
             yield* savePersisted
             return {
               events: Stream.fromIterable<AgentEvent.Event>([completed, terminalCompletedEvent(turn, transcript)]),
@@ -587,7 +678,11 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         turn: number,
         prompt: Ai.Prompt.RawInput,
         overrides?: TurnPolicy.TurnOverrides,
-      ): Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel> => {
+      ): Stream.Stream<
+        AgentEvent.Event,
+        RunError,
+        Ai.LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
+      > => {
         let next:
           | {
               readonly prompt: Ai.Prompt.RawInput
@@ -617,7 +712,11 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
 
       const resumeStream = (
         resume: Resume,
-      ): Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel> => {
+      ): Stream.Stream<
+        AgentEvent.Event,
+        RunError,
+        Ai.LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
+      > => {
         let next:
           | {
               readonly prompt: Ai.Prompt.RawInput
@@ -684,11 +783,34 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
     }),
   ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } }))
 
+/** @experimental The text primitive; everything else derives from it. */
+export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
+  agent: Agent<Tools>,
+  options: RunOptions,
+): Stream.Stream<AgentEvent.Event, RunError, RunServices> =>
+  streamInternal(agent, options, undefined) as Stream.Stream<AgentEvent.Event, RunError, RunServices>
+
+/** @experimental `stream` plus one terminal structured-output turn before `Completed`. */
+export const streamObject = <Tools extends Record<string, Ai.Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
+  agent: Agent<Tools>,
+  options: ObjectRunOptions<StructuredOutputSchema>,
+): Stream.Stream<AgentEvent.Event, RunError, RunServices | StructuredOutputSchema["DecodingServices"]> =>
+  streamInternal(agent, options, {
+    schema: options.schema,
+    objectName: options.objectName ?? "output",
+    objectPrompt: options.objectPrompt ?? defaultObjectPrompt,
+  })
+
 /** @experimental Result of a non-streaming run. */
 export interface Result {
   readonly text: string
   readonly turns: number
   readonly transcript: Ai.Prompt.Prompt
+}
+
+/** @experimental Result of a non-streaming structured-output run. */
+export interface ObjectResult<A> extends Result {
+  readonly value: A
 }
 
 /** @experimental `stream` folded to its `Completed` event. */
@@ -705,6 +827,58 @@ export const generate = <Tools extends Record<string, Ai.Tool.Any>>(
           event._tag === "Completed"
             ? Effect.succeed({ text: event.text, turns: event.turns, transcript: event.transcript })
             : Effect.fail(new AgentEvent.AgentError({ message: "Agent run ended without a Completed event", turn: 0 })),
+      }),
+    ),
+  )
+
+/** @experimental `streamObject` folded to its `StructuredOutput` and `Completed` events. */
+export const generateObject = <Tools extends Record<string, Ai.Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
+  agent: Agent<Tools>,
+  options: ObjectRunOptions<StructuredOutputSchema>,
+): Effect.Effect<
+  ObjectResult<StructuredOutputSchema["Type"]>,
+  RunError,
+  RunServices | StructuredOutputSchema["DecodingServices"]
+> =>
+  Stream.runFold(
+    streamObject(agent, options),
+    () => ({
+      value: Option.none<StructuredOutputSchema["Type"]>(),
+      completed: Option.none<AgentEvent.Completed>(),
+    }),
+    (acc, event) => {
+      if (event._tag === "StructuredOutput") {
+        return { ...acc, value: Option.some(event.value as StructuredOutputSchema["Type"]) }
+      }
+      if (event._tag === "Completed") {
+        return { ...acc, completed: Option.some(event) }
+      }
+      return acc
+    },
+  ).pipe(
+    Effect.flatMap(({ value, completed }) =>
+      Option.match(completed, {
+        onNone: () =>
+          Effect.fail(
+            new AgentEvent.AgentError({ message: "Agent object run ended without a Completed event", turn: 0 }),
+          ),
+        onSome: (event) =>
+          Option.match(value, {
+            onNone: () =>
+              Effect.fail(
+                new AgentEvent.AgentError({
+                  message: "Agent object run ended without a StructuredOutput event",
+                  turn: 0,
+                }),
+              ),
+            onSome: (typedValue) =>
+              Effect.succeed({
+                text: event.text,
+                turns: event.turns,
+                transcript: event.transcript,
+                value: typedValue,
+              }),
+          }),
       }),
     ),
   )

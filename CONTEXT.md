@@ -8,14 +8,14 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 
 ## Domain model
 
-- **Agent**: an agent definition value (name, instructions, toolkit, model, turn policy) carrying its own defaults. `Agent.make` builds it; `Agent.stream` is the loop primitive and `Agent.generate` is derived from it. An Agent is not a user, bot, or account.
+- **Agent**: an agent definition value (name, instructions, toolkit, model, turn policy) carrying its own defaults. `Agent.make` builds it; `Agent.stream` is the text loop primitive, `Agent.generate` is derived from it, and `Agent.streamObject` / `Agent.generateObject` run the same loop followed by one terminal structured-output turn. An Agent is not a user, bot, or account.
 - **Turn**: one model call plus the sequential execution of the tool calls it emits. Turn 0 always runs; follow-up turns re-feed tool results via `Ai.Prompt.fromResponseParts(...)`.
 - **TurnPolicy**: a plain, `Schedule`-inspired value (not a service) that decides whether to run another turn when tool results are pending. Constructors: `recurs`, `untilToolCall`, `both`, `make`. Default `recurs(8)`.
 - **ToolExecutor**: the tool-call execution seam. `execute(request) => Effect<Outcome>` where `Outcome` is `Success | Failure | Suspend`. Default `fromToolkit` runs the toolkit's own handlers in-process; hosts swap in their own.
 - **ToolContext**: the per-call ambient service provided while a framework-executed tool is running. It carries the run `sessionId`, an `AbortSignal` that is aborted when the run/tool scope is interrupted, and `emit(progress)` for in-flight progress updates.
 - **ToolOutputStore**: the optional spill seam for oversized successful tool outputs. Baton can store the full output out of context and re-feed a bounded inline `ToolOutput` envelope with `outputPaths`; absent or no-op stores preserve inline results unchanged.
 - **Approvals**: the enforcement point for `Ai.Tool.needsApproval` (which `effect/unstable/ai` declares but never enforces). `check(request) => Effect<Decision>` where `Decision` is `Approved | Denied | Pending`. `Denied` re-feeds a failed tool result; `Pending` suspends the run.
-- **AgentEvent**: the closed union of loop events hosts observe and optionally persist (`ModelPart`, `TurnStarted`, `TurnCompleted`, `ApprovalRequested`, `Completed`, tool execution and progress events).
+- **AgentEvent**: the closed union of loop events hosts observe and optionally persist (`ModelPart`, `TurnStarted`, `TurnCompleted`, `StructuredOutput`, `ApprovalRequested`, `Completed`, tool execution and progress events).
 - **AgentError**: a `Schema.TaggedErrorClass` for loop failures (policy stop with pending results, middleware bugs, misconfiguration).
 - **AgentSuspended**: a typed error on the stream's error channel signalling the run did not finish and must be re-entered via `RunOptions.resume` once the host resolves the suspension `token`. Reasons: `tool-wait` (from a `Suspend` outcome) or `approval` (from a `Pending` decision).
 - **ModelRegistry**: the provider-agnostic registry that maps a model selection to a concrete Effect AI `LanguageModel` layer. Missing registrations fail typed, not silently.

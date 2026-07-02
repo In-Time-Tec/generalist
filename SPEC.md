@@ -19,10 +19,10 @@ SPEC.md
 
 ## Packages
 
-| Package         | npm             | Directory       | Purpose                                                                                                                                                                         |
-| --------------- | --------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@batonfx/core` | `@batonfx/core` | `packages/core` | The Effect-native agent loop: Agent, TurnPolicy, ToolExecutor, ToolContext, ToolOutputStore, Approvals, ModelRegistry, ModelResilience, ModelMiddleware, chat persistence seam. |
-| `@batonfx/mcp`  | `@batonfx/mcp`  | `packages/mcp`  | MCP client bridge: discover an MCP server's tools as an `Ai.Toolkit` plus a Baton `ToolExecutor` adapter (`@batonfx/mcp/baton`).                                                |
+| Package         | npm             | Directory       | Purpose                                                                                                                                                                                            |
+| --------------- | --------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@batonfx/core` | `@batonfx/core` | `packages/core` | The Effect-native agent loop: Agent, structured output, TurnPolicy, ToolExecutor, ToolContext, ToolOutputStore, Approvals, ModelRegistry, ModelResilience, ModelMiddleware, chat persistence seam. |
+| `@batonfx/mcp`  | `@batonfx/mcp`  | `packages/mcp`  | MCP client bridge: discover an MCP server's tools as an `Ai.Toolkit` plus a Baton `ToolExecutor` adapter (`@batonfx/mcp/baton`).                                                                   |
 
 ## Feature branches
 
