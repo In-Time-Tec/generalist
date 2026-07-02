@@ -80,7 +80,28 @@ export type Event =
 export class AgentError extends Schema.TaggedErrorClass<AgentError>()("@batonfx/core/AgentError", {
   message: Schema.String,
   turn: Schema.Number,
+  cause: Schema.optionalKey(Schema.Defect()),
 }) {}
+
+/** @experimental The turn policy declined another turn while tool results were still pending. */
+export class TurnLimitExceeded extends Schema.TaggedErrorClass<TurnLimitExceeded>()("@batonfx/core/TurnLimitExceeded", {
+  turn: Schema.Number,
+  pending: Schema.Array(
+    Schema.Struct({
+      tool_call_id: Schema.String,
+      tool_name: Schema.String,
+    }),
+  ),
+}) {}
+
+/** @experimental A ModelMiddleware hook violated the loop contract. */
+export class MiddlewareViolation extends Schema.TaggedErrorClass<MiddlewareViolation>()(
+  "@batonfx/core/MiddlewareViolation",
+  {
+    turn: Schema.Number,
+    detail: Schema.String,
+  },
+) {}
 
 /**
  * @experimental The run suspended: a tool outcome was `Suspend` or an approval

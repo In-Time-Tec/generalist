@@ -65,7 +65,12 @@ export interface RunOptions {
   }
 }
 
-type RunError = AgentEvent.AgentError | AgentEvent.AgentSuspended
+/** @experimental The error channel of `stream` and `generate`. */
+export type RunError =
+  | AgentEvent.AgentError
+  | AgentEvent.AgentSuspended
+  | AgentEvent.TurnLimitExceeded
+  | AgentEvent.MiddlewareViolation
 
 type RunServices =
   | Ai.LanguageModel.LanguageModel
@@ -194,7 +199,9 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
                       : { timeToLive: persistenceOptions.timeToLive },
                   )
                   .pipe(
-                    Effect.mapError((error) => new AgentEvent.AgentError({ message: errorMessage(error), turn: 0 })),
+                    Effect.mapError(
+                      (error) => new AgentEvent.AgentError({ message: errorMessage(error), turn: 0, cause: error }),
+                    ),
                   ),
             })
 
@@ -217,7 +224,9 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         persisted === undefined
           ? Effect.void
           : persisted.save.pipe(
-              Effect.mapError((error) => new AgentEvent.AgentError({ message: errorMessage(error), turn: 0 })),
+              Effect.mapError(
+                (error) => new AgentEvent.AgentError({ message: errorMessage(error), turn: 0, cause: error }),
+              ),
             )
 
       const failSuspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "approval") =>
@@ -295,7 +304,7 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         part: Ai.Response.StreamPart<Record<string, Ai.Tool.Any>>,
       ): Stream.Stream<AgentEvent.Event, RunError> => {
         if (part.type === "error") {
-          return Stream.fail(new AgentEvent.AgentError({ message: errorMessage(part.error), turn }))
+          return Stream.fail(new AgentEvent.AgentError({ message: errorMessage(part.error), turn, cause: part.error }))
         }
         const modelPart = Stream.fromIterable<AgentEvent.Event>([{ _tag: "ModelPart", turn, part }])
         if (part.type === "tool-call") {
@@ -324,7 +333,10 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
                 onNone: (): Stream.Stream<AgentEvent.Event, RunError> =>
                   part.type === "tool-call"
                     ? Stream.fail(
-                        new AgentEvent.AgentError({ message: "ModelMiddleware dropped a tool-call part", turn }),
+                        new AgentEvent.MiddlewareViolation({
+                          turn,
+                          detail: "ModelMiddleware dropped a tool-call part",
+                        }),
                       )
                     : Stream.empty,
               }),
@@ -391,9 +403,12 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
               return Stream.concat(
                 Stream.fromIterable<AgentEvent.Event>([completed]),
                 Stream.fail(
-                  new AgentEvent.AgentError({
-                    message: "Turn policy stopped with pending tool results",
+                  new AgentEvent.TurnLimitExceeded({
                     turn: turn + 1,
+                    pending: pending.map((result) => ({
+                      tool_call_id: result.id,
+                      tool_name: result.name,
+                    })),
                   }),
                 ),
               )

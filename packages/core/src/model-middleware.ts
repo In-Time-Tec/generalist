@@ -19,7 +19,7 @@ export interface Middleware {
    * Transform or drop a model stream part before the loop processes it.
    * Return `Option.none()` to drop the part (it is not folded, not emitted, not persisted).
    * Tool-call parts may be transformed but MUST NOT be dropped — dropping a tool-call
-   * is a middleware bug; the loop fails the run with AgentError if it happens.
+   * is a middleware bug; the loop fails the run with MiddlewareViolation if it happens.
    */
   readonly transformPart?: (
     part: Ai.Response.StreamPart<any>,

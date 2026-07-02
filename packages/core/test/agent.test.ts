@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor, TurnPolicy } from "../src/index"
+import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor, TurnPolicy } from "../src/index"
 
 type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
 
@@ -46,6 +46,13 @@ const toolCallPart = (id: string, name: string, params: unknown) =>
 const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
 
 describe("Agent", () => {
+  it("constructs AgentError without a cause", () => {
+    const error = new AgentEvent.AgentError({ message: "boom", turn: 0 })
+
+    expect(error._tag).toBe("@batonfx/core/AgentError")
+    expect(error.cause).toBeUndefined()
+  })
+
   it.effect("runs an agent turn and emits loop events", () =>
     Effect.gen(function* () {
       const agent = Agent.make({
@@ -127,8 +134,9 @@ describe("Agent", () => {
     )
   })
 
-  it.effect("fails typed on in-band stream error parts", () =>
-    Effect.gen(function* () {
+  it.effect("fails typed on in-band stream error parts", () => {
+    const streamError = new Error("stream exploded")
+    return Effect.gen(function* () {
       const agent = Agent.make({ name: "error-agent" })
 
       const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "relay input" })))
@@ -136,22 +144,20 @@ describe("Agent", () => {
       expect(failure._tag).toBe("@batonfx/core/AgentError")
       expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toContain("stream exploded")
       expect(failure._tag === "@batonfx/core/AgentError" && failure.turn).toBe(0)
+      expect(failure._tag === "@batonfx/core/AgentError" && failure.cause).toBe(streamError)
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
           modelLayer(() =>
-            Stream.fromIterable([
-              textDelta("partial"),
-              Ai.Response.makePart("error", { error: new Error("stream exploded") }),
-            ]),
+            Stream.fromIterable([textDelta("partial"), Ai.Response.makePart("error", { error: streamError })]),
           ),
           unusedExecutor,
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
         ),
       ),
-    ),
-  )
+    )
+  })
 
   it.effect("fails typed when the stream channel fails", () => {
     const streamFailure = Ai.AiError.make({
@@ -166,6 +172,7 @@ describe("Agent", () => {
 
       expect(failure._tag).toBe("@batonfx/core/AgentError")
       expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toContain("stream channel exploded")
+      expect(failure._tag === "@batonfx/core/AgentError" && failure.cause).toBe(streamFailure)
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
@@ -184,16 +191,17 @@ describe("Agent", () => {
       const agent = Agent.make({
         name: "policy-stop-agent",
         toolkit: Ai.Toolkit.make(echoTool),
-        policy: TurnPolicy.recurs(1),
+        policy: TurnPolicy.recurs(0),
       })
 
       const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "loop forever" })))
 
-      expect(calls).toBe(2)
-      expect(failure._tag).toBe("@batonfx/core/AgentError")
-      expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
-        "Turn policy stopped with pending tool results",
-      )
+      expect(calls).toBe(1)
+      expect(failure._tag).toBe("@batonfx/core/TurnLimitExceeded")
+      if (failure._tag === "@batonfx/core/TurnLimitExceeded") {
+        expect(failure.turn).toBe(1)
+        expect(failure.pending).toEqual([{ tool_call_id: "tool-call-1", tool_name: "echo" }])
+      }
     }).pipe(
       Effect.provide(
         Layer.mergeAll(

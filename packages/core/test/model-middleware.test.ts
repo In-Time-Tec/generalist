@@ -198,8 +198,11 @@ describe("ModelMiddleware", () => {
 
       const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" })))
 
-      expect(failure._tag).toBe("@batonfx/core/AgentError")
-      expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toContain("dropped a tool-call")
+      expect(failure._tag).toBe("@batonfx/core/MiddlewareViolation")
+      if (failure._tag === "@batonfx/core/MiddlewareViolation") {
+        expect(failure.turn).toBe(0)
+        expect(failure.detail).toContain("tool-call")
+      }
     }).pipe(
       Effect.provide(
         Layer.mergeAll(

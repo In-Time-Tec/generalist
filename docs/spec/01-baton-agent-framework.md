@@ -29,7 +29,7 @@ Baton does not own (deferred, see ADR-0001): UI helpers, memory abstractions, ev
 | Module                | Export namespace  | Purpose                                                                                       |
 | --------------------- | ----------------- | --------------------------------------------------------------------------------------------- |
 | `agent.ts`            | `Agent`           | Agent definition value, `make`, the `stream` primitive, and `generate` derived from it.       |
-| `agent-event.ts`      | `AgentEvent`      | Closed union of loop events plus `AgentError` and `AgentSuspended` tagged errors.             |
+| `agent-event.ts`      | `AgentEvent`      | Closed union of loop events plus tagged run errors.                                           |
 | `approvals.ts`        | `Approvals`       | Enforcement point for `Ai.Tool.needsApproval`; `autoApprove`, `denyAll`, and `testLayer`.     |
 | `model-middleware.ts` | `ModelMiddleware` | Interceptor seam for model input (prompt) and output (stream parts); `identityLayer` default. |
 | `model-registry.ts`   | `ModelRegistry`   | Provider-agnostic `LanguageModel` registration/selection.                                     |
@@ -45,8 +45,17 @@ Module conventions: `Service`/`Interface`/`layer`/`testLayer` pattern; every exp
 - `tool-call` stream parts are executed sequentially in stream order: approval gating first (when the tool declares `needsApproval`), then `ToolExecutor.execute`. Outcomes map to tool-result parts (`Success` → `isFailure: false`, `Failure` → `isFailure: true` with `{ error: message }`) that are collected as the turn's `pendingToolResults` and re-fed to the model on the next turn.
 - After each turn, `TurnCompleted { turn, transcript }` is emitted with the full chat history — hosts that persist conversation state read it from here.
 - If `pendingToolResults` is empty after a turn, the loop emits `Completed { turns, text, transcript }` and ends — the policy is **not** consulted.
-- If `pendingToolResults` is non-empty, the loop calls `policy.decide(info)`. `Continue` runs the next turn with `Ai.Prompt.fromResponseParts(pendingToolResults)` as prompt, applying that decision's `overrides` (instructions, model layer, active tools) for that turn only. `Stop` fails the stream with `AgentError { message: "Turn policy stopped with pending tool results", turn }` — pending results are never silently dropped.
+- If `pendingToolResults` is non-empty, the loop calls `policy.decide(info)`. `Continue` runs the next turn with `Ai.Prompt.fromResponseParts(pendingToolResults)` as prompt, applying that decision's `overrides` (instructions, model layer, active tools) for that turn only. `Stop` fails the stream with `TurnLimitExceeded { turn, pending }` — pending results are never silently dropped.
 - The default policy is `TurnPolicy.recurs(8)` (an eight-follow-up-turn cap).
+
+## Run errors
+
+`Agent.RunError` is the error channel of `Agent.stream` and `Agent.generate`: `AgentError | AgentSuspended | TurnLimitExceeded | MiddlewareViolation`. `AgentError` keeps the stable tag `@batonfx/core/AgentError`; `AgentSuspended` keeps the stable tag `@batonfx/core/AgentSuspended`. Consumers match typed tags and structured fields rather than diagnostic strings.
+
+- **`AgentError`** carries `{ message, turn, cause? }` for general loop failures and wrapped external failures. `cause` is an optional `Schema.Defect()` value preserving the live underlying error for host classification.
+- **`AgentSuspended`** carries `{ token, reason, tool_call_id, tool_name, tool_params }` when the run must be resumed out-of-band.
+- **`TurnLimitExceeded`** carries `{ turn, pending }` when the policy stops while tool results are pending. `pending` is an array of `{ tool_call_id, tool_name }`.
+- **`MiddlewareViolation`** carries `{ turn, detail }` for host middleware contract bugs such as dropping a `tool-call` part.
 
 ## Service seams
 
@@ -64,7 +73,7 @@ Module conventions: `Service`/`Interface`/`layer`/`testLayer` pattern; every exp
   - `transformPart(part, context) => Effect<Option<Ai.Response.StreamPart>, AgentError>` — transform or drop a single model stream part before the loop processes it. `Option.none()` drops the part: it is not folded, not emitted as `ModelPart`, not persisted.
   - `context` is `TurnContext { agentName, turn }` (0-based turn).
 - **Ordering** — `transformPrompt` hooks run in array order (`m2(m1(prompt))`). `transformPart` hooks run in array order; the first hook that returns `Option.none()` short-circuits — remaining hooks are skipped and the part is dropped.
-- **Tool-call-drop prohibition** — `tool-call` parts may be transformed but MUST NOT be dropped. Dropping a tool-call is a middleware bug; the loop fails the run with `AgentError { message: "ModelMiddleware dropped a tool-call part", turn }`.
+- **Tool-call-drop prohibition** — `tool-call` parts may be transformed but MUST NOT be dropped. Dropping a tool-call is a middleware bug; the loop fails the run with `MiddlewareViolation { turn, detail }`.
 - **Error semantics** — a hook that fails on the error channel fails the whole run with that `AgentError` (middleware are host bugs, not model failures). A `transformPrompt` failure fails the turn **before** the model is called — no model call happens.
 - **Placement** — middleware runs **before** the fold that dispatches tool calls and accumulates text, so middleware sees raw model output and everything downstream (`AgentEvent`s, tool dispatch, and any host-side persistence) sees the transformed stream. A durable host that persists model output after this fold therefore persists exactly the transformed/dropped parts: guardrails act **before** durability.
 
@@ -93,7 +102,7 @@ Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, 
 
 **System-message seeding.** On a persisted chat, inspect `yield* Ref.get(chat.history)`. If the history is empty, prepend Baton's system message by including it in the **first turn's** prompt (`Ai.Prompt.fromMessages([system, ...user])`). If the history is non-empty, do **not** re-add the system message — it is already stored from the first run. This keeps stored history self-contained and prevents duplicate system messages accumulating run over run.
 
-**Save points.** `Persisted` saves history to the backing store as part of each text-generation call (happy path), plus Baton issues one explicit `chat.save` in two places: (a) after the final turn, before emitting `Completed`; (b) before propagating `AgentSuspended`, so a suspended conversation's history — including the pending tool call — survives to the resume. `PersistenceError`/`AiError` from `save` or `getOrCreate` map to `AgentError` with the cause message.
+**Save points.** `Persisted` saves history to the backing store as part of each text-generation call (happy path), plus Baton issues one explicit `chat.save` in two places: (a) after the final turn, before emitting `Completed`; (b) before propagating `AgentSuspended`, so a suspended conversation's history — including the pending tool call — survives to the resume. `PersistenceError`/`AiError` from `save` or `getOrCreate` map to `AgentError` with the cause message and `cause` value.
 
 **Mutual exclusivity.** `RunOptions.history` (in-memory transcript continuation) and `RunOptions.persistence` are mutually exclusive — both set fails immediately with `AgentError({ message: "RunOptions.history and RunOptions.persistence are mutually exclusive" })`. `ChatNotFoundError` cannot occur because Baton uses `getOrCreate`.
 
