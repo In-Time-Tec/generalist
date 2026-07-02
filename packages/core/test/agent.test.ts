@@ -43,6 +43,9 @@ const unusedExecutor = ToolExecutor.testLayer({
 const toolCallPart = (id: string, name: string, params: unknown) =>
   Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
+const providerToolCallPart = (id: string, name: string, params: unknown) =>
+  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: true })
+
 const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
 
 const usage = (
@@ -455,6 +458,180 @@ describe("Agent", () => {
           }),
           echoExecutor,
           Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("passes provider-executed tool calls through without local gating or execution", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "provider-tool-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "provider already handled it" }))
+
+      expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "TurnCompleted", "Completed"])
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(false)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
+      const modelPart = events.find((event) => event._tag === "ModelPart")
+      if (modelPart?._tag === "ModelPart" && modelPart.part.type === "tool-call") {
+        expect(modelPart.part.providerExecuted).toBe(true)
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => Stream.make(providerToolCallPart("provider-call", "gated", { text: "done upstream" }))),
+          unusedExecutor,
+          Approvals.testLayer({ check: () => Effect.die("approvals must not be consulted") }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    ),
+  )
+
+  it.effect("evaluates needsApproval functions and executes when they return false", () => {
+    let calls = 0
+    let executed = 0
+    let sawParams: unknown
+    let sawToolCallId = ""
+    let sawMessages = ""
+    const dynamicTool = Ai.Tool.make("dynamic", {
+      description: "Dynamic approval test tool",
+      parameters: Schema.Struct({ amount: Schema.Number }),
+      success: Schema.Unknown,
+      needsApproval: (params, context) => {
+        sawParams = params
+        sawToolCallId = context.toolCallId
+        sawMessages = JSON.stringify(context.messages)
+        return params.amount > 100
+      },
+    })
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "dynamic-approval-agent", toolkit: Ai.Toolkit.make(dynamicTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "safe amount" }))
+
+      expect(executed).toBe(1)
+      expect(sawParams).toEqual({ amount: 10 })
+      expect(sawToolCallId).toBe("tool-call-dynamic-safe")
+      expect(sawMessages).toContain("safe amount")
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(false)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-dynamic-safe", "dynamic", { amount: 10 }))
+              : Stream.make(textDelta("safe executed"))
+          }),
+          ToolExecutor.testLayer({
+            execute: () => {
+              executed += 1
+              return Effect.succeed({ _tag: "Success", result: { ok: true }, encodedResult: { ok: true } })
+            },
+          }),
+          Approvals.testLayer({ check: () => Effect.die("approvals must not be consulted") }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("evaluates needsApproval functions and gates when they return true", () => {
+    let calls = 0
+    let approvals = 0
+    const dynamicTool = Ai.Tool.make("dynamic-gated", {
+      description: "Dynamic approval gated test tool",
+      parameters: Schema.Struct({ amount: Schema.Number }),
+      success: Schema.Unknown,
+      needsApproval: (params) => params.amount > 100,
+    })
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "dynamic-gated-agent", toolkit: Ai.Toolkit.make(dynamicTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "large amount" }))
+
+      expect(approvals).toBe(1)
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-dynamic-gated", "dynamic-gated", { amount: 500 }))
+              : Stream.make(textDelta("saw denial"))
+          }),
+          unusedExecutor,
+          Approvals.testLayer({
+            check: () => {
+              approvals += 1
+              return Effect.succeed({ _tag: "Denied" })
+            },
+          }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("fails closed when needsApproval functions throw or fail", () => {
+    let approvals = 0
+    let calls = 0
+    const failingNeedsApproval = (() => Effect.fail(new Error("approval predicate failed"))) as unknown as (
+      params: { readonly amount: number },
+      context: Ai.Tool.NeedsApprovalContext,
+    ) => boolean
+    const throwingTool = Ai.Tool.make("throwing-approval", {
+      description: "Throwing approval test tool",
+      parameters: Schema.Struct({ amount: Schema.Number }),
+      success: Schema.Unknown,
+      needsApproval: () => {
+        throw new Error("approval predicate exploded")
+      },
+    })
+    const failingTool = Ai.Tool.make("failing-approval", {
+      description: "Failing approval test tool",
+      parameters: Schema.Struct({ amount: Schema.Number }),
+      success: Schema.Unknown,
+      needsApproval: failingNeedsApproval,
+    })
+    return Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "fail-closed-agent",
+        toolkit: Ai.Toolkit.make(throwingTool, failingTool),
+      })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "needs approval fail closed" }))
+
+      expect(approvals).toBe(2)
+      expect(events.filter((event) => event._tag === "ApprovalRequested")).toHaveLength(2)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.fromIterable([
+                  toolCallPart("tool-call-throwing", "throwing-approval", { amount: 1 }),
+                  toolCallPart("tool-call-failing", "failing-approval", { amount: 1 }),
+                ])
+              : Stream.make(textDelta("saw denied dynamic approvals"))
+          }),
+          unusedExecutor,
+          Approvals.testLayer({
+            check: () => {
+              approvals += 1
+              return Effect.succeed({ _tag: "Denied" })
+            },
+          }),
           ModelMiddleware.identityLayer,
         ),
       ),

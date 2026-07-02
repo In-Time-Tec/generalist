@@ -118,8 +118,19 @@ const suspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "appr
 const withSystem = (instructions: string, prompt: Ai.Prompt.Prompt): Ai.Prompt.Prompt =>
   Ai.Prompt.fromMessages([Ai.Prompt.makeMessage("system", { content: instructions }), ...prompt.content])
 
-const isGated = (tool: Ai.Tool.Any | undefined) =>
-  tool !== undefined && (tool.needsApproval === true || typeof tool.needsApproval === "function")
+const approvalRequired = (
+  tool: Ai.Tool.Any | undefined,
+  call: AnyToolCall,
+  messages: ReadonlyArray<Ai.Prompt.Message>,
+): Effect.Effect<boolean> => {
+  const needsApproval = tool?.needsApproval
+  if (needsApproval === undefined) return Effect.succeed(false)
+  if (typeof needsApproval === "boolean") return Effect.succeed(needsApproval)
+  return Effect.suspend(() => {
+    const result = needsApproval(call.params as never, { toolCallId: call.id, messages })
+    return Effect.isEffect(result) ? result : Effect.succeed(result)
+  }).pipe(Effect.catchCause(() => Effect.succeed(true)))
+}
 
 /** Fold the prompt through every `transformPrompt` hook in array order. */
 const applyPromptChain = (
@@ -275,30 +286,40 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
           ),
         )
 
-      const toolCallEvents = (turn: number, call: AnyToolCall): Stream.Stream<AgentEvent.Event, RunError> => {
+      const toolCallEvents = (
+        turn: number,
+        call: AnyToolCall,
+        messages: ReadonlyArray<Ai.Prompt.Message>,
+      ): Stream.Stream<AgentEvent.Event, RunError> => {
         const request: ToolExecutor.Request = { call, turn, agentName: agent.name }
         const tool = agent.toolkit.tools[call.name] as Ai.Tool.Any | undefined
-        if (!isGated(tool)) return executeApproved(turn, call, request)
-        return Stream.concat(
-          Stream.fromIterable<AgentEvent.Event>([{ _tag: "ApprovalRequested", turn, call }]),
-          Stream.unwrap(
-            approvals.check(request).pipe(
-              Effect.map((decision): Stream.Stream<AgentEvent.Event, RunError> => {
-                switch (decision._tag) {
-                  case "Approved":
-                    return executeApproved(turn, call, request)
-                  case "Denied": {
-                    const result = failedResult(call, decision.reason ?? "Tool call denied")
-                    state.pending.push(result)
-                    return Stream.fromIterable<AgentEvent.Event>([
-                      { _tag: "ToolExecutionCompleted", turn, call, result },
-                    ])
-                  }
-                  case "Pending":
-                    return failSuspended(call, decision.token, "approval")
-                }
-              }),
-            ),
+        return Stream.unwrap(
+          approvalRequired(tool, call, messages).pipe(
+            Effect.map((isRequired): Stream.Stream<AgentEvent.Event, RunError> => {
+              if (!isRequired) return executeApproved(turn, call, request)
+              return Stream.concat(
+                Stream.fromIterable<AgentEvent.Event>([{ _tag: "ApprovalRequested", turn, call }]),
+                Stream.unwrap(
+                  approvals.check(request).pipe(
+                    Effect.map((decision): Stream.Stream<AgentEvent.Event, RunError> => {
+                      switch (decision._tag) {
+                        case "Approved":
+                          return executeApproved(turn, call, request)
+                        case "Denied": {
+                          const result = failedResult(call, decision.reason ?? "Tool call denied")
+                          state.pending.push(result)
+                          return Stream.fromIterable<AgentEvent.Event>([
+                            { _tag: "ToolExecutionCompleted", turn, call, result },
+                          ])
+                        }
+                        case "Pending":
+                          return failSuspended(call, decision.token, "approval")
+                      }
+                    }),
+                  ),
+                ),
+              )
+            }),
           ),
         )
       }
@@ -324,13 +345,17 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
       const partEvents = (
         turn: number,
         part: Ai.Response.StreamPart<Record<string, Ai.Tool.Any>>,
+        messages: ReadonlyArray<Ai.Prompt.Message>,
       ): Stream.Stream<AgentEvent.Event, RunError> => {
         if (part.type === "error") {
           return Stream.fail(new AgentEvent.AgentError({ message: errorMessage(part.error), turn, cause: part.error }))
         }
         const modelPart = Stream.fromIterable<AgentEvent.Event>([{ _tag: "ModelPart", turn, part }])
         if (part.type === "tool-call") {
-          return Stream.concat(modelPart, toolCallEvents(turn, part as AnyToolCall))
+          const call = part as AnyToolCall
+          return call.providerExecuted === true
+            ? modelPart
+            : Stream.concat(modelPart, toolCallEvents(turn, call, messages))
         }
         if (part.type === "text-delta") {
           state.text = `${state.text}${part.delta}`
@@ -348,13 +373,14 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
       const applyPartToEvents = (
         turn: number,
         part: Ai.Response.StreamPart<any>,
+        messages: ReadonlyArray<Ai.Prompt.Message>,
       ): Stream.Stream<AgentEvent.Event, RunError> =>
         Stream.unwrap(
           applyPartChain(chain, part, { agentName: agent.name, turn }).pipe(
             Effect.map(
               Option.match({
                 onSome: (transformed) =>
-                  partEvents(turn, transformed as Ai.Response.StreamPart<Record<string, Ai.Tool.Any>>),
+                  partEvents(turn, transformed as Ai.Response.StreamPart<Record<string, Ai.Tool.Any>>, messages),
                 onNone: (): Stream.Stream<AgentEvent.Event, RunError> =>
                   part.type === "tool-call"
                     ? Stream.fail(
@@ -382,12 +408,17 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         const toolkit = overrides?.activeTools === undefined ? agent.toolkit : activeToolkit(overrides.activeTools)
         const parts = Stream.unwrap(
           applyPromptChain(chain, Ai.Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
-            Effect.map((transformedPrompt) =>
-              chat.streamText({ prompt: transformedPrompt, toolkit, disableToolCallResolution: true }).pipe(
-                Stream.catchCause((cause) =>
-                  Stream.make(Ai.Response.makePart("error", { error: Cause.squash(cause) })),
-                ),
-                Stream.flatMap((part) => applyPartToEvents(turn, part as Ai.Response.StreamPart<any>)),
+            Effect.flatMap((transformedPrompt) =>
+              Ref.get(chat.history).pipe(
+                Effect.map((history) => {
+                  const messages = Ai.Prompt.concat(history, transformedPrompt).content
+                  return chat.streamText({ prompt: transformedPrompt, toolkit, disableToolCallResolution: true }).pipe(
+                    Stream.catchCause((cause) =>
+                      Stream.make(Ai.Response.makePart("error", { error: Cause.squash(cause) })),
+                    ),
+                    Stream.flatMap((part) => applyPartToEvents(turn, part as Ai.Response.StreamPart<any>, messages)),
+                  )
+                }),
               ),
             ),
           ),
@@ -519,7 +550,11 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
           providerExecuted: false,
         })
         const currentTurn = resetTurnState(0).pipe(
-          Stream.concat(toolCallEvents(0, call)),
+          Stream.concat(
+            Stream.unwrap(
+              Ref.get(chat.history).pipe(Effect.map((history) => toolCallEvents(0, call, history.content))),
+            ),
+          ),
           Stream.concat(
             Stream.unwrap(
               afterTurn(0).pipe(
