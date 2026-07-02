@@ -12,7 +12,7 @@ Baton owns:
 
 - the model-turn loop: build an `Ai.Chat`, call `chat.streamText({ prompt, toolkit, disableToolCallResolution: true })`, fold stream parts, execute tool calls, re-feed tool results via `Ai.Prompt.fromResponseParts(...)`, repeat per policy;
 - the closed loop-event union (`AgentEvent.Event`) that hosts observe and optionally persist;
-- the loop seams: `ToolExecutor`, `ToolContext`, `ToolOutputStore`, `Approvals`, and `TurnPolicy` (a plain value, not a service);
+- the loop seams: `ToolExecutor`, `ToolContext`, `ToolOutputStore`, `ModelResilience`, `Approvals`, and `TurnPolicy` (a plain value, not a service);
 - the suspension contract (`AgentSuspended` on the error channel, resumable via `RunOptions.resume`);
 - the provider-agnostic `ModelRegistry` for `LanguageModel` layer registration and selection.
 
@@ -33,6 +33,7 @@ Baton does not own (deferred, see ADR-0001): UI helpers, memory abstractions, ev
 | `approvals.ts`        | `Approvals`       | Enforcement point for `Ai.Tool.needsApproval`; `autoApprove`, `denyAll`, and `testLayer`.     |
 | `model-middleware.ts` | `ModelMiddleware` | Interceptor seam for model input (prompt) and output (stream parts); `identityLayer` default. |
 | `model-registry.ts`   | `ModelRegistry`   | Provider-agnostic `LanguageModel` registration/selection.                                     |
+| `model-resilience.ts` | `ModelResilience` | Optional retry seam for model-call failures inside the loop.                                  |
 | `tool-context.ts`     | `ToolContext`     | Per-tool-call ambient context: abort signal, progress emitter, and session identity.          |
 | `tool-executor.ts`    | `ToolExecutor`    | Tool-call execution seam; `fromToolkit` default executor and `testLayer`.                     |
 | `tool-output.ts`      | `ToolOutput`      | Optional spill seam for oversized successful tool outputs.                                    |
@@ -43,6 +44,7 @@ Module conventions: `Service`/`Interface`/`layer`/`testLayer` pattern; every exp
 ## Turn semantics
 
 - Turn 0 always runs (it is the initial model call; the policy is never consulted for it).
+- Before each model turn calls `chat.streamText`, Baton resolves `ModelResilience` optionally. If absent, model-call behavior is unchanged. If present, Baton wraps the active `Ai.LanguageModel.Service` for that turn, including any per-turn `TurnPolicy` model override. Streaming retry is allowed only while the attempted model call has emitted no parts. Once any part is emitted, the turn is never re-run; a later typed stream failure becomes one `error` part and then follows the normal `AgentError` path. Provider-emitted in-band `error` parts are normal stream parts and are not classified or retried.
 - Every raw model stream part is emitted as `ModelPart { turn, part }` — Baton does not filter; hosts decide what to persist. Text is accumulated from `text-delta` parts across all turns into `Completed.text`. `finish` parts also flow through unchanged as `ModelPart`s.
 - Framework-executed `tool-call` stream parts (`providerExecuted !== true`) are executed sequentially in stream order: approval gating first (when the tool declares `needsApproval`), then `ToolExecutor.execute`. Outcomes map to tool-result parts (`Success` → `isFailure: false`, `Failure` → `isFailure: true` with `{ error: message }`) that are collected as the turn's `pendingToolResults` and re-fed to the model on the next turn. Provider-executed `tool-call` parts (`providerExecuted === true`) and their provider `tool-result` parts pass through only as `ModelPart`s; Baton never gates, dispatches, or pends them.
 - Each framework-executed tool runs with a fresh `ToolContext` whose `signal` aborts when the tool/run scope is interrupted, whose `sessionId` is the active `RunOptions.sessionId` or `"local"`, and whose `emit` surfaces progress as `ToolProgress { turn, toolCallId, message?, data? }`. Event order for a locally executed tool is `ToolExecutionStarted`, zero or more `ToolProgress`, then `ToolExecutionCompleted` or suspension/failure. `ToolProgress` is observational only: it is never added to pending tool results and is never re-fed to the model.
@@ -72,6 +74,7 @@ Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run
 - **`ToolExecutor`** — `execute(request) => Effect<Outcome, AgentError>` where `request` includes `{ call, turn, agentName, sessionId }` and `Outcome` is `Success | Failure | Suspend`. The default `fromToolkit` executor runs the toolkit's own handlers in-process (`toolkit.handle`, last non-preliminary result wins). A durable host swaps in its own executor.
 - **`ToolContext`** — ambient per-call context available while `ToolExecutor.execute` runs. `ToolContext` carries `{ signal, emit, sessionId }`; the loop provides it around execution, and `layerDefault` provides a standalone never-aborting/no-op context with session `"local"` for direct tests or tools run outside the loop. `emit({ toolCallId, message?, data? })` becomes a `ToolProgress` event for the current turn.
 - **`ToolOutputStore`** — optional output spill seam used by `ToolOutput.bound`. `put(toolCallId, content) => Effect<Option<string>, ToolOutputError>` stores overflow and returns `Some(path)` when it spilled or `None` when the store declines; absent stores and `layerNoop` decline spill. The in-memory layer returns `mem:<id>` references and is non-durable. When spilling, Baton replaces both `result` and `encodedResult` with `ToolOutput { inline: { truncated: true, bytes, maxBytes, preview }, outputPaths: [path] }`; `preview` is a UTF-8 bounded string from the serialized encoded result.
+- **`ModelResilience`** — optional model-call retry seam. `classify(error) => "transient" | "terminal"` sees the live provider failure before Baton wraps or stringifies it; `retrySchedule` controls retries. `defaultClassify` treats retryable `Ai.AiError` values as transient and everything else as terminal. `none` disables retry, `make`/`layer` build policies, `testLayer` swaps exact behavior in tests, and `apply(model, policy)` wraps `streamText`, `generateText`, and `generateObject`. `Agent.stream` resolves this service optionally so its requirement set does not grow.
 - **`Approvals`** — `check(request) => Effect<Decision>` where `Decision` is `Approved | Denied | Pending`. This is the enforcement point for `Ai.Tool.needsApproval`, which `effect/unstable/ai` declares but never enforces for Baton's disabled tool-resolution loop. `needsApproval: true` gates the call; `false` or `undefined` does not. A `NeedsApprovalFunction` is evaluated with the actual call params and `{ toolCallId, messages }`; a thrown exception, failure, or defect fails closed by treating the call as gated. Tools without an approval requirement never touch the Approvals service. `Denied` re-feeds a failed tool result; `Pending` suspends the run.
 - **`TurnPolicy`** — a plain value carried by the agent (like `Schedule` values), not a service. `decide(info) => Effect<Decision>` with per-turn `overrides` on `Continue`.
 
@@ -126,10 +129,11 @@ Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, 
 
 ## Composing with a durable runtime
 
-Baton is designed to be composed behind a durable runtime's own agent-loop interface: Baton owns turn iteration, tool-dispatch ordering, tool-result re-feed, and the turn cap; the durable host owns everything durable (sequence allocation, an execution-event fold, model-call retry policy, prompt assembly, structured output, blob/artifact stores). The host provides the `ToolExecutor`, `Approvals`, optional `ToolOutputStore`, `ModelMiddleware`, and `LanguageModel` seams per run and folds Baton's `AgentEvent` stream into its own durable events. The reference composition is [Relay](https://github.com/In-Time-Tec/relayfx); its host-side wiring, retry policy, blob store, and event fold live in that repository, not here.
+Baton is designed to be composed behind a durable runtime's own agent-loop interface: Baton owns turn iteration, tool-dispatch ordering, tool-result re-feed, the turn cap, and an optional model-call retry seam; the durable host owns everything durable (sequence allocation, an execution-event fold, prompt assembly, structured output, blob/artifact stores). The host provides the `ToolExecutor`, `Approvals`, optional `ToolOutputStore`, optional `ModelResilience`, `ModelMiddleware`, and `LanguageModel` seams per run and folds Baton's `AgentEvent` stream into its own durable events. The reference composition is [Relay](https://github.com/In-Time-Tec/relayfx); its host-side wiring, retry policy selection, blob store, and event fold live in that repository, not here.
 
 ## Related docs
 
 - `docs/spec/decisions/ADR-0001-baton-standalone-agent-framework.md`
 - `docs/spec/decisions/ADR-0002-tool-context-output-spill.md`
+- `docs/spec/decisions/ADR-0003-model-resilience.md`
 - `README.md`

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Schedule, Schema, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
 import {
   Agent,
   AgentEvent,
   Approvals,
+  ModelResilience,
   ModelMiddleware,
   ToolContext,
   ToolExecutor,
@@ -77,6 +78,17 @@ const usage = (
 
 const finishPart = (reason: Ai.Response.FinishReason, reportedUsage: Ai.Response.Usage) =>
   Ai.Response.makePart("finish", { reason, usage: reportedUsage, response: undefined })
+
+const transientModelError = Ai.AiError.make({
+  module: "AgentTestLanguageModel",
+  method: "streamText",
+  reason: new Ai.AiError.RateLimitError({}),
+})
+
+const retryTransientModelError = ModelResilience.layer({
+  retrySchedule: Schedule.recurs(1),
+  classify: (error) => (error === transientModelError ? "transient" : "terminal"),
+})
 
 describe("Agent", () => {
   it("adds usage fieldwise without inventing absent leaves", () => {
@@ -545,6 +557,187 @@ describe("Agent", () => {
           modelLayer(() => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.fail(streamFailure)))),
           unusedExecutor,
           Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("does not retry model failures when ModelResilience is absent", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "no-model-retry-agent" })
+
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "retry absent" })))
+
+      expect(calls).toBe(1)
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      if (failure._tag === "@batonfx/core/AgentError") expect(failure.cause).toBe(transientModelError)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.fail(transientModelError)
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("retries model stream failures before any part is emitted", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "model-retry-agent" })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "retry model" }))
+
+      expect(calls).toBe(2)
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") expect(completed.text).toBe("after retry")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1 ? Stream.fail(transientModelError) : Stream.make(textDelta("after retry"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          retryTransientModelError,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("surfaces terminal pre-emission model failures through AgentError", () => {
+    let calls = 0
+    let classifications = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "model-terminal-failure-agent" })
+
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "terminal model" })))
+
+      expect(calls).toBe(1)
+      expect(classifications).toBe(1)
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      if (failure._tag === "@batonfx/core/AgentError") expect(failure.cause).toBe(transientModelError)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.fail(transientModelError)
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelResilience.layer({
+            retrySchedule: Schedule.recurs(3),
+            classify: () => {
+              classifications += 1
+              return "terminal"
+            },
+          }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("does not retry model stream failures after a part is emitted", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "model-partial-failure-agent" })
+
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "partial model" })))
+
+      expect(calls).toBe(1)
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      if (failure._tag === "@batonfx/core/AgentError") expect(failure.cause).toBe(transientModelError)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.fail(transientModelError)))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("does not retry in-band model error parts", () => {
+    let calls = 0
+    let classifications = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "model-in-band-error-agent" })
+
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "in-band error" })))
+
+      expect(calls).toBe(1)
+      expect(classifications).toBe(0)
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      if (failure._tag === "@batonfx/core/AgentError") expect(failure.cause).toBe(transientModelError)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.make(Ai.Response.makePart("error", { error: transientModelError }))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelResilience.layer({
+            retrySchedule: Schedule.recurs(3),
+            classify: () => {
+              classifications += 1
+              return "transient"
+            },
+          }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("wraps per-turn model overrides with ModelResilience", () => {
+    let ambientCalls = 0
+    let overrideCalls = 0
+    const overrideModel = modelLayer(() => {
+      overrideCalls += 1
+      return overrideCalls === 1 ? Stream.fail(transientModelError) : Stream.make(textDelta("override ok"))
+    })
+    return Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "override-model-retry-agent",
+        toolkit: Ai.Toolkit.make(echoTool),
+        policy: TurnPolicy.make(() => Effect.succeed(TurnPolicy.decision.continue({ model: overrideModel }))),
+      })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool then override" }))
+
+      expect(ambientCalls).toBe(1)
+      expect(overrideCalls).toBe(2)
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") expect(completed.text).toBe("override ok")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            ambientCalls += 1
+            return Stream.make(toolCallPart("tool-call-override-model", "echo", { text: "from model" }))
+          }),
+          echoExecutor,
+          Approvals.autoApprove,
+          retryTransientModelError,
           ModelMiddleware.identityLayer,
         ),
       ),

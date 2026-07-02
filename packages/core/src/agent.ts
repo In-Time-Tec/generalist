@@ -3,6 +3,7 @@ import * as Ai from "effect/unstable/ai"
 import * as AgentEvent from "./agent-event"
 import * as Approvals from "./approvals"
 import * as ModelMiddleware from "./model-middleware"
+import * as ModelResilience from "./model-resilience"
 import * as ToolContext from "./tool-context"
 import * as ToolExecutor from "./tool-executor"
 import * as ToolOutput from "./tool-output"
@@ -209,6 +210,7 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
 
       // Resolve `Chat.Persistence` optionally so `stream`'s `R` does not grow.
       const persistenceService = yield* Effect.serviceOption(Ai.Chat.Persistence)
+      const resilienceService = yield* Effect.serviceOption(ModelResilience.ModelResilience)
       const persistenceOptions = options.persistence
       const persisted: Ai.Chat.Persisted | undefined =
         persistenceOptions === undefined
@@ -489,7 +491,20 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
             ),
           ),
         )
-        return overrides?.model === undefined ? parts : parts.pipe(Stream.provide(overrides.model))
+        const resilientParts = Option.match(resilienceService, {
+          onNone: () => parts,
+          onSome: (resilience) =>
+            Stream.unwrap(
+              Ai.LanguageModel.LanguageModel.pipe(
+                Effect.map((model) =>
+                  parts.pipe(
+                    Stream.provideService(Ai.LanguageModel.LanguageModel, ModelResilience.apply(model, resilience)),
+                  ),
+                ),
+              ),
+            ),
+        })
+        return overrides?.model === undefined ? resilientParts : resilientParts.pipe(Stream.provide(overrides.model))
       }
 
       const turnCompletedEvent = (turn: number, transcript: Ai.Prompt.Prompt): AgentEvent.TurnCompleted => ({
