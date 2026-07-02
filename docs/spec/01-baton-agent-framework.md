@@ -12,11 +12,12 @@ Baton owns:
 
 - the model-turn loop: build an `Ai.Chat`, call `chat.streamText({ prompt, toolkit, disableToolCallResolution: true })`, fold stream parts, execute tool calls, re-feed tool results via `Ai.Prompt.fromResponseParts(...)`, repeat per policy, and optionally run one terminal structured-output turn;
 - the closed loop-event union (`AgentEvent.Event`) that hosts observe and optionally persist;
+- the standalone `Session` event-log seam and pure context projector;
 - the loop seams: `ToolExecutor`, `ToolContext`, `ToolOutputStore`, `ModelResilience`, `Approvals`, and `TurnPolicy` (a plain value, not a service);
 - the suspension contract (`AgentSuspended` on the error channel, resumable via `RunOptions.resume`);
 - the provider-agnostic `ModelRegistry` for `LanguageModel` layer registration and selection.
 
-Baton does not own (deferred, see ADR-0001): UI helpers, memory abstractions, evals, model-judge guardrails or detection heuristics, multi-agent/handoffs, durability of any kind. Baton owns ergonomic **Guardrail** combinators over `ModelMiddleware`, but no separate guardrail subsystem. Baton owns a **chat persistence seam** (`RunOptions.persistence`, see below) but no persistence _implementation_ — consumers provide upstream `Chat.Persistence` layers. Baton also owns a non-durable **tool output spill seam** (`ToolOutputStore`, see below); durable blob stores remain host-side.
+Baton does not own (deferred, see ADR-0001): UI helpers, generic memory abstractions, evals, model-judge guardrails or detection heuristics, multi-agent/handoffs, durability of any kind. Baton owns ergonomic **Guardrail** combinators over `ModelMiddleware`, but no separate guardrail subsystem. Baton owns a standalone **Session** event-log seam and projector, but no durable/addressable session implementation. Baton owns a **chat persistence seam** (`RunOptions.persistence`, see below) but no persistence _implementation_ — consumers provide upstream `Chat.Persistence` layers. Baton also owns a non-durable **tool output spill seam** (`ToolOutputStore`, see below); durable blob stores remain host-side.
 
 ## Boundary rule
 
@@ -35,6 +36,7 @@ Baton does not own (deferred, see ADR-0001): UI helpers, memory abstractions, ev
 | `model-middleware.ts` | `ModelMiddleware` | Interceptor seam for model input (prompt) and output (stream parts); `identityLayer` default.             |
 | `model-registry.ts`   | `ModelRegistry`   | Provider-agnostic `LanguageModel` registration/selection.                                                 |
 | `model-resilience.ts` | `ModelResilience` | Optional retry seam for model-call failures inside the loop.                                              |
+| `session.ts`          | `Session`         | Append-only session event-log seam, memory layer, and pure `buildContext` projector.                      |
 | `tool-context.ts`     | `ToolContext`     | Per-tool-call ambient context: abort signal, progress emitter, and session identity.                      |
 | `tool-executor.ts`    | `ToolExecutor`    | Tool-call execution seam; `fromToolkit` default executor and `testLayer`.                                 |
 | `tool-output.ts`      | `ToolOutput`      | Optional spill seam for oversized successful tool outputs.                                                |
@@ -117,6 +119,8 @@ The run did NOT finish; the host resolves `token` out-of-band and re-enters via 
 
 ## Chat persistence
 
+`SessionStore` is intentionally not part of `Agent.RunServices` in this contract. `Agent.stream` continues to construct and operate on `Ai.Chat`; `Session` is a standalone seam for future compaction, steering, instructions, and durable host adapters.
+
 `RunOptions.sessionId` is an opaque host-assigned identity for the active run/session. It defaults to `"local"` and is threaded into `ToolExecutor.Request`, `Approvals.Request`, and `ToolContext.sessionId`. `RunOptions.toolOutputMaxBytes` is an optional non-negative finite byte limit for successful tool-result `encodedResult` values; invalid values fail before the first model call with `AgentError`. The byte limit has no effect unless a `ToolOutputStore` is available and chooses to spill.
 
 Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, so a standalone Baton app has no conversation continuity between runs. Baton adds exactly one seam — a way to run the loop on a **persisted** chat instead of a fresh one — and delegates all storage to `effect/unstable/ai`'s `Chat.Persistence` primitive. Baton adds **no** `BackingPersistence` implementation, store schema, or package; consumers provide upstream layers (`Chat.layerPersisted({ storeId })` over a `BackingPersistence` layer such as `Persistence.layerBackingMemory` or `Persistence.layerBackingSql`).
@@ -151,4 +155,6 @@ Baton is designed to be composed behind a durable runtime's own agent-loop inter
 - `docs/spec/decisions/ADR-0002-tool-context-output-spill.md`
 - `docs/spec/decisions/ADR-0003-model-resilience.md`
 - `docs/spec/decisions/ADR-0004-guardrail-combinators.md`
+- `docs/spec/decisions/ADR-0005-session-event-log.md`
+- `docs/spec/02-session-event-log.md`
 - `README.md`
