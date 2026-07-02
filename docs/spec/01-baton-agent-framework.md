@@ -41,12 +41,18 @@ Module conventions: `Service`/`Interface`/`layer`/`testLayer` pattern; every exp
 ## Turn semantics
 
 - Turn 0 always runs (it is the initial model call; the policy is never consulted for it).
-- Every raw model stream part is emitted as `ModelPart { turn, part }` — Baton does not filter; hosts decide what to persist. Text is accumulated from `text-delta` parts across all turns into `Completed.text`.
+- Every raw model stream part is emitted as `ModelPart { turn, part }` — Baton does not filter; hosts decide what to persist. Text is accumulated from `text-delta` parts across all turns into `Completed.text`. `finish` parts also flow through unchanged as `ModelPart`s.
 - `tool-call` stream parts are executed sequentially in stream order: approval gating first (when the tool declares `needsApproval`), then `ToolExecutor.execute`. Outcomes map to tool-result parts (`Success` → `isFailure: false`, `Failure` → `isFailure: true` with `{ error: message }`) that are collected as the turn's `pendingToolResults` and re-fed to the model on the next turn.
-- After each turn, `TurnCompleted { turn, transcript }` is emitted with the full chat history — hosts that persist conversation state read it from here.
-- If `pendingToolResults` is empty after a turn, the loop emits `Completed { turns, text, transcript }` and ends — the policy is **not** consulted.
+- After each turn, `TurnCompleted { turn, transcript, usage?, finishReason? }` is emitted with the full chat history — hosts that persist conversation state read it from here. `usage`/`finishReason` come from that turn's transformed `finish` part when the model reported one.
+- If `pendingToolResults` is empty after a turn, the loop emits `Completed { turns, text, transcript, usage? }` and ends — the policy is **not** consulted. `Completed.usage` is the fieldwise cumulative usage across all turns that reported usage.
 - If `pendingToolResults` is non-empty, the loop calls `policy.decide(info)`. `Continue` runs the next turn with `Ai.Prompt.fromResponseParts(pendingToolResults)` as prompt, applying that decision's `overrides` (instructions, model layer, active tools) for that turn only. `Stop` fails the stream with `TurnLimitExceeded { turn, pending }` — pending results are never silently dropped.
 - The default policy is `TurnPolicy.recurs(8)` (an eight-follow-up-turn cap).
+
+## Usage & telemetry
+
+`AgentEvent.addUsage(a, b)` fieldwise-sums upstream `Ai.Response.Usage` values. Numeric leaves that are absent on both sides stay absent; a value present on either side is summed with the other side treated as zero.
+
+Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run` with attribute `baton.agent.name`, and each model turn in `Baton.Agent.turn` with attribute `baton.turn`. When a `finish` part is captured, Baton annotates the current turn span with Effect AI GenAI attributes for operation `chat`, reported input/output token totals, and the finish reason.
 
 ## Run errors
 
@@ -84,7 +90,7 @@ The run suspends by failing the stream with `AgentSuspended` on the error channe
 - a `ToolExecutor` outcome of `Suspend { token }` fails with `AgentSuspended { token, reason: "tool-wait", tool_call_id, tool_name, tool_params }`;
 - an `Approvals` decision of `Pending { token }` fails with `AgentSuspended { token, reason: "approval", ... }`.
 
-The run did NOT finish; the host resolves `token` out-of-band and re-enters via `RunOptions.resume` with the pending call. The field shape deliberately mirrors a tool call so durable hosts can persist it. On resume, the initial model call is skipped: the resumed call executes first (approval gating applies), its tool-result part becomes the pending result of pseudo-turn 0, `TurnCompleted` is emitted with the current transcript, and the loop proceeds through the normal policy-gated follow-up turns. `Agent.stream` emits a trailing `TurnCompleted { transcript }` before re-failing with `AgentSuspended`, so a durable host can persist the finalized transcript.
+The run did NOT finish; the host resolves `token` out-of-band and re-enters via `RunOptions.resume` with the pending call. The field shape deliberately mirrors a tool call so durable hosts can persist it. On resume, the initial model call is skipped: the resumed call executes first (approval gating applies), its tool-result part becomes the pending result of pseudo-turn 0, `TurnCompleted` is emitted with the current transcript, and the loop proceeds through the normal policy-gated follow-up turns. `Agent.stream` emits a trailing `TurnCompleted { transcript, usage?, finishReason? }` before re-failing with `AgentSuspended`, so a durable host can persist the finalized transcript.
 
 ## Chat persistence
 

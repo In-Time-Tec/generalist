@@ -45,7 +45,44 @@ const toolCallPart = (id: string, name: string, params: unknown) =>
 
 const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
 
+const usage = (
+  inputTokens: Partial<Ai.Response.Usage["inputTokens"]>,
+  outputTokens: Partial<Ai.Response.Usage["outputTokens"]>,
+) =>
+  new Ai.Response.Usage({
+    inputTokens: {
+      uncached: inputTokens.uncached,
+      total: inputTokens.total,
+      cacheRead: inputTokens.cacheRead,
+      cacheWrite: inputTokens.cacheWrite,
+    },
+    outputTokens: {
+      total: outputTokens.total,
+      text: outputTokens.text,
+      reasoning: outputTokens.reasoning,
+    },
+  })
+
+const finishPart = (reason: Ai.Response.FinishReason, reportedUsage: Ai.Response.Usage) =>
+  Ai.Response.makePart("finish", { reason, usage: reportedUsage, response: undefined })
+
 describe("Agent", () => {
+  it("adds usage fieldwise without inventing absent leaves", () => {
+    const first = usage({ uncached: 1, total: 10, cacheWrite: 3 }, { total: 4, text: 2 })
+    const second = usage({ uncached: 4, total: 20, cacheRead: 5 }, { total: 6, reasoning: 7 })
+
+    const summed = AgentEvent.addUsage(first, second)
+
+    expect(summed.inputTokens.uncached).toBe(5)
+    expect(summed.inputTokens.total).toBe(30)
+    expect(summed.inputTokens.cacheRead).toBe(5)
+    expect(summed.inputTokens.cacheWrite).toBe(3)
+    expect(summed.outputTokens.total).toBe(10)
+    expect(summed.outputTokens.text).toBe(2)
+    expect(summed.outputTokens.reasoning).toBe(7)
+    expect(AgentEvent.addUsage(usage({}, {}), usage({}, {})).inputTokens.total).toBeUndefined()
+  })
+
   it("constructs AgentError without a cause", () => {
     const error = new AgentEvent.AgentError({ message: "boom", turn: 0 })
 
@@ -68,10 +105,16 @@ describe("Agent", () => {
       if (completed?._tag === "Completed") {
         expect(completed.text).toBe("saw system and input")
         expect(completed.turns).toBe(1)
+        expect("usage" in completed).toBe(false)
       }
       const modelPart = events[1]
       if (modelPart?._tag === "ModelPart") {
         expect(modelPart.part.type).toBe("text-delta")
+      }
+      const turnCompleted = events.find((event) => event._tag === "TurnCompleted")
+      if (turnCompleted?._tag === "TurnCompleted") {
+        expect("usage" in turnCompleted).toBe(false)
+        expect("finishReason" in turnCompleted).toBe(false)
       }
     }).pipe(
       Effect.provide(
@@ -93,6 +136,43 @@ describe("Agent", () => {
       ),
     ),
   )
+
+  it.effect("surfaces finish usage while preserving raw finish parts", () => {
+    const reportedUsage = usage({ total: 12, cacheRead: 2 }, { total: 5, text: 4 })
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "usage-agent" })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "report usage" }))
+
+      expect(events.map((event) => event._tag)).toEqual([
+        "TurnStarted",
+        "ModelPart",
+        "ModelPart",
+        "TurnCompleted",
+        "Completed",
+      ])
+      const finishModelPart = events.find((event) => event._tag === "ModelPart" && event.part.type === "finish")
+      expect(finishModelPart?._tag === "ModelPart" && finishModelPart.part.type === "finish").toBe(true)
+      const turnCompleted = events.find((event) => event._tag === "TurnCompleted")
+      if (turnCompleted?._tag === "TurnCompleted") {
+        expect(turnCompleted.usage).toEqual(reportedUsage)
+        expect(turnCompleted.finishReason).toBe("stop")
+      }
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") {
+        expect(completed.usage).toEqual(reportedUsage)
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => Stream.fromIterable([textDelta("done"), finishPart("stop", reportedUsage)])),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
 
   it.effect("executes tool-call stream parts through ToolExecutor", () => {
     let calls = 0
@@ -125,6 +205,51 @@ describe("Agent", () => {
             }
             secondCallSawToolResult = JSON.stringify(options.prompt.content).includes("from model")
             return Stream.make(textDelta("after tool"))
+          }),
+          echoExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("accumulates usage across tool-calling turns", () => {
+    let calls = 0
+    const firstUsage = usage({ total: 10, uncached: 8 }, { total: 2 })
+    const secondUsage = usage({ total: 7, cacheRead: 3 }, { total: 5, text: 4, reasoning: 1 })
+    const expectedUsage = AgentEvent.addUsage(firstUsage, secondUsage)
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "multi-usage-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+
+      const turnCompleted = events.filter((event) => event._tag === "TurnCompleted")
+      expect(turnCompleted).toHaveLength(2)
+      if (turnCompleted[0]?._tag === "TurnCompleted") {
+        expect(turnCompleted[0].usage).toEqual(firstUsage)
+        expect(turnCompleted[0].finishReason).toBe("tool-calls")
+      }
+      if (turnCompleted[1]?._tag === "TurnCompleted") {
+        expect(turnCompleted[1].usage).toEqual(secondUsage)
+        expect(turnCompleted[1].finishReason).toBe("stop")
+      }
+      expect(events.filter((event) => event._tag === "ModelPart" && event.part.type === "finish")).toHaveLength(2)
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") {
+        expect(completed.usage).toEqual(expectedUsage)
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.fromIterable([
+                  toolCallPart("tool-call-usage", "echo", { text: "from model" }),
+                  finishPart("tool-calls", firstUsage),
+                ])
+              : Stream.fromIterable([textDelta("after tool"), finishPart("stop", secondUsage)])
           }),
           echoExecutor,
           Approvals.autoApprove,

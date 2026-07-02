@@ -54,6 +54,8 @@ export interface TurnCompleted {
   readonly _tag: "TurnCompleted"
   readonly turn: number
   readonly transcript: Ai.Prompt.Prompt
+  readonly usage?: Ai.Response.Usage
+  readonly finishReason?: Ai.Response.FinishReason
   readonly metadata?: Metadata
 }
 
@@ -63,8 +65,28 @@ export interface Completed {
   readonly turns: number
   readonly text: string
   readonly transcript: Ai.Prompt.Prompt
+  readonly usage?: Ai.Response.Usage
   readonly metadata?: Metadata
 }
+
+const addUsageField = (left: number | undefined, right: number | undefined): number | undefined =>
+  left === undefined && right === undefined ? undefined : (left ?? 0) + (right ?? 0)
+
+/** @experimental Fieldwise sum of upstream model usage values. */
+export const addUsage = (left: Ai.Response.Usage, right: Ai.Response.Usage): Ai.Response.Usage =>
+  new Ai.Response.Usage({
+    inputTokens: {
+      uncached: addUsageField(left.inputTokens.uncached, right.inputTokens.uncached),
+      total: addUsageField(left.inputTokens.total, right.inputTokens.total),
+      cacheRead: addUsageField(left.inputTokens.cacheRead, right.inputTokens.cacheRead),
+      cacheWrite: addUsageField(left.inputTokens.cacheWrite, right.inputTokens.cacheWrite),
+    },
+    outputTokens: {
+      total: addUsageField(left.outputTokens.total, right.outputTokens.total),
+      text: addUsageField(left.outputTokens.text, right.outputTokens.text),
+      reasoning: addUsageField(left.outputTokens.reasoning, right.outputTokens.reasoning),
+    },
+  })
 
 /** @experimental Closed union of Baton loop events. */
 export type Event =

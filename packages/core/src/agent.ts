@@ -236,6 +236,10 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         text: "",
         turn: 0,
         pending: [] as Array<PendingToolResult>,
+        finish: undefined as
+          | { readonly usage: Ai.Response.Usage; readonly reason: Ai.Response.FinishReason }
+          | undefined,
+        usage: undefined as Ai.Response.Usage | undefined,
       }
 
       const executeApproved = (
@@ -299,6 +303,24 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         )
       }
 
+      const captureFinishPart = (part: Ai.Response.FinishPart): Effect.Effect<void> =>
+        Effect.gen(function* () {
+          const span = yield* Effect.currentSpan
+          state.finish = {
+            usage: state.finish === undefined ? part.usage : AgentEvent.addUsage(state.finish.usage, part.usage),
+            reason: part.reason,
+          }
+          state.usage = state.usage === undefined ? part.usage : AgentEvent.addUsage(state.usage, part.usage)
+          Ai.Telemetry.addGenAIAnnotations(span, {
+            operation: { name: "chat" },
+            usage: {
+              inputTokens: part.usage.inputTokens.total,
+              outputTokens: part.usage.outputTokens.total,
+            },
+            response: { finishReasons: [part.reason] },
+          })
+        }).pipe(Effect.orDie)
+
       const partEvents = (
         turn: number,
         part: Ai.Response.StreamPart<Record<string, Ai.Tool.Any>>,
@@ -312,6 +334,9 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         }
         if (part.type === "text-delta") {
           state.text = `${state.text}${part.delta}`
+        }
+        if (part.type === "finish") {
+          return modelPart.pipe(Stream.tap(() => captureFinishPart(part)))
         }
         return modelPart
       }
@@ -370,37 +395,51 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         return overrides?.model === undefined ? parts : parts.pipe(Stream.provide(overrides.model))
       }
 
-      const runTurn = (
-        turn: number,
-        prompt: Ai.Prompt.RawInput,
-        overrides?: TurnPolicy.TurnOverrides,
-      ): Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel> =>
-        Stream.fromIterable<AgentEvent.Event>([{ _tag: "TurnStarted", turn }]).pipe(
-          Stream.concat(Stream.sync(() => void (state.turn = turn)).pipe(Stream.drain)),
-          Stream.concat(modelTurn(turn, prompt, overrides)),
-          Stream.concat(Stream.suspend(() => afterTurn(turn))),
-        )
+      const turnCompletedEvent = (turn: number, transcript: Ai.Prompt.Prompt): AgentEvent.TurnCompleted => ({
+        _tag: "TurnCompleted",
+        turn,
+        transcript,
+        ...(state.finish === undefined ? {} : { usage: state.finish.usage, finishReason: state.finish.reason }),
+      })
 
-      const afterTurn = (turn: number): Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel> =>
-        Stream.unwrap(
-          Effect.gen(function* () {
-            const transcript = yield* Ref.get(chat.history)
-            const completed: AgentEvent.Event = { _tag: "TurnCompleted", turn, transcript }
-            const pending = state.pending
-            if (pending.length === 0) {
-              yield* savePersisted
-              return Stream.fromIterable<AgentEvent.Event>([
-                completed,
-                { _tag: "Completed", turns: turn + 1, text: state.text, transcript },
-              ])
+      const terminalCompletedEvent = (turn: number, transcript: Ai.Prompt.Prompt): AgentEvent.Completed => ({
+        _tag: "Completed",
+        turns: turn + 1,
+        text: state.text,
+        transcript,
+        ...(state.usage === undefined ? {} : { usage: state.usage }),
+      })
+
+      const afterTurn = (
+        turn: number,
+      ): Effect.Effect<
+        {
+          readonly events: Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel>
+          readonly next?: {
+            readonly prompt: Ai.Prompt.RawInput
+            readonly overrides?: TurnPolicy.TurnOverrides
+          }
+        },
+        AgentEvent.AgentError
+      > =>
+        Effect.gen(function* () {
+          const transcript = yield* Ref.get(chat.history)
+          const completed: AgentEvent.Event = turnCompletedEvent(turn, transcript)
+          const pending = state.pending
+          if (pending.length === 0) {
+            yield* savePersisted
+            return {
+              events: Stream.fromIterable<AgentEvent.Event>([completed, terminalCompletedEvent(turn, transcript)]),
             }
-            const decision = yield* agent.policy.decide({
-              turn: turn + 1,
-              history: transcript,
-              pendingToolResults: pending,
-            })
-            if (decision._tag === "Stop") {
-              return Stream.concat(
+          }
+          const decision = yield* agent.policy.decide({
+            turn: turn + 1,
+            history: transcript,
+            pendingToolResults: pending,
+          })
+          if (decision._tag === "Stop") {
+            return {
+              events: Stream.concat(
                 Stream.fromIterable<AgentEvent.Event>([completed]),
                 Stream.fail(
                   new AgentEvent.TurnLimitExceeded({
@@ -411,33 +450,91 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
                     })),
                   }),
                 ),
-              )
+              ),
             }
-            state.pending = []
-            const basePrompt = Ai.Prompt.fromResponseParts(pending)
-            const prompt =
-              decision.overrides?.instructions === undefined
-                ? basePrompt
-                : withSystem(decision.overrides.instructions, basePrompt)
-            return Stream.concat(
-              Stream.fromIterable<AgentEvent.Event>([completed]),
-              runTurn(turn + 1, prompt, decision.overrides),
-            )
-          }),
+          }
+          state.pending = []
+          const basePrompt = Ai.Prompt.fromResponseParts(pending)
+          const prompt =
+            decision.overrides?.instructions === undefined
+              ? basePrompt
+              : withSystem(decision.overrides.instructions, basePrompt)
+          return {
+            events: Stream.fromIterable<AgentEvent.Event>([completed]),
+            next: { prompt, ...(decision.overrides === undefined ? {} : { overrides: decision.overrides }) },
+          }
+        })
+
+      const resetTurnState = (turn: number) =>
+        Stream.sync(() => {
+          state.turn = turn
+          state.finish = undefined
+        }).pipe(Stream.drain)
+
+      const runTurn = (
+        turn: number,
+        prompt: Ai.Prompt.RawInput,
+        overrides?: TurnPolicy.TurnOverrides,
+      ): Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel> => {
+        let next:
+          | {
+              readonly prompt: Ai.Prompt.RawInput
+              readonly overrides?: TurnPolicy.TurnOverrides
+            }
+          | undefined
+        const currentTurn = Stream.fromIterable<AgentEvent.Event>([{ _tag: "TurnStarted", turn }]).pipe(
+          Stream.concat(resetTurnState(turn)),
+          Stream.concat(modelTurn(turn, prompt, overrides)),
+          Stream.concat(
+            Stream.unwrap(
+              afterTurn(turn).pipe(
+                Effect.map((result) => {
+                  next = result.next
+                  return result.events
+                }),
+              ),
+            ),
+          ),
+          Stream.withSpan("Baton.Agent.turn", { attributes: { "baton.turn": turn } }),
         )
+        return Stream.concat(
+          currentTurn,
+          Stream.suspend(() => (next === undefined ? Stream.empty : runTurn(turn + 1, next.prompt, next.overrides))),
+        )
+      }
 
       const resumeStream = (
         resume: Resume,
       ): Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel> => {
+        let next:
+          | {
+              readonly prompt: Ai.Prompt.RawInput
+              readonly overrides?: TurnPolicy.TurnOverrides
+            }
+          | undefined
         const call = Ai.Response.makePart("tool-call", {
           id: resume.call.id,
           name: resume.call.name,
           params: resume.call.params,
           providerExecuted: false,
         })
+        const currentTurn = resetTurnState(0).pipe(
+          Stream.concat(toolCallEvents(0, call)),
+          Stream.concat(
+            Stream.unwrap(
+              afterTurn(0).pipe(
+                Effect.map((result) => {
+                  next = result.next
+                  return result.events
+                }),
+              ),
+            ),
+          ),
+          Stream.withSpan("Baton.Agent.turn", { attributes: { "baton.turn": 0 } }),
+        )
         return Stream.concat(
-          toolCallEvents(0, call),
-          Stream.suspend(() => afterTurn(0)),
+          currentTurn,
+          Stream.suspend(() => (next === undefined ? Stream.empty : runTurn(1, next.prompt, next.overrides))),
         )
       }
 
@@ -458,7 +555,7 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
               Ref.get(chat.history).pipe(
                 Effect.map((transcript) =>
                   Stream.concat(
-                    Stream.fromIterable<AgentEvent.Event>([{ _tag: "TurnCompleted", turn: state.turn, transcript }]),
+                    Stream.fromIterable<AgentEvent.Event>([turnCompletedEvent(state.turn, transcript)]),
                     Stream.failCause<RunError>(cause),
                   ),
                 ),
@@ -469,7 +566,7 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         }),
       )
     }),
-  )
+  ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } }))
 
 /** @experimental Result of a non-streaming run. */
 export interface Result {
