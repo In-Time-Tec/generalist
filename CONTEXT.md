@@ -22,6 +22,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - **ModelResilience**: the optional model-call retry seam. It classifies live model-call failures as `transient` or `terminal` and supplies the retry schedule applied inside a single model call; streamed turns retry only before any part has been emitted.
 - **ModelMiddleware**: the interceptor seam for everything going into (`transformPrompt`) or out of (`transformPart`) the model — PII scrubbing, prompt-injection screening, output filtering, logging. Ships a `identityLayer` default and no built-in filters.
 - **Guardrail**: ergonomic `ModelMiddleware.Middleware` combinators for input validation, prompt/output regex redaction, and output filtering. Guardrails are not a separate subsystem; they compose through `ModelMiddleware.layer([...])`.
+- **Instructions**: the ordered context-source registry. `openEpoch` renders baseline sources once into the run's system-message baseline and keeps dynamic sources for later `renderUpdate` calls; filesystem, skills, and memory sources are contributed by later packages/seams.
 - **Session**: an append-only conversation entry log with a current leaf pointer for branch navigation. `Session.buildContext(path)` is the pure projector from a root-to-leaf path into an `Ai.Prompt`; durable/addressable storage belongs to hosts such as Relay.
 - **Chat persistence seam**: `RunOptions.persistence` runs the loop on a persisted `Ai.Chat` instead of a fresh one. Baton delegates all chat storage to `effect/unstable/ai`'s `Chat.Persistence`; it adds no chat store of its own.
 - **Tool output spill seam**: `ToolOutputStore` stores oversized tool outputs out of context when present and when `RunOptions.toolOutputMaxBytes` is exceeded. It is non-durable in core; durable blob stores belong to hosts such as Relay.
@@ -34,6 +35,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Errors that cross a service boundary are `Schema.TaggedErrorClass`.
 - No `Date.now()` or raw platform time/concurrency/randomness — use Effect primitives.
 - Pending tool results are never silently dropped: a `Stop` policy with pending results fails the run.
+- Instructions context baselines are opened at run start; dynamic context updates are rendered separately and are not injected until the compaction/update contract does so.
 - Session context is derived from a root-to-leaf path, not stored separately.
 - `TurnPolicy` is a plain value, not a service — agents carry their own default like `Schedule` values.
 - Every behavior-bearing seam exposes a test or memory layer (`testLayer`) so tests swap implementations through Effect layers.
@@ -43,3 +45,4 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 
 - Agent framework contract: `docs/spec/01-baton-agent-framework.md`
 - Session event-log contract: `docs/spec/02-session-event-log.md`
+- Instructions and context-epoch contract: `docs/spec/03-instructions-and-context-epoch.md`

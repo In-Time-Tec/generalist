@@ -1,0 +1,81 @@
+import { Context, Effect, Layer, Option } from "effect"
+import * as AgentEvent from "./agent-event"
+
+/** @experimental Context available while rendering instruction sources. */
+export interface RenderContext {
+  readonly agentName: string
+  readonly turn: number
+}
+
+/** @experimental Ordered source of model instructions or contextual updates. */
+export interface ContextSource {
+  readonly id: string
+  readonly cache: "baseline" | "dynamic"
+  readonly render: (context: RenderContext) => Effect.Effect<Option.Option<string>, AgentEvent.AgentError>
+}
+
+/** @experimental Instructions registry service boundary. */
+export interface Interface {
+  readonly sources: ReadonlyArray<ContextSource>
+}
+
+/** @experimental */
+export class Instructions extends Context.Service<Instructions, Interface>()("@batonfx/core/Instructions") {}
+
+/** @experimental Frozen baseline plus dynamic sources for later update rendering. */
+export interface ContextEpoch {
+  readonly baseline: string
+  readonly dynamic: ReadonlyArray<ContextSource>
+}
+
+/** @experimental A static baseline source. */
+export const staticSource = (id: string, text: string): ContextSource => ({
+  id,
+  cache: "baseline",
+  render: () => Effect.succeed(text.length === 0 ? Option.none() : Option.some(text)),
+})
+
+/** @experimental Render baseline sources and freeze dynamic sources for an epoch. */
+export const openEpoch = (
+  instructions: Interface,
+  context: RenderContext,
+): Effect.Effect<ContextEpoch, AgentEvent.AgentError> =>
+  Effect.gen(function* () {
+    const baseline: Array<string> = []
+    const dynamic: Array<ContextSource> = []
+
+    for (const source of instructions.sources) {
+      if (source.cache === "dynamic") {
+        dynamic.push(source)
+      } else {
+        const rendered = yield* source.render(context)
+        if (Option.isSome(rendered)) baseline.push(rendered.value)
+      }
+    }
+
+    return { baseline: baseline.join("\n\n"), dynamic }
+  })
+
+/** @experimental Render dynamic sources for an incremental context update. */
+export const renderUpdate = (
+  epoch: ContextEpoch,
+  context: RenderContext,
+): Effect.Effect<Option.Option<string>, AgentEvent.AgentError> =>
+  Effect.gen(function* () {
+    const fragments: Array<string> = []
+
+    for (const source of epoch.dynamic) {
+      const rendered = yield* source.render(context)
+      if (Option.isSome(rendered)) fragments.push(rendered.value)
+    }
+
+    return fragments.length === 0 ? Option.none() : Option.some(fragments.join("\n\n"))
+  })
+
+/** @experimental Provide an explicit ordered instructions registry. */
+export const layer = (sources: ReadonlyArray<ContextSource>): Layer.Layer<Instructions> =>
+  Layer.succeed(Instructions, Instructions.of({ sources: [...sources] }))
+
+/** @experimental */
+export const testLayer = (implementation: Interface): Layer.Layer<Instructions> =>
+  Layer.succeed(Instructions, Instructions.of(implementation))

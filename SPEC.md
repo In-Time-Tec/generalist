@@ -11,26 +11,29 @@ SPEC.md
 ├─ CONTEXT.md                                  vocabulary
 ├─ docs/spec/
 │  ├─ 01-baton-agent-framework.md              the agent loop contract
-│  └─ 02-session-event-log.md                  session log and projector contract
+│  ├─ 02-session-event-log.md                  session log and projector contract
+│  └─ 03-instructions-and-context-epoch.md     instructions registry and context epoch contract
 └─ docs/spec/decisions/
    ├─ ADR-0001-baton-standalone-agent-framework.md
    ├─ ADR-0002-tool-context-output-spill.md
    ├─ ADR-0003-model-resilience.md
    ├─ ADR-0004-guardrail-combinators.md
-   └─ ADR-0005-session-event-log.md
+   ├─ ADR-0005-session-event-log.md
+   └─ ADR-0006-instructions-context-epoch.md
 ```
 
 ## Packages
 
-| Package         | npm             | Directory       | Purpose                                                                                                                                                                                                                            |
-| --------------- | --------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@batonfx/core` | `@batonfx/core` | `packages/core` | The Effect-native agent loop: Agent, Session, structured output, TurnPolicy, ToolExecutor, ToolContext, ToolOutputStore, Approvals, ModelRegistry, ModelResilience, ModelMiddleware, Guardrail combinators, chat persistence seam. |
-| `@batonfx/mcp`  | `@batonfx/mcp`  | `packages/mcp`  | MCP client bridge: discover an MCP server's tools as an `Ai.Toolkit` plus a Baton `ToolExecutor` adapter (`@batonfx/mcp/baton`).                                                                                                   |
+| Package         | npm             | Directory       | Purpose                                                                                                                                                                                                                                          |
+| --------------- | --------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@batonfx/core` | `@batonfx/core` | `packages/core` | The Effect-native agent loop: Agent, Instructions, Session, structured output, TurnPolicy, ToolExecutor, ToolContext, ToolOutputStore, Approvals, ModelRegistry, ModelResilience, ModelMiddleware, Guardrail combinators, chat persistence seam. |
+| `@batonfx/mcp`  | `@batonfx/mcp`  | `packages/mcp`  | MCP client bridge: discover an MCP server's tools as an `Ai.Toolkit` plus a Baton `ToolExecutor` adapter (`@batonfx/mcp/baton`).                                                                                                                 |
 
 ## Feature branches
 
 - Agent framework contract: `docs/spec/01-baton-agent-framework.md`
 - Session event-log contract: `docs/spec/02-session-event-log.md`
+- Instructions and context-epoch contract: `docs/spec/03-instructions-and-context-epoch.md`
 
 ## Decisions
 
@@ -39,3 +42,4 @@ SPEC.md
 - ADR-0003 — Model Resilience: `docs/spec/decisions/ADR-0003-model-resilience.md`
 - ADR-0004 — Guardrail Combinators: `docs/spec/decisions/ADR-0004-guardrail-combinators.md`
 - ADR-0005 — Session Event Log: `docs/spec/decisions/ADR-0005-session-event-log.md`
+- ADR-0006 — Instructions Context Epoch: `docs/spec/decisions/ADR-0006-instructions-context-epoch.md`

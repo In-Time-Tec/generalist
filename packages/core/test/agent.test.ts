@@ -5,6 +5,7 @@ import {
   Agent,
   AgentEvent,
   Approvals,
+  Instructions,
   ModelResilience,
   ModelMiddleware,
   ToolContext,
@@ -60,6 +61,13 @@ const providerToolCallPart = (id: string, name: string, params: unknown) =>
   Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: true })
 
 const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+
+const systemText = (prompt: Ai.Prompt.Prompt): string | undefined => {
+  for (const message of prompt.content) {
+    if (message.role === "system") return message.content
+  }
+  return undefined
+}
 
 const usage = (
   inputTokens: Partial<Ai.Response.Usage["inputTokens"]>,
@@ -165,6 +173,117 @@ describe("Agent", () => {
       ),
     ),
   )
+
+  it.effect("uses an Instructions baseline for the first-turn system message", () => {
+    let capturedSystem: string | undefined
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "instructions-agent", instructions: "fallback instructions" })
+
+      yield* Stream.runDrain(Agent.stream(agent, { prompt: "hello" }))
+
+      expect(capturedSystem).toBe("first\n\nsecond")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            capturedSystem = systemText(options.prompt)
+            return Stream.make(textDelta("done"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+          Instructions.layer([
+            Instructions.staticSource("first", "first"),
+            Instructions.staticSource("second", "second"),
+          ]),
+        ),
+      ),
+    )
+  })
+
+  it.effect("keeps options.system ahead of an Instructions baseline", () => {
+    let capturedSystem: string | undefined
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "instructions-system-agent", instructions: "fallback instructions" })
+
+      yield* Stream.runDrain(Agent.stream(agent, { prompt: "hello", system: "override" }))
+
+      expect(capturedSystem).toBe("override")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            capturedSystem = systemText(options.prompt)
+            return Stream.make(textDelta("done"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+          Instructions.layer([Instructions.staticSource("registry", "registry")]),
+        ),
+      ),
+    )
+  })
+
+  it.effect("keeps explicit history ahead of an Instructions baseline", () => {
+    let capturedSystem: string | undefined
+    let capturedPrompt = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "instructions-history-agent", instructions: "fallback instructions" })
+
+      yield* Stream.runDrain(
+        Agent.stream(agent, {
+          prompt: "new input",
+          history: [
+            { role: "system", content: "history system" },
+            { role: "user", content: [{ type: "text", text: "earlier" }] },
+          ],
+        }),
+      )
+
+      expect(capturedSystem).toBe("history system")
+      expect(capturedPrompt).not.toContain("registry")
+      expect(capturedPrompt).not.toContain("fallback instructions")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            capturedSystem = systemText(options.prompt)
+            capturedPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("done"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+          Instructions.layer([Instructions.staticSource("registry", "registry")]),
+        ),
+      ),
+    )
+  })
+
+  it.effect("falls back to agent instructions when the Instructions baseline is empty", () => {
+    let capturedSystem: string | undefined
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "empty-instructions-agent", instructions: "fallback instructions" })
+
+      yield* Stream.runDrain(Agent.stream(agent, { prompt: "hello" }))
+
+      expect(capturedSystem).toBe("fallback instructions")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            capturedSystem = systemText(options.prompt)
+            return Stream.make(textDelta("done"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+          Instructions.layer([Instructions.staticSource("empty", "")]),
+        ),
+      ),
+    )
+  })
 
   it.effect("surfaces finish usage while preserving raw finish parts", () => {
     const reportedUsage = usage({ total: 12, cacheRead: 2 }, { total: 5, text: 4 })

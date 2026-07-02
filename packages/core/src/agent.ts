@@ -2,6 +2,7 @@ import { Cause, type Duration, Effect, Fiber, Option, Queue, Ref, type Schema, S
 import * as Ai from "effect/unstable/ai"
 import * as AgentEvent from "./agent-event"
 import * as Approvals from "./approvals"
+import * as Instructions from "./instructions"
 import * as ModelMiddleware from "./model-middleware"
 import * as ModelResilience from "./model-resilience"
 import * as ToolContext from "./tool-context"
@@ -224,7 +225,18 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
 
       const sessionId = options.sessionId ?? "local"
 
-      const system = options.system ?? agent.instructions
+      const instructionsService = yield* Effect.serviceOption(Instructions.Instructions)
+      const instructionsEpoch =
+        options.system === undefined && options.history === undefined && Option.isSome(instructionsService)
+          ? yield* Instructions.openEpoch(instructionsService.value, { agentName: agent.name, turn: 0 })
+          : undefined
+      const system =
+        options.system ??
+        (instructionsEpoch === undefined
+          ? agent.instructions
+          : instructionsEpoch.baseline.length === 0
+            ? agent.instructions
+            : instructionsEpoch.baseline)
 
       // Resolve `Chat.Persistence` optionally so `stream`'s `R` does not grow.
       const persistenceService = yield* Effect.serviceOption(Ai.Chat.Persistence)
