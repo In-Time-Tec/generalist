@@ -4,6 +4,8 @@ Baton (`@batonfx/core`, directory `packages/core`) is a standalone, **non-durabl
 
 Baton is the _Effect_ version of an agent framework, not a port of AI SDK/Mastra vocabulary. Payload vocabulary is `Ai.Prompt`/`Ai.Response` from `effect/unstable/ai` — Baton adds loop framing only, no second wire format.
 
+Compatibility: this spec is tested against `effect` and `@effect/vitest` `4.0.0-beta.93`.
+
 ## Scope
 
 Baton owns:
