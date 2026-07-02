@@ -5,10 +5,12 @@ import {
   Agent,
   AgentEvent,
   Approvals,
+  Compaction,
   Instructions,
   ModelResilience,
   ModelMiddleware,
   Permissions,
+  Session,
   Steering,
   ToolContext,
   ToolExecutor,
@@ -99,6 +101,13 @@ const transientModelError = Ai.AiError.make({
   method: "streamText",
   reason: new Ai.AiError.RateLimitError({}),
 })
+
+const contextOverflowError = (description: string) =>
+  Ai.AiError.make({
+    module: "AgentTestLanguageModel",
+    method: "streamText",
+    reason: new Ai.AiError.UnknownError({ description }),
+  })
 
 const retryTransientModelError = ModelResilience.layer({
   retrySchedule: Schedule.recurs(1),
@@ -691,6 +700,304 @@ describe("Agent", () => {
           modelLayer(() => {
             calls += 1
             return Stream.make(textDelta("done"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("leaves Session untouched when Compaction is absent", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "no-compaction-agent" })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "complete" }))
+      const session = yield* Session.SessionStore
+
+      expect(calls).toBe(1)
+      expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "TurnCompleted", "Completed"])
+      expect(yield* session.path()).toEqual([])
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.make(textDelta("done"))
+          }),
+          Session.memoryLayer,
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("does not duplicate a pre-populated Session path when Compaction is active", () => {
+    let calls = 0
+    const seed = Ai.Prompt.makeMessage("user", { content: [Ai.Prompt.makePart("text", { text: "seed" })] })
+    return Effect.gen(function* () {
+      const session = yield* Session.SessionStore
+      yield* session.append({ _tag: "Message", message: seed })
+      const agent = Agent.make({ name: "prepopulated-session-agent" })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "next", history: Ai.Prompt.fromMessages([seed]) }),
+      )
+      const path = yield* session.path()
+      const seedEntries = path.filter(
+        (entry) => entry._tag === "Message" && JSON.stringify(entry.message.content).includes("seed"),
+      )
+
+      expect(calls).toBe(1)
+      expect(seedEntries).toHaveLength(1)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.make(textDelta("done"))
+          }),
+          Session.memoryLayer,
+          Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("applies proactive compaction before a model call", () => {
+    let prompt = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "proactive-compaction-agent" })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "original prompt", compaction: { contextWindow: 10 } }),
+      )
+
+      expect(prompt).toContain("compacted history")
+      expect(prompt).toContain("compacted prompt")
+      expect(prompt).not.toContain("original prompt")
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            prompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("done"))
+          }),
+          Compaction.testLayer({
+            maybeCompact: () =>
+              Effect.succeed(
+                Option.some({
+                  _tag: "Microcompact",
+                  history: Ai.Prompt.make("compacted history"),
+                  prompt: Ai.Prompt.make("compacted prompt"),
+                }),
+              ),
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("summarizes through the default Compaction layer and records a session boundary", () => {
+    let streamCalls = 0
+    let summaryCalls = 0
+    let secondPrompt = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "default-compaction-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context" }))
+      const session = yield* Session.SessionStore
+      const path = yield* session.path()
+
+      expect(streamCalls).toBe(2)
+      expect(summaryCalls).toBe(1)
+      expect(secondPrompt).toContain("<conversation-checkpoint>")
+      expect(secondPrompt).toContain("checkpoint summary")
+      expect(secondPrompt).toContain("tool-call-compact-summary")
+      expect(path.some((entry) => entry._tag === "Compaction")).toBe(true)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            (options) => {
+              streamCalls += 1
+              if (streamCalls === 1) {
+                return Stream.make(
+                  toolCallPart("tool-call-compact-summary", "echo", { text: "needs summary" }),
+                  finishPart("stop", usage({ total: 100 }, { total: 1 })),
+                )
+              }
+              secondPrompt = JSON.stringify(options.prompt.content)
+              return Stream.make(textDelta("after compaction"))
+            },
+            (options) => {
+              summaryCalls += 1
+              expect(options.toolChoice).toBe("none")
+              return Effect.succeed([{ type: "text", text: "checkpoint summary" }])
+            },
+          ),
+          echoExecutor,
+          Approvals.autoApprove,
+          Session.memoryLayer,
+          Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("uses Compaction layer reserveTokens instead of the Agent default", () => {
+    let streamCalls = 0
+    let summaryCalls = 0
+    let secondPrompt = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "reserve-compaction-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context" }))
+
+      expect(streamCalls).toBe(2)
+      expect(summaryCalls).toBe(0)
+      expect(secondPrompt).not.toContain("<conversation-checkpoint>")
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            (options) => {
+              streamCalls += 1
+              if (streamCalls === 1) {
+                return Stream.make(
+                  toolCallPart("tool-call-reserve", "echo", { text: "reserve" }),
+                  finishPart("stop", usage({ total: 10_000 }, { total: 1 })),
+                )
+              }
+              secondPrompt = JSON.stringify(options.prompt.content)
+              return Stream.make(textDelta("after reserve"))
+            },
+            () => {
+              summaryCalls += 1
+              return Effect.succeed([{ type: "text", text: "unexpected summary" }])
+            },
+          ),
+          echoExecutor,
+          Approvals.autoApprove,
+          Session.memoryLayer,
+          Compaction.layer({ contextWindow: 20_000, reserveTokens: 1, keepRecentTokens: 1 }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("reactively compacts and retries a pre-emission overflow once", () => {
+    let calls = 0
+    let overflowRequests = 0
+    let retriedPrompt = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "reactive-compaction-agent" })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "too large" }))
+
+      expect(calls).toBe(2)
+      expect(overflowRequests).toBe(1)
+      expect(retriedPrompt).toContain("after overflow")
+      expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(1)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 1) return Stream.fail(contextOverflowError("maximum context length exceeded"))
+            retriedPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("recovered"))
+          }),
+          Compaction.testLayer({
+            maybeCompact: (request) =>
+              Effect.sync(() => {
+                if (request.overflow) overflowRequests += 1
+                return Option.some({
+                  _tag: "Microcompact",
+                  history: Ai.Prompt.empty,
+                  prompt: Ai.Prompt.make("after overflow"),
+                })
+              }),
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("fails after one reactive compaction retry", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "reactive-compaction-fail-agent" })
+
+      const error = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "too large" })))
+
+      expect(calls).toBe(2)
+      expect(error._tag).toBe("@batonfx/core/AgentError")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.fail(contextOverflowError("context window overflow"))
+          }),
+          Compaction.testLayer({
+            maybeCompact: () =>
+              Effect.succeed(
+                Option.some({ _tag: "Microcompact", history: Ai.Prompt.empty, prompt: Ai.Prompt.make("retry") }),
+              ),
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("does not retry overflow after partial emission", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "partial-overflow-agent" })
+
+      const error = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "partial" })))
+
+      expect(calls).toBe(1)
+      expect(error._tag).toBe("@batonfx/core/AgentError")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.concat(
+              Stream.make(textDelta("partial")),
+              Stream.fail(contextOverflowError("context length exceeded")),
+            )
+          }),
+          Compaction.testLayer({
+            maybeCompact: () =>
+              Effect.succeed(
+                Option.some({ _tag: "Microcompact", history: Ai.Prompt.empty, prompt: Ai.Prompt.make("retry") }),
+              ),
           }),
           unusedExecutor,
           Approvals.autoApprove,

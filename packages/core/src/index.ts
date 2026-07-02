@@ -1,6 +1,7 @@
 export * as Agent from "./agent"
 export * as AgentEvent from "./agent-event"
 export * as Approvals from "./approvals"
+export * as Compaction from "./compaction"
 export * as Guardrail from "./guardrail"
 export * as Instructions from "./instructions"
 export * as ModelMiddleware from "./model-middleware"

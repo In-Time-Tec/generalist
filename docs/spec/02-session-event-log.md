@@ -38,7 +38,7 @@ Each entry has an opaque `id`, a `parentId` (`null` for a root entry), and optio
 
 ## Agent integration
 
-`SessionStore` is not wired into `Agent.stream` in this milestone. The current agent loop continues to use `Ai.Chat`; later issues compose `Session` for instructions, steering, and compaction.
+`SessionStore` is wired into `Agent.stream` only when `Compaction` is also present. In that mode the loop mirrors chat transcript messages into the session path and appends a `Compaction` entry after summary checkpointing. Without `Compaction`, `SessionStore` remains a standalone seam and the current agent loop continues to use `Ai.Chat` only.
 
 ## Related docs
 

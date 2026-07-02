@@ -2,10 +2,12 @@ import { Cause, type Duration, Effect, Fiber, Option, Queue, Ref, type Schema, S
 import * as Ai from "effect/unstable/ai"
 import * as AgentEvent from "./agent-event"
 import * as Approvals from "./approvals"
+import * as Compaction from "./compaction"
 import * as Instructions from "./instructions"
 import * as ModelMiddleware from "./model-middleware"
 import * as ModelResilience from "./model-resilience"
 import * as Permissions from "./permissions"
+import * as Session from "./session"
 import * as Steering from "./steering"
 import * as ToolContext from "./tool-context"
 import * as ToolExecutor from "./tool-executor"
@@ -62,6 +64,10 @@ export interface RunOptions {
   readonly sessionId?: string
   /** @experimental Spill successful tool outputs whose encoded size exceeds this byte limit. */
   readonly toolOutputMaxBytes?: number
+  /** @experimental Context-window hint for optional compaction. */
+  readonly compaction?: {
+    readonly contextWindow?: number
+  }
   /**
    * @experimental Run this agent on a persisted chat. Requires `Chat.Persistence`
    * to be provided in context (e.g. via `Chat.layerPersisted({ storeId })` over a
@@ -225,6 +231,18 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         )
       }
 
+      if (
+        options.compaction?.contextWindow !== undefined &&
+        (!Number.isFinite(options.compaction.contextWindow) || options.compaction.contextWindow <= 0)
+      ) {
+        return yield* Effect.fail(
+          new AgentEvent.AgentError({
+            message: "RunOptions.compaction.contextWindow must be a positive finite number",
+            turn: 0,
+          }),
+        )
+      }
+
       const sessionId = options.sessionId ?? "local"
 
       const instructionsService = yield* Effect.serviceOption(Instructions.Instructions)
@@ -245,6 +263,9 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const resilienceService = yield* Effect.serviceOption(ModelResilience.ModelResilience)
       const permissionsService = yield* Effect.serviceOption(Permissions.Permissions)
       const steeringService = yield* Effect.serviceOption(Steering.Steering)
+      const compactionService = yield* Effect.serviceOption(Compaction.Compaction)
+      const sessionService = yield* Effect.serviceOption(Session.SessionStore)
+      const tokenizerService = yield* Effect.serviceOption(Ai.Tokenizer.Tokenizer)
       const persistenceOptions = options.persistence
       const persisted: Ai.Chat.Persisted | undefined =
         persistenceOptions === undefined
@@ -307,7 +328,123 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           | { readonly usage: Ai.Response.Usage; readonly reason: Ai.Response.FinishReason }
           | undefined,
         usage: undefined as Ai.Response.Usage | undefined,
+        contextTokens: undefined as number | undefined,
       }
+
+      let sessionSyncedMessages = 0
+      let sessionInitialized = false
+
+      const activeSession = Option.isSome(compactionService) ? sessionService : Option.none<Session.Interface>()
+
+      const sessionError = (turn: number, error: Session.SessionStoreError): AgentEvent.AgentError =>
+        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+
+      const compactionError = (turn: number, error: Compaction.CompactionError): AgentEvent.AgentError =>
+        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+
+      const syncSession = (
+        turn: number,
+        transcript: Ai.Prompt.Prompt,
+      ): Effect.Effect<ReadonlyArray<Session.Entry>, AgentEvent.AgentError> =>
+        Option.match(activeSession, {
+          onNone: () => Effect.succeed([]),
+          onSome: (session) =>
+            Effect.gen(function* () {
+              const existingPath = yield* session.path().pipe(Effect.mapError((error) => sessionError(turn, error)))
+              if (!sessionInitialized) {
+                sessionInitialized = true
+                if (existingPath.length > 0) {
+                  sessionSyncedMessages = transcript.content.length
+                  return existingPath
+                }
+              }
+              for (const message of transcript.content.slice(sessionSyncedMessages)) {
+                yield* session
+                  .append({ _tag: "Message", message })
+                  .pipe(Effect.mapError((error) => sessionError(turn, error)))
+              }
+              sessionSyncedMessages = transcript.content.length
+              return yield* session.path().pipe(Effect.mapError((error) => sessionError(turn, error)))
+            }),
+        })
+
+      const countTokens = (turn: number, prompt: Ai.Prompt.Prompt): Effect.Effect<number, AgentEvent.AgentError> => {
+        if (state.contextTokens !== undefined) return Effect.succeed(state.contextTokens)
+        return Option.match(tokenizerService, {
+          onNone: () => Effect.succeed(0),
+          onSome: (tokenizer) =>
+            tokenizer.tokenize(prompt).pipe(
+              Effect.map((tokens) => tokens.length),
+              Effect.mapError(
+                (error) => new AgentEvent.AgentError({ message: errorMessage(error), turn, cause: error }),
+              ),
+            ),
+        })
+      }
+
+      const compactionUsage = (
+        turn: number,
+        history: Ai.Prompt.Prompt,
+        prompt: Ai.Prompt.Prompt,
+      ): Effect.Effect<Compaction.Usage, AgentEvent.AgentError> =>
+        countTokens(turn, Ai.Prompt.concat(history, prompt)).pipe(
+          Effect.map((contextTokens) => ({
+            contextTokens,
+            contextWindow: options.compaction?.contextWindow ?? Number.POSITIVE_INFINITY,
+            reserveTokens: Compaction.DEFAULT_RESERVE_TOKENS,
+          })),
+        )
+
+      const applyCompactionResult = (
+        turn: number,
+        result: Compaction.Result,
+      ): Effect.Effect<void, AgentEvent.AgentError> =>
+        Effect.gen(function* () {
+          yield* Ref.set(chat.history, result.history)
+          sessionSyncedMessages = result.history.content.length
+          if (result._tag === "Summarize" && Option.isSome(activeSession)) {
+            yield* activeSession.value
+              .append({
+                _tag: "Compaction",
+                summary: result.summary,
+                firstKeptEntryId: result.firstKeptEntryId,
+              })
+              .pipe(Effect.mapError((error) => sessionError(turn, error)))
+          }
+        })
+
+      const preparePrompt = (
+        turn: number,
+        prompt: Ai.Prompt.Prompt,
+        overflow: boolean,
+      ): Effect.Effect<Ai.Prompt.Prompt, AgentEvent.AgentError, Ai.LanguageModel.LanguageModel> =>
+        Option.match(compactionService, {
+          onNone: () => Effect.succeed(prompt),
+          onSome: (compaction) =>
+            Effect.gen(function* () {
+              const history = yield* Ref.get(chat.history)
+              const path = yield* syncSession(turn, history)
+              const usage = yield* compactionUsage(turn, history, prompt)
+              const compacted = yield* compaction
+                .maybeCompact({
+                  agentName: agent.name,
+                  sessionId,
+                  turn,
+                  history,
+                  prompt,
+                  path,
+                  usage,
+                  overflow,
+                  ...(options.toolOutputMaxBytes === undefined
+                    ? {}
+                    : { toolOutputMaxBytes: options.toolOutputMaxBytes }),
+                })
+                .pipe(Effect.mapError((error) => compactionError(turn, error)))
+              if (Option.isNone(compacted)) return prompt
+              yield* applyCompactionResult(turn, compacted.value)
+              return compacted.value.prompt
+            }),
+        })
 
       const boundedSuccessResult = (
         turn: number,
@@ -540,6 +677,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
             reason: part.reason,
           }
           state.usage = state.usage === undefined ? part.usage : AgentEvent.addUsage(state.usage, part.usage)
+          state.contextTokens = part.usage.inputTokens.total ?? state.contextTokens
           Ai.Telemetry.addGenAIAnnotations(span, {
             operation: { name: "chat" },
             usage: {
@@ -634,19 +772,54 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         overrides?: TurnPolicy.TurnOverrides,
       ): Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel> => {
         const toolkit = overrides?.activeTools === undefined ? agent.toolkit : activeToolkit(overrides.activeTools)
+        const attempt = (
+          activePrompt: Ai.Prompt.Prompt,
+          retryOverflow: boolean,
+        ): Stream.Stream<
+          { readonly part: Ai.Response.StreamPart<any>; readonly messages: ReadonlyArray<Ai.Prompt.Message> },
+          AgentEvent.AgentError,
+          Ai.LanguageModel.LanguageModel
+        > =>
+          Stream.unwrap(
+            Ref.get(chat.history).pipe(
+              Effect.map((historyBeforeAttempt) => {
+                let emitted = false
+                const messages = Ai.Prompt.concat(historyBeforeAttempt, activePrompt).content
+                return chat.streamText({ prompt: activePrompt, toolkit, disableToolCallResolution: true }).pipe(
+                  Stream.map((part) => ({ part: part as Ai.Response.StreamPart<any>, messages })),
+                  Stream.tap(() =>
+                    Effect.sync(() => {
+                      emitted = true
+                    }),
+                  ),
+                  Stream.catchCause((cause) => {
+                    const error = Cause.squash(cause)
+                    if (
+                      retryOverflow &&
+                      !emitted &&
+                      Compaction.isContextOverflow(error) &&
+                      Option.isSome(compactionService)
+                    ) {
+                      return Stream.unwrap(
+                        Effect.gen(function* () {
+                          yield* Ref.set(chat.history, historyBeforeAttempt)
+                          const compactedPrompt = yield* preparePrompt(turn, activePrompt, true)
+                          return attempt(compactedPrompt, false)
+                        }),
+                      )
+                    }
+                    return Stream.make({ part: Ai.Response.makePart("error", { error }), messages })
+                  }),
+                )
+              }),
+            ),
+          )
         const parts = Stream.unwrap(
           applyPromptChain(chain, Ai.Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
-            Effect.flatMap((transformedPrompt) =>
-              Ref.get(chat.history).pipe(
-                Effect.map((history) => {
-                  const messages = Ai.Prompt.concat(history, transformedPrompt).content
-                  return chat.streamText({ prompt: transformedPrompt, toolkit, disableToolCallResolution: true }).pipe(
-                    Stream.catchCause((cause) =>
-                      Stream.make(Ai.Response.makePart("error", { error: Cause.squash(cause) })),
-                    ),
-                    Stream.flatMap((part) => applyPartToEvents(turn, part as Ai.Response.StreamPart<any>, messages)),
-                  )
-                }),
+            Effect.flatMap((transformedPrompt) => preparePrompt(turn, transformedPrompt, false)),
+            Effect.map((preparedPrompt) =>
+              attempt(preparedPrompt, true).pipe(
+                Stream.flatMap(({ part, messages }) => applyPartToEvents(turn, part, messages)),
               ),
             ),
           ),
@@ -759,6 +932,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       > =>
         Effect.gen(function* () {
           const transcript = yield* Ref.get(chat.history)
+          yield* syncSession(turn, transcript)
           const completed: AgentEvent.Event = turnCompletedEvent(turn, transcript)
           const pending = state.pending
           if (pending.length === 0) {
