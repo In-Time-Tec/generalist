@@ -6,6 +6,7 @@ import * as Instructions from "./instructions"
 import * as ModelMiddleware from "./model-middleware"
 import * as ModelResilience from "./model-resilience"
 import * as Permissions from "./permissions"
+import * as Steering from "./steering"
 import * as ToolContext from "./tool-context"
 import * as ToolExecutor from "./tool-executor"
 import * as ToolOutput from "./tool-output"
@@ -243,6 +244,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const persistenceService = yield* Effect.serviceOption(Ai.Chat.Persistence)
       const resilienceService = yield* Effect.serviceOption(ModelResilience.ModelResilience)
       const permissionsService = yield* Effect.serviceOption(Permissions.Permissions)
+      const steeringService = yield* Effect.serviceOption(Steering.Steering)
       const persistenceOptions = options.persistence
       const persisted: Ai.Chat.Persisted | undefined =
         persistenceOptions === undefined
@@ -721,6 +723,24 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           }),
         ).pipe(Stream.flatMap((events) => Stream.fromIterable<AgentEvent.Event>(events)))
 
+      const promptFromSteeringMessages = (messages: ReadonlyArray<Steering.Message>): Ai.Prompt.Prompt =>
+        messages.reduce<Ai.Prompt.Prompt>(
+          (prompt, message) => Ai.Prompt.concat(prompt, message.prompt),
+          Ai.Prompt.empty,
+        )
+
+      const takeSteering = (): Effect.Effect<ReadonlyArray<Steering.Message>> =>
+        Option.match(steeringService, {
+          onNone: () => Effect.succeed([]),
+          onSome: (service) => service.takeSteering(),
+        })
+
+      const takeFollowUp = (): Effect.Effect<ReadonlyArray<Steering.Message>> =>
+        Option.match(steeringService, {
+          onNone: () => Effect.succeed([]),
+          onSome: (service) => service.takeFollowUp(),
+        })
+
       const afterTurn = (
         turn: number,
       ): Effect.Effect<
@@ -742,6 +762,13 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           const completed: AgentEvent.Event = turnCompletedEvent(turn, transcript)
           const pending = state.pending
           if (pending.length === 0) {
+            const followUp = yield* takeFollowUp()
+            if (followUp.length > 0) {
+              return {
+                events: Stream.fromIterable<AgentEvent.Event>([completed]),
+                next: { prompt: promptFromSteeringMessages(followUp) },
+              }
+            }
             if (structured !== undefined) {
               return {
                 events: Stream.concat(
@@ -777,7 +804,10 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
             }
           }
           state.pending = []
-          const basePrompt = Ai.Prompt.fromResponseParts(pending)
+          const steering = yield* takeSteering()
+          const toolPrompt = Ai.Prompt.fromResponseParts(pending)
+          const basePrompt =
+            steering.length === 0 ? toolPrompt : Ai.Prompt.concat(promptFromSteeringMessages(steering), toolPrompt)
           const prompt =
             decision.overrides?.instructions === undefined
               ? basePrompt

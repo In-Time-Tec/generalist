@@ -25,6 +25,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - **Guardrail**: ergonomic `ModelMiddleware.Middleware` combinators for input validation, prompt/output regex redaction, and output filtering. Guardrails are not a separate subsystem; they compose through `ModelMiddleware.layer([...])`.
 - **Instructions**: the ordered context-source registry. `openEpoch` renders baseline sources once into the run's system-message baseline and keeps dynamic sources for later `renderUpdate` calls; filesystem, skills, and memory sources are contributed by later packages/seams.
 - **Session**: an append-only conversation entry log with a current leaf pointer for branch navigation. `Session.buildContext(path)` is the pure projector from a root-to-leaf path into an `Ai.Prompt`; durable/addressable storage belongs to hosts such as Relay.
+- **Steering**: the optional live-input seam with two queues. Steering input drains after tool results and before the next model turn; follow-up input drains only when the run would otherwise complete. Queue interruption leaves undrained messages in the service layer.
 - **Chat persistence seam**: `RunOptions.persistence` runs the loop on a persisted `Ai.Chat` instead of a fresh one. Baton delegates all chat storage to `effect/unstable/ai`'s `Chat.Persistence`; it adds no chat store of its own.
 - **Tool output spill seam**: `ToolOutputStore` stores oversized tool outputs out of context when present and when `RunOptions.toolOutputMaxBytes` is exceeded. It is non-durable in core; durable blob stores belong to hosts such as Relay.
 
@@ -38,6 +39,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Pending tool results are never silently dropped: a `Stop` policy with pending results fails the run.
 - Permission policy is optional. Absent `Permissions` preserves existing tool execution and `needsApproval` behavior exactly.
 - Instructions context baselines are opened at run start; dynamic context updates are rendered separately and are not injected until the compaction/update contract does so.
+- Steering is optional. Absent `Steering` preserves current turn and completion behavior exactly.
 - Session context is derived from a root-to-leaf path, not stored separately.
 - `TurnPolicy` is a plain value, not a service — agents carry their own default like `Schedule` values.
 - Every behavior-bearing seam exposes a test or memory layer (`testLayer`) so tests swap implementations through Effect layers.
@@ -49,3 +51,4 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Session event-log contract: `docs/spec/02-session-event-log.md`
 - Instructions and context-epoch contract: `docs/spec/03-instructions-and-context-epoch.md`
 - Permissions policy contract: `docs/spec/04-permissions-policy.md`
+- Steering and interrupts contract: `docs/spec/05-steering-and-interrupts.md`

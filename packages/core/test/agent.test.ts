@@ -9,6 +9,7 @@ import {
   ModelResilience,
   ModelMiddleware,
   Permissions,
+  Steering,
   ToolContext,
   ToolExecutor,
   ToolOutput,
@@ -669,6 +670,245 @@ describe("Agent", () => {
                 remembered.push(rule)
               }),
           }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("preserves completion behavior when Steering is absent", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "no-steering-agent" })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "complete" }))
+
+      expect(calls).toBe(1)
+      expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "TurnCompleted", "Completed"])
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return Stream.make(textDelta("done"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("drains steering after tool calls and before tool results", () => {
+    let calls = 0
+    let secondMessages: ReadonlyArray<Ai.Prompt.Message> = []
+    return Effect.gen(function* () {
+      const steering = yield* Steering.Steering
+      yield* steering.steer({ prompt: "steer one" })
+      yield* steering.steer({ prompt: "steer two" })
+      const agent = Agent.make({ name: "steering-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool" }))
+
+      expect(calls).toBe(2)
+      const secondPrompt = JSON.stringify(secondMessages)
+      expect(secondPrompt).toContain("steer one")
+      expect(secondPrompt).toContain("steer two")
+      expect(secondPrompt).toContain("from model")
+      const toolCallIndex = secondMessages.findIndex((message) => message.role === "assistant")
+      const steerOneIndex = secondMessages.findIndex((message) => JSON.stringify(message.content).includes("steer one"))
+      const steerTwoIndex = secondMessages.findIndex((message) => JSON.stringify(message.content).includes("steer two"))
+      const toolResultIndex = secondMessages.findIndex((message) => message.role === "tool")
+      expect(toolCallIndex).toBeGreaterThanOrEqual(0)
+      expect(steerOneIndex).toBeGreaterThan(toolCallIndex)
+      expect(steerTwoIndex).toBeGreaterThan(steerOneIndex)
+      expect(toolResultIndex).toBeGreaterThan(steerTwoIndex)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 1) {
+              return Stream.make(toolCallPart("tool-call-steer", "echo", { text: "from model" }))
+            }
+            secondMessages = options.prompt.content
+            return Stream.make(textDelta("after steering"))
+          }),
+          echoExecutor,
+          Approvals.autoApprove,
+          Steering.layer({ steeringMode: "all" }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("steering one-at-a-time leaves later steering queued", () => {
+    let calls = 0
+    let secondPrompt = ""
+    return Effect.gen(function* () {
+      const steering = yield* Steering.Steering
+      yield* steering.steer({ prompt: "first steer" })
+      yield* steering.steer({ prompt: "second steer" })
+      const agent = Agent.make({ name: "steering-one-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      yield* Stream.runDrain(Agent.stream(agent, { prompt: "use tool" }))
+      const remaining = yield* steering.takeSteering()
+
+      expect(secondPrompt).toContain("first steer")
+      expect(secondPrompt).not.toContain("second steer")
+      expect(remaining.map((message) => message.prompt)).toEqual(["second steer"])
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 1) {
+              return Stream.make(toolCallPart("tool-call-steering-one", "echo", { text: "from model" }))
+            }
+            secondPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("after first steering"))
+          }),
+          echoExecutor,
+          Approvals.autoApprove,
+          Steering.layer({ steeringMode: "one-at-a-time" }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("drains follow-up only when the run would otherwise complete", () => {
+    let calls = 0
+    const prompts: Array<string> = []
+    return Effect.gen(function* () {
+      const steering = yield* Steering.Steering
+      yield* steering.followUp({ prompt: "follow one" })
+      yield* steering.followUp({ prompt: "follow two" })
+      const agent = Agent.make({ name: "follow-up-agent" })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start" }))
+
+      expect(calls).toBe(3)
+      expect(prompts[1]).toContain("follow one")
+      expect(prompts[2]).toContain("follow two")
+      expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(3)
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") expect(completed.turns).toBe(3)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            prompts.push(JSON.stringify(options.prompt.content))
+            calls += 1
+            return Stream.make(textDelta(`turn ${calls}`))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          Steering.layer(),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("follow-up all mode combines queued follow-ups into one next turn", () => {
+    let calls = 0
+    let secondPrompt = ""
+    return Effect.gen(function* () {
+      const steering = yield* Steering.Steering
+      yield* steering.followUp({ prompt: "follow one" })
+      yield* steering.followUp({ prompt: "follow two" })
+      const agent = Agent.make({ name: "follow-up-all-agent" })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start" }))
+
+      expect(calls).toBe(2)
+      expect(secondPrompt).toContain("follow one")
+      expect(secondPrompt).toContain("follow two")
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") expect(completed.turns).toBe(2)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 2) secondPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta(`turn ${calls}`))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          Steering.layer({ followUpMode: "all" }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("follow-up delays terminal structured output until follow-up is drained", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const steering = yield* Steering.Steering
+      yield* steering.followUp({ prompt: "follow before object" })
+      const agent = Agent.make({ name: "follow-up-structured-agent" })
+
+      const events = yield* Stream.runCollect(Agent.streamObject(agent, { prompt: "start", schema: objectSchema }))
+
+      expect(calls).toBe(2)
+      expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(2)
+      const structured = events.find((event) => event._tag === "StructuredOutput")
+      if (structured?._tag === "StructuredOutput") expect(structured.turn).toBe(2)
+      const completed = events.at(-1)
+      if (completed?._tag === "Completed") expect(completed.turns).toBe(3)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            () => {
+              calls += 1
+              return Stream.make(textDelta(`turn ${calls}`))
+            },
+            () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          Steering.layer(),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("interrupting Agent.stream preserves undrained steering queues", () => {
+    let started: Deferred.Deferred<void> | undefined
+    return Effect.gen(function* () {
+      const currentStarted = yield* Deferred.make<void>()
+      started = currentStarted
+      const steering = yield* Steering.Steering
+      yield* steering.steer({ prompt: "queued steering" })
+      yield* steering.followUp({ prompt: "queued follow-up" })
+      const agent = Agent.make({ name: "interrupt-steering-agent" })
+      const run = Stream.runDrain(Agent.stream(agent, { prompt: "never finish" }))
+      const fiber = yield* run.pipe(Effect.forkChild({ startImmediately: true }))
+
+      yield* Deferred.await(currentStarted)
+      yield* Fiber.interrupt(fiber)
+
+      expect((yield* steering.takeSteering()).map((message) => message.prompt)).toEqual(["queued steering"])
+      expect((yield* steering.takeFollowUp()).map((message) => message.prompt)).toEqual(["queued follow-up"])
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() =>
+            Stream.fromEffect(
+              started === undefined ? Effect.die("missing started Deferred") : Deferred.succeed(started, undefined),
+            ).pipe(Stream.drain, Stream.concat(Stream.never)),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          Steering.layer(),
           ModelMiddleware.identityLayer,
         ),
       ),
