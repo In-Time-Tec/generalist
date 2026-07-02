@@ -15,7 +15,8 @@ SPEC.md
 │  ├─ 03-instructions-and-context-epoch.md     instructions registry and context epoch contract
 │  ├─ 04-permissions-policy.md                 tool permissions policy contract
 │  ├─ 05-steering-and-interrupts.md            steering queues and interrupt contract
-│  └─ 06-compaction.md                         compaction strategy and loop integration contract
+│  ├─ 06-compaction.md                         compaction strategy and loop integration contract
+│  └─ 07-skills.md                             skill source and filesystem loader contract
 └─ docs/spec/decisions/
    ├─ ADR-0001-baton-standalone-agent-framework.md
    ├─ ADR-0002-tool-context-output-spill.md
@@ -25,15 +26,17 @@ SPEC.md
    ├─ ADR-0006-instructions-context-epoch.md
    ├─ ADR-0007-permissions-policy-seam.md
    ├─ ADR-0008-steering-and-run-interrupts.md
-   └─ ADR-0009-compaction-strategy-seam.md
+   ├─ ADR-0009-compaction-strategy-seam.md
+   └─ ADR-0010-adopt-agentskills-standard.md
 ```
 
 ## Packages
 
-| Package         | npm             | Directory       | Purpose                                                                                                                                                                                                                                                                             |
-| --------------- | --------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@batonfx/core` | `@batonfx/core` | `packages/core` | The Effect-native agent loop: Agent, Instructions, Session, Steering, Compaction, structured output, TurnPolicy, ToolExecutor, ToolContext, ToolOutputStore, Permissions, Approvals, ModelRegistry, ModelResilience, ModelMiddleware, Guardrail combinators, chat persistence seam. |
-| `@batonfx/mcp`  | `@batonfx/mcp`  | `packages/mcp`  | MCP client bridge: discover an MCP server's tools as an `Ai.Toolkit` plus a Baton `ToolExecutor` adapter (`@batonfx/mcp/baton`).                                                                                                                                                    |
+| Package           | npm               | Directory         | Purpose                                                                                                                                                                                                                                                                                          |
+| ----------------- | ----------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@batonfx/core`   | `@batonfx/core`   | `packages/core`   | The Effect-native agent loop: Agent, Instructions, Session, SkillSource, Steering, Compaction, structured output, TurnPolicy, ToolExecutor, ToolContext, ToolOutputStore, Permissions, Approvals, ModelRegistry, ModelResilience, ModelMiddleware, Guardrail combinators, chat persistence seam. |
+| `@batonfx/mcp`    | `@batonfx/mcp`    | `packages/mcp`    | MCP client bridge: discover an MCP server's tools as an `Ai.Toolkit` plus a Baton `ToolExecutor` adapter (`@batonfx/mcp/baton`).                                                                                                                                                                 |
+| `@batonfx/skills` | `@batonfx/skills` | `packages/skills` | Filesystem `SKILL.md` and instruction-file sources for core seams.                                                                                                                                                                                                                               |
 
 ## Feature branches
 
@@ -43,6 +46,7 @@ SPEC.md
 - Permissions policy contract: `docs/spec/04-permissions-policy.md`
 - Steering and interrupts contract: `docs/spec/05-steering-and-interrupts.md`
 - Compaction strategy contract: `docs/spec/06-compaction.md`
+- Skills contract: `docs/spec/07-skills.md`
 
 ## Decisions
 
@@ -55,3 +59,4 @@ SPEC.md
 - ADR-0007 — Permissions Policy Seam: `docs/spec/decisions/ADR-0007-permissions-policy-seam.md`
 - ADR-0008 — Steering and Run Interrupts: `docs/spec/decisions/ADR-0008-steering-and-run-interrupts.md`
 - ADR-0009 — Compaction Strategy Seam: `docs/spec/decisions/ADR-0009-compaction-strategy-seam.md`
+- ADR-0010 — Adopt the agentskills.io Skill Format: `docs/spec/decisions/ADR-0010-adopt-agentskills-standard.md`

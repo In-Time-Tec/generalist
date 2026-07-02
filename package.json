@@ -43,6 +43,7 @@
   "dependencies": {
     "@batonfx/core": "workspace:*",
     "@batonfx/mcp": "workspace:*",
+    "@batonfx/skills": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

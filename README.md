@@ -24,6 +24,8 @@ The full contract is in [`docs/spec/01-baton-agent-framework.md`](docs/spec/01-b
 bun add @batonfx/core
 # optional: MCP tool bridge
 bun add @batonfx/mcp
+# optional: SKILL.md and instruction-file sources
+bun add @batonfx/skills
 ```
 
 `effect` is a peer of your app; Baton is pinned to a single `effect` catalog entry so the two never drift.
@@ -70,6 +72,7 @@ Provide a `LanguageModel` layer (via `ModelRegistry` or an `@effect/ai-*` provid
 | ------------------------ | -------------------------------------------------------------- |
 | `packages/core`          | `@batonfx/core` — the Effect-native agent loop.                |
 | `packages/mcp`           | `@batonfx/mcp` — the MCP client bridge and Baton adapter.      |
+| `packages/skills`        | `@batonfx/skills` — SKILL.md and instruction-file sources.     |
 | `docs/spec/`             | Specification tree (feature docs and ADRs).                    |
 | `ast-grep/`              | Structural lint rules (including the `@relayfx/*` import ban). |
 | `SPEC.md` / `CONTEXT.md` | Specification index and canonical vocabulary.                  |

@@ -24,6 +24,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - **ModelMiddleware**: the interceptor seam for everything going into (`transformPrompt`) or out of (`transformPart`) the model — PII scrubbing, prompt-injection screening, output filtering, logging. Ships a `identityLayer` default and no built-in filters.
 - **Guardrail**: ergonomic `ModelMiddleware.Middleware` combinators for input validation, prompt/output regex redaction, and output filtering. Guardrails are not a separate subsystem; they compose through `ModelMiddleware.layer([...])`.
 - **Instructions**: the ordered context-source registry. `openEpoch` renders baseline sources once into the run's system-message baseline and keeps dynamic sources for later `renderUpdate` calls; filesystem, skills, and memory sources are contributed by later packages/seams.
+- **SkillSource**: the optional source seam for agentskills.io `SKILL.md` skills. Startup context receives selected listings only; bodies load lazily on activation. Filesystem discovery lives in `@batonfx/skills`, not core.
 - **Session**: an append-only conversation entry log with a current leaf pointer for branch navigation. `Session.buildContext(path)` is the pure projector from a root-to-leaf path into an `Ai.Prompt`; durable/addressable storage belongs to hosts such as Relay.
 - **Steering**: the optional live-input seam with two queues. Steering input drains after tool results and before the next model turn; follow-up input drains only when the run would otherwise complete. Queue interruption leaves undrained messages in the service layer.
 - **Compaction**: the optional context-shrinking seam for long runs. A strategy decides whether to compact, chooses a safe session cut point, and summarizes old context into a checkpoint after first trying tool-output microcompaction.
@@ -40,6 +41,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Pending tool results are never silently dropped: a `Stop` policy with pending results fails the run.
 - Permission policy is optional. Absent `Permissions` preserves existing tool execution and `needsApproval` behavior exactly.
 - Instructions context baselines are opened at run start; dynamic context updates are rendered separately and are not injected until the compaction/update contract does so.
+- SkillSource is optional and standalone. The Agent loop does not activate or read skills automatically in v1.
 - Steering is optional. Absent `Steering` preserves current turn and completion behavior exactly.
 - Compaction is optional. Absent `Compaction` preserves current turn, session, and completion behavior exactly.
 - Session context is derived from a root-to-leaf path, not stored separately.
@@ -55,3 +57,4 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Permissions policy contract: `docs/spec/04-permissions-policy.md`
 - Steering and interrupts contract: `docs/spec/05-steering-and-interrupts.md`
 - Compaction strategy contract: `docs/spec/06-compaction.md`
+- Skills contract: `docs/spec/07-skills.md`
