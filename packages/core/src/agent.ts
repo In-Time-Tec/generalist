@@ -1,9 +1,11 @@
-import { Cause, type Duration, Effect, Option, Ref, Stream } from "effect"
+import { Cause, type Duration, Effect, Fiber, Option, Queue, Ref, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
 import * as AgentEvent from "./agent-event"
 import * as Approvals from "./approvals"
 import * as ModelMiddleware from "./model-middleware"
+import * as ToolContext from "./tool-context"
 import * as ToolExecutor from "./tool-executor"
+import * as ToolOutput from "./tool-output"
 import * as TurnPolicy from "./turn-policy"
 
 /** @experimental An agent definition: a plain value, not a service. */
@@ -52,6 +54,10 @@ export interface RunOptions {
   /** Overrides the derived system message when `history` is not set. */
   readonly system?: string
   readonly resume?: Resume
+  /** @experimental Opaque host-assigned identity for this run/session. */
+  readonly sessionId?: string
+  /** @experimental Spill successful tool outputs whose encoded size exceeds this byte limit. */
+  readonly toolOutputMaxBytes?: number
   /**
    * @experimental Run this agent on a persisted chat. Requires `Chat.Persistence`
    * to be provided in context (e.g. via `Chat.layerPersisted({ storeId })` over a
@@ -185,6 +191,20 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         )
       }
 
+      if (
+        options.toolOutputMaxBytes !== undefined &&
+        (!Number.isFinite(options.toolOutputMaxBytes) || options.toolOutputMaxBytes < 0)
+      ) {
+        return yield* Effect.fail(
+          new AgentEvent.AgentError({
+            message: "RunOptions.toolOutputMaxBytes must be a non-negative finite number",
+            turn: 0,
+          }),
+        )
+      }
+
+      const sessionId = options.sessionId ?? "local"
+
       const system = options.system ?? agent.instructions
 
       // Resolve `Chat.Persistence` optionally so `stream`'s `R` does not grow.
@@ -253,6 +273,43 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         usage: undefined as Ai.Response.Usage | undefined,
       }
 
+      const boundedSuccessResult = (
+        turn: number,
+        call: AnyToolCall,
+        outcome: ToolExecutor.Success,
+      ): Effect.Effect<PendingToolResult, AgentEvent.AgentError> =>
+        (options.toolOutputMaxBytes === undefined
+          ? Effect.succeed(outcome)
+          : ToolOutput.bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes }).pipe(
+              Effect.mapError((error) => new AgentEvent.AgentError({ message: error.message, turn, cause: error })),
+            )
+        ).pipe(Effect.map((bounded) => successResult(call, bounded)))
+
+      const outcomeEvents = (
+        turn: number,
+        call: AnyToolCall,
+        outcome: ToolExecutor.Outcome,
+      ): Effect.Effect<Stream.Stream<AgentEvent.Event, RunError>, AgentEvent.AgentError> => {
+        switch (outcome._tag) {
+          case "Success":
+            return boundedSuccessResult(turn, call, outcome).pipe(
+              Effect.map((result) => {
+                state.pending.push(result)
+                return Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
+              }),
+            )
+          case "Failure": {
+            const result = failedResult(call, outcome.message)
+            state.pending.push(result)
+            return Effect.succeed(
+              Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }]),
+            )
+          }
+          case "Suspend":
+            return Effect.succeed(failSuspended(call, outcome.token, "tool-wait"))
+        }
+      }
+
       const executeApproved = (
         turn: number,
         call: AnyToolCall,
@@ -261,28 +318,37 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         Stream.concat(
           Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
           Stream.unwrap(
-            executor.execute(request).pipe(
-              Effect.map((outcome): Stream.Stream<AgentEvent.Event, RunError> => {
-                switch (outcome._tag) {
-                  case "Success": {
-                    const result = successResult(call, outcome)
-                    state.pending.push(result)
-                    return Stream.fromIterable<AgentEvent.Event>([
-                      { _tag: "ToolExecutionCompleted", turn, call, result },
-                    ])
+            Effect.gen(function* () {
+              const progressQueue = yield* Queue.unbounded<AgentEvent.ToolProgress, Cause.Done>()
+              const signal = yield* Effect.abortSignal
+              const context = ToolContext.ToolContext.of({
+                signal,
+                sessionId,
+                emit: (progress) => {
+                  const event: AgentEvent.ToolProgress = {
+                    _tag: "ToolProgress",
+                    turn,
+                    toolCallId: progress.toolCallId,
+                    ...(progress.message === undefined ? {} : { message: progress.message }),
+                    ...(progress.data === undefined ? {} : { data: progress.data }),
                   }
-                  case "Failure": {
-                    const result = failedResult(call, outcome.message)
-                    state.pending.push(result)
-                    return Stream.fromIterable<AgentEvent.Event>([
-                      { _tag: "ToolExecutionCompleted", turn, call, result },
-                    ])
-                  }
-                  case "Suspend":
-                    return failSuspended(call, outcome.token, "tool-wait")
-                }
-              }),
-            ),
+                  return Queue.offer(progressQueue, event).pipe(Effect.asVoid)
+                },
+              })
+              const fiber = yield* executor
+                .execute(request)
+                .pipe(
+                  Effect.provideService(ToolContext.ToolContext, context),
+                  Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
+                  Effect.forkScoped({ startImmediately: true }),
+                )
+              return Stream.concat(
+                Stream.fromQueue(progressQueue),
+                Stream.fromEffect(Fiber.join(fiber)).pipe(
+                  Stream.flatMap((outcome) => Stream.unwrap(outcomeEvents(turn, call, outcome))),
+                ),
+              )
+            }),
           ),
         )
 
@@ -291,7 +357,7 @@ export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
         call: AnyToolCall,
         messages: ReadonlyArray<Ai.Prompt.Message>,
       ): Stream.Stream<AgentEvent.Event, RunError> => {
-        const request: ToolExecutor.Request = { call, turn, agentName: agent.name }
+        const request: ToolExecutor.Request = { call, turn, agentName: agent.name, sessionId }
         const tool = agent.toolkit.tools[call.name] as Ai.Tool.Any | undefined
         return Stream.unwrap(
           approvalRequired(tool, call, messages).pipe(

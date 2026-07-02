@@ -1,7 +1,16 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor, TurnPolicy } from "../src/index"
+import {
+  Agent,
+  AgentEvent,
+  Approvals,
+  ModelMiddleware,
+  ToolContext,
+  ToolExecutor,
+  ToolOutput,
+  TurnPolicy,
+} from "../src/index"
 
 type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
 
@@ -210,6 +219,235 @@ describe("Agent", () => {
             return Stream.make(textDelta("after tool"))
           }),
           echoExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("provides ToolContext to executors and emits ToolProgress events", () => {
+    let calls = 0
+    let requestSessionId = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "context-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "use the context tool", sessionId: "session-1" }),
+      )
+
+      const tags = events.map((event) => event._tag)
+      expect(requestSessionId).toBe("session-1")
+      expect(tags.indexOf("ToolExecutionStarted")).toBeLessThan(tags.indexOf("ToolProgress"))
+      expect(tags.indexOf("ToolProgress")).toBeLessThan(tags.indexOf("ToolExecutionCompleted"))
+      const progress = events.find((event) => event._tag === "ToolProgress")
+      if (progress?._tag === "ToolProgress") {
+        expect(progress.turn).toBe(0)
+        expect(progress.toolCallId).toBe("tool-call-context")
+        expect(progress.message).toBe("working")
+        expect(progress.data).toEqual({ phase: "started" })
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-context", "echo", { text: "from model" }))
+              : Stream.make(textDelta("after context"))
+          }),
+          ToolExecutor.testLayer({
+            execute: (request) =>
+              Effect.gen(function* () {
+                requestSessionId = request.sessionId
+                const context = yield* ToolContext.ToolContext
+                expect(context.sessionId).toBe("session-1")
+                expect(context.signal.aborted).toBe(false)
+                yield* context.emit({
+                  toolCallId: request.call.id,
+                  message: "working",
+                  data: { phase: "started" },
+                })
+                return { _tag: "Success", result: { ok: true }, encodedResult: { ok: true } }
+              }),
+          }),
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("provides ToolContext to default toolkit handlers", () => {
+    let calls = 0
+    let handlerSessionId = ""
+    const handledTool = Ai.Tool.make("handled-context", {
+      description: "Reads Baton ToolContext from a toolkit handler",
+      parameters: Schema.Struct({ text: Schema.String }),
+      success: Schema.Unknown,
+      dependencies: [ToolContext.ToolContext],
+    })
+    const toolkit = Ai.Toolkit.make(handledTool)
+    return Effect.gen(function* () {
+      const handledToolkit = yield* toolkit.pipe(
+        Effect.provide(
+          toolkit.toLayer({
+            "handled-context": () =>
+              Effect.gen(function* () {
+                const context = yield* ToolContext.ToolContext
+                handlerSessionId = context.sessionId
+                yield* context.emit({ toolCallId: "tool-call-handled-context", message: "from handler" })
+                return { ok: true }
+              }),
+          }),
+        ),
+      )
+      const agent = Agent.make({ name: "toolkit-context-agent", toolkit })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "use handler", sessionId: "session-toolkit" }),
+      ).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            modelLayer(() => {
+              calls += 1
+              return calls === 1
+                ? Stream.make(toolCallPart("tool-call-handled-context", "handled-context", { text: "from model" }))
+                : Stream.make(textDelta("after handler"))
+            }),
+            ToolExecutor.fromToolkit(handledToolkit),
+            Approvals.autoApprove,
+            ModelMiddleware.identityLayer,
+          ),
+        ),
+      )
+
+      expect(handlerSessionId).toBe("session-toolkit")
+      expect(events.some((event) => event._tag === "ToolProgress")).toBe(true)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    })
+  })
+
+  it.effect("passes sessionId to approvals for gated tools", () => {
+    let calls = 0
+    let approvalSessionId = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "gated-session-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "needs approval", sessionId: "session-approval" }),
+      )
+
+      expect(approvalSessionId).toBe("session-approval")
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-gated-session", "gated", { text: "from model" }))
+              : Stream.make(textDelta("after denial"))
+          }),
+          unusedExecutor,
+          Approvals.testLayer({
+            check: (request) => {
+              approvalSessionId = request.sessionId
+              return Effect.succeed({ _tag: "Denied" })
+            },
+          }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("aborts ToolContext signals when a running tool stream is interrupted", () => {
+    let calls = 0
+    let aborted = false
+    return Effect.gen(function* () {
+      const started = yield* Deferred.make<void>()
+      const agent = Agent.make({ name: "abort-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const run = Stream.runDrain(Agent.stream(agent, { prompt: "abort the tool" })).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            modelLayer(() => {
+              calls += 1
+              return Stream.make(toolCallPart("tool-call-abort", "echo", { text: "from model" }))
+            }),
+            ToolExecutor.testLayer({
+              execute: () =>
+                Effect.gen(function* () {
+                  const context = yield* ToolContext.ToolContext
+                  context.signal.addEventListener("abort", () => {
+                    aborted = true
+                  })
+                  yield* Deferred.succeed(started, undefined)
+                  yield* Effect.never
+                  return { _tag: "Failure", message: "unreachable" }
+                }),
+            }),
+            Approvals.autoApprove,
+            ModelMiddleware.identityLayer,
+          ),
+        ),
+      )
+
+      const fiber = yield* run.pipe(Effect.forkChild({ startImmediately: true }))
+      yield* Deferred.await(started)
+      yield* Fiber.interrupt(fiber)
+
+      expect(aborted).toBe(true)
+    })
+  })
+
+  it.effect("spills large successful tool results before re-feeding them", () => {
+    let calls = 0
+    let stored: { readonly toolCallId: string; readonly content: unknown } | undefined
+    let secondPrompt = ""
+    const largeOutput = "x".repeat(256)
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "spill-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "use big tool", sessionId: "spill-session", toolOutputMaxBytes: 48 }),
+      )
+
+      const completed = events.find((event) => event._tag === "ToolExecutionCompleted")
+      expect(stored).toEqual({
+        toolCallId: "tool-call-spill",
+        content: { result: largeOutput, encodedResult: largeOutput },
+      })
+      if (completed?._tag === "ToolExecutionCompleted") {
+        expect(completed.result.encodedResult).toMatchObject({
+          inline: { truncated: true, maxBytes: 48 },
+          outputPaths: ["mem:tool-call-spill"],
+        })
+        expect(JSON.stringify(completed.result.encodedResult)).not.toContain(largeOutput)
+      }
+      expect(secondPrompt).toContain("mem:tool-call-spill")
+      expect(secondPrompt).not.toContain(largeOutput)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 1) {
+              return Stream.make(toolCallPart("tool-call-spill", "echo", { text: "from model" }))
+            }
+            secondPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("after spill"))
+          }),
+          ToolExecutor.testLayer({
+            execute: () => Effect.succeed({ _tag: "Success", result: largeOutput, encodedResult: largeOutput }),
+          }),
+          ToolOutput.testLayer({
+            put: (toolCallId, content) => {
+              stored = { toolCallId, content }
+              return Effect.succeed(Option.some(`mem:${toolCallId}`))
+            },
+          }),
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
         ),

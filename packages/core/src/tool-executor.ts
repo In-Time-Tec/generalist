@@ -1,12 +1,14 @@
 import { Cause, Context, Effect, Layer, Option, Sink, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
 import * as AgentEvent from "./agent-event"
+import * as ToolContext from "./tool-context"
 
 /** @experimental A single tool-call execution request. */
 export interface Request {
   readonly call: Ai.Response.ToolCallPart<string, unknown>
   readonly turn: number
   readonly agentName: string
+  readonly sessionId: string
 }
 
 /** @experimental Tool ran; `result`/`encodedResult` feed the tool-result part. */
@@ -33,7 +35,7 @@ export type Outcome = Success | Failure | Suspend
 
 /** @experimental */
 export interface Interface {
-  readonly execute: (request: Request) => Effect.Effect<Outcome, AgentEvent.AgentError>
+  readonly execute: (request: Request) => Effect.Effect<Outcome, AgentEvent.AgentError, ToolContext.ToolContext>
 }
 
 /** @experimental */

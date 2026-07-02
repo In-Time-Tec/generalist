@@ -27,6 +27,16 @@ export interface ToolExecutionStarted {
   readonly metadata?: Metadata
 }
 
+/** @experimental An in-flight progress update from a running tool. */
+export interface ToolProgress {
+  readonly _tag: "ToolProgress"
+  readonly turn: number
+  readonly toolCallId: string
+  readonly message?: string
+  readonly data?: Record<string, unknown>
+  readonly metadata?: Metadata
+}
+
 /** @experimental A tool call finished; `result` is the part re-fed to the model. */
 export interface ToolExecutionCompleted {
   readonly _tag: "ToolExecutionCompleted"
@@ -93,6 +103,7 @@ export type Event =
   | TurnStarted
   | ModelPart
   | ToolExecutionStarted
+  | ToolProgress
   | ToolExecutionCompleted
   | ApprovalRequested
   | TurnCompleted

@@ -1,6 +1,6 @@
-import { ToolExecutor } from "@batonfx/core"
+import { ToolContext, ToolExecutor } from "@batonfx/core"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import * as Ai from "effect/unstable/ai"
 import { toolExecutorLayer, toolkit } from "../src/baton"
 import { makeFixture } from "./fixture"
@@ -9,11 +9,12 @@ const request = (name: string, params: unknown): ToolExecutor.Request => ({
   call: Ai.Response.makePart("tool-call", { id: `call-${name}`, name, params, providerExecuted: false }),
   turn: 0,
   agentName: "mcp-test-agent",
+  sessionId: "mcp-test-session",
 })
 
 const execute = (source: Parameters<typeof toolExecutorLayer>[0], name: string, params: unknown) =>
   ToolExecutor.ToolExecutor.use((executor) => executor.execute(request(name, params))).pipe(
-    Effect.provide(toolExecutorLayer(source)),
+    Effect.provide(Layer.mergeAll(toolExecutorLayer(source), ToolContext.layerDefault)),
   )
 
 describe("baton adapter", () => {
