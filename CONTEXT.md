@@ -18,6 +18,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - **AgentEvent**: the closed union of loop events hosts observe and optionally persist (`ModelPart`, `TurnStarted`, `TurnCompleted`, `StructuredOutput`, `ApprovalRequested`, `Completed`, tool execution and progress events).
 - **AgentError**: a `Schema.TaggedErrorClass` for loop failures (policy stop with pending results, middleware bugs, misconfiguration).
 - **AgentSuspended**: a typed error on the stream's error channel signalling the run did not finish and must be re-entered via `RunOptions.resume` once the host resolves the suspension `token`. Reasons: `tool-wait` (from a `Suspend` outcome) or `approval` (from a `Pending` decision).
+- **Permissions**: the optional policy seam consulted for every framework-executed local tool call before `ToolExecutor` and before `Ai.Tool.needsApproval` / `Approvals`. It evaluates declarative allow/deny/ask rules. Allow continues to the existing approval path, deny re-feeds a failed tool result, and ask suspends via `AgentSuspended { reason: "approval" }` unless an in-process host answers.
 - **ModelRegistry**: the provider-agnostic registry that maps a model selection to a concrete Effect AI `LanguageModel` layer. Missing registrations fail typed, not silently.
 - **ModelResilience**: the optional model-call retry seam. It classifies live model-call failures as `transient` or `terminal` and supplies the retry schedule applied inside a single model call; streamed turns retry only before any part has been emitted.
 - **ModelMiddleware**: the interceptor seam for everything going into (`transformPrompt`) or out of (`transformPart`) the model — PII scrubbing, prompt-injection screening, output filtering, logging. Ships a `identityLayer` default and no built-in filters.
@@ -35,6 +36,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Errors that cross a service boundary are `Schema.TaggedErrorClass`.
 - No `Date.now()` or raw platform time/concurrency/randomness — use Effect primitives.
 - Pending tool results are never silently dropped: a `Stop` policy with pending results fails the run.
+- Permission policy is optional. Absent `Permissions` preserves existing tool execution and `needsApproval` behavior exactly.
 - Instructions context baselines are opened at run start; dynamic context updates are rendered separately and are not injected until the compaction/update contract does so.
 - Session context is derived from a root-to-leaf path, not stored separately.
 - `TurnPolicy` is a plain value, not a service — agents carry their own default like `Schedule` values.
@@ -46,3 +48,4 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Agent framework contract: `docs/spec/01-baton-agent-framework.md`
 - Session event-log contract: `docs/spec/02-session-event-log.md`
 - Instructions and context-epoch contract: `docs/spec/03-instructions-and-context-epoch.md`
+- Permissions policy contract: `docs/spec/04-permissions-policy.md`

@@ -5,6 +5,7 @@ import * as Approvals from "./approvals"
 import * as Instructions from "./instructions"
 import * as ModelMiddleware from "./model-middleware"
 import * as ModelResilience from "./model-resilience"
+import * as Permissions from "./permissions"
 import * as ToolContext from "./tool-context"
 import * as ToolExecutor from "./tool-executor"
 import * as ToolOutput from "./tool-output"
@@ -241,6 +242,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       // Resolve `Chat.Persistence` optionally so `stream`'s `R` does not grow.
       const persistenceService = yield* Effect.serviceOption(Ai.Chat.Persistence)
       const resilienceService = yield* Effect.serviceOption(ModelResilience.ModelResilience)
+      const permissionsService = yield* Effect.serviceOption(Permissions.Permissions)
       const persistenceOptions = options.persistence
       const persisted: Ai.Chat.Persisted | undefined =
         persistenceOptions === undefined
@@ -384,14 +386,40 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           ),
         )
 
-      const toolCallEvents = (
+      const permissionError = (turn: number, error: Permissions.PermissionError): AgentEvent.AgentError =>
+        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+
+      const permissionDeniedEvents = (
+        turn: number,
+        call: AnyToolCall,
+        reason: string | undefined,
+      ): Stream.Stream<AgentEvent.Event> => {
+        const result = failedResult(call, reason ?? "Permission denied")
+        state.pending.push(result)
+        return Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
+      }
+
+      const rememberAlways = (turn: number, call: AnyToolCall): Effect.Effect<void, AgentEvent.AgentError> =>
+        Effect.serviceOption(Permissions.RuleStore).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () => Effect.void,
+              onSome: (store) =>
+                store
+                  .remember({ pattern: call.name, level: "allow" })
+                  .pipe(Effect.mapError((error) => permissionError(turn, error))),
+            }),
+          ),
+        )
+
+      const approvalEvents = (
         turn: number,
         call: AnyToolCall,
         messages: ReadonlyArray<Ai.Prompt.Message>,
-      ): Stream.Stream<AgentEvent.Event, RunError> => {
-        const request: ToolExecutor.Request = { call, turn, agentName: agent.name, sessionId }
-        const tool = agent.toolkit.tools[call.name] as Ai.Tool.Any | undefined
-        return Stream.unwrap(
+        request: ToolExecutor.Request,
+        tool: Ai.Tool.Any | undefined,
+      ): Stream.Stream<AgentEvent.Event, RunError> =>
+        Stream.unwrap(
           approvalRequired(tool, call, messages).pipe(
             Effect.map((isRequired): Stream.Stream<AgentEvent.Event, RunError> => {
               if (!isRequired) return executeApproved(turn, call, request)
@@ -419,6 +447,86 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
               )
             }),
           ),
+        )
+
+      const permissionAnsweredEvents = (
+        turn: number,
+        call: AnyToolCall,
+        request: ToolExecutor.Request,
+        answer: Permissions.Answer,
+      ): Stream.Stream<AgentEvent.Event, RunError> => {
+        switch (answer._tag) {
+          case "Approved":
+            return executeApproved(turn, call, request)
+          case "Denied":
+            return permissionDeniedEvents(turn, call, answer.reason)
+          case "Always":
+            return Stream.unwrap(rememberAlways(turn, call).pipe(Effect.as(executeApproved(turn, call, request))))
+        }
+      }
+
+      const permissionAskEvents = (
+        turn: number,
+        call: AnyToolCall,
+        request: ToolExecutor.Request,
+        token: string,
+      ): Stream.Stream<AgentEvent.Event, RunError> => {
+        const pending: Permissions.Pending = {
+          token,
+          tool: call.name,
+          params: call.params,
+          agentName: agent.name,
+          turn,
+          toolCallId: call.id,
+        }
+        if (Option.isNone(permissionsService)) return failSuspended(call, token, "approval")
+        return Stream.concat(
+          Stream.fromIterable<AgentEvent.Event>([{ _tag: "ApprovalRequested", turn, call }]),
+          Stream.unwrap(
+            permissionsService.value.await(pending).pipe(
+              Effect.mapError((error) => permissionError(turn, error)),
+              Effect.map(
+                Option.match({
+                  onNone: () => failSuspended(call, token, "approval"),
+                  onSome: (answer) => permissionAnsweredEvents(turn, call, request, answer),
+                }),
+              ),
+            ),
+          ),
+        )
+      }
+
+      const toolCallEvents = (
+        turn: number,
+        call: AnyToolCall,
+        messages: ReadonlyArray<Ai.Prompt.Message>,
+      ): Stream.Stream<AgentEvent.Event, RunError> => {
+        const request: ToolExecutor.Request = { call, turn, agentName: agent.name, sessionId }
+        const tool = agent.toolkit.tools[call.name] as Ai.Tool.Any | undefined
+        if (Option.isNone(permissionsService)) return approvalEvents(turn, call, messages, request, tool)
+        return Stream.unwrap(
+          permissionsService.value
+            .evaluate({
+              tool: call.name,
+              params: call.params,
+              agentName: agent.name,
+              turn,
+              toolCallId: call.id,
+              sessionId,
+            })
+            .pipe(
+              Effect.mapError((error) => permissionError(turn, error)),
+              Effect.map((decision): Stream.Stream<AgentEvent.Event, RunError> => {
+                switch (decision._tag) {
+                  case "Allow":
+                    return approvalEvents(turn, call, messages, request, tool)
+                  case "Deny":
+                    return permissionDeniedEvents(turn, call, decision.reason)
+                  case "Ask":
+                    return permissionAskEvents(turn, call, request, decision.token)
+                }
+              }),
+            ),
         )
       }
 

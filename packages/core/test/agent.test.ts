@@ -8,6 +8,7 @@ import {
   Instructions,
   ModelResilience,
   ModelMiddleware,
+  Permissions,
   ToolContext,
   ToolExecutor,
   ToolOutput,
@@ -492,6 +493,181 @@ describe("Agent", () => {
               approvalSessionId = request.sessionId
               return Effect.succeed({ _tag: "Denied" })
             },
+          }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("denies through Permissions before approvals or executor", () => {
+    let calls = 0
+    let secondPrompt = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "permission-deny-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "needs permission" }))
+
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(false)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
+      const denied = events.find((event) => event._tag === "ToolExecutionCompleted")
+      if (denied?._tag === "ToolExecutionCompleted") {
+        expect(denied.result.isFailure).toBe(true)
+        expect(JSON.stringify(denied.result.encodedResult)).toContain("Permission denied")
+      }
+      expect(secondPrompt).toContain("Permission denied")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 1) {
+              return Stream.make(toolCallPart("tool-call-permission-deny", "gated", { text: "blocked" }))
+            }
+            secondPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("saw denied permission"))
+          }),
+          ToolExecutor.testLayer({ execute: () => Effect.die("permission-denied call must not execute") }),
+          Approvals.testLayer({ check: () => Effect.die("permission-denied call must not ask approvals") }),
+          Permissions.fromRuleset({ rules: [{ pattern: "gated", level: "deny" }] }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("allows through Permissions while preserving tool-declared approvals", () => {
+    let calls = 0
+    let secondPrompt = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "permission-allow-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "needs approval" }))
+
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
+      expect(secondPrompt).toContain("Tool call denied")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            if (calls === 1) {
+              return Stream.make(toolCallPart("tool-call-permission-allow", "gated", { text: "still gated" }))
+            }
+            secondPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("saw approval denial"))
+          }),
+          ToolExecutor.testLayer({ execute: () => Effect.die("approval-denied call must not execute") }),
+          Approvals.denyAll,
+          Permissions.allowAll,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("suspends permission asks through the existing approval suspension path", () => {
+    const events: Array<AgentEvent.Event> = []
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "permission-ask-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+
+      const failure = yield* Effect.flip(
+        Stream.runForEach(Agent.stream(agent, { prompt: "needs permission" }), (event) =>
+          Effect.sync(() => {
+            events.push(event)
+          }),
+        ),
+      )
+
+      expect(events.map((event) => event._tag)).toEqual([
+        "TurnStarted",
+        "ModelPart",
+        "ApprovalRequested",
+        "TurnCompleted",
+      ])
+      expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
+      if (failure._tag === "@batonfx/core/AgentSuspended") {
+        expect(failure.reason).toBe("approval")
+        expect(failure.token).toBe("permission:tool-call-permission-ask")
+        expect(failure.tool_name).toBe("gated")
+        expect(failure.tool_params).toEqual({ text: "ask" })
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => Stream.make(toolCallPart("tool-call-permission-ask", "gated", { text: "ask" }))),
+          ToolExecutor.testLayer({ execute: () => Effect.die("permission ask must not execute") }),
+          Approvals.testLayer({ check: () => Effect.die("permission ask must not ask approvals") }),
+          Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("executes permission Approved answers without consulting Approvals again", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "permission-approved-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "ask then approve" }))
+
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-permission-approved", "gated", { text: "approved" }))
+              : Stream.make(textDelta("after approved permission"))
+          }),
+          echoExecutor,
+          Approvals.testLayer({ check: () => Effect.die("permission-approved call must not ask approvals") }),
+          Permissions.interactive({
+            ruleset: { rules: [], fallback: "ask" },
+            onAsk: () => Effect.succeed({ _tag: "Approved" }),
+          }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("remembers Always answers through the optional RuleStore", () => {
+    let calls = 0
+    const remembered: Array<Permissions.Rule> = []
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "permission-always-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "ask always" }))
+
+      expect(remembered).toEqual([{ pattern: "gated", level: "allow" }])
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-permission-always", "gated", { text: "always" }))
+              : Stream.make(textDelta("after always"))
+          }),
+          echoExecutor,
+          Approvals.testLayer({ check: () => Effect.die("permission-always call must not ask approvals") }),
+          Permissions.interactive({
+            ruleset: { rules: [], fallback: "ask" },
+            onAsk: () => Effect.succeed({ _tag: "Always" }),
+          }),
+          Permissions.ruleStoreTestLayer({
+            remember: (rule) =>
+              Effect.sync(() => {
+                remembered.push(rule)
+              }),
           }),
           ModelMiddleware.identityLayer,
         ),
