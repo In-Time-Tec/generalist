@@ -16,7 +16,7 @@ Baton owns:
 - the suspension contract (`AgentSuspended` on the error channel, resumable via `RunOptions.resume`);
 - the provider-agnostic `ModelRegistry` for `LanguageModel` layer registration and selection.
 
-Baton does not own (deferred, see ADR-0001): UI helpers, memory abstractions, evals, guardrails, multi-agent/handoffs, durability of any kind. Baton owns a **chat persistence seam** (`RunOptions.persistence`, see below) but no persistence _implementation_ — consumers provide upstream `Chat.Persistence` layers. Baton also owns a non-durable **tool output spill seam** (`ToolOutputStore`, see below); durable blob stores remain host-side.
+Baton does not own (deferred, see ADR-0001): UI helpers, memory abstractions, evals, model-judge guardrails or detection heuristics, multi-agent/handoffs, durability of any kind. Baton owns ergonomic **Guardrail** combinators over `ModelMiddleware`, but no separate guardrail subsystem. Baton owns a **chat persistence seam** (`RunOptions.persistence`, see below) but no persistence _implementation_ — consumers provide upstream `Chat.Persistence` layers. Baton also owns a non-durable **tool output spill seam** (`ToolOutputStore`, see below); durable blob stores remain host-side.
 
 ## Boundary rule
 
@@ -31,6 +31,7 @@ Baton does not own (deferred, see ADR-0001): UI helpers, memory abstractions, ev
 | `agent.ts`            | `Agent`           | Agent definition value, `make`, text `stream`/`generate`, and structured `streamObject`/`generateObject`. |
 | `agent-event.ts`      | `AgentEvent`      | Closed union of loop events, including `StructuredOutput`, plus tagged run errors.                        |
 | `approvals.ts`        | `Approvals`       | Enforcement point for `Ai.Tool.needsApproval`; `autoApprove`, `denyAll`, and `testLayer`.                 |
+| `guardrail.ts`        | `Guardrail`       | Ergonomic input/output guardrail combinators that produce `ModelMiddleware.Middleware` values.            |
 | `model-middleware.ts` | `ModelMiddleware` | Interceptor seam for model input (prompt) and output (stream parts); `identityLayer` default.             |
 | `model-registry.ts`   | `ModelRegistry`   | Provider-agnostic `LanguageModel` registration/selection.                                                 |
 | `model-resilience.ts` | `ModelResilience` | Optional retry seam for model-call failures inside the loop.                                              |
@@ -82,7 +83,7 @@ Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run
 
 ## Model middleware
 
-`ModelMiddleware` (`model-middleware.ts`) is the interceptor seam for everything that goes **into** or comes **out of** the model. It is where PII scrubbing, prompt-injection screening, output filtering, and prompt logging plug in without forking the loop. Baton ships the seam and an identity default only — **no built-in filters in v1**.
+`ModelMiddleware` (`model-middleware.ts`) is the interceptor seam for everything that goes **into** or comes **out of** the model. It is where PII scrubbing, prompt-injection screening, output filtering, and prompt logging plug in without forking the loop. Baton ships the seam, an identity default, and `Guardrail` middleware combinators only — no model-judge guardrails or detection heuristics.
 
 - **Service** — `ModelMiddleware` holds a `ReadonlyArray<Middleware>` (the chain), applied in array order. `identityLayer` provides the empty chain and is the default; `layer(middleware)` provides an explicit chain. The loop requires `ModelMiddleware`, so `Agent.stream` / `Agent.generate` have `ModelMiddleware` in their requirements `R` alongside `LanguageModel`, `ToolExecutor`, and `Approvals`.
 - **A `Middleware`** has two optional hooks; an omitted hook is identity:
@@ -94,6 +95,16 @@ Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run
 - **Error semantics** — a hook that fails on the error channel fails the whole run with that `AgentError` (middleware are host bugs, not model failures). A `transformPrompt` failure fails the turn **before** the model is called — no model call happens.
 - **Placement** — middleware runs **before** the fold that dispatches tool calls and accumulates text, so middleware sees raw model output and everything downstream (`AgentEvent`s, tool dispatch, and any host-side persistence) sees the transformed stream. A durable host that persists model output after this fold therefore persists exactly the transformed/dropped parts: guardrails act **before** durability.
 - **Structured output** — `transformPrompt` applies to the terminal `objectPrompt` with the structured turn index. `transformPart` does not apply to the structured response because the terminal turn uses non-streaming `chat.generateObject`; consumers observe that response via `StructuredOutput.content`.
+
+### Guardrails
+
+`Guardrail` (`guardrail.ts`) exports typed combinators that return plain `ModelMiddleware.Middleware` values and compose through `ModelMiddleware.layer([...])` in the same array order as any other middleware. They add no new service, ordering rule, or loop state.
+
+- `validateInput(check)` runs in `transformPrompt`. `check(prompt, context)` returns `Effect<Option<string>>`; `None` allows the prompt unchanged, and `Some(reason)` blocks the run with `AgentError { turn: context.turn }` before the model is called.
+- `redactInput({ pattern, replacement? })` rewrites text-bearing prompt fields before the model sees them. It redacts system message content, prompt text parts, reasoning text, and tool approval-response reasons; it leaves file data, tool-call params, tool-result payloads, identifiers, and provider options unchanged.
+- `redactOutput({ pattern, replacement? })` rewrites streamed `text-delta.delta` values before they are folded, emitted, or persisted. It is per-part and does not detect matches split across stream chunks.
+- `filterOutput(keep)` runs in `transformPart` and returns `Option.none()` for non-tool parts when `keep(part, context)` is false. Tool-call parts are never dropped by this combinator, preserving tool execution and avoiding accidental middleware violations.
+- Output guardrails do not apply to the terminal structured-output response because that path is non-streaming; `StructuredOutput.content` is emitted as returned by upstream `chat.generateObject`.
 
 ## Suspension contract
 
@@ -139,4 +150,5 @@ Baton is designed to be composed behind a durable runtime's own agent-loop inter
 - `docs/spec/decisions/ADR-0001-baton-standalone-agent-framework.md`
 - `docs/spec/decisions/ADR-0002-tool-context-output-spill.md`
 - `docs/spec/decisions/ADR-0003-model-resilience.md`
+- `docs/spec/decisions/ADR-0004-guardrail-combinators.md`
 - `README.md`

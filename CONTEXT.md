@@ -21,6 +21,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - **ModelRegistry**: the provider-agnostic registry that maps a model selection to a concrete Effect AI `LanguageModel` layer. Missing registrations fail typed, not silently.
 - **ModelResilience**: the optional model-call retry seam. It classifies live model-call failures as `transient` or `terminal` and supplies the retry schedule applied inside a single model call; streamed turns retry only before any part has been emitted.
 - **ModelMiddleware**: the interceptor seam for everything going into (`transformPrompt`) or out of (`transformPart`) the model — PII scrubbing, prompt-injection screening, output filtering, logging. Ships a `identityLayer` default and no built-in filters.
+- **Guardrail**: ergonomic `ModelMiddleware.Middleware` combinators for input validation, prompt/output regex redaction, and output filtering. Guardrails are not a separate subsystem; they compose through `ModelMiddleware.layer([...])`.
 - **Chat persistence seam**: `RunOptions.persistence` runs the loop on a persisted `Ai.Chat` instead of a fresh one. Baton delegates all chat storage to `effect/unstable/ai`'s `Chat.Persistence`; it adds no chat store of its own.
 - **Tool output spill seam**: `ToolOutputStore` stores oversized tool outputs out of context when present and when `RunOptions.toolOutputMaxBytes` is exceeded. It is non-durable in core; durable blob stores belong to hosts such as Relay.
 
