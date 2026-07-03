@@ -1,111 +1,80 @@
 # BatonFX
 
-BatonFX is a standalone, **non-durable**, Effect-native agent framework — a model-turn loop built directly on `effect/unstable/ai`. Baton is the agent; a durable runtime such as [Relay](https://github.com/In-Time-Tec/relayfx) is the durable race it runs in. Use Baton alone when you just need an agent or chat streaming; compose it behind a durable runtime when you need suspend/resume durability. Baton depends on `effect` only.
-
-## What Baton is
-
-Baton owns the model-turn loop and nothing durable:
-
-- **`Agent`** — an agent definition value (`Agent.make`) with `Agent.stream` (the loop primitive) and `Agent.generate` (derived). Builds an `Ai.Chat`, streams model output with `disableToolCallResolution: true`, folds stream parts, executes tool calls, re-feeds tool results, and repeats per policy.
-- **`TurnPolicy`** — a plain, `Schedule`-inspired value deciding whether to run another turn when tool results are pending (`recurs`, `untilToolCall`, `both`, `make`; default `recurs(8)`).
-- **`ToolExecutor`** — the tool-call execution seam (`Success | Failure | Suspend`). Default `fromToolkit` runs the toolkit's handlers in-process.
-- **`Approvals`** — the enforcement point for `Ai.Tool.needsApproval` (`Approved | Denied | Pending`); `Pending` suspends the run.
-- **`ModelRegistry`** — provider-agnostic `LanguageModel` layer registration and selection; missing registrations fail typed.
-- **`ModelMiddleware`** — the interceptor seam for model input/output (PII scrubbing, injection screening, output filtering, logging); ships an identity default only.
-- **Memory** — optional recall/remember seam in core; non-durable working-memory and semantic-recall layers live in `@batonfx/memory`.
-- **Chat persistence seam** — `RunOptions.persistence` runs the loop on a persisted `Ai.Chat`, delegating all storage to `effect/unstable/ai`'s `Chat.Persistence`.
-
-Suspension is a typed error (`AgentSuspended`) on the stream's error channel, re-entered via `RunOptions.resume` — the seam designed to be backed by durable runtimes like Relay. Every export is `@experimental` while `effect/unstable/ai` is itself unstable.
-
-The full contract is in [`docs/spec/01-baton-agent-framework.md`](docs/spec/01-baton-agent-framework.md); the vocabulary is in [`CONTEXT.md`](CONTEXT.md).
-
-## Install
-
-```bash
-bun add @batonfx/core
-# optional: MCP tool bridge
-bun add @batonfx/mcp
-# optional: SKILL.md and instruction-file sources
-bun add @batonfx/skills
-# optional: provider registration helpers and embeddings
-bun add @batonfx/providers
-# optional: non-durable working memory and semantic recall layers
-bun add @batonfx/memory
-```
-
-`effect` is a peer of your app; Baton is pinned to a single `effect` catalog entry so the two never drift.
-
-## Usage
-
-A persisted chat that carries conversation history across runs (memory-backed shown; swap `Persistence.layerBackingSql` for SQL):
+BatonFX is the **Effect-native agent framework**: a standalone, non-durable model-turn loop over `effect/unstable/ai` with typed tools, typed suspension, provider layers, memory, skills, transport, and UI adapters that compose as Effect services.
 
 ```ts
 import { Effect, Layer } from "effect"
-import * as Ai from "effect/unstable/ai"
-import { Persistence } from "effect/unstable/persistence"
-import { Agent } from "@batonfx/core"
+import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Deterministic } from "@batonfx/providers"
 
-const persistenceLayer = Ai.Chat.layerPersisted({ storeId: "my-app-chats" }).pipe(
-  Layer.provide(Persistence.layerBackingMemory),
-)
+const agent = Agent.make({ name: "assistant", instructions: "Be concise." })
 
-const agent = Agent.make({ name: "assistant", instructions: "You are a helpful assistant." })
-
-// Run 1 and run 2 share the same chatId, so run 2 sees run 1's history.
-const program = Effect.gen(function* () {
-  const first = yield* Agent.generate(agent, {
-    prompt: "My name is Ada.",
-    persistence: { chatId: "user-42" },
-  })
-  const second = yield* Agent.generate(agent, {
-    prompt: "What is my name?",
-    persistence: { chatId: "user-42" },
-  })
-  return [first.text, second.text]
-}).pipe(Effect.provide(persistenceLayer))
-```
-
-Provide a `LanguageModel` layer (via `ModelRegistry`, `@batonfx/providers`, or an `@effect/ai-*` provider) plus the `ToolExecutor`, `Approvals`, and `ModelMiddleware` seams — `fromToolkit`, `autoApprove`/`denyAll`, and `identityLayer` are the built-in defaults. See the package README and tests under `packages/core` for more.
-
-`@batonfx/providers` turns upstream provider packages into `ModelRegistry` layers:
-
-```ts
-import { Config, Effect } from "effect"
-import { Agent, ModelRegistry } from "@batonfx/core"
-import { Presets } from "@batonfx/providers"
-
-const agent = Agent.make({ name: "assistant" })
-
-const program = ModelRegistry.provide(
-  { provider: "groq", model: "llama-3.3-70b-versatile" },
-  Agent.generate(agent, { prompt: "Hello" }),
-).pipe(
+const program = Agent.generate(agent, { prompt: "Explain Baton in one sentence." }).pipe(
   Effect.provide(
-    Presets.withGroq({
-      model: "llama-3.3-70b-versatile",
-      apiKey: Config.redacted("GROQ_API_KEY"),
-    }),
+    Layer.mergeAll(
+      Deterministic.withDeterministic({ model: "local" }),
+      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
+      Approvals.autoApprove,
+      ModelMiddleware.identityLayer,
+    ),
   ),
 )
 ```
 
-## MCP tools
+Baton is the agent; a durable runtime such as [Relay](https://github.com/In-Time-Tec/relayfx) is the durable race it runs in. Use Baton alone for process-local agents and chat streaming. Compose it behind Relay when you need durable, addressable suspend/resume executions.
 
-`@batonfx/mcp` connects to an MCP server, discovers its tools, and exposes them two ways: as an `Ai.Toolkit` Baton consumes as-is, and as a Baton `ToolExecutor` layer (`@batonfx/mcp/baton`) that proxies calls to the server. The MCP SDK dependency lives entirely in `@batonfx/mcp`; core keeps its `effect`-only rule.
+## Install
+
+```bash
+bun add effect @batonfx/core
+bun add @batonfx/providers @batonfx/mcp @batonfx/skills @batonfx/memory
+bun add @batonfx/transport @batonfx/foldkit
+```
+
+## Capability matrix
+
+| Capability                                                          | Package              | Stable tier for 0.1.0                         |
+| ------------------------------------------------------------------- | -------------------- | --------------------------------------------- |
+| Agent loop, events, typed suspension, turn policy, tools, approvals | `@batonfx/core`      | stable core tags; APIs marked `@experimental` |
+| Provider registration, deterministic local model, model catalog     | `@batonfx/providers` | experimental                                  |
+| MCP discovery and Baton `ToolExecutor` adapter                      | `@batonfx/mcp`       | experimental                                  |
+| SKILL.md and instruction-file sources                               | `@batonfx/skills`    | experimental                                  |
+| Working memory, vector store, semantic recall                       | `@batonfx/memory`    | experimental                                  |
+| SSE, WebSocket, wire frames, in-memory session registry             | `@batonfx/transport` | experimental                                  |
+| FoldKit connection, subscription, commands, headless chat model     | `@batonfx/foldkit`   | experimental                                  |
+
+## A plugin is a Layer
+
+Baton seams are Effect services. You pay only for the seams you provide: a model registry layer, an approvals layer, a memory layer, a transport registry layer, or your own host implementation. The core loop discovers optional seams with `Effect.serviceOption` when the contract says they are optional.
+
+## Effect beta compatibility
+
+| Baton release | Tested Effect range                               | Notes                                                                               |
+| ------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `0.1.x`       | `effect@4.0.0-beta.93` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+
+## Start here
+
+- Consumer docs: [`docs/site/README.md`](docs/site/README.md)
+- 5-minute guide: [`docs/site/getting-started.md`](docs/site/getting-started.md)
+- Runnable examples: [`examples/`](examples/)
+- Normative specification: [`SPEC.md`](SPEC.md)
+- Vocabulary: [`CONTEXT.md`](CONTEXT.md)
 
 ## Repository layout
 
-| Path                     | Purpose                                                        |
-| ------------------------ | -------------------------------------------------------------- |
-| `packages/core`          | `@batonfx/core` — the Effect-native agent loop.                |
-| `packages/memory`        | `@batonfx/memory` — non-durable memory implementations.        |
-| `packages/mcp`           | `@batonfx/mcp` — the MCP client bridge and Baton adapter.      |
-| `packages/providers`     | `@batonfx/providers` — provider helpers and embedding layers.  |
-| `packages/skills`        | `@batonfx/skills` — SKILL.md and instruction-file sources.     |
-| `docs/spec/`             | Specification tree (feature docs and ADRs).                    |
-| `ast-grep/`              | Structural lint rules (including the `@relayfx/*` import ban). |
-| `SPEC.md` / `CONTEXT.md` | Specification index and canonical vocabulary.                  |
-| `AGENTS.md`              | Conventions for AI agents working in this repo.                |
+| Path                 | Purpose                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| `packages/core`      | `@batonfx/core` — the Effect-native agent loop.                                     |
+| `packages/providers` | `@batonfx/providers` — provider helpers and deterministic local models.             |
+| `packages/mcp`       | `@batonfx/mcp` — MCP client bridge and Baton adapter.                               |
+| `packages/skills`    | `@batonfx/skills` — SKILL.md and instruction-file sources.                          |
+| `packages/memory`    | `@batonfx/memory` — non-durable memory implementations.                             |
+| `packages/transport` | `@batonfx/transport` — wire frames, session registry, SSE, WS, and client adapters. |
+| `packages/foldkit`   | `@batonfx/foldkit` — FoldKit adapter and headless chat model.                       |
+| `docs/spec`          | Normative specs and ADRs.                                                           |
+| `docs/site`          | Consumer-facing guides, recipes, API stability, and positioning.                    |
+| `examples`           | Private Bun workspaces typechecked in CI.                                           |
 
 ## Verification
 
@@ -114,10 +83,13 @@ bun install
 bun run format:check
 bun run lint
 bun run typecheck
+bun run check:docs
+bun run typecheck:examples
+bun run check:release
 bun run test
 bun run build
 ```
 
 ## Provenance
 
-Baton was developed by [In Time Tec](https://intimetec.com) and is composed inside [Relay](https://github.com/In-Time-Tec/relayfx) (the `@relayfx` durable runtime). BatonFX is the standalone home of the framework; the durable-composition half lives in the relayfx repository.
+Baton was developed by [In Time Tec](https://intimetec.com) and is composed inside [Relay](https://github.com/In-Time-Tec/relayfx). Relay owns durability, addressability, event logs, and hosted execution. Baton owns the standalone non-durable primitives.

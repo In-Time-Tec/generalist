@@ -1,0 +1,24 @@
+{
+  "name": "@batonfx/example-capstone-local-assistant",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "typecheck": "bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@batonfx/core": "workspace:*",
+    "@batonfx/foldkit": "workspace:*",
+    "@batonfx/mcp": "workspace:*",
+    "@batonfx/memory": "workspace:*",
+    "@batonfx/providers": "workspace:*",
+    "@batonfx/skills": "workspace:*",
+    "@batonfx/transport": "workspace:*",
+    "effect": "catalog:",
+    "foldkit": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

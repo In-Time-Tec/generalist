@@ -1,0 +1,17 @@
+{
+  "name": "@batonfx/example-multi-agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "typecheck": "bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@batonfx/core": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}
