@@ -10,6 +10,7 @@
         "@batonfx/memory": "workspace:*",
         "@batonfx/providers": "workspace:*",
         "@batonfx/skills": "workspace:*",
+        "@batonfx/transport": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -101,6 +102,20 @@
         "vitest": "catalog:",
       },
     },
+    "packages/transport": {
+      "name": "@batonfx/transport",
+      "version": "0.0.0",
+      "dependencies": {
+        "@batonfx/core": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
   },
   "catalog": {
     "@ast-grep/cli": "0.44.0",
@@ -156,6 +171,8 @@
     "@batonfx/providers": ["@batonfx/providers@workspace:packages/providers"],
 
     "@batonfx/skills": ["@batonfx/skills@workspace:packages/skills"],
+
+    "@batonfx/transport": ["@batonfx/transport@workspace:packages/transport"],
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
 
