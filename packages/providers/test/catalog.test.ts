@@ -1,0 +1,63 @@
+import { describe, expect, it } from "@effect/vitest"
+import { Effect } from "effect"
+import * as CatalogSubpath from "@batonfx/providers/catalog"
+import { Catalog } from "../src/index"
+
+describe("Catalog", () => {
+  it.effect("requires a known bundled model", () =>
+    Effect.gen(function* () {
+      const metadata = yield* Catalog.require({ provider: "openai", model: "gpt-4o-mini" })
+
+      expect(metadata.provider).toBe("openai")
+      expect(metadata.model).toBe("gpt-4o-mini")
+      expect(metadata.contextWindow).toBeGreaterThan(0)
+      expect(metadata.maxOutput).toBeGreaterThan(0)
+    }).pipe(Effect.provide(Catalog.layer())),
+  )
+
+  it.effect("fails typed when required metadata is missing", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(Catalog.require({ provider: "missing", model: "none" }))
+
+      expect(failure._tag).toBe("@batonfx/providers/ModelMetadataNotFound")
+      if (failure._tag === "@batonfx/providers/ModelMetadataNotFound") {
+        expect(failure.provider).toBe("missing")
+        expect(failure.model).toBe("none")
+      }
+    }).pipe(Effect.provide(Catalog.layer())),
+  )
+
+  it.effect("lets overrides shadow bundled metadata by provider and model", () => {
+    const override: Catalog.ModelMetadata = {
+      provider: "openai",
+      model: "gpt-4o-mini",
+      contextWindow: 42,
+      maxOutput: 7,
+      pricing: { inputPerMTok: 1 },
+      modalities: ["text"],
+    }
+
+    return Effect.gen(function* () {
+      const metadata = yield* Catalog.require({ provider: "openai", model: "gpt-4o-mini" })
+      const all = yield* Catalog.all()
+
+      expect(metadata).toEqual(override)
+      expect(all.find((entry) => entry.provider === "openai" && entry.model === "gpt-4o-mini")).toEqual(override)
+    }).pipe(Effect.provide(Catalog.layer([override])))
+  })
+
+  it.effect("returns undefined from lookup when metadata is missing", () =>
+    Effect.gen(function* () {
+      const metadata = yield* Catalog.lookup({ provider: "missing", model: "none" })
+
+      expect(metadata).toBeUndefined()
+    }).pipe(Effect.provide(Catalog.layer())),
+  )
+
+  it("exports the catalog namespace and subpath", () => {
+    expect(typeof Catalog.layer).toBe("function")
+    expect(typeof Catalog.testLayer).toBe("function")
+    expect(typeof CatalogSubpath.layer).toBe("function")
+    expect(CatalogSubpath.ModelCatalog).toBeDefined()
+  })
+})

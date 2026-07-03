@@ -61,6 +61,20 @@ Embeddings are not registered in `ModelRegistry`, which is language-model-only. 
 
 Memory packages consume the Effect AI embedding tag rather than importing provider packages.
 
+## Model metadata catalog
+
+`@batonfx/providers/catalog` exposes an offline-safe `ModelCatalog` service for model metadata: context window, maximum output tokens, optional price-per-million-token fields, and optional text/image/audio modalities.
+
+`Catalog.layer(overrides?)` serves a bundled static snapshot and applies caller overrides by exact `(provider, model)` identity. `Catalog.testLayer(entries)` installs only the provided entries for tests. `lookup` returns `undefined` for unknown models; `require` fails with `ModelMetadataNotFound`.
+
+The bundled table is intentionally not exhaustive. It is a checked-in snapshot for common models, not a hosted metadata system. Callers that need fresher prices, region-specific limits, custom OpenAI-compatible deployments, or private models pass overrides.
+
+A future live metadata fetcher, if added, must be an explicit optional layer and must not replace the offline-safe default.
+
+### Provider metadata gaps
+
+Google AI Studio is reachable through the OpenAI-compatible preset. Baton does not ship first-party Google or Bedrock provider helpers in this milestone because the relevant upstream Effect AI providers are not compatible with the pinned Effect AI v4 beta catalog used by this repository. Users can still represent those models through catalog overrides when they use an OpenAI-compatible endpoint or their own provider layer.
+
 ## Integration
 
 Consumers install `@batonfx/providers` when they want provider convenience helpers. `@batonfx/core` remains provider-agnostic and `effect`-only. Relay can later re-export these helpers or compose them into durable addressable runs without Baton depending on Relay.
@@ -69,3 +83,4 @@ Consumers install `@batonfx/providers` when they want provider convenience helpe
 
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0011-provider-registration-helpers.md`
+- `docs/spec/decisions/ADR-0012-model-metadata-catalog.md`

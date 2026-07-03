@@ -29,7 +29,8 @@ SPEC.md
    ├─ ADR-0008-steering-and-run-interrupts.md
    ├─ ADR-0009-compaction-strategy-seam.md
    ├─ ADR-0010-adopt-agentskills-standard.md
-   └─ ADR-0011-provider-registration-helpers.md
+   ├─ ADR-0011-provider-registration-helpers.md
+   └─ ADR-0012-model-metadata-catalog.md
 ```
 
 ## Packages
@@ -65,3 +66,4 @@ SPEC.md
 - ADR-0009 — Compaction Strategy Seam: `docs/spec/decisions/ADR-0009-compaction-strategy-seam.md`
 - ADR-0010 — Adopt the agentskills.io Skill Format: `docs/spec/decisions/ADR-0010-adopt-agentskills-standard.md`
 - ADR-0011 — Provider Registration Helpers: `docs/spec/decisions/ADR-0011-provider-registration-helpers.md`
+- ADR-0012 — Model Metadata Catalog: `docs/spec/decisions/ADR-0012-model-metadata-catalog.md`

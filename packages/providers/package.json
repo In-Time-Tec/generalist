@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./catalog": "./src/catalog.ts",
     "./openai": "./src/openai.ts",
     "./anthropic": "./src/anthropic.ts",
     "./openrouter": "./src/openrouter.ts",
@@ -15,7 +16,7 @@
     "./embedding": "./src/embedding.ts"
   },
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/openai.ts ./src/anthropic.ts ./src/openrouter.ts ./src/openai-compat.ts ./src/deterministic.ts ./src/presets.ts ./src/embedding.ts --outdir dist --target bun --format esm",
+    "build": "bun build ./src/index.ts ./src/catalog.ts ./src/openai.ts ./src/anthropic.ts ./src/openrouter.ts ./src/openai-compat.ts ./src/deterministic.ts ./src/presets.ts ./src/embedding.ts --outdir dist --target bun --format esm",
     "lint": "bun --cwd ../.. oxlint packages/providers/src packages/providers/test",
     "test": "bun --cwd ../.. vitest run packages/providers/test --passWithNoTests",
     "typecheck": "bun tsc --noEmit"

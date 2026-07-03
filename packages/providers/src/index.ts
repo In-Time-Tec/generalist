@@ -1,4 +1,5 @@
 export * as Anthropic from "./anthropic"
+export * as Catalog from "./catalog"
 export * as Deterministic from "./deterministic"
 export * as Embedding from "./embedding"
 export * as OpenAi from "./openai"
