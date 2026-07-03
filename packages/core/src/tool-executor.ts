@@ -48,6 +48,17 @@ const failureMessage = (cause: Cause.Cause<unknown>): string => {
 
 const failureOutcome = (message: string): Outcome => ({ _tag: "Failure", message })
 
+const resultMessage = (result: unknown): string => {
+  if (typeof result === "string") return result
+  if (result instanceof Error) return `${result.name}: ${result.message}`
+  try {
+    const message = JSON.stringify(result)
+    return message === undefined ? String(result) : message
+  } catch {
+    return String(result)
+  }
+}
+
 const executeWithToolkit = <Tools extends Record<string, Ai.Tool.Any>>(
   toolkit: Ai.Toolkit.WithHandler<Tools>,
   request: Request,
@@ -65,14 +76,19 @@ const executeWithToolkit = <Tools extends Record<string, Ai.Tool.Any>>(
     Effect.map(
       Option.match({
         onNone: (): Outcome => failureOutcome("Tool handler did not produce a final result"),
-        onSome: (result): Outcome => ({
-          _tag: "Success",
-          result: result.result,
-          encodedResult: result.encodedResult,
-        }),
+        onSome: (result): Outcome =>
+          result.isFailure
+            ? failureOutcome(resultMessage(result.result))
+            : {
+                _tag: "Success",
+                result: result.result,
+                encodedResult: result.encodedResult,
+              },
       }),
     ),
-    Effect.catchCause((cause) => Effect.succeed(failureOutcome(failureMessage(cause)))),
+    Effect.catchCause((cause) =>
+      Cause.hasInterrupts(cause) ? Effect.interrupt : Effect.succeed(failureOutcome(failureMessage(cause))),
+    ),
   )
 }
 

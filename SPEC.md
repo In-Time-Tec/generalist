@@ -18,7 +18,8 @@ SPEC.md
 │  ├─ 06-compaction.md                         compaction strategy and loop integration contract
 │  ├─ 07-skills.md                             skill source and filesystem loader contract
 │  ├─ 08-providers.md                          provider registration helper contract
-│  └─ 09-memory.md                             recall and remember seam contract
+│  ├─ 09-memory.md                             recall and remember seam contract
+│  └─ 10-multi-agent.md                        in-process multi-agent contract
 └─ docs/spec/decisions/
    ├─ ADR-0001-baton-standalone-agent-framework.md
    ├─ ADR-0002-tool-context-output-spill.md
@@ -31,7 +32,8 @@ SPEC.md
    ├─ ADR-0009-compaction-strategy-seam.md
    ├─ ADR-0010-adopt-agentskills-standard.md
    ├─ ADR-0011-provider-registration-helpers.md
-   └─ ADR-0012-model-metadata-catalog.md
+   ├─ ADR-0012-model-metadata-catalog.md
+   └─ ADR-0013-in-process-multi-agent.md
 ```
 
 ## Packages
@@ -55,6 +57,7 @@ SPEC.md
 - Skills contract: `docs/spec/07-skills.md`
 - Providers contract: `docs/spec/08-providers.md`
 - Memory contract: `docs/spec/09-memory.md`
+- In-process multi-agent contract: `docs/spec/10-multi-agent.md`
 
 ## Decisions
 
@@ -70,3 +73,4 @@ SPEC.md
 - ADR-0010 — Adopt the agentskills.io Skill Format: `docs/spec/decisions/ADR-0010-adopt-agentskills-standard.md`
 - ADR-0011 — Provider Registration Helpers: `docs/spec/decisions/ADR-0011-provider-registration-helpers.md`
 - ADR-0012 — Model Metadata Catalog: `docs/spec/decisions/ADR-0012-model-metadata-catalog.md`
+- ADR-0013 — In-process Multi-agent: `docs/spec/decisions/ADR-0013-in-process-multi-agent.md`

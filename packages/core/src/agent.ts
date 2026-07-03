@@ -111,7 +111,8 @@ export type RunError =
   | AgentEvent.TurnLimitExceeded
   | AgentEvent.MiddlewareViolation
 
-type RunServices =
+/** @experimental Services required to run an agent. */
+export type RunServices =
   | Ai.LanguageModel.LanguageModel
   | ToolExecutor.ToolExecutor
   | Approvals.Approvals
