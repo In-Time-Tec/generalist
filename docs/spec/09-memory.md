@@ -1,6 +1,6 @@
 # 09 — Memory
 
-Baton memory is an optional core seam for recall before the first model turn and remember after completed turns. Core owns only the timing and prompt insertion contract. Concrete memory implementations live outside `@batonfx/core`.
+Baton memory is an optional core seam for recall before the first model turn and remember after completed turns. Core owns only the timing and prompt insertion contract. Concrete non-durable implementations live in `@batonfx/memory`; durable implementations remain host-owned.
 
 ## Scope
 
@@ -12,7 +12,7 @@ Baton owns:
 - remember calls after completed turns;
 - loud error mapping into `AgentError`.
 
-Baton does not own vector stores, embedding models, summarization, extraction, ranking, durable storage, or automatic key derivation in this milestone.
+Baton core does not own vector stores, embedding models, summarization, extraction, ranking, durable storage, or automatic key derivation. `@batonfx/memory` owns only in-process, non-durable implementations over core's seam.
 
 ## Key isolation
 
@@ -41,6 +41,38 @@ Terminal remember runs before persisted-chat save and before `Completed`. Suspen
 ## Service helpers
 
 `Memory.merge(first, second)` recalls from both memories with `first` items first and remembers to both. `noopLayer` provides a memory that recalls nothing and records nothing. `testLayer(implementation)` provides exact recall/remember behavior for tests.
+
+## `@batonfx/memory`
+
+`@batonfx/memory` depends only on `@batonfx/core` and `effect`. It imports provider-neutral Effect AI tags, never provider SDKs. Embeddings are supplied by an upstream `Ai.EmbeddingModel.EmbeddingModel` layer; language-model summarization is supplied by a caller-provided `Ai.LanguageModel.LanguageModel` layer.
+
+The package exports `VectorStore`, `SemanticRecall`, `WorkingMemory`, and `combinedLayer`.
+
+## VectorStore
+
+`VectorStore` stores `Document { id, key, text, metadata? }` values with embeddings and queries by cosine similarity. The in-process `memoryLayer` stores documents in a `Ref<HashMap>` and is non-durable.
+
+Key isolation is part of the contract: query candidates must match both `key.agent` and `key.subject` exactly before scoring. Upsert replaces only the same `(agent, subject, id)` tuple. A matching-key embedding dimension mismatch fails with `VectorStoreError` instead of being silently ignored.
+
+External stores such as pgvector or Chroma are host adapters, not part of this milestone.
+
+## SemanticRecall
+
+`SemanticRecall.layer(options?)` provides `Memory.Memory` from `VectorStore` and `Ai.EmbeddingModel.EmbeddingModel`. Recall extracts current user text from the run prompt, embeds it, queries the vector store, and returns each match as one text `Memory.Item` with match score metadata.
+
+Remember is terminal-only. On terminal turns, semantic recall extracts the final user/assistant exchange, embeds that text, and upserts it into the vector store under the provided `Memory.Key`. Nonterminal turns do not upsert semantic memory.
+
+Embedding and vector-store failures map to `MemoryError`; hosts that want best-effort behavior wrap the layer.
+
+## WorkingMemory
+
+`WorkingMemory.layer(options?)` provides an in-process bounded recent text tail per `Memory.Key`. Recall returns the rolling summary first when present, followed by recent user/assistant messages in order as role-prefixed text items.
+
+Remember normalizes full transcripts to text-bearing user/assistant messages, deduplicates against the stored tail, and keeps `maxMessages` recent messages. Overflow is dropped unless `summarize` is configured. When summarization is configured, overflow plus any existing summary are summarized with the caller-provided language-model layer, not the agent loop's ambient model.
+
+## Combined memory
+
+`combinedLayer(options?)` builds working memory and semantic recall and provides `Memory.merge(working, semantic)`. Recall ordering is working memory first and semantic matches second. Remember fans out to both layers.
 
 ## Related docs
 

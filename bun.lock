@@ -7,6 +7,7 @@
       "dependencies": {
         "@batonfx/core": "workspace:*",
         "@batonfx/mcp": "workspace:*",
+        "@batonfx/memory": "workspace:*",
         "@batonfx/providers": "workspace:*",
         "@batonfx/skills": "workspace:*",
         "effect": "catalog:",
@@ -45,6 +46,20 @@
       "dependencies": {
         "@batonfx/core": "workspace:*",
         "@modelcontextprotocol/sdk": "catalog:",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/memory": {
+      "name": "@batonfx/memory",
+      "version": "0.0.0",
+      "dependencies": {
+        "@batonfx/core": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -135,6 +150,8 @@
     "@batonfx/core": ["@batonfx/core@workspace:packages/core"],
 
     "@batonfx/mcp": ["@batonfx/mcp@workspace:packages/mcp"],
+
+    "@batonfx/memory": ["@batonfx/memory@workspace:packages/memory"],
 
     "@batonfx/providers": ["@batonfx/providers@workspace:packages/providers"],
 

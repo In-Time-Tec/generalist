@@ -12,6 +12,7 @@ Baton owns the model-turn loop and nothing durable:
 - **`Approvals`** — the enforcement point for `Ai.Tool.needsApproval` (`Approved | Denied | Pending`); `Pending` suspends the run.
 - **`ModelRegistry`** — provider-agnostic `LanguageModel` layer registration and selection; missing registrations fail typed.
 - **`ModelMiddleware`** — the interceptor seam for model input/output (PII scrubbing, injection screening, output filtering, logging); ships an identity default only.
+- **Memory** — optional recall/remember seam in core; non-durable working-memory and semantic-recall layers live in `@batonfx/memory`.
 - **Chat persistence seam** — `RunOptions.persistence` runs the loop on a persisted `Ai.Chat`, delegating all storage to `effect/unstable/ai`'s `Chat.Persistence`.
 
 Suspension is a typed error (`AgentSuspended`) on the stream's error channel, re-entered via `RunOptions.resume` — the seam designed to be backed by durable runtimes like Relay. Every export is `@experimental` while `effect/unstable/ai` is itself unstable.
@@ -28,6 +29,8 @@ bun add @batonfx/mcp
 bun add @batonfx/skills
 # optional: provider registration helpers and embeddings
 bun add @batonfx/providers
+# optional: non-durable working memory and semantic recall layers
+bun add @batonfx/memory
 ```
 
 `effect` is a peer of your app; Baton is pinned to a single `effect` catalog entry so the two never drift.
@@ -95,6 +98,7 @@ const program = ModelRegistry.provide(
 | Path                     | Purpose                                                        |
 | ------------------------ | -------------------------------------------------------------- |
 | `packages/core`          | `@batonfx/core` — the Effect-native agent loop.                |
+| `packages/memory`        | `@batonfx/memory` — non-durable memory implementations.        |
 | `packages/mcp`           | `@batonfx/mcp` — the MCP client bridge and Baton adapter.      |
 | `packages/providers`     | `@batonfx/providers` — provider helpers and embedding layers.  |
 | `packages/skills`        | `@batonfx/skills` — SKILL.md and instruction-file sources.     |
