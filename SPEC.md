@@ -17,7 +17,8 @@ SPEC.md
 │  ├─ 05-steering-and-interrupts.md            steering queues and interrupt contract
 │  ├─ 06-compaction.md                         compaction strategy and loop integration contract
 │  ├─ 07-skills.md                             skill source and filesystem loader contract
-│  └─ 08-providers.md                          provider registration helper contract
+│  ├─ 08-providers.md                          provider registration helper contract
+│  └─ 09-memory.md                             recall and remember seam contract
 └─ docs/spec/decisions/
    ├─ ADR-0001-baton-standalone-agent-framework.md
    ├─ ADR-0002-tool-context-output-spill.md
@@ -52,6 +53,7 @@ SPEC.md
 - Compaction strategy contract: `docs/spec/06-compaction.md`
 - Skills contract: `docs/spec/07-skills.md`
 - Providers contract: `docs/spec/08-providers.md`
+- Memory contract: `docs/spec/09-memory.md`
 
 ## Decisions
 

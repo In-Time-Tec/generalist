@@ -26,6 +26,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - **ModelMiddleware**: the interceptor seam for everything going into (`transformPrompt`) or out of (`transformPart`) the model — PII scrubbing, prompt-injection screening, output filtering, logging. Ships a `identityLayer` default and no built-in filters.
 - **Guardrail**: ergonomic `ModelMiddleware.Middleware` combinators for input validation, prompt/output regex redaction, and output filtering. Guardrails are not a separate subsystem; they compose through `ModelMiddleware.layer([...])`.
 - **Instructions**: the ordered context-source registry. `openEpoch` renders baseline sources once into the run's system-message baseline and keeps dynamic sources for later `renderUpdate` calls; filesystem, skills, and memory sources are contributed by later packages/seams.
+- **Memory**: the optional recall/remember seam. `RunOptions.memory.key` is host-chosen; recall inserts one user message after the system message and before the run prompt; remember runs after completed turns. Concrete memory implementations live outside core.
 - **SkillSource**: the optional source seam for agentskills.io `SKILL.md` skills. Startup context receives selected listings only; bodies load lazily on activation. Filesystem discovery lives in `@batonfx/skills`, not core.
 - **Session**: an append-only conversation entry log with a current leaf pointer for branch navigation. `Session.buildContext(path)` is the pure projector from a root-to-leaf path into an `Ai.Prompt`; durable/addressable storage belongs to hosts such as Relay.
 - **Steering**: the optional live-input seam with two queues. Steering input drains after tool results and before the next model turn; follow-up input drains only when the run would otherwise complete. Queue interruption leaves undrained messages in the service layer.
@@ -44,6 +45,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Permission policy is optional. Absent `Permissions` preserves existing tool execution and `needsApproval` behavior exactly.
 - Instructions context baselines are opened at run start; dynamic context updates are rendered separately and are not injected until the compaction/update contract does so.
 - SkillSource is optional and standalone. The Agent loop does not activate or read skills automatically in v1.
+- Memory is optional and per-run. Baton never derives a memory subject; hosts pass `RunOptions.memory.key` explicitly.
 - Provider helpers are optional and standalone. Core never imports provider SDKs; provider dependencies live in `@batonfx/providers`.
 - Steering is optional. Absent `Steering` preserves current turn and completion behavior exactly.
 - Compaction is optional. Absent `Compaction` preserves current turn, session, and completion behavior exactly.
@@ -62,3 +64,4 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Compaction strategy contract: `docs/spec/06-compaction.md`
 - Skills contract: `docs/spec/07-skills.md`
 - Providers contract: `docs/spec/08-providers.md`
+- Memory contract: `docs/spec/09-memory.md`

@@ -18,7 +18,7 @@ Ship the loop as **Baton** (`@batonfx/core`) — a standalone, Effect-native, no
 
 Baton is Effect-native and non-durable. It depends on `effect` only — never on a durable runtime's schema package, event log, or Postgres. The boundary rule is: if a module needs a durable runtime's schema, it belongs in that runtime, not Baton. In this repository the rule is enforced structurally by the `no-relayfx-imports` ast-grep rule. Payload vocabulary is `Ai.Prompt`/`Ai.Response`; Baton adds loop framing only, no second wire format.
 
-Baton exposes exactly three seams — `ToolExecutor`, `Approvals`, `TurnPolicy` — plus a provider-agnostic `ModelRegistry`. Suspension is a typed error (`AgentSuspended`) on the stream's error channel, re-entered via `RunOptions.resume`.
+Baton exposes a small set of Effect-native seams around the loop — including tool execution, approvals, model registry, model middleware, resilience, instructions, permissions, steering, compaction, session, and memory. Suspension is a typed error (`AgentSuspended`) on the stream's error channel, re-entered via `RunOptions.resume`.
 
 A durable runtime composes Baton behind its own unchanged agent-loop interface: it keeps its durable event log, tool runtime, and schema vocabulary in its own shim and adapts at that boundary.
 
@@ -26,7 +26,7 @@ Every Baton export is `@experimental`.
 
 ## Deferred
 
-UI helpers (useChat/data-stream/SSE), memory abstractions, evals, guardrails, and multi-agent/handoffs are explicitly out of scope for v1. (MCP shipped separately as `@batonfx/mcp`; chat persistence shipped as a seam only — see `docs/spec/01-baton-agent-framework.md`.)
+UI helpers (useChat/data-stream/SSE), concrete memory implementations, evals, and multi-agent/handoffs are explicitly out of scope for v1. Baton now includes an interface-only `Memory` seam so applications can compose recall/remember behavior without core owning storage, retrieval, extraction, or durability. (MCP shipped separately as `@batonfx/mcp`; chat persistence shipped as a seam only — see `docs/spec/01-baton-agent-framework.md`.)
 
 ## Consequences
 
@@ -40,9 +40,10 @@ UI helpers (useChat/data-stream/SSE), memory abstractions, evals, guardrails, an
 
 - Porting AI SDK/Mastra vocabulary: rejected; Baton is the Effect version of an agent framework, with `Schedule`-inspired turn policies and `Ai.Prompt`/`Ai.Response` as the only payload vocabulary.
 - Making `TurnPolicy` a service: rejected; policies are plain values so agents carry their own default, exactly like `Schedule` values.
-- Shipping UI/memory/evals/multi-agent in v1: rejected; deferred until the loop core stabilizes.
+- Shipping UI/concrete memory stores/evals/multi-agent in v1: rejected; concrete implementations are deferred until the loop core stabilizes.
 
 ## Related docs
 
 - `docs/spec/01-baton-agent-framework.md`
+- `docs/spec/09-memory.md`
 - [relayfx ADR-0018 and ADR-0021](https://github.com/In-Time-Tec/relayfx) — the durable-composition decision.

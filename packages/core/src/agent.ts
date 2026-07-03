@@ -4,6 +4,7 @@ import * as AgentEvent from "./agent-event"
 import * as Approvals from "./approvals"
 import * as Compaction from "./compaction"
 import * as Instructions from "./instructions"
+import * as Memory from "./memory"
 import * as ModelMiddleware from "./model-middleware"
 import * as ModelResilience from "./model-resilience"
 import * as Permissions from "./permissions"
@@ -67,6 +68,10 @@ export interface RunOptions {
   /** @experimental Context-window hint for optional compaction. */
   readonly compaction?: {
     readonly contextWindow?: number
+  }
+  /** @experimental Consult the Memory service for this run. */
+  readonly memory?: {
+    readonly key: Memory.Key
   }
   /**
    * @experimental Run this agent on a persisted chat. Requires `Chat.Persistence`
@@ -151,6 +156,9 @@ const suspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "appr
 
 const withSystem = (instructions: string, prompt: Ai.Prompt.Prompt): Ai.Prompt.Prompt =>
   Ai.Prompt.fromMessages([Ai.Prompt.makeMessage("system", { content: instructions }), ...prompt.content])
+
+const isUserMessagePart = (part: Ai.Prompt.Part): part is Ai.Prompt.UserMessagePart =>
+  part.type === "text" || part.type === "file"
 
 const approvalRequired = (
   tool: Ai.Tool.Any | undefined,
@@ -264,9 +272,27 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const permissionsService = yield* Effect.serviceOption(Permissions.Permissions)
       const steeringService = yield* Effect.serviceOption(Steering.Steering)
       const compactionService = yield* Effect.serviceOption(Compaction.Compaction)
+      const memoryService = yield* Effect.serviceOption(Memory.Memory)
       const sessionService = yield* Effect.serviceOption(Session.SessionStore)
       const tokenizerService = yield* Effect.serviceOption(Ai.Tokenizer.Tokenizer)
       const persistenceOptions = options.persistence
+      const memoryOptions = options.memory
+      const memoryRuntime: { readonly key: Memory.Key; readonly service: Memory.Interface } | undefined =
+        memoryOptions === undefined
+          ? undefined
+          : {
+              key: memoryOptions.key,
+              service: yield* Option.match(memoryService, {
+                onNone: () =>
+                  Effect.fail(
+                    new AgentEvent.AgentError({
+                      message: "RunOptions.memory requires Memory in context",
+                      turn: 0,
+                    }),
+                  ),
+                onSome: Effect.succeed,
+              }),
+            }
       const persisted: Ai.Chat.Persisted | undefined =
         persistenceOptions === undefined
           ? undefined
@@ -341,6 +367,55 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
 
       const compactionError = (turn: number, error: Compaction.CompactionError): AgentEvent.AgentError =>
         new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+
+      const memoryError = (turn: number, error: Memory.MemoryError): AgentEvent.AgentError =>
+        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+
+      const insertRecalledItems = (
+        turn: number,
+        prompt: Ai.Prompt.Prompt,
+        items: ReadonlyArray<Memory.Item>,
+      ): Effect.Effect<Ai.Prompt.Prompt, AgentEvent.AgentError> =>
+        Effect.gen(function* () {
+          const parts = items.flatMap((item) => item.parts)
+          if (parts.length === 0) return prompt
+          const userParts: Array<Ai.Prompt.UserMessagePart> = []
+          for (const part of parts) {
+            if (!isUserMessagePart(part)) {
+              return yield* Effect.fail(
+                new AgentEvent.AgentError({
+                  message: `Memory recalled unsupported prompt part type: ${part.type}`,
+                  turn,
+                }),
+              )
+            }
+            userParts.push(part)
+          }
+          const memoryMessage = Ai.Prompt.makeMessage("user", { content: userParts })
+          const [first, ...rest] = prompt.content
+          return first?.role === "system"
+            ? Ai.Prompt.fromMessages([first, memoryMessage, ...rest])
+            : Ai.Prompt.fromMessages([memoryMessage, ...prompt.content])
+        })
+
+      const recallInitialPrompt = (prompt: Ai.Prompt.Prompt): Effect.Effect<Ai.Prompt.Prompt, AgentEvent.AgentError> =>
+        memoryRuntime === undefined
+          ? Effect.succeed(prompt)
+          : memoryRuntime.service.recall({ key: memoryRuntime.key, turn: 0, prompt }).pipe(
+              Effect.mapError((error) => memoryError(0, error)),
+              Effect.flatMap((items) => insertRecalledItems(0, prompt, items)),
+            )
+
+      const rememberTurn = (
+        turn: number,
+        transcript: Ai.Prompt.Prompt,
+        terminal: boolean,
+      ): Effect.Effect<void, AgentEvent.AgentError> =>
+        memoryRuntime === undefined
+          ? Effect.void
+          : memoryRuntime.service
+              .remember({ key: memoryRuntime.key, turn, transcript, terminal })
+              .pipe(Effect.mapError((error) => memoryError(turn, error)))
 
       const syncSession = (
         turn: number,
@@ -933,8 +1008,9 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         Effect.gen(function* () {
           const transcript = yield* Ref.get(chat.history)
           yield* syncSession(turn, transcript)
-          const completed: AgentEvent.Event = turnCompletedEvent(turn, transcript)
           const pending = state.pending
+          yield* rememberTurn(turn, transcript, pending.length === 0)
+          const completed: AgentEvent.Event = turnCompletedEvent(turn, transcript)
           if (pending.length === 0) {
             const followUp = yield* takeFollowUp()
             if (followUp.length > 0) {
@@ -1077,8 +1153,12 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         )
       }
 
+      const baseInitialPrompt =
+        seedSystem === undefined
+          ? Ai.Prompt.make(options.prompt)
+          : withSystem(seedSystem, Ai.Prompt.make(options.prompt))
       const initialPrompt =
-        seedSystem === undefined ? options.prompt : withSystem(seedSystem, Ai.Prompt.make(options.prompt))
+        options.resume === undefined ? yield* recallInitialPrompt(baseInitialPrompt) : baseInitialPrompt
       const runStream = options.resume === undefined ? runTurn(0, initialPrompt) : resumeStream(options.resume)
       // On suspension, emit the finalized transcript as a trailing `TurnCompleted`
       // before re-failing. `chat.streamText` appends the assistant message (e.g. the
