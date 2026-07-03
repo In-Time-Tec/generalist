@@ -1,6 +1,6 @@
 # 11 — Transport wire and in-process session registry
 
-Baton transport is the non-durable, same-process layer that turns `Agent.stream` into replayable wire frames for chat transports. It owns schemas and an in-memory `SessionRegistry`; it does not own SSE, WebSocket, clients, durable event logs, or Relay integration.
+Baton transport is the non-durable, same-process layer that turns `Agent.stream` into replayable wire frames for chat transports. It owns schemas, an in-memory `SessionRegistry`, and thin SSE/WebSocket/client adapters over the registry seam. It does not own durable event logs, Relay integration, multiplexing, or AI SDK data-stream adapters.
 
 ## Scope
 
@@ -9,9 +9,10 @@ Baton owns:
 - toolkit-parameterized codecs for loop events and server/client frames;
 - a loose browser codec that accepts unknown tool names as display data;
 - `SessionRegistry`, an interface for opening sessions, sending prompts, attaching to replay/live frames, resolving approval suspensions, interrupting runs, and inspecting status;
-- `layerMemory`, a best-effort in-process registry implementation.
+- `layerMemory`, a best-effort in-process registry implementation;
+- SSE, WebSocket, and isomorphic client adapters that depend only on `SessionRegistry`.
 
-Baton does not own durable storage, cross-process sessions, multiplexing, SSE/WS handlers, or a browser client in this milestone. Relay implements the same `SessionRegistry` interface over its durable event log.
+Baton does not own durable storage, cross-process sessions, multiplexing, EventSource wrappers, POST command routes, command acknowledgement envelopes, or browser UI state. Relay implements the same `SessionRegistry` interface over its durable event log.
 
 ## Wire contract
 
@@ -63,7 +64,38 @@ Each subscriber has a bounded queue. A lagging subscriber fails with `Subscriber
 
 The SSE/WS handlers added later depend on `SessionRegistry`, not `layerMemory`, so Relay can provide its own implementation without changing those handlers.
 
+## SSE contract
+
+SSE is downstream-only. Hosts expose ordinary command routes for `SendMessage`, `ResolveApproval`, and `Cancel`; those routes call `SessionRegistry` methods directly.
+
+`Sse.respond(toolkit)` reads the resume cursor from `Last-Event-ID`; if absent, it falls back to `?after_seq=`. Invalid cursors are ignored. The cursor is passed to `SessionRegistry.attach(sessionId, afterSeq)`.
+
+Each SSE event has:
+
+- `id` equal to the server frame `seq`;
+- `event` equal to the server frame `_tag`;
+- `data` equal to JSON for `Wire.ServerFrame(toolkit)`.
+
+Responses use `text/event-stream`, `cache-control: no-cache`, `connection: keep-alive`, and `baton-sse-version: 1`. Heartbeats are SSE comment lines and do not carry frame data.
+
+## WebSocket contract
+
+WebSocket transport is text-JSON only. Clients send existing `Wire.ClientFrame` values, and servers send existing `Wire.ServerFrame` values.
+
+One socket attaches to one session at a time. A new `Attach` frame interrupts and replaces the previous attachment fiber. `SendMessage`, `ResolveApproval`, and `Cancel` dispatch to `SessionRegistry.send`, `resolveApproval`, and `interrupt`.
+
+`SubscriberLagged` closes the socket with code `4000` and reason `lagged`. Clients reconnect and reattach with the last seen `seq`. Malformed client frames and transport command errors are socket/protocol errors; they are not encoded as replay `Failed` frames because replay frames must keep monotonic session `seq` semantics.
+
+## Client contract
+
+The default client decodes server frames with `Wire.LooseServerFrame`, so browser clients can display unknown tool-call and tool-result names without importing the server toolkit. Hosts that need strict decoding can add their own decode layer around the wire schema.
+
+The WebSocket client reconnects with bounded exponential backoff while its scope is open. On every connection it sends `Attach { sessionId, afterSeq }`, where `afterSeq` is the last seen server frame `seq` when available. It does not buffer commands while disconnected; `send` fails with `TransportError` unless a writer is currently open.
+
+The SSE client helper decodes `text/event-stream` response bodies into loose server frames. Browser `EventSource` integration is outside this contract.
+
 ## Related docs
 
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0014-transport-wire-and-session-registry.md`
+- `docs/spec/decisions/ADR-0015-transport-sse-websocket-client.md`

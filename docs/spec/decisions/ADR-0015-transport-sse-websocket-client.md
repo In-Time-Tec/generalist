@@ -1,0 +1,26 @@
+# ADR-0015 — Transport SSE, WebSocket, and Client Adapters
+
+## Status
+
+Accepted.
+
+## Context
+
+The transport wire format and `SessionRegistry` seam provide replayable session frames. Chat hosts need thin SSE and WebSocket adapters plus a small isomorphic client without coupling Baton to Relay or to a durable runtime.
+
+## Decision
+
+Add `@batonfx/transport` subpaths for SSE, WebSocket, and client adapters. They depend only on the existing wire schemas and `SessionRegistry`. SSE uses the pinned Effect SSE encoder and maps `Last-Event-ID` to `attach(afterSeq)`. WebSocket uses existing `Wire.ClientFrame` and `Wire.ServerFrame` values with one attached session per socket. The default client decodes `Wire.LooseServerFrame` and reattaches after reconnect with the last seen sequence.
+
+Transport errors are not replay frames. Malformed WebSocket client frames and command dispatch failures close the socket rather than manufacturing non-monotonic `Failed` frames.
+
+## Consequences
+
+- Relay can reuse these handlers by providing a durable `SessionRegistry`.
+- Clients have a simple reconnect contract based on frame sequence.
+- Browser clients can display unknown tool data through loose decoding.
+- Command acknowledgements, multiplexing, EventSource wrappers, and offline command queues remain future protocol work.
+
+## Related docs
+
+- `docs/spec/11-transport.md`

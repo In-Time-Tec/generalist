@@ -35,7 +35,8 @@ SPEC.md
    ├─ ADR-0011-provider-registration-helpers.md
    ├─ ADR-0012-model-metadata-catalog.md
    ├─ ADR-0013-in-process-multi-agent.md
-   └─ ADR-0014-transport-wire-and-session-registry.md
+   ├─ ADR-0014-transport-wire-and-session-registry.md
+   └─ ADR-0015-transport-sse-websocket-client.md
 ```
 
 ## Packages
@@ -47,6 +48,7 @@ SPEC.md
 | `@batonfx/mcp`       | `@batonfx/mcp`       | `packages/mcp`       | MCP client bridge: discover an MCP server's tools as an `Ai.Toolkit` plus a Baton `ToolExecutor` adapter (`@batonfx/mcp/baton`).                                                                                                                                                                 |
 | `@batonfx/providers` | `@batonfx/providers` | `packages/providers` | Provider registration helpers, OpenAI-compatible presets, deterministic model registration, and embedding layers over upstream Effect AI provider packages.                                                                                                                                      |
 | `@batonfx/skills`    | `@batonfx/skills`    | `packages/skills`    | Filesystem `SKILL.md` and instruction-file sources for core seams.                                                                                                                                                                                                                               |
+| `@batonfx/transport` | `@batonfx/transport` | `packages/transport` | Replayable wire frames, in-process `SessionRegistry`, and thin SSE/WebSocket/client adapters for non-durable chat transports.                                                                                                                                                                    |
 
 ## Feature branches
 
@@ -78,3 +80,4 @@ SPEC.md
 - ADR-0012 — Model Metadata Catalog: `docs/spec/decisions/ADR-0012-model-metadata-catalog.md`
 - ADR-0013 — In-process Multi-agent: `docs/spec/decisions/ADR-0013-in-process-multi-agent.md`
 - ADR-0014 — Transport Wire and Session Registry: `docs/spec/decisions/ADR-0014-transport-wire-and-session-registry.md`
+- ADR-0015 — Transport SSE, WebSocket, and Client Adapters: `docs/spec/decisions/ADR-0015-transport-sse-websocket-client.md`

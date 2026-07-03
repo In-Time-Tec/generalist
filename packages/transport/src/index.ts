@@ -1,2 +1,6 @@
+export * as Client from "./client"
+export * as Errors from "./errors"
 export * as SessionRegistry from "./session-registry"
+export * as Sse from "./sse"
 export * as Wire from "./wire"
+export * as Ws from "./ws"
