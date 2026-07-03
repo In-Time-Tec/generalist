@@ -20,7 +20,8 @@ SPEC.md
 │  ├─ 08-providers.md                          provider registration helper contract
 │  ├─ 09-memory.md                             recall and remember seam contract
 │  ├─ 10-multi-agent.md                        in-process multi-agent contract
-│  └─ 11-transport.md                          wire frames and in-process session registry contract
+│  ├─ 11-transport.md                          wire frames and in-process session registry contract
+│  └─ 12-foldkit-adapter.md                     FoldKit resource/subscription/chat adapter contract
 └─ docs/spec/decisions/
    ├─ ADR-0001-baton-standalone-agent-framework.md
    ├─ ADR-0002-tool-context-output-spill.md
@@ -36,7 +37,8 @@ SPEC.md
    ├─ ADR-0012-model-metadata-catalog.md
    ├─ ADR-0013-in-process-multi-agent.md
    ├─ ADR-0014-transport-wire-and-session-registry.md
-   └─ ADR-0015-transport-sse-websocket-client.md
+   ├─ ADR-0015-transport-sse-websocket-client.md
+   └─ ADR-0016-foldkit-adapter.md
 ```
 
 ## Packages
@@ -44,6 +46,7 @@ SPEC.md
 | Package              | npm                  | Directory            | Purpose                                                                                                                                                                                                                                                                                          |
 | -------------------- | -------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `@batonfx/core`      | `@batonfx/core`      | `packages/core`      | The Effect-native agent loop: Agent, Instructions, Session, SkillSource, Steering, Compaction, structured output, TurnPolicy, ToolExecutor, ToolContext, ToolOutputStore, Permissions, Approvals, ModelRegistry, ModelResilience, ModelMiddleware, Guardrail combinators, chat persistence seam. |
+| `@batonfx/foldkit`   | `@batonfx/foldkit`   | `packages/foldkit`   | FoldKit adapter: shared transport connection resource, subscriptions, commands, and a headless chat submodel.                                                                                                                                                                                    |
 | `@batonfx/memory`    | `@batonfx/memory`    | `packages/memory`    | Non-durable memory layers for the core seam: in-process vector store, semantic recall over Effect AI embeddings, bounded working memory, and combined composition.                                                                                                                               |
 | `@batonfx/mcp`       | `@batonfx/mcp`       | `packages/mcp`       | MCP client bridge: discover an MCP server's tools as an `Ai.Toolkit` plus a Baton `ToolExecutor` adapter (`@batonfx/mcp/baton`).                                                                                                                                                                 |
 | `@batonfx/providers` | `@batonfx/providers` | `packages/providers` | Provider registration helpers, OpenAI-compatible presets, deterministic model registration, and embedding layers over upstream Effect AI provider packages.                                                                                                                                      |
@@ -63,6 +66,7 @@ SPEC.md
 - Memory contract: `docs/spec/09-memory.md`
 - In-process multi-agent contract: `docs/spec/10-multi-agent.md`
 - Transport contract: `docs/spec/11-transport.md`
+- FoldKit adapter contract: `docs/spec/12-foldkit-adapter.md`
 
 ## Decisions
 
@@ -81,3 +85,4 @@ SPEC.md
 - ADR-0013 — In-process Multi-agent: `docs/spec/decisions/ADR-0013-in-process-multi-agent.md`
 - ADR-0014 — Transport Wire and Session Registry: `docs/spec/decisions/ADR-0014-transport-wire-and-session-registry.md`
 - ADR-0015 — Transport SSE, WebSocket, and Client Adapters: `docs/spec/decisions/ADR-0015-transport-sse-websocket-client.md`
+- ADR-0016 — FoldKit Adapter: `docs/spec/decisions/ADR-0016-foldkit-adapter.md`

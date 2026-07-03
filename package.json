@@ -32,6 +32,7 @@
       "@types/node": "24.12.2",
       "@vitest/coverage-v8": "4.0.16",
       "effect": "4.0.0-beta.93",
+      "foldkit": "0.122.0",
       "oxlint": "1.60.0",
       "oxlint-tsgolint": "0.21.0",
       "prettier": "3.6.2",
@@ -42,6 +43,7 @@
   },
   "dependencies": {
     "@batonfx/core": "workspace:*",
+    "@batonfx/foldkit": "workspace:*",
     "@batonfx/memory": "workspace:*",
     "@batonfx/mcp": "workspace:*",
     "@batonfx/providers": "workspace:*",

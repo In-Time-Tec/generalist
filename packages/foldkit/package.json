@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@batonfx/foldkit",
+  "version": "0.0.0",
+  "private": false,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir dist --target bun --format esm",
+    "lint": "bun --cwd ../.. oxlint packages/foldkit/src packages/foldkit/test",
+    "test": "bun --cwd ../.. vitest run packages/foldkit/test --passWithNoTests",
+    "typecheck": "bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@batonfx/transport": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": ">=4.0.0-beta.88 <4.0.1",
+    "foldkit": ">=0.122.0 <1"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/bun": "catalog:",
+    "effect": "catalog:",
+    "foldkit": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
