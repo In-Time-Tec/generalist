@@ -7,6 +7,7 @@
       "dependencies": {
         "@batonfx/core": "workspace:*",
         "@batonfx/mcp": "workspace:*",
+        "@batonfx/providers": "workspace:*",
         "@batonfx/skills": "workspace:*",
         "effect": "catalog:",
       },
@@ -44,6 +45,24 @@
       "dependencies": {
         "@batonfx/core": "workspace:*",
         "@modelcontextprotocol/sdk": "catalog:",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/providers": {
+      "name": "@batonfx/providers",
+      "version": "0.0.0",
+      "dependencies": {
+        "@batonfx/core": "workspace:*",
+        "@effect/ai-anthropic": "catalog:",
+        "@effect/ai-openai": "catalog:",
+        "@effect/ai-openai-compat": "catalog:",
+        "@effect/ai-openrouter": "catalog:",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -117,9 +136,19 @@
 
     "@batonfx/mcp": ["@batonfx/mcp@workspace:packages/mcp"],
 
+    "@batonfx/providers": ["@batonfx/providers@workspace:packages/providers"],
+
     "@batonfx/skills": ["@batonfx/skills@workspace:packages/skills"],
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
+
+    "@effect/ai-anthropic": ["@effect/ai-anthropic@4.0.0-beta.93", "", { "peerDependencies": { "effect": "^4.0.0-beta.93" } }, "sha512-eBK5jGQIXabvNKFWIlVgUYYB6YaLBXibKDU0F3HG7jI7ga4Q9evtmKLxCfrUsndYBleUSXh9iSu7vpjtpGa90g=="],
+
+    "@effect/ai-openai": ["@effect/ai-openai@4.0.0-beta.93", "", { "peerDependencies": { "effect": "^4.0.0-beta.93" } }, "sha512-eN18KCePcWHywaWZ4cdoPgZeuVdRt6HY8QSsBai2vKvquljpnBr/NJ/EsVqzY/hY8OE+g/PNKKzGkaIm3HnfcA=="],
+
+    "@effect/ai-openai-compat": ["@effect/ai-openai-compat@4.0.0-beta.93", "", { "peerDependencies": { "effect": "^4.0.0-beta.93" } }, "sha512-xur/Dq9u1jY2NgeMhpJzTgOC1sujGu+pyM95XSupCtkOYcp4G1N9HhdU0cf52P68pAgLQsjGM/UBTuwThnm6nA=="],
+
+    "@effect/ai-openrouter": ["@effect/ai-openrouter@4.0.0-beta.93", "", { "peerDependencies": { "effect": "^4.0.0-beta.93" } }, "sha512-jXNNd3HLtxMzaUYvGr0AWvQSDs0TTB1NgOzDRfJOr/sOssAexC2GEJgkZCCUZ1gmXWeED6dgu/PdJWq0mMq3XQ=="],
 
     "@effect/vitest": ["@effect/vitest@4.0.0-beta.93", "", { "peerDependencies": { "effect": "^4.0.0-beta.93", "vitest": "^3.0.0 || ^4.0.0" } }, "sha512-gMAnZ9PiMeJMDED9s0jWgCOhc2JccrTCxowhur/KriImsHnHIRj4VG/vK0xLw0Axe4AkTWzXNdRsFrYOjBTl3A=="],
 

@@ -1,0 +1,40 @@
+import * as OpenRouter from "@effect/ai-openrouter"
+import { ModelRegistry } from "@batonfx/core"
+import { Config, Layer, Redacted } from "effect"
+import { FetchHttpClient } from "effect/unstable/http"
+import type { RegistrationOptions } from "./openai"
+
+/** @experimental */
+export interface OpenRouterInput extends RegistrationOptions {
+  readonly model: string
+  readonly config?: Omit<typeof OpenRouter.OpenRouterLanguageModel.Config.Service, "model">
+}
+
+/** @experimental */
+export const openRouter = (input: OpenRouterInput) =>
+  ModelRegistry.registrationFromLayer({
+    provider: "openrouter",
+    model: input.model,
+    layer: OpenRouter.OpenRouterLanguageModel.layer({
+      model: input.model,
+      ...(input.config === undefined ? {} : { config: input.config }),
+    }),
+    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
+    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+  })
+
+/** @experimental */
+export const openRouterClientLayerConfig = OpenRouter.OpenRouterClient.layerConfig
+
+/** @experimental */
+export interface WithOpenRouterOptions extends OpenRouterInput {
+  readonly apiKey: Config.Config<Redacted.Redacted<string>>
+  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenRouter.OpenRouterClient.layerConfig>[0]>, "apiKey">
+}
+
+/** @experimental */
+export const withOpenRouter = (options: WithOpenRouterOptions) =>
+  ModelRegistry.layerFromRegistrationEffects([openRouter(options)]).pipe(
+    Layer.provide(OpenRouter.OpenRouterClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
+    Layer.provide(FetchHttpClient.layer),
+  )

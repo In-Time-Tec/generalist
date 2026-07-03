@@ -26,6 +26,8 @@ bun add @batonfx/core
 bun add @batonfx/mcp
 # optional: SKILL.md and instruction-file sources
 bun add @batonfx/skills
+# optional: provider registration helpers and embeddings
+bun add @batonfx/providers
 ```
 
 `effect` is a peer of your app; Baton is pinned to a single `effect` catalog entry so the two never drift.
@@ -60,7 +62,29 @@ const program = Effect.gen(function* () {
 }).pipe(Effect.provide(persistenceLayer))
 ```
 
-Provide a `LanguageModel` layer (via `ModelRegistry` or an `@effect/ai-*` provider) plus the `ToolExecutor`, `Approvals`, and `ModelMiddleware` seams — `fromToolkit`, `autoApprove`/`denyAll`, and `identityLayer` are the built-in defaults. See the package README and tests under `packages/core` for more.
+Provide a `LanguageModel` layer (via `ModelRegistry`, `@batonfx/providers`, or an `@effect/ai-*` provider) plus the `ToolExecutor`, `Approvals`, and `ModelMiddleware` seams — `fromToolkit`, `autoApprove`/`denyAll`, and `identityLayer` are the built-in defaults. See the package README and tests under `packages/core` for more.
+
+`@batonfx/providers` turns upstream provider packages into `ModelRegistry` layers:
+
+```ts
+import { Config, Effect } from "effect"
+import { Agent, ModelRegistry } from "@batonfx/core"
+import { Presets } from "@batonfx/providers"
+
+const agent = Agent.make({ name: "assistant" })
+
+const program = ModelRegistry.provide(
+  { provider: "groq", model: "llama-3.3-70b-versatile" },
+  Agent.generate(agent, { prompt: "Hello" }),
+).pipe(
+  Effect.provide(
+    Presets.withGroq({
+      model: "llama-3.3-70b-versatile",
+      apiKey: Config.redacted("GROQ_API_KEY"),
+    }),
+  ),
+)
+```
 
 ## MCP tools
 
@@ -72,6 +96,7 @@ Provide a `LanguageModel` layer (via `ModelRegistry` or an `@effect/ai-*` provid
 | ------------------------ | -------------------------------------------------------------- |
 | `packages/core`          | `@batonfx/core` — the Effect-native agent loop.                |
 | `packages/mcp`           | `@batonfx/mcp` — the MCP client bridge and Baton adapter.      |
+| `packages/providers`     | `@batonfx/providers` — provider helpers and embedding layers.  |
 | `packages/skills`        | `@batonfx/skills` — SKILL.md and instruction-file sources.     |
 | `docs/spec/`             | Specification tree (feature docs and ADRs).                    |
 | `ast-grep/`              | Structural lint rules (including the `@relayfx/*` import ban). |

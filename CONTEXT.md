@@ -20,6 +20,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - **AgentSuspended**: a typed error on the stream's error channel signalling the run did not finish and must be re-entered via `RunOptions.resume` once the host resolves the suspension `token`. Reasons: `tool-wait` (from a `Suspend` outcome) or `approval` (from a `Pending` decision).
 - **Permissions**: the optional policy seam consulted for every framework-executed local tool call before `ToolExecutor` and before `Ai.Tool.needsApproval` / `Approvals`. It evaluates declarative allow/deny/ask rules. Allow continues to the existing approval path, deny re-feeds a failed tool result, and ask suspends via `AgentSuspended { reason: "approval" }` unless an in-process host answers.
 - **ModelRegistry**: the provider-agnostic registry that maps a model selection to a concrete Effect AI `LanguageModel` layer. Missing registrations fail typed, not silently.
+- **Providers**: the optional `@batonfx/providers` helper package that adapts upstream `@effect/ai-*` providers into `ModelRegistry` registrations and exposes embedding layers over Effect AI's `EmbeddingModel` tag. Core remains provider-agnostic.
 - **ModelResilience**: the optional model-call retry seam. It classifies live model-call failures as `transient` or `terminal` and supplies the retry schedule applied inside a single model call; streamed turns retry only before any part has been emitted.
 - **ModelMiddleware**: the interceptor seam for everything going into (`transformPrompt`) or out of (`transformPart`) the model — PII scrubbing, prompt-injection screening, output filtering, logging. Ships a `identityLayer` default and no built-in filters.
 - **Guardrail**: ergonomic `ModelMiddleware.Middleware` combinators for input validation, prompt/output regex redaction, and output filtering. Guardrails are not a separate subsystem; they compose through `ModelMiddleware.layer([...])`.
@@ -42,6 +43,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Permission policy is optional. Absent `Permissions` preserves existing tool execution and `needsApproval` behavior exactly.
 - Instructions context baselines are opened at run start; dynamic context updates are rendered separately and are not injected until the compaction/update contract does so.
 - SkillSource is optional and standalone. The Agent loop does not activate or read skills automatically in v1.
+- Provider helpers are optional and standalone. Core never imports provider SDKs; provider dependencies live in `@batonfx/providers`.
 - Steering is optional. Absent `Steering` preserves current turn and completion behavior exactly.
 - Compaction is optional. Absent `Compaction` preserves current turn, session, and completion behavior exactly.
 - Session context is derived from a root-to-leaf path, not stored separately.
@@ -58,3 +60,4 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Steering and interrupts contract: `docs/spec/05-steering-and-interrupts.md`
 - Compaction strategy contract: `docs/spec/06-compaction.md`
 - Skills contract: `docs/spec/07-skills.md`
+- Providers contract: `docs/spec/08-providers.md`
