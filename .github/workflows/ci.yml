@@ -42,6 +42,15 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Check docs
+        run: bun run check:docs
+
+      - name: Typecheck examples
+        run: bun run typecheck:examples
+
+      - name: Check release
+        run: bun run check:release
+
       - name: Test
         run: bun run test
 
