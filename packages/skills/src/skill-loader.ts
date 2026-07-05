@@ -126,14 +126,18 @@ const splitDocument = (
   source: string,
   content: string,
 ): Effect.Effect<readonly [string, string], SkillSource.SkillSourceError> =>
-  Effect.sync(() => {
+  Effect.gen(function* () {
     const normalized = content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n")
     const lines = normalized.split("\n")
-    if (lines[0] !== "---") throw new Error("missing opening frontmatter fence")
+    if (lines[0] !== "---") {
+      return yield* Effect.fail(sourceError(source, "Invalid SKILL.md document: missing opening frontmatter fence"))
+    }
     const close = lines.findIndex((line, index) => index > 0 && line === "---")
-    if (close === -1) throw new Error("missing closing frontmatter fence")
+    if (close === -1) {
+      return yield* Effect.fail(sourceError(source, "Invalid SKILL.md document: missing closing frontmatter fence"))
+    }
     return [lines.slice(1, close).join("\n"), lines.slice(close + 1).join("\n")] as const
-  }).pipe(Effect.catchCause((cause) => Effect.fail(sourceError(source, "Invalid SKILL.md document", cause))))
+  })
 
 const namespacedName = (path: Path.Path, relativeFile: string, explicitName: string | undefined): string => {
   const directory = path.dirname(relativeFile)

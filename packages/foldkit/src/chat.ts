@@ -325,12 +325,17 @@ const flushStreaming = (model: Model): Model => {
 const upsertToolCall = (entries: ReadonlyArray<ChatEntry>, call: ToolCallLike): ReadonlyArray<ChatEntry> => {
   const index = entries.findIndex((entry) => entry._tag === "ToolEntry" && entry.callId === call.id)
   const previous = index >= 0 ? entries[index] : undefined
+  const previousToolEntry = previous?._tag === "ToolEntry" ? previous : undefined
   const next = ToolEntry({
     callId: call.id,
     name: call.name,
-    params: call.params,
-    outcome: previous?._tag === "ToolEntry" ? previous.outcome : Pending(),
-    progress: previous?._tag === "ToolEntry" ? previous.progress : [],
+    // `resolveTool` re-upserts with `params: undefined` defensively (a tool
+    // result may arrive without this view ever having seen the matching
+    // tool-call part). Falling back to the previously tracked params keeps a
+    // real tool call's params from being wiped out when its result resolves.
+    params: call.params === undefined ? previousToolEntry?.params : call.params,
+    outcome: previousToolEntry?.outcome ?? Pending(),
+    progress: previousToolEntry?.progress ?? [],
   })
   if (index < 0) return [...entries, next]
   return entries.map((entry, entryIndex) => (entryIndex === index ? next : entry))

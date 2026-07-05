@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Option, Schedule, Schema, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
 import {
   Agent,
@@ -136,6 +136,70 @@ describe("Agent", () => {
 
     expect(error._tag).toBe("@batonfx/core/AgentError")
     expect(error.cause).toBeUndefined()
+  })
+
+  it.effect("fails before model calls when toolOutputMaxBytes is invalid", () => {
+    let modelCalls = 0
+    const invalidValues = [-1, Number.NaN, Number.POSITIVE_INFINITY]
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "invalid-tool-output-limit-agent" })
+
+      for (const toolOutputMaxBytes of invalidValues) {
+        const failure = yield* Effect.flip(
+          Stream.runDrain(Agent.stream(agent, { prompt: "hello", toolOutputMaxBytes })),
+        )
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
+          "RunOptions.toolOutputMaxBytes must be a non-negative finite number",
+        )
+      }
+      expect(modelCalls).toBe(0)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            modelCalls += 1
+            return Stream.make(textDelta("unexpected"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("fails before model calls when compaction contextWindow is invalid", () => {
+    let modelCalls = 0
+    const invalidValues = [0, -1, Number.NaN, Number.POSITIVE_INFINITY]
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "invalid-context-window-agent" })
+
+      for (const contextWindow of invalidValues) {
+        const failure = yield* Effect.flip(
+          Stream.runDrain(Agent.stream(agent, { prompt: "hello", compaction: { contextWindow } })),
+        )
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
+          "RunOptions.compaction.contextWindow must be a positive finite number",
+        )
+      }
+      expect(modelCalls).toBe(0)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            modelCalls += 1
+            return Stream.make(textDelta("unexpected"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
   })
 
   it.effect("runs an agent turn and emits loop events", () =>
@@ -1216,6 +1280,152 @@ describe("Agent", () => {
           unusedExecutor,
           Approvals.autoApprove,
           Steering.layer(),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("interrupting Agent.stream while needsApproval awaits exits interrupted", () => {
+    let started: Deferred.Deferred<void> | undefined
+    const waitingApprovalTool = Ai.Tool.make("waiting-approval", {
+      description: "Requires waiting approval",
+      parameters: Schema.Struct({ text: Schema.String }),
+      success: Schema.Unknown,
+      needsApproval: () =>
+        Effect.gen(function* () {
+          if (started === undefined) return yield* Effect.die("missing started Deferred")
+          yield* Deferred.succeed(started, undefined)
+          return yield* Effect.never
+        }),
+    })
+    return Effect.gen(function* () {
+      const currentStarted = yield* Deferred.make<void>()
+      started = currentStarted
+      const agent = Agent.make({
+        name: "interrupt-waiting-approval-agent",
+        toolkit: Ai.Toolkit.make(waitingApprovalTool),
+      })
+      const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "needs approval" })).pipe(
+        Effect.forkChild({ startImmediately: true }),
+      )
+
+      yield* Deferred.await(currentStarted)
+      yield* Fiber.interrupt(fiber)
+      const exit = yield* Fiber.await(fiber)
+
+      expect(Exit.hasInterrupts(exit)).toBe(true)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() =>
+            Stream.make(toolCallPart("tool-call-waiting-approval", "waiting-approval", { text: "wait" })),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("interrupting Agent.stream before the first model part exits interrupted", () => {
+    let started: Deferred.Deferred<void> | undefined
+    return Effect.gen(function* () {
+      const currentStarted = yield* Deferred.make<void>()
+      started = currentStarted
+      const agent = Agent.make({ name: "external-interrupt-model-stream-agent" })
+      const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "never emit" })).pipe(
+        Effect.forkChild({ startImmediately: true }),
+      )
+
+      yield* Deferred.await(currentStarted)
+      yield* Fiber.interrupt(fiber)
+      const exit = yield* Fiber.await(fiber)
+
+      expect(Exit.hasInterrupts(exit)).toBe(true)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() =>
+            Stream.fromEffect(
+              started === undefined ? Effect.die("missing started Deferred") : Deferred.succeed(started, undefined),
+            ).pipe(Stream.drain, Stream.concat(Stream.never)),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("preserves interrupt causes while needsApproval is evaluating", () => {
+    let started: Deferred.Deferred<void> | undefined
+    const interruptibleApprovalTool = Ai.Tool.make("interruptible-approval", {
+      description: "Requires interruptible approval",
+      parameters: Schema.Struct({ text: Schema.String }),
+      success: Schema.Unknown,
+      needsApproval: () =>
+        Effect.gen(function* () {
+          if (started === undefined) return yield* Effect.die("missing started Deferred")
+          yield* Deferred.succeed(started, undefined)
+          return yield* Effect.interrupt
+        }),
+    })
+    return Effect.gen(function* () {
+      const currentStarted = yield* Deferred.make<void>()
+      started = currentStarted
+      const agent = Agent.make({
+        name: "interrupt-approval-agent",
+        toolkit: Ai.Toolkit.make(interruptibleApprovalTool),
+      })
+      const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "needs approval" })).pipe(
+        Effect.forkChild({ startImmediately: true }),
+      )
+
+      yield* Deferred.await(currentStarted)
+      const exit = yield* Fiber.await(fiber)
+
+      expect(Exit.hasInterrupts(exit)).toBe(true)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() =>
+            Stream.make(toolCallPart("tool-call-interrupt-approval", "interruptible-approval", { text: "wait" })),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("preserves interrupt causes before the first model part", () => {
+    let started: Deferred.Deferred<void> | undefined
+    return Effect.gen(function* () {
+      const currentStarted = yield* Deferred.make<void>()
+      started = currentStarted
+      const agent = Agent.make({ name: "interrupt-model-stream-agent" })
+      const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "never emit" })).pipe(
+        Effect.forkChild({ startImmediately: true }),
+      )
+
+      yield* Deferred.await(currentStarted)
+      const exit = yield* Fiber.await(fiber)
+
+      expect(Exit.hasInterrupts(exit)).toBe(true)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() =>
+            Stream.fromEffect(
+              started === undefined ? Effect.die("missing started Deferred") : Deferred.succeed(started, undefined),
+            ).pipe(Stream.drain, Stream.concat(Stream.fromEffect(Effect.interrupt))),
+          ),
+          unusedExecutor,
+          Approvals.autoApprove,
           ModelMiddleware.identityLayer,
         ),
       ),
