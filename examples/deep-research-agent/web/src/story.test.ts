@@ -63,10 +63,15 @@ const completionFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
   eventFrame(6, {
     _tag: "ModelPart",
     turn: 1,
+    part: Ai.Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Compare transport frames." }),
+  }),
+  eventFrame(7, {
+    _tag: "ModelPart",
+    turn: 1,
     part: Ai.Response.makePart("text-delta", { id: "assistant", delta: "Final cited answer" }),
   }),
-  eventFrame(7, { _tag: "TurnCompleted", turn: 1 }),
-  eventFrame(8, { _tag: "Completed", turns: 2, text: "Final cited answer\n\nSources:\n[1] Baton docs" }),
+  eventFrame(8, { _tag: "TurnCompleted", turn: 1 }),
+  eventFrame(9, { _tag: "Completed", turns: 2, text: "Final cited answer\n\nSources:\n[1] Baton docs" }),
 ]
 
 describe("deep-research-agent web update", () => {
@@ -110,7 +115,27 @@ describe("deep-research-agent web update", () => {
             progress: [],
           }),
         )
-        expect(assistant).toEqual(Chat.AssistantEntry({ text: "Final cited answer", reasoning: null }))
+        expect(assistant).toEqual(
+          Chat.AssistantEntry({ text: "Final cited answer", reasoning: "Compare transport frames." }),
+        )
+      }),
+    )
+  })
+
+  test("clicking stop dispatches the existing Baton cancel command", () => {
+    Story.story(
+      update,
+      Story.with({
+        ...readyModel(),
+        chat: { ...readyModel().chat, run: Chat.Running({ turn: 0 }) },
+      }),
+      Story.message(GotChatMessage({ message: Chat.ClickedCancel() })),
+      Story.Command.expectExact(Chat.CancelRun({ sessionId })),
+      Story.Command.resolve(Chat.CancelRun({ sessionId }), Chat.CancelledRun(), (message) =>
+        GotChatMessage({ message }),
+      ),
+      Story.model((model) => {
+        expect(model.chat.run).toEqual(Chat.Running({ turn: 0 }))
       }),
     )
   })

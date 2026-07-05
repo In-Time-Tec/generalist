@@ -230,11 +230,44 @@ const userEntryView = (entry: typeof Chat.UserEntry.Type): Html =>
     ]),
   ])
 
-const assistantEntryView = (model: Model, key: string, entry: typeof Chat.AssistantEntry.Type): Html =>
+interface WebSearchResult {
+  readonly title: string
+  readonly url: string
+  readonly snippet: string
+}
+
+const inlineCitationsView = (results: ReadonlyArray<WebSearchResult>): Html => {
+  const h = html<Message>()
+  return h.div(
+    [h.Class("mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground")],
+    [
+      h.span([h.Class("mr-1")], ["Sources"]),
+      ...results.map((result, index) =>
+        h.a(
+          [
+            h.Href(result.url),
+            h.Target("_blank"),
+            h.Rel("noreferrer"),
+            h.Class("rounded-full border px-2 py-0.5 text-primary hover:bg-accent"),
+          ],
+          [`[${index + 1}] ${result.title}`],
+        ),
+      ),
+    ],
+  )
+}
+
+const assistantEntryView = (
+  model: Model,
+  key: string,
+  entry: typeof Chat.AssistantEntry.Type,
+  citationResults: ReadonlyArray<WebSearchResult>,
+): Html =>
   message({ align: "start" }, [
     messageContent({}, [
       ...(entry.reasoning === null ? [] : [reasoningBlockView(model, key, entry.reasoning, false)]),
-      response({}, [responseText({}, entry.text)]),
+      ...(entry.text.length === 0 ? [] : [response({}, [responseText({}, entry.text)])]),
+      ...(citationResults.length > 0 ? [inlineCitationsView(citationResults)] : []),
     ]),
   ])
 
@@ -248,7 +281,7 @@ const toolStatusOf = (outcome: Chat.ToolOutcome): ToolStatus => {
 }
 
 interface WebSearchSuccess {
-  readonly results: ReadonlyArray<{ readonly title: string; readonly url: string; readonly snippet: string }>
+  readonly results: ReadonlyArray<WebSearchResult>
 }
 
 const isWebSearchSuccess = (value: unknown): value is WebSearchSuccess =>
@@ -257,7 +290,7 @@ const isWebSearchSuccess = (value: unknown): value is WebSearchSuccess =>
 const toolResultBodyView = (outcome: Extract<Chat.ToolOutcome, { _tag: "Completed" }>): Html => {
   const h = html<Message>()
   return toolOutput({ isError: outcome.isFailure }, [
-    h.pre([h.Class("overflow-x-auto p-3 text-xs")], [h.code([], [JSON.stringify(outcome.result, null, 2)])]),
+    h.pre([h.Class("max-h-72 overflow-auto p-3 text-xs")], [h.code([], [JSON.stringify(outcome.result, null, 2)])]),
   ])
 }
 
@@ -314,13 +347,33 @@ const toolEntryView = (model: Model, entry: typeof Chat.ToolEntry.Type): Html =>
   ])
 }
 
+const sourceResultsBefore = (entries: ReadonlyArray<Chat.ChatEntry>, index: number): ReadonlyArray<WebSearchResult> => {
+  const seen = new Set<string>()
+  const results: Array<WebSearchResult> = []
+  for (const entry of entries.slice(0, index)) {
+    if (entry._tag !== "ToolEntry" || entry.outcome._tag !== "Completed" || entry.outcome.isFailure) continue
+    if (!isWebSearchSuccess(entry.outcome.result)) continue
+    for (const result of entry.outcome.result.results) {
+      const key = `${result.title}\n${result.url}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      results.push(result)
+    }
+  }
+  return results
+}
+
 const chatEntryView = (model: Model, entry: Chat.ChatEntry, index: number): Html => {
   const h = html<Message>()
   switch (entry._tag) {
     case "UserEntry":
       return h.keyed("div")(`entry-${index}-user`, [], [userEntryView(entry)])
     case "AssistantEntry":
-      return h.keyed("div")(`entry-${index}-assistant`, [], [assistantEntryView(model, `reasoning-${index}`, entry)])
+      return h.keyed("div")(
+        `entry-${index}-assistant`,
+        [],
+        [assistantEntryView(model, `reasoning-${index}`, entry, sourceResultsBefore(model.chat.entries, index))],
+      )
     case "ToolEntry":
       return h.keyed("div")(`entry-${index}-tool`, [], [toolEntryView(model, entry)])
   }
@@ -416,7 +469,10 @@ const sessionBannerContentView = (session: SessionState): Html => {
 
 const footerView = (model: Model): Html => {
   const isReady = model.session._tag === "SessionReady"
+  const isCancellable =
+    model.chat.sessionId !== null && (model.chat.run._tag === "Running" || model.chat.run._tag === "AwaitingApproval")
   const submitMessage = GotChatMessage({ message: Chat.SubmittedMessage() })
+  const cancelMessage = GotChatMessage({ message: Chat.ClickedCancel() })
   return promptInput({ class: "mx-auto w-full max-w-3xl", onSubmitted: submitMessage }, [
     promptInputTextarea({
       id: "research-question",
@@ -429,7 +485,9 @@ const footerView = (model: Model): Html => {
     promptInputToolbar({}, [
       promptInputSubmit({
         status: promptStatusOf(model.chat.run),
-        isDisabled: !isReady || model.chat.draft.trim().length === 0,
+        type: isCancellable ? "button" : "submit",
+        onClick: isCancellable ? cancelMessage : undefined,
+        isDisabled: !isReady || (!isCancellable && model.chat.draft.trim().length === 0),
       }),
     ]),
   ])
