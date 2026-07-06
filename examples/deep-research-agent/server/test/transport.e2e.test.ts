@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { createServer } from "node:net"
+import { connect, createServer } from "node:net"
 import { describe, expect, live } from "@effect/vitest"
 import { Effect, Fiber, Schema, Stream } from "effect"
 import * as Encoding from "effect/unstable/encoding"
@@ -52,6 +52,39 @@ const startServer = (port: number) =>
       }),
     ),
     (child) => Effect.sync(() => child.kill()),
+  )
+
+// A spawned Bun server binds its port only after its module tree finishes
+// importing, which on a cold CI runner can take well past the old 5s open-session
+// retry budget — the connection was then refused and the test flaked. Probe the
+// port directly (a TCP connect succeeds the instant Bun is listening) and gate the
+// run on that deterministic signal instead of racing the boot.
+const probePort = (port: number) =>
+  Effect.tryPromise({
+    try: () =>
+      new Promise<void>((resolve, reject) => {
+        const socket = connect({ port, host: "127.0.0.1" })
+        socket.once("connect", () => {
+          socket.destroy()
+          resolve()
+        })
+        socket.once("error", (error) => {
+          socket.destroy()
+          reject(error)
+        })
+      }),
+    catch: (error) => error,
+  })
+
+const waitForServerReady = (port: number, attempts: number): Effect.Effect<void> =>
+  probePort(port).pipe(
+    Effect.catch((error) =>
+      attempts <= 0
+        ? Effect.die(
+            new Error(`deep-research-agent server on port ${port} never accepted a connection: ${String(error)}`),
+          )
+        : Effect.sleep("150 millis").pipe(Effect.andThen(waitForServerReady(port, attempts - 1))),
+    ),
   )
 
 const openSessionWithRetry = (
@@ -111,6 +144,8 @@ describe("deep-research-agent Baton transport e2e", () => {
           const port = yield* freePort
           yield* startServer(port)
           const baseUrl = `http://127.0.0.1:${port}`
+          // 200 × 150ms ≈ 30s budget for a cold CI boot before we touch any route.
+          yield* waitForServerReady(port, 200)
           const sessionId = "deep-research-transport-e2e"
           const opened = yield* openSessionWithRetry(baseUrl, sessionId, 50)
           const response = yield* HttpClient.get(`${baseUrl}/sessions/${sessionId}/events`)
@@ -179,6 +214,6 @@ describe("deep-research-agent Baton transport e2e", () => {
           )
         }),
       ).pipe(Effect.provide(FetchHttpClient.layer)),
-    20_000,
+    60_000,
   )
 })
