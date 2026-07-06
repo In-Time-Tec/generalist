@@ -172,7 +172,7 @@ const approvalRequired = (
   return Effect.suspend(() => {
     const result = needsApproval(call.params as never, { toolCallId: call.id, messages })
     return Effect.isEffect(result) ? result : Effect.succeed(result)
-  }).pipe(Effect.catchCause(() => Effect.succeed(true)))
+  }).pipe(Effect.catchCause((cause) => (Cause.hasInterrupts(cause) ? Effect.interrupt : Effect.succeed(true))))
 }
 
 /** Fold the prompt through every `transformPrompt` hook in array order. */
@@ -869,6 +869,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
                     }),
                   ),
                   Stream.catchCause((cause) => {
+                    if (Cause.hasInterrupts(cause)) return Stream.fromEffect(Effect.interrupt)
                     const error = Cause.squash(cause)
                     if (
                       retryOverflow &&
@@ -1169,6 +1170,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       // trailing event is invisible to consumers that observe just the error.
       return runStream.pipe(
         Stream.catchCause((cause) => {
+          if (Cause.hasInterrupts(cause)) return Stream.fromEffect(Effect.interrupt)
           const error = Cause.squash(cause)
           if (error instanceof AgentEvent.AgentSuspended) {
             return Stream.unwrap(

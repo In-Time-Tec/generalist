@@ -1,0 +1,13 @@
+{
+  "name": "@batonfx/example-deep-research-agent",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.14",
+  "scripts": {
+    "start": "bun run --cwd server start",
+    "server": "bun run --cwd server start",
+    "web": "bun run --cwd web dev",
+    "test": "bun --cwd ../.. vitest run examples/deep-research-agent --passWithNoTests",
+    "typecheck": "bun run --cwd server typecheck && bun run --cwd web typecheck"
+  }
+}

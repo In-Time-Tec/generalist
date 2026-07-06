@@ -44,6 +44,7 @@ Baton does not own (deferred, see ADR-0001): UI helpers, concrete memory impleme
 | `model-resilience.ts` | `ModelResilience` | Optional retry seam for model-call failures inside the loop.                                              |
 | `permissions.ts`      | `Permissions`     | Optional allow/deny/ask policy seam for local tool calls before execution and tool-declared approvals.    |
 | `session.ts`          | `Session`         | Append-only session event-log seam, memory layer, and pure `buildContext` projector.                      |
+| `skill-source.ts`     | `SkillSource`     | Optional agentskills.io skill listing and lazy body source seam.                                          |
 | `steering.ts`         | `Steering`        | Optional two-queue live-input seam for steering and follow-up prompts plus test layer.                    |
 | `tool-context.ts`     | `ToolContext`     | Per-tool-call ambient context: abort signal, progress emitter, and session identity.                      |
 | `tool-executor.ts`    | `ToolExecutor`    | Tool-call execution seam; `fromToolkit` default executor and `testLayer`.                                 |
@@ -181,12 +182,17 @@ Baton is designed to be composed behind a durable runtime's own agent-loop inter
 - `docs/spec/decisions/ADR-0007-permissions-policy-seam.md`
 - `docs/spec/decisions/ADR-0008-steering-and-run-interrupts.md`
 - `docs/spec/decisions/ADR-0009-compaction-strategy-seam.md`
+- `docs/spec/decisions/ADR-0010-adopt-agentskills-standard.md`
+- `docs/spec/decisions/ADR-0011-provider-registration-helpers.md`
+- `docs/spec/decisions/ADR-0012-model-metadata-catalog.md`
 - `docs/spec/02-session-event-log.md`
 - `docs/spec/03-instructions-and-context-epoch.md`
 - `docs/spec/04-permissions-policy.md`
 - `docs/spec/05-steering-and-interrupts.md`
 - `docs/spec/06-compaction.md`
+- `docs/spec/07-skills.md`
+- `docs/spec/08-providers.md`
+- `docs/spec/09-memory.md`
 - `docs/spec/10-multi-agent.md`
 - `docs/spec/11-transport.md`
-- `docs/spec/09-memory.md`
 - `README.md`

@@ -1,8 +1,18 @@
+import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
 
 export default defineConfig({
+  resolve: {
+    alias: [
+      { find: "@", replacement: fileURLToPath(new URL("./examples/deep-research-agent/web/src", import.meta.url)) },
+    ],
+  },
   test: {
-    include: ["packages/**/test/**/*.test.ts"],
+    include: [
+      "packages/**/test/**/*.test.ts",
+      "examples/deep-research-agent/server/test/**/*.test.ts",
+      "examples/deep-research-agent/web/src/**/*.test.ts",
+    ],
     coverage: {
       enabled: false,
       provider: "v8",

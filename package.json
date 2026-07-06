@@ -22,7 +22,8 @@
   "workspaces": {
     "packages": [
       "packages/*",
-      "examples/*"
+      "examples/*",
+      "examples/*/*"
     ],
     "catalog": {
       "@ast-grep/cli": "0.44.0",
@@ -30,6 +31,7 @@
       "@effect/ai-openai": "4.0.0-beta.93",
       "@effect/ai-openai-compat": "4.0.0-beta.93",
       "@effect/ai-openrouter": "4.0.0-beta.93",
+      "@effect/platform-bun": "4.0.0-beta.93",
       "@effect/vitest": "4.0.0-beta.93",
       "@modelcontextprotocol/sdk": "1.29.0",
       "@tsconfig/bun": "1.0.9",
@@ -38,6 +40,7 @@
       "@vitest/coverage-v8": "4.0.16",
       "effect": "4.0.0-beta.93",
       "foldkit": "0.122.0",
+      "happy-dom": "20.10.6",
       "oxlint": "1.60.0",
       "oxlint-tsgolint": "0.21.0",
       "prettier": "3.6.2",
@@ -63,6 +66,7 @@
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "happy-dom": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "prettier": "catalog:",

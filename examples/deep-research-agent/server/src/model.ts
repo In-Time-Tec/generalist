@@ -1,0 +1,115 @@
+import { OpenRouter } from "@batonfx/providers"
+import { Effect, Layer, Option, Stream } from "effect"
+import * as Ai from "effect/unstable/ai"
+import { FetchHttpClient } from "effect/unstable/http"
+
+type StreamText = Parameters<typeof Ai.LanguageModel.make>[0]["streamText"]
+
+interface WebSearchSuccess {
+  readonly results: ReadonlyArray<{
+    readonly title: string
+    readonly url: string
+    readonly snippet: string
+  }>
+}
+
+const findWebSearchResult = (prompt: Ai.Prompt.Prompt): WebSearchSuccess | undefined => {
+  for (const message of prompt.content) {
+    if (message.role !== "tool") continue
+    for (const part of message.content) {
+      if (part.type === "tool-result" && part.name === "web_search" && !part.isFailure) {
+        return part.result as WebSearchSuccess
+      }
+    }
+  }
+  return undefined
+}
+
+const latestUserQuestion = (prompt: Ai.Prompt.Prompt): string => {
+  const userMessages = prompt.content.filter((message) => message.role === "user")
+  const last = userMessages.at(-1)
+  if (last === undefined) return "the topic"
+  for (const part of last.content) {
+    if (part.type === "text") return part.text
+  }
+  return "the topic"
+}
+
+const synthesizeAnswer = (result: WebSearchSuccess): string => {
+  if (result.results.length === 0) {
+    return "I could not find any relevant sources for this question."
+  }
+  const summary = result.results.map((item) => item.snippet).join(" ")
+  const citations = result.results.map((item, index) => `[${index + 1}] ${item.title} — ${item.url}`).join("\n")
+  return [
+    `Based on ${result.results.length} source${result.results.length === 1 ? "" : "s"}, here is what I found:`,
+    "",
+    summary,
+    "",
+    "Sources:",
+    citations,
+  ].join("\n")
+}
+
+/**
+ * @experimental Scripted `streamText` for the credential-free demo path.
+ * Reads the growing prompt to decide which script step to play: no prior
+ * `web_search` tool result means "plan and call the tool"; a prior result
+ * means "synthesize the final cited answer from it". Deriving the step from
+ * the prompt (rather than a call counter) keeps the script correct across
+ * multiple questions asked in the same server process.
+ */
+const scriptedStreamText: StreamText = (options) => {
+  const priorResult = findWebSearchResult(options.prompt)
+  if (priorResult !== undefined) {
+    return Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: synthesizeAnswer(priorResult) }))
+  }
+  const query = latestUserQuestion(options.prompt)
+  return Stream.make(
+    Ai.Response.makePart("tool-call", {
+      id: "search-1",
+      name: "web_search",
+      params: { query },
+      providerExecuted: false,
+    }),
+  )
+}
+
+/** @experimental A closed `Ai.LanguageModel` requiring nothing, scripted to demonstrate the plan -> search -> synthesize loop. */
+const scriptedDeterministicModel: Layer.Layer<Ai.LanguageModel.LanguageModel> = Layer.effect(
+  Ai.LanguageModel.LanguageModel,
+  Ai.LanguageModel.make({
+    generateText: () => Effect.succeed([{ type: "text", text: "deterministic response" }]),
+    streamText: scriptedStreamText,
+  }),
+)
+
+/** @experimental */
+export interface WithOpenRouterOrDeterministicOptions extends OpenRouter.WithOpenRouterOptions {}
+
+/**
+ * @experimental Copies the shape of `Deterministic.withOpenAiOrDeterministic`
+ * (`packages/providers/src/deterministic.ts`), swapping OpenAI for
+ * OpenRouter: try to build a real OpenRouter model layer from `options`, and
+ * fall back to the scripted deterministic model above when the API key
+ * config does not resolve. Unlike the packaged helper this returns a closed
+ * `Ai.LanguageModel` directly (not a `ModelRegistry` registration), which is
+ * what `SessionRegistry.layerMemory` needs for its single-agent server.
+ */
+export const withOpenRouterOrDeterministic = (
+  options: WithOpenRouterOrDeterministicOptions,
+): Layer.Layer<Ai.LanguageModel.LanguageModel> =>
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const openRouterRegistration = yield* OpenRouter.openRouter(options).pipe(
+        Effect.provide(OpenRouter.openRouterClientLayerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
+        Effect.provide(FetchHttpClient.layer),
+        Effect.asSome,
+        Effect.catchTag("ConfigError", () => Effect.succeedNone),
+      )
+      return Option.match(openRouterRegistration, {
+        onNone: () => scriptedDeterministicModel,
+        onSome: (registration) => registration.layer,
+      })
+    }),
+  )
