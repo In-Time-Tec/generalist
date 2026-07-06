@@ -99,6 +99,7 @@ describe("deep-research-agent web update", () => {
             callId: "search-1",
             name: "web_search",
             params: { query: "What makes Baton standalone?" },
+            phase: "executing",
             outcome: {
               _tag: "Completed",
               isFailure: false,
@@ -154,6 +155,7 @@ describe("deep-research-agent web update", () => {
               callId: "search-1",
               name: "web_search",
               params: { query: "What makes Baton standalone?" },
+              phase: "called",
               outcome: { _tag: "Pending" },
               progress: [],
             }),

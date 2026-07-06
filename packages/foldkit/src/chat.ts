@@ -12,10 +12,19 @@ const UserEntryFields = { text: Schema.String }
 const AssistantEntryFields = { text: Schema.String, reasoning: Schema.NullOr(Schema.String) }
 const RunCompletedFields = { text: Schema.String }
 const StringReasonFields = { reason: Schema.String }
+const OpenedSessionFields = { sessionId: Schema.String }
+
+/** @experimental */
+export const ToolPendingPhase = Schema.Literals(["called", "executing"])
+
+/** @experimental */
+export type ToolPendingPhase = typeof ToolPendingPhase.Type
+
 const ToolEntryFields = {
   callId: Schema.String,
   name: Schema.String,
   params: Schema.Unknown,
+  phase: ToolPendingPhase,
   outcome: Schema.suspend((): Schema.Schema<ToolOutcome> => ToolOutcome),
   progress: Schema.Array(Schema.String),
 }
@@ -113,6 +122,12 @@ export const ReceivedAgent: CallableTaggedStruct<"ReceivedAgent", typeof Receive
 )
 
 /** @experimental */
+export const OpenedSession: CallableTaggedStruct<"OpenedSession", typeof OpenedSessionFields> = m(
+  "OpenedSession",
+  OpenedSessionFields,
+)
+
+/** @experimental */
 export const ChangedDraft: CallableTaggedStruct<"ChangedDraft", typeof UserEntryFields> = m(
   "ChangedDraft",
   UserEntryFields,
@@ -151,6 +166,7 @@ export const FailedAgentCommand: CallableTaggedStruct<"FailedAgentCommand", type
 /** @experimental */
 export type Message =
   | typeof ReceivedAgent.Type
+  | typeof OpenedSession.Type
   | typeof ChangedDraft.Type
   | typeof SubmittedMessage.Type
   | typeof ClickedCancel.Type
@@ -164,6 +180,7 @@ export type Message =
 /** @experimental */
 export const Message: Schema.Schema<Message> = Schema.Union([
   ReceivedAgent,
+  OpenedSession,
   ChangedDraft,
   SubmittedMessage,
   ClickedCancel,
@@ -194,6 +211,123 @@ export type OutMessage = typeof RunCompleted.Type | typeof ApprovalRequired.Type
 
 /** @experimental */
 export const OutMessage: Schema.Schema<OutMessage> = Schema.Union([RunCompleted, ApprovalRequired, RunFailed])
+
+/** @experimental */
+export const MessageAlign = Schema.Literals(["start", "end"])
+
+/** @experimental */
+export type MessageAlign = typeof MessageAlign.Type
+
+/** @experimental */
+export const PromptInputStatus = Schema.Literals(["idle", "submitted", "streaming", "error"])
+
+/** @experimental */
+export type PromptInputStatus = typeof PromptInputStatus.Type
+
+/** @experimental */
+export const ToolStatus = Schema.Literals(["input-streaming", "input-available", "output-available", "output-error"])
+
+/** @experimental */
+export type ToolStatus = typeof ToolStatus.Type
+
+/** @experimental */
+export const UserConversationItem: CallableTaggedStruct<
+  "UserConversationItem",
+  { key: typeof Schema.String; align: typeof MessageAlign; entry: typeof UserEntry }
+> = m("UserConversationItem", { key: Schema.String, align: MessageAlign, entry: UserEntry })
+
+/** @experimental */
+export const AssistantConversationItem: CallableTaggedStruct<
+  "AssistantConversationItem",
+  { key: typeof Schema.String; align: typeof MessageAlign; entry: typeof AssistantEntry }
+> = m("AssistantConversationItem", { key: Schema.String, align: MessageAlign, entry: AssistantEntry })
+
+/** @experimental */
+export const ToolConversationItem: CallableTaggedStruct<
+  "ToolConversationItem",
+  {
+    key: typeof Schema.String
+    align: typeof MessageAlign
+    entry: typeof ToolEntry
+    status: typeof ToolStatus
+    input: typeof Schema.String
+  }
+> = m("ToolConversationItem", {
+  key: Schema.String,
+  align: MessageAlign,
+  entry: ToolEntry,
+  status: ToolStatus,
+  input: Schema.String,
+})
+
+/** @experimental */
+export const StreamingConversationItem: CallableTaggedStruct<
+  "StreamingConversationItem",
+  {
+    key: typeof Schema.String
+    align: typeof MessageAlign
+    text: typeof Schema.String
+    reasoning: typeof Schema.String
+    isStreaming: typeof Schema.Boolean
+  }
+> = m("StreamingConversationItem", {
+  key: Schema.String,
+  align: MessageAlign,
+  text: Schema.String,
+  reasoning: Schema.String,
+  isStreaming: Schema.Boolean,
+})
+
+/** @experimental */
+export const WaitingConversationItem: CallableTaggedStruct<
+  "WaitingConversationItem",
+  { key: typeof Schema.String; align: typeof MessageAlign }
+> = m("WaitingConversationItem", { key: Schema.String, align: MessageAlign })
+
+/** @experimental */
+export const ApprovalConversationItem: CallableTaggedStruct<
+  "ApprovalConversationItem",
+  {
+    key: typeof Schema.String
+    align: typeof MessageAlign
+    token: typeof Schema.String
+    toolName: typeof Schema.String
+    params: typeof Schema.Unknown
+  }
+> = m("ApprovalConversationItem", {
+  key: Schema.String,
+  align: MessageAlign,
+  token: Schema.String,
+  toolName: Schema.String,
+  params: Schema.Unknown,
+})
+
+/** @experimental */
+export const FailureConversationItem: CallableTaggedStruct<
+  "FailureConversationItem",
+  { key: typeof Schema.String; align: typeof MessageAlign; message: typeof Schema.String }
+> = m("FailureConversationItem", { key: Schema.String, align: MessageAlign, message: Schema.String })
+
+/** @experimental */
+export type ConversationItem =
+  | typeof UserConversationItem.Type
+  | typeof AssistantConversationItem.Type
+  | typeof ToolConversationItem.Type
+  | typeof StreamingConversationItem.Type
+  | typeof WaitingConversationItem.Type
+  | typeof ApprovalConversationItem.Type
+  | typeof FailureConversationItem.Type
+
+/** @experimental */
+export const ConversationItem: Schema.Schema<ConversationItem> = Schema.Union([
+  UserConversationItem,
+  AssistantConversationItem,
+  ToolConversationItem,
+  StreamingConversationItem,
+  WaitingConversationItem,
+  ApprovalConversationItem,
+  FailureConversationItem,
+])
 
 /** @experimental */
 export type ChatCommand = Command.Command<Message, any, Connection.AgentConnection>
@@ -322,18 +456,20 @@ const flushStreaming = (model: Model): Model => {
   return { ...model, entries: [...model.entries, ...entry], streaming: null }
 }
 
-const upsertToolCall = (entries: ReadonlyArray<ChatEntry>, call: ToolCallLike): ReadonlyArray<ChatEntry> => {
+const upsertToolCall = (
+  entries: ReadonlyArray<ChatEntry>,
+  call: ToolCallLike,
+  phase: ToolPendingPhase = "called",
+): ReadonlyArray<ChatEntry> => {
   const index = entries.findIndex((entry) => entry._tag === "ToolEntry" && entry.callId === call.id)
   const previous = index >= 0 ? entries[index] : undefined
   const previousToolEntry = previous?._tag === "ToolEntry" ? previous : undefined
+  const nextPhase = previousToolEntry?.phase === "executing" || phase === "executing" ? "executing" : "called"
   const next = ToolEntry({
     callId: call.id,
     name: call.name,
-    // `resolveTool` re-upserts with `params: undefined` defensively (a tool
-    // result may arrive without this view ever having seen the matching
-    // tool-call part). Falling back to the previously tracked params keeps a
-    // real tool call's params from being wiped out when its result resolves.
     params: call.params === undefined ? previousToolEntry?.params : call.params,
+    phase: nextPhase,
     outcome: previousToolEntry?.outcome ?? Pending(),
     progress: previousToolEntry?.progress ?? [],
   })
@@ -349,6 +485,7 @@ const resolveTool = (entries: ReadonlyArray<ChatEntry>, result: ToolResultLike):
           callId: entry.callId,
           name: entry.name,
           params: entry.params,
+          phase: entry.phase,
           outcome: Completed({ isFailure: result.isFailure, result: result.result }),
           progress: entry.progress,
         })
@@ -363,6 +500,7 @@ const addProgress = (entries: ReadonlyArray<ChatEntry>, callId: string, message:
           callId: entry.callId,
           name: entry.name,
           params: entry.params,
+          phase: entry.phase,
           outcome: entry.outcome,
           progress: entry.progress.concat(message),
         })
@@ -441,6 +579,7 @@ const applyEvent = (model: Model, event: Wire.EventType): readonly [Model, Optio
     case "ModelPart":
       return [applyPart(model, event.turn, event.part), Option.none()]
     case "ToolExecutionStarted":
+      return [{ ...model, entries: upsertToolCall(model.entries, event.call, "executing") }, Option.none()]
     case "ApprovalRequested":
       return [{ ...model, entries: upsertToolCall(model.entries, event.call) }, Option.none()]
     case "ToolProgress":
@@ -449,7 +588,7 @@ const applyEvent = (model: Model, event: Wire.EventType): readonly [Model, Optio
         : [{ ...model, entries: addProgress(model.entries, event.toolCallId, event.message) }, Option.none()]
     case "ToolExecutionCompleted":
       return [
-        { ...model, entries: resolveTool(upsertToolCall(model.entries, event.call), event.result) },
+        { ...model, entries: resolveTool(upsertToolCall(model.entries, event.call, "executing"), event.result) },
         Option.none(),
       ]
     case "TurnCompleted":
@@ -521,6 +660,93 @@ const applyFrame = (model: Model, frame: Wire.LooseServerFrameType): readonly [M
   }
 }
 
+const jsonText = (value: unknown): string => {
+  try {
+    return JSON.stringify(value, null, 2) ?? "undefined"
+  } catch {
+    return String(value)
+  }
+}
+
+/** @experimental */
+export const promptInputStatusOf = (run: RunState): PromptInputStatus => {
+  switch (run._tag) {
+    case "Idle":
+      return "idle"
+    case "Running":
+      return "streaming"
+    case "AwaitingApproval":
+      return "submitted"
+    case "Failed":
+      return "error"
+  }
+}
+
+/** @experimental */
+export const toolStatusOf = (entry: typeof ToolEntry.Type): ToolStatus => {
+  switch (entry.outcome._tag) {
+    case "Pending":
+      return entry.phase === "executing" ? "input-available" : "input-streaming"
+    case "Completed":
+      return entry.outcome.isFailure ? "output-error" : "output-available"
+  }
+}
+
+const conversationItemFor = (entry: ChatEntry, index: number): ConversationItem => {
+  switch (entry._tag) {
+    case "UserEntry":
+      return UserConversationItem({ key: `entry-${index}-user`, align: "end", entry })
+    case "AssistantEntry":
+      return AssistantConversationItem({ key: `entry-${index}-assistant`, align: "start", entry })
+    case "ToolEntry":
+      return ToolConversationItem({
+        key: `tool-${entry.callId}`,
+        align: "start",
+        entry,
+        status: toolStatusOf(entry),
+        input: jsonText(entry.params),
+      })
+  }
+}
+
+/** @experimental */
+export const conversationItems = (model: Model): ReadonlyArray<ConversationItem> => {
+  const entries = model.entries.map(conversationItemFor)
+  const streaming =
+    model.streaming === null
+      ? []
+      : [
+          StreamingConversationItem({
+            key: "streaming-assistant",
+            align: "start",
+            text: model.streaming.text,
+            reasoning: model.streaming.reasoning,
+            isStreaming: true,
+          }),
+        ]
+  const waiting =
+    model.run._tag === "Running" && model.streaming === null
+      ? [WaitingConversationItem({ key: "waiting-assistant", align: "start" })]
+      : []
+  const approval =
+    model.run._tag === "AwaitingApproval"
+      ? [
+          ApprovalConversationItem({
+            key: `approval-${model.run.token}`,
+            align: "start",
+            token: model.run.token,
+            toolName: model.run.toolName,
+            params: model.run.params,
+          }),
+        ]
+      : []
+  const failure =
+    model.run._tag === "Failed"
+      ? [FailureConversationItem({ key: "run-failure", align: "start", message: model.run.message })]
+      : []
+  return [...entries, ...streaming, ...waiting, ...approval, ...failure]
+}
+
 const isServerFrame = (incoming: Connection.Incoming): incoming is Wire.LooseServerFrameType =>
   incoming._tag === "Event" ||
   incoming._tag === "Suspended" ||
@@ -556,6 +782,20 @@ export const update = (
             Option.some(RunFailed({ message: message.incoming.reason })),
           ]
       }
+    case "OpenedSession":
+      return [
+        {
+          ...model,
+          sessionId: message.sessionId,
+          connection: "connecting",
+          lastSeq: -1,
+          run: Idle(),
+          entries: [],
+          streaming: null,
+        },
+        [],
+        Option.none(),
+      ]
     case "ChangedDraft":
       return [{ ...model, draft: message.text }, [], Option.none()]
     case "SubmittedMessage": {
