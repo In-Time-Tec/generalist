@@ -8,10 +8,11 @@ Baton owns:
 
 - the core `SkillSource` seam;
 - listing selection for progressive disclosure;
+- loop integration for startup listing injection and `activate_skill` body loading;
 - a filesystem-backed source package, `@batonfx/skills`;
 - an instruction-file loader for `AGENTS.md` / `CLAUDE.md` files.
 
-Baton does not own hosted skill distribution, durable skill registries, shell templating, automatic loop activation, or context-fork subagent execution in this milestone.
+Baton does not own hosted skill distribution, durable skill registries, shell templating, or context-fork subagent execution in this milestone.
 
 ## Core seam
 
@@ -37,6 +38,8 @@ Only `description` is required by the filesystem loader. `name` defaults to the 
 ## Progressive disclosure
 
 Startup context contains only selected listings: `- name: capped description`. The description cap is `DESCRIPTION_CAP = 1536` characters. `selectListings(skills, budgetTokens, recentlyUsed)` estimates listing cost with a stable approximation, excludes `disableModelInvocation` skills, and drops least-recently-used skills first when over budget while preserving source order among selected skills.
+
+When `SkillSource` is present, `Agent.stream` appends selected listings to the system baseline and advertises the built-in `activate_skill` tool. The model activates a listed skill by calling `activate_skill` with `{ name }`. Baton handles that call through `SkillSource.get(name)`, evaluates the selected `Skill.body`, adds contributed `Skill.tools` to the active toolkit, and returns a normal successful tool result containing `{ name, body, allowedTools }`. Non-activated skill bodies are not read.
 
 The Markdown body is loaded only by evaluating `Skill.body`. Supporting files are not loaded automatically in v1; consumers can expose read tools or package-specific loaders later.
 
@@ -64,7 +67,7 @@ Default filenames are `AGENTS.md` then `CLAUDE.md`. For each directory, the firs
 
 ## Integration
 
-This milestone does not change `Agent.stream`. Consumers compose `SkillSource` into `Instructions` by rendering selected listings, and expose body activation through tools or later package integrations. `contextFork`, `agent`, and `model` are parsed metadata only until multi-agent support lands.
+Consumers provide `SkillSource` as an optional Effect service. Local filesystem discovery and Relay's durable pinned-snapshot registry both adapt to the same `SkillSource.Interface`, so the loop activation path is identical for standalone Baton and durable hosts. `contextFork`, `agent`, and `model` are parsed metadata only until multi-agent support lands.
 
 ## Related docs
 

@@ -12,6 +12,10 @@ FoldKit applications need a small adapter that turns Baton transport streams and
 
 Add `@batonfx/foldkit` as a package that peer-depends on FoldKit and Effect, depends on `@batonfx/transport`, and exports `Connection` and `Chat` namespaces. The adapter uses a static FoldKit runtime `resources` layer for a shared `AgentConnection`, a WebSocket-backed connection layer, FoldKit command definitions that convert failures into messages, and a pure replay-idempotent chat update.
 
+Hosts open sessions through their own route or direct registry call, then pass the opened `sessionId` into the `Chat` model. The adapter does not define an `OpenSession` wire frame or a generic session-opening HTTP route.
+
+The adapter also exposes foldcn-aligned view-data helpers for prompt input status, tool status, and conversation rows. These helpers remain pure data mappers and do not import or own styled FoldCN component source.
+
 The adapter does not define styled views, EventSource wrappers, generic SSE command routes, Relay behavior, or durable execution semantics.
 
 ## Consequences

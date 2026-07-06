@@ -9,8 +9,10 @@ Baton owns:
 - an `AgentConnection` resource service that FoldKit applications provide through runtime `resources`;
 - a WebSocket-backed connection layer that composes `@batonfx/transport`'s client;
 - a subscription that streams decoded transport frames and connection facts into FoldKit messages;
+- a chat message for accepting a host-opened session id and starting the connection subscription;
 - command definitions for user messages, approval resolution, and cancellation;
 - a headless `Chat` model and pure `update` for reference chat state.
+- foldcn-aligned view-data helpers for prompt input status, tool status, and conversation rows.
 
 Baton does not own styled views, FoldCN components, durable execution addressability, Relay-specific session semantics, multi-session UI, history pagination beyond `Snapshot`, EventSource wrappers, or generic SSE command POST routes.
 
@@ -37,6 +39,8 @@ Current WebSocket transport reconnects with the last sequence it has seen intern
 
 `Chat.Model` is a headless display model. It tracks the selected `sessionId`, connection state, last accepted `seq`, run state, display entries, streaming assistant text/reasoning, and draft text.
 
+Hosts open sessions through their own route or direct registry call, then dispatch `OpenedSession { sessionId }` into the chat model. The adapter does not add an `OpenSession` wire frame or standard HTTP route. Accepting an opened session selects the session, resets replay cursor and display entries, and lets the existing subscription attach.
+
 Replay idempotence is mandatory: any server frame with `seq <= lastSeq` is dropped without changing state or emitting commands/out messages. Accepted frames set `lastSeq` before applying their content.
 
 Frame handling:
@@ -62,6 +66,14 @@ Frame handling:
 | `Ended`                                       | no-op logical run terminator                                                         |
 
 User messages update draft state and emit commands. Commands convert every send failure into `FailedAgentCommand`; no command fails silently.
+
+Tool entries retain the difference between a tool call observed in model output and execution actually starting. Foldcn tool status helpers map that to `input-streaming` before `ToolExecutionStarted`, `input-available` while execution is running, and `output-available` / `output-error` after completion.
+
+The adapter exposes pure helpers that map the headless model to foldcn component inputs without importing copied foldcn components:
+
+- prompt input status from `RunState`;
+- tool status from a `ToolEntry`;
+- conversation rows for user messages, assistant messages, tool calls, streaming assistant output, waiting indicator, and failures.
 
 ## Related docs
 

@@ -70,6 +70,7 @@ describe("deep-research-agent web view", () => {
               callId: "search-1",
               name: "web_search",
               params: { query: "baton standalone" },
+              phase: "executing",
               outcome: { _tag: "Pending" },
               progress: [],
             }),
@@ -125,6 +126,7 @@ describe("deep-research-agent web view", () => {
               callId: "search-1",
               name: "web_search",
               params: { query: "baton standalone" },
+              phase: "executing",
               outcome: {
                 _tag: "Completed",
                 isFailure: false,
@@ -201,6 +203,7 @@ describe("deep-research-agent web view", () => {
               callId: "search-1",
               name: "web_search",
               params: { query: "baton standalone" },
+              phase: "executing",
               outcome: {
                 _tag: "Completed",
                 isFailure: false,

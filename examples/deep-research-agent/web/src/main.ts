@@ -14,12 +14,10 @@ import * as Conversation from "@/components/ui/conversation"
 import { loader } from "@/components/ui/loader"
 import * as MessageScroller from "@/components/ui/message-scroller"
 import { message, messageContent } from "@/components/ui/message"
-import type { PromptInputStatus } from "@/components/ui/prompt-input"
 import { promptInput, promptInputSubmit, promptInputTextarea, promptInputToolbar } from "@/components/ui/prompt-input"
 import { reasoning, reasoningContent, reasoningTrigger } from "@/components/ui/reasoning"
 import { response, responseText } from "@/components/ui/response"
 import { source, sources, sourcesContent, sourcesTrigger } from "@/components/ui/sources"
-import type { ToolStatus } from "@/components/ui/tool"
 import { tool, toolContent, toolHeader, toolInput, toolOutput } from "@/components/ui/tool"
 
 const SERVER_HTTP_URL = "http://localhost:4000"
@@ -271,15 +269,6 @@ const assistantEntryView = (
     ]),
   ])
 
-const toolStatusOf = (outcome: Chat.ToolOutcome): ToolStatus => {
-  switch (outcome._tag) {
-    case "Pending":
-      return "input-available"
-    case "Completed":
-      return outcome.isFailure ? "output-error" : "output-available"
-  }
-}
-
 interface WebSearchSuccess {
   readonly results: ReadonlyArray<WebSearchResult>
 }
@@ -336,7 +325,7 @@ const toolEntryView = (model: Model, entry: typeof Chat.ToolEntry.Type): Html =>
       tool({}, [
         toolHeader({
           name: entry.name,
-          status: toolStatusOf(entry.outcome),
+          status: Chat.toolStatusOf(entry),
           isOpen,
           onToggled: ToggledExpanded({ key: entry.callId }),
         }),
@@ -434,19 +423,6 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
   return [...entries, ...streaming, ...waiting, ...failure]
 }
 
-const promptStatusOf = (run: Chat.RunState): PromptInputStatus => {
-  switch (run._tag) {
-    case "Idle":
-      return "idle"
-    case "Running":
-      return "streaming"
-    case "AwaitingApproval":
-      return "submitted"
-    case "Failed":
-      return "error"
-  }
-}
-
 const sessionBannerView = (session: SessionState): Html => {
   const h = html<Message>()
   return h.keyed("div")(session._tag, [], [sessionBannerContentView(session)])
@@ -484,7 +460,7 @@ const footerView = (model: Model): Html => {
     }),
     promptInputToolbar({}, [
       promptInputSubmit({
-        status: promptStatusOf(model.chat.run),
+        status: Chat.promptInputStatusOf(model.chat.run),
         type: isCancellable ? "button" : "submit",
         onClick: isCancellable ? cancelMessage : undefined,
         isDisabled: !isReady || (!isCancellable && model.chat.draft.trim().length === 0),

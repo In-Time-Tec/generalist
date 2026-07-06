@@ -48,10 +48,14 @@ describe("Chat", () => {
         callId: "call-1",
         name: "lookup",
         params: { q: "baton" },
+        phase: "called",
         outcome: { _tag: "Pending" },
         progress: [],
       },
     ])
+    const pendingTool = model.entries[0]
+    if (pendingTool?._tag !== "ToolEntry") throw new Error("expected pending tool entry")
+    expect(Chat.toolStatusOf(pendingTool)).toBe("input-streaming")
 
     const result = Ai.Response.makePart("tool-result", {
       id: "call-1",
@@ -65,8 +69,12 @@ describe("Chat", () => {
     ;[model] = updateWith(model, eventFrame(4, { _tag: "ToolExecutionCompleted", turn: 0, call, result }))
     expect(model.entries[0]).toMatchObject({
       _tag: "ToolEntry",
+      phase: "executing",
       outcome: { _tag: "Completed", isFailure: false, result: { ok: true } },
     })
+    const completedTool = model.entries[0]
+    if (completedTool?._tag !== "ToolEntry") throw new Error("expected completed tool entry")
+    expect(Chat.toolStatusOf(completedTool)).toBe("output-available")
     ;[model] = updateWith(model, eventFrame(5, { _tag: "TurnCompleted", turn: 0 }))
     expect(model.streaming).toBeNull()
     expect(model.entries[1]).toEqual({ _tag: "AssistantEntry", text: "Hello world", reasoning: null })
