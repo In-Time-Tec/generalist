@@ -12,7 +12,7 @@ Baton owns:
 - `renderUpdate`, which renders dynamic sources into one optional incremental update;
 - minimal Agent integration for first-turn system-message derivation when an `Instructions` service is present.
 
-Baton does not own filesystem `AGENTS.md` / `CLAUDE.md` discovery, skills catalog rendering, memory recall sources, durable epoch storage, provider-specific prompt-cache controls, or full per-turn update injection in this milestone.
+Baton does not own filesystem `AGENTS.md` / `CLAUDE.md` discovery, memory recall sources, durable epoch storage, provider-specific prompt-cache controls, or full per-turn update injection in this milestone.
 
 ## Public model
 
@@ -39,6 +39,7 @@ Baton does not own filesystem `AGENTS.md` / `CLAUDE.md` discovery, skills catalo
 - When `options.history` is set, the provided history is used verbatim and the registry is ignored.
 - Otherwise, Baton opens an epoch with `{ agentName: agent.name, turn: 0 }`; a non-empty `epoch.baseline` becomes the first-turn system message.
 - If the registry baseline is empty, Baton falls back to `agent.instructions`.
+- If `SkillSource` is present and `history` is absent, Baton appends selected skill listings after the derived system message. The listing fragment is opt-in through `SkillSource`; absent `SkillSource`, byte-for-byte prompt derivation is unchanged.
 - Dynamic updates are exposed through `renderUpdate` but are not injected by the Agent until the compaction/update milestone.
 
 Persisted chats keep the current seeding contract: the derived system message seeds only an empty persisted chat, and non-empty persisted history is not re-seeded.

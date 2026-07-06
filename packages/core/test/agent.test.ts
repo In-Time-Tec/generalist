@@ -11,6 +11,7 @@ import {
   ModelMiddleware,
   Permissions,
   Session,
+  SkillSource,
   Steering,
   ToolContext,
   ToolExecutor,
@@ -44,6 +45,21 @@ const gatedTool = Ai.Tool.make("gated", {
   success: Schema.Unknown,
   needsApproval: true,
 })
+
+const testSkill = (
+  name: string,
+  description: string,
+  body: string,
+  options: Partial<SkillSource.Frontmatter> = {},
+): SkillSource.Skill => {
+  const frontmatter: SkillSource.Frontmatter = { name, description, ...options }
+  return {
+    frontmatter,
+    listing: SkillSource.makeListing(frontmatter),
+    body: Effect.succeed(body),
+    tools: [],
+  }
+}
 
 const echoExecutor = ToolExecutor.testLayer({
   execute: (request) =>
@@ -355,6 +371,141 @@ describe("Agent", () => {
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
           Instructions.layer([Instructions.staticSource("empty", "")]),
+        ),
+      ),
+    )
+  })
+
+  it.effect("injects skill listings and loads only activated skill bodies", () => {
+    let calls = 0
+    let firstPrompt = ""
+    let secondPrompt = ""
+    let firstTools: ReadonlyArray<string> = []
+    let secondTools: ReadonlyArray<string> = []
+    let deployBodyReads = 0
+    const reviewTool = Ai.Tool.make("review_tool", {
+      description: "Review helper",
+      parameters: Schema.Struct({ target: Schema.String }),
+      success: Schema.Unknown,
+    })
+    const review: SkillSource.Skill = {
+      ...testSkill("review", "Review code before changing it.", "FULL REVIEW BODY", {
+        allowedTools: ["read", "grep"],
+      }),
+      tools: [reviewTool],
+    }
+    const deployBase = testSkill("deploy", "Deploy after verification.", "FULL DEPLOY BODY", {
+      allowedTools: ["deploy"],
+    })
+    const deploy: SkillSource.Skill = {
+      ...deployBase,
+      body: Effect.sync(() => {
+        deployBodyReads += 1
+        return "FULL DEPLOY BODY"
+      }),
+    }
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "skill-agent", instructions: "base instructions" })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "review this" }))
+      const activation = events.find(
+        (event) => event._tag === "ToolExecutionCompleted" && event.call.name === "activate_skill",
+      )
+
+      expect(calls).toBe(2)
+      expect(firstTools).toContain("activate_skill")
+      expect(firstTools).not.toContain("review_tool")
+      expect(secondTools).toContain("review_tool")
+      expect(firstPrompt).toContain("base instructions")
+      expect(firstPrompt).toContain("- review: Review code before changing it.")
+      expect(firstPrompt).toContain("- deploy: Deploy after verification.")
+      expect(firstPrompt).not.toContain("FULL REVIEW BODY")
+      expect(firstPrompt).not.toContain("FULL DEPLOY BODY")
+      expect(secondPrompt).toContain("FULL REVIEW BODY")
+      expect(secondPrompt).toContain("read")
+      expect(secondPrompt).toContain("grep")
+      expect(secondPrompt).not.toContain("FULL DEPLOY BODY")
+      expect(deployBodyReads).toBe(0)
+      expect(activation?._tag === "ToolExecutionCompleted" && activation.result.result).toEqual({
+        name: "review",
+        body: "FULL REVIEW BODY",
+        allowedTools: ["read", "grep"],
+      })
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            const content = JSON.stringify(options.prompt.content)
+            if (calls === 1) {
+              firstPrompt = content
+              firstTools = options.tools.map((tool) => tool.name)
+              return Stream.make(toolCallPart("skill-call-review", "activate_skill", { name: "review" }))
+            }
+            secondPrompt = content
+            secondTools = options.tools.map((tool) => tool.name)
+            return Stream.make(textDelta("used review"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+          SkillSource.fromSkills([review, deploy]),
+        ),
+      ),
+    )
+  })
+
+  it.effect("keeps runs without SkillSource unchanged", () => {
+    let capturedPrompt = ""
+    let capturedTools: ReadonlyArray<string> = []
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "no-skills-agent", instructions: "plain instructions" })
+
+      const result = yield* Agent.generate(agent, { prompt: "hello" })
+
+      expect(result.text).toBe("done")
+      expect(capturedPrompt).toBe(
+        `[{"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","options":{},"role":"system","content":"plain instructions"},{"content":[{"text":"hello","~effect/ai/Prompt/Part":"~effect/ai/Prompt/Part","type":"text","options":{}}],"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"user","options":{}}]`,
+      )
+      expect(capturedTools).toEqual([])
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            capturedPrompt = JSON.stringify(options.prompt.content)
+            capturedTools = options.tools.map((tool) => tool.name)
+            return Stream.make(textDelta("done"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("preserves empty system instructions without SkillSource", () => {
+    let capturedPrompt = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "empty-system-agent", instructions: "" })
+
+      const result = yield* Agent.generate(agent, { prompt: "hello" })
+
+      expect(result.text).toBe("done")
+      expect(capturedPrompt).toBe(
+        `[{"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","options":{},"role":"system","content":""},{"content":[{"text":"hello","~effect/ai/Prompt/Part":"~effect/ai/Prompt/Part","type":"text","options":{}}],"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"user","options":{}}]`,
+      )
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            capturedPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("done"))
+          }),
+          unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
         ),
       ),
     )

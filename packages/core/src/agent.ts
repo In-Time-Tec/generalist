@@ -1,4 +1,4 @@
-import { Cause, type Duration, Effect, Fiber, Option, Queue, Ref, type Schema, Stream } from "effect"
+import { Cause, type Duration, Effect, Fiber, Option, Queue, Ref, Schema, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
 import * as AgentEvent from "./agent-event"
 import * as Approvals from "./approvals"
@@ -9,6 +9,7 @@ import * as ModelMiddleware from "./model-middleware"
 import * as ModelResilience from "./model-resilience"
 import * as Permissions from "./permissions"
 import * as Session from "./session"
+import * as SkillSource from "./skill-source"
 import * as Steering from "./steering"
 import * as ToolContext from "./tool-context"
 import * as ToolExecutor from "./tool-executor"
@@ -122,7 +123,29 @@ type AnyToolCall = Ai.Response.ToolCallPart<string, unknown>
 
 type PendingToolResult = Ai.Response.ToolResultPart<string, unknown, unknown>
 
+const skillListingBudgetTokens = 2_048
+
+const activateSkillToolName = "activate_skill"
+
+const activateSkillParameters = Schema.Struct({ name: Schema.String })
+
+const activateSkillTool = Ai.Tool.make(activateSkillToolName, {
+  description: "Load the full body for one listed Baton skill by name before applying that skill.",
+  parameters: activateSkillParameters,
+  success: Schema.Struct({
+    name: Schema.String,
+    body: Schema.String,
+    allowedTools: Schema.Array(Schema.String),
+  }),
+})
+
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
+
+const appendInstructionFragment = (base: string | undefined, fragment: string | undefined): string | undefined => {
+  if (fragment === undefined || fragment.length === 0) return base
+  if (base === undefined || base.length === 0) return fragment
+  return `${base}\n\n${fragment}`
+}
 
 const successResult = (call: AnyToolCall, outcome: ToolExecutor.Success): PendingToolResult =>
   Ai.Response.toolResultPart({
@@ -157,6 +180,9 @@ const suspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "appr
 
 const withSystem = (instructions: string, prompt: Ai.Prompt.Prompt): Ai.Prompt.Prompt =>
   Ai.Prompt.fromMessages([Ai.Prompt.makeMessage("system", { content: instructions }), ...prompt.content])
+
+const skillListingsInstructions = (listings: string): string =>
+  `Available skills:\n${listings}\n\nCall ${activateSkillToolName} with a listed skill name to load its full body before using it.`
 
 const isUserMessagePart = (part: Ai.Prompt.Part): part is Ai.Prompt.UserMessagePart =>
   part.type === "text" || part.type === "file"
@@ -255,17 +281,36 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const sessionId = options.sessionId ?? "local"
 
       const instructionsService = yield* Effect.serviceOption(Instructions.Instructions)
+      const skillSourceService = yield* Effect.serviceOption(SkillSource.SkillSource)
+      const skillRuntime = Option.isNone(skillSourceService)
+        ? undefined
+        : {
+            source: skillSourceService.value,
+            skills: yield* skillSourceService.value.all.pipe(
+              Effect.mapError((error) => new AgentEvent.AgentError({ message: error.message, turn: 0, cause: error })),
+            ),
+          }
+      const selectedSkills =
+        skillRuntime === undefined ? [] : SkillSource.selectListings(skillRuntime.skills, skillListingBudgetTokens, [])
+      const skillListings = selectedSkills.map((skill) => skill.listing).join("\n")
+      const hasActivatableSkills = selectedSkills.length > 0
       const instructionsEpoch =
         options.system === undefined && options.history === undefined && Option.isSome(instructionsService)
           ? yield* Instructions.openEpoch(instructionsService.value, { agentName: agent.name, turn: 0 })
           : undefined
-      const system =
+      const baseSystem =
         options.system ??
         (instructionsEpoch === undefined
           ? agent.instructions
           : instructionsEpoch.baseline.length === 0
             ? agent.instructions
             : instructionsEpoch.baseline)
+      const system = appendInstructionFragment(
+        baseSystem,
+        options.history === undefined && skillListings.length > 0
+          ? skillListingsInstructions(skillListings)
+          : undefined,
+      )
 
       // Resolve `Chat.Persistence` optionally so `stream`'s `R` does not grow.
       const persistenceService = yield* Effect.serviceOption(Ai.Chat.Persistence)
@@ -358,6 +403,9 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         contextTokens: undefined as number | undefined,
       }
 
+      const activatedSkillBodies = new Map<string, string>()
+      const activatedSkillTools = new Map<string, Ai.Tool.Any>()
+
       let sessionSyncedMessages = 0
       let sessionInitialized = false
 
@@ -371,6 +419,12 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
 
       const memoryError = (turn: number, error: Memory.MemoryError): AgentEvent.AgentError =>
         new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+
+      const skillError = (turn: number, error: SkillSource.SkillSourceError): AgentEvent.AgentError =>
+        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+
+      const isSkillActivationCall = (call: AnyToolCall): boolean =>
+        call.name === activateSkillToolName && skillRuntime !== undefined && hasActivatableSkills
 
       const insertRecalledItems = (
         turn: number,
@@ -541,7 +595,11 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       ): Effect.Effect<Stream.Stream<AgentEvent.Event, RunError>, AgentEvent.AgentError> => {
         switch (outcome._tag) {
           case "Success":
-            return boundedSuccessResult(turn, call, outcome).pipe(
+            return (
+              isSkillActivationCall(call)
+                ? Effect.succeed(successResult(call, outcome))
+                : boundedSuccessResult(turn, call, outcome)
+            ).pipe(
               Effect.map((result) => {
                 state.pending.push(result)
                 return Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
@@ -584,13 +642,14 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
                   return Queue.offer(progressQueue, event).pipe(Effect.asVoid)
                 },
               })
-              const fiber = yield* executor
-                .execute(request)
-                .pipe(
-                  Effect.provideService(ToolContext.ToolContext, context),
-                  Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
-                  Effect.forkScoped({ startImmediately: true }),
-                )
+              const execution = isSkillActivationCall(call)
+                ? activateSkillOutcome(turn, call)
+                : executor.execute(request)
+              const fiber = yield* execution.pipe(
+                Effect.provideService(ToolContext.ToolContext, context),
+                Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
+                Effect.forkScoped({ startImmediately: true }),
+              )
               return Stream.concat(
                 Stream.fromQueue(progressQueue),
                 Stream.fromEffect(Fiber.join(fiber)).pipe(
@@ -613,6 +672,37 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         state.pending.push(result)
         return Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
       }
+
+      const activateSkillOutcome = (
+        turn: number,
+        call: AnyToolCall,
+      ): Effect.Effect<ToolExecutor.Outcome, AgentEvent.AgentError> =>
+        Effect.gen(function* () {
+          if (skillRuntime === undefined) return { _tag: "Failure", message: "SkillSource is not available" }
+          const params = Schema.decodeUnknownOption(activateSkillParameters)(call.params)
+          if (Option.isNone(params)) return { _tag: "Failure", message: "Skill activation requires a name" }
+          const skill = yield* skillRuntime.source
+            .get(params.value.name)
+            .pipe(Effect.mapError((error) => skillError(turn, error)))
+          if (skill === undefined) return { _tag: "Failure", message: `Skill not found: ${params.value.name}` }
+          if (skill.frontmatter.disableModelInvocation === true) {
+            return { _tag: "Failure", message: `Skill is not model-invocable: ${params.value.name}` }
+          }
+          let body = activatedSkillBodies.get(skill.frontmatter.name)
+          if (body === undefined) {
+            body = yield* skill.body.pipe(Effect.mapError((error) => skillError(turn, error)))
+            activatedSkillBodies.set(skill.frontmatter.name, body)
+            for (const tool of skill.tools) {
+              activatedSkillTools.set(tool.name, tool)
+            }
+          }
+          const output = {
+            name: skill.frontmatter.name,
+            body,
+            allowedTools: [...(skill.frontmatter.allowedTools ?? [])],
+          }
+          return { _tag: "Success", result: output, encodedResult: output }
+        })
 
       const rememberAlways = (turn: number, call: AnyToolCall): Effect.Effect<void, AgentEvent.AgentError> =>
         Effect.serviceOption(Permissions.RuleStore).pipe(
@@ -717,7 +807,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         messages: ReadonlyArray<Ai.Prompt.Message>,
       ): Stream.Stream<AgentEvent.Event, RunError> => {
         const request: ToolExecutor.Request = { call, turn, agentName: agent.name, sessionId }
-        const tool = agent.toolkit.tools[call.name] as Ai.Tool.Any | undefined
+        const tool = currentToolkit().tools[call.name] as Ai.Tool.Any | undefined
         if (Option.isNone(permissionsService)) return approvalEvents(turn, call, messages, request, tool)
         return Stream.unwrap(
           permissionsService.value
@@ -837,17 +927,24 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           ),
         )
 
-      const activeToolkit = (activeTools: ReadonlyArray<string>): Ai.Toolkit.Toolkit<Tools> =>
+      const currentToolkit = (): Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>> =>
         Ai.Toolkit.make(
-          ...Object.values(agent.toolkit.tools).filter((tool) => activeTools.includes(tool.name)),
-        ) as unknown as Ai.Toolkit.Toolkit<Tools>
+          ...Object.values(agent.toolkit.tools),
+          ...(hasActivatableSkills ? [activateSkillTool] : []),
+          ...activatedSkillTools.values(),
+        ) as unknown as Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>>
+
+      const activeToolkit = (activeTools: ReadonlyArray<string>): Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>> =>
+        Ai.Toolkit.make(
+          ...Object.values(currentToolkit().tools).filter((tool) => activeTools.includes(tool.name)),
+        ) as unknown as Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>>
 
       const modelTurn = (
         turn: number,
         prompt: Ai.Prompt.RawInput,
         overrides?: TurnPolicy.TurnOverrides,
       ): Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel> => {
-        const toolkit = overrides?.activeTools === undefined ? agent.toolkit : activeToolkit(overrides.activeTools)
+        const toolkit = overrides?.activeTools === undefined ? currentToolkit() : activeToolkit(overrides.activeTools)
         const attempt = (
           activePrompt: Ai.Prompt.Prompt,
           retryOverflow: boolean,

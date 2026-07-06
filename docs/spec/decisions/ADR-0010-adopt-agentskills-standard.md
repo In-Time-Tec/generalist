@@ -19,4 +19,4 @@ Use `docs/spec/07-skills.md` and ADR-0010 because earlier issues already allocat
 - `@batonfx/core` remains `effect`-only and filesystem-free.
 - `@batonfx/skills` owns `SKILL.md` and instruction-file discovery.
 - The parser supports the flat frontmatter subset Baton needs without a YAML dependency.
-- Automatic activation, context forks, shell templating, and hosted skill distribution are deferred.
+- Activation uses Baton's built-in `activate_skill` tool over `SkillSource.Interface`; context forks, shell templating, and hosted skill distribution are deferred.
