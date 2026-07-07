@@ -12,9 +12,10 @@ Baton owns:
 - `Handoff.transferTool`, a conventionally named transfer tool;
 - `Handoff.fanOut`, bounded same-process child-run fan-out;
 - `Handoff.supervisor`, a convenience builder for a routing agent and handled transfer toolkit;
-- conversion of child run failures at a tool boundary into failed tool results.
+- conversion of child run failures at a tool boundary into failed tool results;
+- propagation of child suspension so the parent run suspends too.
 
-Baton does not own durable child state, address books, cross-process routing, shared transcripts, streaming child events into the parent stream, handoff input filters, or child HITL resume tokens in this milestone.
+Baton does not own durable child state, address books, cross-process routing, shared transcripts, streaming child events into the parent stream, or handoff input filters in this milestone.
 
 ## Agent as tool
 
@@ -22,7 +23,9 @@ Baton does not own durable child state, address books, cross-process routing, sh
 
 The handler runs `Agent.generate` for the child in the current Effect context. It does not provide or override `Ai.LanguageModel.LanguageModel`, `ToolExecutor`, `Approvals`, or `ModelMiddleware`; callers decide what services child runs inherit.
 
-At the tool boundary, child `AgentSuspended`, `AgentError`, `TurnLimitExceeded`, `MiddlewareViolation`, and defects thrown by prompt/result mappers become a failed tool result with a string message. They do not become a parent `AgentSuspended`. Cross-agent durable HITL is a host concern.
+At the tool boundary, child `AgentError`, `TurnLimitExceeded`, `MiddlewareViolation`, and defects thrown by prompt/result mappers become a failed tool result with a string message.
+
+Child `AgentSuspended` propagates instead of collapsing into a string: the handler re-raises it, `ToolExecutor.fromToolkit` maps it to a `Suspend` outcome carrying the child's token, and the parent run fails with its own `AgentSuspended` (`reason: "tool-wait"`, the parent's sub-agent tool call identity, the child's token). The host resolves the token out-of-band and resumes the parent with the parent's pending call; the re-entered handler runs the child again, whose approval checks consult the host's `Approvals` service with the resolved decision. Durable cross-process HITL remains a host concern.
 
 ## Handoff
 

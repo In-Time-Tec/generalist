@@ -17,7 +17,7 @@ type AgentToolTool<Name extends string, Parameters extends Schema.Top, Success e
   }
 >
 
-/** @experimental Options for exposing an agent as a handled Effect AI tool. */
+/** @experimental */
 export interface AsToolOptions<
   Parameters extends Schema.Top = DefaultParameters,
   Success extends Schema.Top = DefaultSuccess,
@@ -30,7 +30,7 @@ export interface AsToolOptions<
   readonly fromResult?: (result: Agent.Result) => Success["Type"]
 }
 
-/** @experimental A handled toolkit containing one child-agent tool. */
+/** @experimental */
 export type Toolkit = Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>
 
 const errorMessage = (error: unknown): string => {
@@ -71,7 +71,7 @@ const lazyHandled = <Name extends string, Parameters extends Schema.Top, Success
     ) as ReturnType<Toolkit["handle"]>,
 })
 
-/** @experimental Expose a same-process child agent as a failed-result-safe tool handler. */
+/** @experimental */
 export const asTool = <
   Tools extends Record<string, Ai.Tool.Any>,
   const Name extends string = string,
@@ -104,9 +104,12 @@ export const asTool = <
     Effect.gen(function* () {
       const prompt = yield* Effect.try({ try: () => toPrompt(params), catch: errorMessage })
       const result = yield* Agent.generate(agent, { prompt }).pipe(
-        Effect.catchCause((cause) =>
-          Cause.hasInterrupts(cause) ? Effect.interrupt : Effect.fail(causeMessage(agent.name, cause)),
-        ),
+        Effect.catchCause((cause) => {
+          if (Cause.hasInterrupts(cause)) return Effect.interrupt
+          const error = Cause.squash(cause)
+          if (error instanceof AgentEvent.AgentSuspended) return Effect.die(error)
+          return Effect.fail(causeMessage(agent.name, cause))
+        }),
       )
       return yield* Effect.try({ try: () => fromResult(result), catch: errorMessage })
     })

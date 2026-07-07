@@ -2,11 +2,11 @@ import { describe, expect, it } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Redacted } from "effect"
 import * as Ai from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
-import { anthropic } from "@batonfx/providers/anthropic"
+import { anthropic, withAnthropic } from "@batonfx/providers/anthropic"
 import { withOpenAiOrDeterministic } from "@batonfx/providers/deterministic"
 import { openAi, withOpenAi } from "@batonfx/providers/openai"
 import { openAiCompatible, withOpenAiCompatible } from "@batonfx/providers/openai-compat"
-import { openRouter } from "@batonfx/providers/openrouter"
+import { openRouter, withOpenRouter } from "@batonfx/providers/openrouter"
 import { Deterministic, Embedding, Presets } from "../src/index"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
@@ -75,6 +75,58 @@ describe("providers", () => {
       ),
     )
   })
+
+  it.effect("combines two withProvider layers so models from both resolve", () => {
+    const agent = Agent.make({ name: "combined-agent" })
+    return Effect.gen(function* () {
+      const registered = yield* ModelRegistry.registrations()
+      expect(registered.map((item) => [item.provider, item.model])).toEqual([
+        ["det-a", "model-a"],
+        ["det-b", "model-b"],
+      ])
+
+      const first = yield* ModelRegistry.provide(
+        { provider: "det-a", model: "model-a" },
+        Agent.generate(agent, { prompt: "hello" }),
+      )
+      const second = yield* ModelRegistry.provide(
+        { provider: "det-b", model: "model-b" },
+        Agent.generate(agent, { prompt: "hello" }),
+      )
+      expect(first.text).toBe("deterministic response")
+      expect(second.text).toBe("deterministic response")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          ModelRegistry.combine([
+            Deterministic.withDeterministic({ provider: "det-a", model: "model-a" }),
+            Deterministic.withDeterministic({ provider: "det-b", model: "model-b" }),
+          ]),
+          ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("combines anthropic and openrouter registry layers without dropping registrations", () =>
+    Effect.gen(function* () {
+      const registered = yield* ModelRegistry.registrations()
+
+      expect(registered.map((item) => [item.provider, item.model])).toEqual([
+        ["anthropic", "claude-test"],
+        ["openrouter", "openrouter-test"],
+      ])
+    }).pipe(
+      Effect.provide(
+        ModelRegistry.combine([
+          withAnthropic({ model: "claude-test", apiKey }),
+          withOpenRouter({ model: "openrouter-test", apiKey }),
+        ]),
+      ),
+    ),
+  )
 
   it("builds embedding layers without live calls", () => {
     const openAiLayer: Layer.Layer<Ai.EmbeddingModel.EmbeddingModel, Config.ConfigError> =

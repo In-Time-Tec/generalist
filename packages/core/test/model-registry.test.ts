@@ -83,6 +83,65 @@ describe("ModelRegistry", () => {
     }).pipe(Effect.provide(ModelRegistry.memoryLayer())),
   )
 
+  it.effect("combine resolves models from every combined registry layer", () =>
+    Effect.gen(function* () {
+      const first = yield* ModelRegistry.provide(
+        { provider: "prov-a", model: "model-a" },
+        Ai.LanguageModel.generateText({ prompt: "hello" }),
+      )
+      const second = yield* ModelRegistry.provide(
+        { provider: "prov-b", model: "model-b" },
+        Ai.LanguageModel.generateText({ prompt: "hello" }),
+      )
+
+      expect(first.text).toBe("from-a")
+      expect(second.text).toBe("from-b")
+    }).pipe(
+      Effect.provide(
+        ModelRegistry.combine([
+          ModelRegistry.layerFromRegistrationEffects([
+            ModelRegistry.registrationFromLayer({ provider: "prov-a", model: "model-a", layer: modelLayer("from-a") }),
+          ]),
+          ModelRegistry.layerFromRegistrationEffects([
+            ModelRegistry.registrationFromLayer({ provider: "prov-b", model: "model-b", layer: modelLayer("from-b") }),
+          ]),
+        ]),
+      ),
+    ),
+  )
+
+  it.effect("combine keeps upsert semantics for identical registrations", () =>
+    Effect.gen(function* () {
+      const registrations = yield* ModelRegistry.registrations()
+      const response = yield* ModelRegistry.provide(
+        { provider: "test", model: "deterministic" },
+        Ai.LanguageModel.generateText({ prompt: "hello" }),
+      )
+
+      expect(registrations).toHaveLength(1)
+      expect(response.text).toBe("second")
+    }).pipe(
+      Effect.provide(
+        ModelRegistry.combine([
+          ModelRegistry.layerFromRegistrationEffects([
+            ModelRegistry.registrationFromLayer({
+              provider: "test",
+              model: "deterministic",
+              layer: modelLayer("first"),
+            }),
+          ]),
+          ModelRegistry.layerFromRegistrationEffects([
+            ModelRegistry.registrationFromLayer({
+              provider: "test",
+              model: "deterministic",
+              layer: modelLayer("second"),
+            }),
+          ]),
+        ]),
+      ),
+    ),
+  )
+
   it.effect("bounds concurrent provides to maxConcurrentModelCalls", () =>
     Effect.gen(function* () {
       const registration = yield* ModelRegistry.registrationFromLayer({

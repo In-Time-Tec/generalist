@@ -3,7 +3,7 @@ import * as Ai from "effect/unstable/ai"
 import * as AgentEvent from "./agent-event"
 import * as ToolContext from "./tool-context"
 
-/** @experimental A single tool-call execution request. */
+/** @experimental */
 export interface Request {
   readonly call: Ai.Response.ToolCallPart<string, unknown>
   readonly turn: number
@@ -11,20 +11,20 @@ export interface Request {
   readonly sessionId: string
 }
 
-/** @experimental Tool ran; `result`/`encodedResult` feed the tool-result part. */
+/** @experimental */
 export interface Success {
   readonly _tag: "Success"
   readonly result: unknown
   readonly encodedResult: unknown
 }
 
-/** @experimental Tool failed; the model sees a failed tool result and may react. */
+/** @experimental */
 export interface Failure {
   readonly _tag: "Failure"
   readonly message: string
 }
 
-/** @experimental The host will resolve this out-of-band; suspends the run. */
+/** @experimental */
 export interface Suspend {
   readonly _tag: "Suspend"
   readonly token: string
@@ -86,17 +86,18 @@ const executeWithToolkit = <Tools extends Record<string, Ai.Tool.Any>>(
               },
       }),
     ),
-    Effect.catchCause((cause) =>
-      Cause.hasInterrupts(cause) ? Effect.interrupt : Effect.succeed(failureOutcome(failureMessage(cause))),
-    ),
+    Effect.catchCause((cause) => {
+      if (Cause.hasInterrupts(cause)) return Effect.interrupt
+      const error = Cause.squash(cause)
+      if (error instanceof AgentEvent.AgentSuspended) {
+        return Effect.succeed<Outcome>({ _tag: "Suspend", token: error.token })
+      }
+      return Effect.succeed(failureOutcome(failureMessage(cause)))
+    }),
   )
 }
 
-/**
- * @experimental Default executor: runs the toolkit's own handlers in-process.
- * `toolkit.handle(name, params)` streams handler results; the last
- * non-preliminary result becomes `Success`; handler failure becomes `Failure`.
- */
+/** @experimental */
 export const fromToolkit = <Tools extends Record<string, Ai.Tool.Any>>(
   toolkit: Ai.Toolkit.WithHandler<Tools>,
 ): Layer.Layer<ToolExecutor> =>

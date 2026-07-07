@@ -23,7 +23,7 @@ describe("baton adapter", () => {
       Effect.gen(function* () {
         const { source } = yield* makeFixture
         const kit = yield* toolkit(source)
-        expect(Object.keys(kit.tools).toSorted()).toEqual(["calc_add", "calc_boom", "calc_stats"])
+        expect(Object.keys(kit.tools).toSorted()).toEqual(["calc_add", "calc_boom", "calc_hang", "calc_stats"])
       }),
     ),
   )

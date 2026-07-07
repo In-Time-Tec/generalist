@@ -31,6 +31,8 @@ Each helper accepts the model name, optional language-model config, optional reg
 
 `withOpenAi`, `withAnthropic`, `withOpenRouter`, and `withOpenAiCompatible` return `Layer<ModelRegistry.Service, Config.ConfigError>`. They compose the corresponding registration effect with the upstream client `layerConfig` and `FetchHttpClient.layer`.
 
+Every `with*` layer provides the single `ModelRegistry.Service` tag with its own fresh registry, so `Layer.mergeAll(withAnthropic(...), withOpenRouter(...))` keeps only one provider's registrations. Multi-provider hosts combine registry layers with `ModelRegistry.combine([withAnthropic(...), withOpenRouter(...)], options?)`, which builds each layer, collects its registrations, and installs one registry containing all of them. Upsert semantics are preserved: on identical `(provider, model, registrationKey)` identity, later layers win.
+
 The raw upstream `*Client.layerConfig` functions are re-exported for callers that want to assemble provider layers manually.
 
 ## Deterministic model

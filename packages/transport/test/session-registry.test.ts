@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scheduler, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import * as Ai from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
@@ -227,6 +227,72 @@ describe("SessionRegistry.layerMemory", () => {
       ),
     ),
   )
+
+  it.effect("interrupt cancels an active run and finalizes session state", () => {
+    let modelCalls = 0
+    let started: Deferred.Deferred<void>
+    return Effect.gen(function* () {
+      started = yield* Deferred.make<void>()
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-interrupt" }))
+      const firstFiber = yield* collectThroughEnded("s-interrupt").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-interrupt", "first"))
+      yield* Deferred.await(started)
+
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.interrupt("s-interrupt"))
+
+      const info = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-interrupt"))
+      expect(info.status._tag).toBe("Failed")
+
+      const first = yield* Fiber.join(firstFiber)
+      expect(first.some((frame) => frame._tag === "Failed")).toBe(true)
+      expect(first.at(-1)?._tag).toBe("Ended")
+
+      const secondFiber = yield* collectThroughEnded("s-interrupt", first.at(-1)?.seq).pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-interrupt", "second"))
+      const second = yield* Fiber.join(secondFiber)
+      expect(second.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
+    }).pipe(
+      Effect.provide(
+        baseLayers(Agent.make({ name: "interrupt-agent" }), () => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.unwrap(Deferred.succeed(started, undefined).pipe(Effect.as(Stream.fromEffect(Effect.never))))
+          }
+          return assistantText("reply", "after interrupt")
+        }),
+      ),
+    )
+  })
+
+  it.effect("interrupt landing before the run fiber is recorded still cancels the run", () => {
+    const awaitRunning: Effect.Effect<void, SessionRegistry.SessionError, SessionRegistry.SessionRegistry> =
+      SessionRegistry.SessionRegistry.use((registry) => registry.info("s-stop-race")).pipe(
+        Effect.flatMap((current) => (current.status._tag === "Running" ? Effect.void : awaitRunning)),
+      )
+    const stopDuringSend = Effect.gen(function* () {
+      const sendFiber = yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.send("s-stop-race", "go"),
+      ).pipe(Effect.forkChild)
+      yield* awaitRunning
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.interrupt("s-stop-race"))
+      yield* Fiber.join(sendFiber)
+    }).pipe(Effect.provideService(Scheduler.MaxOpsBeforeYield, 3))
+    return Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-stop-race" }))
+      yield* Effect.forEach(
+        Array.from({ length: 8 }),
+        () =>
+          SessionRegistry.SessionRegistry.use((registry) =>
+            registry.attach("s-stop-race").pipe(Stream.runDrain, Effect.forkChild),
+          ),
+        { discard: true },
+      )
+      yield* stopDuringSend
+
+      const info = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-stop-race"))
+      expect(info.status._tag).toBe("Failed")
+    }).pipe(Effect.provide(baseLayers(Agent.make({ name: "stop-race-agent" }), () => Stream.fromEffect(Effect.never))))
+  })
 
   it.effect("emits suspension as data and resolves approved approvals", () => {
     const gated = Ai.Tool.make("gated", {

@@ -4,25 +4,12 @@ import * as Ai from "effect/unstable/ai"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
 
-/**
- * Throughput governance for the model registry.
- *
- * @experimental
- */
+/** @experimental */
 export interface GovernanceOptions {
-  /**
-   * Maximum model turns executing concurrently across the whole process.
-   * Undefined leaves the registry unbounded (today's behavior).
-   *
-   * A permit is held for the duration of one *model turn* — the provider
-   * stream including any tool executions that run inside the stream fold —
-   * not per HTTP request. This is the coarsest correct granularity available
-   * at this seam; finer-grained limiting belongs in provider client layers.
-   */
   readonly maxConcurrentModelCalls?: number
 }
 
-/** @experimental Provider-agnostic model selection. */
+/** @experimental */
 export interface ModelSelection {
   readonly provider: string
   readonly model: string
@@ -119,10 +106,6 @@ export const layer = (initialRegistrations: ReadonlyArray<Registration> = [], op
     Effect.gen(function* () {
       const registry = yield* Ref.make<Registry>(initialRegistrations.reduce(upsertRegistration, Chunk.empty()))
 
-      // A single process-wide semaphore bounds concurrent model turns. A permit
-      // is held across the whole provided effect — the provider stream plus any
-      // tool executions inside the stream fold. Unset leaves the path unwrapped
-      // so behavior is bit-identical to an unbounded registry.
       const semaphore =
         options?.maxConcurrentModelCalls === undefined
           ? undefined
@@ -166,6 +149,17 @@ export const layerFromRegistrationEffects = <E, R>(
   registrations: ReadonlyArray<Effect.Effect<Registration, E, R>>,
   options?: GovernanceOptions,
 ) => Layer.unwrap(Effect.all(registrations).pipe(Effect.map((items) => layer(items, options))))
+
+/** @experimental */
+export const combine = <E = never, R = never>(
+  registries: ReadonlyArray<Layer.Layer<Service, E, R>>,
+  options?: GovernanceOptions,
+): Layer.Layer<Service, E, R> =>
+  Layer.unwrap(
+    Effect.forEach(registries, (registry) =>
+      Layer.build(registry).pipe(Effect.flatMap((context) => Context.get(context, Service).registrations)),
+    ).pipe(Effect.map((groups) => layer(groups.flat(), options))),
+  )
 
 /** @experimental */
 export const memoryLayer = layer

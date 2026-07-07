@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Layer, Schema, Stream } from "effect"
+import { Cause, Effect, Exit, Layer, Schema, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
-import { Agent, AgentTool, Approvals, ModelMiddleware, ToolContext, ToolExecutor } from "../src/index"
+import { Agent, AgentEvent, AgentTool, Approvals, ModelMiddleware, ToolContext, ToolExecutor } from "../src/index"
 
 type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
 
@@ -109,23 +109,25 @@ describe("AgentTool", () => {
     )
   })
 
-  it.effect("turns child suspension into a failed parent tool result", () => {
+  it.effect("propagates child suspension so the parent run suspends", () => {
     let parentCalls = 0
     return Effect.gen(function* () {
       const child = Agent.make({ name: "reviewer", toolkit: Ai.Toolkit.make(gatedTool) })
       const childTool = AgentTool.asTool(child, { name: "ask_reviewer" })
       const parent = Agent.make({ name: "parent", toolkit: parentToolkit(childTool) })
 
-      const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
+      const exit = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" })).pipe(Effect.exit)
 
-      const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
-      expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.isFailure).toBe(true)
-      if (toolCompleted?._tag === "ToolExecutionCompleted") {
-        expect(JSON.stringify(toolCompleted.result.result)).toContain("reviewer")
-        expect(JSON.stringify(toolCompleted.result.result)).toContain("suspended")
+      expect(Exit.isFailure(exit)).toBe(true)
+      const error = exit._tag === "Failure" ? Cause.squash(exit.cause) : undefined
+      expect(error).toBeInstanceOf(AgentEvent.AgentSuspended)
+      if (error instanceof AgentEvent.AgentSuspended) {
+        expect(error.token).toBe("approval-1")
+        expect(error.reason).toBe("tool-wait")
+        expect(error.tool_name).toBe("ask_reviewer")
+        expect(error.tool_call_id).toBe("call-reviewer")
+        expect(parentCalls).toBe(1)
       }
-      const completed = events.at(-1)
-      expect(completed?._tag === "Completed" && completed.text).toBe("parent handled child failure")
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
@@ -137,7 +139,7 @@ describe("AgentTool", () => {
             parentCalls += 1
             return parentCalls === 1
               ? Stream.make(toolCallPart("call-reviewer", "ask_reviewer", { prompt: "child approval task" }))
-              : Stream.make(textDelta("parent handled child failure"))
+              : Stream.make(textDelta("parent should never see this"))
           }),
           ToolExecutor.fromToolkit(
             AgentTool.asTool(Agent.make({ name: "reviewer", toolkit: Ai.Toolkit.make(gatedTool) }), {

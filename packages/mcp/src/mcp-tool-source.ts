@@ -2,17 +2,13 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
-import { Context, Effect, Layer, Ref, Schema, Scope } from "effect"
+import { Context, Duration, Effect, Layer, Ref, Schema, Scope } from "effect"
 import * as Ai from "effect/unstable/ai"
 
-/**
- * @experimental JSON value vocabulary of the MCP bridge. Structurally identical
- * to Relay's `Shared.JsonValue`; declared locally so the core module depends on
- * `effect` and the MCP SDK only.
- */
+/** @experimental */
 export type JsonValue = typeof Schema.Json.Type
 
-/** @experimental Transport configuration for a single MCP server connection. */
+/** @experimental */
 export type McpTransport =
   | {
       readonly kind: "stdio"
@@ -20,28 +16,33 @@ export type McpTransport =
       readonly args?: ReadonlyArray<string>
       readonly env?: Record<string, string>
     }
-  | { readonly kind: "http"; readonly url: string; readonly headers?: Record<string, string> } // Streamable HTTP
+  | { readonly kind: "http"; readonly url: string; readonly headers?: Record<string, string> }
 
-/** @experimental Connecting to (or handshaking with) an MCP server failed. */
+/** @experimental */
+export interface CallOptions {
+  readonly callTimeout?: Duration.Input
+}
+
+/** @experimental */
 export class McpConnectionError extends Schema.TaggedErrorClass<McpConnectionError>()("McpConnectionError", {
   server: Schema.String,
   message: Schema.String,
 }) {}
 
-/** @experimental A tools/call failed: transport error or a result with `isError: true`. */
+/** @experimental */
 export class McpToolCallError extends Schema.TaggedErrorClass<McpToolCallError>()("McpToolCallError", {
   server: Schema.String,
   tool: Schema.String,
   message: Schema.String,
 }) {}
 
-/** @experimental A tool discovered from a connected MCP server's tools/list. */
+/** @experimental */
 export interface DiscoveredTool {
-  readonly name: string // namespaced: `<server>_<tool>` to avoid cross-server collisions
-  readonly rawName: string // the server's tool name
+  readonly name: string
+  readonly rawName: string
   readonly description: string
-  readonly inputSchema: JsonValue // JSON Schema from tools/list, passed through untouched
-  readonly outputSchema: JsonValue // {} when the server declares none
+  readonly inputSchema: JsonValue
+  readonly outputSchema: JsonValue
 }
 
 /** @experimental */
@@ -49,7 +50,6 @@ export interface Interface {
   readonly server: string
   readonly tools: Effect.Effect<ReadonlyArray<DiscoveredTool>>
   readonly callTool: (rawName: string, input: JsonValue) => Effect.Effect<JsonValue, McpToolCallError>
-  /** DiscoveredTools as Ai.Tool.dynamic values (parameters = inputSchema, success = Schema.Unknown). */
   readonly aiTools: Effect.Effect<ReadonlyArray<Ai.Tool.Any>>
 }
 
@@ -96,18 +96,11 @@ const aiToolFromDiscovered = (tool: DiscoveredTool): Ai.Tool.Any =>
     success: Schema.Unknown,
   })
 
-/**
- * Scoped constructor from a pre-built MCP SDK transport: connects on acquire,
- * lists tools once, closes the client (and its transport) on scope release.
- *
- * This is the seam `layer` is built on; it is exported so tests (and unusual
- * hosts) can bring their own transport, e.g. the SDK's `InMemoryTransport`.
- *
- * @experimental
- */
+/** @experimental */
 export const fromTransport = (
   name: string,
   transport: Transport,
+  options?: CallOptions,
 ): Effect.Effect<Interface, McpConnectionError, Scope.Scope> =>
   Effect.gen(function* () {
     const client = yield* Effect.acquireRelease(
@@ -130,9 +123,15 @@ export const fromTransport = (
       listed.tools.map((tool) => discoveredTool(name, tool)),
     )
 
+    const callTimeoutMillis = options?.callTimeout === undefined ? undefined : Duration.toMillis(options.callTimeout)
+
     const callTool = (rawName: string, input: JsonValue): Effect.Effect<JsonValue, McpToolCallError> =>
       Effect.tryPromise({
-        try: () => client.callTool({ name: rawName, arguments: callArguments(input) }),
+        try: (signal) =>
+          client.callTool({ name: rawName, arguments: callArguments(input) }, undefined, {
+            signal,
+            ...(callTimeoutMillis === undefined ? {} : { timeout: callTimeoutMillis }),
+          }),
         catch: (error) => new McpToolCallError({ server: name, tool: rawName, message: errorMessage(error) }),
       }).pipe(
         Effect.flatMap((result) => {
@@ -178,44 +177,31 @@ const buildTransport = (server: string, transport: McpTransport): Effect.Effect<
 const makeInterface = (options: {
   readonly name: string
   readonly transport: McpTransport
+  readonly callTimeout?: Duration.Input
 }): Effect.Effect<Interface, McpConnectionError, Scope.Scope> =>
   buildTransport(options.name, options.transport).pipe(
-    Effect.flatMap((transport) => fromTransport(options.name, transport)),
+    Effect.flatMap((transport) =>
+      fromTransport(
+        options.name,
+        transport,
+        options.callTimeout === undefined ? undefined : { callTimeout: options.callTimeout },
+      ),
+    ),
   )
 
-/**
- * Scoped layer: connects on acquire (Client + transport from
- * `@modelcontextprotocol/sdk`), lists tools once, closes on release.
- *
- * One layer serves one MCP server. For multiple servers, either merge multiple
- * uniquely-tagged layers via {@link layerTagged} or use separate service tags:
- *
- * ```ts
- * const GithubSource = Context.Service<GithubSource, McpToolSource.Interface>()("app/GithubSource")
- * const JiraSource = Context.Service<JiraSource, McpToolSource.Interface>()("app/JiraSource")
- * const sources = Layer.mergeAll(
- *   McpToolSource.layerTagged(GithubSource, { name: "github", transport: { kind: "stdio", command: "github-mcp" } }),
- *   McpToolSource.layerTagged(JiraSource, { name: "jira", transport: { kind: "http", url: "https://jira.example/mcp" } }),
- * )
- * ```
- *
- * @experimental
- */
+/** @experimental */
 export const layer = (options: {
-  readonly name: string // server label used for namespacing + errors
+  readonly name: string
   readonly transport: McpTransport
+  readonly callTimeout?: Duration.Input
 }): Layer.Layer<McpToolSource, McpConnectionError> => Layer.effect(McpToolSource, makeInterface(options))
 
-/**
- * As {@link layer}, but provides the source under a consumer-owned tag so N
- * servers can coexist in one context (the `McpToolSource` class tag is unique).
- *
- * @experimental
- */
+/** @experimental */
 export const layerTagged = <Identifier>(
   tag: Context.Key<Identifier, Interface>,
   options: {
     readonly name: string
     readonly transport: McpTransport
+    readonly callTimeout?: Duration.Input
   },
 ): Layer.Layer<Identifier, McpConnectionError> => Layer.effect(tag, makeInterface(options))

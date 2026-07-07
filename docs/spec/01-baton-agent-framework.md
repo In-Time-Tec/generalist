@@ -166,7 +166,7 @@ Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, 
 
 ## Integrations
 
-- **MCP** arrives via `@batonfx/mcp`, not Baton core. The bridge converts an MCP server's tools into `Ai.Tool.dynamic` values (a toolkit Baton consumes as-is) plus a `ToolExecutor` layer (`@batonfx/mcp/baton`) that proxies calls to the server. Baton core keeps its `effect`-only dependency rule; the MCP SDK dependency lives entirely in `@batonfx/mcp`.
+- **MCP** arrives via `@batonfx/mcp`, not Baton core. The bridge converts an MCP server's tools into `Ai.Tool.dynamic` values (a toolkit Baton consumes as-is) plus a `ToolExecutor` layer (`@batonfx/mcp/baton`) that proxies calls to the server. Each `tools/call` passes the fiber's `AbortSignal` and the optional configured `callTimeout` as SDK `RequestOptions`, so interrupting a run aborts the in-flight request and a hung server cannot wedge the loop. Baton core keeps its `effect`-only dependency rule; the MCP SDK dependency lives entirely in `@batonfx/mcp`.
 - **Transport** arrives via `@batonfx/transport`, not Baton core. It converts `AgentEvent` streams into replayable wire frames and owns an in-process `SessionRegistry`; durable registries remain host-side.
 
 ## Composing with a durable runtime

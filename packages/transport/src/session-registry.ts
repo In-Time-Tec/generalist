@@ -17,17 +17,17 @@ import * as Ai from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals } from "@batonfx/core"
 import * as Wire from "./wire"
 
-/** @experimental Registry operation failed. */
+/** @experimental */
 export class SessionError extends Schema.TaggedErrorClass<SessionError>()("@batonfx/transport/SessionError", {
   message: Schema.String,
 }) {}
 
-/** @experimental A session already has a running or suspended logical run. */
+/** @experimental */
 export class SessionBusy extends Schema.TaggedErrorClass<SessionBusy>()("@batonfx/transport/SessionBusy", {
   sessionId: Schema.String,
 }) {}
 
-/** @experimental A subscriber fell behind its bounded queue. */
+/** @experimental */
 export class SubscriberLagged extends Schema.TaggedErrorClass<SubscriberLagged>()(
   "@batonfx/transport/SubscriberLagged",
   {
@@ -36,7 +36,7 @@ export class SubscriberLagged extends Schema.TaggedErrorClass<SubscriberLagged>(
   },
 ) {}
 
-/** @experimental Information about one in-process session. */
+/** @experimental */
 export interface SessionInfo {
   readonly sessionId: string
   readonly chatId: string
@@ -45,7 +45,7 @@ export interface SessionInfo {
   readonly idleSince: Option.Option<number>
 }
 
-/** @experimental Memory registry options. */
+/** @experimental */
 export interface MemoryOptions<Tools extends Record<string, Ai.Tool.Any>> {
   readonly agent: Agent.Agent<Tools>
   readonly ringBufferCapacity?: number
@@ -54,7 +54,7 @@ export interface MemoryOptions<Tools extends Record<string, Ai.Tool.Any>> {
   readonly stripTranscripts?: boolean
 }
 
-/** @experimental Session registry service boundary. */
+/** @experimental */
 export interface Interface {
   readonly open: (options: {
     readonly sessionId?: string
@@ -96,8 +96,15 @@ interface SessionState {
   readonly ring: ReadonlyArray<Wire.LooseServerFrameType>
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
   readonly runFiber: Option.Option<Fiber.Fiber<void>>
+  readonly interruptRequested: boolean
   readonly idleSince: Option.Option<number>
 }
+
+type InterruptAction =
+  | { readonly _tag: "Missing" }
+  | { readonly _tag: "Ignore" }
+  | { readonly _tag: "Requested" }
+  | { readonly _tag: "Stop"; readonly fiber: Fiber.Fiber<void> }
 
 interface RegistryState {
   readonly sessions: ReadonlyMap<string, SessionState>
@@ -155,7 +162,7 @@ const toApprovalDecision = (decision: Wire.ClientApproval): Approvals.Decision =
   return decision.reason === undefined ? { _tag: "Denied" } : { _tag: "Denied", reason: decision.reason }
 }
 
-/** @experimental Single-process non-durable registry layer. */
+/** @experimental */
 export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
   options: MemoryOptions<Tools>,
 ): Layer.Layer<SessionRegistry, never, Agent.RunServices | Ai.Chat.Persistence> =>
@@ -286,6 +293,21 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
           Effect.asVoid,
         )
 
+      const finalizeInterrupted = (sessionId: string): Effect.Effect<void> =>
+        lookup(sessionId).pipe(
+          Effect.flatMap((session) => {
+            if (session.status._tag !== "Running") return Effect.void
+            const error = new AgentEvent.AgentError({ message: "Session interrupted", turn: 0 })
+            return publish(sessionId, { _tag: "Failed", error }).pipe(
+              Effect.andThen(finalizeRun(sessionId, { _tag: "Failed", error })),
+            )
+          }),
+          Effect.ignore,
+        )
+
+      const stopRun = (sessionId: string, fiber: Fiber.Fiber<void>): Effect.Effect<void> =>
+        Fiber.interrupt(fiber).pipe(Effect.andThen(finalizeInterrupted(sessionId)))
+
       const makeApprovals = (
         resume: Agent.Resume | undefined,
         decision: Wire.ClientApproval | undefined,
@@ -368,6 +390,7 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
             ...session,
             status: { _tag: "Running", turn: 0 },
             runFiber: Option.none(),
+            interruptRequested: false,
             idleSince: Option.none(),
           }
           const sessions = new Map(current.sessions)
@@ -396,11 +419,23 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
           const runSession = yield* reserveRun(sessionId, resume)
           yield* publish(sessionId, { _tag: "SessionStatus", status: runSession.status })
           const fiber = yield* runStream(runSession, prompt, resume, approvalDecision).pipe(Effect.forkIn(scope))
-          yield* updateSession(sessionId, (current) =>
-            current.status._tag === "Running"
-              ? { ...current, runFiber: Option.some(fiber), idleSince: Option.none() }
-              : current,
-          )
+          const stopRequested = yield* Ref.modify(state, (current): readonly [boolean, RegistryState] => {
+            const session = current.sessions.get(sessionId)
+            if (session === undefined) return [false, current]
+            const updated: SessionState =
+              session.status._tag === "Running"
+                ? {
+                    ...session,
+                    runFiber: Option.some(fiber),
+                    interruptRequested: false,
+                    idleSince: Option.none(),
+                  }
+                : { ...session, interruptRequested: false }
+            const sessions = new Map(current.sessions)
+            sessions.set(sessionId, updated)
+            return [session.interruptRequested, { ...current, sessions }]
+          })
+          if (stopRequested) yield* stopRun(sessionId, fiber)
         })
 
       const snapshotFrame = (
@@ -486,6 +521,7 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
                 ring: [],
                 subscribers: new Map(),
                 runFiber: Option.none(),
+                interruptRequested: false,
                 idleSince: Option.some(now),
               }
               const sessions = new Map(current.sessions)
@@ -565,13 +601,26 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
             }),
           ),
         interrupt: (sessionId) =>
-          lookup(sessionId).pipe(
-            Effect.flatMap((session) =>
-              Option.match(session.runFiber, {
-                onNone: () => Effect.void,
-                onSome: (fiber) => Fiber.interrupt(fiber).pipe(Effect.asVoid),
-              }),
-            ),
+          Ref.modify(state, (current): readonly [InterruptAction, RegistryState] => {
+            const session = current.sessions.get(sessionId)
+            if (session === undefined) return [{ _tag: "Missing" }, current]
+            if (Option.isSome(session.runFiber)) return [{ _tag: "Stop", fiber: session.runFiber.value }, current]
+            if (session.status._tag !== "Running") return [{ _tag: "Ignore" }, current]
+            const sessions = new Map(current.sessions)
+            sessions.set(sessionId, { ...session, interruptRequested: true })
+            return [{ _tag: "Requested" }, { ...current, sessions }]
+          }).pipe(
+            Effect.flatMap((action): Effect.Effect<void, SessionError> => {
+              switch (action._tag) {
+                case "Missing":
+                  return Effect.fail(sessionError(`Session ${sessionId} is not open`))
+                case "Stop":
+                  return stopRun(sessionId, action.fiber)
+                case "Requested":
+                case "Ignore":
+                  return Effect.void
+              }
+            }),
           ),
         info: (sessionId) => lookup(sessionId).pipe(Effect.map(infoFrom)),
       })

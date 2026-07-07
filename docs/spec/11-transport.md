@@ -42,7 +42,7 @@ When `stripTranscripts` is true, `TurnCompleted` and `Completed` event frames om
 
 `resolveApproval` resumes only a suspended approval with a matching token. `Approved` re-enters with a one-shot approvals override that approves the suspended call. `Denied` re-enters with a one-shot denial so the model receives the same failed tool-result path as core approval denial. Tool-wait suspension is surfaced as `Suspended` but not resolved by this client frame.
 
-`interrupt` cancels a running fiber and emits terminal data frames. It is idempotent when no run is active.
+`interrupt` cancels by session status, not by fiber presence. When the run fiber is already recorded, it interrupts that fiber. When the cancel lands after `send`/`resolveApproval` reserved the run but before the fiber is recorded, it marks the reservation interrupt-requested; `send`/`resolveApproval` consume the mark when recording the fiber and cancel the run immediately, so a `Cancel` racing a `SendMessage` is never dropped. A cancelled run publishes a `Failed` frame carrying `AgentError` with message `Session interrupted`, a `Failed` session status, and `Ended`, leaving the session free for the next `send`. It is idempotent when no run is active or reserved.
 
 ## Backpressure and idle policy
 

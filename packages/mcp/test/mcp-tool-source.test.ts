@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Fiber, Option } from "effect"
 import * as Ai from "effect/unstable/ai"
 import { McpToolSource } from "../src/index"
-import { addInputSchema, makeFixture, statsOutputSchema } from "./fixture"
+import { addInputSchema, makeFixture, makeFixtureWith, statsOutputSchema } from "./fixture"
 
 describe("McpToolSource", () => {
   it.effect("discovers namespaced tools with schema passthrough", () =>
@@ -12,7 +12,7 @@ describe("McpToolSource", () => {
         const tools = yield* source.tools
 
         expect(source.server).toBe("calc")
-        expect(tools.map((tool) => tool.name)).toEqual(["calc_add", "calc_stats", "calc_boom"])
+        expect(tools.map((tool) => tool.name)).toEqual(["calc_add", "calc_stats", "calc_boom", "calc_hang"])
         const add = tools[0]
         expect(add?.rawName).toBe("add")
         expect(add?.description).toBe("Add two numbers")
@@ -29,7 +29,7 @@ describe("McpToolSource", () => {
         const { source } = yield* makeFixture
         const aiTools = yield* source.aiTools
 
-        expect(aiTools.map((tool) => tool.name)).toEqual(["calc_add", "calc_stats", "calc_boom"])
+        expect(aiTools.map((tool) => tool.name)).toEqual(["calc_add", "calc_stats", "calc_boom", "calc_hang"])
         const add = aiTools[0]
         expect(add === undefined ? undefined : Ai.Tool.getDescription(add)).toBe("Add two numbers")
         expect(add === undefined ? undefined : Ai.Tool.getJsonSchema(add)).toEqual(addInputSchema)
@@ -82,9 +82,40 @@ describe("McpToolSource", () => {
           return fixture.closes
         }),
       )
-      // The linked in-memory pair cascades close events, so the spy can fire
-      // more than once; release must have closed the transport at least once.
       expect(closes.count).toBeGreaterThanOrEqual(1)
     }),
+  )
+
+  it.live("interrupting an in-flight call aborts the server-side request", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture
+        const fiber = yield* fixture.source.callTool("hang", {}).pipe(Effect.forkChild)
+        yield* Effect.promise(() => fixture.hang.started)
+
+        yield* Fiber.interrupt(fiber)
+
+        const aborted = yield* Effect.promise(() => fixture.hang.aborted).pipe(Effect.timeoutOption("500 millis"))
+        expect(Option.isSome(aborted)).toBe(true)
+      }),
+    ),
+  )
+
+  it.live("callTool fails typed when the configured call timeout elapses", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fixture = yield* makeFixtureWith({ callTimeout: "100 millis" })
+
+        const outcome = yield* fixture.source.callTool("hang", {}).pipe(Effect.flip, Effect.timeoutOption("2 seconds"))
+
+        expect(Option.isSome(outcome)).toBe(true)
+        if (Option.isSome(outcome)) {
+          expect(outcome.value._tag).toBe("McpToolCallError")
+          expect(outcome.value.server).toBe("calc")
+          expect(outcome.value.tool).toBe("hang")
+          expect(outcome.value.message).toContain("timed out")
+        }
+      }),
+    ),
   )
 })
