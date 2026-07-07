@@ -159,9 +159,7 @@ export const landing = (): Html =>
               h.h2([h.Class("text-2xl font-semibold tracking-tight")], ["Package pages"]),
               h.p(
                 [h.Class("mt-3 text-muted-foreground")],
-                [
-                  "Each package page is sourced from the matching spec document and verified against the package export barrel.",
-                ],
+                ["Each package page explains what the package owns, the invariants it keeps, and the exports you use."],
               ),
               h.div([h.Class("mt-5")], [packageList()]),
             ],

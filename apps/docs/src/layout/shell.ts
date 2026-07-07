@@ -10,7 +10,7 @@ import * as NavigationMenu from "@/components/ui/navigation-menu"
 import { GotSearchCommandMessage, GotSearchDialogMessage, PressedSearchShortcut, type Message } from "../app/message"
 import type { Model } from "../app/model"
 import { SearchCommand, filterSearchItems } from "../app/searchPalette"
-import { type Route, toPath } from "../route/route"
+import { type Route } from "../route/route"
 
 const h = html<Message>()
 
@@ -102,7 +102,6 @@ const topNav = (model: Model): Html =>
             NavigationMenu.list({}, [
               navLink("/", "Home", model.route._tag === "Home"),
               navLink("/docs/getting-started", "Docs", isDocsRoute(model.route)),
-              navLink("/docs/reference/decisions", "ADRs", toPath(model.route) === "/docs/reference/decisions"),
             ]),
           ]),
           h.div(
