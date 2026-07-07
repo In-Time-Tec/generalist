@@ -25,6 +25,8 @@ Baton does not own a model-metadata catalog, durable blob storage, durable sessi
 
 The default reserve is `16_384` tokens and the default recent-tail target is `20_000` tokens.
 
+All internal size estimates (`fits`, cut-point selection, `keepRecentTokens`) are token-denominated. Without provider-native token counting, the default strategy estimates tokens from serialized length at approximately 4 characters per token, so char-denominated lengths and token budgets never mix.
+
 ## Strategy contract
 
 A strategy has three responsibilities:
@@ -41,7 +43,7 @@ The default strategy first microcompacts successful tool-result payloads in the 
 
 If the microcompacted context fits under `contextWindow - reserveTokens`, Baton uses that projected context and does not call the summary model.
 
-If the context still exceeds budget, the strategy summarizes the older session prefix with a single dedicated `LanguageModel.generateText` call using `tools: []` / `toolChoice: "none"`, keeps the recent suffix verbatim, and re-injects the summary as one synthetic user checkpoint:
+If the context still exceeds budget, the strategy summarizes the older session prefix with a single dedicated `LanguageModel.generateText` call using `tools: []` / `toolChoice: "none"`, keeps the recent suffix verbatim, and re-injects the summary as one synthetic user checkpoint. Any `system` messages in the summarized prefix are hoisted out and kept ahead of the checkpoint, so summary checkpointing never drops the run's system prompt:
 
 ```text
 <conversation-checkpoint>

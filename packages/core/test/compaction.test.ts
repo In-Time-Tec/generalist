@@ -64,6 +64,63 @@ describe("Compaction", () => {
     }
   })
 
+  it("keeps a token-denominated keepRecentTokens budget when cutting", () => {
+    const strategy = Compaction.defaultStrategy()
+    const entries = [
+      entry("0", user("aaa ".repeat(100))),
+      entry("1", user("bbb ".repeat(100))),
+      entry("2", user("ccc ".repeat(100))),
+      entry("3", user("ddd ".repeat(100))),
+    ]
+
+    const plan = strategy.cut(entries, 200)
+
+    expect(Option.isSome(plan)).toBe(true)
+    if (Option.isSome(plan)) {
+      expect(plan.value.head.map((item) => item.id)).toEqual(["0", "1"])
+      expect(plan.value.recent.map((item) => item.id)).toEqual(["2", "3"])
+    }
+  })
+
+  it.effect("keeps microcompaction when the token estimate fits the budget", () => {
+    let summaryCalls = 0
+    const large = "abcdef".repeat(40)
+    const padding = "pad ".repeat(300)
+    return Effect.gen(function* () {
+      const service = Compaction.make(Compaction.defaultStrategy(), {
+        contextWindow: 1_000,
+        reserveTokens: 0,
+        keepRecentTokens: 1,
+      })
+
+      const compacted = yield* service.maybeCompact({
+        agentName: "token-budget-agent",
+        sessionId: "session",
+        turn: 1,
+        history: Ai.Prompt.fromMessages([user(padding)]),
+        prompt: Ai.Prompt.fromMessages([toolResult("call-large", large)]),
+        path: [entry("0", user("old")), entry("1", user("recent"))],
+        usage: { contextTokens: 2_000, contextWindow: 1_000, reserveTokens: 0 },
+        overflow: false,
+        toolOutputMaxBytes: 12,
+      })
+
+      expect(summaryCalls).toBe(0)
+      expect(Option.isSome(compacted)).toBe(true)
+      if (Option.isSome(compacted)) expect(compacted.value._tag).toBe("Microcompact")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          ToolOutput.testLayer({ put: () => Effect.succeed(Option.some("mem:large")) }),
+          modelLayer(() => {
+            summaryCalls += 1
+            return Effect.succeed([{ type: "text", text: "unexpected summary" }])
+          }),
+        ),
+      ),
+    )
+  })
+
   it.effect("microcompacts successful tool results before summarizing", () => {
     let summaryCalls = 0
     const large = "abcdef".repeat(40)
@@ -163,6 +220,56 @@ describe("Compaction", () => {
       ),
     )
   })
+
+  it.effect("keeps the system message ahead of the checkpoint when summarizing", () =>
+    Effect.gen(function* () {
+      const store = yield* Session.SessionStore
+      yield* store.append({
+        _tag: "Message",
+        message: Ai.Prompt.makeMessage("system", { content: "You are a careful reviewer" }),
+      })
+      yield* store.append({ _tag: "Message", message: user("old goal") })
+      yield* store.append({ _tag: "Message", message: user("recent tail") })
+      const path = yield* store.path()
+      const service = Compaction.make(Compaction.defaultStrategy(), {
+        contextWindow: 10,
+        reserveTokens: 1,
+        keepRecentTokens: 1,
+      })
+
+      const compacted = yield* service.maybeCompact({
+        agentName: "system-summary-agent",
+        sessionId: "session",
+        turn: 2,
+        history: Session.buildContext(path),
+        prompt: Ai.Prompt.make("continue"),
+        path,
+        usage: { contextTokens: 100, contextWindow: 10, reserveTokens: 1 },
+        overflow: false,
+      })
+
+      expect(Option.isSome(compacted)).toBe(true)
+      if (Option.isSome(compacted)) {
+        const value = compacted.value
+        expect(value._tag).toBe("Summarize")
+        if (value._tag === "Summarize") {
+          const first = value.history.content[0]
+          expect(first?.role).toBe("system")
+          const history = JSON.stringify(value.history.content)
+          expect(history).toContain("You are a careful reviewer")
+          expect(history).toContain("<conversation-checkpoint>")
+          expect(history).toContain("recent tail")
+        }
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          Session.memoryLayer,
+          modelLayer(() => Effect.succeed([{ type: "text", text: "checkpoint summary" }])),
+        ),
+      ),
+    ),
+  )
 
   it.effect("microcompacts summarized head tool results before the summary call", () => {
     let summaryPrompt = ""

@@ -71,6 +71,7 @@ export const apply = (model: Ai.LanguageModel.Service, resilience: Interface): A
             }),
           ),
           Stream.catchCause((cause) => {
+            if (Cause.hasInterrupts(cause)) return Stream.failCause(cause)
             const error = Cause.squash(cause)
             return emitted ? Stream.make(Ai.Response.makePart("error", { error })) : Stream.failCause(cause)
           }),

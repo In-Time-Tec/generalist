@@ -101,37 +101,78 @@ const escapeRegExp = (value: string): string => value.replace(/[|\\{}()[\]^$+?.]
 
 const glob = (pattern: string): RegExp => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`)
 
-const stringValue = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined)
-
-const paramsText = (params: unknown): string => {
-  if (typeof params === "string") return params
-  if (Array.isArray(params)) return params.map(String).join(" ")
-  if (typeof params === "object" && params !== null) {
-    const record = params as Readonly<Record<string, unknown>>
-    const direct =
-      stringValue(record.command) ?? stringValue(record.cmd) ?? stringValue(record.input) ?? stringValue(record.text)
-    if (direct !== undefined) return direct
-    const args = record.args ?? record.arguments
-    if (Array.isArray(args)) return args.map(String).join(" ")
-    if (typeof args === "string") return args
-  }
-  const json = JSON.stringify(params)
-  return json === undefined ? String(params) : json
+interface Projection {
+  readonly candidates: ReadonlyArray<string>
+  readonly complete: boolean
 }
 
-/** @experimental Match a permission pattern against a tool call. */
-export const matches = (pattern: string, tool: string, params: unknown): boolean => {
+const isTextLeaf = (value: unknown): value is string | number | boolean | bigint =>
+  typeof value === "string" || typeof value === "number" || typeof value === "boolean" || typeof value === "bigint"
+
+const collectCandidates = (value: unknown, visiting: Set<object>, out: Array<string>): boolean => {
+  if (typeof value === "string") {
+    out.push(value)
+    return true
+  }
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    out.push(String(value))
+    return true
+  }
+  if (value === null || value === undefined) return true
+  if (typeof value !== "object") return false
+  if (visiting.has(value)) return false
+  visiting.add(value)
+  let complete = true
+  if (Array.isArray(value)) {
+    const joined = value.filter(isTextLeaf).map(String)
+    if (joined.length > 0) out.push(joined.join(" "))
+    for (const element of value) {
+      complete = collectCandidates(element, visiting, out) && complete
+    }
+  } else {
+    for (const propValue of Object.values(value)) {
+      complete = collectCandidates(propValue, visiting, out) && complete
+    }
+  }
+  visiting.delete(value)
+  return complete
+}
+
+const serializedParams = (params: unknown): string => {
+  try {
+    const json = JSON.stringify(params)
+    return json === undefined ? String(params) : json
+  } catch {
+    return String(params)
+  }
+}
+
+const project = (params: unknown): Projection => {
+  const candidates: Array<string> = []
+  const complete = collectCandidates(params, new Set(), candidates)
+  candidates.push(serializedParams(params))
+  return { candidates, complete }
+}
+
+const matchesProjection = (pattern: string, tool: string, projection: Projection, failClosed: boolean): boolean => {
   const separator = pattern.indexOf(":")
   if (separator === -1) return glob(pattern).test(tool)
   const toolPattern = pattern.slice(0, separator)
-  const paramsPattern = pattern.slice(separator + 1)
-  return glob(toolPattern).test(tool) && glob(paramsPattern).test(paramsText(params))
+  if (!glob(toolPattern).test(tool)) return false
+  if (!projection.complete && failClosed) return true
+  const paramsPattern = glob(pattern.slice(separator + 1))
+  return projection.candidates.some((candidate) => paramsPattern.test(candidate))
 }
 
+/** @experimental Match a permission pattern against a tool call. */
+export const matches = (pattern: string, tool: string, params: unknown): boolean =>
+  matchesProjection(pattern, tool, project(params), false)
+
 const matchingRule = (ruleset: Ruleset, tool: string, params: unknown): Rule | undefined => {
+  const projection = project(params)
   let matched: Rule | undefined
   for (const rule of ruleset.rules) {
-    if (matches(rule.pattern, tool, params)) matched = rule
+    if (matchesProjection(rule.pattern, tool, projection, rule.level === "deny")) matched = rule
   }
   return matched
 }

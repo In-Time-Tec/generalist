@@ -113,9 +113,13 @@ const serialized = (value: unknown): string => {
   return json === undefined ? String(value) : json
 }
 
-const estimateEntryTokens = (entry: Session.Entry): number => serialized(entry).length
+const APPROX_CHARS_PER_TOKEN = 4
 
-const estimatePromptTokens = (prompt: Ai.Prompt.Prompt): number => serialized(prompt.content).length
+const estimateTokens = (text: string): number => Math.ceil(text.length / APPROX_CHARS_PER_TOKEN)
+
+const estimateEntryTokens = (entry: Session.Entry): number => estimateTokens(serialized(entry))
+
+const estimatePromptTokens = (prompt: Ai.Prompt.Prompt): number => estimateTokens(serialized(prompt.content))
 
 const fits = (history: Ai.Prompt.Prompt, prompt: Ai.Prompt.Prompt, usage: Usage): boolean =>
   Number.isFinite(usage.contextWindow) &&
@@ -193,8 +197,18 @@ const checkpointMessage = (summary: string): Ai.Prompt.Message =>
 const summaryPrompt = (template: string, prompt: Ai.Prompt.Prompt): Ai.Prompt.Prompt =>
   Ai.Prompt.make(`${template}\n\nConversation to summarize:\n${serialized(prompt.content)}`)
 
-const compactedHistory = (summary: string, recent: ReadonlyArray<Session.Entry>): Ai.Prompt.Prompt =>
-  Ai.Prompt.concat(Ai.Prompt.fromMessages([checkpointMessage(summary)]), Session.buildContext(recent))
+const systemMessages = (entries: ReadonlyArray<Session.Entry>): ReadonlyArray<Ai.Prompt.Message> =>
+  entries.flatMap((entry) => (entry._tag === "Message" && entry.message.role === "system" ? [entry.message] : []))
+
+const compactedHistory = (
+  summary: string,
+  head: ReadonlyArray<Session.Entry>,
+  recent: ReadonlyArray<Session.Entry>,
+): Ai.Prompt.Prompt =>
+  Ai.Prompt.concat(
+    Ai.Prompt.fromMessages([...systemMessages(head), checkpointMessage(summary)]),
+    Session.buildContext(recent),
+  )
 
 const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => ({
   contextTokens: Number.isFinite(usage.contextTokens) ? usage.contextTokens : 0,
@@ -282,7 +296,7 @@ export const make = (strategy: Strategy, options: DefaultOptions = {}): Interfac
       const summary = yield* strategy.summarize(plan.value, { ...input, history, prompt, usage })
       return Option.some<Result>({
         _tag: "Summarize",
-        history: compactedHistory(summary, plan.value.recent),
+        history: compactedHistory(summary, plan.value.head, plan.value.recent),
         prompt,
         summary,
         firstKeptEntryId: plan.value.firstKeptEntryId,

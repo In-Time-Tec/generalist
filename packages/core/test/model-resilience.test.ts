@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Schedule, Schema, Stream } from "effect"
+import { Cause, Effect, Exit, Schedule, Schema, Stream } from "effect"
 import * as Ai from "effect/unstable/ai"
 import { ModelResilience } from "../src/index"
 
@@ -205,6 +205,26 @@ describe("ModelResilience", () => {
       expect(parts.map((part) => part.type)).toEqual(["text-delta", "error"])
       const errorPart = parts[1]
       if (errorPart?.type === "error") expect(errorPart.error).toBe(transientError)
+    })
+  })
+
+  it.effect("propagates mid-stream interrupts instead of squashing them into an error part", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(Cause.interrupt())))
+        },
+      }),
+      ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+    )
+    return Effect.gen(function* () {
+      const exit = yield* Effect.exit(Stream.runCollect(wrapped.streamText({ prompt: "interrupted stream" })))
+
+      expect(calls).toBe(1)
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause)).toBe(true)
     })
   })
 
