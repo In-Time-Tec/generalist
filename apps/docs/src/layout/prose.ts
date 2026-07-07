@@ -46,7 +46,7 @@ export const commandBlock = (label: string, language: string, codeText: string):
     [
       codeBlock({ language, class: "rounded-md" }, [
         codeBlockHeader({}, [codeBlockTitle({}, [label])]),
-        codeBlockContent({ code: codeText }),
+        codeBlockContent({ code: codeText, language }),
       ]),
     ],
   )

@@ -9,7 +9,6 @@ export type DocPage = Readonly<{
   title: string
   navTitle: string
   group: string
-  source: ReadonlyArray<string>
   lead: string
   summary: ReadonlyArray<string>
   invariants: ReadonlyArray<string>
@@ -51,7 +50,6 @@ const docsPages: ReadonlyArray<DocPage> = [
     title: "Getting started",
     navTitle: "Getting started",
     group: "Start",
-    source: ["CONTEXT.md", "SPEC.md", "docs/spec/01-baton-agent-framework.md", "packages/core/src/index.ts"],
     lead: "Install the package you need, define an Agent value, and provide the Effect layers that own model, tools, approvals, and middleware.",
     summary: [
       "Baton is an Effect-native model-turn loop over effect/unstable/ai, not a second prompt or tool wire format.",
@@ -74,7 +72,6 @@ const docsPages: ReadonlyArray<DocPage> = [
     title: "Core agent loop",
     navTitle: "Agent loop",
     group: "Core seams",
-    source: ["docs/spec/01-baton-agent-framework.md", "packages/core/src/index.ts", "packages/core/src/agent.ts"],
     lead: "The core package owns the non-durable turn loop, event stream, suspension contract, and optional seams around model calls and local tools.",
     summary: [
       "Baton builds an Ai.Chat, streams model parts, executes framework-owned tool calls sequentially, re-feeds tool results, and repeats by TurnPolicy.",
@@ -120,7 +117,6 @@ export const assistant = Agent.make({
     title: "Session event log",
     navTitle: "Session event log",
     group: "Core seams",
-    source: ["docs/spec/02-session-event-log.md", "packages/core/src/session.ts"],
     lead: "Session is an append-only conversation log plus a pure projector from a root-to-leaf path into an Ai.Prompt.",
     summary: [
       "The log stores Message, Compaction, and BranchSummary entries. It does not store a second computed prompt.",
@@ -149,7 +145,6 @@ export const toPrompt = Session.buildContext`,
     title: "Instructions and context epoch",
     navTitle: "Instructions",
     group: "Core seams",
-    source: ["docs/spec/03-instructions-and-context-epoch.md", "packages/core/src/instructions.ts"],
     lead: "Instructions is an ordered context-source registry that opens a stable run baseline once and keeps dynamic sources for later update rendering.",
     summary: [
       "Baseline sources render once at turn 0 and become the system-message baseline when no explicit system or history is supplied.",
@@ -179,7 +174,6 @@ export const instructionsLayer = Instructions.layer([
     title: "Permissions policy",
     navTitle: "Permissions",
     group: "Core seams",
-    source: ["docs/spec/04-permissions-policy.md", "packages/core/src/permissions.ts"],
     lead: "Permissions is the optional allow, deny, or ask policy seam for framework-executed local tool calls.",
     summary: [
       "Rules are ordered and later matching rules win. Fallback defaults to ask.",
@@ -220,7 +214,6 @@ export const permissionsLayer = Permissions.fromRuleset(ruleset)`,
     title: "Steering and interrupts",
     navTitle: "Steering",
     group: "Core seams",
-    source: ["docs/spec/05-steering-and-interrupts.md", "packages/core/src/steering.ts"],
     lead: "Steering provides two in-process FIFO queues for live prompts: steering input before the next tool-result turn and follow-up input before completion.",
     summary: [
       "takeSteering and takeFollowUp are non-blocking and return an empty array when no messages are queued.",
@@ -251,7 +244,6 @@ export const steeringLayer = Steering.layer({
     title: "Compaction",
     navTitle: "Compaction",
     group: "Core seams",
-    source: ["docs/spec/06-compaction.md", "packages/core/src/compaction.ts"],
     lead: "Compaction is an optional strategy boundary for shrinking projected model context before a turn or after a pre-emission context overflow.",
     summary: [
       "The default strategy tries tool-output microcompaction before summary checkpointing.",
@@ -288,12 +280,6 @@ export const compactionLayer = Compaction.layer({
     title: "Skills",
     navTitle: "Skills",
     group: "Packages",
-    source: [
-      "docs/spec/07-skills.md",
-      "packages/core/src/skill-source.ts",
-      "packages/skills/src/index.ts",
-      "packages/skills/src/skill-loader.ts",
-    ],
     lead: "Skills use the agentskills.io SKILL.md directory format with startup listings and lazy body activation through Baton's activate_skill tool.",
     summary: [
       "Core owns the SkillSource seam and listing selection. Filesystem discovery lives in @batonfx/skills.",
@@ -329,7 +315,6 @@ export const filesystemSkills = SkillLoader.layer({ roots: [".agents/skills"] })
     title: "Providers",
     navTitle: "Providers",
     group: "Packages",
-    source: ["docs/spec/08-providers.md", "packages/providers/src/index.ts"],
     lead: "@batonfx/providers adapts upstream Effect AI providers into core's ModelRegistry and exposes provider-neutral embedding layers.",
     summary: [
       "Registration helpers return ModelRegistry registrations keyed by provider, model, and optional registrationKey.",
@@ -370,7 +355,6 @@ export const catalog = Catalog.layer([
     title: "Memory",
     navTitle: "Memory",
     group: "Packages",
-    source: ["docs/spec/09-memory.md", "packages/core/src/memory.ts", "packages/memory/src/index.ts"],
     lead: "Memory is an optional per-run recall and remember seam. Core owns timing; @batonfx/memory owns in-process implementations.",
     summary: [
       "RunOptions.memory.key is host-chosen and includes agent plus subject. Baton never derives a subject automatically.",
@@ -410,7 +394,6 @@ export const memory = combinedLayer({ semantic: { limit: 5 } })`,
     title: "In-process multi-agent",
     navTitle: "Multi-agent",
     group: "Core seams",
-    source: ["docs/spec/10-multi-agent.md", "packages/core/src/agent-tool.ts", "packages/core/src/handoff.ts"],
     lead: "Baton's multi-agent support is same-process and non-durable: one Agent can call another as a tool, transfer through handoff tools, or fan out in parallel.",
     summary: [
       "AgentTool.asTool exposes an agent as an Ai.Toolkit.WithHandler.",
@@ -444,7 +427,6 @@ export const transferToResearcher = Handoff.transferTool(specialist)`,
     title: "Transport",
     navTitle: "Transport",
     group: "Packages",
-    source: ["docs/spec/11-transport.md", "packages/transport/src/index.ts"],
     lead: "@batonfx/transport turns Agent.stream into replayable wire frames for non-durable chat transports.",
     summary: [
       "Server frame seq values are monotonic per session and are the replay cursor.",
@@ -480,7 +462,6 @@ export const frame: Wire.ClientFrameType = {
     title: "FoldKit adapter",
     navTitle: "FoldKit adapter",
     group: "Packages",
-    source: ["docs/spec/12-foldkit-adapter.md", "packages/foldkit/src/index.ts"],
     lead: "@batonfx/foldkit adapts Baton transport into FoldKit applications as headless state, commands, subscriptions, and connection resources.",
     summary: [
       "AgentConnection is a long-lived Effect resource supplied through FoldKit runtime resources.",
@@ -505,29 +486,9 @@ export const connectionLayer = Connection.layerWebSocket({ url: "ws://localhost:
       },
     ],
   },
-  {
-    path: "/docs/reference/decisions",
-    title: "Architecture decisions",
-    navTitle: "ADRs",
-    group: "Reference",
-    source: ["docs/spec/decisions/*.md"],
-    lead: "The ADRs lock stable choices behind the spec tree. They explain why Baton stays standalone, non-durable, Effect-native, and seam-driven.",
-    summary: [
-      "ADR-0001 establishes Baton as a standalone agent framework that depends on effect only.",
-      "ADR-0005 through ADR-0010 lock the session, instructions, permissions, steering, compaction, and skills seams.",
-      "ADR-0011 through ADR-0016 add provider helpers, model metadata, multi-agent, transport, SSE/WebSocket/client, and FoldKit adapter decisions.",
-    ],
-    invariants: [
-      "Accepted ADRs are part of the architecture, not implementation notes.",
-      "New durable behavior requires spec work and an ADR before code.",
-      "The docs site summarizes ADRs and links their source paths; it does not supersede them.",
-    ],
-    exports: [],
-    examples: [],
-  },
 ]
 
-export const navGroups: ReadonlyArray<NavGroup> = ["Start", "Core seams", "Packages", "Reference"].map((group) => ({
+export const navGroups: ReadonlyArray<NavGroup> = ["Start", "Core seams", "Packages"].map((group) => ({
   title: group,
   pages: docsPages.filter((page) => page.group === group),
 }))

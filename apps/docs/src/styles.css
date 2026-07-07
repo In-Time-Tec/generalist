@@ -46,6 +46,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --code-keyword: oklch(0.53 0.19 25);
+  --code-string: oklch(0.52 0.13 150);
+  --code-number: oklch(0.55 0.14 60);
+  --code-type: oklch(0.52 0.15 255);
+  --code-function: oklch(0.52 0.19 300);
+  --code-property: oklch(0.38 0.03 260);
+  --code-comment: oklch(0.62 0.02 260);
+  --code-punct: oklch(0.5 0.02 260);
 }
 
 .dark {
@@ -81,6 +89,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --code-keyword: oklch(0.75 0.15 22);
+  --code-string: oklch(0.78 0.12 150);
+  --code-number: oklch(0.8 0.12 65);
+  --code-type: oklch(0.75 0.12 240);
+  --code-function: oklch(0.76 0.15 305);
+  --code-property: oklch(0.85 0.02 260);
+  --code-comment: oklch(0.6 0.02 260);
+  --code-punct: oklch(0.68 0.02 260);
 }
 
 @theme inline {
@@ -176,6 +192,39 @@
   [tabindex="-1"]:focus {
     outline: none;
   }
+}
+
+/* Code syntax highlighting tokens (see lib/highlight.ts + the code-block
+   component). Coloured by the --code-* variables above so highlighting is
+   themeable and works out of the box in light and dark. */
+.hl-comment {
+  color: var(--code-comment);
+  font-style: italic;
+}
+.hl-keyword {
+  color: var(--code-keyword);
+}
+.hl-string {
+  color: var(--code-string);
+}
+.hl-number,
+.hl-constant {
+  color: var(--code-number);
+}
+.hl-type {
+  color: var(--code-type);
+}
+.hl-func {
+  color: var(--code-function);
+}
+.hl-property {
+  color: var(--code-property);
+}
+.hl-punct {
+  color: var(--code-punct);
+}
+.hl-plain {
+  color: var(--foreground);
 }
 
 @utility no-scrollbar {

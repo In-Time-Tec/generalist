@@ -2,6 +2,7 @@ import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
 import { button } from "@/components/ui/button"
+import { highlight } from "@/lib/highlight"
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 
@@ -154,18 +155,20 @@ const lineNumberClass = cn(
 export type CodeBlockContentConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
     code: string
+    language?: string
     showsLineNumbers?: boolean
   }>
 
 /**
  * Code body: `pre > code` with each line in a block span so the optional CSS
- * counter line numbers line up. No tokenization (gap: AI Elements uses
- * Shiki); the text renders in the theme's foreground.
+ * counter line numbers line up. Lines are tokenized by `lib/highlight` into
+ * `.hl-*`-classed spans (theme-colored); unsupported languages fall back to
+ * plain foreground text.
  */
 export const codeBlockContent = <ParentMessage>(config: CodeBlockContentConfig<ParentMessage>): Html => {
   const h = html<ParentMessage>()
   const showsLineNumbers = config.showsLineNumbers ?? false
-  const lines = config.code.split("\n")
+  const lines = highlight(config.code, config.language ?? "")
   return h.div(
     [
       ...(config.attributes ?? []),
@@ -178,8 +181,11 @@ export const codeBlockContent = <ParentMessage>(config: CodeBlockContentConfig<P
         [
           h.code(
             [h.Class(cn("font-mono text-sm", showsLineNumbers && "[counter-increment:line_0] [counter-reset:line]"))],
-            lines.map((line) =>
-              h.span([h.Class(showsLineNumbers ? lineNumberClass : "block")], [line === "" ? "\n" : line]),
+            lines.map((tokens) =>
+              h.span(
+                [h.Class(showsLineNumbers ? lineNumberClass : "block")],
+                tokens.length === 0 ? ["\n"] : tokens.map((token) => h.span([h.Class(token.cls)], [token.text])),
+              ),
             ),
           ),
         ],

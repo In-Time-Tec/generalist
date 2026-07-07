@@ -46,12 +46,12 @@ test("landing renders the BatonFX docs shell", async () => {
   expect(document.body.textContent).toContain("Package pages")
 })
 
-test("spec-backed docs pages render", async () => {
+test("docs pages render", async () => {
   bootAt("/docs/core/agent-loop")
   await settle()
 
   expect(document.body.textContent).toContain("Core agent loop")
-  expect(document.body.textContent).toContain("Verified exports")
+  expect(document.body.textContent).toContain("Exports")
   expect(document.body.textContent).toContain("ToolExecutor")
 
   bootAt("/docs/packages/foldkit")
