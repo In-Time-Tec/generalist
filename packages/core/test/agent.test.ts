@@ -1074,6 +1074,47 @@ describe("Agent", () => {
     )
   })
 
+  it.effect("keeps the seeded system message after a Summarize compaction", () => {
+    let streamCalls = 0
+    let secondPrompt = ""
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "system-compaction-agent", toolkit: Ai.Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "old context", system: "You are a careful test agent" }),
+      )
+
+      expect(streamCalls).toBe(2)
+      expect(secondPrompt).toContain("<conversation-checkpoint>")
+      expect(secondPrompt).toContain("You are a careful test agent")
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(
+            (options) => {
+              streamCalls += 1
+              if (streamCalls === 1) {
+                return Stream.make(
+                  toolCallPart("tool-call-system-compact", "echo", { text: "needs summary" }),
+                  finishPart("stop", usage({ total: 100 }, { total: 1 })),
+                )
+              }
+              secondPrompt = JSON.stringify(options.prompt.content)
+              return Stream.make(textDelta("after compaction"))
+            },
+            () => Effect.succeed([{ type: "text", text: "checkpoint summary" }]),
+          ),
+          echoExecutor,
+          Approvals.autoApprove,
+          Session.memoryLayer,
+          Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
   it.effect("uses Compaction layer reserveTokens instead of the Agent default", () => {
     let streamCalls = 0
     let summaryCalls = 0

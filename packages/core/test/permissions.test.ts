@@ -19,6 +19,29 @@ describe("Permissions", () => {
     expect(Permissions.matches("bash:*secret*", "bash", { args: ["cat", "secret.txt"] })).toBe(true)
   })
 
+  it("matches deny patterns against array and nested command shapes", () => {
+    const ruleset: Permissions.Ruleset = {
+      rules: [{ pattern: "bash:rm -rf*", level: "deny" }],
+      fallback: "allow",
+    }
+
+    expect(Permissions.matches("bash:rm -rf*", "bash", { command: ["rm", "-rf", "/"] })).toBe(true)
+    expect(Permissions.evaluate(ruleset, "bash", { command: ["rm", "-rf", "/"] })).toBe("deny")
+    expect(Permissions.evaluate(ruleset, "bash", { args: ["rm", "-rf", "/"] })).toBe("deny")
+    expect(Permissions.evaluate(ruleset, "bash", { input: { command: ["rm", "-rf", "/"] } })).toBe("deny")
+    expect(Permissions.evaluate(ruleset, "bash", { commands: [{ executable: "rm -rf /tmp/cache" }] })).toBe("deny")
+    expect(Permissions.evaluate(ruleset, "bash", { command: ["ls", "-la"] })).toBe("allow")
+  })
+
+  it("fails closed on unprojectable params when a deny pattern is configured", () => {
+    const ruleset: Permissions.Ruleset = {
+      rules: [{ pattern: "bash:rm -rf*", level: "deny" }],
+      fallback: "allow",
+    }
+
+    expect(Permissions.evaluate(ruleset, "bash", { run: () => "rm -rf /" })).toBe("deny")
+  })
+
   it("evaluates rules with last-match wins and default ask", () => {
     expect(
       Permissions.evaluate(

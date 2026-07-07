@@ -23,7 +23,7 @@ Baton does not own durable permission waits, cross-process approval delivery, ap
 - A pattern without `:` matches the tool name. A pattern with `:` matches `<tool>:<argument-text>`.
 - Glob matching is intentionally minimal: `*` matches any run of characters.
 
-Argument text is derived from a string parameter directly, from common shell-style fields such as `command`, `cmd`, or `args`, and otherwise from a stable string representation of the params value.
+Argument matching is shape-independent: the params value is recursively projected into candidate strings — every string, number, boolean, and bigint leaf, a space-joined form of each array's primitive elements, and a stable string representation of the whole value — and the argument pattern matches when it matches any candidate. When a params value cannot be fully projected (non-JSON leaves such as functions or symbols, or cyclic references), `deny` rules with an argument pattern fail closed and match; `allow` and `ask` rules match only on the candidates that could be projected.
 
 ## Decision model
 
