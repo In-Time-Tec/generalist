@@ -95,12 +95,12 @@ const heroSection = (model: Model): Html =>
           ),
           h.p(
             [h.Class("mt-6 text-2xl font-light text-gray-900 md:text-3xl dark:text-white")],
-            ["Effect gives you primitives. Batonfx gives you ", accent("agents"), "."],
+            ["A TypeScript framework for building AI ", accent("agents"), " on Effect."],
           ),
           h.p(
             [h.Class("mt-4 max-w-2xl text-lg text-gray-600 dark:text-gray-400")],
             [
-              "effect/unstable/ai models the model — prompts, responses, toolkits. Batonfx models the agent: what it may do, when it stops, who approves, and how it is tested. Every seam is an Effect service with a deterministic test layer, so agents are assertable in CI with zero API keys. Whatever Effect ships next, Batonfx builds on it.",
+              "An agent is a plain Effect value — instructions, typed tools, a turn policy. A run is a stream of typed events you fold, persist, or forward. Every seam — model, tools, approvals, permissions — is an Effect service with a deterministic test layer, so you can assert an agent's behavior in CI with zero API keys.",
             ],
           ),
           h.div([h.Class("mt-8 max-w-xl")], [commandBlock(model, "Install", installCommand)]),
@@ -125,7 +125,7 @@ const pairSection = (): Html =>
                 [h.Class("mt-2 text-gray-600 dark:text-gray-400")],
                 [
                   h.strong([h.Class("text-gray-900 dark:text-white")], ["Batonfx"]),
-                  " builds the agent — in your process, with storage and delivery owned by you. Start here. ",
+                  " builds agents that run in your process, with storage and delivery owned by you. Start here. ",
                   h.a(
                     [
                       h.Href("https://relayfx-docs.up.railway.app"),
@@ -135,7 +135,7 @@ const pairSection = (): Html =>
                     ],
                     ["Relayfx"],
                   ),
-                  " makes its runs durable on your Postgres. Add it when a lost run is an incident, not a shrug.",
+                  " makes their runs durable on your Postgres. Add it when runs must survive deploys, crashes, and multi-day waits.",
                 ],
               ),
             ],
@@ -161,11 +161,11 @@ const promiseSection = (): Html =>
       h.div(
         [h.Class("landing-section-narrow")],
         [
-          sectionHeading("Agents, not glue."),
+          sectionHeading("An agent is a value."),
           h.p(
             [h.Class("mt-4 max-w-3xl text-lg text-gray-600 dark:text-gray-400")],
             [
-              "An agent is a plain value — instructions, typed tools, policies — and everything around it is what you would otherwise glue together by hand: turn iteration, permissions, approvals, steering, memory, skills, multi-agent composition. Batonfx ships the agent architecture and refuses the rest: no storage, no vendor clients, no project scaffold.",
+              "You define an agent the way you define any Effect value, run it with the layers you choose, and observe it as a typed event stream. Turn iteration, permissions, approvals, steering, memory, skills, and multi-agent composition are in the box; storage, transport clients, and deployment stay yours.",
             ],
           ),
           h.div(
@@ -407,7 +407,7 @@ const honestySection = (): Html =>
               h.p(
                 [h.Class("mt-4 text-gray-600 dark:text-gray-400")],
                 [
-                  "Batonfx persists nothing by design; bring your own store. It is a single-process loop with no distribution or replay. When runs must survive a deploy, put durable orchestration on top.",
+                  "Batonfx persists nothing by design; bring your own store. It runs in one process, with no distribution and no replay. If a run must survive a deploy, a crash, or a multi-day wait, that durability lives above it.",
                 ],
               ),
               h.p(

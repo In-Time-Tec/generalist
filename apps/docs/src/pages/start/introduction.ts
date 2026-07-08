@@ -8,12 +8,12 @@ export const introduction = Prose.definePage({
   navTitle: "What is Batonfx",
   group: "Start",
   description:
-    "Effect gives you AI primitives; Batonfx gives you agents: complete, testable agents over effect/unstable/ai with typed tools, typed suspension, permissions, steering, and every seam exposed as an Effect service.",
+    "Batonfx is a TypeScript framework for building AI agents on Effect: agents are plain values, runs are typed event streams, and every seam is an Effect service with a deterministic test layer.",
   content: [
     Prose.p(
-      "Effect gives you AI primitives — prompts, responses, toolkits, provider clients. Batonfx turns them into agents. It is a standalone, non-durable agent framework built on ",
+      "Batonfx is a TypeScript framework for building AI agents on Effect. It is standalone and non-durable, built on ",
       Prose.code("effect/unstable/ai"),
-      ", adding everything a production agent needs that a model call does not have: turn iteration, permissions, human approval as typed suspension, steering, and the test seams a hand-rolled version never gets. An agent is a plain value: a name, instructions, a toolkit, and a turn policy. A run is an Effect stream of typed events — the model call, each tool execution, each turn boundary — that you fold, observe, or forward to a browser. There is no runtime process to operate and no storage Batonfx owns: durability, persistence, and identity stay with the host application.",
+      ", and it covers what an agent needs beyond a model call: turn iteration, permissions, human approval as typed suspension, steering, and deterministic test seams. An agent is a plain value: a name, instructions, a toolkit, and a turn policy. A run is an Effect stream of typed events — the model call, each tool execution, each turn boundary — that you fold, observe, or forward to a browser. There is no runtime process to operate and no storage Batonfx owns: durability, persistence, and identity stay with the host application.",
     ),
     Prose.p(
       "Every capability is an Effect service. Four layers are required on every run — the language model, the tool executor, approvals, and model middleware — and everything else (permissions, memory, skills, compaction, steering) is an optional seam discovered at runtime. Absent means default behavior, and every behavior-bearing seam ships a test layer, so agents run deterministically in CI with zero credentials.",
