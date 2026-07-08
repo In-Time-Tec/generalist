@@ -95,12 +95,12 @@ const heroSection = (model: Model): Html =>
           ),
           h.p(
             [h.Class("mt-6 text-2xl font-light text-gray-900 md:text-3xl dark:text-white")],
-            ["The agent ", accent("loop"), " for Effect. Nothing else."],
+            ["Effect gives you primitives. Batonfx gives you ", accent("agents"), "."],
           ),
           h.p(
             [h.Class("mt-4 max-w-2xl text-lg text-gray-600 dark:text-gray-400")],
             [
-              "The loop you were about to write yourself — turn iteration, typed tools, human approval as a typed suspension — as one Effect you compose. Every seam is a service with a deterministic test layer, so agents are assertable in CI with zero API keys. No runtime to operate, no storage it owns.",
+              "effect/unstable/ai models the model — prompts, responses, toolkits. Batonfx models the agent: what it may do, when it stops, who approves, and how it is tested. Every seam is an Effect service with a deterministic test layer, so agents are assertable in CI with zero API keys. Whatever Effect ships next, Batonfx builds on it.",
             ],
           ),
           h.div([h.Class("mt-8 max-w-xl")], [commandBlock(model, "Install", installCommand)]),
@@ -120,12 +120,12 @@ const pairSection = (): Html =>
           h.div(
             [h.Class("rounded-lg border border-gray-300 bg-cream/60 p-6 dark:border-gray-700 dark:bg-gray-850")],
             [
-              h.p([h.Class("font-medium text-gray-900 dark:text-white")], ["Two packages, one loop."]),
+              h.p([h.Class("font-medium text-gray-900 dark:text-white")], ["Two packages, one agent."]),
               h.p(
                 [h.Class("mt-2 text-gray-600 dark:text-gray-400")],
                 [
                   h.strong([h.Class("text-gray-900 dark:text-white")], ["Batonfx"]),
-                  " is the agent loop, in your process, with storage and delivery owned by you. Start here. ",
+                  " builds the agent — in your process, with storage and delivery owned by you. Start here. ",
                   h.a(
                     [
                       h.Href("https://relayfx-docs.up.railway.app"),
@@ -135,7 +135,7 @@ const pairSection = (): Html =>
                     ],
                     ["Relayfx"],
                   ),
-                  " runs the same loop inside durable executions on your Postgres. Add it when a lost run is an incident, not a shrug.",
+                  " makes its runs durable on your Postgres. Add it when a lost run is an incident, not a shrug.",
                 ],
               ),
             ],
@@ -161,11 +161,11 @@ const promiseSection = (): Html =>
       h.div(
         [h.Class("landing-section-narrow")],
         [
-          sectionHeading("One loop. Your layers."),
+          sectionHeading("Agents, not glue."),
           h.p(
             [h.Class("mt-4 max-w-3xl text-lg text-gray-600 dark:text-gray-400")],
             [
-              "Most agent SDKs bundle the loop with storage, transport, and vendor clients. Batonfx is only the loop — plus the typed errors, interruption, and test seams the hand-rolled version never gets.",
+              "An agent is a plain value — instructions, typed tools, policies — and everything around it is what you would otherwise glue together by hand: turn iteration, permissions, approvals, steering, memory, skills, multi-agent composition. Batonfx ships the agent architecture and refuses the rest: no storage, no vendor clients, no project scaffold.",
             ],
           ),
           h.div(
