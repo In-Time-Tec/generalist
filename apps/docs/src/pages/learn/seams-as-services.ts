@@ -28,7 +28,11 @@ export const seamsAsServices = Prose.definePage({
     Prose.table(
       ["Service", "What it decides", "Default when you have nothing to decide"],
       [
-        [[Prose.code("Ai.LanguageModel.LanguageModel")], "Which model answers each turn", "None; this one is always yours"],
+        [
+          [Prose.code("Ai.LanguageModel.LanguageModel")],
+          "Which model answers each turn",
+          "None; this one is always yours",
+        ],
         [
           [Prose.code("ToolExecutor.ToolExecutor")],
           "How tool calls execute",
