@@ -10,7 +10,7 @@ export const coreModelsReference = Prose.definePage({
     Prose.lead(
       "Four namespaces of @batonfx/core cover the model side of a run: ModelRegistry selects models per run, ModelMiddleware transforms prompts and stream parts, ModelResilience retries transient failures, and Guardrail builds common middleware.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core"),
+    Prose.command("Install", "bun add @batonfx/core"),
     Prose.h2("model-registry", "ModelRegistry"),
     Prose.p(
       "A registry of named model registrations. ",

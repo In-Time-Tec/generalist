@@ -10,7 +10,7 @@ export const transportReference = Prose.definePage({
     Prose.lead(
       "@batonfx/transport serves agent runs over SSE and WebSocket: a schema-defined wire protocol, an in-memory session registry with replay, server handlers, and a reconnecting client.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core @batonfx/transport"),
+    Prose.command("Install", "bun add @batonfx/core @batonfx/transport"),
     Prose.p("Published on npm at 0.1.1. Requires ", Prose.code("@batonfx/core"), "."),
     Prose.h2("exports", "Exports map"),
     Prose.table(

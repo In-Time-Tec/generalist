@@ -10,7 +10,7 @@ export const coreToolsReference = Prose.definePage({
     Prose.lead(
       "Four namespaces of @batonfx/core cover tool execution: ToolExecutor runs calls, ToolContext is the ambient per-call context, ToolOutput bounds large results, and AgentTool wraps an agent as a tool.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core"),
+    Prose.command("Install", "bun add @batonfx/core"),
     Prose.h2("tool-executor", "ToolExecutor"),
     Prose.p(
       "One of the four required run services. The interface is a single function ",

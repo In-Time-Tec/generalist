@@ -10,7 +10,7 @@ export const corePoliciesReference = Prose.definePage({
     Prose.lead(
       "Three namespaces of @batonfx/core gate what a run may do next: TurnPolicy decides follow-up turns, Approvals enforces needsApproval, and Permissions evaluates allow/deny/ask rules per tool call.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core"),
+    Prose.command("Install", "bun add @batonfx/core"),
     Prose.h2("turn-policy", "TurnPolicy"),
     Prose.p(
       "A policy is ",

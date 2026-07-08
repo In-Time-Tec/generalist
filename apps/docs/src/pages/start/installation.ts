@@ -1,9 +1,9 @@
 import * as Prose from "../../prose"
 
-const bunInstall = `bun add effect@4.0.0-beta.93 @batonfx/core @batonfx/providers`
+const bunInstall = `bun add @batonfx/core @batonfx/providers`
 
-const otherManagers = `npm install effect@4.0.0-beta.93 @batonfx/core @batonfx/providers
-pnpm add effect@4.0.0-beta.93 @batonfx/core @batonfx/providers`
+const otherManagers = `npm install @batonfx/core @batonfx/providers
+pnpm add @batonfx/core @batonfx/providers`
 
 export const installation = Prose.definePage({
   path: "/docs/start/installation",

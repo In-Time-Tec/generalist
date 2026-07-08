@@ -10,7 +10,7 @@ export const skillsReference = Prose.definePage({
     Prose.lead(
       "@batonfx/skills implements the core SkillSource seam from the filesystem: SkillLoader discovers SKILL.md files, and InstructionFiles loads AGENTS.md/CLAUDE.md instruction files.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core @batonfx/skills"),
+    Prose.command("Install", "bun add @batonfx/core @batonfx/skills"),
     Prose.p("Published on npm at 0.1.1. Requires ", Prose.code("@batonfx/core"), "."),
     Prose.h2("exports", "Exports map"),
     Prose.table(

@@ -10,7 +10,7 @@ export const foldkitReference = Prose.definePage({
     Prose.lead(
       "@batonfx/foldkit adapts the transport protocol to FoldKit's Elm architecture: Connection owns the WebSocket, Chat is a headless submodel that folds wire frames into renderable state.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 foldkit@0.122.0 @batonfx/transport @batonfx/foldkit"),
+    Prose.command("Install", "bun add foldkit@0.122.0 @batonfx/transport @batonfx/foldkit"),
     Prose.p(
       "Published on npm at 0.1.1. Depends on ",
       Prose.code("@batonfx/transport"),

@@ -10,7 +10,7 @@ export const coreEventsReference = Prose.definePage({
     Prose.lead(
       "AgentEvent declares the closed union of loop events every run streams, plus the four error classes a run can fail with.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core"),
+    Prose.command("Install", "bun add @batonfx/core"),
     Prose.h2("event-union", "The Event union"),
     Prose.p(
       Prose.code("AgentEvent.Event"),

@@ -10,7 +10,7 @@ export const coreContextReference = Prose.definePage({
     Prose.lead(
       "Seven namespaces of @batonfx/core shape what the model sees and how a conversation persists. All are optional seams discovered per run; absent means default behavior.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core"),
+    Prose.command("Install", "bun add @batonfx/core"),
     Prose.h2("instructions", "Instructions"),
     Prose.p(
       "An ordered registry of ",

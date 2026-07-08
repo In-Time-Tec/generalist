@@ -23,7 +23,7 @@ const h = html<Message>()
 
 const quickstartPath = "/docs/start/quickstart"
 const agentLoopPath = "/docs/learn/agent-loop"
-const installCommand = "bun add effect@4.0.0-beta.93 @batonfx/core @batonfx/providers"
+const installCommand = "bun add @batonfx/core @batonfx/providers"
 
 const glyph = (symbol: string, offsetY?: string): Html =>
   h.div(

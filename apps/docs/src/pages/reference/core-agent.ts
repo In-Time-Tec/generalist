@@ -10,7 +10,7 @@ export const coreAgentReference = Prose.definePage({
     Prose.lead(
       "The Agent namespace of @batonfx/core defines the agent value, the four run functions, and every option and service a run consumes.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core"),
+    Prose.command("Install", "bun add @batonfx/core"),
     Prose.h2("agent-make", "Agent.make"),
     Prose.p(
       "An ",

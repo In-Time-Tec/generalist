@@ -10,7 +10,7 @@ export const memoryReference = Prose.definePage({
     Prose.lead(
       "@batonfx/memory implements the core Memory seam twice — a recency window with optional summarization, and embedding-based semantic recall — plus the VectorStore seam they share.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core @batonfx/memory"),
+    Prose.command("Install", "bun add @batonfx/core @batonfx/memory"),
     Prose.p("Published on npm at 0.1.1. Requires ", Prose.code("@batonfx/core"), "."),
     Prose.h2("exports", "Exports map"),
     Prose.table(

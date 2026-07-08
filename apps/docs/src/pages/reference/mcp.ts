@@ -10,7 +10,7 @@ export const mcpReference = Prose.definePage({
     Prose.lead(
       "@batonfx/mcp connects Model Context Protocol servers to Batonfx: McpToolSource discovers and calls MCP tools, and the baton subpath adapts them into a toolkit and a ToolExecutor.",
     ),
-    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core @batonfx/mcp"),
+    Prose.command("Install", "bun add @batonfx/core @batonfx/mcp"),
     Prose.p(
       "Published on npm at 0.1.1. Requires ",
       Prose.code("@batonfx/core"),

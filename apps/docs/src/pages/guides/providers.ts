@@ -30,7 +30,7 @@ export const providers = Prose.definePage({
       Prose.code("@effect/ai-*"),
       " packages.",
     ),
-    Prose.command("Terminal", "bun add effect@4.0.0-beta.93 @batonfx/core @batonfx/providers"),
+    Prose.command("Terminal", "bun add @batonfx/core @batonfx/providers"),
     Prose.h2("register-one-provider", "1. Register a provider"),
     Prose.p(
       "Each provider module ships a ",
