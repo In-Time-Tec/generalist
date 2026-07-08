@@ -73,7 +73,7 @@ export const coreModelsReference = Prose.definePage({
       Prose.code("LanguageModel"),
       " layer. Wrap the run in ",
       Prose.code("ModelRegistry.provide({ provider, model }, effect)"),
-      " — never provide a registry layer where a LanguageModel is required.",
+      ". Never provide a registry layer where a LanguageModel is required.",
     ),
     Prose.h2("model-middleware", "ModelMiddleware"),
     Prose.p(
@@ -94,7 +94,7 @@ export const coreModelsReference = Prose.definePage({
           [Prose.code("(part, context: TurnContext) => Effect<Option<StreamPart>, AgentError>")],
           [
             Prose.code("Option.none()"),
-            " drops the part. Tool-call parts may be transformed but must not be dropped — the loop fails the run with ",
+            " drops the part. Tool-call parts may be transformed but must not be dropped: the loop fails the run with ",
             Prose.code("MiddlewareViolation"),
             " if one is",
           ],

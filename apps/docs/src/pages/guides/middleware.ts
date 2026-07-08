@@ -29,7 +29,7 @@ export const middleware = Prose.definePage({
     Prose.p(
       "To drop a part, return ",
       Prose.code("Option.none()"),
-      ". A dropped part never reaches the event stream or the transcript — the loop behaves as if the model never produced it.",
+      ". A dropped part never reaches the event stream or the transcript: the loop behaves as if the model never produced it.",
     ),
     Prose.codeBlock({
       label: "custom-middleware.ts",
@@ -63,7 +63,7 @@ export const middleware = Prose.definePage({
       "Tool calls may not be dropped",
       "Tool-call parts may be transformed but never dropped. Dropping one desynchronizes the loop from the model, so the run fails with ",
       Prose.code("MiddlewareViolation"),
-      " — see ",
+      "; see ",
       Prose.link("/docs/reference/core-events", "AgentEvent and errors"),
       ".",
     ),
@@ -96,7 +96,7 @@ export const middleware = Prose.definePage({
     Prose.codeBlock({ label: "resilience.ts", source: resilience }),
     Prose.bullets(
       [
-        "Streaming retries stop as soon as any part has been emitted — a half-consumed stream is never silently replayed into the same turn.",
+        "Streaming retries stop as soon as any part has been emitted, so a half-consumed stream is never silently replayed into the same turn.",
       ],
       ["Without the layer the default is ", Prose.code("ModelResilience.none"), ": every failure is terminal."],
     ),
@@ -110,7 +110,7 @@ export const middleware = Prose.definePage({
     ),
     Prose.codeBlock({ label: "pii-scrub.ts", source: piiScrub, expectedOutput: piiScrubExpected }),
     Prose.p(
-      "To keep long transcripts inside the context window — a prompt-shaping concern that lives one level above middleware — see ",
+      "To keep long transcripts inside the context window (a prompt-shaping concern that lives one level above middleware), see ",
       Prose.link("/docs/guides/compaction", "How to stay inside the context window"),
       ". Signatures for every type on this page are in ",
       Prose.link("/docs/reference/core-models", "Models and middleware"),

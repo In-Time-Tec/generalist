@@ -44,7 +44,7 @@ export const serveTransport = Prose.definePage({
     Prose.bullets(
       [
         Prose.code("seq"),
-        " numbers server frames, not agent events. It is 0-based and monotonic per session — the same value SSE clients use as their resume cursor.",
+        " numbers server frames, not agent events. It is 0-based and monotonic per session, and it is the same value SSE clients use as their resume cursor.",
       ],
       [
         "Terminal outcomes are data frames: ",
@@ -84,7 +84,7 @@ export const serveTransport = Prose.definePage({
       Prose.link("/docs/learn/suspension", "Suspension as a typed error"),
       "). ",
       Prose.code("resolveApproval"),
-      " re-enters the run with a one-shot approvals override for exactly the suspended call — ",
+      " re-enters the run with a one-shot approvals override for exactly the suspended call: ",
       Prose.code("Approved"),
       " executes the tool, ",
       Prose.code("Denied"),
@@ -123,7 +123,7 @@ export const serveTransport = Prose.definePage({
     Prose.p(
       "Launch ",
       Prose.code("serverLayer"),
-      " with your platform's HTTP server — the example uses ",
+      " with your platform's HTTP server. The example uses ",
       Prose.code("Layer.launch(serverLayer)"),
       " over ",
       Prose.code("BunHttpServer.layer({ port: 4000 })"),
@@ -149,9 +149,9 @@ export const serveTransport = Prose.definePage({
       [
         "Each subscriber gets a bounded queue. A lagging subscriber fails with ",
         Prose.code("SubscriberLagged"),
-        " — over WebSocket the socket closes with code ",
+        " (over WebSocket the socket closes with code ",
         Prose.code("4000"),
-        " — while the run and other subscribers continue.",
+        ") while the run and other subscribers continue.",
       ],
       [
         Prose.code("stripTranscripts"),

@@ -37,7 +37,7 @@ export const turnPolicy = Prose.definePage({
     Prose.p(
       "When the policy stops while tool results are still pending, the run fails with ",
       Prose.code("TurnLimitExceeded"),
-      " carrying the pending calls — the loop refuses to silently drop work:",
+      " carrying the pending calls, because the loop refuses to silently drop work:",
     ),
     Prose.codeBlock({ label: "turn-limit.ts", source: turnLimit, expectedOutput: turnLimitExpected }),
     Prose.h2("override-per-turn", "3. Override instructions, model, or tools per turn"),
@@ -60,7 +60,7 @@ export const turnPolicy = Prose.definePage({
     ),
     Prose.h2("recipe-token-budget", "Recipe: a token-budget policy"),
     Prose.p(
-      "Policies receive the full history each decision, so a budget policy stays a plain value — estimate the context size and stop when it exceeds your budget. If the estimate should come from provider metadata, read that metadata before constructing the agent so the loop's service set stays unchanged:",
+      "Policies receive the full history each decision, so a budget policy stays a plain value: estimate the context size and stop when it exceeds your budget. If the estimate should come from provider metadata, read that metadata before constructing the agent so the loop's service set stays unchanged:",
     ),
     Prose.codeBlock({ label: "token-budget.ts", source: tokenBudget }),
     Prose.callout(
@@ -73,12 +73,12 @@ export const turnPolicy = Prose.definePage({
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
       [
-        "Shrink context instead of stopping — ",
+        "Shrink context instead of stopping: ",
         Prose.link("/docs/guides/compaction", "How to stay inside the context window"),
         ".",
       ],
       [
-        "Inject user input between turns — ",
+        "Inject user input between turns: ",
         Prose.link("/docs/guides/steering", "How to steer and interrupt a running agent"),
         ".",
       ],

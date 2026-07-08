@@ -10,7 +10,7 @@ export const memory = Prose.definePage({
   navTitle: "Memory",
   group: "Guides",
   description:
-    "Recall and remember across runs with Memory.Key, WorkingMemory, and SemanticRecall over a VectorStore — including a pgvector adapter recipe.",
+    "Recall and remember across runs with Memory.Key, WorkingMemory, and SemanticRecall over a VectorStore, including a pgvector adapter recipe.",
   content: [
     Prose.p(
       "Memory is an optional recall/remember seam: before turn 0 the loop asks the ",
@@ -21,7 +21,7 @@ export const memory = Prose.definePage({
       Prose.code("Memory.Key"),
       " of ",
       Prose.code("{ agent, subject }"),
-      " that you choose — Batonfx never derives memory identity from session ids or users.",
+      " that you choose. Batonfx never derives memory identity from session ids or users.",
     ),
     Prose.h2("working-memory", "1. Start with working memory"),
     Prose.p(
@@ -51,7 +51,7 @@ export const memory = Prose.definePage({
       Prose.code("VectorStore"),
       " and an ",
       Prose.code("Ai.EmbeddingModel"),
-      " — ",
+      "; ",
       Prose.code("Embedding.withOpenAiEmbedding"),
       " from ",
       Prose.code("@batonfx/providers"),
@@ -63,7 +63,7 @@ export const memory = Prose.definePage({
       Prose.code("combinedLayer"),
       " from ",
       Prose.code("@batonfx/memory"),
-      " — recall merges items from both, remember writes to both.",
+      ": recall merges items from both, remember writes to both.",
     ),
     Prose.h2("recipe-pgvector", "Recipe: a pgvector VectorStore"),
     Prose.p(
@@ -80,17 +80,17 @@ export const memory = Prose.definePage({
     Prose.p(
       "The in-process ",
       Prose.code("VectorStore.memoryLayer"),
-      " remains the offline-safe default — swap layers, not call sites, when you move to Postgres.",
+      " remains the offline-safe default; swap layers, not call sites, when you move to Postgres.",
     ),
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
       [
-        "Understand where recalled items land in the prompt — ",
+        "Understand where recalled items land in the prompt: ",
         Prose.link("/docs/learn/sessions-and-history", "Sessions, history, and persistence"),
         ".",
       ],
       [
-        "Keep long sessions inside the window once memory grows — ",
+        "Keep long sessions inside the window once memory grows: ",
         Prose.link("/docs/guides/compaction", "How to stay inside the context window"),
         ".",
       ],

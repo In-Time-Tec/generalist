@@ -17,7 +17,7 @@ export const coreAgentReference = Prose.definePage({
       Prose.code("Agent<Tools>"),
       " is a plain value ",
       Prose.code("{ name, instructions?, toolkit, policy }"),
-      " — not a service. ",
+      ", not a service. ",
       Prose.code("Agent.make(options)"),
       " fills defaults:",
     ),
@@ -84,7 +84,7 @@ export const coreAgentReference = Prose.definePage({
           [Prose.code("history")],
           [Prose.code("Ai.Prompt.RawInput"), " (optional)"],
           [
-            "Prior transcript, used verbatim as the initial chat history — no system message is prepended. Mutually exclusive with ",
+            "Prior transcript, used verbatim as the initial chat history; no system message is prepended. Mutually exclusive with ",
             Prose.code("persistence"),
           ],
         ],

@@ -10,7 +10,7 @@ export const testingEvals = Prose.definePage({
   navTitle: "Test agents and run evals",
   group: "Guides",
   description:
-    "Pin loop behavior with scripted models and testLayers, then gate CI on a deterministic eval — no API keys anywhere.",
+    "Pin loop behavior with scripted models and testLayers, then gate CI on a deterministic eval, with no API keys anywhere.",
   content: [
     Prose.p(
       "Every behavior-bearing seam in Baton is an Effect service with an in-memory ",
@@ -33,7 +33,7 @@ export const testingEvals = Prose.definePage({
       expectedOutput: scriptedLoopTestExpected,
     }),
     Prose.p(
-      "The same layers drop into any test runner — wrap the program in ",
+      "The same layers drop into any test runner: wrap the program in ",
       Prose.code("it.effect"),
       " from ",
       Prose.code("@effect/vitest"),
@@ -74,7 +74,7 @@ export const testingEvals = Prose.definePage({
     Prose.p(
       "For an eval binary, select the deterministic registration through the same ",
       Prose.code("ModelRegistry.provide"),
-      " pattern used for real providers — swapping in OpenRouter later changes the selection and the layer, nothing else (",
+      " pattern used for real providers. Swapping in OpenRouter later changes the selection and the layer, nothing else (",
       Prose.link("/docs/guides/providers", "How to register real model providers"),
       "). This is ",
       Prose.link("https://github.com/In-Time-Tec/batonfx/tree/main/examples/eval-in-ci", "examples/eval-in-ci"),
@@ -88,7 +88,7 @@ export const testingEvals = Prose.definePage({
         Prose.code("eval passed"),
         " and exits 0; on a mismatch ",
         Prose.code("Effect.die"),
-        " rejects the promise and the process exits non-zero — exactly what a CI step needs.",
+        " rejects the promise and the process exits non-zero, which is exactly what a CI step needs.",
       ],
       [
         "Never provide ",
@@ -105,7 +105,7 @@ export const testingEvals = Prose.definePage({
     Prose.p(
       "If you have not built the loop this page tests, start with ",
       Prose.link("/docs/start/quickstart", "the quickstart"),
-      " — its final step is this eval.",
+      "; its final step is this eval.",
     ),
   ],
 })

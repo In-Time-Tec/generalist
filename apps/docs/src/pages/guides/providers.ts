@@ -41,7 +41,7 @@ export const providers = Prose.definePage({
       Prose.code("Config"),
       ", never from string literals. Wrap the run in ",
       Prose.code("ModelRegistry.provide(selection, effect)"),
-      " — that call looks up the registration and supplies its ",
+      ": that call looks up the registration and supplies its ",
       Prose.code("LanguageModel"),
       " layer for exactly that run.",
     ),
@@ -55,7 +55,7 @@ export const providers = Prose.definePage({
       Prose.code("ModelRegistry.Service"),
       ", not ",
       Prose.code("Ai.LanguageModel"),
-      ". Providing it where a run expects a language model fails with a missing-service error — always pair it with ",
+      ". Providing it where a run expects a language model fails with a missing-service error, so always pair it with ",
       Prose.code("ModelRegistry.provide"),
       ".",
     ),
@@ -91,7 +91,7 @@ export const providers = Prose.definePage({
     Prose.p(
       "For a single-agent server that needs a plain ",
       Prose.code("LanguageModel"),
-      " layer rather than a registry, the deep-research example builds the same fallback at the model-layer level — see ",
+      " layer rather than a registry, the deep-research example builds the same fallback at the model-layer level; see ",
       Prose.link(
         "https://github.com/In-Time-Tec/batonfx/blob/main/examples/deep-research-agent/server/src/model.ts",
         "withOpenRouterOrDeterministic in examples/deep-research-agent",
@@ -138,7 +138,7 @@ export const providers = Prose.definePage({
     Prose.p(
       "For context windows and pricing of models reached through presets, pass overrides to the offline ",
       Prose.code("Catalog.layer"),
-      " — the full export map is in ",
+      ". The full export map is in ",
       Prose.link("/docs/reference/providers", "the @batonfx/providers reference"),
       ". To pin loop behavior without any provider at all, see ",
       Prose.link("/docs/guides/testing-evals", "How to test agents and run evals in CI"),

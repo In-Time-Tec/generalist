@@ -28,7 +28,7 @@ export const seamsAsServices = Prose.definePage({
     Prose.table(
       ["Service", "What it decides", "Default when you have nothing to decide"],
       [
-        [[Prose.code("Ai.LanguageModel.LanguageModel")], "Which model answers each turn", "None — always yours"],
+        [[Prose.code("Ai.LanguageModel.LanguageModel")], "Which model answers each turn", "None; this one is always yours"],
         [
           [Prose.code("ToolExecutor.ToolExecutor")],
           "How tool calls execute",
@@ -47,7 +47,7 @@ export const seamsAsServices = Prose.definePage({
       ],
     ),
     Prose.p(
-      "Even an agent with no tools provides all four — the point is that the seams always exist, not that they always do something:",
+      "Even an agent with no tools provides all four. The point is that the seams always exist, not that they always do something:",
     ),
     Prose.codeBlock({ label: "four-layers.ts", source: fourLayers, expectedOutput: fourLayersExpected }),
     Prose.h2("optional-seams", "Optional seams, discovered not demanded"),
@@ -79,7 +79,7 @@ export const seamsAsServices = Prose.definePage({
       ".",
     ),
     Prose.p(
-      "Absent means default — and default means the documented base behavior, exactly. No ",
+      "Absent means default, and default means the documented base behavior, exactly. No ",
       Prose.code("Permissions"),
       " layer means tools run under the ordinary approval path; no ",
       Prose.code("Compaction"),
@@ -107,17 +107,17 @@ export const seamsAsServices = Prose.definePage({
       Prose.code("Ref"),
       ", and a scripted ",
       Prose.code("Ai.LanguageModel.make"),
-      " stands in for the model itself. Tests and CI evals swap implementations through layers alone — the run under test is the production code path with different providers, which is how ",
+      " stands in for the model itself. Tests and CI evals swap implementations through layers alone: the run under test is the production code path with different providers, which is how ",
       Prose.link("/docs/guides/testing-evals", "agents are tested and evaled in CI"),
       " without an API key.",
     ),
     Prose.h2("why-this-makes-batonfx-embeddable", "Why this makes Batonfx embeddable"),
     Prose.p(
-      "Because every seam is a service, a host can replace any of them without Batonfx importing host code. An in-process CLI provides four layers and is done. A durable runtime provides the same four plus durable implementations of the optional seams — a Postgres-backed ",
+      "Because every seam is a service, a host can replace any of them without Batonfx importing host code. An in-process CLI provides four layers and is done. A durable runtime provides the same four plus durable implementations of the optional seams (a Postgres-backed ",
       Prose.code("SessionStore"),
       ", a blob-backed ",
       Prose.code("ToolOutputStore"),
-      ", wait-backed approvals — and the loop cannot tell the difference. That swap is exactly how Relayfx hosts Batonfx, the subject of ",
+      ", wait-backed approvals) and the loop cannot tell the difference. That swap is exactly how Relayfx hosts Batonfx, the subject of ",
       Prose.link("/docs/learn/baton-and-relay", "Batonfx and Relayfx: where durability lives"),
       ".",
     ),

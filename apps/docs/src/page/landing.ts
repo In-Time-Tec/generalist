@@ -100,7 +100,7 @@ const heroSection = (model: Model): Html =>
           h.p(
             [h.Class("mt-4 max-w-2xl text-lg text-gray-600 dark:text-gray-400")],
             [
-              "An agent is a plain Effect value — instructions, typed tools, a turn policy. A run is a stream of typed events you fold, persist, or forward. Every seam — model, tools, approvals, permissions — is an Effect service with a deterministic test layer, so you can assert an agent's behavior in CI with zero API keys.",
+              "An agent is a plain Effect value: instructions, typed tools, a turn policy. A run is a stream of typed events you fold, persist, or forward. Every seam (model, tools, approvals, permissions) is an Effect service with a deterministic test layer, so you can assert an agent's behavior in CI with zero API keys.",
             ],
           ),
           h.div([h.Class("mt-8 max-w-xl")], [commandBlock(model, "Install", installCommand)]),

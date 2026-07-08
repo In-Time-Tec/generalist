@@ -25,7 +25,7 @@ export const mcp = Prose.definePage({
     Prose.h2("connect-to-a-server", "1. Connect to a server"),
     Prose.p(
       Prose.code("McpToolSource.layer"),
-      " opens the connection, lists the tools once, and closes the client when the layer's scope ends. Discovered tool names are prefixed with the source name — a ",
+      " opens the connection, lists the tools once, and closes the client when the layer's scope ends. Discovered tool names are prefixed with the source name: a ",
       Prose.code("search"),
       " tool on the ",
       Prose.code("files"),
@@ -63,7 +63,7 @@ export const mcp = Prose.definePage({
         Prose.code("tools/call"),
         " passes the running fiber's ",
         Prose.code("AbortSignal"),
-        " to the SDK — interrupting a Baton run cancels the in-flight MCP request on the server.",
+        " to the SDK, so interrupting a Baton run cancels the in-flight MCP request on the server.",
       ],
       [
         "An optional ",

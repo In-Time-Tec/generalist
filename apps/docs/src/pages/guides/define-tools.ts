@@ -46,7 +46,7 @@ export const defineTools = Prose.definePage({
     Prose.callout(
       "info",
       "Every run needs an executor",
-      "The executor is one of the four required layers — provide ",
+      "The executor is one of the four required layers. Provide ",
       Prose.code("ToolExecutor.fromToolkit"),
       " for real handlers, or ",
       Prose.code("ToolExecutor.testLayer"),
@@ -56,7 +56,7 @@ export const defineTools = Prose.definePage({
     ),
     Prose.h2("run-the-agent", "3. Run the agent against the toolkit"),
     Prose.p(
-      "Attach the toolkit to the agent and provide the four layers. The scripted model makes this deterministic — it requests ",
+      "Attach the toolkit to the agent and provide the four layers. The scripted model makes this deterministic: it requests ",
       Prose.code("search_docs"),
       " on turn 0 and answers from the result on turn 1, with zero credentials:",
     ),
@@ -65,9 +65,9 @@ export const defineTools = Prose.definePage({
     Prose.p(
       "Inside a handler, resolve ",
       Prose.code("ToolContext.ToolContext"),
-      " to emit progress updates — they surface as ",
+      " to emit progress updates (they surface as ",
       Prose.code("ToolProgress"),
-      " events on the run stream — and pass ",
+      " events on the run stream), and pass ",
       Prose.code("context.signal"),
       " to abortable work so interrupting the run cancels the underlying request:",
     ),
@@ -78,9 +78,9 @@ export const defineTools = Prose.definePage({
       Prose.code("RunOptions.toolOutputMaxBytes"),
       " and provide a ",
       Prose.code("ToolOutputStore"),
-      ". Successful results over the limit are replaced by an inline envelope — ",
+      ". Successful results over the limit are replaced by an inline envelope, ",
       Prose.code("{ truncated, bytes, maxBytes, preview }"),
-      " — plus ",
+      ", plus ",
       Prose.code("outputPaths"),
       " pointing at the spilled content:",
     ),
@@ -96,17 +96,17 @@ export const defineTools = Prose.definePage({
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
       [
-        "Gate a tool behind a human decision — ",
+        "Gate a tool behind a human decision: ",
         Prose.link("/docs/guides/approvals", "How to require human approval for a tool"),
         ".",
       ],
       [
-        "Allow, deny, or ask by pattern — ",
+        "Allow, deny, or ask by pattern: ",
         Prose.link("/docs/guides/permissions", "How to gate tools with permission rules"),
         ".",
       ],
       [
-        "Script executors and models in CI — ",
+        "Script executors and models in CI: ",
         Prose.link("/docs/guides/testing-evals", "How to test agents and run evals in CI"),
         ".",
       ],

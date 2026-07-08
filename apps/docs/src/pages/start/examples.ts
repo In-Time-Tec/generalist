@@ -13,7 +13,7 @@ export const examples = Prose.definePage({
     "The nine runnable examples in the Batonfx repository: what each one shows and the one command that runs it.",
   content: [
     Prose.lead(
-      "The repository ships nine runnable examples, typechecked in CI. All but one run offline with scripted models — no API keys.",
+      "The repository ships nine runnable examples, typechecked in CI. All but one run offline with scripted models, no API keys.",
     ),
     Prose.codeBlock({ label: "Terminal", language: "bash", source: cloneSource }),
     Prose.h2("the-examples", "The examples"),

@@ -82,7 +82,7 @@ export const corePoliciesReference = Prose.definePage({
     Prose.table(
       ["Layer", "Behavior"],
       [
-        [[Prose.code("Approvals.autoApprove")], "Every check returns Approved — the default choice"],
+        [[Prose.code("Approvals.autoApprove")], "Every check returns Approved, the default choice"],
         [[Prose.code("Approvals.denyAll")], "Every check returns Denied; useful in tests and lockdown"],
         [[Prose.code("Approvals.testLayer(implementation)")], "Layer from an explicit interface"],
       ],

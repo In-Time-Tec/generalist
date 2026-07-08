@@ -190,7 +190,7 @@ export const searchDocs = (query: string, limit = 8): ReadonlyArray<SearchResult
 }
 
 const siteTagline =
-  "Batonfx: a TypeScript framework for building AI agents on Effect — agents are plain values, runs are typed event streams, and every seam is an Effect service with a deterministic test layer, with durability left to the host."
+  "Batonfx: a TypeScript framework for building AI agents on Effect. Agents are plain values, runs are typed event streams, and every seam is an Effect service with a deterministic test layer, with durability left to the host."
 
 export const llmsIndex = (): string => {
   const header: ReadonlyArray<string> = ["# Batonfx", "", `> ${siteTagline}`, ""]

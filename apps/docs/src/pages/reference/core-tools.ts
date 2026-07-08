@@ -144,7 +144,7 @@ export const coreToolsReference = Prose.definePage({
       Prose.code('failureMode: "return"'),
       ", so child failures come back to the parent model as failed tool results. A child ",
       Prose.code("AgentSuspended"),
-      " is not translated — it escapes as a defect.",
+      " is not translated; it escapes as a defect.",
     ),
     Prose.table(
       ["Option", "Default"],

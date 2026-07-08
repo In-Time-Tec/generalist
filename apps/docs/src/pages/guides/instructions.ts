@@ -28,7 +28,7 @@ export const instructions = Prose.definePage({
       Prose.code("Instructions.layer"),
       ". When the registry produces a non-empty baseline, it replaces ",
       Prose.code("agent.instructions"),
-      " — rendered fragments join with one blank line:",
+      ", and rendered fragments join with one blank line:",
     ),
     Prose.codeBlock({ label: "context-sources.ts", source: contextSources, expectedOutput: contextSourcesExpected }),
     Prose.callout(
@@ -38,7 +38,7 @@ export const instructions = Prose.definePage({
       Prose.code("RunOptions.system"),
       " wins over the registry, and a ",
       Prose.code("RunOptions.history"),
-      " transcript is used verbatim — both skip epoch rendering entirely.",
+      " transcript is used verbatim. Both skip epoch rendering entirely.",
     ),
     Prose.h2("baseline-vs-dynamic", "2. Choose baseline or dynamic per source"),
     Prose.table(
@@ -80,17 +80,17 @@ export const instructions = Prose.definePage({
       Prose.code("FileSystem"),
       " and ",
       Prose.code("Path"),
-      " — provide them from your platform runtime. Core never reads the filesystem itself.",
+      "; provide them from your platform runtime. Core never reads the filesystem itself.",
     ),
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
       [
-        "Add lazily-loaded skills next to the baseline listing — ",
+        "Add lazily-loaded skills next to the baseline listing: ",
         Prose.link("/docs/guides/skills", "How to add skills"),
         ".",
       ],
       [
-        "See how epochs interact with summarized history — ",
+        "See how epochs interact with summarized history: ",
         Prose.link("/docs/guides/compaction", "How to stay inside the context window"),
         ".",
       ],

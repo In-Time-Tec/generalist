@@ -14,7 +14,7 @@ export const compaction = Prose.definePage({
     Prose.p(
       "Compaction is optional: when a ",
       Prose.code("Compaction"),
-      " layer is present, the loop consults it before model turns and once more after a context-overflow failure. The default strategy works in two stages — first it microcompacts oversized tool outputs, and only if that is not enough does it summarize older history into a checkpoint while keeping a recent suffix verbatim.",
+      " layer is present, the loop consults it before model turns and once more after a context-overflow failure. The default strategy works in two stages: first it microcompacts oversized tool outputs, and only if that is not enough does it summarize older history into a checkpoint while keeping a recent suffix verbatim.",
     ),
     Prose.h2("provide-the-layer", "1. Provide the layer and declare the window"),
     Prose.p(
@@ -67,12 +67,12 @@ export const compaction = Prose.definePage({
       Prose.code("Compaction.truncate(maxTokens)"),
       " is a strategy that cuts the oldest messages with the ambient ",
       Prose.code("Ai.Tokenizer"),
-      " instead of summarizing — no extra model call, no session store needed. Provide it as the implementation of the same seam:",
+      " instead of summarizing: no extra model call, no session store needed. Provide it as the implementation of the same seam:",
     ),
     Prose.codeBlock({ label: "truncate-only.ts", source: truncateOnly }),
     Prose.h2("recipe-trim-middleware", "Recipe: context-truncation middleware"),
     Prose.p(
-      "For a cheap local bound before the model ever sees the prompt — independent of session history — trim inside a ",
+      "For a cheap local bound before the model ever sees the prompt (independent of session history), trim inside a ",
       Prose.code("ModelMiddleware.transformPrompt"),
       " hook. Use middleware for per-turn input hygiene and keep ",
       Prose.code("Compaction"),
@@ -89,12 +89,12 @@ export const compaction = Prose.definePage({
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
       [
-        "Cap runs that should end rather than compact — ",
+        "Cap runs that should end rather than compact: ",
         Prose.link("/docs/guides/turn-policy", "How to control turn budgets"),
         ".",
       ],
       [
-        "Bound tool outputs at the source — ",
+        "Bound tool outputs at the source: ",
         Prose.link("/docs/guides/define-tools", "How to define tools and toolkits"),
         ".",
       ],

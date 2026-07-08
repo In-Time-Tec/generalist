@@ -8,7 +8,7 @@ export const memoryReference = Prose.definePage({
   description: "WorkingMemory, SemanticRecall, the VectorStore seam, and the combined layer.",
   content: [
     Prose.lead(
-      "@batonfx/memory implements the core Memory seam twice — a recency window with optional summarization, and embedding-based semantic recall — plus the VectorStore seam they share.",
+      "@batonfx/memory implements the core Memory seam twice (a recency window with optional summarization, and embedding-based semantic recall) plus the VectorStore seam they share.",
     ),
     Prose.command("Install", "bun add @batonfx/core @batonfx/memory"),
     Prose.p("Published on npm at 0.1.1. Requires ", Prose.code("@batonfx/core"), "."),
@@ -103,7 +103,7 @@ export const memoryReference = Prose.definePage({
       Prose.code("VectorStore.memoryLayer"),
       " is the in-process implementation using cosine similarity; it rejects non-finite vectors and mismatched dimensions. ",
       Prose.code("testLayer(implementation)"),
-      " wraps an explicit interface — a Postgres/pgvector store implements the same two functions.",
+      " wraps an explicit interface; a Postgres/pgvector store implements the same two functions.",
     ),
     Prose.h2("combined", "combinedLayer"),
     Prose.p(

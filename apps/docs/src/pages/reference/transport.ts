@@ -74,7 +74,7 @@ export const transportReference = Prose.definePage({
     Prose.p(
       "Server-to-client frames; a union of six. Every frame carries ",
       Prose.code("seq"),
-      ", monotonic per session — it is the replay cursor a client hands back as ",
+      ", monotonic per session; it is the replay cursor a client hands back as ",
       Prose.code("afterSeq"),
       " when reattaching.",
     ),
@@ -136,11 +136,11 @@ export const transportReference = Prose.definePage({
     Prose.bullets(
       [
         Prose.code("Wire.EventSchema(toolkit)"),
-        " types tool-call and tool-result parts against the toolkit's schemas — the server-side codec.",
+        " types tool-call and tool-result parts against the toolkit's schemas, the server-side codec.",
       ],
       [
         Prose.code("Wire.LooseEventSchema"),
-        " accepts any tool name with unknown params — the browser-side codec behind ",
+        " accepts any tool name with unknown params, the browser-side codec behind ",
         Prose.code("LooseServerFrame"),
         ".",
       ],
@@ -212,7 +212,7 @@ export const transportReference = Prose.definePage({
         [[Prose.code("ringBufferCapacity")], [Prose.code("1024"), " frames kept for replay"]],
         [
           [Prose.code("subscriberQueueCapacity")],
-          [Prose.code("128"), " — slower subscribers fail with ", Prose.code("SubscriberLagged")],
+          [Prose.code("128"), ": slower subscribers fail with ", Prose.code("SubscriberLagged")],
         ],
         [[Prose.code("idleTimeout")], [Prose.code('"15 minutes"'), " before idle sessions are evicted"]],
         [[Prose.code("stripTranscripts")], [Prose.code("false")]],

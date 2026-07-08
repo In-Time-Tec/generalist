@@ -19,7 +19,7 @@ export const foldkitChat = Prose.definePage({
       Prose.code("Chat"),
       " is a headless submodel with a pure ",
       Prose.code("update"),
-      " that projects those frames into display state. It ships no styled components — rendering stays yours.",
+      " that projects those frames into display state. It ships no styled components; rendering stays yours.",
     ),
     Prose.command("Terminal", "bun add @batonfx/foldkit @batonfx/transport foldkit"),
     Prose.h2("embed-the-chat-model", "1. Open a session and embed the chat model"),
@@ -62,7 +62,7 @@ export const foldkitChat = Prose.definePage({
       Prose.code("Chat.ClickedApprove"),
       " and ",
       Prose.code("Chat.ClickedDeny"),
-      " — the submodel already carries the token.",
+      ". The submodel already carries the token.",
     ),
     Prose.codeBlock({ label: "view.ts", source: chatView }),
     Prose.p(
@@ -72,7 +72,7 @@ export const foldkitChat = Prose.definePage({
       Prose.code("Chat.promptInputStatusOf"),
       ", and ",
       Prose.code("Chat.toolStatusOf"),
-      " map the model to foldcn-aligned view data — that is what ",
+      " map the model to foldcn-aligned view data; that is what ",
       Prose.link(
         "https://github.com/In-Time-Tec/batonfx/blob/main/examples/deep-research-agent/web/src/main.ts",
         "the deep-research web app",
@@ -82,7 +82,7 @@ export const foldkitChat = Prose.definePage({
     Prose.h2("wire-the-websocket-resource", "3. Wire the WebSocket resource and run"),
     Prose.p(
       Prose.code("Connection.layerWebSocket"),
-      " composes the transport client and needs a WebSocket constructor — in the browser that is ",
+      " composes the transport client and needs a WebSocket constructor; in the browser that is ",
       Prose.code("Socket.layerWebSocketConstructorGlobal"),
       ". Provide it through the application's static ",
       Prose.code("resources"),
@@ -107,7 +107,7 @@ export const foldkitChat = Prose.definePage({
         Prose.code("reconnecting"),
         ", and ",
         Prose.code("disconnected"),
-        " — render it as a status badge.",
+        ". Render it as a status badge.",
       ],
       [
         "Send failures never vanish: every command converts them into ",

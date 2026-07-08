@@ -196,7 +196,7 @@ export const providersReference = Prose.definePage({
         [
           [Prose.code("azureOpenAi"), " / ", Prose.code("withAzureOpenAi")],
           [Prose.code("azure")],
-          [Prose.code("https://<resource>.openai.azure.com/openai/v1"), " — takes a required ", Prose.code("resource")],
+          [Prose.code("https://<resource>.openai.azure.com/openai/v1"), ": takes a required ", Prose.code("resource")],
         ],
         [
           [Prose.code("ollama"), " / ", Prose.code("withOllama")],

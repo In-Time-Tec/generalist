@@ -17,10 +17,10 @@ export const quickstart = Prose.definePage({
   navTitle: "Quickstart",
   group: "Start",
   description:
-    "Build a tool-calling weather agent and a CI eval in about five minutes — with zero API keys, using a scripted model and the deterministic provider.",
+    "Build a tool-calling weather agent and a CI eval in about five minutes, with zero API keys, using a scripted model and the deterministic provider.",
   content: [
     Prose.lead(
-      "In this quickstart we build a tool-calling weather agent and a CI eval — with zero API keys. About five minutes.",
+      "In this quickstart we build a tool-calling weather agent and a CI eval, with zero API keys. About five minutes.",
     ),
     Prose.p("You will learn how to:"),
     Prose.bullets(
@@ -29,18 +29,18 @@ export const quickstart = Prose.definePage({
       "Watch the event stream",
       "Run a deterministic eval",
     ),
-    Prose.h2("step-1-create-the-project", "Step 1 — Create the project"),
+    Prose.h2("step-1-create-the-project", "Step 1: Create the project"),
     Prose.codeBlock({ label: "Terminal", language: "bash", source: step1 }),
     Prose.p(
       "The install summary lists ",
       Prose.code("@batonfx/core@0.1.1"),
       " and ",
       Prose.code("@batonfx/providers@0.1.1"),
-      ". npm and pnpm work the same way — ",
+      ". npm and pnpm work the same way; ",
       Prose.link("/docs/start/installation", "Installation"),
       " has the variants.",
     ),
-    Prose.h2("step-2-define-the-agent", "Step 2 — Define the agent"),
+    Prose.h2("step-2-define-the-agent", "Step 2: Define the agent"),
     Prose.p(
       "Replace ",
       Prose.code("index.ts"),
@@ -49,16 +49,16 @@ export const quickstart = Prose.definePage({
       ":",
     ),
     Prose.codeBlock({ label: "index.ts", source: step2, expectedOutput: step2Expected }),
-    Prose.p("Notice nothing is running yet — an Agent is a plain value, not a service."),
-    Prose.h2("step-3-script-a-model", "Step 3 — Script a model"),
+    Prose.p("Notice nothing is running yet: an Agent is a plain value, not a service."),
+    Prose.h2("step-3-script-a-model", "Step 3: Script a model"),
     Prose.p(
-      "Add a scripted model layer above the log. It calls our tool on the first model call and answers on the second — the whole loop with zero credentials:",
+      "Add a scripted model layer above the log. It calls our tool on the first model call and answers on the second. That is the whole loop with zero credentials:",
     ),
     Prose.codeBlock({ label: "index.ts", source: step3, expectedOutput: step3Expected }),
     Prose.p(
       "Run it again and the file still only prints values: the model layer is as inert as the agent until a run provides it.",
     ),
-    Prose.h2("step-4-provide-the-four-layers-and-run", "Step 4 — Provide the four layers and run"),
+    Prose.h2("step-4-provide-the-four-layers-and-run", "Step 4: Provide the four layers and run"),
     Prose.p(
       "Replace the log line with the layer stack and a program that runs the agent, then run ",
       Prose.code("bun run index.ts"),
@@ -68,32 +68,32 @@ export const quickstart = Prose.definePage({
     Prose.callout(
       "info",
       "The 4 required layers",
-      "Every Batonfx run needs exactly four services; this is the single most-repeated wiring in every Batonfx program. Everything else — permissions, memory, skills, compaction, steering — is optional: absent means default behavior. ",
+      "Every Batonfx run needs exactly four services; this is the single most-repeated wiring in every Batonfx program. Everything else (permissions, memory, skills, compaction, steering) is optional: absent means default behavior. ",
       Prose.link("/docs/learn/seams-as-services", "Seams as services"),
       " explains the two-tier model.",
     ),
     Prose.bullets(
       [
         Prose.code("Ai.LanguageModel.LanguageModel"),
-        " — the model: a direct layer like ours, or supplied per run by ",
+        ": the model, either a direct layer like ours or supplied per run by ",
         Prose.code("ModelRegistry.provide"),
         ".",
       ],
       [
         Prose.code("ToolExecutor.ToolExecutor"),
-        " — even for agents with no tools; ",
+        ": required even for agents with no tools; ",
         Prose.code("ToolExecutor.fromToolkit(agent.toolkit)"),
         " or a test layer.",
       ],
-      [Prose.code("Approvals.Approvals"), " — ", Prose.code("Approvals.autoApprove"), " when nothing needs approval."],
+      [Prose.code("Approvals.Approvals"), ": ", Prose.code("Approvals.autoApprove"), " when nothing needs approval."],
       [
         Prose.code("ModelMiddleware.ModelMiddleware"),
-        " — ",
+        ": ",
         Prose.code("ModelMiddleware.identityLayer"),
         " when you have none.",
       ],
     ),
-    Prose.h2("step-5-watch-the-loop", "Step 5 — Watch the loop"),
+    Prose.h2("step-5-watch-the-loop", "Step 5: Watch the loop"),
     Prose.p(
       Prose.code("Agent.generate"),
       " is a fold over the primitive: ",
@@ -112,7 +112,7 @@ export const quickstart = Prose.definePage({
       Prose.link("/docs/learn/agent-loop", "The agent loop"),
       " explains the turn contract behind this sequence.",
     ),
-    Prose.h2("step-6-make-it-an-eval", "Step 6 — Make it an eval"),
+    Prose.h2("step-6-make-it-an-eval", "Step 6: Make it an eval"),
     Prose.p(
       "Create ",
       Prose.code("eval.ts"),
@@ -129,9 +129,9 @@ export const quickstart = Prose.definePage({
       Prose.code("ModelRegistry.provide(selection, effect)"),
       " supplies the actual LanguageModel per run. Swapping to a real model is the same shape with ",
       Prose.code("withOpenRouter"),
-      " — see ",
+      " (see ",
       Prose.link("/docs/guides/providers", "How to register real model providers"),
-      ". The registry layer is never a LanguageModel layer by itself.",
+      "). The registry layer is never a LanguageModel layer by itself.",
     ),
     Prose.h2("success", "You have built an agent and an eval"),
     Prose.p(
@@ -143,17 +143,17 @@ export const quickstart = Prose.definePage({
       Prose.code("bun run eval.ts"),
       " prints ",
       Prose.code("eval passed"),
-      " and exits 0 — all without an API key.",
+      " and exits 0, all without an API key.",
     ),
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
-      ["Connect a real model — ", Prose.link("/docs/guides/providers", "How to register real model providers"), "."],
+      ["Connect a real model: ", Prose.link("/docs/guides/providers", "How to register real model providers"), "."],
       [
-        "Build the full app with approvals and a live UI — ",
+        "Build the full app with approvals and a live UI: ",
         Prose.link("/docs/start/research-agent", "Tutorial: a research agent"),
         ".",
       ],
-      ["Understand what just happened — ", Prose.link("/docs/learn/agent-loop", "The agent loop"), "."],
+      ["Understand what just happened: ", Prose.link("/docs/learn/agent-loop", "The agent loop"), "."],
     ),
   ],
 })

@@ -93,7 +93,7 @@ export const mcpReference = Prose.definePage({
             Prose.code("Success"),
             " or ",
             Prose.code("Failure"),
-            " — MCP tools never ",
+            "; MCP tools never ",
             Prose.code("Suspend"),
           ],
         ],

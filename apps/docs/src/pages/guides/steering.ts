@@ -20,7 +20,7 @@ export const steering = Prose.definePage({
       Prose.code("followUp"),
       " messages are seen only when the run would otherwise complete. Like every optional seam, the agent discovers it with ",
       Prose.code("Effect.serviceOption"),
-      " — absent means unchanged behavior (",
+      ", and absent means unchanged behavior (",
       Prose.link("/docs/learn/seams-as-services", "Seams as services"),
       ").",
     ),
@@ -45,7 +45,7 @@ export const steering = Prose.definePage({
         "Steered prompts are prepended before the pending tool results, so middleware and the model see one composed prompt.",
       ],
       [
-        "A non-empty follow-up queue starts another normal turn instead of completing — that is why the run reports three turns.",
+        "A non-empty follow-up queue starts another normal turn instead of completing, which is why the run reports three turns.",
       ],
       [
         Prose.code("TurnPolicy"),
@@ -64,12 +64,12 @@ export const steering = Prose.definePage({
         [
           [Prose.code("steer")],
           ["after tool results, before the next model turn"],
-          [Prose.code('"all"'), " — every buffered message, FIFO"],
+          [Prose.code('"all"'), ": every buffered message, FIFO"],
         ],
         [
           [Prose.code("followUp")],
           ["when the run would otherwise complete"],
-          [Prose.code('"one-at-a-time"'), " — at most one message per boundary"],
+          [Prose.code('"one-at-a-time"'), ": at most one message per boundary"],
         ],
       ],
     ),

@@ -60,7 +60,7 @@ export const skillsReference = Prose.definePage({
       Prose.code("web:search"),
       " unless the frontmatter sets an explicit ",
       Prose.code("name"),
-      " containing a colon. Bodies load lazily — listing skills reads only headers.",
+      " containing a colon. Bodies load lazily; listing skills reads only headers.",
     ),
     Prose.h2("skill-md", "The SKILL.md contract"),
     Prose.p(

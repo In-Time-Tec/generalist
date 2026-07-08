@@ -13,14 +13,14 @@ export const introduction = Prose.definePage({
     Prose.p(
       "Batonfx is a TypeScript framework for building AI agents on Effect. It is standalone and non-durable, built on ",
       Prose.code("effect/unstable/ai"),
-      ", and it covers what an agent needs beyond a model call: turn iteration, permissions, human approval as typed suspension, steering, and deterministic test seams. An agent is a plain value: a name, instructions, a toolkit, and a turn policy. A run is an Effect stream of typed events — the model call, each tool execution, each turn boundary — that you fold, observe, or forward to a browser. There is no runtime process to operate and no storage Batonfx owns: durability, persistence, and identity stay with the host application.",
+      ", and it covers what an agent needs beyond a model call: turn iteration, permissions, human approval as typed suspension, steering, and deterministic test seams. An agent is a plain value: a name, instructions, a toolkit, and a turn policy. A run is an Effect stream of typed events (the model call, each tool execution, each turn boundary) that you fold, observe, or forward to a browser. There is no runtime process to operate and no storage Batonfx owns: durability, persistence, and identity stay with the host application.",
     ),
     Prose.p(
-      "Every capability is an Effect service. Four layers are required on every run — the language model, the tool executor, approvals, and model middleware — and everything else (permissions, memory, skills, compaction, steering) is an optional seam discovered at runtime. Absent means default behavior, and every behavior-bearing seam ships a test layer, so agents run deterministically in CI with zero credentials.",
+      "Every capability is an Effect service. Four layers are required on every run: the language model, the tool executor, approvals, and model middleware. Everything else (permissions, memory, skills, compaction, steering) is an optional seam discovered at runtime. Absent means default behavior, and every behavior-bearing seam ships a test layer, so agents run deterministically in CI with zero credentials.",
     ),
     Prose.h2("a-complete-program", "A complete program"),
     Prose.p(
-      "This runs an agent against the deterministic provider and asserts on its answer — no API key, exit code 0 on success:",
+      "This runs an agent against the deterministic provider and asserts on its answer: no API key, exit code 0 on success.",
     ),
     Prose.codeBlock({ label: "eval.ts", source: evalSource, expectedOutput: evalExpected }),
     Prose.h2("when-to-use-batonfx", "When to use Batonfx"),
@@ -32,7 +32,7 @@ export const introduction = Prose.definePage({
     ),
     Prose.h2("non-goals", "Non-goals"),
     Prose.p(
-      "Batonfx will not grow a workflow engine, a database, a project scaffold, or a hosted platform. Multi-step orchestration, persistence, and deployment belong to your application — or to Relayfx when they must be durable. A framework that owns only the agent stays small enough to read, swap, and leave.",
+      "Batonfx will not grow a workflow engine, a database, a project scaffold, or a hosted platform. Multi-step orchestration, persistence, and deployment belong to your application, or to Relayfx when they must be durable. A framework that owns only the agent stays small enough to read, swap, and leave.",
     ),
     Prose.h2("where-relayfx-fits", "Where Relayfx fits"),
     Prose.p(
@@ -44,13 +44,13 @@ export const introduction = Prose.definePage({
     ),
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
-      ["Install the packages — ", Prose.link("/docs/start/installation", "Installation"), "."],
+      ["Install the packages: ", Prose.link("/docs/start/installation", "Installation"), "."],
       [
-        "Build a tool-calling agent and a CI eval in five minutes — ",
+        "Build a tool-calling agent and a CI eval in five minutes: ",
         Prose.link("/docs/start/quickstart", "Quickstart"),
         ".",
       ],
-      ["Understand the loop itself — ", Prose.link("/docs/learn/agent-loop", "The agent loop"), "."],
+      ["Understand the loop itself: ", Prose.link("/docs/learn/agent-loop", "The agent loop"), "."],
     ),
   ],
 })

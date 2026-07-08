@@ -15,7 +15,7 @@ export const comparisons = Prose.definePage({
     Prose.bullets(
       [
         Prose.strong("The agent lives inside your process."),
-        " CLIs, scripts, servers, and tests that need a tool-calling agent with no external infrastructure — ",
+        " CLIs, scripts, servers, and tests that need a tool-calling agent with no external infrastructure. ",
         Prose.code("Agent.stream"),
         " emits a closed nine-event union you fold, persist, or forward (",
         Prose.link("/docs/learn/agent-loop", "The agent loop"),
@@ -25,13 +25,13 @@ export const comparisons = Prose.definePage({
         Prose.strong("A human has to approve tool calls."),
         " An approval-gated tool suspends the run as ",
         Prose.code("AgentSuspended"),
-        " on the error channel, carrying a resume token — suspension is a value in the type signature, not a callback to wire (",
+        " on the error channel, carrying a resume token. Suspension is a value in the type signature, not a callback to wire (",
         Prose.link("/docs/learn/suspension", "Suspension as a typed error"),
         ").",
       ],
       [
         Prose.strong("Agent behavior must be assertable in CI."),
-        " Every behavior-bearing seam ships a deterministic test layer, and a scripted model runs the full loop with zero API keys — ",
+        " Every behavior-bearing seam ships a deterministic test layer, and a scripted model runs the full loop with zero API keys; ",
         Prose.link("/docs/start/quickstart", "the quickstart"),
         " ends with exactly such an eval, exit code 0 on success.",
       ],
@@ -52,7 +52,7 @@ export const comparisons = Prose.definePage({
         Prose.strong("A single model call with tools is enough."),
         " Use ",
         Prose.code("effect/unstable/ai"),
-        " directly — it is Batonfx's own substrate, and it resolves tool calls within one generation. Batonfx starts paying for itself when a model call becomes an agent: multiple turns, policies, approvals, an observable stream.",
+        " directly: it is Batonfx's own substrate, and it resolves tool calls within one generation. Batonfx starts paying for itself when a model call becomes an agent: multiple turns, policies, approvals, an observable stream.",
       ],
       [
         Prose.strong("Runs must survive deploys, crashes, or multi-day waits."),
@@ -75,7 +75,7 @@ export const comparisons = Prose.definePage({
     Prose.p(
       "Count the turns and count the processes. One turn, one process: use the primitives. Many turns, one process: Batonfx. Many turns, and the run must outlive the process: Batonfx inside Relayfx. The fastest way to test the fit is ",
       Prose.link("/docs/start/quickstart", "the quickstart"),
-      " — a tool-calling agent and a CI eval in about five minutes, no API key required.",
+      ", which builds a tool-calling agent and a CI eval in about five minutes, no API key required.",
     ),
   ],
 })

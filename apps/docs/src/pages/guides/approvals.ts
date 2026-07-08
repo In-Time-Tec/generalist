@@ -27,7 +27,7 @@ export const approvals = Prose.definePage({
       Prose.code("needsApproval: true"),
       " on the tool. For call-dependent gating, pass a predicate ",
       Prose.code("(params, context) => boolean"),
-      " instead — it runs before every call to that tool.",
+      " instead; it runs before every call to that tool.",
     ),
     Prose.codeBlock({ label: "needs-approval-tool.ts", source: needsApprovalTool }),
     Prose.h2("provide-approvals", "2. Provide an Approvals layer"),
@@ -62,7 +62,7 @@ export const approvals = Prose.definePage({
       Prose.code("AgentSuspended"),
       ", carrying the token plus the pending call's id, name, and params. Store those, resolve the approval out-of-band, then re-enter with ",
       Prose.code("RunOptions.resume"),
-      " — the resumed run executes the approved call first, then continues under the normal turn policy:",
+      ". The resumed run executes the approved call first, then continues under the normal turn policy:",
     ),
     Prose.codeBlock({
       label: "suspend-and-resume.ts",
@@ -74,7 +74,7 @@ export const approvals = Prose.definePage({
       Prose.code("Approvals"),
       " layer that now answers ",
       Prose.code("Approved"),
-      " — in a real host, from the stored approval record for that token.",
+      " (in a real host, from the stored approval record for that token).",
     ),
     Prose.h2("over-the-wire", "4. Move the decision over the wire"),
     Prose.p(
@@ -82,7 +82,7 @@ export const approvals = Prose.definePage({
       Prose.code("Suspended"),
       " frame and the client answers with ",
       Prose.code("ResolveApproval"),
-      " — the token round-trips, the registry resumes the run for you. ",
+      ": the token round-trips, and the registry resumes the run for you. ",
       Prose.link("/docs/guides/serve-transport", "How to serve an agent over SSE and WebSocket"),
       " wires it; ",
       Prose.link("/docs/guides/foldkit-chat", "How to build a chat UI with FoldKit"),
@@ -91,12 +91,12 @@ export const approvals = Prose.definePage({
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
       [
-        "Decide by pattern before the approval gate — ",
+        "Decide by pattern before the approval gate: ",
         Prose.link("/docs/guides/permissions", "How to gate tools with permission rules"),
         ".",
       ],
       [
-        "Understand the token and re-entry contract — ",
+        "Understand the token and re-entry contract: ",
         Prose.link("/docs/learn/suspension", "Suspension as a typed error"),
         ".",
       ],

@@ -68,7 +68,7 @@ export const coreEventsReference = Prose.definePage({
           "A model turn completes, after that turn's tool executions",
           [
             Prose.code("transcript"),
-            " is the full chat history at this point — the export point for hosts that persist conversation state durably",
+            " is the full chat history at this point, the export point for hosts that persist conversation state durably",
           ],
         ],
         [

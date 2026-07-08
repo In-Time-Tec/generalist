@@ -19,7 +19,7 @@ export const multiAgent = Prose.definePage({
       Prose.code("Agent.generate"),
       ", toolkits, and the ",
       Prose.code("ToolExecutor"),
-      " seam rather than adding a new runtime. Durable, addressable, cross-process child executions belong to a host runtime — see ",
+      " seam rather than adding a new runtime. Durable, addressable, cross-process child executions belong to a host runtime; see ",
       Prose.link("/docs/learn/baton-and-relay", "Baton and Relay"),
       ".",
     ),
@@ -38,7 +38,7 @@ export const multiAgent = Prose.definePage({
       Prose.code("transfer_to_<specialist>"),
       " tool per specialist, an agent whose toolkit advertises them, and a handled toolkit for ",
       Prose.code("ToolExecutor.fromToolkit"),
-      ". The transfer tool is a routing convention — the supervisor's model still decides when to call it.",
+      ". The transfer tool is a routing convention: the supervisor's model still decides when to call it.",
     ),
     Prose.codeBlock({ label: "supervisor.ts", source: supervisor, expectedOutput: supervisorExpected }),
     Prose.callout(
@@ -53,7 +53,7 @@ export const multiAgent = Prose.definePage({
       Prose.code("{ prompt: string }"),
       " parameters, and ",
       Prose.code("result.text"),
-      " as the output — override any of them.",
+      " as the output. Override any of them.",
     ),
     Prose.codeBlock({ label: "agent-as-tool.ts", source: agentAsTool, expectedOutput: agentAsToolExpected }),
     Prose.bullets(

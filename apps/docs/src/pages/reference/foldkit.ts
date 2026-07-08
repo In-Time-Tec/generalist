@@ -45,7 +45,7 @@ export const foldkitReference = Prose.definePage({
         [[Prose.code("Wire.LooseServerFrameType")], "Any of the six server frames"],
         [[Prose.code("ConnectionOpened")], "The socket opened"],
         [[Prose.code("ConnectionLost")], "The socket is reconnecting or closed"],
-        [[Prose.code("ConnectionFailed")], [Prose.code("{ reason }"), " — the frame stream failed"]],
+        [[Prose.code("ConnectionFailed")], [Prose.code("{ reason }"), ": the frame stream failed"]],
       ],
     ),
     Prose.table(

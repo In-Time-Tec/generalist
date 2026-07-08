@@ -17,7 +17,7 @@ export const structuredOutput = Prose.definePage({
       Prose.code("Agent.generateObject"),
       " or ",
       Prose.code("Agent.streamObject"),
-      ". The normal loop runs first — tools, turns, policies all apply — then one terminal turn asks the model for output matching your Schema. Invalid output fails the run loudly; it never returns untyped data.",
+      ". The normal loop runs first (tools, turns, policies all apply), then one terminal turn asks the model for output matching your Schema. Invalid output fails the run loudly; it never returns untyped data.",
     ),
     Prose.h2("define-the-schema", "1. Define the schema and fold to a value"),
     Prose.p(
@@ -39,7 +39,7 @@ export const structuredOutput = Prose.definePage({
       Prose.code("streamText"),
       "; the terminal structured turn uses ",
       Prose.code("generateText"),
-      ". A scripted model for tests must implement both — which is also why this snippet runs with zero credentials.",
+      ". A scripted model for tests must implement both, which is also why this snippet runs with zero credentials.",
     ),
     Prose.h2("stream-the-events", "2. Stream the run when you need the events"),
     Prose.p(
@@ -61,24 +61,24 @@ export const structuredOutput = Prose.definePage({
       Prose.code('"output"'),
       "); ",
       Prose.code("objectPrompt"),
-      " replaces the default instruction — ",
+      " replaces the default instruction (",
       Prose.code('"Return the final structured output for the task above."'),
-      " — when your schema needs more guidance.",
+      ") when your schema needs more guidance.",
     ),
     Prose.callout(
       "warning",
       "The terminal turn does not execute tools",
-      "Tool use belongs to the loop turns before it. If the model must gather data, let the loop do that first — the structured turn only formats what the transcript already contains.",
+      "Tool use belongs to the loop turns before it. If the model must gather data, let the loop do that first; the structured turn only formats what the transcript already contains.",
     ),
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
       [
-        "Bound how many loop turns run before the terminal turn — ",
+        "Bound how many loop turns run before the terminal turn: ",
         Prose.link("/docs/guides/turn-policy", "How to control turn budgets"),
         ".",
       ],
       [
-        "Assert structured results in CI — ",
+        "Assert structured results in CI: ",
         Prose.link("/docs/guides/testing-evals", "How to test agents and run evals in CI"),
         ".",
       ],

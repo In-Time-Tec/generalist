@@ -17,7 +17,7 @@ export const skills = Prose.definePage({
       Prose.code("activate_skill"),
       " tool to pull in a skill's full body when the task matches. Provide a ",
       Prose.code("SkillSource"),
-      " layer and the loop handles the rest — listing injection, the activation tool, and lazy body loading.",
+      " layer and the loop handles the rest: listing injection, the activation tool, and lazy body loading.",
     ),
     Prose.h2("write-a-skill", "1. Write a SKILL.md"),
     Prose.p(
@@ -40,7 +40,7 @@ export const skills = Prose.definePage({
       Prose.code("SkillSource.fromSkills"),
       ". The loop appends the listings to the system message, advertises ",
       Prose.code("activate_skill"),
-      ", handles the activation call itself — it never reaches your executor — and returns ",
+      ", handles the activation call itself (it never reaches your executor), and returns ",
       Prose.code("{ name, body, allowedTools }"),
       " to the model as an ordinary tool result:",
     ),
@@ -84,17 +84,17 @@ export const skills = Prose.definePage({
       Prose.code("disableModelInvocation"),
       " are excluded, and least-recently-used listings drop first when over budget. Descriptions are capped at ",
       Prose.code("DESCRIPTION_CAP"),
-      " (1,536 characters) — front-load the sentence that tells the model when to activate.",
+      " (1,536 characters), so front-load the sentence that tells the model when to activate.",
     ),
     Prose.h2("next-steps", "Next steps"),
     Prose.bullets(
       [
-        "Compose skills with the rest of the system message — ",
+        "Compose skills with the rest of the system message: ",
         Prose.link("/docs/guides/instructions", "How to compose instructions and context sources"),
         ".",
       ],
       [
-        "Remember facts across runs instead of re-teaching them — ",
+        "Remember facts across runs instead of re-teaching them: ",
         Prose.link("/docs/guides/memory", "How to add memory"),
         ".",
       ],
