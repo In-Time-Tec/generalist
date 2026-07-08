@@ -74,9 +74,7 @@ export const onePayloadVocabulary = Prose.definePage({
     ),
     Prose.h2("the-invariant", "The invariant"),
     Prose.p(
-      "The rule in ",
-      Prose.code("CONTEXT.md"),
-      " is blunt: payload vocabulary is ",
+      "The rule is blunt: payload vocabulary is ",
       Prose.code("Ai.Prompt"),
       "/",
       Prose.code("Ai.Response"),

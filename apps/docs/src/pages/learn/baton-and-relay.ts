@@ -64,9 +64,11 @@ export const batonAndRelay = Prose.definePage({
     Prose.p(
       "This is not a hypothetical embedding. Relayfx's runtime drives ",
       Prose.code("Baton.Agent.stream"),
-      " inside its durable agent-loop service, providing its own tool executor, approvals, and session store as layers, and folding the ",
+      " inside its durable agent-loop service, providing its own ",
+      Prose.code("ToolRuntime"),
+      ", approvals, and session store as layers, and folding the ",
       Prose.code("AgentEvent"),
-      " stream into durable execution events — Relayfx owns every sequence number, id, and cursor; Batonfx owns turn iteration. Relayfx's ADR-0022 goes seam by seam: sessions, memory, permissions, steering, compaction, tool-output spill, and skills are adopted through durable Postgres-backed implementations of Batonfx's interfaces, while in-memory transport stays Batonfx-standalone. The suspension shape pays off exactly as designed: a ",
+      " stream into durable execution events — Relayfx owns every sequence number, id, and cursor; Batonfx owns turn iteration. The adoption goes seam by seam: sessions, memory, permissions, steering, compaction, tool-output spill, and skills are adopted through durable Postgres-backed implementations of Batonfx's interfaces, while in-memory transport stays Batonfx-standalone. The suspension shape pays off exactly as designed: a ",
       Prose.code("tool-wait"),
       " becomes a durable wait row keyed by the tool call id, and resume re-enters with the persisted call.",
     ),

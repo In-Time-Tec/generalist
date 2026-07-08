@@ -11,7 +11,7 @@ export const providersReference = Prose.definePage({
       "@batonfx/providers binds real model providers to the ModelRegistry: registration helpers per provider, a deterministic model for tests, seven OpenAI-compatible presets, a static model catalog, and embedding layers.",
     ),
     Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core @batonfx/providers"),
-    Prose.p("Published on npm at 0.1.1. Requires ", Prose.code("@batonfx/core"), " and the pinned effect version."),
+    Prose.p("Published on npm. Requires ", Prose.code("@batonfx/core"), " and the pinned effect version."),
     Prose.h2("exports", "Exports map"),
     Prose.table(
       ["Subpath", "Contents"],

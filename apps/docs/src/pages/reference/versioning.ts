@@ -113,9 +113,7 @@ export const versioningReference = Prose.definePage({
       Prose.code("catalog:"),
       " protocols out of package manifests, dry-runs ",
       Prose.code("bun publish --access public"),
-      " for every package, and only publishes and tags when the dry-run flag is off. After publish, a scratch Bun consumer installs each package, imports its documented exports, and runs ",
-      Prose.code("bun tsc --noEmit"),
-      ".",
+      " for every package, and only publishes and tags when the dry-run flag is off.",
     ),
     Prose.p(
       "For install commands and the package matrix, see ",
