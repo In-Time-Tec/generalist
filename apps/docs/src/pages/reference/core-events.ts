@@ -1,0 +1,157 @@
+import * as Prose from "../../prose"
+
+export const coreEventsReference = Prose.definePage({
+  path: "/docs/reference/core-events",
+  title: "AgentEvent and errors",
+  navTitle: "AgentEvent",
+  group: "Reference",
+  description: "The closed nine-member Event union and the four error classes, with fields and emission conditions.",
+  content: [
+    Prose.lead(
+      "AgentEvent declares the closed union of loop events every run streams, plus the four error classes a run can fail with.",
+    ),
+    Prose.command("Install", "bun add effect@4.0.0-beta.93 @batonfx/core"),
+    Prose.h2("event-union", "The Event union"),
+    Prose.p(
+      Prose.code("AgentEvent.Event"),
+      " has exactly nine members. Every member carries an optional ",
+      Prose.code("metadata"),
+      " escape-hatch record; ",
+      Prose.code("turn"),
+      " is 0-based throughout.",
+    ),
+    Prose.table(
+      ["Event", "Fields", "Emitted when", "Notes"],
+      [
+        [[Prose.code("TurnStarted")], [Prose.code("turn")], "A model turn starts", "Turn 0 always runs"],
+        [
+          [Prose.code("ModelPart")],
+          [Prose.code("turn"), ", ", Prose.code("part")],
+          "The model streams a part",
+          ["A raw ", Prose.code("Ai.Response.StreamPart"), " passed through unchanged"],
+        ],
+        [
+          [Prose.code("ToolExecutionStarted")],
+          [Prose.code("turn"), ", ", Prose.code("call")],
+          "A tool call is about to execute via the ToolExecutor service",
+          [Prose.code("call"), " is the ", Prose.code("Ai.Response.ToolCallPart")],
+        ],
+        [
+          [Prose.code("ToolProgress")],
+          [Prose.code("turn"), ", ", Prose.code("toolCallId"), ", ", Prose.code("message?"), ", ", Prose.code("data?")],
+          ["A running tool emits progress through ", Prose.code("ToolContext.emit")],
+          "In-flight; zero or more per call",
+        ],
+        [
+          [Prose.code("ToolExecutionCompleted")],
+          [Prose.code("turn"), ", ", Prose.code("call"), ", ", Prose.code("result")],
+          "A tool call finishes",
+          [Prose.code("result"), " is the tool-result part re-fed to the model"],
+        ],
+        [
+          [Prose.code("ApprovalRequested")],
+          [Prose.code("turn"), ", ", Prose.code("call")],
+          ["Before consulting Approvals for a ", Prose.code("needsApproval"), " tool"],
+          "Precedes Approved, Denied, or suspension",
+        ],
+        [
+          [Prose.code("TurnCompleted")],
+          [
+            Prose.code("turn"),
+            ", ",
+            Prose.code("transcript"),
+            ", ",
+            Prose.code("usage?"),
+            ", ",
+            Prose.code("finishReason?"),
+          ],
+          "A model turn completes, after that turn's tool executions",
+          [
+            Prose.code("transcript"),
+            " is the full chat history at this point — the export point for hosts that persist conversation state durably",
+          ],
+        ],
+        [
+          [Prose.code("StructuredOutput")],
+          [Prose.code("turn"), ", ", Prose.code("value"), ", ", Prose.code("content")],
+          "The terminal structured turn produces a schema-validated value",
+          ["Only on ", Prose.code("streamObject"), "/", Prose.code("generateObject"), " runs"],
+        ],
+        [
+          [Prose.code("Completed")],
+          [Prose.code("turns"), ", ", Prose.code("text"), ", ", Prose.code("transcript"), ", ", Prose.code("usage?")],
+          "Terminal event: the run finished without suspension",
+          "Always the last event of a successful run",
+        ],
+      ],
+    ),
+    Prose.h3("add-usage", "addUsage"),
+    Prose.p(
+      Prose.code("AgentEvent.addUsage(left, right)"),
+      " returns the fieldwise sum of two ",
+      Prose.code("Ai.Response.Usage"),
+      " values, preserving ",
+      Prose.code("undefined"),
+      " when neither side reports a field.",
+    ),
+    Prose.h2("error-classes", "Error classes"),
+    Prose.p("All four are Schema tagged error classes with frozen tags under ", Prose.code("@batonfx/core/"), "."),
+    Prose.table(
+      ["Error", "Fields", "Raised when"],
+      [
+        [
+          [Prose.code("AgentError")],
+          [Prose.code("message"), ", ", Prose.code("turn"), ", ", Prose.code("cause?")],
+          "The loop fails; turn is the 0-based turn that failed",
+        ],
+        [
+          [Prose.code("TurnLimitExceeded")],
+          [Prose.code("turn"), ", ", Prose.code("pending: Array<{ tool_call_id, tool_name }>")],
+          "The turn policy declines another turn while tool results are still pending",
+        ],
+        [
+          [Prose.code("MiddlewareViolation")],
+          [Prose.code("turn"), ", ", Prose.code("detail")],
+          "A ModelMiddleware hook violates the loop contract, e.g. drops a tool-call part",
+        ],
+        [
+          [Prose.code("AgentSuspended")],
+          [
+            Prose.code("token"),
+            ", ",
+            Prose.code('reason: "tool-wait" | "approval"'),
+            ", ",
+            Prose.code("tool_call_id"),
+            ", ",
+            Prose.code("tool_name"),
+            ", ",
+            Prose.code("tool_params"),
+          ],
+          [
+            "A tool outcome was ",
+            Prose.code("Suspend"),
+            " or an approval decision was ",
+            Prose.code("Pending"),
+            "; the run did not finish",
+          ],
+        ],
+      ],
+    ),
+    Prose.callout(
+      "info",
+      "AgentSuspended is a contract, not a failure",
+      "The host resolves the token out-of-band and re-enters via ",
+      Prose.code("RunOptions.resume"),
+      " with the pending call. The field shape deliberately mirrors a tool call so durable hosts can persist it as one.",
+    ),
+    Prose.p(
+      "For the loop that emits these events, see ",
+      Prose.link("/docs/learn/agent-loop", "The agent loop"),
+      ". For the suspension contract, see ",
+      Prose.link("/docs/learn/suspension", "Suspension as a typed error"),
+      " and ",
+      Prose.link("/docs/guides/approvals", "How to require human approval for a tool"),
+      ".",
+    ),
+  ],
+})

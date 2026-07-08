@@ -34,6 +34,13 @@
       "name": "@batonfx/docs",
       "version": "0.0.0",
       "dependencies": {
+        "@batonfx/core": "workspace:*",
+        "@batonfx/foldkit": "workspace:*",
+        "@batonfx/mcp": "workspace:*",
+        "@batonfx/memory": "workspace:*",
+        "@batonfx/providers": "workspace:*",
+        "@batonfx/skills": "workspace:*",
+        "@batonfx/transport": "workspace:*",
         "@foldkit/ui": "catalog:",
         "class-variance-authority": "catalog:",
         "clsx": "catalog:",

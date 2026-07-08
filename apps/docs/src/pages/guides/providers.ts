@@ -1,0 +1,148 @@
+import combineProviders from "../../snippets/guides/providers/combine-providers.ts?raw"
+import deterministicRegistry from "../../snippets/guides/providers/deterministic-registry.ts?raw"
+import deterministicRegistryExpected from "../../snippets/guides/providers/deterministic-registry.expected.txt?raw"
+import geminiOpenaiCompat from "../../snippets/guides/providers/gemini-openai-compat.ts?raw"
+import openaiOrDeterministic from "../../snippets/guides/providers/openai-or-deterministic.ts?raw"
+import withOpenrouter from "../../snippets/guides/providers/with-openrouter.ts?raw"
+import * as Prose from "../../prose"
+
+export const providers = Prose.definePage({
+  path: "/docs/guides/providers",
+  title: "How to register real model providers",
+  navTitle: "Register model providers",
+  group: "Guides",
+  description:
+    "Bind provider and model pairs to language-model layers with @batonfx/providers, combine registries, and keep a deterministic fallback for keyless environments.",
+  content: [
+    Prose.p(
+      Prose.code("@batonfx/core"),
+      " is provider-agnostic: ",
+      Prose.code("ModelRegistry"),
+      " maps a ",
+      Prose.code("{ provider, model, registrationKey? }"),
+      " selection to an Effect AI ",
+      Prose.code("LanguageModel"),
+      " layer and fails with a typed ",
+      Prose.code("LanguageModelNotRegistered"),
+      " when the selection is missing. ",
+      Prose.code("@batonfx/providers"),
+      " adds registration helpers over the upstream ",
+      Prose.code("@effect/ai-*"),
+      " packages.",
+    ),
+    Prose.command("Terminal", "bun add effect@4.0.0-beta.93 @batonfx/core @batonfx/providers"),
+    Prose.h2("register-one-provider", "1. Register a provider"),
+    Prose.p(
+      "Each provider module ships a ",
+      Prose.code("with*"),
+      " layer that composes the registration, the upstream client layer, and ",
+      Prose.code("FetchHttpClient.layer"),
+      ". Credentials come from Effect ",
+      Prose.code("Config"),
+      ", never from string literals. Wrap the run in ",
+      Prose.code("ModelRegistry.provide(selection, effect)"),
+      " — that call looks up the registration and supplies its ",
+      Prose.code("LanguageModel"),
+      " layer for exactly that run.",
+    ),
+    Prose.codeBlock({ label: "with-openrouter.ts", source: withOpenrouter }),
+    Prose.callout(
+      "warning",
+      "The registry is not a model",
+      "A ",
+      Prose.code("with*"),
+      " layer provides ",
+      Prose.code("ModelRegistry.Service"),
+      ", not ",
+      Prose.code("Ai.LanguageModel"),
+      ". Providing it where a run expects a language model fails with a missing-service error — always pair it with ",
+      Prose.code("ModelRegistry.provide"),
+      ".",
+    ),
+    Prose.h2("combine-several-providers", "2. Combine several providers"),
+    Prose.p(
+      "Every ",
+      Prose.code("with*"),
+      " layer installs its own fresh registry under the same service tag, so ",
+      Prose.code("Layer.mergeAll"),
+      " keeps only one provider's registrations. Combine registries with ",
+      Prose.code("ModelRegistry.combine"),
+      " instead; on identical identity the later layer wins.",
+    ),
+    Prose.codeBlock({ label: "combine-providers.ts", source: combineProviders }),
+    Prose.h2("keep-ci-keyless", "3. Keep CI keyless with the deterministic registration"),
+    Prose.p(
+      "The deterministic registration is a local ",
+      Prose.code("LanguageModel"),
+      " that always answers ",
+      Prose.code("deterministic response"),
+      ". It runs with no credentials, which makes it the model for CI evals and local development.",
+    ),
+    Prose.codeBlock({
+      label: "deterministic-registry.ts",
+      source: deterministicRegistry,
+      expectedOutput: deterministicRegistryExpected,
+    }),
+    Prose.p(
+      Prose.code("Deterministic.withOpenAiOrDeterministic"),
+      " installs both registrations in one registry: the deterministic fallback always, and OpenAI only when its key config resolves. The selection stays data, so each environment picks its own pair.",
+    ),
+    Prose.codeBlock({ label: "openai-or-deterministic.ts", source: openaiOrDeterministic }),
+    Prose.p(
+      "For a single-agent server that needs a plain ",
+      Prose.code("LanguageModel"),
+      " layer rather than a registry, the deep-research example builds the same fallback at the model-layer level — see ",
+      Prose.link(
+        "https://github.com/In-Time-Tec/batonfx/blob/main/examples/deep-research-agent/server/src/model.ts",
+        "withOpenRouterOrDeterministic in examples/deep-research-agent",
+      ),
+      ".",
+    ),
+    Prose.h2("openai-compatible-presets", "4. Pick an OpenAI-compatible preset"),
+    Prose.p(
+      "Presets are thin wrappers over ",
+      Prose.code("OpenAiCompatible.openAiCompatible"),
+      " that fix the provider name and base URL. Each has a matching ",
+      Prose.code("with*"),
+      " layer form.",
+    ),
+    Prose.table(
+      ["Preset", "Provider", "Base URL"],
+      [
+        [[Prose.code("Presets.groq")], [Prose.code("groq")], [Prose.code("https://api.groq.com/openai/v1")]],
+        [[Prose.code("Presets.mistral")], [Prose.code("mistral")], [Prose.code("https://api.mistral.ai/v1")]],
+        [[Prose.code("Presets.xai")], [Prose.code("xai")], [Prose.code("https://api.x.ai/v1")]],
+        [[Prose.code("Presets.deepseek")], [Prose.code("deepseek")], [Prose.code("https://api.deepseek.com/v1")]],
+        [
+          [Prose.code("Presets.googleAiStudio")],
+          [Prose.code("google")],
+          [Prose.code("https://generativelanguage.googleapis.com/v1beta/openai/")],
+        ],
+        [
+          [Prose.code("Presets.azureOpenAi")],
+          [Prose.code("azure")],
+          [Prose.code("https://{resource}.openai.azure.com/openai/v1")],
+        ],
+        [[Prose.code("Presets.ollama")], [Prose.code("ollama")], [Prose.code("http://localhost:11434/v1")]],
+      ],
+    ),
+    Prose.h2("recipe-gemini", "Recipe: Gemini via the OpenAI-compatible preset"),
+    Prose.p(
+      "Baton has no first-party Google helper yet because the upstream Effect AI Google provider is not compatible with the pinned beta, but Google AI Studio speaks the OpenAI protocol. Register it with the ",
+      Prose.code("googleAiStudio"),
+      " preset and select ",
+      Prose.code('{ provider: "google", model: "gemini-2.0-flash" }'),
+      ".",
+    ),
+    Prose.codeBlock({ label: "gemini-openai-compat.ts", source: geminiOpenaiCompat }),
+    Prose.p(
+      "For context windows and pricing of models reached through presets, pass overrides to the offline ",
+      Prose.code("Catalog.layer"),
+      " — the full export map is in ",
+      Prose.link("/docs/reference/providers", "the @batonfx/providers reference"),
+      ". To pin loop behavior without any provider at all, see ",
+      Prose.link("/docs/guides/testing-evals", "How to test agents and run evals in CI"),
+      ".",
+    ),
+  ],
+})

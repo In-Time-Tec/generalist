@@ -1,0 +1,1 @@
+{"sessionId":"research-1","chatId":"research-1","status":{"_tag":"Idle"},"lastSeq":-1,"idleSince":{"_id":"Option","_tag":"Some","value":1783475829769}}

@@ -1,0 +1,50 @@
+import { Console, Effect, Layer, Option, Stream } from "effect"
+import * as Ai from "effect/unstable/ai"
+import { Agent, Approvals, Instructions, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+
+const persona = Instructions.staticSource("persona", "You are the release-notes assistant.")
+
+const houseStyle = Instructions.staticSource(
+  "house-style",
+  "Write one sentence per change. Never use exclamation marks.",
+)
+
+const workspaceState: Instructions.ContextSource = {
+  id: "workspace-state",
+  cache: "dynamic",
+  render: (context) =>
+    Effect.succeed(Option.some(`Rendering update for ${context.agentName} at turn ${context.turn}.`)),
+}
+
+const instructionsLayer = Instructions.layer([persona, houseStyle, workspaceState])
+
+const agent = Agent.make({ name: "release-notes", instructions: "This fallback is replaced by the registry." })
+
+const modelLayer = Layer.effect(
+  Ai.LanguageModel.LanguageModel,
+  Ai.LanguageModel.make({
+    generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+    streamText: (options) => {
+      const system = options.prompt.content.find((message) => message.role === "system")
+      const text = system === undefined || typeof system.content !== "string" ? "no system message" : system.content
+      return Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: text }))
+    },
+  }),
+)
+
+const program = Effect.gen(function* () {
+  const result = yield* Agent.generate(agent, { prompt: "What are your instructions?" })
+  yield* Console.log(result.text)
+}).pipe(
+  Effect.provide(
+    Layer.mergeAll(
+      modelLayer,
+      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
+      Approvals.autoApprove,
+      ModelMiddleware.identityLayer,
+      instructionsLayer,
+    ),
+  ),
+)
+
+await Effect.runPromise(program)

@@ -1,20 +1,29 @@
 import { Effect, Match, Option, Schema } from "effect"
 import { Command } from "foldkit"
-import { load, pushUrl } from "foldkit/navigation"
+import { load, pushUrl, replaceUrl } from "foldkit/navigation"
 import { evo } from "foldkit/struct"
 import * as Url from "foldkit/url"
 
 import * as Dialog from "@/components/ui/dialog"
 
-import { urlToRoute } from "../route/route"
+import { legacyRedirects } from "../content/registry"
+import { isSidebarGroupOpen, readSidebarGroups, writeSidebarGroups, SidebarGroups } from "../layout/sidebarStorage"
+import { toPath, urlToRoute } from "../route/route"
 import {
+  ClearedCopiedCode,
+  CompletedApplyTheme,
+  CompletedCopyCode,
   CompletedLoadExternal,
   CompletedNavigateInternal,
+  CompletedSaveSidebarGroups,
+  CompletedSaveThemePreference,
   GotSearchCommandMessage,
   GotSearchDialogMessage,
+  GotSidebarGroups,
+  GotThemePreference,
   type Message,
 } from "./message"
-import type { Model } from "./model"
+import { ThemePreference, type Model } from "./model"
 import { SearchCommand, initialSearchCommand, itemToPath } from "./searchPalette"
 
 type Update = readonly [Model, ReadonlyArray<Command.Command<Message>>]
@@ -31,13 +40,23 @@ export const update = (model: Model, message: Message): Update =>
             External: ({ href }) => [model, [LoadExternal({ href })]],
           }),
         ),
-      ChangedUrl: ({ url }) => [
-        evo(model, {
-          route: () => urlToRoute(url),
-          url: () => url,
-        }),
-        [],
-      ],
+      ChangedUrl: ({ url }) => {
+        const route = urlToRoute(url)
+        const redirectTarget = legacyRedirects.get(toPath(route))
+        if (redirectTarget !== undefined) {
+          return [model, [RedirectLegacy({ url: redirectTarget })]]
+        }
+        return [
+          evo(model, {
+            route: () => route,
+            url: () => url,
+            isMobileNavOpen: () => false,
+            isMobileTocOpen: () => false,
+            maybeActiveSectionId: () => Option.none(),
+          }),
+          [],
+        ]
+      },
       PressedSearchShortcut: () => {
         if (model.searchDialog.isOpen) {
           const [closedDialog, dialogCommands] = Dialog.close(model.searchDialog)
@@ -113,6 +132,42 @@ export const update = (model: Model, message: Message): Update =>
           },
         })
       },
+      ClickedCopyCode: ({ source }) => [evo(model, { copiedCode: () => Option.some(source) }), [CopyCode({ source })]],
+      CompletedCopyCode: ({ source }) => [model, [ScheduleClearCopiedCode({ source })]],
+      ClearedCopiedCode: ({ source }) => [
+        Option.contains(model.copiedCode, source) ? evo(model, { copiedCode: () => Option.none() }) : model,
+        [],
+      ],
+      SelectedThemePreference: ({ preference }) => [
+        evo(model, { themePreference: () => preference }),
+        [ApplyTheme({ preference }), SaveThemePreference({ preference })],
+      ],
+      GotThemePreference: ({ preference }) => [
+        evo(model, { themePreference: () => preference }),
+        [ApplyTheme({ preference })],
+      ],
+      ChangedSystemTheme: () => [model, [ApplyTheme({ preference: model.themePreference })]],
+      ToggledSidebarGroup: ({ group }) => {
+        const open = {
+          ...model.openSidebarGroups,
+          [group]: !isSidebarGroupOpen(model.openSidebarGroups, group),
+        }
+        return [evo(model, { openSidebarGroups: () => open }), [SaveSidebarGroups({ open })]]
+      },
+      GotSidebarGroups: ({ open }) => [evo(model, { openSidebarGroups: () => open }), []],
+      ChangedActiveSection: ({ sectionId }) => [evo(model, { maybeActiveSectionId: () => Option.some(sectionId) }), []],
+      ToggledMobileTableOfContents: ({ isOpen }) => [evo(model, { isMobileTocOpen: () => isOpen }), []],
+      ClickedMobileTableOfContentsLink: ({ sectionId }) => [
+        evo(model, {
+          maybeActiveSectionId: () => Option.some(sectionId),
+          isMobileTocOpen: () => false,
+        }),
+        [],
+      ],
+      ToggledMobileNav: ({ isOpen }) => [evo(model, { isMobileNavOpen: () => isOpen }), []],
+      CompletedApplyTheme: () => [model, []],
+      CompletedSaveThemePreference: () => [model, []],
+      CompletedSaveSidebarGroups: () => [model, []],
       CompletedNavigateInternal: () => [model, []],
       CompletedLoadExternal: () => [model, []],
     }),
@@ -129,3 +184,87 @@ const LoadExternal = Command.define(
   { href: Schema.String },
   CompletedLoadExternal,
 )(({ href }) => load(href).pipe(Effect.as(CompletedLoadExternal())))
+
+export const RedirectLegacy = Command.define(
+  "RedirectLegacy",
+  { url: Schema.String },
+  CompletedNavigateInternal,
+)(({ url }) => replaceUrl(url).pipe(Effect.as(CompletedNavigateInternal())))
+
+const CopyCode = Command.define(
+  "CopyCode",
+  { source: Schema.String },
+  CompletedCopyCode,
+)(({ source }) =>
+  Effect.promise(() => navigator.clipboard.writeText(source).catch(() => undefined)).pipe(
+    Effect.as(CompletedCopyCode({ source })),
+  ),
+)
+
+const ScheduleClearCopiedCode = Command.define(
+  "ScheduleClearCopiedCode",
+  { source: Schema.String },
+  ClearedCopiedCode,
+)(({ source }) => Effect.sleep("2 seconds").pipe(Effect.as(ClearedCopiedCode({ source }))))
+
+const THEME_STORAGE_KEY = "theme-preference"
+
+const readThemePreference = (): ThemePreference => {
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY)
+    if (raw === null) {
+      return "System"
+    }
+    const parsed: unknown = JSON.parse(raw)
+    return parsed === "Light" || parsed === "Dark" || parsed === "System" ? parsed : "System"
+  } catch {
+    return "System"
+  }
+}
+
+const prefersDark = (): boolean =>
+  typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches
+
+export const LoadThemePreference = Command.define(
+  "LoadThemePreference",
+  GotThemePreference,
+)(Effect.sync(() => GotThemePreference({ preference: readThemePreference() })))
+
+const ApplyTheme = Command.define(
+  "ApplyTheme",
+  { preference: ThemePreference },
+  CompletedApplyTheme,
+)(({ preference }) =>
+  Effect.sync(() => {
+    const isDark = preference === "Dark" || (preference === "System" && prefersDark())
+    document.documentElement.classList.toggle("dark", isDark)
+    return CompletedApplyTheme()
+  }),
+)
+
+const SaveThemePreference = Command.define(
+  "SaveThemePreference",
+  { preference: ThemePreference },
+  CompletedSaveThemePreference,
+)(({ preference }) =>
+  Effect.sync(() => {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(preference))
+    return CompletedSaveThemePreference()
+  }),
+)
+
+export const LoadSidebarGroups = Command.define(
+  "LoadSidebarGroups",
+  GotSidebarGroups,
+)(Effect.sync(() => GotSidebarGroups({ open: readSidebarGroups() })))
+
+const SaveSidebarGroups = Command.define(
+  "SaveSidebarGroups",
+  { open: SidebarGroups },
+  CompletedSaveSidebarGroups,
+)(({ open }) =>
+  Effect.sync(() => {
+    writeSidebarGroups(open)
+    return CompletedSaveSidebarGroups()
+  }),
+)
