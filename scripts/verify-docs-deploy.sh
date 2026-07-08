@@ -42,8 +42,8 @@ if command -v jq >/dev/null && [ -f "$HOME/.railway/config.json" ]; then
     release_sha=$(git ls-remote origin refs/heads/release | cut -f1)
     deployed_sha=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
       -H "Authorization: Bearer $token" -H "Content-Type: application/json" \
-      -d '{"query":"query { deployments(first: 5, input: { projectId: \"ea293b35-7e8c-4874-a944-7e977993ef5b\", environmentId: \"7e2a5ab4-7046-49de-bae1-15180778e92d\" }) { edges { node { status meta } } } }"}' |
-      jq -r '[.data.deployments.edges[].node | select(.status == "SUCCESS")][0].meta.commitHash // empty')
+      -d '{"query":"query { deployments(first: 8, input: { projectId: \"ea293b35-7e8c-4874-a944-7e977993ef5b\" }) { edges { node { status environmentId meta } } } }"}' |
+      jq -r --arg env "7e2a5ab4-7046-49de-bae1-15180778e92d" '[.data.deployments.edges[].node | select(.environmentId == $env and .status == "SUCCESS")][0].meta.commitHash // empty')
     if [ -n "$deployed_sha" ] && [ "$deployed_sha" = "$release_sha" ]; then
       echo "ok   production sha matches origin/release ($release_sha)"
     else
