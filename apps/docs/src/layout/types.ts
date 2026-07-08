@@ -1,12 +1,12 @@
 import type { Html } from "foldkit/html"
 
-export type TocEntry = Readonly<{
-  id: string
-  label: string
-}>
+import type { TocEntry } from "../prose/node"
+
+export type { TocEntry }
 
 export type DocsPageView = Readonly<{
   title: string
+  navTitle: string
   body: Html
   toc: ReadonlyArray<TocEntry>
 }>

@@ -9,90 +9,131 @@ import {
   breadcrumbPage,
   breadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { scrollArea } from "@/components/ui/scroll-area"
+import { cn } from "@/lib/utils"
 import { separator } from "@/components/ui/separator"
 
-import type { Message } from "../app/message"
-import { navGroups, pageByPath } from "../content/docs"
-import { toPath, type Route } from "../route/route"
-import type { DocsPageView, TocEntry } from "./types"
+import { ToggledSidebarGroup, type Message } from "../app/message"
+import type { Model } from "../app/model"
+import { defaultDocsPath, navGroups, type NavGroup } from "../content/registry"
+import { toPath } from "../route/route"
+import { chevronDown } from "./icon"
+import { pager } from "./pager"
+import { isSidebarGroupOpen } from "./sidebarStorage"
+import { mobileTableOfContents, tableOfContents } from "./tableOfContents"
+import type { DocsPageView } from "./types"
 
 const h = html<Message>()
 
-const activeItemClass = "bg-accent text-accent-foreground rounded-md px-3 py-1.5 text-sm font-medium"
-const itemClass = "text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors"
-
 const sidebarLink = (href: string, label: string, isActive: boolean): Html =>
-  h.a([h.Href(href), h.Class(isActive ? activeItemClass : itemClass)], [label])
-
-const sidebar = (path: string): Html =>
-  h.aside(
-    [h.Class("sticky top-14 hidden h-[calc(100vh-3.5rem)] w-64 shrink-0 py-8 pr-4 lg:block")],
+  h.li(
+    [],
     [
-      scrollArea(
-        { fade: true, class: "rounded-none pr-2" },
-        navGroups.flatMap((group) => [
-          h.div(
-            [h.Class("mt-2 first:mt-0")],
-            [
-              h.p([h.Class("mb-1 px-3 text-sm font-semibold")], [group.title]),
-              h.nav(
-                [h.AriaLabel(group.title), h.Class("flex flex-col gap-1")],
-                group.pages.map((page) => sidebarLink(page.path, page.navTitle, path === page.path)),
-              ),
-            ],
+      h.a(
+        [
+          h.Href(href),
+          ...(isActive ? [h.AriaCurrent("page")] : []),
+          h.Class(
+            isActive
+              ? "block rounded-md bg-accent-100 px-2.5 py-1.5 text-sm text-accent-700 dark:bg-accent-900/50 dark:text-accent-400"
+              : "block rounded-md px-2.5 py-1.5 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800",
           ),
-        ]),
+        ],
+        [label],
       ),
     ],
   )
 
-const tocLink = (entry: TocEntry): Html =>
-  h.a(
+const sidebarGroup = (group: NavGroup, path: string, openSidebarGroups: Model["openSidebarGroups"]): Html => {
+  const isLocked = group.pages.some((page) => page.path === path)
+  const isOpen = isLocked || isSidebarGroupOpen(openSidebarGroups, group.title)
+  const panelId = `sidebar-group-${group.title.toLowerCase()}`
+  return h.li(
+    [],
     [
-      h.Href(`#${entry.id}`),
-      h.Class("text-muted-foreground hover:text-foreground block py-1 text-sm transition-colors"),
+      h.button(
+        [
+          h.DataAttribute("sidebar-group", group.title),
+          h.AriaExpanded(isOpen),
+          h.AriaControls(panelId),
+          ...(isLocked ? [h.AriaDisabled(true)] : [h.OnClick(ToggledSidebarGroup({ group: group.title }))]),
+          h.Class(
+            cn(
+              "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-xs font-semibold tracking-wider text-gray-600 uppercase transition dark:text-gray-400",
+              isLocked
+                ? "cursor-default"
+                : "cursor-pointer hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-300",
+            ),
+          ),
+        ],
+        [
+          h.span([], [group.title]),
+          isLocked ? h.empty : h.span([h.Class(cn(isOpen && "rotate-180"))], [chevronDown("size-3")]),
+        ],
+      ),
+      isOpen
+        ? h.ul(
+            [h.Id(panelId), h.Class("mt-1 mb-3 space-y-0.5")],
+            group.pages.map((page) => sidebarLink(page.path, page.navTitle, path === page.path)),
+          )
+        : h.div([h.Id(panelId), h.Class("hidden")], []),
     ],
-    [entry.label],
   )
+}
 
-const rightRail = (toc: ReadonlyArray<TocEntry>): Html =>
+const sidebar = (path: string, openSidebarGroups: Model["openSidebarGroups"]): Html =>
   h.aside(
-    [h.Class("sticky top-14 hidden h-[calc(100vh-3.5rem)] w-56 shrink-0 py-10 xl:block")],
     [
-      h.p([h.Class("mb-2 text-sm font-semibold")], ["On this page"]),
-      h.nav([h.AriaLabel("On this page"), h.Class("flex flex-col")], toc.map(tocLink)),
+      h.AriaLabel("Documentation sidebar"),
+      h.Class(
+        "sticky top-[var(--header-height)] hidden h-[calc(100vh-var(--header-height))] w-64 shrink-0 overflow-y-auto py-6 pr-4 md:block",
+      ),
+    ],
+    [
+      h.nav(
+        [h.AriaLabel("Documentation")],
+        [
+          h.ul(
+            [h.Class("space-y-1")],
+            navGroups.map((group) => sidebarGroup(group, path, openSidebarGroups)),
+          ),
+        ],
+      ),
     ],
   )
 
-const breadcrumbs = (path: string, title: string): Html =>
+const breadcrumbs = (title: string): Html =>
   breadcrumb({}, [
     breadcrumbList({}, [
-      breadcrumbItem({}, [breadcrumbLink({ href: "/" }, ["BatonFX"])]),
+      breadcrumbItem({}, [breadcrumbLink({ href: "/" }, ["Batonfx"])]),
       breadcrumbSeparator({}),
-      breadcrumbItem({}, [breadcrumbLink({ href: "/docs/getting-started" }, ["Docs"])]),
+      breadcrumbItem({}, [breadcrumbLink({ href: defaultDocsPath }, ["Docs"])]),
       breadcrumbSeparator({}),
       breadcrumbItem({}, [breadcrumbPage({}, [title])]),
     ]),
   ])
 
-export const docsLayout = (route: Route, page: DocsPageView): Html => {
-  const path = toPath(route)
-  const current = pageByPath.get(path)
+export const docsLayout = (model: Model, page: DocsPageView): Html => {
+  const path = toPath(model.route)
   return h.div(
     [h.Class("mx-auto flex w-full max-w-7xl gap-8 px-4 sm:px-6")],
     [
-      sidebar(path),
+      sidebar(path, model.openSidebarGroups),
       h.main(
-        [h.Id("main-content"), h.Class("min-w-0 flex-1 py-10")],
+        [h.Id("main-content"), h.Class("min-w-0 flex-1")],
         [
+          mobileTableOfContents(page.toc, model.maybeActiveSectionId, model.isMobileTocOpen),
           h.div(
-            [h.Class("mx-auto max-w-3xl")],
-            [breadcrumbs(path, current?.navTitle ?? page.title), separator({ class: "my-6" }), page.body],
+            [h.Class("py-10")],
+            [
+              h.div(
+                [h.Class("mx-auto max-w-3xl")],
+                [breadcrumbs(page.navTitle), separator({ class: "my-6" }), page.body, pager(path)],
+              ),
+            ],
           ),
         ],
       ),
-      rightRail(page.toc),
+      tableOfContents(page.toc, model.maybeActiveSectionId),
     ],
   )
 }

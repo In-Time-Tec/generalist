@@ -1,0 +1,5 @@
+TurnStarted
+ModelPart
+TurnCompleted
+StructuredOutput: {"total":42,"currency":"USD"}
+Completed

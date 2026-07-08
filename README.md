@@ -4,12 +4,15 @@ BatonFX is the **Effect-native agent framework**: a standalone, non-durable mode
 
 ```ts
 import { Effect, Layer } from "effect"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { Deterministic } from "@batonfx/providers"
 
 const agent = Agent.make({ name: "assistant", instructions: "Be concise." })
 
-const program = Agent.generate(agent, { prompt: "Explain Baton in one sentence." }).pipe(
+const program = ModelRegistry.provide(
+  { provider: "deterministic", model: "local" },
+  Agent.generate(agent, { prompt: "Explain Baton in one sentence." }),
+).pipe(
   Effect.provide(
     Layer.mergeAll(
       Deterministic.withDeterministic({ model: "local" }),

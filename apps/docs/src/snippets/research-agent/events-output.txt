@@ -1,0 +1,37 @@
+id: 0
+event: SessionStatus
+data: {"_tag":"SessionStatus","seq":0,"status":{"_tag":"Running","turn":0}}
+
+id: 1
+event: SessionStatus
+data: {"_tag":"SessionStatus","seq":1,"status":{"_tag":"Running","turn":0}}
+
+id: 2
+event: Event
+data: {"_tag":"Event","seq":2,"event":{"_tag":"TurnStarted","turn":0}}
+
+id: 3
+event: Event
+data: {"_tag":"Event","seq":3,"event":{"_tag":"ModelPart","turn":0,"part":{"metadata":{},"type":"tool-call","id":"search-1","name":"web_search","params":{"query":"What is Effect for TypeScript?"},"providerExecuted":false}}}
+
+id: 4
+event: Event
+data: {"_tag":"Event","seq":4,"event":{"_tag":"ApprovalRequested","turn":0,"call":{"metadata":{},"type":"tool-call","id":"search-1","name":"web_search","params":{"query":"What is Effect for TypeScript?"},"providerExecuted":false}}}
+
+id: 5
+event: Event
+data: {"_tag":"Event","seq":5,"event":{"_tag":"TurnCompleted","turn":0}}
+
+id: 6
+event: Suspended
+data: {"_tag":"Suspended","seq":6,"suspension":{"_tag":"@batonfx/core/AgentSuspended","token":"approve-search-1","reason":"approval","tool_call_id":"search-1","tool_name":"web_search","tool_params":{"query":"What is Effect for TypeScript?"}}}
+
+id: 7
+event: SessionStatus
+data: {"_tag":"SessionStatus","seq":7,"status":{"_tag":"Suspended","suspension":{"_tag":"@batonfx/core/AgentSuspended","token":"approve-search-1","reason":"approval","tool_call_id":"search-1","tool_name":"web_search","tool_params":{"query":"What is Effect for TypeScript?"}}}}
+
+id: 8
+event: Ended
+data: {"_tag":"Ended","seq":8}
+
+: keep-alive

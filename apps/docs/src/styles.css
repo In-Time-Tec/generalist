@@ -12,40 +12,82 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+  font-family: "Inter Variable";
+  src: url("/fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Variable.woff2") format("woff2");
+  font-weight: 300 600;
+  font-display: swap;
+}
+
+@theme {
+  --color-cream: #f8f7fb;
+  --color-gray-50: #f5f4f8;
+  --color-gray-100: #eeedf2;
+  --color-gray-200: #e0dfe6;
+  --color-gray-300: #cdcbd4;
+  --color-gray-400: #9e9baa;
+  --color-gray-500: #716e7e;
+  --color-gray-600: #534f60;
+  --color-gray-700: #3e3a4a;
+  --color-gray-800: #2a2833;
+  --color-gray-850: #232129;
+  --color-gray-900: #1e1c21;
+  --color-gray-950: #13121a;
+  --color-accent-100: #fdeed3;
+  --color-accent-200: #f8d89b;
+  --color-accent-300: #eab75c;
+  --color-accent-400: #d9942a;
+  --color-accent-500: #d9942a;
+  --color-accent-600: #9a6210;
+  --color-accent-700: #7f500c;
+  --color-accent-800: #64400a;
+  --color-accent-900: #442a06;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
 :root {
+  --header-height: 3.5rem;
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.977 0.003 300);
+  --foreground: oklch(0.28 0.01 300);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.52 0.11 70);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --accent: oklch(0.95 0.04 80);
+  --accent-foreground: oklch(0.32 0.08 70);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --ring: oklch(0.62 0.12 70);
+  --chart-1: oklch(0.64 0.15 70);
+  --chart-2: oklch(0.58 0.13 235);
+  --chart-3: oklch(0.62 0.14 168);
+  --chart-4: oklch(0.52 0.12 300);
+  --chart-5: oklch(0.48 0.1 25);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary: oklch(0.52 0.11 70);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.95 0.04 80);
+  --sidebar-accent-foreground: oklch(0.32 0.08 70);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: oklch(0.62 0.12 70);
   --code-keyword: oklch(0.53 0.19 25);
   --code-string: oklch(0.52 0.13 150);
   --code-number: oklch(0.55 0.14 60);
@@ -57,38 +99,38 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --background: oklch(0.245 0.008 310);
+  --foreground: oklch(0.9 0.005 300);
+  --card: oklch(0.27 0.008 310);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.27 0.008 310);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.71 0.14 70);
+  --primary-foreground: oklch(0.25 0.06 70);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.3 0.05 70);
+  --accent-foreground: oklch(0.92 0.05 80);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --ring: oklch(0.71 0.14 70);
+  --chart-1: oklch(0.76 0.12 70);
+  --chart-2: oklch(0.69 0.11 235);
+  --chart-3: oklch(0.78 0.11 168);
+  --chart-4: oklch(0.7 0.12 300);
+  --chart-5: oklch(0.72 0.12 25);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.71 0.14 70);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.71 0.14 70);
   --code-keyword: oklch(0.75 0.15 22);
   --code-string: oklch(0.78 0.12 150);
   --code-number: oklch(0.8 0.12 65);
@@ -182,8 +224,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    color-scheme: light;
+    scroll-padding-top: calc(var(--header-height) + 1.5rem);
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
@@ -194,9 +243,32 @@
   }
 }
 
-/* Code syntax highlighting tokens (see lib/highlight.ts + the code-block
-   component). Coloured by the --code-* variables above so highlighting is
-   themeable and works out of the box in light and dark. */
+@layer components {
+  .landing-section {
+    @apply px-6 py-10 md:px-12 md:py-24 lg:px-20;
+  }
+
+  [data-glyph]::before {
+    content: attr(data-glyph);
+  }
+
+  .landing-section + .landing-section {
+    border: none;
+  }
+
+  .landing-section-narrow {
+    @apply mx-auto max-w-6xl;
+  }
+
+  .cta-primary {
+    @apply inline-flex items-center gap-2 rounded-lg bg-accent-600 px-6 py-3 text-base font-normal text-white transition hover:bg-accent-700 active:bg-accent-800 dark:bg-accent-500 dark:text-accent-900 dark:hover:bg-accent-600 dark:active:bg-accent-700;
+  }
+
+  .cta-secondary {
+    @apply inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-cream px-6 py-3 text-base font-normal text-gray-900 transition hover:border-gray-400 hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:hover:border-gray-400 dark:hover:bg-gray-800;
+  }
+}
+
 .hl-comment {
   color: var(--code-comment);
   font-style: italic;
