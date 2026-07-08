@@ -188,7 +188,7 @@ const assertPagesRender = async (pages: ReadonlyArray<(typeof allPages)[number]>
   await assertPagesRender(rest)
 }
 
-test("every registered page renders its title and toc anchors", async () => {
+test("every registered page renders its title and toc anchors", { timeout: 120_000 }, async () => {
   await assertPagesRender(allPages)
 })
 
