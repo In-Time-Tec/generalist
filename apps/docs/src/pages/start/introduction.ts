@@ -8,12 +8,12 @@ export const introduction = Prose.definePage({
   navTitle: "What is Batonfx",
   group: "Start",
   description:
-    "Batonfx is the Effect-native agent loop: a standalone, non-durable model-turn loop over effect/unstable/ai with typed tools, typed suspension, and every seam exposed as an Effect service.",
+    "Batonfx is the agent loop you were about to write yourself: a standalone, non-durable model-turn loop over effect/unstable/ai with typed tools, typed suspension, and every seam exposed as an Effect service.",
   content: [
     Prose.p(
-      "Batonfx is a standalone, non-durable agent loop built on ",
+      "Batonfx is the agent loop you were about to write yourself — a standalone, non-durable model-turn loop built on ",
       Prose.code("effect/unstable/ai"),
-      ". An agent is a plain value: a name, instructions, a toolkit, and a turn policy. A run is an Effect stream of typed events — the model call, each tool execution, each turn boundary — that you fold, observe, or forward to a browser. There is no runtime process to operate and no storage Batonfx owns: durability, persistence, and identity stay with the host application.",
+      ", with the typed errors, interruption, and test seams the hand-rolled version never gets. An agent is a plain value: a name, instructions, a toolkit, and a turn policy. A run is an Effect stream of typed events — the model call, each tool execution, each turn boundary — that you fold, observe, or forward to a browser. There is no runtime process to operate and no storage Batonfx owns: durability, persistence, and identity stay with the host application.",
     ),
     Prose.p(
       "Every capability is an Effect service. Four layers are required on every run — the language model, the tool executor, approvals, and model middleware — and everything else (permissions, memory, skills, compaction, steering) is an optional seam discovered at runtime. Absent means default behavior, and every behavior-bearing seam ships a test layer, so agents run deterministically in CI with zero credentials.",
@@ -29,6 +29,10 @@ export const introduction = Prose.definePage({
       "Human-in-the-loop flows: approval-gated tools suspend the run as a typed error carrying a resume token.",
       "Streaming chat: an in-memory session registry serves the event stream over SSE and WebSocket, with a headless FoldKit chat model for the browser.",
       "Deterministic CI: scripted models and test layers on every seam make agent behavior assertable.",
+    ),
+    Prose.h2("non-goals", "Non-goals"),
+    Prose.p(
+      "Batonfx will not grow a workflow engine, a database, a project scaffold, or a hosted platform. Multi-step orchestration, persistence, and deployment belong to your application — or to Relayfx when they must be durable. A framework that owns only the loop stays small enough to read, swap, and leave.",
     ),
     Prose.h2("where-relayfx-fits", "Where Relayfx fits"),
     Prose.p(

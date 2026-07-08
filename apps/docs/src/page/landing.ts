@@ -95,16 +95,51 @@ const heroSection = (model: Model): Html =>
           ),
           h.p(
             [h.Class("mt-6 text-2xl font-light text-gray-900 md:text-3xl dark:text-white")],
-            ["The Effect-native agent ", accent("loop"), "."],
+            ["The agent ", accent("loop"), " for Effect. Nothing else."],
           ),
           h.p(
             [h.Class("mt-4 max-w-2xl text-lg text-gray-600 dark:text-gray-400")],
             [
-              "An in-process agent loop over Effect AI: turn iteration, tool execution seams, permission checks, steering, and an observable event stream. Durability stays with your host.",
+              "The loop you were about to write yourself — turn iteration, typed tools, human approval as a typed suspension — as one Effect you compose. Every seam is a service with a deterministic test layer, so agents are assertable in CI with zero API keys. No runtime to operate, no storage it owns.",
             ],
           ),
           h.div([h.Class("mt-8 max-w-xl")], [commandBlock(model, "Install", installCommand)]),
           h.div([h.Class("mt-8")], [ctaRow()]),
+        ],
+      ),
+    ],
+  )
+
+const pairSection = (): Html =>
+  h.section(
+    [h.Class("landing-section")],
+    [
+      h.div(
+        [h.Class("landing-section-narrow")],
+        [
+          h.div(
+            [h.Class("rounded-lg border border-gray-300 bg-cream/60 p-6 dark:border-gray-700 dark:bg-gray-850")],
+            [
+              h.p([h.Class("font-medium text-gray-900 dark:text-white")], ["Two packages, one loop."]),
+              h.p(
+                [h.Class("mt-2 text-gray-600 dark:text-gray-400")],
+                [
+                  h.strong([h.Class("text-gray-900 dark:text-white")], ["Batonfx"]),
+                  " is the agent loop, in your process, with storage and delivery owned by you. Start here. ",
+                  h.a(
+                    [
+                      h.Href("https://relayfx-docs.up.railway.app"),
+                      h.Target("_blank"),
+                      h.Rel("noreferrer"),
+                      h.Class("font-medium text-accent-600 underline underline-offset-4 dark:text-accent-400"),
+                    ],
+                    ["Relayfx"],
+                  ),
+                  " runs the same loop inside durable executions on your Postgres. Add it when a lost run is an incident, not a shrug.",
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     ],
@@ -129,7 +164,9 @@ const promiseSection = (): Html =>
           sectionHeading("One loop. Your layers."),
           h.p(
             [h.Class("mt-4 max-w-3xl text-lg text-gray-600 dark:text-gray-400")],
-            ["Most agent SDKs bundle a loop with storage, transport, and vendor clients. Batonfx is only the loop."],
+            [
+              "Most agent SDKs bundle the loop with storage, transport, and vendor clients. Batonfx is only the loop — plus the typed errors, interruption, and test seams the hand-rolled version never gets.",
+            ],
           ),
           h.div(
             [h.Class("mt-10 grid gap-4 md:grid-cols-3")],
@@ -185,6 +222,7 @@ const builtOnEffectSection = (): Html =>
               checkItem("The loop is an Effect you compose and provide"),
               checkItem("Payloads are Ai.Prompt and Ai.Response from effect/unstable/ai"),
               checkItem("Every seam ships a deterministic test layer"),
+              checkItem("Suspension is a typed error carrying a resume token, not a callback"),
             ],
           ),
         ],
@@ -439,6 +477,7 @@ export const landing = (model: Model): Html =>
     [h.Id("main-content"), h.Class("isolate overflow-x-hidden")],
     [
       heroSection(model),
+      pairSection(),
       glyph("( )"),
       promiseSection(),
       glyph("=>"),

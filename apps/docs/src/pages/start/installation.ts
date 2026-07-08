@@ -26,7 +26,7 @@ export const installation = Prose.definePage({
       Prose.code("effect@4.0.0-beta.93"),
       ". The ",
       Prose.code("effect/unstable/ai"),
-      " modules Batonfx reuses change between betas, so install the pinned version rather than a floating range.",
+      " modules Batonfx reuses change between betas, so install the pinned version rather than a floating range. That churn is Batonfx's problem, not yours: each release tracks one tested Effect version, and the release train absorbs upstream breaking changes before you see them.",
     ),
     Prose.h2("package-matrix", "Package matrix"),
     Prose.p("Add the packages your application composes; each one is installable on its own."),

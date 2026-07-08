@@ -190,7 +190,7 @@ export const searchDocs = (query: string, limit = 8): ReadonlyArray<SearchResult
 }
 
 const siteTagline =
-  "Batonfx: the Effect-native agent loop — turn iteration, typed tools, approvals, steering, and an observable event stream, with durability left to the host."
+  "Batonfx: the agent loop for Effect, nothing else — turn iteration, typed tools, typed suspension for human approval, and deterministic test layers on every seam, with durability left to the host."
 
 export const llmsIndex = (): string => {
   const header: ReadonlyArray<string> = ["# Batonfx", "", `> ${siteTagline}`, ""]

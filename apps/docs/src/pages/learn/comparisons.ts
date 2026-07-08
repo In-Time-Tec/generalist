@@ -2,14 +2,26 @@ import * as Prose from "../../prose"
 
 export const comparisons = Prose.definePage({
   path: "/docs/learn/comparisons",
-  title: "Batonfx vs AI SDK and Mastra",
+  title: "Batonfx vs raw Effect AI, AI SDK, and Mastra",
   navTitle: "Comparisons",
   group: "Learn",
   description:
-    "An honest comparison with Vercel's AI SDK and Mastra: what each is for, and when each is the right choice.",
+    "An honest comparison with raw effect/unstable/ai, Vercel's AI SDK, and Mastra: what each is for, and when each is the right choice.",
   content: [
     Prose.p(
       "Batonfx is narrower than the frameworks it gets compared to, on purpose. It is an Effect-native agent loop with typed tools, typed errors, and Effect services as its only extension mechanism — not a general JavaScript AI toolkit and not an application framework. This page draws both comparisons honestly, including when to pick the other tool.",
+    ),
+    Prose.h2("batonfx-vs-raw-effect-ai", "Batonfx vs raw effect/unstable/ai"),
+    Prose.p(
+      "The strongest objection an Effect team can raise is also the easiest to answer: why not use ",
+      Prose.code("effect/unstable/ai"),
+      " directly? You should — Batonfx's payloads are its payloads, unmodified. Effect AI is a provider abstraction: a unified ",
+      Prose.code("LanguageModel"),
+      ", typed toolkits, and streaming, with no loop on top. The moment a tool call has to feed the next model turn, you are writing turn iteration, tool dispatch, an approval gate, a turn budget, and an event stream by hand — and then writing them again for the next agent. That glue is exactly what Batonfx is: ",
+      Prose.code("Agent.stream"),
+      " owns the iteration, and every decision the loop makes (execution, permissions, approvals, ",
+      Prose.link("/docs/learn/suspension", "suspension"),
+      ", steering, compaction) is an Effect service you provide or omit. If a single model call with tools is all you need, use Effect AI directly and skip the framework — Batonfx starts paying for itself at the first multi-turn loop.",
     ),
     Prose.h2("batonfx-vs-ai-sdk", "Batonfx vs Vercel AI SDK"),
     Prose.p(
