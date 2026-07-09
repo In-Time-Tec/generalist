@@ -116,6 +116,53 @@ describe("Session", () => {
     }).pipe(Effect.provide(Session.memoryLayer)),
   )
 
+  it.effect("projects memory, skills, steering, tool calls, tool results, and handoffs as prompt context", () =>
+    Effect.gen(function* () {
+      const store = yield* Session.SessionStore
+      const toolCall = Prompt.makePart("tool-call", {
+        id: "call-search",
+        name: "web_search",
+        params: { query: "Baton" },
+        providerExecuted: false,
+      })
+      const toolResult = Prompt.makePart("tool-result", {
+        id: "call-search",
+        name: "web_search",
+        isFailure: false,
+        result: { results: ["Baton docs"] },
+      })
+
+      yield* store.append({ _tag: "Memory", items: ["customer is enterprise"] })
+      yield* store.append({ _tag: "Skill", name: "research", body: "Use primary sources." })
+      yield* store.append({ _tag: "Steering", message: user("Prioritize docs.") })
+      yield* store.append({ _tag: "ToolCall", part: toolCall })
+      yield* store.append({ _tag: "ToolResult", part: toolResult })
+      yield* store.append({ _tag: "Handoff", target: "reviewer", summary: "Reviewer found no issues." })
+      const path = yield* store.path()
+
+      const prompt = Session.buildContext(path)
+
+      expect(prompt.content.map((message) => message.role)).toEqual([
+        "system",
+        "system",
+        "user",
+        "assistant",
+        "tool",
+        "system",
+      ])
+      expect(promptTexts(prompt)).toEqual([
+        "<memory>\ncustomer is enterprise\n</memory>",
+        '<skill name="research">\nUse primary sources.\n</skill>',
+        "Prioritize docs.",
+        "",
+        "",
+        '<handoff target="reviewer">\nReviewer found no issues.\n</handoff>',
+      ])
+      expect(prompt.content[3]?.content).toEqual([toolCall])
+      expect(prompt.content[4]?.content).toEqual([toolResult])
+    }).pipe(Effect.provide(Session.memoryLayer)),
+  )
+
   it.effect("fails typed for unknown leaves and invalid compactions", () =>
     Effect.gen(function* () {
       const store = yield* Session.SessionStore

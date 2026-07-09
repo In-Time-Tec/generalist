@@ -120,7 +120,9 @@ export const coreContextReference = definePage({
       "An append-only entry log with a leaf pointer. ",
       code("Entry"),
       " is the closed union ",
-      code("MessageEntry | CompactionEntry | BranchSummaryEntry"),
+      code(
+        "MessageEntry | ToolCallEntry | ToolResultEntry | MemoryEntry | SkillEntry | SteeringEntry | HandoffEntry | CompactionEntry | BranchSummaryEntry",
+      ),
       "; the store interface is ",
       code("{ append, path, setLeaf, leaf }"),
       ".",
@@ -129,6 +131,12 @@ export const coreContextReference = definePage({
       ["Entry", "Fields beyond id/parentId/metadata", "Projection"],
       [
         [[code("MessageEntry")], [code("message: Ai.Prompt.Message")], "Included verbatim"],
+        [[code("ToolCallEntry")], [code("part: Ai.Prompt.ToolCallPart")], "Assistant tool-call message"],
+        [[code("ToolResultEntry")], [code("part: Ai.Prompt.ToolResultPart")], "Tool result message"],
+        [[code("MemoryEntry")], [code("items: ReadonlyArray<string>")], [code("<memory>"), " system note"]],
+        [[code("SkillEntry")], [code("name"), ", ", code("body")], [code("<skill>"), " system note"]],
+        [[code("SteeringEntry")], [code("message: Ai.Prompt.Message")], "Included verbatim"],
+        [[code("HandoffEntry")], [code("target"), ", ", code("summary")], [code("<handoff>"), " system note"]],
         [
           [code("CompactionEntry")],
           [code("summary"), ", ", code("firstKeptEntryId")],

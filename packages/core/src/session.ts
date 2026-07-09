@@ -19,6 +19,44 @@ export interface MessageEntry extends BaseEntry {
   readonly message: Prompt.Message
 }
 
+/** @experimental A model-requested tool call. */
+export interface ToolCallEntry extends BaseEntry {
+  readonly _tag: "ToolCall"
+  readonly part: Prompt.ToolCallPart
+}
+
+/** @experimental A tool execution result. */
+export interface ToolResultEntry extends BaseEntry {
+  readonly _tag: "ToolResult"
+  readonly part: Prompt.ToolResultPart
+}
+
+/** @experimental Recalled or persisted memory context. */
+export interface MemoryEntry extends BaseEntry {
+  readonly _tag: "Memory"
+  readonly items: ReadonlyArray<string>
+}
+
+/** @experimental An activated skill body. */
+export interface SkillEntry extends BaseEntry {
+  readonly _tag: "Skill"
+  readonly name: string
+  readonly body: string
+}
+
+/** @experimental Live steering input preserved as a prompt message. */
+export interface SteeringEntry extends BaseEntry {
+  readonly _tag: "Steering"
+  readonly message: Prompt.Message
+}
+
+/** @experimental A handoff context note. */
+export interface HandoffEntry extends BaseEntry {
+  readonly _tag: "Handoff"
+  readonly target: string
+  readonly summary: string
+}
+
 /** @experimental A compaction boundary for prompt projection. */
 export interface CompactionEntry extends BaseEntry {
   readonly _tag: "Compaction"
@@ -33,7 +71,16 @@ export interface BranchSummaryEntry extends BaseEntry {
 }
 
 /** @experimental Closed union of session entries. */
-export type Entry = MessageEntry | CompactionEntry | BranchSummaryEntry
+export type Entry =
+  | MessageEntry
+  | ToolCallEntry
+  | ToolResultEntry
+  | MemoryEntry
+  | SkillEntry
+  | SteeringEntry
+  | HandoffEntry
+  | CompactionEntry
+  | BranchSummaryEntry
 
 /** @experimental Session entry input appended by a store implementation. */
 export type AppendInput = Entry extends infer Item
@@ -104,6 +151,18 @@ const entryFromInput = (input: AppendInput, id: EntryId, parentId: EntryId | nul
   switch (input._tag) {
     case "Message":
       return { ...base, _tag: "Message", message: input.message }
+    case "ToolCall":
+      return { ...base, _tag: "ToolCall", part: input.part }
+    case "ToolResult":
+      return { ...base, _tag: "ToolResult", part: input.part }
+    case "Memory":
+      return { ...base, _tag: "Memory", items: input.items }
+    case "Skill":
+      return { ...base, _tag: "Skill", name: input.name, body: input.body }
+    case "Steering":
+      return { ...base, _tag: "Steering", message: input.message }
+    case "Handoff":
+      return { ...base, _tag: "Handoff", target: input.target, summary: input.summary }
     case "Compaction":
       return { ...base, _tag: "Compaction", summary: input.summary, firstKeptEntryId: input.firstKeptEntryId }
     case "BranchSummary":
@@ -172,6 +231,17 @@ const checkpointMessage = (summary: string): Prompt.Message =>
 const branchSummaryMessage = (summary: string): Prompt.Message =>
   messageFromText("system", `<abandoned-branch-summary>\n${summary}\n</abandoned-branch-summary>`)
 
+const attributeValue = (value: string): string => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+
+const memoryMessage = (items: ReadonlyArray<string>): Prompt.Message =>
+  messageFromText("system", `<memory>\n${items.join("\n")}\n</memory>`)
+
+const skillMessage = (entry: SkillEntry): Prompt.Message =>
+  messageFromText("system", `<skill name="${attributeValue(entry.name)}">\n${entry.body}\n</skill>`)
+
+const handoffMessage = (entry: HandoffEntry): Prompt.Message =>
+  messageFromText("system", `<handoff target="${attributeValue(entry.target)}">\n${entry.summary}\n</handoff>`)
+
 const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Message> => {
   const compactionIndex = path.findLastIndex((entry) => entry._tag === "Compaction")
   const messages: Array<Prompt.Message> = []
@@ -187,6 +257,24 @@ const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Mes
     switch (entry._tag) {
       case "Message":
         messages.push(entry.message)
+        break
+      case "ToolCall":
+        messages.push(Prompt.makeMessage("assistant", { content: [entry.part] }))
+        break
+      case "ToolResult":
+        messages.push(Prompt.makeMessage("tool", { content: [entry.part] }))
+        break
+      case "Memory":
+        messages.push(memoryMessage(entry.items))
+        break
+      case "Skill":
+        messages.push(skillMessage(entry))
+        break
+      case "Steering":
+        messages.push(entry.message)
+        break
+      case "Handoff":
+        messages.push(handoffMessage(entry))
         break
       case "BranchSummary":
         messages.push(branchSummaryMessage(entry.summary))

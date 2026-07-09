@@ -10,14 +10,15 @@
 
 ## Current slice
 
-- [x] Refactor Baton steering from ad-hoc queue modes to Effect `Queue` policies with explicit drain modes, bounded capacity, and overflow behavior.
-- [x] Emit `SteeringDrained` events when queued steering or follow-up input is consumed into the next prompt.
-- [x] Update Baton specs, docs, snippets, transport codecs, FoldKit projection, and tests for queue policies and steering drain events.
-- [x] Publish Baton patch release and merge/push to `main` and `release`.
-- [x] Bump Relay to the new Baton patch, verify, merge/push to `main` and `release`.
+- [x] Prove Baton `Session.buildContext` dropped non-message context entries before the Phase 5 context-engineering slice.
+- [x] Expand the closed `Session.Entry` union for memory, skills, steering, tool calls, tool results, and handoffs without introducing another prompt format.
+- [x] Preserve Effect AI `Prompt` roles/parts for prompt-native entries and render context notes as tagged system messages.
+- [x] Run scoped Baton validation for the session context slice.
+- [ ] Publish Baton patch release and merge/push to `main` and `release`.
+- [ ] Bump Relay to the new Baton patch, verify, merge/push to `main` and `release`.
 
 ## Remaining plan audit
 
-- [ ] Re-audit Baton agent runtime against the plan for Effect-native seam shape, avoiding duplicate abstractions over Effect AI.
+- [~] Re-audit Baton agent runtime against the plan for Effect-native seam shape, avoiding duplicate abstractions over Effect AI.
 - [ ] Re-audit Relay durable composition to ensure it builds on Baton surfaces rather than parallel abstractions.
 - [ ] Update this TODO after each shipped slice until the plan is complete.
