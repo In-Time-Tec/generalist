@@ -13,8 +13,8 @@
 - [x] Refactor Baton steering from ad-hoc queue modes to Effect `Queue` policies with explicit drain modes, bounded capacity, and overflow behavior.
 - [x] Emit `SteeringDrained` events when queued steering or follow-up input is consumed into the next prompt.
 - [x] Update Baton specs, docs, snippets, transport codecs, FoldKit projection, and tests for queue policies and steering drain events.
-- [ ] Publish Baton patch release and merge/push to `main` and `release`.
-- [ ] Bump Relay to the new Baton patch, verify, merge/push to `main` and `release`.
+- [x] Publish Baton patch release and merge/push to `main` and `release`.
+- [x] Bump Relay to the new Baton patch, verify, merge/push to `main` and `release`.
 
 ## Remaining plan audit
 
