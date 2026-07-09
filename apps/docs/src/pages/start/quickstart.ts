@@ -24,7 +24,7 @@ export const quickstart = definePage({
     p("You will learn how to:"),
     bullets(
       "Define an Agent value",
-      "Provide the four layers every run needs",
+      "Provide the model and tool handler layers this run needs",
       "Watch the event stream",
       "Run a deterministic eval",
     ),
@@ -51,7 +51,7 @@ export const quickstart = definePage({
     p(
       "Run it again and the file still only prints values: the model layer is as inert as the agent until a run provides it.",
     ),
-    h2("step-4-provide-the-four-layers-and-run", "Step 4: Provide the four layers and run"),
+    h2("step-4-provide-the-layers-and-run", "Step 4: Provide the layers and run"),
     p(
       "Replace the log line with the layer stack and a program that runs the agent, then run ",
       code("bun run index.ts"),
@@ -60,8 +60,8 @@ export const quickstart = definePage({
     codeBlock({ label: "index.ts", source: step4, expectedOutput: step4Expected }),
     callout(
       "info",
-      "The 4 required layers",
-      "Every Batonfx run needs exactly four services; this is the single most-repeated wiring in every Batonfx program. Everything else (permissions, memory, skills, compaction, steering) is optional: absent means default behavior. ",
+      "The base run is small",
+      "A Batonfx run always needs a model. A tool-calling run also needs the Effect AI handler layer for its toolkit. ToolExecutor, approvals, middleware, permissions, memory, skills, compaction, and steering are optional seams: absent means default behavior. ",
       link("/docs/learn/seams-as-services", "Seams as services"),
       " explains the two-tier model.",
     ),
@@ -73,13 +73,15 @@ export const quickstart = definePage({
         ".",
       ],
       [
-        code("ToolExecutor.ToolExecutor"),
-        ": required even for agents with no tools; ",
-        code("ToolExecutor.fromToolkit(agent.toolkit)"),
-        " or a test layer.",
+        code("toolkit.toLayer({ ...handlers })"),
+        ": required only when the active toolkit has in-process tools to execute.",
       ],
-      [code("Approvals.Approvals"), ": ", code("Approvals.autoApprove"), " when nothing needs approval."],
-      [code("ModelMiddleware.ModelMiddleware"), ": ", code("ModelMiddleware.identityLayer"), " when you have none."],
+      [
+        code("ToolExecutor.ToolExecutor"),
+        ": optional override for durable waits, client tools, remote workers, MCP, or sandboxes.",
+      ],
+      [code("Approvals.Approvals"), ": optional; only needed for tools that declare ", code("needsApproval"), "."],
+      [code("ModelMiddleware.ModelMiddleware"), ": optional; absent means identity."],
     ),
     h2("step-5-watch-the-loop", "Step 5: Watch the loop"),
     p(

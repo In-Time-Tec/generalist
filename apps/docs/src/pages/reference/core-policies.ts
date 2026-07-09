@@ -51,11 +51,11 @@ export const corePoliciesReference = definePage({
     ),
     h2("approvals", "Approvals"),
     p(
-      "One of the four required run services and the enforcement point for ",
+      "Optional enforcement point for ",
       code("Ai.Tool.needsApproval"),
       ", which ",
       code("effect/unstable/ai"),
-      " declares but never enforces. The interface is ",
+      " declares but never enforces. Baton resolves this service only for approval-gated calls. The interface is ",
       code("check: (request: ToolExecutor.Request) => Effect<Decision>"),
       ".",
     ),

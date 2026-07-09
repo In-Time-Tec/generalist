@@ -1,4 +1,4 @@
-import { Cause, Context, Effect, Layer, Option, Sink, Stream } from "effect"
+import { Cause, Context, Effect, Layer, Option, Schedule, Schema, Sink, Stream } from "effect"
 import { Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, AgentSuspended } from "./agent-event"
 import { ToolContext } from "./tool-context"
@@ -60,6 +60,33 @@ export interface RouteOptions {
 /** @experimental */
 export type RouteInput<R = never> = Route | Effect.Effect<Route, never, R>
 
+/** @experimental */
+export type Placement = "client" | "remote" | "mcp" | "sandbox"
+
+/** @experimental */
+export interface PlacementRequest extends Request {
+  readonly placement: Placement
+  readonly tool: Tool.Any
+}
+
+/** @experimental */
+export type PlacementResponse =
+  | { readonly _tag: "Success"; readonly result: unknown }
+  | { readonly _tag: "Failure"; readonly message: string }
+  | { readonly _tag: "Suspend"; readonly token: string }
+
+/** @experimental */
+export interface PlacementRouteOptions<Tools extends Record<string, Tool.Any>> {
+  readonly toolkit: Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
+  readonly tools?: ReadonlyArray<string> | undefined
+  readonly execute: (request: PlacementRequest) => Effect.Effect<PlacementResponse, unknown, ToolContext>
+}
+
+/** @experimental */
+export interface RemoteRouteOptions<Tools extends Record<string, Tool.Any>> extends PlacementRouteOptions<Tools> {
+  readonly schedule?: Schedule.Schedule<unknown, unknown> | undefined
+}
+
 const failureMessage = (cause: Cause.Cause<unknown>): string => {
   const error = Cause.squash(cause)
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -75,6 +102,47 @@ const resultMessage = (result: unknown): string => {
     return message === undefined ? String(result) : message
   } catch {
     return String(result)
+  }
+}
+
+const schemaMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : typeof error === "string" ? error : resultMessage(error)
+
+const decodeSuccess = (tool: Tool.Any, result: unknown): Effect.Effect<Outcome> => {
+  const successSchema = tool.successSchema as unknown as Schema.ConstraintCodec<unknown, unknown, never, never>
+  if (!Schema.isSchema(successSchema)) {
+    return Effect.succeed({ _tag: "Success", result, encodedResult: result })
+  }
+  return Schema.decodeUnknownEffect(successSchema)(result).pipe(
+    Effect.flatMap((decoded) =>
+      Schema.encodeUnknownEffect(successSchema)(decoded).pipe(
+        Effect.map((encoded): Success => ({ _tag: "Success", result: decoded, encodedResult: encoded })),
+      ),
+    ),
+    Effect.catchCause((cause) =>
+      Effect.succeed(failureOutcome(`invalid client result: ${schemaMessage(Cause.squash(cause))}`)),
+    ),
+  )
+}
+
+const placementOutcome = (
+  placement: Placement,
+  tool: Tool.Any,
+  response: PlacementResponse,
+): Effect.Effect<Outcome> => {
+  switch (response._tag) {
+    case "Failure":
+      return Effect.succeed(failureOutcome(response.message))
+    case "Suspend":
+      return Effect.succeed({ _tag: "Suspend", token: response.token })
+    case "Success":
+      return decodeSuccess(tool, response.result).pipe(
+        Effect.map((outcome) =>
+          outcome._tag === "Failure"
+            ? failureOutcome(outcome.message.replace("invalid client result", `invalid ${placement} result`))
+            : outcome,
+        ),
+      )
   }
 }
 
@@ -166,6 +234,47 @@ export const route = (options: RouteOptions): Route => {
   }
 }
 
+const placementRoute = <Tools extends Record<string, Tool.Any>>(
+  placement: Placement,
+  options: PlacementRouteOptions<Tools> | RemoteRouteOptions<Tools>,
+): Route => {
+  const routedTools = options.tools ?? Object.keys(options.toolkit.tools)
+  return route({
+    tools: routedTools,
+    execute: (request) => {
+      const tool = options.toolkit.tools[request.call.name]
+      if (tool === undefined) return Effect.succeed(failureOutcome(`Tool ${request.call.name} is not registered`))
+      const effect = options.execute({ ...request, placement, tool })
+      const scheduled =
+        "schedule" in options && options.schedule !== undefined ? Effect.retry(effect, options.schedule) : effect
+      return scheduled.pipe(
+        Effect.flatMap((response) => placementOutcome(placement, tool, response)),
+        Effect.catchCause((cause) =>
+          Cause.hasInterrupts(cause)
+            ? Effect.interrupt
+            : Effect.succeed(failureOutcome(`${placement} tool infrastructure failed: ${failureMessage(cause)}`)),
+        ),
+      )
+    },
+  })
+}
+
+/** @experimental Route tool calls to a user/browser/desktop client. */
+export const client = <Tools extends Record<string, Tool.Any>>(options: PlacementRouteOptions<Tools>): Route =>
+  placementRoute("client", options)
+
+/** @experimental Route tool calls to a remote tool worker or service. */
+export const remote = <Tools extends Record<string, Tool.Any>>(options: RemoteRouteOptions<Tools>): Route =>
+  placementRoute("remote", options)
+
+/** @experimental Route tool calls to an MCP placement adapter. */
+export const mcp = <Tools extends Record<string, Tool.Any>>(options: PlacementRouteOptions<Tools>): Route =>
+  placementRoute("mcp", options)
+
+/** @experimental Route tool calls to a workspace or sandbox runtime. */
+export const sandbox = <Tools extends Record<string, Tool.Any>>(options: PlacementRouteOptions<Tools>): Route =>
+  placementRoute("sandbox", options)
+
 /** @experimental */
 export function routeToolkit<Tools extends Record<string, Tool.Any>>(toolkit: Toolkit.WithHandler<Tools>): Route
 export function routeToolkit<Tools extends Record<string, Tool.Any>>(
@@ -186,8 +295,10 @@ const routeInputEffect = <R>(input: RouteInput<R>): Effect.Effect<Route, never, 
   Effect.isEffect(input) ? input : Effect.succeed(input)
 
 /** @experimental */
-export const router = <R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R> =>
-  Layer.effect(
+export function router(routes: Iterable<Route>): Layer.Layer<ToolExecutor>
+export function router<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R>
+export function router<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R> {
+  return Layer.effect(
     ToolExecutor,
     Effect.all(Array.from(routes, routeInputEffect)).pipe(
       Effect.map((resolved) =>
@@ -202,6 +313,7 @@ export const router = <R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExec
       ),
     ),
   )
+}
 
 /** @experimental */
 export const testLayer = (implementation: Interface): Layer.Layer<ToolExecutor> =>

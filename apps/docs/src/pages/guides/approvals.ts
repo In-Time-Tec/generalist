@@ -51,7 +51,7 @@ export const approvals = definePage({
       code("Approvals.autoApprove"),
       " when nothing needs approval and ",
       code("Approvals.denyAll"),
-      " for lockdown or tests. Approvals is one of the four required layers on every run.",
+      " for lockdown or tests. Runs without approval-gated tools do not need an Approvals layer.",
     ),
     h2("catch-and-resume", "3. Catch AgentSuspended and resume"),
     p(

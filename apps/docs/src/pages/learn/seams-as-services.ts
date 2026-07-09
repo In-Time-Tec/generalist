@@ -7,47 +7,40 @@ export const seamsAsServices = definePage({
   navTitle: "Seams as services",
   group: "Learn",
   description:
-    "Four required services, roughly eleven optional seams discovered at run time, and a test layer for every one of them.",
+    "One required model service, optional seams discovered at run time, and a test layer for every behavior-bearing seam.",
   content: [
     p(
       "Batonfx has no plugin API. Every extension point is an Effect service, and a plugin is a ",
       code("Layer"),
-      ". That one decision splits the framework's surface into two tiers: a small set of services a run cannot start without, and a larger set of optional seams the loop discovers at run time with ",
+      ". That one decision splits the framework's surface into two tiers: the model service a run cannot start without, handler layers required by the tools you attach, and optional seams the loop discovers at run time with ",
       code("Effect.serviceOption"),
       ".",
     ),
-    h2("the-four-required-services", "The four required services"),
+    h2("the-required-service", "The required service"),
     p(
       "The requirement is written in the type. ",
       code("Agent.stream"),
-      " needs ",
-      code("RunServices"),
-      ", a union of exactly four services:",
+      " always needs a ",
+      code("LanguageModel"),
+      " in context. Tool handler layers are required only for the toolkit calls the model can make:",
     ),
     table(
-      ["Service", "What it decides", "Default when you have nothing to decide"],
+      ["Layer", "What it decides", "When you provide it"],
       [
-        [[code("Ai.LanguageModel.LanguageModel")], "Which model answers each turn", "None; this one is always yours"],
+        [[code("Ai.LanguageModel.LanguageModel")], "Which model answers each turn", "Always"],
+        [
+          [code("toolkit.toLayer({ ...handlers })")],
+          "How in-process Effect AI tools execute",
+          "When the agent advertises tools with local handlers",
+        ],
         [
           [code("ToolExecutor.ToolExecutor")],
-          "How tool calls execute",
-          [code("fromToolkit"), " runs the toolkit's handlers in-process"],
-        ],
-        [
-          [code("Approvals.Approvals")],
-          ["Whether a ", code("needsApproval"), " tool may run"],
-          [code("Approvals.autoApprove")],
-        ],
-        [
-          [code("ModelMiddleware.ModelMiddleware")],
-          "What transforms prompts and parts",
-          [code("ModelMiddleware.identityLayer")],
+          "Where externally placed tools execute",
+          "Only when overriding local toolkit handlers for durable waits, clients, remote workers, MCP, or sandboxes",
         ],
       ],
     ),
-    p(
-      "Even an agent with no tools provides all four. The point is that the seams always exist, not that they always do something:",
-    ),
+    p("An agent with no tools can run with only a model layer:"),
     codeBlock({ label: "four-layers.ts", source: fourLayers, expectedOutput: fourLayersExpected }),
     h2("optional-seams", "Optional seams, discovered not demanded"),
     p(
@@ -71,6 +64,10 @@ export const seamsAsServices = definePage({
       code("ModelResilience"),
       ", ",
       code("ToolOutputStore"),
+      ", ",
+      code("Approvals"),
+      ", ",
+      code("ModelMiddleware"),
       ", ",
       code("Ai.Chat.Persistence"),
       ", and ",
@@ -112,7 +109,7 @@ export const seamsAsServices = definePage({
     ),
     h2("why-this-makes-batonfx-embeddable", "Why this makes Batonfx embeddable"),
     p(
-      "Because every seam is a service, a host can replace any of them without Batonfx importing host code. An in-process CLI provides four layers and is done. A durable runtime provides the same four plus durable implementations of the optional seams (a Postgres-backed ",
+      "Because every seam is a service, a host can replace any of them without Batonfx importing host code. An in-process CLI provides a model and the handler layers for its local tools. A durable runtime provides the same model/tool surface plus durable implementations of optional seams (a Postgres-backed ",
       code("SessionStore"),
       ", a blob-backed ",
       code("ToolOutputStore"),

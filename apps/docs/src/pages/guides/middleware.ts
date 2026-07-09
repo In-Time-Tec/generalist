@@ -16,7 +16,7 @@ export const middleware = definePage({
   content: [
     p(
       code("ModelMiddleware"),
-      " is one of the four required layers on every run, and its default is the identity chain ",
+      " is optional. When absent, Baton uses the same identity behavior as ",
       code("ModelMiddleware.identityLayer"),
       ". A middleware has two optional hooks: ",
       code("transformPrompt"),

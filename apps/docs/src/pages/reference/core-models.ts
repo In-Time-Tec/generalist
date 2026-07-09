@@ -73,9 +73,9 @@ export const coreModelsReference = definePage({
     ),
     h2("model-middleware", "ModelMiddleware"),
     p(
-      "One of the four required run services: a ",
+      "Optional prompt/stream interceptor: a ",
       code("ReadonlyArray<Middleware>"),
-      " applied in array order. Both hooks are optional; omitted hooks are identity.",
+      " applied in array order. When no layer is provided, Baton uses the empty identity chain. Both hooks are optional; omitted hooks are identity.",
     ),
     table(
       ["Hook", "Signature", "Contract"],

@@ -55,6 +55,19 @@ bun add @batonfx/transport @batonfx/foldkit
 
 Baton seams are Effect services. You pay only for the seams you provide: a model registry layer, an approvals layer, a memory layer, a transport registry layer, or your own host implementation. The core loop discovers optional seams with `Effect.serviceOption` when the contract says they are optional.
 
+## Tool placement stays on Effect AI tools
+
+Define tools once with `Tool.make` and `Toolkit.make`. Ordinary in-process calls run through `toolkit.toLayer(...)`; hosts that need placement can route the same toolkit with `ToolExecutor.client`, `ToolExecutor.remote`, `ToolExecutor.mcp`, or `ToolExecutor.sandbox` without redefining schemas or wrapping tools.
+
+```ts
+const clientTools = ToolExecutor.router([
+  ToolExecutor.client({
+    toolkit,
+    execute: ({ call }) => desktopClient.callTool(call.name, call.params),
+  }),
+])
+```
+
 ## Effect beta compatibility
 
 | Baton release | Tested Effect range                               | Notes                                                                               |

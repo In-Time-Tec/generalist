@@ -27,7 +27,7 @@ export const steering = definePage({
     p(
       "To steer a run, provide ",
       code("Steering.layer()"),
-      " alongside the four required layers and queue messages on the same service instance the run sees. The scripted model below calls a tool on turn 0, so the steered prompt lands before turn 1 and the follow-up starts one extra turn at the end.",
+      " alongside the run's model/tool layers and queue messages on the same service instance the run sees. The scripted model below calls a tool on turn 0, so the steered prompt lands before turn 1 and the follow-up starts one extra turn at the end.",
     ),
     codeBlock({
       label: "steer-and-follow-up.ts",

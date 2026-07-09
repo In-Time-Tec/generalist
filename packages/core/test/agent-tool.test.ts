@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Cause, Effect, Exit, Layer, Schema, Stream } from "effect"
+import { Cause, Effect, Exit, Layer, Schedule, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentEvent, AgentTool, Approvals, ModelMiddleware, ToolContext, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
@@ -115,6 +115,131 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
                 }),
             }),
           ]).pipe(Layer.provide(toolkit.toLayer({ lookup: ({ id }) => Effect.succeed({ source: "toolkit", id }) }))),
+          ToolContext.layerDefault,
+        ),
+      ),
+    )
+  })
+
+  it.effect("ToolExecutor.client validates placement results against the Effect AI tool schema", () => {
+    const selectFile = Tool.make("select_file", {
+      parameters: Schema.Struct({}),
+      success: Schema.Struct({ name: Schema.String, contents: Schema.String }),
+    })
+    const toolkit = Toolkit.make(selectFile)
+
+    return Effect.gen(function* () {
+      const executor = yield* ToolExecutor.ToolExecutor
+      const success = yield* executor.execute(request("select_file", {}))
+      const invalid = yield* executor.execute(request("select_file", { invalid: true }))
+
+      expect(success).toEqual({
+        _tag: "Success",
+        result: { name: "notes.txt", contents: "hello" },
+        encodedResult: { name: "notes.txt", contents: "hello" },
+      })
+      expect(invalid._tag).toBe("Failure")
+      expect(invalid._tag === "Failure" && invalid.message).toContain("invalid client result")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          ToolExecutor.router([
+            ToolExecutor.client({
+              toolkit,
+              execute: ({ call }) =>
+                Effect.succeed(
+                  "invalid" in (call.params as Record<string, unknown>)
+                    ? { _tag: "Success", result: { name: 123, contents: "bad" } }
+                    : { _tag: "Success", result: { name: "notes.txt", contents: "hello" } },
+                ),
+            }),
+          ]),
+          ToolContext.layerDefault,
+        ),
+      ),
+    )
+  })
+
+  it.effect("ToolExecutor.remote retries infrastructure failures without retrying tool failures", () => {
+    const runCi = Tool.make("run_ci", {
+      parameters: Schema.Struct({}),
+      success: Schema.Struct({ status: Schema.String }),
+    })
+    const toolkit = Toolkit.make(runCi)
+    let attempts = 0
+
+    return Effect.gen(function* () {
+      const executor = yield* ToolExecutor.ToolExecutor
+      const recovered = yield* executor.execute(request("run_ci", {}))
+      const failed = yield* executor.execute(request("run_ci", { toolFailure: true }))
+
+      expect(attempts).toBe(3)
+      expect(recovered).toEqual({
+        _tag: "Success",
+        result: { status: "green" },
+        encodedResult: { status: "green" },
+      })
+      expect(failed).toEqual({ _tag: "Failure", message: "ci failed" })
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          ToolExecutor.router([
+            ToolExecutor.remote({
+              toolkit,
+              schedule: Schedule.recurs(1),
+              execute: ({ call }): Effect.Effect<ToolExecutor.PlacementResponse, string> =>
+                Effect.gen(function* () {
+                  attempts += 1
+                  if ("toolFailure" in (call.params as Record<string, unknown>)) {
+                    return { _tag: "Failure", message: "ci failed" }
+                  }
+                  if (attempts === 1) {
+                    yield* Effect.fail("network unavailable")
+                  }
+                  return { _tag: "Success", result: { status: "green" } }
+                }),
+            }),
+          ]),
+          ToolContext.layerDefault,
+        ),
+      ),
+    )
+  })
+
+  it.effect("ToolExecutor.mcp and sandbox are placement routes over Effect AI tool names", () => {
+    const githubSearch = Tool.make("github_search", {
+      parameters: Schema.Struct({ query: Schema.String }),
+      success: Schema.Struct({ source: Schema.String }),
+    })
+    const shell = Tool.make("shell", {
+      parameters: Schema.Struct({ command: Schema.String }),
+      success: Schema.Struct({ source: Schema.String }),
+    })
+
+    return Effect.gen(function* () {
+      const executor = yield* ToolExecutor.ToolExecutor
+      const mcp = yield* executor.execute(request("github_search", { query: "baton" }))
+      const sandbox = yield* executor.execute(request("shell", { command: "pwd" }))
+
+      expect(mcp).toEqual({ _tag: "Success", result: { source: "mcp" }, encodedResult: { source: "mcp" } })
+      expect(sandbox).toEqual({
+        _tag: "Success",
+        result: { source: "sandbox" },
+        encodedResult: { source: "sandbox" },
+      })
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          ToolExecutor.router([
+            ToolExecutor.mcp({
+              toolkit: Toolkit.make(githubSearch),
+              execute: () => Effect.succeed({ _tag: "Success", result: { source: "mcp" } }),
+            }),
+            ToolExecutor.sandbox({
+              toolkit: Toolkit.make(shell),
+              execute: () => Effect.succeed({ _tag: "Success", result: { source: "sandbox" } }),
+            }),
+          ]),
           ToolContext.layerDefault,
         ),
       ),

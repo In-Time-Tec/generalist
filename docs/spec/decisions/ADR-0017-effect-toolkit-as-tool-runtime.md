@@ -20,6 +20,8 @@ Baton treats Effect AI `Tool` and `Toolkit` values as the public tool runtime. A
 
 The advanced `ToolExecutor` seam stays for durable hosts, remote tool runners, MCP adapters, and suspension. It overrides local toolkit handler execution when provided, and it remains the only way for a host to return `Suspend` from a tool call.
 
+Placement helpers (`ToolExecutor.client`, `ToolExecutor.remote`, `ToolExecutor.mcp`, and `ToolExecutor.sandbox`) are named route constructors, not a second tool definition API. They route by Effect AI tool names from an existing `Toolkit`, pass the original `Tool` value to the placement executor, and validate successful placement results with the tool's existing `success` schema. Remote retry is limited to infrastructure failures in the Effect error channel; returned tool failures remain model-visible tool failures and are not retried.
+
 ## Execution plan
 
 1. Update the agent loop so no-tool runs do not require `ToolExecutor`, `Approvals`, or `ModelMiddleware`.
@@ -28,6 +30,7 @@ The advanced `ToolExecutor` seam stays for durable hosts, remote tool runners, M
 4. Update tests, examples, docs snippets, and references to show the Effect-native path first and the override seam only for durable or remote execution.
 5. Align Relay to consume Effect toolkits at the SDK/runtime boundary instead of exposing a duplicate registered-tool authoring shape.
 6. Re-export Effect AI primitives from `@batonfx/core` directly so examples can import `Agent`, `Tool`, `Toolkit`, `LanguageModel`, `Prompt`, and `Response` from one Baton entrypoint while still using upstream Effect AI values.
+7. Add first-class placement route constructors over Effect AI toolkit definitions for client, remote worker, MCP, and sandbox execution.
 
 ## Consequences
 
@@ -37,6 +40,7 @@ The advanced `ToolExecutor` seam stays for durable hosts, remote tool runners, M
 - Durable runtimes still have a seam for waits, remote execution, and persisted approvals.
 - Relay can derive its durable tool registry from the same Effect toolkit definitions that Baton executes locally.
 - The root Baton import becomes ergonomic without hiding provenance: `Tool.make` from `@batonfx/core` is the same value as `Tool.make` from `effect/unstable/ai`.
+- Placement-specific routing is explicit without adding duplicate fields like registered-tool definitions, AI-tool wrappers, or per-host tool schemas.
 
 ## Related docs
 

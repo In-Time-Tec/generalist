@@ -4,6 +4,23 @@ Baton is a standalone, **non-durable**, Effect-native agent loop over `effect/un
 
 See [`docs/spec/01-baton-agent-framework.md`](../../docs/spec/01-baton-agent-framework.md) for the full contract.
 
+## Tool execution placement
+
+Baton uses Effect AI `Tool` and `Toolkit` values directly. For ordinary in-process tools, provide the handler layer from `toolkit.toLayer(...)` and no `ToolExecutor` is required. `ToolExecutor` is the optional override seam for durable waits and external placement. Its route helpers keep placement explicit while reusing the same toolkit definitions:
+
+```ts
+import { Effect } from "effect"
+import { ToolExecutor } from "@batonfx/core"
+
+const executorLayer = ToolExecutor.router([
+  ToolExecutor.remote({
+    toolkit,
+    execute: ({ call }) =>
+      remoteWorker.call(call.name, call.params).pipe(Effect.map((result) => ({ _tag: "Success", result }))),
+  }),
+])
+```
+
 ## Chat persistence (standalone conversation history)
 
 Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, so a standalone app has no conversation continuity between runs. Set `RunOptions.persistence` to run the loop on a **persisted** chat instead: the chat identified by `chatId` is created on first use and accumulates history across runs.

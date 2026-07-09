@@ -15,7 +15,7 @@ export const introduction = definePage({
       ", and it covers what an agent needs beyond a model call: turn iteration, permissions, human approval as typed suspension, steering, and deterministic test seams. An agent is a plain value: a name, instructions, a toolkit, and a turn policy. A run is an Effect stream of typed events (the model call, each tool execution, each turn boundary) that you fold, observe, or forward to a browser. There is no runtime process to operate and no storage Batonfx owns: durability, persistence, and identity stay with the host application.",
     ),
     p(
-      "Every capability is an Effect service. Four layers are required on every run: the language model, the tool executor, approvals, and model middleware. Everything else (permissions, memory, skills, compaction, steering) is an optional seam discovered at runtime. Absent means default behavior, and every behavior-bearing seam ships a test layer, so agents run deterministically in CI with zero credentials.",
+      "Every capability is an Effect service. A run always needs a language model; local tools add their Effect AI handler layer; placement, approvals, middleware, permissions, memory, skills, compaction, and steering are optional seams discovered at runtime. Absent means default behavior, and every behavior-bearing seam ships a test layer, so agents run deterministically in CI with zero credentials.",
     ),
     h2("a-complete-program", "A complete program"),
     p(

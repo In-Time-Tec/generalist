@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "@batonfx/core"
+import { Agent, LanguageModel, Response, Tool, Toolkit } from "@batonfx/core"
 
 const weatherTool = Tool.make("get_weather", {
   description: "Get local weather for a city",
@@ -45,8 +45,6 @@ const modelLayer = Layer.effect(
 const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ get_weather: ({ city }) => Effect.succeed(`sunny and 72°F in ${city}`) }),
-  Approvals.autoApprove,
-  ModelMiddleware.identityLayer,
 )
 
 const program = Effect.gen(function* () {
