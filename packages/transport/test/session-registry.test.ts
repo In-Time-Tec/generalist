@@ -43,7 +43,7 @@ const dependencies = (streamText: ModelParams["streamText"]) =>
   Layer.mergeAll(modelLayer(streamText), Approvals.autoApprove, ModelMiddleware.identityLayer, persistenceLayer)
 
 const baseLayers = <Tools extends Record<string, Tool.Any>>(
-  agent: Agent.Agent<Tools>,
+  agent: Agent.Agent<Tools, false>,
   streamText: ModelParams["streamText"],
 ) => SessionRegistry.layerMemory({ agent }).pipe(Layer.provide(dependencies(streamText)))
 

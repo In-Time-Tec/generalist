@@ -23,8 +23,8 @@ export interface TransferOptions<
 }
 
 /** @experimental One child run in a bounded fan-out. */
-export interface FanOutChild<Tools extends Record<string, Tool.Any>> {
-  readonly agent: Agent<Tools>
+export interface FanOutChild<Tools extends Record<string, Tool.Any>, HasModel extends boolean = boolean> {
+  readonly agent: Agent<Tools, HasModel>
   readonly prompt: Prompt.RawInput
   readonly options?: Omit<RunOptions, "prompt">
 }
@@ -36,7 +36,7 @@ export interface FanOutOptions {
 
 /** @experimental Built supervisor agent and handled toolkit for its transfer tools. */
 export interface Supervisor {
-  readonly agent: Agent<Record<string, Tool.Any>>
+  readonly agent: Agent<Record<string, Tool.Any>, false>
   readonly toolkit: Toolkit.WithHandler<Record<string, Tool.Any>>
 }
 
@@ -44,7 +44,7 @@ export interface Supervisor {
 export interface SupervisorOptions {
   readonly name: string
   readonly instructions?: string
-  readonly specialists: ReadonlyArray<Agent<Record<string, Tool.Any>>>
+  readonly specialists: ReadonlyArray<Agent<Record<string, Tool.Any>, boolean>>
   readonly policy?: TurnPolicy
 }
 
@@ -97,10 +97,11 @@ const toolkitFromHandled = (
 /** @experimental Build a `transfer_to_<agent.name>` same-process handoff tool. */
 export const transferTool = <
   Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean,
   Parameters extends Schema.Top = DefaultTransferParameters,
   Success extends Schema.Top = typeof Schema.String,
 >(
-  target: Agent<Tools>,
+  target: Agent<Tools, HasModel>,
   options: TransferOptions<Parameters, Success> = {},
 ): Toolkit.WithHandler<Record<string, Tool.Any>> =>
   asTool(target, {
@@ -113,10 +114,10 @@ export const transferTool = <
   }) as Toolkit.WithHandler<Record<string, Tool.Any>>
 
 /** @experimental Run isolated child agents concurrently and preserve input order. */
-export const fanOut = <Tools extends Record<string, Tool.Any>>(
-  children: ReadonlyArray<FanOutChild<Tools>>,
+export const fanOut = <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
+  children: ReadonlyArray<FanOutChild<Tools, HasModel>>,
   options: FanOutOptions = {},
-): Effect.Effect<ReadonlyArray<Result>, RunError, RunServices<Tools>> =>
+): Effect.Effect<ReadonlyArray<Result>, RunError, RunServices<Tools, HasModel>> =>
   positiveConcurrency(options.concurrency).pipe(
     Effect.flatMap((concurrency) =>
       Effect.forEach(children, (child) => generate(child.agent, { ...child.options, prompt: child.prompt }), {

@@ -17,7 +17,8 @@
 - [x] Publish Baton patch release and merge/push to `main` and `release`.
 - [x] Add Phase 5 memory lifecycle progress with host-requested `Memory.forget` cleanup.
 - [x] Refine `Memory.forget` to support exact item ids per the north-star plan.
-- [ ] Bump Relay to the new Baton patch, verify, merge/push to `main` and `release`.
+- [x] Bump Relay to Baton `0.3.5`, verify durable memory forget, merge/push to `main` and `release`.
+- [x] Rework Baton `Agent.make` defaults to carry `model`, `memory`, and `metadata`, with model defaults resolved through `ModelRegistry` and memory defaults used unless run options override them.
 
 ## Remaining plan audit
 

@@ -7,7 +7,7 @@ Baton memory is an optional core seam for recall before the first model turn, re
 Baton owns:
 
 - the `Memory` service interface in `packages/core/src/memory.ts`;
-- the per-run `RunOptions.memory.key` contract;
+- the agent default `Agent.make({ memory })` and per-run `RunOptions.memory.key` contracts;
 - recall insertion into the initial prompt;
 - remember calls after completed turns;
 - host-requested forget lifecycle cleanup;
@@ -21,7 +21,7 @@ Baton core does not own vector stores, embedding models, summarization, extracti
 
 ## Recall
 
-When `RunOptions.memory` is set and the `Memory` service is present, Baton calls `recall({ key, turn: 0, prompt })` once for non-resume runs. `prompt` is the run's initial prompt before recalled memory is inserted.
+When `Agent.make({ memory })` or `RunOptions.memory` is set and the `Memory` service is present, Baton calls `recall({ key, turn: 0, prompt })` once for non-resume runs. `prompt` is the run's initial prompt before recalled memory is inserted. A run-specific `RunOptions.memory.key` overrides the agent default.
 
 Recalled items are flattened in source order into one user message. That message is inserted after an initial system message when one exists and before the run prompt. Recall happens before model middleware, so guardrails and other prompt middleware see the enriched prompt.
 
@@ -41,7 +41,7 @@ Forget is store-agnostic. Omitting `id` deletes all non-durable working state fo
 
 ## Missing services and errors
 
-`Agent.stream` resolves `Memory` with `Effect.serviceOption`, so `RunServices` does not grow. If `RunOptions.memory` is absent, missing `Memory` preserves current behavior. If `RunOptions.memory` is set and `Memory` is absent, Baton fails before the first model call with `AgentError { message: "RunOptions.memory requires Memory in context", turn: 0 }`.
+`Agent.stream` resolves `Memory` with `Effect.serviceOption`, so `RunServices` does not grow. If both `Agent.memory` and `RunOptions.memory` are absent, missing `Memory` preserves current behavior. If a run-specific key is set and `Memory` is absent, Baton fails before the first model call with `AgentError { message: "RunOptions.memory requires Memory in context", turn: 0 }`. If only the agent default is set and `Memory` is absent, it fails with `AgentError { message: "Agent.memory requires Memory in context", turn: 0 }`.
 
 `MemoryError` from `recall` or `remember` maps to `AgentError { message, turn, cause }` and fails the run. `MemoryError` from host-called `forget` is returned to the host. Hosts that want best-effort memory wrap their implementation to ignore or recover from memory failures.
 

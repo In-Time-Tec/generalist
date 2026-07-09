@@ -57,7 +57,7 @@ const lazyHandled = <Name extends string, Parameters extends Schema.Top, Success
   name: Name,
   handler: (
     params: Parameters["Type"],
-  ) => Effect.Effect<Success["Type"], string, RunServices<Record<string, Tool.Any>>>,
+  ) => Effect.Effect<Success["Type"], string, RunServices<Record<string, Tool.Any>, boolean>>,
 ): AgentToolToolkit => ({
   tools: toolkit.tools as Record<string, Tool.Any>,
   handle: (toolName, params) =>
@@ -76,11 +76,12 @@ const lazyHandled = <Name extends string, Parameters extends Schema.Top, Success
 /** @experimental */
 export const asTool = <
   Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean,
   const Name extends string = string,
   Parameters extends Schema.Top = DefaultParameters,
   Success extends Schema.Top = DefaultSuccess,
 >(
-  agent: Agent<Tools>,
+  agent: Agent<Tools, HasModel>,
   options: AsToolOptions<Parameters, Success> = {},
 ): AgentToolToolkit => {
   const name = (options.name ?? agent.name) as Name
@@ -100,7 +101,7 @@ export const asTool = <
   const toolkit = Toolkit.make(tool) as unknown as Toolkit.Toolkit<
     Record<Name, AgentToolTool<Name, Parameters, Success>>
   >
-  const handler = (params: Parameters["Type"]): Effect.Effect<Success["Type"], string, RunServices<Tools>> =>
+  const handler = (params: Parameters["Type"]): Effect.Effect<Success["Type"], string, RunServices<Tools, HasModel>> =>
     Effect.gen(function* () {
       const prompt = yield* Effect.try({ try: () => toPrompt(params), catch: errorMessage })
       const result = yield* generate(agent, { prompt }).pipe(

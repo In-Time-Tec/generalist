@@ -7,6 +7,8 @@ import {
   Approvals,
   Compaction,
   Instructions,
+  Memory,
+  ModelRegistry,
   ModelResilience,
   ModelMiddleware,
   Permissions,
@@ -148,6 +150,18 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     expect(AgentEvent.addUsage(usage({}, {}), usage({}, {})).inputTokens.total).toBeUndefined()
   })
 
+  it("carries model, memory, and metadata defaults as agent data", () => {
+    const model = { provider: "test", model: "deterministic", registrationKey: "primary" }
+    const memory = { agent: "defaults-agent", subject: "subject-1" }
+    const metadata = { audience: "internal", revision: 1 }
+
+    const agent = Agent.make("defaults-agent", { model, memory, metadata })
+
+    expect(agent.model).toEqual(model)
+    expect(agent.memory).toEqual(memory)
+    expect(agent.metadata).toEqual(metadata)
+  })
+
   it("constructs AgentError without a cause", () => {
     const error = new AgentEvent.AgentError({ message: "boom", turn: 0 })
 
@@ -275,6 +289,65 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       expect(result.text).toBe("minimal done")
     }).pipe(Effect.provide(modelLayer(() => Stream.make(textDelta("minimal done"))))),
   )
+
+  it.effect("uses the agent model default through ModelRegistry", () =>
+    Effect.gen(function* () {
+      const registration = yield* ModelRegistry.registrationFromLayer({
+        provider: "test",
+        model: "agent-default",
+        layer: modelLayer(() => Stream.make(textDelta("registry done"))),
+      })
+      const agent = Agent.make("model-default-agent", {
+        model: { provider: "test", model: "agent-default" },
+      })
+
+      const result = yield* Agent.generate(agent, { prompt: "hello" }).pipe(
+        Effect.provide(ModelRegistry.memoryLayer([registration])),
+      )
+
+      expect(result.text).toBe("registry done")
+    }),
+  )
+
+  it.effect("uses the agent memory default when run options omit memory", () => {
+    const key = { agent: "memory-default-agent", subject: "subject-1" }
+    let recalled = false
+    let rememberedKey: Memory.Key | undefined
+
+    return Effect.gen(function* () {
+      const agent = Agent.make("memory-default-agent", { memory: key })
+
+      const result = yield* Agent.generate(agent, { prompt: "live prompt" })
+
+      expect(recalled).toBe(true)
+      expect(rememberedKey).toEqual(key)
+      expect(result.text).toBe("saw memory")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) =>
+            Stream.make(
+              textDelta(
+                JSON.stringify(options.prompt.content).includes("stored fact") ? "saw memory" : "missing memory",
+              ),
+            ),
+          ),
+          Memory.testLayer({
+            recall: (input) =>
+              Effect.sync(() => {
+                recalled = input.key.agent === key.agent && input.key.subject === key.subject
+                return [{ id: "memory-default-item", parts: [Prompt.makePart("text", { text: "stored fact" })] }]
+              }),
+            remember: (input) =>
+              Effect.sync(() => {
+                rememberedKey = input.key
+              }),
+            forget: () => Effect.void,
+          }),
+        ),
+      ),
+    )
+  })
 
   it.effect("executes Effect toolkit handlers without a ToolExecutor layer", () => {
     let calls = 0

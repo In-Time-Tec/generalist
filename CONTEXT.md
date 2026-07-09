@@ -8,7 +8,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 
 ## Domain model
 
-- **Agent**: an agent definition value (name, instructions, toolkit, model, turn policy) carrying its own defaults. `Agent.make` builds it; `Agent.stream` is the text loop primitive, `Agent.generate` is derived from it, and `Agent.streamObject` / `Agent.generateObject` run the same loop followed by one terminal structured-output turn. An Agent is not a user, bot, or account.
+- **Agent**: an agent definition value (name, instructions, toolkit, model selection, memory key, turn policy, and metadata) carrying its own defaults. `Agent.make` builds it; `Agent.stream` is the text loop primitive, `Agent.generate` is derived from it, and `Agent.streamObject` / `Agent.generateObject` run the same loop followed by one terminal structured-output turn. An Agent is not a user, bot, or account.
 - **Turn**: one model call plus the sequential execution of the tool calls it emits. Turn 0 always runs; follow-up turns re-feed tool results via `Ai.Prompt.fromResponseParts(...)`.
 - **TurnPolicy**: a plain, `Schedule`-inspired value (not a service) that decides whether to run another turn when tool results are pending. Constructors: `recurs`, `untilToolCall`, `both`, `make`. Default `recurs(8)`.
 - **ToolExecutor**: the tool-call execution seam. `execute(request) => Effect<Outcome>` where `Outcome` is `Success | Failure | Suspend`. Default `fromToolkit` runs the toolkit's own handlers in-process; hosts swap in their own.
@@ -45,7 +45,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Permission policy is optional. Absent `Permissions` preserves existing tool execution and `needsApproval` behavior exactly.
 - Instructions context baselines are opened at run start; dynamic context updates are rendered separately and are not injected until the compaction/update contract does so.
 - SkillSource is optional and standalone. Absent `SkillSource`, the Agent loop does not advertise skill listings or the `activate_skill` tool.
-- Memory is optional and per-run. Baton never derives a memory subject; hosts pass `RunOptions.memory.key` explicitly.
+- Memory is optional and host-chosen. Baton never derives a memory subject; hosts pass either `Agent.make({ memory })` as an agent default or `RunOptions.memory.key` for a run-specific override.
 - Memory forget is host-requested cleanup. Baton never infers memory retention or calls forget from the agent loop. `ForgetInput.id` narrows cleanup to one implementation-owned memory item within the exact key; omitting it drops the whole key.
 - Provider helpers are optional and standalone. Core never imports provider SDKs; provider dependencies live in `@batonfx/providers`.
 - Steering is optional. Absent `Steering` preserves current turn and completion behavior exactly.

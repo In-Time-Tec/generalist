@@ -45,8 +45,8 @@ export interface SessionInfo {
 }
 
 /** @experimental */
-export interface MemoryOptions<Tools extends Record<string, Tool.Any>> {
-  readonly agent: Agent.Agent<Tools>
+export interface MemoryOptions<Tools extends Record<string, Tool.Any>, HasModel extends boolean = boolean> {
+  readonly agent: Agent.Agent<Tools, HasModel>
   readonly ringBufferCapacity?: number
   readonly subscriberQueueCapacity?: number
   readonly idleTimeout?: Duration.Input
@@ -160,14 +160,14 @@ const toApprovalDecision = (decision: ClientApproval): Approvals.Decision => {
 }
 
 /** @experimental */
-export const layerMemory = <Tools extends Record<string, Tool.Any>>(
-  options: MemoryOptions<Tools>,
-): Layer.Layer<SessionRegistry, never, Agent.RunServices<Tools> | Chat.Persistence> =>
+export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
+  options: MemoryOptions<Tools, HasModel>,
+): Layer.Layer<SessionRegistry, never, Agent.RunServices<Tools, HasModel> | Chat.Persistence> =>
   Layer.effect(
     SessionRegistry,
     Effect.gen(function* () {
       const scope = yield* Effect.scope
-      const context = yield* Effect.context<Agent.RunServices<Tools> | Chat.Persistence>()
+      const context = yield* Effect.context<Agent.RunServices<Tools, HasModel> | Chat.Persistence>()
       const approvals = yield* Effect.serviceOption(Approvals.Approvals)
       const persistence = yield* Chat.Persistence
       const state = yield* Ref.make<RegistryState>({ sessions: new Map(), nextSubscriberId: 0 })

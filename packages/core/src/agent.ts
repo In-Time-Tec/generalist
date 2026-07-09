@@ -18,6 +18,7 @@ import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage, i
 import { Instructions, openEpoch } from "./instructions"
 import { type Item, type Key, Memory, type MemoryError } from "./memory"
 import { type Middleware, ModelMiddleware, type TurnContext } from "./model-middleware"
+import { type ModelEnvironment, type ModelSelection, Service } from "./model-registry"
 import { ModelResilience, apply } from "./model-resilience"
 import { type Answer, type Pending, type PermissionError, Permissions, RuleStore } from "./permissions"
 import { type Entry, SessionStore, type SessionStoreError } from "./session"
@@ -30,11 +31,19 @@ import { defaultPolicy, type TurnOverrides, type TurnPolicy } from "./turn-polic
 
 type CompactionResult = import("./compaction").Result
 /** @experimental An agent definition: a plain value, not a service. */
-export interface Agent<Tools extends Record<string, Tool.Any> = {}> {
+export interface Agent<Tools extends Record<string, Tool.Any> = {}, HasModel extends boolean = boolean> {
   readonly name: string
   readonly instructions?: string
   readonly toolkit: Toolkit.Toolkit<Tools>
   readonly policy: TurnPolicy
+  readonly model?: HasModel extends true ? ModelSelection : ModelSelection
+  readonly memory?: Key
+  readonly metadata?: Readonly<Record<string, unknown>>
+}
+
+/** @experimental */
+export interface WithModelDefault {
+  readonly model: ModelSelection
 }
 
 /** @experimental */
@@ -42,6 +51,9 @@ export interface MakeOptions<Tools extends Record<string, Tool.Any> = {}> {
   readonly instructions?: string
   readonly toolkit?: Toolkit.Toolkit<Tools>
   readonly policy?: TurnPolicy
+  readonly model?: ModelSelection
+  readonly memory?: Key
+  readonly metadata?: Readonly<Record<string, unknown>>
 }
 
 /** @experimental */
@@ -52,19 +64,31 @@ export interface MakeObjectOptions<Tools extends Record<string, Tool.Any> = {}> 
 /** @experimental Defaults: empty toolkit, `defaultPolicy`. */
 export function make<Tools extends Record<string, Tool.Any> = {}>(
   name: string,
+  options: MakeOptions<Tools> & WithModelDefault,
+): Agent<Tools, true>
+export function make<Tools extends Record<string, Tool.Any> = {}>(
+  name: string,
   options?: MakeOptions<Tools>,
-): Agent<Tools>
-export function make<Tools extends Record<string, Tool.Any> = {}>(options: MakeObjectOptions<Tools>): Agent<Tools>
+): Agent<Tools, false>
+export function make<Tools extends Record<string, Tool.Any> = {}>(
+  options: MakeObjectOptions<Tools> & WithModelDefault,
+): Agent<Tools, true>
+export function make<Tools extends Record<string, Tool.Any> = {}>(
+  options: MakeObjectOptions<Tools>,
+): Agent<Tools, false>
 export function make<Tools extends Record<string, Tool.Any> = {}>(
   nameOrOptions: string | MakeObjectOptions<Tools>,
   options: MakeOptions<Tools> = {},
-): Agent<Tools> {
+): Agent<Tools, boolean> {
   const resolved = typeof nameOrOptions === "string" ? { ...options, name: nameOrOptions } : nameOrOptions
   return {
     name: resolved.name,
     ...(resolved.instructions === undefined ? {} : { instructions: resolved.instructions }),
     toolkit: resolved.toolkit ?? (Toolkit.empty as unknown as Toolkit.Toolkit<Tools>),
     policy: resolved.policy ?? defaultPolicy,
+    ...(resolved.model === undefined ? {} : { model: resolved.model }),
+    ...(resolved.memory === undefined ? {} : { memory: resolved.memory }),
+    ...(resolved.metadata === undefined ? {} : { metadata: resolved.metadata }),
   }
 }
 
@@ -148,9 +172,9 @@ interface StructuredRunConfig<StructuredOutputSchema extends ObjectSchema> {
 export type RunError = AgentError | AgentSuspended | TurnLimitExceeded | MiddlewareViolation
 
 /** @experimental Services required to run an agent. */
-export type RunServices<Tools extends Record<string, Tool.Any> = {}> =
-  | LanguageModel.LanguageModel
+export type RunServices<Tools extends Record<string, Tool.Any> = {}, HasModel extends boolean = boolean> =
   | Tool.HandlersFor<Tools>
+  | (HasModel extends true ? Service : LanguageModel.LanguageModel)
 
 type AnyToolCall = Response.ToolCallPart<string, unknown>
 
@@ -267,11 +291,15 @@ const applyPartChain = (
     return current
   })
 
-const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
-  agent: Agent<Tools>,
+const streamInternal = <
+  Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean,
+  StructuredOutputSchema extends ObjectSchema,
+>(
+  agent: Agent<Tools, HasModel>,
   options: RunOptions,
   structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
-): Stream.Stream<Event, RunError, RunServices<Tools> | StructuredOutputSchema["DecodingServices"]> =>
+): Stream.Stream<Event, RunError, RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]> =>
   Stream.unwrap(
     Effect.gen(function* () {
       const executor = yield* Effect.serviceOption(ToolExecutor)
@@ -350,6 +378,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
       // Resolve `Chat.Persistence` optionally so `stream`'s `R` does not grow.
       const persistenceService = yield* Effect.serviceOption(Chat.Persistence)
       const resilienceService = yield* Effect.serviceOption(ModelResilience)
+      const modelRegistryService = yield* Effect.serviceOption(Service)
       const permissionsService = yield* Effect.serviceOption(Permissions)
       const steeringService = yield* Effect.serviceOption(Steering)
       const compactionService = yield* Effect.serviceOption(Compaction)
@@ -357,7 +386,26 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
       const sessionService = yield* Effect.serviceOption(SessionStore)
       const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
       const persistenceOptions = options.persistence
-      const memoryOptions = options.memory
+      const memoryOptions = options.memory ?? (agent.memory === undefined ? undefined : { key: agent.memory })
+      const agentModel = agent.model
+      const agentModelContext =
+        agentModel === undefined
+          ? undefined
+          : yield* Option.match(modelRegistryService, {
+              onNone: () =>
+                Effect.fail(
+                  new AgentError({
+                    message: "Agent.model requires ModelRegistry in context",
+                    turn: 0,
+                  }),
+                ),
+              onSome: (registry) =>
+                registry
+                  .provide(agentModel, Effect.context<ModelEnvironment>())
+                  .pipe(
+                    Effect.mapError((error) => new AgentError({ message: errorMessage(error), turn: 0, cause: error })),
+                  ),
+            })
       const memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined =
         memoryOptions === undefined
           ? undefined
@@ -367,7 +415,10 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
                 onNone: () =>
                   Effect.fail(
                     new AgentError({
-                      message: "RunOptions.memory requires Memory in context",
+                      message:
+                        options.memory === undefined
+                          ? "Agent.memory requires Memory in context"
+                          : "RunOptions.memory requires Memory in context",
                       turn: 0,
                     }),
                   ),
@@ -909,6 +960,12 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
             ),
         })
 
+      const withAgentModel = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+        agentModelContext === undefined ? effect : effect.pipe(Effect.provide(agentModelContext))
+
+      const provideAgentModel = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
+        agentModelContext === undefined ? stream : stream.pipe(Stream.provideContext(agentModelContext))
+
       const partEvents = (
         turn: number,
         part: Response.StreamPart<Record<string, Tool.Any>>,
@@ -978,7 +1035,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
         turn: number,
         prompt: Prompt.RawInput,
         overrides?: TurnOverrides,
-      ): Stream.Stream<Event, RunError, RunServices<Tools>> => {
+      ): Stream.Stream<Event, RunError, RunServices<Tools, HasModel>> => {
         const toolkit = overrides?.activeTools === undefined ? currentToolkit() : activeToolkit(overrides.activeTools)
         const attempt = (
           activePrompt: Prompt.Prompt,
@@ -1039,7 +1096,11 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
               ),
             ),
         })
-        return overrides?.model === undefined ? resilientParts : resilientParts.pipe(Stream.provide(overrides.model))
+        return (
+          overrides?.model === undefined
+            ? provideAgentModel(resilientParts)
+            : resilientParts.pipe(Stream.provide(overrides.model))
+        ) as Stream.Stream<Event, RunError, RunServices<Tools, HasModel>>
       }
 
       const turnCompletedEvent = (turn: number, transcript: Prompt.Prompt): TurnCompleted => ({
@@ -1068,13 +1129,15 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
               agentName: agent.name,
               turn: structuredTurn,
             })
-            const response = yield* withModelResilience(
-              chat.generateObject({
-                prompt: transformedPrompt,
-                schema: config.schema,
-                objectName: config.objectName,
-                toolChoice: "none",
-              }),
+            const response = yield* withAgentModel(
+              withModelResilience(
+                chat.generateObject({
+                  prompt: transformedPrompt,
+                  schema: config.schema,
+                  objectName: config.objectName,
+                  toolChoice: "none",
+                }),
+              ),
             ).pipe(
               Effect.mapError(
                 (error) => new AgentError({ message: errorMessage(error), turn: structuredTurn, cause: error }),
@@ -1297,17 +1360,21 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
   ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } }))
 
 /** @experimental The text primitive; everything else derives from it. */
-export const stream = <Tools extends Record<string, Tool.Any>>(
-  agent: Agent<Tools>,
+export const stream = <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
+  agent: Agent<Tools, HasModel>,
   options: RunOptions,
-): Stream.Stream<Event, RunError, RunServices<Tools>> =>
-  streamInternal(agent, options, undefined) as Stream.Stream<Event, RunError, RunServices<Tools>>
+): Stream.Stream<Event, RunError, RunServices<Tools, HasModel>> =>
+  streamInternal(agent, options, undefined) as Stream.Stream<Event, RunError, RunServices<Tools, HasModel>>
 
 /** @experimental `stream` plus one terminal structured-output turn before `Completed`. */
-export const streamObject = <Tools extends Record<string, Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
-  agent: Agent<Tools>,
+export const streamObject = <
+  Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean,
+  StructuredOutputSchema extends ObjectSchema,
+>(
+  agent: Agent<Tools, HasModel>,
   options: ObjectRunOptions<StructuredOutputSchema>,
-): Stream.Stream<Event, RunError, RunServices<Tools> | StructuredOutputSchema["DecodingServices"]> =>
+): Stream.Stream<Event, RunError, RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]> =>
   streamInternal(agent, options, {
     schema: options.schema,
     objectName: options.objectName ?? "output",
@@ -1327,10 +1394,10 @@ export interface ObjectResult<A> extends Result {
 }
 
 /** @experimental `stream` folded to its `Completed` event. */
-export const generate = <Tools extends Record<string, Tool.Any>>(
-  agent: Agent<Tools>,
+export const generate = <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
+  agent: Agent<Tools, HasModel>,
   options: RunOptions,
-): Effect.Effect<Result, RunError, RunServices<Tools>> =>
+): Effect.Effect<Result, RunError, RunServices<Tools, HasModel>> =>
   Stream.runLast(stream(agent, options)).pipe(
     Effect.flatMap(
       Option.match({
@@ -1344,13 +1411,17 @@ export const generate = <Tools extends Record<string, Tool.Any>>(
   )
 
 /** @experimental `streamObject` folded to its `StructuredOutput` and `Completed` events. */
-export const generateObject = <Tools extends Record<string, Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
-  agent: Agent<Tools>,
+export const generateObject = <
+  Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean,
+  StructuredOutputSchema extends ObjectSchema,
+>(
+  agent: Agent<Tools, HasModel>,
   options: ObjectRunOptions<StructuredOutputSchema>,
 ): Effect.Effect<
   ObjectResult<StructuredOutputSchema["Type"]>,
   RunError,
-  RunServices<Tools> | StructuredOutputSchema["DecodingServices"]
+  RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]
 > =>
   Stream.runFold(
     streamObject(agent, options),
