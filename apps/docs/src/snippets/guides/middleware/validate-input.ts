@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Option, Stream } from "effect"
-import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, Approvals, Guardrail, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, Guardrail, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 const blockInjection = Guardrail.validateInput((prompt) =>
   Effect.succeed(

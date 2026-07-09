@@ -1,7 +1,6 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
+import { Agent, Approvals, Chat, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "@batonfx/core"
 import { SessionRegistry } from "@batonfx/transport"
 
 const deployTool = Tool.make("deploy", {

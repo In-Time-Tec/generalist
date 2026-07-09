@@ -11,7 +11,7 @@ export const foldkitReference = definePage({
     ),
     command("Install", "bun add foldkit@0.122.0 @batonfx/transport @batonfx/foldkit"),
     p(
-      "Published on npm at 0.1.1. Depends on ",
+      "Published on npm at 0.3.0. Depends on ",
       code("@batonfx/transport"),
       "; peer dependencies are ",
       code("effect >=4.0.0-beta.88 <4.0.1"),

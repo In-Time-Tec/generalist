@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Option, Stream } from "effect"
-import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, Approvals, Instructions, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, Instructions, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 const persona = Instructions.staticSource("persona", "You are the release-notes assistant.")
 

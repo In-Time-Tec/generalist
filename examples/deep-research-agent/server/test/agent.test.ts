@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { Prompt } from "effect/unstable/ai"
+import { Prompt } from "@batonfx/core"
 import { agent } from "../src/agent"
 
 describe("deep-research-agent definition", () => {

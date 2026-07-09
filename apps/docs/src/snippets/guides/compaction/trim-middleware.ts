@@ -1,6 +1,5 @@
 import { Effect, Layer } from "effect"
-import { Prompt } from "effect/unstable/ai"
-import { ModelMiddleware } from "@batonfx/core"
+import { ModelMiddleware, Prompt } from "@batonfx/core"
 
 const maxUserChars = 8_000
 

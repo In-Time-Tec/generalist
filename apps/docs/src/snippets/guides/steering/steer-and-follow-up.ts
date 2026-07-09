@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, ModelMiddleware, Steering } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Steering, Tool, Toolkit } from "@batonfx/core"
 
 const statusTool = Tool.make("check_status", {
   description: "Check the deploy status of a service",

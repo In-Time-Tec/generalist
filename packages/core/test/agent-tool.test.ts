@@ -76,6 +76,51 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     })
   })
 
+  it.effect("ToolExecutor.router dispatches named routes without redefining tools", () => {
+    const lookupTool = Tool.make("lookup", {
+      parameters: Schema.Struct({ id: Schema.String }),
+      success: Schema.Struct({ source: Schema.String, id: Schema.String }),
+    })
+    const toolkit = Toolkit.make(lookupTool)
+
+    return Effect.gen(function* () {
+      const executor = yield* ToolExecutor.ToolExecutor
+      const lookup = yield* executor.execute(request("lookup", { id: "local" }))
+      const remote = yield* executor.execute(request("remote", {}))
+      const missing = yield* executor.execute(request("missing", {}))
+
+      expect(lookup).toEqual({
+        _tag: "Success",
+        result: { source: "toolkit", id: "local" },
+        encodedResult: { source: "toolkit", id: "local" },
+      })
+      expect(remote).toEqual({
+        _tag: "Success",
+        result: { source: "remote" },
+        encodedResult: { source: "remote" },
+      })
+      expect(missing).toEqual({ _tag: "Failure", message: "Tool missing is not registered" })
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          ToolExecutor.router([
+            ToolExecutor.routeToolkit(toolkit),
+            ToolExecutor.route({
+              tools: ["remote"],
+              execute: () =>
+                Effect.succeed({
+                  _tag: "Success",
+                  result: { source: "remote" },
+                  encodedResult: { source: "remote" },
+                }),
+            }),
+          ]).pipe(Layer.provide(toolkit.toLayer({ lookup: ({ id }) => Effect.succeed({ source: "toolkit", id }) }))),
+          ToolContext.layerDefault,
+        ),
+      ),
+    )
+  })
+
   it.effect("exposes a child agent as a parent tool", () => {
     let parentCalls = 0
     return Effect.gen(function* () {

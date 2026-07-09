@@ -1,6 +1,5 @@
 import { Effect } from "effect"
-import { Prompt } from "effect/unstable/ai"
-import { Agent, TurnPolicy } from "@batonfx/core"
+import { Agent, Prompt, TurnPolicy } from "@batonfx/core"
 
 const approximateTokens = (history: Prompt.Prompt): number => Math.ceil(JSON.stringify(history.content).length / 4)
 

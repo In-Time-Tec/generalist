@@ -43,6 +43,23 @@ export class ToolExecutor extends Context.Service<ToolExecutor, Interface>()("@b
 /** @experimental */
 export type ToolkitInput<Tools extends Record<string, Tool.Any>> = Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
 
+/** @experimental */
+export interface Route {
+  readonly tools: ReadonlyArray<string>
+  readonly matches: (request: Request) => boolean
+  readonly execute: Interface["execute"]
+}
+
+/** @experimental */
+export interface RouteOptions {
+  readonly tools?: ReadonlyArray<string> | undefined
+  readonly matches?: ((request: Request) => boolean) | undefined
+  readonly execute: Interface["execute"]
+}
+
+/** @experimental */
+export type RouteInput<R = never> = Route | Effect.Effect<Route, never, R>
+
 const failureMessage = (cause: Cause.Cause<unknown>): string => {
   const error = Cause.squash(cause)
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -138,6 +155,53 @@ export function fromToolkit<Tools extends Record<string, Tool.Any>>(
     ),
   )
 }
+
+/** @experimental */
+export const route = (options: RouteOptions): Route => {
+  const routedTools = options.tools ?? []
+  return {
+    tools: routedTools,
+    matches: (request) => routedTools.includes(request.call.name) || options.matches?.(request) === true,
+    execute: options.execute,
+  }
+}
+
+/** @experimental */
+export function routeToolkit<Tools extends Record<string, Tool.Any>>(toolkit: Toolkit.WithHandler<Tools>): Route
+export function routeToolkit<Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.Toolkit<Tools>,
+): Effect.Effect<Route, never, Tool.HandlersFor<Tools>>
+export function routeToolkit<Tools extends Record<string, Tool.Any>>(
+  toolkit: ToolkitInput<Tools>,
+): RouteInput<Tool.HandlersFor<Tools>> {
+  const makeRoute = (handled: Toolkit.WithHandler<Tools>) =>
+    route({
+      tools: Object.keys(handled.tools),
+      execute: (request) => executeWithToolkit(handled, request),
+    })
+  return "handle" in toolkit ? makeRoute(toolkit) : toolkit.pipe(Effect.map(makeRoute))
+}
+
+const routeInputEffect = <R>(input: RouteInput<R>): Effect.Effect<Route, never, R> =>
+  Effect.isEffect(input) ? input : Effect.succeed(input)
+
+/** @experimental */
+export const router = <R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R> =>
+  Layer.effect(
+    ToolExecutor,
+    Effect.all(Array.from(routes, routeInputEffect)).pipe(
+      Effect.map((resolved) =>
+        ToolExecutor.of({
+          execute: (request) => {
+            const matched = resolved.find((candidate) => candidate.matches(request))
+            return matched === undefined
+              ? Effect.succeed(failureOutcome(`Tool ${request.call.name} is not registered`))
+              : matched.execute(request)
+          },
+        }),
+      ),
+    ),
+  )
 
 /** @experimental */
 export const testLayer = (implementation: Interface): Layer.Layer<ToolExecutor> =>

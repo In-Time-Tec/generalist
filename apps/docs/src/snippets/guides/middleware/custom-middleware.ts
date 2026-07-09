@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Option, Stream } from "effect"
-import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 const dropReasoning: ModelMiddleware.Middleware = {
   transformPart: (part) => Effect.succeed(part.type === "reasoning-delta" ? Option.none() : Option.some(part)),

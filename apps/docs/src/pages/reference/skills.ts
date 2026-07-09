@@ -10,7 +10,7 @@ export const skillsReference = definePage({
       "@batonfx/skills implements the core SkillSource seam from the filesystem: SkillLoader discovers SKILL.md files, and InstructionFiles loads AGENTS.md/CLAUDE.md instruction files.",
     ),
     command("Install", "bun add @batonfx/core @batonfx/skills"),
-    p("Published on npm at 0.1.1. Requires ", code("@batonfx/core"), "."),
+    p("Published on npm at 0.3.0. Requires ", code("@batonfx/core"), "."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],

@@ -1,9 +1,8 @@
 // @vitest-environment happy-dom
 
-import { AgentEvent } from "@batonfx/core"
+import { AgentEvent, Response } from "@batonfx/core"
 import { Chat } from "@batonfx/foldkit"
 import { Wire } from "@batonfx/transport"
-import { Response } from "effect/unstable/ai"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
 import { GotChatMessage, OpenedSession, SessionReady, init, type Model, update } from "./main"

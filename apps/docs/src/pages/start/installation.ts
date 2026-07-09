@@ -10,10 +10,10 @@ export const installation = definePage({
   navTitle: "Installation",
   group: "Start",
   description:
-    "Install @batonfx/core and @batonfx/providers with the pinned Effect beta, plus the package matrix for all seven published packages at 0.1.1.",
+    "Install @batonfx/core and @batonfx/providers with the pinned Effect beta, plus the package matrix for all seven published packages at 0.3.0.",
   content: [
     lead(
-      "Batonfx ships as seven packages on npm, all at 0.1.1. Most projects start with the core loop and the provider helpers.",
+      "Batonfx ships as seven packages on npm, all at 0.3.0. Most projects start with the core loop and the provider helpers.",
     ),
     codeBlock({ label: "Terminal", language: "bash", source: bunInstall }),
     p("With npm or pnpm:"),
@@ -21,7 +21,7 @@ export const installation = definePage({
     callout(
       "warning",
       "Pin the Effect beta",
-      "Batonfx 0.1.x is built and tested against ",
+      "Batonfx 0.3.x is built and tested against ",
       code("effect@4.0.0-beta.93"),
       ". The ",
       code("effect/unstable/ai"),
@@ -34,27 +34,27 @@ export const installation = definePage({
       [
         [
           [code("@batonfx/core")],
-          "0.1.1",
+          "0.3.0",
           "The agent loop: events, typed suspension, turn policy, tools, approvals, permissions, steering, compaction",
         ],
         [
           [code("@batonfx/providers")],
-          "0.1.1",
+          "0.3.0",
           "Model registration for OpenAI, Anthropic, OpenRouter, and OpenAI-compatible APIs, plus the deterministic local model",
         ],
-        [[code("@batonfx/mcp")], "0.1.1", "MCP discovery and the Baton ToolExecutor adapter"],
-        [[code("@batonfx/skills")], "0.1.1", "SKILL.md and instruction-file sources"],
-        [[code("@batonfx/memory")], "0.1.1", "Working memory, vector store, semantic recall"],
+        [[code("@batonfx/mcp")], "0.3.0", "MCP discovery and the Baton ToolExecutor adapter"],
+        [[code("@batonfx/skills")], "0.3.0", "SKILL.md and instruction-file sources"],
+        [[code("@batonfx/memory")], "0.3.0", "Working memory, vector store, semantic recall"],
         [
           [code("@batonfx/transport")],
-          "0.1.1",
+          "0.3.0",
           "Wire frames, in-memory session registry, SSE and WebSocket serving, client adapters",
         ],
-        [[code("@batonfx/foldkit")], "0.1.1", "FoldKit connection service and headless chat model"],
+        [[code("@batonfx/foldkit")], "0.3.0", "FoldKit connection service and headless chat model"],
       ],
     ),
     h2("effect-compatibility", "Effect compatibility"),
-    table(["Batonfx release", "Tested Effect version"], [[[code("0.1.x")], [code("effect@4.0.0-beta.93")]]]),
+    table(["Batonfx release", "Tested Effect version"], [[[code("0.3.x")], [code("effect@4.0.0-beta.93")]]]),
     p(
       code("@batonfx/foldkit"),
       " additionally declares peer ranges ",

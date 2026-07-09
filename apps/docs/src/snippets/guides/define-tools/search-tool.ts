@@ -1,5 +1,5 @@
 import { Context, Effect, Schema } from "effect"
-import { Tool, Toolkit } from "effect/unstable/ai"
+import { Tool, Toolkit } from "@batonfx/core"
 export interface DocsIndexInterface {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<string>>
 }

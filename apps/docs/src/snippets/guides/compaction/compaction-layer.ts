@@ -1,6 +1,5 @@
 import { Effect, Layer } from "effect"
-import { LanguageModel } from "effect/unstable/ai"
-import { Agent, Approvals, Compaction, ModelMiddleware, ToolExecutor, ToolOutput } from "@batonfx/core"
+import { Agent, Approvals, Compaction, LanguageModel, ModelMiddleware, ToolExecutor, ToolOutput } from "@batonfx/core"
 
 const agent = Agent.make({ name: "long-running-assistant" })
 

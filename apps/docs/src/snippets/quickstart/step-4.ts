@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "@batonfx/core"
 
 const weatherTool = Tool.make("get_weather", {
   description: "Get local weather for a city",

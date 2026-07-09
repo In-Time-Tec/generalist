@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, Approvals, Memory, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, Memory, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 import { WorkingMemory } from "@batonfx/memory"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]

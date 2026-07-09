@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Stream } from "effect"
-import { LanguageModel, Prompt } from "effect/unstable/ai"
+import { LanguageModel, Prompt } from "@batonfx/core"
 import { withOpenRouterOrDeterministic } from "../src/model"
 import { testLayer } from "../src/search-provider"
 import { toolkit, toolkitLayer } from "../src/tools"

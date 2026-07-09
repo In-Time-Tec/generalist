@@ -1,8 +1,17 @@
 import { Effect, Layer, Schema, Stream } from "effect"
-import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import {
+  Agent,
+  Approvals,
+  Chat,
+  LanguageModel,
+  ModelMiddleware,
+  Response,
+  Tool,
+  ToolExecutor,
+  Toolkit,
+} from "@batonfx/core"
 import { SessionRegistry, Sse, Ws } from "@batonfx/transport"
 
 const searchTool = Tool.make("web_search", {

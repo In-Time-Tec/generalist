@@ -2,7 +2,7 @@
 
 Baton (`@batonfx/core`, directory `packages/core`) is a standalone, **non-durable**, Effect-native agent loop over `effect/unstable/ai`. Baton is the agent; a durable runtime such as [Relay](https://github.com/In-Time-Tec/relayfx) is the durable race it runs in. Use Baton alone when you just need an agent or chat streaming; compose it with a durable runtime when you need durability.
 
-Baton is the _Effect_ version of an agent framework, not a port of AI SDK/Mastra vocabulary. Payload vocabulary is `Ai.Prompt`/`Ai.Response` from `effect/unstable/ai` — Baton adds loop framing only, no second wire format.
+Baton is the _Effect_ version of an agent framework, not a port of AI SDK/Mastra vocabulary. Payload vocabulary is `Ai.Prompt`/`Ai.Response` from `effect/unstable/ai` — Baton adds loop framing only, no second wire format. `@batonfx/core` directly re-exports selected Effect AI modules (`Tool`, `Toolkit`, `LanguageModel`, `Prompt`, `Response`, `Chat`, `Tokenizer`, and related modules) as identity-preserving convenience exports; those values remain owned by Effect AI.
 
 Compatibility: this spec is tested against `effect` and `@effect/vitest` `4.0.0-beta.93`.
 
@@ -26,7 +26,17 @@ Baton does not own (deferred, see ADR-0001): UI helpers, concrete memory impleme
 
 ## Module inventory
 
-`packages/core/src` contains these intentional public module namespaces exported from `src/index.ts`:
+`packages/core/src` contains these intentional public module namespaces exported from `src/index.ts`. In addition to Baton-owned modules, the root entrypoint re-exports selected Effect AI modules directly from `effect/unstable/ai` so applications can import the agent loop and the upstream tool/model primitives from one place without Baton inventing a parallel tool model.
+
+| Effect AI export     | Baton stance                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| `Tool`, `Toolkit`    | Public tool definition/runtime primitives; used unchanged by `Agent.make` and `ToolExecutor`.     |
+| `LanguageModel`      | Upstream model service consumed by `Agent.stream`, `Agent.generate`, and `ModelRegistry`.         |
+| `Prompt`, `Response` | Upstream payload vocabulary for prompts, stream parts, tool calls, tool results, and transcripts. |
+| `Chat`, `Tokenizer`  | Upstream chat persistence and token-counting primitives used by Baton seams when provided.        |
+| other AI modules     | Transparent convenience exports only; ownership and semantics stay in Effect AI.                  |
+
+The Baton-owned modules are:
 
 | Module                | Export namespace  | Purpose                                                                                                   |
 | --------------------- | ----------------- | --------------------------------------------------------------------------------------------------------- |
@@ -91,7 +101,7 @@ Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run
 
 ## Service seams
 
-- **`ToolExecutor`** — optional override seam. When absent, Baton executes local tool calls through the active Effect AI toolkit handlers supplied by `Toolkit.toLayer(...)`. When present, `execute(request) => Effect<Outcome, AgentError>` where `request` includes `{ call, turn, agentName, sessionId }` and `Outcome` is `Success | Failure | Suspend`; this override remains the durable-host and remote-tool seam. `fromToolkit` still adapts an already handled toolkit for advanced composition.
+- **`ToolExecutor`** — optional override seam. When absent, Baton executes local tool calls through the active Effect AI toolkit handlers supplied by `Toolkit.toLayer(...)`. When present, `execute(request) => Effect<Outcome, AgentError>` where `request` includes `{ call, turn, agentName, sessionId }` and `Outcome` is `Success | Failure | Suspend`; this override remains the durable-host and remote-tool seam. `fromToolkit` still adapts an already handled toolkit for advanced composition. `route`, `routeToolkit`, and `router` compose placement routes by Effect AI tool-call name without adding a second tool definition model; unmatched calls return a failed tool outcome.
 - **`ToolContext`** — ambient per-call context available while `ToolExecutor.execute` runs. `ToolContext` carries `{ signal, emit, sessionId }`; the loop provides it around execution, and `layerDefault` provides a standalone never-aborting/no-op context with session `"local"` for direct tests or tools run outside the loop. `emit({ toolCallId, message?, data? })` becomes a `ToolProgress` event for the current turn.
 - **`ToolOutputStore`** — optional output spill seam used by `ToolOutput.bound`. `put(toolCallId, content) => Effect<Option<string>, ToolOutputError>` stores overflow and returns `Some(path)` when it spilled or `None` when the store declines; absent stores and `layerNoop` decline spill. The in-memory layer returns `mem:<id>` references and is non-durable. When spilling, Baton replaces both `result` and `encodedResult` with `ToolOutput { inline: { truncated: true, bytes, maxBytes, preview }, outputPaths: [path] }`; `preview` is a UTF-8 bounded string from the serialized encoded result.
 - **`Permissions`** — optional policy seam consulted for every local framework-executed tool call before `ToolExecutor` and before `Ai.Tool.needsApproval` / `Approvals`. `matches(pattern, tool, params)` and `evaluate(ruleset, tool, params)` are pure; `Permissions.evaluate(request)` returns `Allow | Deny | Ask`. `Deny` becomes a failed tool result, `Ask` emits `ApprovalRequested` and calls `await(pending)`, and `Option.none()` from `await` suspends through the existing approval suspension path. If absent, Baton behaves exactly as before.

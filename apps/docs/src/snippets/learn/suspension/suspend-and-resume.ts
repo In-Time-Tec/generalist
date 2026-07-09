@@ -1,6 +1,15 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, ModelMiddleware } from "@batonfx/core"
+import {
+  Agent,
+  AgentEvent,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Prompt,
+  Response,
+  Tool,
+  Toolkit,
+} from "@batonfx/core"
 
 const deployTool = Tool.make("deploy", {
   description: "Deploy a service to production",

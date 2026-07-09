@@ -1,7 +1,6 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import { Chat, LanguageModel, Response } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, Chat, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 import { SessionRegistry } from "@batonfx/transport"
 
 const agent = Agent.make({ name: "chat-agent" })

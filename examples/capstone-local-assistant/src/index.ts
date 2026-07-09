@@ -1,6 +1,16 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Compaction, Memory, ModelMiddleware, ModelRegistry, SkillSource } from "@batonfx/core"
+import {
+  Agent,
+  Approvals,
+  Compaction,
+  Memory,
+  ModelMiddleware,
+  ModelRegistry,
+  Response,
+  SkillSource,
+  Tool,
+  Toolkit,
+} from "@batonfx/core"
 import { Chat, Connection } from "@batonfx/foldkit"
 import { WorkingMemory } from "@batonfx/memory"
 import { Deterministic } from "@batonfx/providers"

@@ -1,6 +1,14 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, Approvals, Guardrail, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import {
+  Agent,
+  Approvals,
+  Guardrail,
+  LanguageModel,
+  ModelMiddleware,
+  Prompt,
+  Response,
+  ToolExecutor,
+} from "@batonfx/core"
 
 const lastUserText = (prompt: Prompt.Prompt): string => {
   const userMessages = prompt.content.filter((message) => message.role === "user")

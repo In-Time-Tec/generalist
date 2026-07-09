@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, Approvals, ModelMiddleware, SkillSource, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, SkillSource, ToolExecutor } from "@batonfx/core"
 
 const frontmatter: SkillSource.Frontmatter = {
   name: "release-notes",

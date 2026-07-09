@@ -11,7 +11,7 @@ export const mcpReference = definePage({
     ),
     command("Install", "bun add @batonfx/core @batonfx/mcp"),
     p(
-      "Published on npm at 0.1.1. Requires ",
+      "Published on npm at 0.3.0. Requires ",
       code("@batonfx/core"),
       " and depends on ",
       code("@modelcontextprotocol/sdk"),

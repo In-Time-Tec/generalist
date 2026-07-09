@@ -1,6 +1,15 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import {
+  Agent,
+  AgentEvent,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Response,
+  Tool,
+  ToolExecutor,
+  Toolkit,
+} from "@batonfx/core"
 
 const reportTool = Tool.make("fetch_report", {
   description: "Fetch a long-running report",

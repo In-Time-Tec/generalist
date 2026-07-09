@@ -18,3 +18,19 @@ export * as ToolContext from "./tool-context"
 export * as ToolExecutor from "./tool-executor"
 export * as ToolOutput from "./tool-output"
 export * as TurnPolicy from "./turn-policy"
+
+export {
+  AiError,
+  Chat,
+  EmbeddingModel,
+  IdGenerator,
+  LanguageModel,
+  Model,
+  Prompt,
+  Response,
+  ResponseIdTracker,
+  Telemetry,
+  Tokenizer,
+  Tool,
+  Toolkit,
+} from "effect/unstable/ai"

@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response } from "@batonfx/core"
 import { docsToolLayer } from "./executor"
 import { toolkit } from "./search-tool"
 

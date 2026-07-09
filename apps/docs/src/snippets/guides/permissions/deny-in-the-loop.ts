@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, ModelMiddleware, Permissions } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool, Toolkit } from "@batonfx/core"
 
 const dropTableTool = Tool.make("drop_table", {
   description: "Drop a database table",

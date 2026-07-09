@@ -4,19 +4,19 @@ export const versioningReference = definePage({
   title: "Versioning and releases",
   navTitle: "Versioning",
   group: "Reference",
-  description: "The published 0.1.1 set, the @experimental policy, effect compatibility, and the release train.",
+  description: "The published 0.3.0 set, the @experimental policy, effect compatibility, and the release train.",
   content: [
     lead(
-      "All seven @batonfx packages publish to npm as a coordinated train at the same version. The current version is 0.1.1.",
+      "All seven @batonfx packages publish to npm as a coordinated train at the same version. The current version is 0.3.0.",
     ),
     h2("published-set", "Published packages"),
     table(
       ["Package", "Version", "Subpath exports"],
       [
-        [[code("@batonfx/core")], [code("0.1.1")], [code(".")]],
+        [[code("@batonfx/core")], [code("0.3.0")], [code(".")]],
         [
           [code("@batonfx/providers")],
-          [code("0.1.1")],
+          [code("0.3.0")],
           [
             code("."),
             ", ",
@@ -37,12 +37,12 @@ export const versioningReference = definePage({
             code("./embedding"),
           ],
         ],
-        [[code("@batonfx/mcp")], [code("0.1.1")], [code("."), ", ", code("./baton")]],
-        [[code("@batonfx/skills")], [code("0.1.1")], [code(".")]],
-        [[code("@batonfx/memory")], [code("0.1.1")], [code(".")]],
+        [[code("@batonfx/mcp")], [code("0.3.0")], [code("."), ", ", code("./baton")]],
+        [[code("@batonfx/skills")], [code("0.3.0")], [code(".")]],
+        [[code("@batonfx/memory")], [code("0.3.0")], [code(".")]],
         [
           [code("@batonfx/transport")],
-          [code("0.1.1")],
+          [code("0.3.0")],
           [
             code("."),
             ", ",
@@ -59,17 +59,17 @@ export const versioningReference = definePage({
             code("./session-registry"),
           ],
         ],
-        [[code("@batonfx/foldkit")], [code("0.1.1")], [code(".")]],
+        [[code("@batonfx/foldkit")], [code("0.3.0")], [code(".")]],
       ],
     ),
-    p("Packages export Bun-friendly TypeScript source paths; the 0.1.x docs and examples intentionally target Bun."),
+    p("Packages export Bun-friendly TypeScript source paths; the 0.3.x docs and examples intentionally target Bun."),
     h2("experimental-policy", "The @experimental policy"),
     p(
       "Every public export carries ",
       code("@experimental"),
       " while ",
       code("effect/unstable/ai"),
-      " is itself unstable. The stable tier for 0.1.x is conceptual: the ",
+      " is itself unstable. The stable tier for 0.3.x is conceptual: the ",
       code("AgentEvent"),
       " union, the frozen error tags, ",
       code("Agent"),
@@ -86,7 +86,7 @@ export const versioningReference = definePage({
       ["Batonfx", "effect", "Notes"],
       [
         [
-          [code("0.1.x")],
+          [code("0.3.x")],
           [code("4.0.0-beta.93")],
           "The tested catalog version; each 0.x minor declares its tested beta",
         ],

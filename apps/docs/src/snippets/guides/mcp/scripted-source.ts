@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool } from "effect/unstable/ai"
-import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
+import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "@batonfx/core"
 import { McpToolSource } from "@batonfx/mcp"
 import { toolkit, toolkitLayer } from "@batonfx/mcp/baton"
 const source: McpToolSource.Interface = {

@@ -1,6 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,

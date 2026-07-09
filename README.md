@@ -1,13 +1,20 @@
 # BatonFX
 
-BatonFX is the **Effect-native agent framework**: a standalone, non-durable model-turn loop over `effect/unstable/ai` with typed tools, typed suspension, provider layers, memory, skills, transport, and UI adapters that compose as Effect services.
+BatonFX is the **Effect-native agent framework**: a standalone, non-durable model-turn loop over `effect/unstable/ai` with typed tools, typed suspension, provider layers, memory, skills, transport, and UI adapters that compose as Effect services. `@batonfx/core` directly re-exports Effect AI primitives such as `Tool`, `Toolkit`, `LanguageModel`, `Prompt`, `Response`, `Chat`, and `Tokenizer`; those exports are the upstream Effect AI values, not Baton wrappers.
 
 ```ts
-import { Effect, Layer } from "effect"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
+import { Effect, Layer, Schema } from "effect"
+import { Agent, ModelRegistry, Tool, Toolkit } from "@batonfx/core"
 import { Deterministic } from "@batonfx/providers"
 
-const agent = Agent.make({ name: "assistant", instructions: "Be concise." })
+const searchTool = Tool.make("search_docs", {
+  description: "Search local docs",
+  parameters: { query: Schema.String },
+  success: Schema.Array(Schema.String),
+})
+
+const toolkit = Toolkit.make(searchTool)
+const agent = Agent.make({ name: "assistant", instructions: "Be concise.", toolkit })
 
 const program = ModelRegistry.provide(
   { provider: "deterministic", model: "local" },
@@ -16,9 +23,7 @@ const program = ModelRegistry.provide(
   Effect.provide(
     Layer.mergeAll(
       Deterministic.withDeterministic({ model: "local" }),
-      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      toolkit.toLayer({ search_docs: () => Effect.succeed(["Getting started"]) }),
     ),
   ),
 )
@@ -54,7 +59,7 @@ Baton seams are Effect services. You pay only for the seams you provide: a model
 
 | Baton release | Tested Effect range                               | Notes                                                                               |
 | ------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `0.1.x`       | `effect@4.0.0-beta.93` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| `0.3.x`       | `effect@4.0.0-beta.93` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 
 ## Start here
 

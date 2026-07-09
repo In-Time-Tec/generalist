@@ -1,6 +1,14 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, type AgentEvent, Approvals, ModelMiddleware } from "@batonfx/core"
+import {
+  Agent,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Response,
+  Tool,
+  Toolkit,
+  type AgentEvent,
+} from "@batonfx/core"
 
 const searchTool = Tool.make("search_docs", {
   description: "Search the project docs",

@@ -1,6 +1,14 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
-import { Agent, AgentTool, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import {
+  Agent,
+  AgentTool,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Response,
+  ToolExecutor,
+  Toolkit,
+} from "@batonfx/core"
 
 const summarizer = Agent.make({
   name: "summarizer",

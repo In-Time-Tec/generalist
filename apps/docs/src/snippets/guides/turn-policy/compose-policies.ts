@@ -1,6 +1,5 @@
 import { Schema } from "effect"
-import { Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, TurnPolicy } from "@batonfx/core"
+import { Agent, Tool, Toolkit, TurnPolicy } from "@batonfx/core"
 
 const submitAnswerTool = Tool.make("submit_answer", {
   description: "Submit the final answer",

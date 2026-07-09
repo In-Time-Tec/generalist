@@ -10,7 +10,7 @@ export const transportReference = definePage({
       "@batonfx/transport serves agent runs over SSE and WebSocket: a schema-defined wire protocol, an in-memory session registry with replay, server handlers, and a reconnecting client.",
     ),
     command("Install", "bun add @batonfx/core @batonfx/transport"),
-    p("Published on npm at 0.1.1. Requires ", code("@batonfx/core"), "."),
+    p("Published on npm at 0.3.0. Requires ", code("@batonfx/core"), "."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],

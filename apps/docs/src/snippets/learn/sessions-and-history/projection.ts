@@ -1,6 +1,5 @@
 import { Console, Effect } from "effect"
-import { Prompt } from "effect/unstable/ai"
-import { Session } from "@batonfx/core"
+import { Prompt, Session } from "@batonfx/core"
 
 const message = (entry: Prompt.Message): Session.AppendInput => ({ _tag: "Message", message: entry })
 

@@ -1,6 +1,6 @@
 import { OpenRouter } from "@batonfx/providers"
 import { Config, Effect, Layer, Option, Stream } from "effect"
-import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response } from "@batonfx/core"
 import { FetchHttpClient } from "effect/unstable/http"
 
 interface WebSearchSuccess {

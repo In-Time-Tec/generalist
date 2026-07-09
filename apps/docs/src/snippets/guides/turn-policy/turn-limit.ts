@@ -1,6 +1,15 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, ModelMiddleware, TurnPolicy } from "@batonfx/core"
+import {
+  Agent,
+  AgentEvent,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Response,
+  Tool,
+  Toolkit,
+  TurnPolicy,
+} from "@batonfx/core"
 
 const lookupTool = Tool.make("lookup", {
   description: "Look up one fact",

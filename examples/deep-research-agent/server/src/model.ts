@@ -1,6 +1,6 @@
 import { OpenRouter } from "@batonfx/providers"
 import { Effect, Layer, Option, Stream } from "effect"
-import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response } from "@batonfx/core"
 import { FetchHttpClient } from "effect/unstable/http"
 
 type StreamText = Parameters<typeof LanguageModel.make>[0]["streamText"]
