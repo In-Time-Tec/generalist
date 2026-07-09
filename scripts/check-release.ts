@@ -4,6 +4,7 @@ const workflow = readFileSync(".github/workflows/publish.yml", "utf8")
 
 const packages = [
   "packages/core",
+  "packages/test",
   "packages/skills",
   "packages/memory",
   "packages/providers",

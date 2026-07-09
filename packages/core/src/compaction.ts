@@ -26,6 +26,18 @@ Use Markdown with these sections:
 
 Do not mention that context was compacted.`
 
+/** @experimental Structured checkpoint schema used by structuredSummary. */
+export const AgentSummary = Schema.Struct({
+  goal: Schema.String,
+  facts: Schema.Array(Schema.String),
+  decisions: Schema.Array(Schema.String),
+  openQuestions: Schema.Array(Schema.String),
+  toolFindings: Schema.Array(Schema.String),
+})
+
+/** @experimental */
+export type AgentSummary = typeof AgentSummary.Type
+
 /** @experimental Token accounting for a compaction decision. */
 export interface Usage {
   readonly contextTokens: number
@@ -80,6 +92,17 @@ export interface Strategy {
     plan: Plan,
     request: Request,
   ) => Effect.Effect<string, CompactionError, LanguageModel.LanguageModel>
+  readonly toolOutputMaxBytes?: number
+  readonly keepRecentTokens?: number
+}
+
+/** @experimental One independently composable compaction capability. */
+export interface StrategyPart {
+  readonly shouldCompact?: Strategy["shouldCompact"]
+  readonly cut?: Strategy["cut"]
+  readonly summarize?: Strategy["summarize"]
+  readonly toolOutputMaxBytes?: number
+  readonly keepRecentTokens?: number
 }
 
 /** @experimental Compaction service boundary consulted by the loop. */
@@ -107,10 +130,49 @@ export interface DefaultOptions {
   readonly summaryPrompt?: string
 }
 
+/** @experimental Options accepted by the Compaction layer. */
+export interface LayerOptions extends DefaultOptions {
+  readonly strategy?: Strategy
+}
+
+/** @experimental Options for lossless tool-output bounding. */
+export interface ToolOutputBoundOptions {
+  readonly maxBytes: number
+}
+
+/** @experimental Options for token-denominated recent retention. */
+export interface KeepRecentOptions {
+  readonly tokens: number
+}
+
+/** @experimental Options for schema-validated structured summaries. */
+export interface StructuredSummaryOptions {
+  readonly objectName?: string
+  readonly summaryModel?: Layer.Layer<LanguageModel.LanguageModel>
+  readonly summaryPrompt?: string
+}
+
 const serialized = (value: unknown): string => {
   const json = JSON.stringify(value)
   return json === undefined ? String(value) : json
 }
+
+const safeNonNegativeInteger = (name: string, value: number): number => {
+  if (!Number.isSafeInteger(value) || value < 0) throw new TypeError(`${name} must be a non-negative safe integer`)
+  return value
+}
+
+const markdownList = (items: ReadonlyArray<string>): string =>
+  items.length === 0 ? "- None" : items.map((item) => `- ${item}`).join("\n")
+
+const renderAgentSummary = (summary: AgentSummary): string =>
+  [
+    `## Goal\n${summary.goal}`,
+    `## Facts\n${markdownList(summary.facts)}`,
+    `## Decisions\n${markdownList(summary.decisions)}`,
+    `## Open Questions\n${markdownList(summary.openQuestions)}`,
+    `## Tool Findings\n${markdownList(summary.toolFindings)}`,
+  ].join("\n\n")
 
 const APPROX_CHARS_PER_TOKEN = 4
 
@@ -196,8 +258,8 @@ const summaryPrompt = (template: string, prompt: Prompt.Prompt): Prompt.Prompt =
 const systemMessages = (entries: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Message> =>
   entries.flatMap((entry) => (entry._tag === "Message" && entry.message.role === "system" ? [entry.message] : []))
 
-const compactedHistory = (summary: string, head: ReadonlyArray<Entry>, recent: ReadonlyArray<Entry>): Prompt.Prompt =>
-  Prompt.concat(Prompt.fromMessages([...systemMessages(head), checkpointMessage(summary)]), buildContext(recent))
+const compactedHistory = (summary: string, head: ReadonlyArray<Entry>, recent: Prompt.Prompt): Prompt.Prompt =>
+  Prompt.concat(Prompt.fromMessages([...systemMessages(head), checkpointMessage(summary)]), recent)
 
 const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => ({
   contextTokens: Number.isFinite(usage.contextTokens) ? usage.contextTokens : 0,
@@ -258,34 +320,107 @@ export const defaultStrategy = (options: DefaultOptions = {}): Strategy => ({
   },
 })
 
+/** @experimental Compile ordered strategy parts onto a complete strategy. */
+export const strategy = (parts: ReadonlyArray<StrategyPart>, base: Strategy = defaultStrategy()): Strategy =>
+  parts.reduce<Strategy>(
+    (current, part) => ({
+      shouldCompact: part.shouldCompact ?? current.shouldCompact,
+      cut: part.cut ?? current.cut,
+      summarize: part.summarize ?? current.summarize,
+      ...(part.toolOutputMaxBytes !== undefined
+        ? { toolOutputMaxBytes: part.toolOutputMaxBytes }
+        : current.toolOutputMaxBytes === undefined
+          ? {}
+          : { toolOutputMaxBytes: current.toolOutputMaxBytes }),
+      ...(part.keepRecentTokens !== undefined
+        ? { keepRecentTokens: part.keepRecentTokens }
+        : current.keepRecentTokens === undefined
+          ? {}
+          : { keepRecentTokens: current.keepRecentTokens }),
+    }),
+    base,
+  )
+
+/** @experimental Configure lossless successful-tool-result bounding. */
+export const toolOutputBound = (options: ToolOutputBoundOptions): StrategyPart => ({
+  toolOutputMaxBytes: safeNonNegativeInteger("ToolOutputBoundOptions.maxBytes", options.maxBytes),
+})
+
+/** @experimental Configure the token target retained verbatim after a summary cut. */
+export const keepRecent = (options: KeepRecentOptions): StrategyPart => ({
+  keepRecentTokens: safeNonNegativeInteger("KeepRecentOptions.tokens", options.tokens),
+})
+
+/** @experimental Summarize through Effect AI structured output and render a string checkpoint. */
+export const structuredSummary = (options: StructuredSummaryOptions = {}): StrategyPart => ({
+  summarize: (plan, request) => {
+    const effect = Effect.gen(function* () {
+      const head = buildContext(plan.head)
+      const [compactedHead] =
+        request.toolOutputMaxBytes === undefined
+          ? ([head, false] as const)
+          : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
+      const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
+      const model = yield* LanguageModel.LanguageModel
+      return yield* model
+        .generateObject({
+          prompt,
+          schema: AgentSummary,
+          objectName: options.objectName ?? "AgentSummary",
+          toolChoice: "none",
+        })
+        .pipe(
+          Effect.map((response) => renderAgentSummary(response.value)),
+          Effect.mapError((error) => new CompactionError({ message: String(error), cause: error })),
+        )
+    })
+    return options.summaryModel === undefined ? effect : effect.pipe(Effect.provide(options.summaryModel))
+  },
+})
+
 /** @experimental Build a compaction service from a strategy. */
-export const make = (strategy: Strategy, options: DefaultOptions = {}): Interface => ({
+export const make = (compactionStrategy: Strategy, options: DefaultOptions = {}): Interface => ({
   maybeCompact: (input) =>
     Effect.gen(function* () {
       const usage = normalizeUsage(input.usage, options)
-      const shouldCompact = input.overflow || strategy.shouldCompact(usage)
+      const shouldCompact = input.overflow || compactionStrategy.shouldCompact(usage)
       if (!shouldCompact) return Option.none<Result>()
 
       let history = input.history
       let prompt = input.prompt
       let changed = false
+      const toolOutputMaxBytes = input.toolOutputMaxBytes ?? compactionStrategy.toolOutputMaxBytes
 
-      if (input.toolOutputMaxBytes !== undefined) {
-        const [compactedHistoryPrompt, historyChanged] = yield* microcompactPrompt(history, input.toolOutputMaxBytes)
-        const [compactedPrompt, promptChanged] = yield* microcompactPrompt(prompt, input.toolOutputMaxBytes)
+      if (toolOutputMaxBytes !== undefined) {
+        const [compactedHistoryPrompt, historyChanged] = yield* microcompactPrompt(history, toolOutputMaxBytes)
+        const [compactedPrompt, promptChanged] = yield* microcompactPrompt(prompt, toolOutputMaxBytes)
         history = compactedHistoryPrompt
         prompt = compactedPrompt
         changed = historyChanged || promptChanged
         if (changed && fits(history, prompt, usage)) return Option.some(makeMicrocompact(history, prompt))
       }
 
-      const plan = strategy.cut(input.path ?? [], options.keepRecentTokens ?? DEFAULT_KEEP_RECENT_TOKENS)
+      const plan = compactionStrategy.cut(
+        input.path ?? [],
+        compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? DEFAULT_KEEP_RECENT_TOKENS,
+      )
       if (Option.isNone(plan)) return changed ? Option.some(makeMicrocompact(history, prompt)) : Option.none<Result>()
 
-      const summary = yield* strategy.summarize(plan.value, { ...input, history, prompt, usage })
+      const summary = yield* compactionStrategy.summarize(plan.value, {
+        ...input,
+        history,
+        prompt,
+        usage,
+        ...(toolOutputMaxBytes === undefined ? {} : { toolOutputMaxBytes }),
+      })
+      const recent = buildContext(plan.value.recent)
+      const [compactedRecent] =
+        toolOutputMaxBytes === undefined
+          ? ([recent, false] as const)
+          : yield* microcompactPrompt(recent, toolOutputMaxBytes)
       return Option.some<Result>({
         _tag: "Summarize",
-        history: compactedHistory(summary, plan.value.head, plan.value.recent),
+        history: compactedHistory(summary, plan.value.head, compactedRecent),
         prompt,
         summary,
         firstKeptEntryId: plan.value.firstKeptEntryId,
@@ -295,9 +430,9 @@ export const make = (strategy: Strategy, options: DefaultOptions = {}): Interfac
 
 /** @experimental Layer wiring the default or provided strategy. */
 export const layer = (
-  options: DefaultOptions = {},
-  strategy: Strategy = defaultStrategy(options),
-): Layer.Layer<Compaction> => Layer.succeed(Compaction, Compaction.of(make(strategy, options)))
+  options: LayerOptions = {},
+  providedStrategy: Strategy = options.strategy ?? defaultStrategy(options),
+): Layer.Layer<Compaction> => Layer.succeed(Compaction, Compaction.of(make(providedStrategy, options)))
 
 /** @experimental Truncate-only compaction over `Tokenizer`. */
 export const truncate = (maxTokens: number): Interface => ({

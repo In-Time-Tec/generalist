@@ -67,6 +67,7 @@ jobs:
 
           const packageDirs = [
             "packages/core",
+            "packages/test",
             "packages/skills",
             "packages/memory",
             "packages/providers",
@@ -109,7 +110,7 @@ jobs:
 
       - name: Validate publish manifests
         run: |
-          if grep -R --line-number --include package.json -E '"(workspace|catalog):' packages/core packages/skills packages/memory packages/providers packages/mcp packages/transport packages/foldkit; then
+          if grep -R --line-number --include package.json -E '"(workspace|catalog):' packages/core packages/test packages/skills packages/memory packages/providers packages/mcp packages/transport packages/foldkit; then
             echo "workspace: or catalog: protocol remains in a publish manifest" >&2
             exit 1
           fi
@@ -118,7 +119,7 @@ jobs:
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          for pkg in packages/core packages/skills packages/memory packages/providers packages/mcp packages/transport packages/foldkit; do
+          for pkg in packages/core packages/test packages/skills packages/memory packages/providers packages/mcp packages/transport packages/foldkit; do
             echo "--- bun publish --dry-run ${pkg}"
             (cd "$pkg" && bun publish --access public --dry-run)
           done
@@ -128,7 +129,7 @@ jobs:
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          for pkg in packages/core packages/skills packages/memory packages/providers packages/mcp packages/transport packages/foldkit; do
+          for pkg in packages/core packages/test packages/skills packages/memory packages/providers packages/mcp packages/transport packages/foldkit; do
             echo "--- bun publish ${pkg}"
             (cd "$pkg" && bun publish --access public)
           done

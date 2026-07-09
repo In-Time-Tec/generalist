@@ -10,7 +10,7 @@ export const transportReference = definePage({
       "@batonfx/transport serves agent runs over SSE and WebSocket: a schema-defined wire protocol, an in-memory session registry with replay, server handlers, and a reconnecting client.",
     ),
     command("Install", "bun add @batonfx/core @batonfx/transport"),
-    p("Published on npm at 0.3.0. Requires ", code("@batonfx/core"), "."),
+    p("Published on npm at 0.4.0. Requires ", code("@batonfx/core"), "."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],
@@ -150,8 +150,10 @@ export const transportReference = definePage({
         ],
         [
           [code("send")],
-          [code("(sessionId, prompt) => Effect<void, SessionError | SessionBusy>")],
-          ["Fails ", code("SessionBusy"), " while a run is active or suspended"],
+          [code("(sessionId, prompt) => Effect<void, SessionError | SessionBusy | SessionQueueFull>")],
+          [
+            "Rejects a concurrent message by default; with enqueue mode it appends to the bounded per-session FIFO queue",
+          ],
         ],
         [
           [code("resolveApproval")],
@@ -171,7 +173,7 @@ export const transportReference = definePage({
         [
           [code("info")],
           [code("(sessionId) => Effect<SessionInfo, SessionError>")],
-          [code("SessionInfo"), " is ", code("{ sessionId, chatId, status, lastSeq, idleSince }")],
+          [code("SessionInfo"), " is ", code("{ sessionId, chatId, status, lastSeq, idleSince, pendingMessages }")],
         ],
       ],
     ),
@@ -194,6 +196,9 @@ export const transportReference = definePage({
         [[code("subscriberQueueCapacity")], [code("128"), ": slower subscribers fail with ", code("SubscriberLagged")]],
         [[code("idleTimeout")], [code('"15 minutes"'), " before idle sessions are evicted"]],
         [[code("stripTranscripts")], [code("false")]],
+        [[code("onConcurrentMessage")], [code('"reject"'), "; set to ", code('"enqueue"'), " for FIFO queueing"]],
+        [[code("pendingMessageCapacity")], [code("128"), " queued messages per session"]],
+        [[code("maxConcurrentRuns")], ["unbounded; set a positive number for a registry-wide run cap"]],
       ],
     ),
     p(
@@ -201,6 +206,8 @@ export const transportReference = definePage({
       code("SessionError{ message }"),
       ", ",
       code("SessionBusy{ sessionId }"),
+      ", ",
+      code("SessionQueueFull{ sessionId, capacity }"),
       ", ",
       code("SubscriberLagged{ sessionId, lastDeliveredSeq }"),
       ".",
@@ -231,7 +238,7 @@ export const transportReference = definePage({
       code("ClientFrame"),
       " JSON text frames, dispatches to the registry, and writes encoded ",
       code("ServerFrame"),
-      "s. Close codes: 4000 when a subscriber lags, 1003 for malformed or binary frames, 1011 for session errors and busy sessions.",
+      "s. Close codes: 4000 when a subscriber lags, 1003 for malformed or binary frames, 1011 for session errors and busy sessions, and 1013 when an enqueue-mode session queue is full.",
     ),
     h2("client", "Client"),
     table(

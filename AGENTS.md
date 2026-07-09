@@ -2,16 +2,17 @@
 
 ## Purpose
 
-BatonFX is a standalone, non-durable, Effect-native agent framework built on `effect/unstable/ai`. It ships two packages: `@batonfx/core` (the agent loop) and `@batonfx/mcp` (an MCP client bridge). Baton depends on `effect` only and must never depend on Relay or any durable runtime.
+BatonFX is a standalone, non-durable, Effect-native agent framework built on `effect/unstable/ai`. It ships focused packages for the agent loop, providers, MCP, skills, memory, transport, FoldKit, and deterministic tests. Baton must never depend on Relay or any durable runtime.
 
 ## Repository layout
 
-| Directory         | Purpose                                                              |
-| ----------------- | -------------------------------------------------------------------- |
-| `packages/core`   | `@batonfx/core` — the Effect-native agent loop.                      |
-| `packages/mcp`    | `@batonfx/mcp` — MCP client bridge and Baton `ToolExecutor` adapter. |
-| `docs/spec/`      | Specification tree: the agent-loop contract and ADRs.                |
-| `ast-grep/rules/` | Structural lint rules, including the `@relayfx/*` import ban.        |
+| Directory         | Purpose                                                                    |
+| ----------------- | -------------------------------------------------------------------------- |
+| `packages/core`   | `@batonfx/core` — the Effect-native agent loop.                            |
+| `packages/test`   | `@batonfx/test` — scripted model fixtures and normalized request capture.  |
+| `packages/*`      | Optional provider, MCP, skill, memory, transport, and UI adapter packages. |
+| `docs/spec/`      | Specification tree: the agent-loop and package contracts plus ADRs.        |
+| `ast-grep/rules/` | Structural lint rules, including the `@relayfx/*` import ban.              |
 
 ## Current standards
 
@@ -27,7 +28,7 @@ BatonFX is a standalone, non-durable, Effect-native agent framework built on `ef
 - Do not use namespace imports. Prefer importing exported names directly. Use an alias only for a real local-name collision or provider variant; do not create wrapper or re-export files just to avoid an alias.
 - Before using or changing an Effect / Effect AI / Vitest API, inspect the installed package source in `node_modules` with `rg`/`sed`. Prefer the pinned local implementation over memory or stale docs.
 - Use Bun as package manager and script runner, `@effect/vitest`/Vitest for tests, Turbo for task orchestration, oxlint + ast-grep for linting, and Prettier for formatting.
-- The `effect` version is pinned once in the root `package.json` `catalog`; both packages consume `effect: "catalog:"` so they never drift.
+- The `effect` version is pinned once in the root `package.json` `catalog`; packages consume `effect: "catalog:"` so they never drift.
 - Package tests live under `test/`, mirroring `src/` paths.
 
 ## Commands

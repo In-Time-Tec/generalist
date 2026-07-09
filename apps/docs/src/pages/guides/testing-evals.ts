@@ -21,10 +21,8 @@ export const testingEvals = definePage({
     h2("script-the-model", "1. Script the model and pin the loop"),
     p(
       "A scripted ",
-      code("Ai.LanguageModel.make"),
-      " layer decides each turn: a tool call on the first call, the final answer on the second. The ",
-      code("ToolExecutor"),
-      " test layer records what the loop asked it to execute, so the assertions pin both the answer and the tool arguments the model produced.",
+      code("TestModel.make"),
+      " fixture decides each turn: a tool call on the first request, the final answer on the second. Its normalized prompt capture proves the tool result was re-fed, while the handler assertion pins the tool arguments the model produced.",
     ),
     codeBlock({
       label: "scripted-loop-test.ts",
@@ -46,7 +44,7 @@ export const testingEvals = definePage({
     table(
       ["Seam", "Test construction"],
       [
-        [[code("Ai.LanguageModel")], ["scripted ", code("Ai.LanguageModel.make"), " layer, as above"]],
+        [[code("Ai.LanguageModel")], [code("TestModel.layer"), " or a stateful ", code("TestModel.make"), " fixture"]],
         [[code("ToolExecutor")], [code("ToolExecutor.testLayer({ execute })")]],
         [
           [code("Approvals")],

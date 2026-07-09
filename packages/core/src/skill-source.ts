@@ -30,13 +30,16 @@ export interface Skill {
 }
 
 /** @experimental Per-entry description character cap. */
-export const DESCRIPTION_CAP = 1_536
+export const DESCRIPTION_CAP = 1_024
 
 /** @experimental Skill registry seam. */
 export interface Interface {
   readonly all: Effect.Effect<ReadonlyArray<Skill>, SkillSourceError>
   readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillSourceError>
 }
+
+/** @experimental Effect that builds one skill source implementation. */
+export type Source<R = never> = Effect.Effect<Interface, SkillSourceError, R>
 
 /** @experimental */
 export class SkillSource extends Context.Service<SkillSource, Interface>()("@batonfx/core/SkillSource") {}
@@ -64,6 +67,34 @@ export const empty: Layer.Layer<SkillSource> = fromSkills([])
 /** @experimental */
 export const testLayer = (implementation: Interface): Layer.Layer<SkillSource> =>
   Layer.succeed(SkillSource, SkillSource.of(implementation))
+
+/** @experimental Merge built sources with later duplicate names winning. */
+export const merge = (sources: ReadonlyArray<Interface>): Interface => ({
+  all: Effect.forEach(sources, (source) => source.all).pipe(
+    Effect.map((groups) => {
+      const byName = new Map<string, Skill>()
+      for (const skills of groups) {
+        for (const skill of skills) byName.set(skill.frontmatter.name, skill)
+      }
+      return [...byName.values()]
+    }),
+  ),
+  get: (name) =>
+    Effect.gen(function* () {
+      for (const source of sources.toReversed()) {
+        const found = yield* source.get(name)
+        if (found !== undefined) return found
+      }
+      return undefined
+    }),
+})
+
+/** @experimental Build one layer from composable sources. */
+export const layer = <R>(sources: ReadonlyArray<Source<R>>): Layer.Layer<SkillSource, SkillSourceError, R> =>
+  Layer.effect(
+    SkillSource,
+    Effect.forEach(sources, (source) => source).pipe(Effect.map((built) => SkillSource.of(merge(built)))),
+  )
 
 const estimatedTokens = (listing: string): number => Math.ceil(listing.length / 4)
 

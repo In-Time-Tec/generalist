@@ -10,7 +10,7 @@ export const memoryReference = definePage({
       "@batonfx/memory implements the core Memory seam twice (a recency window with optional summarization, and embedding-based semantic recall) plus the VectorStore seam they share.",
     ),
     command("Install", "bun add @batonfx/core @batonfx/memory"),
-    p("Published on npm at 0.3.0. Requires ", code("@batonfx/core"), "."),
+    p("Published on npm at 0.4.0. Requires ", code("@batonfx/core"), "."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],

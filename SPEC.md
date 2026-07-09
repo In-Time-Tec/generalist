@@ -21,7 +21,8 @@ SPEC.md
 │  ├─ 09-memory.md                             recall and remember seam contract
 │  ├─ 10-multi-agent.md                        in-process multi-agent contract
 │  ├─ 11-transport.md                          wire frames and in-process session registry contract
-│  └─ 12-foldkit-adapter.md                     FoldKit resource/subscription/chat adapter contract
+│  ├─ 12-foldkit-adapter.md                     FoldKit resource/subscription/chat adapter contract
+│  └─ 13-test-kit.md                            deterministic scripted model and capture contract
 └─ docs/spec/decisions/
    ├─ ADR-0001-baton-standalone-agent-framework.md
    ├─ ADR-0002-tool-context-output-spill.md
@@ -39,7 +40,11 @@ SPEC.md
    ├─ ADR-0014-transport-wire-and-session-registry.md
    ├─ ADR-0015-transport-sse-websocket-client.md
    ├─ ADR-0016-foldkit-adapter.md
-   └─ ADR-0017-effect-toolkit-as-tool-runtime.md
+   ├─ ADR-0017-effect-toolkit-as-tool-runtime.md
+   ├─ ADR-0018-in-process-session-run-queue.md
+   ├─ ADR-0019-manifest-backed-hosted-skills.md
+   ├─ ADR-0020-public-deterministic-test-model.md
+   └─ ADR-0021-portable-turn-policy-snapshots.md
 ```
 
 ## Packages
@@ -51,7 +56,8 @@ SPEC.md
 | `@batonfx/memory`    | `@batonfx/memory`    | `packages/memory`    | Non-durable memory layers for the core seam: in-process vector store, semantic recall over Effect AI embeddings, bounded working memory, and combined composition.                                                                                                                               |
 | `@batonfx/mcp`       | `@batonfx/mcp`       | `packages/mcp`       | MCP client bridge: discover an MCP server's tools as an `Ai.Toolkit` plus a Baton `ToolExecutor` adapter (`@batonfx/mcp/baton`).                                                                                                                                                                 |
 | `@batonfx/providers` | `@batonfx/providers` | `packages/providers` | Provider registration helpers, OpenAI-compatible presets, deterministic model registration, and embedding layers over upstream Effect AI provider packages.                                                                                                                                      |
-| `@batonfx/skills`    | `@batonfx/skills`    | `packages/skills`    | Filesystem `SKILL.md` and instruction-file sources for core seams.                                                                                                                                                                                                                               |
+| `@batonfx/skills`    | `@batonfx/skills`    | `packages/skills`    | Filesystem and manifest-backed HTTP/S3/GitHub `SKILL.md` sources plus instruction-file discovery for core seams.                                                                                                                                                                                 |
+| `@batonfx/test`      | `@batonfx/test`      | `packages/test`      | Scripted Effect AI language-model fixtures, normalized request capture, and reusable model-registry layers for deterministic agent tests.                                                                                                                                                        |
 | `@batonfx/transport` | `@batonfx/transport` | `packages/transport` | Replayable wire frames, in-process `SessionRegistry`, and thin SSE/WebSocket/client adapters for non-durable chat transports.                                                                                                                                                                    |
 
 ## Feature branches
@@ -68,6 +74,7 @@ SPEC.md
 - In-process multi-agent contract: `docs/spec/10-multi-agent.md`
 - Transport contract: `docs/spec/11-transport.md`
 - FoldKit adapter contract: `docs/spec/12-foldkit-adapter.md`
+- Deterministic test-kit contract: `docs/spec/13-test-kit.md`
 
 ## Decisions
 
@@ -88,3 +95,7 @@ SPEC.md
 - ADR-0015 — Transport SSE, WebSocket, and Client Adapters: `docs/spec/decisions/ADR-0015-transport-sse-websocket-client.md`
 - ADR-0016 — FoldKit Adapter: `docs/spec/decisions/ADR-0016-foldkit-adapter.md`
 - ADR-0017 — Effect Toolkit as Tool Runtime: `docs/spec/decisions/ADR-0017-effect-toolkit-as-tool-runtime.md`
+- ADR-0018 — In-process Session Run Queue: `docs/spec/decisions/ADR-0018-in-process-session-run-queue.md`
+- ADR-0019 — Manifest-backed Hosted Skills: `docs/spec/decisions/ADR-0019-manifest-backed-hosted-skills.md`
+- ADR-0020 — Public Deterministic Test Model: `docs/spec/decisions/ADR-0020-public-deterministic-test-model.md`
+- ADR-0021 — Portable Turn Policy Snapshots: `docs/spec/decisions/ADR-0021-portable-turn-policy-snapshots.md`

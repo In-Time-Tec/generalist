@@ -67,9 +67,7 @@ describe("SkillLoader", () => {
 name: review
 description: Review code carefully
 when-to-use: before merging
-allowedTools:
-  - read
-  - grep
+allowed-tools: read grep
 disableModelInvocation: false
 userInvocable: true
 contextFork: true
@@ -112,9 +110,10 @@ Use the checklist.
     }).pipe(Effect.provide(loaderTestLayer({ cwd: "/repo", roots: [".agents/skills"] }, files, directories, reads)))
   })
 
-  it.effect("defaults names, namespaces nested skills, and lets later roots win collisions", () => {
+  it.effect("uses standard names for nested skills and lets later roots win collisions", () => {
     const files = {
       "/repo/a/frontend/lint/SKILL.md": `---
+name: lint
 description: Lint frontend
 ---
 body a`,
@@ -136,10 +135,10 @@ body second`,
     return Effect.gen(function* () {
       const source = yield* SkillSource.SkillSource
       const all = yield* source.all
-      const nested = yield* source.get("frontend:lint")
+      const nested = yield* source.get("lint")
       const duplicate = yield* source.get("dup")
 
-      expect(all.map((skill) => skill.frontmatter.name)).toEqual(["dup", "frontend:lint"])
+      expect(all.map((skill) => skill.frontmatter.name)).toEqual(["dup", "lint"])
       expect(nested?.frontmatter.description).toBe("Lint frontend")
       expect(duplicate?.frontmatter.description).toBe("Second duplicate")
     }).pipe(Effect.provide(loaderTestLayer({ cwd: "/repo", roots: ["a", "b"] }, files, directories)))
@@ -148,6 +147,7 @@ body second`,
   it.effect("fails typed for invalid frontmatter and keeps user-only skills addressable", () => {
     const files = {
       "/repo/skills/user-only/SKILL.md": `---
+name: user-only
 description: User only
 disableModelInvocation: true
 ---
@@ -182,6 +182,67 @@ body`,
 
       expect(userOnly).toBeDefined()
       expect(SkillSource.selectListings(userOnly === undefined ? [] : [userOnly], 1_000, [])).toEqual([])
+    })
+  })
+
+  it.effect("enforces required standard name, directory equality, and description length", () => {
+    const cases = [
+      {
+        file: "/repo/skills/missing/SKILL.md",
+        content: `---
+description: Missing name
+---
+body`,
+      },
+      {
+        file: "/repo/skills/directory/SKILL.md",
+        content: `---
+name: different
+description: Mismatched directory
+---
+body`,
+      },
+      {
+        file: "/repo/skills/invalid/SKILL.md",
+        content: `---
+name: Invalid_Name
+description: Invalid name
+---
+body`,
+      },
+      {
+        file: "/repo/skills/double--dash/SKILL.md",
+        content: `---
+name: double--dash
+description: Consecutive hyphens are invalid
+---
+body`,
+      },
+      {
+        file: "/repo/skills/long/SKILL.md",
+        content: `---
+name: long
+description: ${"x".repeat(1025)}
+---
+body`,
+      },
+    ]
+    return Effect.gen(function* () {
+      for (const testCase of cases) {
+        const relative = testCase.file.slice("/repo/skills/".length)
+        const failure = yield* Effect.flip(
+          SkillSource.SkillSource.pipe(
+            Effect.provide(
+              loaderTestLayer(
+                { cwd: "/repo", roots: ["skills"] },
+                { [testCase.file]: testCase.content },
+                { "/repo/skills": [relative] },
+              ),
+            ),
+          ),
+        )
+        expect(failure._tag).toBe("@batonfx/core/SkillSourceError")
+      }
     })
   })
 })

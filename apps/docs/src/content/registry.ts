@@ -34,6 +34,7 @@ import { mcpReference } from "../pages/reference/mcp"
 import { memoryReference } from "../pages/reference/memory"
 import { providersReference } from "../pages/reference/providers"
 import { skillsReference } from "../pages/reference/skills"
+import { testReference } from "../pages/reference/test"
 import { transportReference } from "../pages/reference/transport"
 import { versioningReference } from "../pages/reference/versioning"
 import { examples } from "../pages/start/examples"
@@ -83,6 +84,7 @@ export const allPages: ReadonlyArray<DocsPage> = [
   providersReference,
   mcpReference,
   skillsReference,
+  testReference,
   memoryReference,
   transportReference,
   foldkitReference,

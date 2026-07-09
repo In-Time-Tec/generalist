@@ -1,10 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scheduler, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scheduler, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
-import { SessionRegistry } from "../src/index"
+import { TestModel } from "@batonfx/test"
+import { SessionRegistry, Wire } from "../src/index"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -139,6 +140,148 @@ describe("SessionRegistry.layerMemory", () => {
     })(),
   )
 
+  it.effect("enqueues concurrent sends and drains them FIFO per session", () =>
+    Effect.gen(function* () {
+      const fixture = yield* TestModel.make([
+        TestModel.turn([TestModel.text("first done")], { delay: "1 hour" }),
+        TestModel.text("second done"),
+        TestModel.text("third done"),
+      ])
+      yield* Effect.gen(function* () {
+        yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-queued" }))
+        const ended = yield* SessionRegistry.SessionRegistry.use((registry) =>
+          registry.attach("s-queued").pipe(
+            Stream.filter((frame) => frame._tag === "Ended"),
+            Stream.take(3),
+            Stream.runCollect,
+            Effect.forkChild,
+          ),
+        )
+
+        yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-queued", "first"))
+        yield* fixture.awaitRequests(1)
+        yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-queued", "second"))
+        yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-queued", "third"))
+
+        const queued = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-queued"))
+        expect(queued.pendingMessages).toBe(2)
+
+        yield* TestClock.adjust("1 hour")
+        yield* Fiber.join(ended)
+
+        const prompts = (yield* fixture.prompts).map((prompt) => JSON.stringify(prompt))
+        expect(prompts).toHaveLength(3)
+        expect(prompts[0]).toContain("first")
+        expect(prompts[1]).toContain("second")
+        expect(prompts[2]).toContain("third")
+        const drained = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-queued"))
+        expect(drained.pendingMessages).toBe(0)
+      }).pipe(
+        Effect.provide(
+          SessionRegistry.layerMemory({
+            agent: Agent.make({ name: "queued-agent" }),
+            onConcurrentMessage: "enqueue",
+          }).pipe(
+            Layer.provide(
+              Layer.mergeAll(fixture.layer, Approvals.autoApprove, ModelMiddleware.identityLayer, persistenceLayer),
+            ),
+          ),
+        ),
+      )
+    }),
+  )
+
+  it.effect("caps concurrent runs across sessions", () => {
+    let firstStarted: Deferred.Deferred<void>
+    let secondStarted: Deferred.Deferred<void>
+    let releaseFirst: Deferred.Deferred<void>
+    let releaseSecond: Deferred.Deferred<void>
+    let modelCalls = 0
+    return Effect.gen(function* () {
+      firstStarted = yield* Deferred.make<void>()
+      secondStarted = yield* Deferred.make<void>()
+      releaseFirst = yield* Deferred.make<void>()
+      releaseSecond = yield* Deferred.make<void>()
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-cap-a" }))
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-cap-b" }))
+      const firstEnded = yield* collectThroughEnded("s-cap-a").pipe(Effect.forkChild)
+      const secondEnded = yield* collectThroughEnded("s-cap-b").pipe(Effect.forkChild)
+
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-cap-a", "first"))
+      yield* Deferred.await(firstStarted)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-cap-b", "second"))
+      yield* Effect.yieldNow
+      yield* Effect.yieldNow
+
+      expect(yield* Deferred.isDone(secondStarted)).toBe(false)
+      yield* Deferred.succeed(releaseFirst, undefined)
+      yield* Deferred.await(secondStarted)
+      yield* Deferred.succeed(releaseSecond, undefined)
+      yield* Fiber.join(firstEnded)
+      yield* Fiber.join(secondEnded)
+      expect(modelCalls).toBe(2)
+    }).pipe(
+      Effect.provide(
+        SessionRegistry.layerMemory({
+          agent: Agent.make({ name: "capped-agent" }),
+          maxConcurrentRuns: 1,
+        }).pipe(
+          Layer.provide(
+            dependencies(() => {
+              modelCalls += 1
+              if (modelCalls === 1) {
+                return Stream.unwrap(
+                  Deferred.succeed(firstStarted, undefined).pipe(
+                    Effect.andThen(Deferred.await(releaseFirst)),
+                    Effect.as(assistantText("reply-a", "first done")),
+                  ),
+                )
+              }
+              return Stream.unwrap(
+                Deferred.succeed(secondStarted, undefined).pipe(
+                  Effect.andThen(Deferred.await(releaseSecond)),
+                  Effect.as(assistantText("reply-b", "second done")),
+                ),
+              )
+            }),
+          ),
+        ),
+      ),
+    )
+  })
+
+  it.effect("fails typed when the pending message queue is full", () => {
+    let release: Deferred.Deferred<void>
+    return Effect.gen(function* () {
+      release = yield* Deferred.make<void>()
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-queue-full" }))
+
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-queue-full", "first"))
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-queue-full", "second"))
+      const error = yield* Effect.flip(
+        SessionRegistry.SessionRegistry.use((registry) => registry.send("s-queue-full", "third")),
+      )
+
+      expect(error._tag).toBe("@batonfx/transport/SessionQueueFull")
+      yield* Deferred.succeed(release, undefined)
+      yield* collectThroughEnded("s-queue-full")
+    }).pipe(
+      Effect.provide(
+        SessionRegistry.layerMemory({
+          agent: Agent.make({ name: "queue-full-agent" }),
+          onConcurrentMessage: "enqueue",
+          pendingMessageCapacity: 1,
+        }).pipe(
+          Layer.provide(
+            dependencies(() =>
+              Stream.unwrap(Deferred.await(release).pipe(Effect.as(assistantText("reply", "released")))),
+            ),
+          ),
+        ),
+      ),
+    )
+  })
+
   it.effect("replays only frames after the requested cursor", () =>
     Effect.gen(function* () {
       yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-replay" }))
@@ -260,6 +403,86 @@ describe("SessionRegistry.layerMemory", () => {
     )
   })
 
+  it.effect("interrupt retains accepted prompts and starts the next queued run", () => {
+    let firstStarted: Deferred.Deferred<void>
+    let modelCalls = 0
+    return Effect.gen(function* () {
+      firstStarted = yield* Deferred.make<void>()
+      const frames = yield* Ref.make<Array<Wire.LooseServerFrameType>>([])
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-interrupt-queue" }))
+      const ended = yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.attach("s-interrupt-queue").pipe(
+          Stream.tap((frame) => Ref.update(frames, (current) => [...current, frame])),
+          Stream.filter((frame) => frame._tag === "Ended"),
+          Stream.take(2),
+          Stream.runCollect,
+          Effect.forkChild,
+        ),
+      )
+
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-interrupt-queue", "first"))
+      yield* Deferred.await(firstStarted)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-interrupt-queue", "second"))
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.interrupt("s-interrupt-queue"))
+      yield* Fiber.join(ended)
+
+      const info = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-interrupt-queue"))
+      const recorded = yield* Ref.get(frames)
+      expect(modelCalls).toBe(2)
+      expect(info.pendingMessages).toBe(0)
+      expect(info.status._tag).toBe("Idle")
+      expect(recorded.filter((frame) => frame._tag === "Failed")).toHaveLength(1)
+      expect(recorded.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
+    }).pipe(
+      Effect.provide(
+        SessionRegistry.layerMemory({
+          agent: Agent.make({ name: "interrupt-queue-agent" }),
+          onConcurrentMessage: "enqueue",
+        }).pipe(
+          Layer.provide(
+            dependencies(() => {
+              modelCalls += 1
+              if (modelCalls === 1) {
+                return Stream.unwrap(Deferred.succeed(firstStarted, undefined).pipe(Effect.andThen(Effect.never)))
+              }
+              return assistantText("reply", "after interrupt")
+            }),
+          ),
+        ),
+      ),
+    )
+  })
+
+  it.effect("rejects invalid queue governance options while building the layer", () =>
+    Effect.gen(function* () {
+      const pendingCapacity = yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.open({ sessionId: "invalid-pending-capacity" }),
+      ).pipe(
+        Effect.provide(
+          SessionRegistry.layerMemory({
+            agent: Agent.make({ name: "invalid-pending-capacity-agent" }),
+            pendingMessageCapacity: 1.5,
+          }).pipe(Layer.provide(dependencies(() => assistantText("reply", "unused")))),
+        ),
+        Effect.exit,
+      )
+      const concurrency = yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.open({ sessionId: "invalid-concurrency" }),
+      ).pipe(
+        Effect.provide(
+          SessionRegistry.layerMemory({
+            agent: Agent.make({ name: "invalid-concurrency-agent" }),
+            maxConcurrentRuns: 0,
+          }).pipe(Layer.provide(dependencies(() => assistantText("reply", "unused")))),
+        ),
+        Effect.exit,
+      )
+
+      expect(Exit.hasDies(pendingCapacity)).toBe(true)
+      expect(Exit.hasDies(concurrency)).toBe(true)
+    }),
+  )
+
   it.effect("interrupt landing before the run fiber is recorded still cancels the run", () => {
     const awaitRunning: Effect.Effect<void, SessionRegistry.SessionError, SessionRegistry.SessionRegistry> =
       SessionRegistry.SessionRegistry.use((registry) => registry.info("s-stop-race")).pipe(
@@ -288,6 +511,61 @@ describe("SessionRegistry.layerMemory", () => {
       const info = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-stop-race"))
       expect(info.status._tag).toBe("Failed")
     }).pipe(Effect.provide(baseLayers(Agent.make({ name: "stop-race-agent" }), () => Stream.fromEffect(Effect.never))))
+  })
+
+  it.effect("stale predecessor registration cannot clear a successor interruption", () => {
+    let releaseFirst: Deferred.Deferred<void>
+    let secondStarted: Deferred.Deferred<void>
+    let modelCalls = 0
+    const awaitStatus = (
+      predicate: (status: Wire.SessionStatus) => boolean,
+    ): Effect.Effect<void, SessionRegistry.SessionError, SessionRegistry.SessionRegistry> =>
+      SessionRegistry.SessionRegistry.use((registry) => registry.info("s-successor-stop")).pipe(
+        Effect.flatMap((info) =>
+          predicate(info.status) ? Effect.void : Effect.yieldNow.pipe(Effect.andThen(awaitStatus(predicate))),
+        ),
+      )
+    return Effect.gen(function* () {
+      releaseFirst = yield* Deferred.make<void>()
+      secondStarted = yield* Deferred.make<void>()
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-successor-stop" }))
+      const firstSend = yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.send("s-successor-stop", "first"),
+      ).pipe(Effect.forkChild)
+
+      yield* awaitStatus((status) => status._tag === "Running")
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-successor-stop", "second"))
+      yield* Deferred.succeed(releaseFirst, undefined)
+      yield* Deferred.await(secondStarted)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.interrupt("s-successor-stop"))
+      yield* awaitStatus((status) => status._tag === "Failed")
+      yield* Fiber.join(firstSend)
+
+      const info = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-successor-stop"))
+      expect(modelCalls).toBe(2)
+      expect(info.pendingMessages).toBe(0)
+      expect(info.status._tag).toBe("Failed")
+    }).pipe(
+      Effect.provide(
+        SessionRegistry.layerMemory({
+          agent: Agent.make({ name: "successor-stop-agent" }),
+          onConcurrentMessage: "enqueue",
+        }).pipe(
+          Layer.provide(
+            dependencies(() => {
+              modelCalls += 1
+              if (modelCalls === 1) {
+                return Stream.unwrap(
+                  Deferred.await(releaseFirst).pipe(Effect.as(assistantText("first-reply", "first complete"))),
+                )
+              }
+              return Stream.unwrap(Deferred.succeed(secondStarted, undefined).pipe(Effect.andThen(Effect.never)))
+            }),
+          ),
+        ),
+      ),
+      Effect.provideService(Scheduler.MaxOpsBeforeYield, 3),
+    )
   })
 
   it.effect("emits suspension as data and resolves approved approvals", () => {
@@ -328,6 +606,82 @@ describe("SessionRegistry.layerMemory", () => {
                 calls += 1
                 if (calls === 1) return Stream.make(toolCallPart("call-approval", "gated", { text: "approved" }))
                 return assistantText("reply", "approved done")
+              }),
+              toolkit.toLayer({
+                gated: () =>
+                  Effect.sync(() => {
+                    handled = true
+                    return "approved"
+                  }),
+              }),
+              Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-token" }) }),
+              ModelMiddleware.identityLayer,
+              persistenceLayer,
+            ),
+          ),
+        ),
+      ),
+    )
+  })
+
+  it.effect("resumes approval before queued prompts and protects accepted work from idle eviction", () => {
+    const gated = Tool.make("gated", {
+      parameters: Schema.Struct({ text: Schema.String }),
+      success: Schema.String,
+      needsApproval: true,
+    })
+    const toolkit = Toolkit.make(gated)
+    const agent = Agent.make({ name: "approval-queue-agent", toolkit })
+    const awaitSuspended: Effect.Effect<void, SessionRegistry.SessionError, SessionRegistry.SessionRegistry> =
+      SessionRegistry.SessionRegistry.use((registry) => registry.info("s-approval-queue")).pipe(
+        Effect.flatMap((current) => (current.status._tag === "Suspended" ? Effect.void : awaitSuspended)),
+      )
+    let modelCalls = 0
+    let handled = false
+    let secondSawHandled = false
+    return Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-approval-queue" }))
+      const ended = yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.attach("s-approval-queue").pipe(
+          Stream.filter((frame) => frame._tag === "Ended"),
+          Stream.take(3),
+          Stream.runCollect,
+          Effect.forkChild,
+        ),
+      )
+
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-approval-queue", "needs approval"))
+      yield* awaitSuspended
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-approval-queue", "queued prompt"))
+      yield* TestClock.adjust("20 millis")
+      const queued = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-approval-queue"))
+      expect(queued.pendingMessages).toBe(1)
+
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.resolveApproval("s-approval-queue", "approval-token", { _tag: "Approved" }),
+      )
+      yield* Fiber.join(ended)
+
+      const completed = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-approval-queue"))
+      expect(modelCalls).toBe(3)
+      expect(handled).toBe(true)
+      expect(secondSawHandled).toBe(true)
+      expect(completed.pendingMessages).toBe(0)
+      expect(completed.status._tag).toBe("Idle")
+    }).pipe(
+      Effect.provide(
+        SessionRegistry.layerMemory({
+          agent,
+          onConcurrentMessage: "enqueue",
+          idleTimeout: "10 millis",
+        }).pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              modelLayer(() => {
+                modelCalls += 1
+                if (modelCalls === 1) return Stream.make(toolCallPart("call-approval-queue", "gated", { text: "ok" }))
+                if (modelCalls === 2) secondSawHandled = handled
+                return assistantText(`reply-${modelCalls}`, `run ${modelCalls} done`)
               }),
               toolkit.toLayer({
                 gated: () =>

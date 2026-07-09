@@ -1,5 +1,6 @@
 import activateSkill from "../../snippets/guides/skills/activate-skill.ts?raw"
 import activateSkillExpected from "../../snippets/guides/skills/activate-skill.expected.txt?raw"
+import hostedSkills from "../../snippets/guides/skills/hosted-skills.ts?raw"
 import skillLoader from "../../snippets/guides/skills/skill-loader.ts?raw"
 import skillMd from "../../snippets/guides/skills/SKILL.md?raw"
 import { bullets, callout, code, codeBlock, definePage, h2, link, p } from "../../prose"
@@ -24,11 +25,11 @@ export const skills = definePage({
       code("SKILL.md"),
       " format: a directory holding a ",
       code("SKILL.md"),
-      " with YAML-style frontmatter and a Markdown body. Only ",
-      code("description"),
-      " is required; ",
+      " with YAML-style frontmatter and a Markdown body. ",
       code("name"),
-      " defaults to the directory name:",
+      " and ",
+      code("description"),
+      " are required, and the name must match the directory:",
     ),
     codeBlock({ label: "release-notes/SKILL.md", language: "markdown", source: skillMd }),
     h2("provide-a-source", "2. Provide a source and watch activation"),
@@ -63,9 +64,7 @@ export const skills = definePage({
       code(".claude/skills"),
       ", ",
       code(".pi/skills"),
-      "), namespaces nested directories as ",
-      code("parent:child"),
-      ", and reads only frontmatter up front:",
+      "), validates each standard name against its immediate directory, and reads only frontmatter up front:",
     ),
     codeBlock({ label: "skill-loader.ts", source: skillLoader }),
     p(
@@ -75,7 +74,18 @@ export const skills = definePage({
       code("Path"),
       " from your platform runtime. Later roots win on name collisions.",
     ),
-    h2("mind-the-budget", "4. Mind the listing budget"),
+    h2("compose-hosted-sources", "4. Compose hosted sources"),
+    p(
+      code("SkillSource.layer"),
+      " composes source effects with later sources winning duplicate names. Hosted adapters load one bounded manifest snapshot through Effect HTTP and fetch SHA-256-verified bodies only on activation:",
+    ),
+    codeBlock({ label: "hosted-skills.ts", source: hostedSkills }),
+    callout(
+      "warning",
+      "Hosted distribution is adapter-owned",
+      "The Agent Skills standard defines directory contents, not catalogs. Baton uses its own versioned manifest; authenticate or sign requests by decorating the provided HttpClient. S3 does not list buckets, and GitHub requires an immutable commit ref.",
+    ),
+    h2("mind-the-budget", "5. Mind the listing budget"),
     p(
       "The loop selects listings under a fixed 2,048-token budget with ",
       code("SkillSource.selectListings"),
@@ -83,7 +93,7 @@ export const skills = definePage({
       code("disableModelInvocation"),
       " are excluded, and least-recently-used listings drop first when over budget. Descriptions are capped at ",
       code("DESCRIPTION_CAP"),
-      " (1,536 characters), so front-load the sentence that tells the model when to activate.",
+      " (1,024 characters), matching the Agent Skills description limit, so front-load the sentence that tells the model when to activate.",
     ),
     h2("next-steps", "Next steps"),
     bullets(

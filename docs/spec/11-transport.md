@@ -36,7 +36,13 @@ When `stripTranscripts` is true, `TurnCompleted` and `Completed` event frames om
 
 `open` creates or returns a session. `sessionId` defaults to a generated id; `chatId` defaults to `sessionId`. The registry stores live run state and replay frames only. Chat history belongs to `Ai.Chat.Persistence`.
 
-`send` starts an `Agent.stream` run with `{ prompt, sessionId, persistence: { chatId } }` and returns after the run fiber starts. A session in `Running` or `Suspended` status rejects another `send` with `SessionBusy`.
+`send` starts an `Agent.stream` run with `{ prompt, sessionId, persistence: { chatId } }` and returns after the run fiber starts. By default, a session in `Running` or `Suspended` status rejects another `send` with `SessionBusy`, preserving the original contract.
+
+`layerMemory` may opt into `onConcurrentMessage: "enqueue"`. In enqueue mode, `send` returns after the prompt is accepted into the process-local queue; it does not wait for that prompt to start or finish. Prompts execute FIFO and never overlap within one session. `pendingMessageCapacity` is a non-negative safe integer, defaults to 128, bounds accepted queued prompts, and overflows with `SessionQueueFull`. `SessionInfo.pendingMessages` exposes the current queue depth without adding a wire lifecycle status.
+
+`maxConcurrentRuns` is an optional positive safe integer that caps registry-owned top-level `Agent.stream` runs across all sessions in that layer. The permit covers the complete run, including model and tool phases, and is released on success, failure, suspension, and interruption. This is a run-level bound for one registry layer, not a process-global bound on nested handoffs or agent calls started outside the registry. Invalid queue-governance numbers are programmer configuration defects detected while building the layer.
+
+Approval resolution has priority over queued ordinary prompts. A prompt accepted while a session is suspended remains queued until the matching approval is resolved and the resumed run reaches a terminal outcome. Failed and interrupted runs retain accepted prompts and start the next one. An idle sweep does not evict a session with accepted queued work. Releasing the registry layer interrupts active runs and drops pending prompts because Baton transport queues are explicitly non-durable.
 
 `attach(sessionId, afterSeq?)` replays ring-buffered frames with `seq > afterSeq`, then streams live frames. If `afterSeq` predates the ring floor, the attachment receives a subscriber-local `Snapshot` frame for the persisted transcript before live frames. Snapshots are not inserted into the shared ring.
 
@@ -48,7 +54,7 @@ When `stripTranscripts` is true, `TurnCompleted` and `Completed` event frames om
 
 Each subscriber has a bounded queue. A lagging subscriber fails with `SubscriberLagged`; the producer run and other subscribers continue. Slow clients never block the model stream.
 
-`layerMemory` evicts non-running sessions after `idleTimeout`. Running sessions are not evicted. Eviction loses ring buffers, subscribers, fibers, and pending suspension state. Persisted chat history survives only when the provided `Ai.Chat.Persistence` survives.
+`layerMemory` evicts non-running sessions without pending prompts after `idleTimeout`. Running sessions and sessions with accepted queued work are not evicted. Eviction loses ring buffers, subscribers, fibers, and pending suspension state. Persisted chat history survives only when the provided `Ai.Chat.Persistence` survives.
 
 ## Relay seam
 
@@ -99,3 +105,4 @@ The SSE client helper decodes `text/event-stream` response bodies into loose ser
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0014-transport-wire-and-session-registry.md`
 - `docs/spec/decisions/ADR-0015-transport-sse-websocket-client.md`
+- `docs/spec/decisions/ADR-0018-in-process-session-run-queue.md`

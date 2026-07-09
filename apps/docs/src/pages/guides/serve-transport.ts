@@ -67,7 +67,11 @@ export const serveTransport = definePage({
         code("Suspended"),
         " fails with ",
         code("SessionBusy"),
-        ".",
+        " by default. Configure ",
+        code('onConcurrentMessage: "enqueue"'),
+        " to accept it into the bounded per-session FIFO queue; a full queue fails with ",
+        code("SessionQueueFull"),
+        ". Approval resolution always takes priority over queued messages.",
       ],
       [
         "If the cursor predates the ring buffer floor, the attachment gets a ",
@@ -167,6 +171,12 @@ export const serveTransport = definePage({
         " evicts idle sessions after ",
         code("idleTimeout"),
         " (default 15 minutes); persisted chat history survives as long as the provided persistence does.",
+      ],
+      [
+        code("pendingMessageCapacity"),
+        " bounds each opt-in message queue, while ",
+        code("maxConcurrentRuns"),
+        " optionally caps active runs across the registry. Accepted queued messages keep their session from being evicted.",
       ],
     ),
     p(

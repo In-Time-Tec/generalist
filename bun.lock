@@ -11,6 +11,7 @@
         "@batonfx/memory": "workspace:*",
         "@batonfx/providers": "workspace:*",
         "@batonfx/skills": "workspace:*",
+        "@batonfx/test": "workspace:*",
         "@batonfx/transport": "workspace:*",
         "effect": "catalog:",
       },
@@ -40,6 +41,7 @@
         "@batonfx/memory": "workspace:*",
         "@batonfx/providers": "workspace:*",
         "@batonfx/skills": "workspace:*",
+        "@batonfx/test": "workspace:*",
         "@batonfx/transport": "workspace:*",
         "@foldkit/ui": "catalog:",
         "class-variance-authority": "catalog:",
@@ -287,6 +289,20 @@
         "vitest": "catalog:",
       },
     },
+    "packages/test": {
+      "name": "@batonfx/test",
+      "version": "0.0.0",
+      "dependencies": {
+        "@batonfx/core": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/transport": {
       "name": "@batonfx/transport",
       "version": "0.0.0",
@@ -295,6 +311,7 @@
         "effect": "catalog:",
       },
       "devDependencies": {
+        "@batonfx/test": "workspace:*",
         "@effect/vitest": "catalog:",
         "@types/bun": "catalog:",
         "typescript": "catalog:",
@@ -393,6 +410,8 @@
     "@batonfx/providers": ["@batonfx/providers@workspace:packages/providers"],
 
     "@batonfx/skills": ["@batonfx/skills@workspace:packages/skills"],
+
+    "@batonfx/test": ["@batonfx/test@workspace:packages/test"],
 
     "@batonfx/transport": ["@batonfx/transport@workspace:packages/transport"],
 

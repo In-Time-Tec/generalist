@@ -1,2 +1,6 @@
+export * as GitHubCatalog from "./github-catalog"
+export * as HostedCatalog from "./hosted-catalog"
+export * as HttpCatalog from "./http-catalog"
 export * as InstructionFiles from "./instructions-files"
+export * as S3Catalog from "./s3-catalog"
 export * as SkillLoader from "./skill-loader"

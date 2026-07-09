@@ -4,6 +4,7 @@ import {
   Context,
   Duration,
   Effect,
+  Exit,
   Fiber,
   Layer,
   Option,
@@ -11,6 +12,7 @@ import {
   Random,
   Ref,
   Schema,
+  Semaphore,
   Stream,
 } from "effect"
 import { Chat, Prompt, Tool } from "effect/unstable/ai"
@@ -25,6 +27,15 @@ export class SessionError extends Schema.TaggedErrorClass<SessionError>()("@bato
 export class SessionBusy extends Schema.TaggedErrorClass<SessionBusy>()("@batonfx/transport/SessionBusy", {
   sessionId: Schema.String,
 }) {}
+
+/** @experimental */
+export class SessionQueueFull extends Schema.TaggedErrorClass<SessionQueueFull>()(
+  "@batonfx/transport/SessionQueueFull",
+  {
+    sessionId: Schema.String,
+    capacity: Schema.Number,
+  },
+) {}
 
 /** @experimental */
 export class SubscriberLagged extends Schema.TaggedErrorClass<SubscriberLagged>()(
@@ -42,6 +53,7 @@ export interface SessionInfo {
   readonly status: SessionStatus
   readonly lastSeq: number
   readonly idleSince: Option.Option<number>
+  readonly pendingMessages: number
 }
 
 /** @experimental */
@@ -51,6 +63,9 @@ export interface MemoryOptions<Tools extends Record<string, Tool.Any>, HasModel 
   readonly subscriberQueueCapacity?: number
   readonly idleTimeout?: Duration.Input
   readonly stripTranscripts?: boolean
+  readonly onConcurrentMessage?: "reject" | "enqueue"
+  readonly pendingMessageCapacity?: number
+  readonly maxConcurrentRuns?: number
 }
 
 /** @experimental */
@@ -60,7 +75,10 @@ export interface Interface {
     readonly chatId?: string
     readonly system?: string
   }) => Effect.Effect<SessionInfo, SessionError>
-  readonly send: (sessionId: string, prompt: Prompt.RawInput) => Effect.Effect<void, SessionError | SessionBusy>
+  readonly send: (
+    sessionId: string,
+    prompt: Prompt.RawInput,
+  ) => Effect.Effect<void, SessionError | SessionBusy | SessionQueueFull>
   readonly resolveApproval: (
     sessionId: string,
     token: string,
@@ -86,6 +104,12 @@ type RunReservation =
   | { readonly _tag: "Busy" }
   | { readonly _tag: "Reserved"; readonly session: SessionState }
 
+type RunSubmission = RunReservation | { readonly _tag: "Enqueued" } | { readonly _tag: "Full" }
+
+interface PendingRun {
+  readonly prompt: Prompt.RawInput
+}
+
 interface SessionState {
   readonly sessionId: string
   readonly chatId: string
@@ -97,13 +121,15 @@ interface SessionState {
   readonly runFiber: Option.Option<Fiber.Fiber<void>>
   readonly interruptRequested: boolean
   readonly idleSince: Option.Option<number>
+  readonly pendingRuns: ReadonlyArray<PendingRun>
+  readonly runId: number
 }
 
 type InterruptAction =
   | { readonly _tag: "Missing" }
   | { readonly _tag: "Ignore" }
   | { readonly _tag: "Requested" }
-  | { readonly _tag: "Stop"; readonly fiber: Fiber.Fiber<void> }
+  | { readonly _tag: "Stop"; readonly fiber: Fiber.Fiber<void>; readonly runId: number }
 
 interface RegistryState {
   readonly sessions: ReadonlyMap<string, SessionState>
@@ -127,10 +153,21 @@ const infoFrom = (session: SessionState): SessionInfo => ({
   status: session.status,
   lastSeq: session.lastSeq,
   idleSince: session.idleSince,
+  pendingMessages: session.pendingRuns.length,
 })
 
 const trimRing = (ring: ReadonlyArray<LooseServerFrameType>, capacity: number): ReadonlyArray<LooseServerFrameType> =>
   ring.length <= capacity ? ring : ring.slice(ring.length - capacity)
+
+const nonNegativeInteger = (name: string, value: number): Effect.Effect<number> =>
+  Number.isSafeInteger(value) && value >= 0
+    ? Effect.succeed(value)
+    : Effect.die(new TypeError(`${name} must be a non-negative safe integer`))
+
+const positiveInteger = (name: string, value: number): Effect.Effect<number> =>
+  Number.isSafeInteger(value) && value > 0
+    ? Effect.succeed(value)
+    : Effect.die(new TypeError(`${name} must be a positive safe integer`))
 
 const stripEventTranscript = (event: AgentEvent.Event, strip: boolean): EventType => {
   if (!strip) return event
@@ -176,6 +213,15 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
       const idleTimeout = options.idleTimeout ?? "15 minutes"
       const idleTimeoutMillis = Duration.toMillis(idleTimeout)
       const stripTranscripts = options.stripTranscripts ?? false
+      const onConcurrentMessage = options.onConcurrentMessage ?? "reject"
+      const pendingMessageCapacity = yield* nonNegativeInteger(
+        "pendingMessageCapacity",
+        options.pendingMessageCapacity ?? 128,
+      )
+      const runSemaphore =
+        options.maxConcurrentRuns === undefined
+          ? undefined
+          : yield* positiveInteger("maxConcurrentRuns", options.maxConcurrentRuns).pipe(Effect.flatMap(Semaphore.make))
 
       const lookup = (sessionId: string): Effect.Effect<SessionState, SessionError> =>
         Ref.get(state).pipe(
@@ -185,26 +231,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
               ? Effect.fail(sessionError(`Session ${sessionId} is not open`))
               : Effect.succeed(session)
           }),
-        )
-
-      const updateSession = (
-        sessionId: string,
-        f: (session: SessionState) => SessionState,
-      ): Effect.Effect<SessionState, SessionError> =>
-        Ref.modify(state, (current) => {
-          const session = current.sessions.get(sessionId)
-          if (session === undefined) return [Option.none<SessionState>(), current]
-          const updated = f(session)
-          const sessions = new Map(current.sessions)
-          sessions.set(sessionId, updated)
-          return [Option.some(updated), { ...current, sessions }]
-        }).pipe(
-          Effect.flatMap(
-            Option.match({
-              onNone: () => Effect.fail(sessionError(`Session ${sessionId} is not open`)),
-              onSome: Effect.succeed,
-            }),
-          ),
         )
 
       const removeSubscriber = (sessionId: string, subscriberId: number): Effect.Effect<void> =>
@@ -259,48 +285,74 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
           ),
         )
 
-      const setStatus = (sessionId: string, status: SessionStatus): Effect.Effect<void, SessionError> =>
+      const setStatus = (sessionId: string, runId: number, status: SessionStatus): Effect.Effect<void, SessionError> =>
         Clock.currentTimeMillis.pipe(
           Effect.flatMap((now) =>
-            updateSession(sessionId, (session) => ({
-              ...session,
-              status,
-              idleSince: status._tag === "Running" ? Option.none() : Option.some(now),
-            })),
+            Ref.modify(state, (current) => {
+              const session = current.sessions.get(sessionId)
+              if (session === undefined || session.runId !== runId || session.status._tag !== "Running") {
+                return [false, current]
+              }
+              const sessions = new Map(current.sessions)
+              sessions.set(sessionId, {
+                ...session,
+                status,
+                idleSince: status._tag === "Running" ? Option.none() : Option.some(now),
+              })
+              return [true, { ...current, sessions }]
+            }),
           ),
-          Effect.andThen(publish(sessionId, { _tag: "SessionStatus", status })),
-          Effect.asVoid,
+          Effect.flatMap((updated) =>
+            updated ? publish(sessionId, { _tag: "SessionStatus", status }).pipe(Effect.asVoid) : Effect.void,
+          ),
         )
 
-      const finalizeRun = (sessionId: string, status: SessionStatus): Effect.Effect<void, SessionError> =>
+      const finalizeRun = (
+        sessionId: string,
+        runId: number,
+        status: SessionStatus,
+        outcome?: FrameWithoutSeq,
+      ): Effect.Effect<void, SessionError> =>
         Clock.currentTimeMillis.pipe(
           Effect.flatMap((now) =>
-            updateSession(sessionId, (session) => ({
-              ...session,
-              status,
-              runFiber: Option.none(),
-              idleSince: Option.some(now),
-            })),
+            Ref.modify(state, (current) => {
+              const session = current.sessions.get(sessionId)
+              if (session === undefined || session.runId !== runId || session.status._tag !== "Running") {
+                return [false, current]
+              }
+              const sessions = new Map(current.sessions)
+              sessions.set(sessionId, {
+                ...session,
+                status,
+                runFiber: Option.none(),
+                idleSince: Option.some(now),
+              })
+              return [true, { ...current, sessions }]
+            }),
           ),
-          Effect.andThen(publish(sessionId, { _tag: "SessionStatus", status })),
-          Effect.andThen(publish(sessionId, { _tag: "Ended" })),
-          Effect.asVoid,
+          Effect.flatMap((finalized) =>
+            finalized
+              ? Effect.gen(function* () {
+                  if (outcome !== undefined) yield* publish(sessionId, outcome)
+                  yield* publish(sessionId, { _tag: "SessionStatus", status })
+                  yield* publish(sessionId, { _tag: "Ended" })
+                }).pipe(Effect.asVoid)
+              : Effect.void,
+          ),
         )
 
-      const finalizeInterrupted = (sessionId: string): Effect.Effect<void> =>
-        lookup(sessionId).pipe(
-          Effect.flatMap((session) => {
-            if (session.status._tag !== "Running") return Effect.void
-            const error = new AgentEvent.AgentError({ message: "Session interrupted", turn: 0 })
-            return publish(sessionId, { _tag: "Failed", error }).pipe(
-              Effect.andThen(finalizeRun(sessionId, { _tag: "Failed", error })),
-            )
-          }),
-          Effect.ignore,
-        )
+      const finalizeInterrupted = (sessionId: string, runId: number): Effect.Effect<void> => {
+        const error = new AgentEvent.AgentError({ message: "Session interrupted", turn: 0 })
+        return finalizeRun(sessionId, runId, { _tag: "Failed", error }, { _tag: "Failed", error }).pipe(Effect.ignore)
+      }
 
-      const stopRun = (sessionId: string, fiber: Fiber.Fiber<void>): Effect.Effect<void> =>
-        Fiber.interrupt(fiber).pipe(Effect.andThen(finalizeInterrupted(sessionId)))
+      let drainAfterInterrupt = (_sessionId: string, _runId: number): Effect.Effect<void> => Effect.void
+
+      const stopRun = (sessionId: string, runId: number, fiber: Fiber.Fiber<void>): Effect.Effect<void> =>
+        Fiber.interrupt(fiber).pipe(
+          Effect.andThen(finalizeInterrupted(sessionId, runId)),
+          Effect.andThen(drainAfterInterrupt(sessionId, runId)),
+        )
 
       const makeApprovals = (
         resume: Agent.Resume | undefined,
@@ -352,7 +404,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
           const run = Agent.stream(options.agent, runOptions).pipe(
             Stream.runForEach((event) =>
               (event._tag === "TurnStarted"
-                ? setStatus(session.sessionId, { _tag: "Running", turn: event.turn })
+                ? setStatus(session.sessionId, session.runId, { _tag: "Running", turn: event.turn })
                 : Effect.void
               ).pipe(
                 Effect.andThen(
@@ -364,16 +416,22 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
               onFailure: (cause) => {
                 const error = Cause.squash(cause)
                 if (error instanceof AgentEvent.AgentSuspended) {
-                  return publish(session.sessionId, { _tag: "Suspended", suspension: error }).pipe(
-                    Effect.andThen(finalizeRun(session.sessionId, { _tag: "Suspended", suspension: error })),
+                  return finalizeRun(
+                    session.sessionId,
+                    session.runId,
+                    { _tag: "Suspended", suspension: error },
+                    { _tag: "Suspended", suspension: error },
                   )
                 }
                 const failure = runFailureFromCause(cause, 0)
-                return publish(session.sessionId, { _tag: "Failed", error: failure }).pipe(
-                  Effect.andThen(finalizeRun(session.sessionId, { _tag: "Failed", error: failure })),
+                return finalizeRun(
+                  session.sessionId,
+                  session.runId,
+                  { _tag: "Failed", error: failure },
+                  { _tag: "Failed", error: failure },
                 )
               },
-              onSuccess: () => finalizeRun(session.sessionId, { _tag: "Idle" }),
+              onSuccess: () => finalizeRun(session.sessionId, session.runId, { _tag: "Idle" }),
             }),
             Effect.catchCause(() => Effect.void),
           )
@@ -396,6 +454,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
           }
           const updated: SessionState = {
             ...session,
+            runId: session.runId + 1,
             status: { _tag: "Running", turn: 0 },
             runFiber: Option.none(),
             interruptRequested: false,
@@ -417,6 +476,136 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
           }),
         )
 
+      const reserveOrEnqueue = (
+        sessionId: string,
+        prompt: Prompt.RawInput,
+      ): Effect.Effect<RunSubmission, SessionError | SessionBusy | SessionQueueFull> =>
+        Ref.modify(state, (current): readonly [RunSubmission, RegistryState] => {
+          const session = current.sessions.get(sessionId)
+          if (session === undefined) return [{ _tag: "Missing" }, current]
+          const busy =
+            session.status._tag === "Running" || session.status._tag === "Suspended" || session.pendingRuns.length > 0
+          if (busy) {
+            if (onConcurrentMessage === "reject") return [{ _tag: "Busy" }, current]
+            if (session.pendingRuns.length >= pendingMessageCapacity) return [{ _tag: "Full" }, current]
+            const sessions = new Map(current.sessions)
+            sessions.set(sessionId, { ...session, pendingRuns: [...session.pendingRuns, { prompt }] })
+            return [{ _tag: "Enqueued" }, { ...current, sessions }]
+          }
+          const updated: SessionState = {
+            ...session,
+            runId: session.runId + 1,
+            status: { _tag: "Running", turn: 0 },
+            runFiber: Option.none(),
+            interruptRequested: false,
+            idleSince: Option.none(),
+          }
+          const sessions = new Map(current.sessions)
+          sessions.set(sessionId, updated)
+          return [
+            { _tag: "Reserved", session: updated },
+            { ...current, sessions },
+          ]
+        }).pipe(
+          Effect.flatMap((submission): Effect.Effect<RunSubmission, SessionError | SessionBusy | SessionQueueFull> => {
+            switch (submission._tag) {
+              case "Missing":
+                return Effect.fail(sessionError(`Session ${sessionId} is not open`))
+              case "Busy":
+                return Effect.fail(new SessionBusy({ sessionId }))
+              case "Full":
+                return Effect.fail(new SessionQueueFull({ sessionId, capacity: pendingMessageCapacity }))
+              case "Enqueued":
+              case "Reserved":
+                return Effect.succeed(submission)
+            }
+          }),
+        )
+
+      const reserveNextRun = (
+        sessionId: string,
+        completedRunId: number,
+      ): Effect.Effect<Option.Option<readonly [SessionState, PendingRun]>> =>
+        Ref.modify(state, (current) => {
+          const session = current.sessions.get(sessionId)
+          if (
+            session === undefined ||
+            session.runId !== completedRunId ||
+            session.status._tag === "Running" ||
+            session.status._tag === "Suspended" ||
+            session.pendingRuns.length === 0
+          ) {
+            return [Option.none<readonly [SessionState, PendingRun]>(), current]
+          }
+          const [next, ...pendingRuns] = session.pendingRuns
+          if (next === undefined) return [Option.none<readonly [SessionState, PendingRun]>(), current]
+          const updated: SessionState = {
+            ...session,
+            runId: session.runId + 1,
+            status: { _tag: "Running", turn: 0 },
+            runFiber: Option.none(),
+            interruptRequested: false,
+            idleSince: Option.none(),
+            pendingRuns,
+          }
+          const sessions = new Map(current.sessions)
+          sessions.set(sessionId, updated)
+          return [Option.some([updated, next] as const), { ...current, sessions }]
+        })
+
+      let launchRun: (
+        session: SessionState,
+        prompt: Prompt.RawInput,
+        resume?: Agent.Resume,
+        approvalDecision?: ClientApproval,
+      ) => Effect.Effect<void, SessionError>
+
+      const drainNext = (sessionId: string, completedRunId: number): Effect.Effect<void> =>
+        reserveNextRun(sessionId, completedRunId).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () => Effect.void,
+              onSome: ([session, pending]) => launchRun(session, pending.prompt).pipe(Effect.ignore),
+            }),
+          ),
+        )
+
+      drainAfterInterrupt = drainNext
+
+      launchRun = (
+        runSession: SessionState,
+        prompt: Prompt.RawInput,
+        resume?: Agent.Resume,
+        approvalDecision?: ClientApproval,
+      ): Effect.Effect<void, SessionError> =>
+        Effect.gen(function* () {
+          yield* publish(runSession.sessionId, { _tag: "SessionStatus", status: runSession.status })
+          const run = runStream(runSession, prompt, resume, approvalDecision)
+          const governed = runSemaphore === undefined ? run : runSemaphore.withPermits(1)(run)
+          const fiber = yield* governed.pipe(
+            Effect.onExit((exit) =>
+              Exit.hasInterrupts(exit) ? Effect.void : drainNext(runSession.sessionId, runSession.runId),
+            ),
+            Effect.forkIn(scope),
+          )
+          const stopRequested = yield* Ref.modify(state, (current): readonly [boolean, RegistryState] => {
+            const session = current.sessions.get(runSession.sessionId)
+            if (session === undefined || session.runId !== runSession.runId || session.status._tag !== "Running") {
+              return [false, current]
+            }
+            const updated: SessionState = {
+              ...session,
+              runFiber: Option.some(fiber),
+              interruptRequested: false,
+              idleSince: Option.none(),
+            }
+            const sessions = new Map(current.sessions)
+            sessions.set(runSession.sessionId, updated)
+            return [session.interruptRequested, { ...current, sessions }]
+          })
+          if (stopRequested) yield* stopRun(runSession.sessionId, runSession.runId, fiber)
+        })
+
       const beginRun = (
         sessionId: string,
         prompt: Prompt.RawInput,
@@ -425,25 +614,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
       ): Effect.Effect<void, SessionError | SessionBusy> =>
         Effect.gen(function* () {
           const runSession = yield* reserveRun(sessionId, resume)
-          yield* publish(sessionId, { _tag: "SessionStatus", status: runSession.status })
-          const fiber = yield* runStream(runSession, prompt, resume, approvalDecision).pipe(Effect.forkIn(scope))
-          const stopRequested = yield* Ref.modify(state, (current): readonly [boolean, RegistryState] => {
-            const session = current.sessions.get(sessionId)
-            if (session === undefined) return [false, current]
-            const updated: SessionState =
-              session.status._tag === "Running"
-                ? {
-                    ...session,
-                    runFiber: Option.some(fiber),
-                    interruptRequested: false,
-                    idleSince: Option.none(),
-                  }
-                : { ...session, interruptRequested: false }
-            const sessions = new Map(current.sessions)
-            sessions.set(sessionId, updated)
-            return [session.interruptRequested, { ...current, sessions }]
-          })
-          if (stopRequested) yield* stopRun(sessionId, fiber)
+          yield* launchRun(runSession, prompt, resume, approvalDecision)
         })
 
       const snapshotFrame = (
@@ -464,7 +635,12 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
             const evicted: Array<readonly [string, ReadonlyArray<SubscriberQueue>, Option.Option<Fiber.Fiber<void>>]> =
               []
             for (const [sessionId, session] of current.sessions) {
-              if (session.status._tag === "Running" || Option.isNone(session.idleSince)) continue
+              if (
+                session.status._tag === "Running" ||
+                session.pendingRuns.length > 0 ||
+                Option.isNone(session.idleSince)
+              )
+                continue
               if (now - session.idleSince.value >= idleTimeoutMillis) {
                 sessions.delete(sessionId)
                 evicted.push([sessionId, Array.from(session.subscribers.values()), session.runFiber] as const)
@@ -531,6 +707,8 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
                 runFiber: Option.none(),
                 interruptRequested: false,
                 idleSince: Option.some(now),
+                pendingRuns: [],
+                runId: 0,
               }
               const sessions = new Map(current.sessions)
               sessions.set(sessionId, session)
@@ -538,7 +716,12 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
             })
             return info
           }),
-        send: (sessionId, prompt) => beginRun(sessionId, prompt),
+        send: (sessionId, prompt) =>
+          reserveOrEnqueue(sessionId, prompt).pipe(
+            Effect.flatMap((submission) =>
+              submission._tag === "Reserved" ? launchRun(submission.session, prompt) : Effect.void,
+            ),
+          ),
         resolveApproval: (sessionId, token, decision) =>
           Effect.gen(function* () {
             const session = yield* lookup(sessionId)
@@ -612,7 +795,8 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
           Ref.modify(state, (current): readonly [InterruptAction, RegistryState] => {
             const session = current.sessions.get(sessionId)
             if (session === undefined) return [{ _tag: "Missing" }, current]
-            if (Option.isSome(session.runFiber)) return [{ _tag: "Stop", fiber: session.runFiber.value }, current]
+            if (Option.isSome(session.runFiber))
+              return [{ _tag: "Stop", fiber: session.runFiber.value, runId: session.runId }, current]
             if (session.status._tag !== "Running") return [{ _tag: "Ignore" }, current]
             const sessions = new Map(current.sessions)
             sessions.set(sessionId, { ...session, interruptRequested: true })
@@ -623,7 +807,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
                 case "Missing":
                   return Effect.fail(sessionError(`Session ${sessionId} is not open`))
                 case "Stop":
-                  return stopRun(sessionId, action.fiber)
+                  return stopRun(sessionId, action.runId, action.fiber)
                 case "Requested":
                 case "Ignore":
                   return Effect.void

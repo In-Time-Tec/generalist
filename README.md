@@ -36,7 +36,7 @@ Baton is the agent; a durable runtime such as [Relay](https://github.com/In-Time
 ```bash
 bun add effect @batonfx/core
 bun add @batonfx/providers @batonfx/mcp @batonfx/skills @batonfx/memory
-bun add @batonfx/transport @batonfx/foldkit
+bun add @batonfx/transport @batonfx/foldkit @batonfx/test
 ```
 
 ## Capability matrix
@@ -48,6 +48,7 @@ bun add @batonfx/transport @batonfx/foldkit
 | MCP discovery and Baton `ToolExecutor` adapter                      | `@batonfx/mcp`       | experimental                                  |
 | SKILL.md and instruction-file sources                               | `@batonfx/skills`    | experimental                                  |
 | Working memory, vector store, semantic recall                       | `@batonfx/memory`    | experimental                                  |
+| Scripted models and normalized request capture                      | `@batonfx/test`      | experimental                                  |
 | SSE, WebSocket, wire frames, in-memory session registry             | `@batonfx/transport` | experimental                                  |
 | FoldKit connection, subscription, commands, headless chat model     | `@batonfx/foldkit`   | experimental                                  |
 
@@ -72,7 +73,7 @@ const clientTools = ToolExecutor.router([
 
 | Baton release | Tested Effect range                               | Notes                                                                               |
 | ------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `0.3.x`       | `effect@4.0.0-beta.93` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| `0.4.x`       | `effect@4.0.0-beta.93` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 
 ## Start here
 
@@ -91,6 +92,7 @@ const clientTools = ToolExecutor.router([
 | `packages/mcp`       | `@batonfx/mcp` — MCP client bridge and Baton adapter.                               |
 | `packages/skills`    | `@batonfx/skills` — SKILL.md and instruction-file sources.                          |
 | `packages/memory`    | `@batonfx/memory` — non-durable memory implementations.                             |
+| `packages/test`      | `@batonfx/test` — scripted model fixtures and normalized request capture.           |
 | `packages/transport` | `@batonfx/transport` — wire frames, session registry, SSE, WS, and client adapters. |
 | `packages/foldkit`   | `@batonfx/foldkit` — FoldKit adapter and headless chat model.                       |
 | `docs/spec`          | Normative specs and ADRs.                                                           |

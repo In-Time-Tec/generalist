@@ -2,7 +2,7 @@
 name: release-notes
 description: Draft release notes from merged changes before announcing a version.
 whenToUse: The user asks for release notes or a changelog entry.
-allowedTools: [read_file, search_docs]
+allowed-tools: read_file search_docs
 ---
 
 Collect the merged changes since the last tag, group them by package, and

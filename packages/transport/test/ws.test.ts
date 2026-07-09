@@ -194,6 +194,27 @@ describe("Ws", () => {
     }),
   )
 
+  it.effect("SessionQueueFull closes the socket with a retry-later code", () =>
+    Effect.gen(function* () {
+      const fake = yield* makeFakeSocket()
+      const fiber = yield* runHandler(
+        fake,
+        registryLayer({
+          send: (sessionId) => Effect.fail(new SessionRegistry.SessionQueueFull({ sessionId, capacity: 1 })),
+        }),
+      )
+
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "SendMessage", sessionId: "s", prompt: "hello" }))
+      const output = yield* Queue.take(fake.outbound)
+      yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(fiber)
+
+      expect(Socket.isCloseEvent(output)).toBe(true)
+      expect(Socket.isCloseEvent(output) && output.code).toBe(1013)
+      expect(Socket.isCloseEvent(output) && output.reason).toBe("session queue full")
+    }),
+  )
+
   it.effect("binary client frames close without dispatching", () =>
     Effect.gen(function* () {
       const fake = yield* makeFakeSocket()

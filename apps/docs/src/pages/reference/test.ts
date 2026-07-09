@@ -1,0 +1,55 @@
+import { code, command, definePage, h2, lead, link, p, table } from "../../prose"
+
+export const testReference = definePage({
+  path: "/docs/reference/test",
+  title: "@batonfx/test",
+  navTitle: "test",
+  group: "Reference",
+  description: "Scripted Effect AI model fixtures and normalized request capture for deterministic agent tests.",
+  content: [
+    lead(
+      "@batonfx/test runs the real Baton loop against scripted Effect AI responses, captures normalized provider requests, and needs no provider credentials or test-runner dependency.",
+    ),
+    command("Install", "bun add -d @batonfx/test @effect/vitest"),
+    h2("script", "Script responses"),
+    table(
+      ["API", "Purpose"],
+      [
+        [[code("TestModel.text(text)")], "One text response part; a top-level part is one model invocation"],
+        [[code("TestModel.toolCall(name, params, options?)")], "One tool call with deterministic or explicit id"],
+        [[code("TestModel.turn(parts, options?)")], "Group parts and set finish reason, usage, or Effect delay"],
+        [[code("TestModel.object(value, options?)")], "One schema-decoded generateObject response"],
+        [[code("TestModel.failure(error, options?)")], "One typed Effect AI failure slot"],
+      ],
+    ),
+    h2("fixture", "Stateful fixtures"),
+    p(
+      code("TestModel.make(script, options?)"),
+      " returns a fixture whose cursor survives layer rebuilds. It exposes ",
+      code("layer"),
+      ", ",
+      code("selection"),
+      ", ",
+      code("registration"),
+      ", ",
+      code("registryLayer"),
+      ", ",
+      code("requests"),
+      ", ",
+      code("prompts"),
+      ", ",
+      code("remaining"),
+      ", and ",
+      code("awaitRequests(count)"),
+      ". Request capture is atomic and includes the normalized prompt, tools, tool choice, response format, and operation without exposing tracing spans.",
+    ),
+    p(
+      code("TestModel.layer(script)"),
+      " is the concise direct-model convenience. Use ",
+      code("make"),
+      " when assertions need capture state or several top-level runs share one script.",
+    ),
+    h2("next", "Guide"),
+    p("See ", link("/docs/guides/testing-evals", "How to test agents and run evals in CI"), "."),
+  ],
+})

@@ -6,13 +6,16 @@ const agent = Agent.make({ name: "long-running-assistant" })
 const compactionLayer = Compaction.layer({
   contextWindow: 128_000,
   reserveTokens: 16_384,
-  keepRecentTokens: 20_000,
+  strategy: Compaction.strategy([
+    Compaction.toolOutputBound({ maxBytes: 16_384 }),
+    Compaction.structuredSummary({ objectName: "AgentSummary" }),
+    Compaction.keepRecent({ tokens: 20_000 }),
+  ]),
 })
 
 export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.LanguageModel> = Agent.generate(agent, {
   prompt: "Continue the migration plan.",
   compaction: { contextWindow: 128_000 },
-  toolOutputMaxBytes: 16_384,
 }).pipe(
   Effect.provide(
     Layer.mergeAll(

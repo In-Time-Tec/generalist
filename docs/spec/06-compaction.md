@@ -8,6 +8,7 @@ Baton owns:
 
 - the `Compaction` service boundary;
 - a pure `Strategy` shape for trigger, cut-point selection, and summarization;
+- composable strategy parts for lossless tool-output bounding, structured summarization, and recent-tail retention;
 - a two-stage default strategy that tries tool-output microcompaction before summary checkpointing;
 - a truncate-only implementation over `Ai.Tokenizer`;
 - optional `Agent.stream` integration that preserves current behavior when `Compaction` is absent.
@@ -35,6 +36,34 @@ A strategy has three responsibilities:
 - `cut(entries, keepRecentTokens)` chooses the session suffix kept verbatim and the prefix summarized.
 - `summarize(plan, request)` performs one dedicated `LanguageModel.generateText` call and returns checkpoint text.
 
+The three required methods remain the complete host-decoration boundary. In particular, `summarize` continues to return `string` so a durable host can journal the nondeterministic model result before Baton uses it.
+
+## Composable strategy pack
+
+`strategy(parts, base?)` compiles ordered `StrategyPart` values onto a base strategy, defaulting to `defaultStrategy()`. A part may replace one required strategy method or set one optional execution parameter. Parts are applied left to right; the last part defining the same capability wins. The result is an ordinary `Strategy`, so existing custom strategies and decorators remain valid.
+
+The public parts are:
+
+- `toolOutputBound({ maxBytes })`, which supplies the lossless successful-tool-result bound used before semantic summarization. An explicit `Request.toolOutputMaxBytes` wins over the strategy part. Bounding still depends on `ToolOutputStore`: when the store does not accept a spill, Baton preserves the original result rather than truncating it. Failed tool results are unchanged.
+- `structuredSummary({ objectName?, summaryModel?, summaryPrompt? })`, which replaces only `summarize`. It calls `LanguageModel.generateObject` directly with the exported `AgentSummary` schema, no toolkit, and `toolChoice: "none"`. Baton deterministically renders the decoded value into the existing string checkpoint contract.
+- `keepRecent({ tokens })`, which supplies the non-negative safe-integer token target for the verbatim suffix. Baton deliberately does not infer turns from message roles because session entries do not carry a canonical turn identifier.
+
+`AgentSummary` has this fixed validated shape:
+
+```ts
+Schema.Struct({
+  goal: Schema.String,
+  facts: Schema.Array(Schema.String),
+  decisions: Schema.Array(Schema.String),
+  openQuestions: Schema.Array(Schema.String),
+  toolFindings: Schema.Array(Schema.String),
+})
+```
+
+Its checkpoint renderer emits the fields in schema order with fixed Markdown headings and list order. Structured generation does not change `SummarizeResult.summary`, `Session.CompactionEntry.summary`, or the host-facing `Strategy.summarize` type.
+
+`layer({ strategy, ...options })` accepts a compiled strategy in the option object. The existing `layer(options, strategy)` positional form remains supported. Invalid `maxBytes` or `tokens` values are programmer configuration defects detected while constructing the part.
+
 Cut points snap to turn boundaries. A kept suffix never starts with a tool-result message and never keeps one side of an assistant tool-call / tool-result pair while dropping the other. If no safe cut exists, the strategy returns no compaction.
 
 ## Default two-stage strategy
@@ -51,7 +80,11 @@ If the context still exceeds budget, the strategy summarizes the older session p
 </conversation-checkpoint>
 ```
 
+When a tool-output bound is active, Baton applies it both to the head sent to the summary model and to tool results in the retained suffix before assembling the checkpoint history. Summary checkpointing never reintroduces a raw oversized tool result from the session path.
+
 The summary template has fixed sections: Goal, Constraints, Progress, Key Decisions, Next Steps, Critical Context, and ends with `Do not mention that context was compacted.`.
+
+`structuredSummary` is an alternative semantic summarizer. It uses the fixed `AgentSummary` object contract and deterministic renderer instead of the free-form default template. It still summarizes the same microcompacted head and keeps the same recent suffix and system-message behavior.
 
 ## Session and losslessness
 

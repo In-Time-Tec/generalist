@@ -64,7 +64,7 @@ export const examples = definePage({
         ],
         [
           [code("capstone-local-assistant")],
-          "All seven packages composed in one offline program: core loop, deterministic provider, skills, memory, wire frames, and the headless chat update",
+          "The runtime packages composed in one offline program: core loop, deterministic provider, skills, memory, wire frames, and the headless chat update",
           [code("bun --cwd examples/capstone-local-assistant start")],
         ],
         [

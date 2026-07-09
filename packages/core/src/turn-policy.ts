@@ -31,7 +31,30 @@ export type Decision = Continue | Stop
 /** @experimental A turn policy in the spirit of `Schedule`. */
 export interface TurnPolicy {
   readonly decide: (info: TurnInfo) => Effect.Effect<Decision>
+  readonly snapshot?: Snapshot
 }
+
+/** @experimental Portable constructor data for a recursive follow-up cap. */
+export interface RecursSnapshot {
+  readonly _tag: "Recurs"
+  readonly count: number
+}
+
+/** @experimental Portable constructor data for a named-tool stop policy. */
+export interface UntilToolCallSnapshot {
+  readonly _tag: "UntilToolCall"
+  readonly name: string
+}
+
+/** @experimental Portable constructor data for two composed portable policies. */
+export interface BothSnapshot {
+  readonly _tag: "Both"
+  readonly first: Snapshot
+  readonly second: Snapshot
+}
+
+/** @experimental Portable constructor data exposed by built-in turn policies. */
+export type Snapshot = RecursSnapshot | UntilToolCallSnapshot | BothSnapshot
 
 /** @experimental */
 export const decision: { readonly continue: (overrides?: TurnOverrides) => Continue; readonly stop: Stop } = {
@@ -46,16 +69,19 @@ export const decision: { readonly continue: (overrides?: TurnOverrides) => Conti
 export const make = (decide: (info: TurnInfo) => Effect.Effect<Decision>): TurnPolicy => ({ decide })
 
 /** @experimental Continue for at most `n` follow-up turns after the first. */
-export const recurs = (n: number): TurnPolicy =>
-  make((info) => Effect.succeed(info.turn < n + 1 ? decision.continue() : decision.stop))
+export const recurs = (n: number): TurnPolicy => ({
+  decide: (info) => Effect.succeed(info.turn < n + 1 ? decision.continue() : decision.stop),
+  ...(Number.isFinite(n) ? { snapshot: { _tag: "Recurs" as const, count: n } } : {}),
+})
 
 /** @experimental Continue while a named tool has not yet been called this run. */
-export const untilToolCall = (name: string): TurnPolicy =>
-  make((info) =>
+export const untilToolCall = (name: string): TurnPolicy => ({
+  decide: (info) =>
     Effect.succeed(
       info.pendingToolResults.some((result) => result.name === name) ? decision.stop : decision.continue(),
     ),
-  )
+  snapshot: { _tag: "UntilToolCall", name },
+})
 
 const mergeOverrides = (first?: TurnOverrides, second?: TurnOverrides): TurnOverrides | undefined => {
   if (first === undefined) return second
@@ -64,8 +90,8 @@ const mergeOverrides = (first?: TurnOverrides, second?: TurnOverrides): TurnOver
 }
 
 /** @experimental Both must continue; overrides merge with `second` winning. */
-export const both = (first: TurnPolicy, second: TurnPolicy): TurnPolicy =>
-  make((info) =>
+export const both = (first: TurnPolicy, second: TurnPolicy): TurnPolicy => ({
+  decide: (info) =>
     Effect.gen(function* () {
       const left = yield* first.decide(info)
       if (left._tag === "Stop") return decision.stop
@@ -73,7 +99,10 @@ export const both = (first: TurnPolicy, second: TurnPolicy): TurnPolicy =>
       if (right._tag === "Stop") return decision.stop
       return decision.continue(mergeOverrides(left.overrides, right.overrides))
     }),
-  )
+  ...(first.snapshot === undefined || second.snapshot === undefined
+    ? {}
+    : { snapshot: { _tag: "Both" as const, first: first.snapshot, second: second.snapshot } }),
+})
 
 /** @experimental Default policy: `recurs(8)` — matches Relay's historical cap. */
 export const defaultPolicy: TurnPolicy = recurs(8)

@@ -189,6 +189,19 @@ export const coreContextReference = definePage({
           "Two-stage strategy: microcompact tool outputs first, then cut and summarize the head",
         ],
         [
+          [code("strategy(parts, base?)")],
+          "Compiles ordered capability parts onto a complete strategy; the last part for one capability wins",
+        ],
+        [[code("toolOutputBound({ maxBytes })")], "Lossless successful-tool-result bound backed by ToolOutputStore"],
+        [
+          [code("structuredSummary(options?)")],
+          ["Validated ", code("AgentSummary"), " generation with deterministic string checkpoint rendering"],
+        ],
+        [
+          [code("keepRecent({ tokens })")],
+          "Token-denominated recent suffix target; Baton does not infer turns from message roles",
+        ],
+        [
           [code("layer(options?, strategy?)")],
           [
             "Service layer; ",
@@ -205,7 +218,8 @@ export const coreContextReference = definePage({
             code("summaryPrompt"),
             " (default ",
             code("SUMMARY_TEMPLATE"),
-            ")",
+            "), and an optional compiled ",
+            code("strategy"),
           ],
         ],
         [

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer, Option, Stream } from "effect"
+import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { Compaction, Session, ToolOutput } from "../src/index"
 
@@ -344,5 +344,165 @@ describe("Compaction", () => {
         ),
       ),
     )
+  })
+
+  it("composes ordered strategy parts onto the default strategy", () => {
+    const composed = Compaction.strategy([
+      { shouldCompact: () => false },
+      { shouldCompact: () => true },
+      Compaction.toolOutputBound({ maxBytes: 128 }),
+      Compaction.keepRecent({ tokens: 256 }),
+    ])
+
+    expect(composed.shouldCompact({ contextTokens: 0, contextWindow: 100, reserveTokens: 10 })).toBe(true)
+    expect(composed.toolOutputMaxBytes).toBe(128)
+    expect(composed.keepRecentTokens).toBe(256)
+  })
+
+  it.effect("applies a composed lossless tool-output bound before summarization", () => {
+    let summaryCalls = 0
+    const large = "bounded-output".repeat(40)
+    const composed = Compaction.strategy([Compaction.toolOutputBound({ maxBytes: 12 })])
+    const service = Compaction.make(composed, {
+      contextWindow: 1_000,
+      reserveTokens: 0,
+      keepRecentTokens: 1,
+    })
+    return Effect.gen(function* () {
+      const compacted = yield* service.maybeCompact({
+        agentName: "composed-tool-bound-agent",
+        sessionId: "session",
+        turn: 1,
+        history: Prompt.empty,
+        prompt: Prompt.fromMessages([toolResult("call-composed-bound", large)]),
+        path: [],
+        usage: { contextTokens: 2_000, contextWindow: 1_000, reserveTokens: 0 },
+        overflow: false,
+      })
+
+      expect(summaryCalls).toBe(0)
+      expect(Option.isSome(compacted)).toBe(true)
+      if (Option.isSome(compacted)) {
+        expect(compacted.value._tag).toBe("Microcompact")
+        expect(JSON.stringify(compacted.value.prompt.content)).toContain("mem:composed-bound")
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          ToolOutput.testLayer({ put: () => Effect.succeed(Option.some("mem:composed-bound")) }),
+          modelLayer(() => {
+            summaryCalls += 1
+            return Effect.succeed([{ type: "text", text: "unexpected summary" }])
+          }),
+        ),
+      ),
+    )
+  })
+
+  it.effect("keeps retained tool results bounded after semantic summarization", () => {
+    const large = "retained-tool-output".repeat(50)
+    const composed = Compaction.strategy([
+      Compaction.toolOutputBound({ maxBytes: 12 }),
+      Compaction.keepRecent({ tokens: 1 }),
+    ])
+    const service = Compaction.make(composed, { contextWindow: 1, reserveTokens: 0 })
+    return Effect.gen(function* () {
+      const compacted = yield* service.maybeCompact({
+        agentName: "retained-tool-bound-agent",
+        sessionId: "session",
+        turn: 2,
+        history: Prompt.empty,
+        prompt: Prompt.make("continue"),
+        path: [
+          entry("0", user("old goal")),
+          entry("1", assistantToolCall("call-retained")),
+          entry("2", toolResult("call-retained", large)),
+        ],
+        usage: { contextTokens: 100, contextWindow: 1, reserveTokens: 0 },
+        overflow: false,
+      })
+
+      expect(Option.isSome(compacted)).toBe(true)
+      if (Option.isSome(compacted) && compacted.value._tag === "Summarize") {
+        const history = JSON.stringify(compacted.value.history.content)
+        expect(history).toContain("mem:retained-tool")
+        expect(history).not.toContain(large)
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          ToolOutput.testLayer({ put: () => Effect.succeed(Option.some("mem:retained-tool")) }),
+          modelLayer(() => Effect.succeed([{ type: "text", text: "checkpoint summary" }])),
+        ),
+      ),
+    )
+  })
+
+  it.effect("generates a validated structured summary and renders a deterministic checkpoint", () => {
+    let objectName: string | undefined
+    let toolChoice: string | object | undefined
+    const composed = Compaction.strategy([
+      Compaction.structuredSummary({ objectName: "AgentSummary" }),
+      Compaction.keepRecent({ tokens: 1 }),
+    ])
+    const service = Compaction.make(composed, { contextWindow: 10, reserveTokens: 0 })
+    return Effect.gen(function* () {
+      const compacted = yield* service.maybeCompact({
+        agentName: "structured-summary-agent",
+        sessionId: "session",
+        turn: 2,
+        history: Prompt.empty,
+        prompt: Prompt.make("continue"),
+        path: [entry("0", user("old goal")), entry("1", user("recent tail"))],
+        usage: { contextTokens: 100, contextWindow: 10, reserveTokens: 0 },
+        overflow: false,
+      })
+
+      expect(Option.isSome(compacted)).toBe(true)
+      if (Option.isSome(compacted) && compacted.value._tag === "Summarize") {
+        expect(compacted.value.summary).toBe(
+          "## Goal\nShip the strategy pack\n\n## Facts\n- Baton uses Effect AI\n\n## Decisions\n- Keep string checkpoints\n\n## Open Questions\n- None\n\n## Tool Findings\n- Tests are deterministic",
+        )
+        expect(JSON.stringify(compacted.value.history.content)).toContain("recent tail")
+      }
+      expect(objectName).toBe("AgentSummary")
+      expect(toolChoice).toBe("none")
+    }).pipe(
+      Effect.provide(
+        modelLayer((options) => {
+          objectName = options.responseFormat?.type === "json" ? options.responseFormat.objectName : undefined
+          toolChoice = options.toolChoice
+          return Effect.succeed([
+            {
+              type: "text",
+              text: JSON.stringify({
+                goal: "Ship the strategy pack",
+                facts: ["Baton uses Effect AI"],
+                decisions: ["Keep string checkpoints"],
+                openQuestions: ["None"],
+                toolFindings: ["Tests are deterministic"],
+              }),
+            },
+          ])
+        }),
+      ),
+    )
+  })
+
+  it("rejects invalid strategy-part bounds", () => {
+    expect(() => Compaction.toolOutputBound({ maxBytes: Number.POSITIVE_INFINITY })).toThrow(TypeError)
+    expect(() => Compaction.keepRecent({ tokens: -1 })).toThrow(TypeError)
+  })
+
+  it("exports the structured summary schema", () => {
+    const decoded = Schema.decodeUnknownSync(Compaction.AgentSummary)({
+      goal: "goal",
+      facts: [],
+      decisions: [],
+      openQuestions: [],
+      toolFindings: [],
+    })
+
+    expect(decoded.goal).toBe("goal")
   })
 })

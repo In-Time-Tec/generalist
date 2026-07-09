@@ -85,6 +85,7 @@ export const handle = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string
         Effect.flatMap(dispatch),
         Effect.catchTag("@batonfx/transport/TransportError", () => close(1003, "malformed client frame")),
         Effect.catchTag("@batonfx/transport/SessionBusy", () => close(1011, "session busy")),
+        Effect.catchTag("@batonfx/transport/SessionQueueFull", () => close(1013, "session queue full")),
         Effect.catchTag("@batonfx/transport/SessionError", (error) => close(1011, error.message)),
       )
 

@@ -65,6 +65,7 @@
     "@batonfx/mcp": "workspace:*",
     "@batonfx/providers": "workspace:*",
     "@batonfx/skills": "workspace:*",
+    "@batonfx/test": "workspace:*",
     "@batonfx/transport": "workspace:*",
     "effect": "catalog:"
   },

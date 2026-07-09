@@ -49,7 +49,7 @@ describe("SkillSource", () => {
 
     expect(SkillSource.makeListing(frontmatter)).toBe("- long: abcdef")
     expect(SkillSource.makeListing(frontmatter, 3)).toBe("- long: abc")
-    expect(SkillSource.DESCRIPTION_CAP).toBe(1_536)
+    expect(SkillSource.DESCRIPTION_CAP).toBe(1_024)
   })
 
   it("selectListings preserves source order under budget and excludes user-only skills", () => {
@@ -85,4 +85,45 @@ describe("SkillSource", () => {
       ),
     ),
   )
+
+  it.effect("merge deduplicates names with later sources winning consistently", () => {
+    const firstOnly = skill("first", "first only")
+    const firstDuplicate = skill("duplicate", "first duplicate")
+    const secondDuplicate = skill("duplicate", "second duplicate")
+    const secondOnly = skill("second", "second only")
+    const merged = SkillSource.merge([
+      {
+        all: Effect.succeed([firstOnly, firstDuplicate]),
+        get: (name) => Effect.succeed(name === "duplicate" ? firstDuplicate : name === "first" ? firstOnly : undefined),
+      },
+      {
+        all: Effect.succeed([secondDuplicate, secondOnly]),
+        get: (name) =>
+          Effect.succeed(name === "duplicate" ? secondDuplicate : name === "second" ? secondOnly : undefined),
+      },
+    ])
+    return Effect.gen(function* () {
+      expect(yield* merged.all).toEqual([firstOnly, secondDuplicate, secondOnly])
+      expect(yield* merged.get("duplicate")).toBe(secondDuplicate)
+      expect(yield* merged.get("missing")).toBeUndefined()
+    })
+  })
+
+  it.effect("layer evaluates composable sources and fails fast", () => {
+    const first = skill("first", "first")
+    const failure = new SkillSource.SkillSourceError({ source: "second", message: "unavailable" })
+    const failed = SkillSource.SkillSource.pipe(
+      Effect.provide(
+        SkillSource.layer([
+          Effect.succeed({ all: Effect.succeed([first]), get: () => Effect.succeed(first) }),
+          Effect.fail(failure),
+        ]),
+      ),
+      Effect.exit,
+    )
+    return Effect.gen(function* () {
+      const exit = yield* failed
+      expect(exit._tag).toBe("Failure")
+    })
+  })
 })

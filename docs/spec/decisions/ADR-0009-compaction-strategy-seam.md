@@ -12,6 +12,8 @@ Long agent runs can overflow provider context windows. Baton already owns the lo
 
 Model compaction as an optional Effect service with a pluggable strategy. The default strategy performs cheap tool-output microcompaction first, then summarizes older session history into one checkpoint while keeping a recent suffix verbatim. The loop consults the service before a streamed model turn and once after a pre-emission context-overflow failure.
 
+Expose ordered strategy parts that compile back into the same required `Strategy` methods. The pack separates lossless tool-output bounding, token-denominated recent-tail retention, and schema-validated structured summarization. Structured summaries use Effect AI `LanguageModel.generateObject` directly and are deterministically rendered to the existing string checkpoint, preserving the durable host decoration boundary.
+
 Use `docs/spec/06-compaction.md` and ADR-0009 because prior issues already allocated spec documents 04/05 and ADR-0007/0008.
 
 ## Consequences
@@ -21,3 +23,4 @@ Use `docs/spec/06-compaction.md` and ADR-0009 because prior issues already alloc
 - Core does not add durable storage; lossless history depends on a provided `SessionStore`, and durable implementations remain host-owned.
 - Summary is a dedicated model call, not another agent loop, so it cannot execute tools or recursively trigger the loop.
 - Relay can later provide an alternative strategy without changing Baton's loop contract.
+- Existing strategies and `summarize` decorators remain source-compatible; optional part metadata is preserved by spreading the base strategy when decorating it.

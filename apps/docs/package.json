@@ -19,6 +19,7 @@
     "@batonfx/memory": "workspace:*",
     "@batonfx/providers": "workspace:*",
     "@batonfx/skills": "workspace:*",
+    "@batonfx/test": "workspace:*",
     "@batonfx/transport": "workspace:*",
     "@foldkit/ui": "catalog:",
     "class-variance-authority": "catalog:",
