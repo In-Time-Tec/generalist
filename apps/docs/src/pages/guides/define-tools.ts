@@ -11,7 +11,7 @@ export const defineTools = definePage({
   navTitle: "Define tools",
   group: "Guides",
   description:
-    "Define tools with Ai.Tool.make, implement handlers behind your own services, and turn a handled toolkit into the ToolExecutor layer.",
+    "Define tools with Tool.make, implement handlers behind your own services, and turn a handled toolkit into the ToolExecutor layer.",
   content: [
     p(
       "Batonfx separates tool advertisement from tool execution: the model sees the toolkit attached to the agent, and the ",
@@ -23,7 +23,7 @@ export const defineTools = definePage({
     h2("describe-the-tool", "1. Describe the tool for the model"),
     p(
       "Give ",
-      code("Ai.Tool.make"),
+      code("Tool.make"),
       " the parameter and success Schemas, and put the real work behind a service so the external call stays swappable in tests. ",
       code("dependencies"),
       " declares that service requirement on the handler; ",

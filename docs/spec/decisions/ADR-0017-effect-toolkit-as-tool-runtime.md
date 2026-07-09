@@ -10,7 +10,7 @@ Effect AI already defines the canonical tool model: `Tool.make`, `Toolkit.make`,
 
 ## Decision
 
-Baton treats Effect AI `Tool` and `Toolkit` values as the public tool runtime. Authors define tools with `Ai.Tool.make`, group them with `Ai.Toolkit.make`, implement handlers with `toolkit.toLayer(...)`, and pass the toolkit to `Agent.make`.
+Baton treats Effect AI `Tool` and `Toolkit` values as the public tool runtime. Authors define tools with `Tool.make`, group them with `Toolkit.make`, implement handlers with `toolkit.toLayer(...)`, and pass the toolkit to `Agent.make`.
 
 `@batonfx/core` directly re-exports selected Effect AI modules for developer ergonomics: `AiError`, `Chat`, `EmbeddingModel`, `IdGenerator`, `LanguageModel`, `Model`, `Prompt`, `Response`, `ResponseIdTracker`, `Telemetry`, `Tokenizer`, `Tool`, and `Toolkit`. These exports are transparent, identity-preserving re-exports from `effect/unstable/ai`; Baton does not wrap, rename, fork, or become the owner of those primitives.
 

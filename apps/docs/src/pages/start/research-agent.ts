@@ -48,7 +48,7 @@ export const researchAgent = definePage({
     codeBlock({ label: "search-provider.ts", source: searchProviderSource }),
     h3("the-web-search-tool", "The web_search tool"),
     p(
-      code("Ai.Tool.make"),
+      code("Tool.make"),
       " declares the name, parameter schema, and success schema; ",
       code("dependencies"),
       " names the service the handler resolves; ",
