@@ -1415,6 +1415,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       expect(steerOneIndex).toBeGreaterThan(toolCallIndex)
       expect(steerTwoIndex).toBeGreaterThan(steerOneIndex)
       expect(toolResultIndex).toBeGreaterThan(steerTwoIndex)
+      const drained = events.find((event) => event._tag === "SteeringDrained")
+      expect(drained).toMatchObject({ _tag: "SteeringDrained", turn: 0, queue: "steering", count: 2 })
       expect(events.at(-1)?._tag).toBe("Completed")
     }).pipe(
       Effect.provide(
@@ -1429,7 +1431,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }),
           echoExecutor,
           Approvals.autoApprove,
-          Steering.layer({ steeringMode: "all" }),
+          Steering.layer({ steering: { mode: "all" } }),
           ModelMiddleware.identityLayer,
         ),
       ),
@@ -1464,7 +1466,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }),
           echoExecutor,
           Approvals.autoApprove,
-          Steering.layer({ steeringMode: "one-at-a-time" }),
+          Steering.layer({ steering: { mode: "one-at-a-time" } }),
           ModelMiddleware.identityLayer,
         ),
       ),
@@ -1486,6 +1488,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       expect(prompts[1]).toContain("follow one")
       expect(prompts[2]).toContain("follow two")
       expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(3)
+      expect(events.filter((event) => event._tag === "SteeringDrained" && event.queue === "followUp")).toHaveLength(2)
       const completed = events.at(-1)
       if (completed?._tag === "Completed") expect(completed.turns).toBe(3)
     }).pipe(
@@ -1531,7 +1534,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }),
           unusedExecutor,
           Approvals.autoApprove,
-          Steering.layer({ followUpMode: "all" }),
+          Steering.layer({ followUp: { mode: "all" } }),
           ModelMiddleware.identityLayer,
         ),
       ),

@@ -590,6 +590,8 @@ const applyEvent = (model: Model, event: Wire.EventType): readonly [Model, Optio
         { ...model, entries: resolveTool(upsertToolCall(model.entries, event.call, "executing"), event.result) },
         Option.none(),
       ]
+    case "SteeringDrained":
+      return [model, Option.none()]
     case "TurnCompleted":
       return [flushStreaming(model), Option.none()]
     case "StructuredOutput":

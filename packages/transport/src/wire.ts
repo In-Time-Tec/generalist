@@ -121,6 +121,13 @@ const EventSchemaWith = (
       metadata: OptionalMetadata,
     }),
     Schema.Struct({
+      _tag: Schema.tag("SteeringDrained"),
+      turn: Schema.Number,
+      queue: Schema.Literals(["steering", "followUp"]),
+      count: Schema.Number,
+      metadata: OptionalMetadata,
+    }),
+    Schema.Struct({
       _tag: Schema.tag("TurnCompleted"),
       turn: Schema.Number,
       transcript: Schema.optionalKey(Prompt.Prompt),
@@ -170,6 +177,7 @@ export type EventType =
   | AgentEvent.ToolProgress
   | AgentEvent.ToolExecutionCompleted
   | AgentEvent.ApprovalRequested
+  | AgentEvent.SteeringDrained
   | (Omit<AgentEvent.TurnCompleted, "transcript"> & { readonly transcript?: Prompt.Prompt })
   | AgentEvent.StructuredOutput
   | (Omit<AgentEvent.Completed, "transcript"> & { readonly transcript?: Prompt.Prompt })

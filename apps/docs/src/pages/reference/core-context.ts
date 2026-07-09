@@ -228,14 +228,17 @@ export const coreContextReference = definePage({
         [
           [code("layer(options?)")],
           [
-            "Two unbounded queues; ",
-            code("steeringMode"),
+            "Two Effect queues; ",
+            code("steering.mode"),
             " defaults to ",
             code('"all"'),
             ", ",
-            code("followUpMode"),
+            code("followUp.mode"),
             " to ",
             code('"one-at-a-time"'),
+            ", and bounded queues require an explicit ",
+            code("onFull"),
+            " policy.",
           ],
         ],
         [

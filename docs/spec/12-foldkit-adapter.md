@@ -56,6 +56,7 @@ Frame handling:
 | `ToolProgress`                                | append progress text to the matching tool entry                                      |
 | `ToolExecutionCompleted` or tool-result parts | resolve the matching tool entry outcome                                              |
 | `ApprovalRequested`                           | upsert pending tool entry; wait for `Suspended` to carry the approval token          |
+| `SteeringDrained`                             | no display transition; hosts may log it separately                                   |
 | `TurnCompleted`                               | flush streaming assistant content into entries                                       |
 | `Completed`                                   | flush streaming content, set `run = Idle`, emit `RunCompleted`                       |
 | `Suspended` with approval                     | set `AwaitingApproval`, emit `ApprovalRequired`                                      |

@@ -36,7 +36,43 @@ describe("Steering", () => {
       expect(prompts(yield* steering.takeSteering())).toEqual(["steer two"])
       expect(prompts(yield* steering.takeFollowUp())).toEqual(["follow one", "follow two"])
       expect(yield* steering.takeFollowUp()).toEqual([])
-    }).pipe(Effect.provide(Steering.layer({ steeringMode: "one-at-a-time", followUpMode: "all" }))),
+    }).pipe(Effect.provide(Steering.layer({ steering: { mode: "one-at-a-time" }, followUp: { mode: "all" } }))),
+  )
+
+  it.effect("fails bounded queues with a typed overflow error", () =>
+    Effect.gen(function* () {
+      const steering = yield* Steering.Steering
+
+      yield* steering.steer(message("kept"))
+      const error = yield* Effect.flip(steering.steer(message("rejected")))
+
+      expect(error).toBeInstanceOf(Steering.SteeringQueueFull)
+      expect(error.queue).toBe("steering")
+      expect(prompts(yield* steering.takeSteering())).toEqual(["kept"])
+    }).pipe(Effect.provide(Steering.layer({ steering: { capacity: 1, onFull: "fail" } }))),
+  )
+
+  it.effect("supports explicit bounded dropping policies", () =>
+    Effect.gen(function* () {
+      const steering = yield* Steering.Steering
+
+      yield* steering.steer(message("oldest"))
+      yield* steering.steer(message("kept"))
+      yield* steering.steer(message("dropped newest"))
+      yield* steering.followUp(message("dropped oldest"))
+      yield* steering.followUp(message("kept one"))
+      yield* steering.followUp(message("kept two"))
+
+      expect(prompts(yield* steering.takeSteering())).toEqual(["oldest", "kept"])
+      expect(prompts(yield* steering.takeFollowUp())).toEqual(["kept one", "kept two"])
+    }).pipe(
+      Effect.provide(
+        Steering.layer({
+          steering: { mode: "all", capacity: 2, onFull: "drop-newest" },
+          followUp: { mode: "all", capacity: 2, onFull: "drop-oldest" },
+        }),
+      ),
+    ),
   )
 
   it.effect("testLayer provides an exact implementation", () => {

@@ -81,7 +81,7 @@ export const onePayloadVocabulary = definePage({
       link("/docs/guides/serve-transport", "the wire frames"),
       " that carry a run over SSE or WebSocket wrap the same ",
       code("AgentEvent"),
-      " values rather than re-encoding them. The one thing Batonfx does define, the nine-member event union and its typed errors, is framing about the loop, not a message format, and it is catalogued in ",
+      " values rather than re-encoding them. The one thing Batonfx does define, the ten-member event union and its typed errors, is framing about the loop, not a message format, and it is catalogued in ",
       link("/docs/reference/core-events", "AgentEvent and errors"),
       ". How that framing drives the loop is the subject of ",
       link("/docs/learn/agent-loop", "The agent loop"),

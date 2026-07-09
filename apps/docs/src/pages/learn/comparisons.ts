@@ -16,7 +16,7 @@ export const comparisons = definePage({
         strong("The agent lives inside your process."),
         " CLIs, scripts, servers, and tests that need a tool-calling agent with no external infrastructure. ",
         code("Agent.stream"),
-        " emits a closed nine-event union you fold, persist, or forward (",
+        " emits a closed ten-event union you fold, persist, or forward (",
         link("/docs/learn/agent-loop", "The agent loop"),
         ").",
       ],

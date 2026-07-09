@@ -53,6 +53,18 @@ export interface ApprovalRequested {
   readonly metadata?: Metadata
 }
 
+/** @experimental Steering queue whose messages were consumed at a turn boundary. */
+export type SteeringQueueName = "steering" | "followUp"
+
+/** @experimental A steering or follow-up queue was drained into the next prompt. */
+export interface SteeringDrained {
+  readonly _tag: "SteeringDrained"
+  readonly turn: number
+  readonly queue: SteeringQueueName
+  readonly count: number
+  readonly metadata?: Metadata
+}
+
 /**
  * @experimental Emitted after each model turn completes (after tool executions
  * for that turn). `transcript` is the full chat history at this point — hosts
@@ -114,6 +126,7 @@ export type Event =
   | ToolProgress
   | ToolExecutionCompleted
   | ApprovalRequested
+  | SteeringDrained
   | TurnCompleted
   | StructuredOutput
   | Completed

@@ -7,6 +7,7 @@ import {
   type Completed,
   type Event,
   MiddlewareViolation,
+  type SteeringDrained,
   type StructuredOutput,
   type ToolProgress,
   type TurnCompleted,
@@ -118,6 +119,17 @@ type ObjectSchema = Schema.Codec<unknown, Record<string, any>, unknown, unknown>
 
 /** @experimental Default prompt for the terminal structured-output turn. */
 export const defaultObjectPrompt = "Return the final structured output for the task above."
+
+const steeringDrainedEvent = (
+  turn: number,
+  queue: SteeringDrained["queue"],
+  messages: ReadonlyArray<Message>,
+): SteeringDrained => ({
+  _tag: "SteeringDrained",
+  turn,
+  queue,
+  count: messages.length,
+})
 
 /** @experimental Options for a run that ends in a schema-validated result. */
 export interface ObjectRunOptions<StructuredOutputSchema extends ObjectSchema> extends RunOptions {
@@ -1122,7 +1134,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
             const followUp = yield* takeFollowUp()
             if (followUp.length > 0) {
               return {
-                events: Stream.fromIterable<Event>([completed]),
+                events: Stream.fromIterable<Event>([completed, steeringDrainedEvent(turn, "followUp", followUp)]),
                 next: { prompt: promptFromSteeringMessages(followUp) },
               }
             }
@@ -1167,7 +1179,9 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutput
               ? basePrompt
               : withSystem(decision.overrides.instructions, basePrompt)
           return {
-            events: Stream.fromIterable<Event>([completed]),
+            events: Stream.fromIterable<Event>(
+              steering.length === 0 ? [completed] : [completed, steeringDrainedEvent(turn, "steering", steering)],
+            ),
             next: { prompt, ...(decision.overrides === undefined ? {} : { overrides: decision.overrides }) },
           }
         })

@@ -8,6 +8,6 @@ const program = Effect.gen(function* () {
   const firstDrain = yield* steering.takeSteering()
   const secondDrain = yield* steering.takeSteering()
   yield* Console.log(`first drain: ${firstDrain.length}, second drain: ${secondDrain.length}`)
-}).pipe(Effect.provide(Steering.layer({ steeringMode: "one-at-a-time", followUpMode: "all" })))
+}).pipe(Effect.provide(Steering.layer({ steering: { mode: "one-at-a-time" }, followUp: { mode: "all" } })))
 
 await Effect.runPromise(program)

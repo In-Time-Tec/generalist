@@ -4,7 +4,7 @@ export const coreEventsReference = definePage({
   title: "AgentEvent and errors",
   navTitle: "AgentEvent",
   group: "Reference",
-  description: "The closed nine-member Event union and the four error classes, with fields and emission conditions.",
+  description: "The closed ten-member Event union and the four error classes, with fields and emission conditions.",
   content: [
     lead(
       "AgentEvent declares the closed union of loop events every run streams, plus the four error classes a run can fail with.",
@@ -13,7 +13,7 @@ export const coreEventsReference = definePage({
     h2("event-union", "The Event union"),
     p(
       code("AgentEvent.Event"),
-      " has exactly nine members. Every member carries an optional ",
+      " has exactly ten members. Every member carries an optional ",
       code("metadata"),
       " escape-hatch record; ",
       code("turn"),
@@ -52,6 +52,12 @@ export const coreEventsReference = definePage({
           [code("turn"), ", ", code("call")],
           ["Before consulting Approvals for a ", code("needsApproval"), " tool"],
           "Precedes Approved, Denied, or suspension",
+        ],
+        [
+          [code("SteeringDrained")],
+          [code("turn"), ", ", code('queue: "steering" | "followUp"'), ", ", code("count")],
+          "Queued steering or follow-up input is drained into the next prompt",
+          "Observational; never enters the transcript",
         ],
         [
           [code("TurnCompleted")],

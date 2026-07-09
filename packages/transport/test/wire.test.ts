@@ -59,8 +59,9 @@ const eventFrames = (): ReadonlyArray<Wire.ServerFrameType> => [
     seq: 6,
     event: { _tag: "TurnCompleted", turn: 0, transcript, usage, finishReason: "stop" },
   },
-  { _tag: "Event", seq: 7, event: { _tag: "StructuredOutput", turn: 1, value: { ok: true }, content: [textPart] } },
-  { _tag: "Event", seq: 8, event: { _tag: "Completed", turns: 1, text: "hello", transcript, usage } },
+  { _tag: "Event", seq: 7, event: { _tag: "SteeringDrained", turn: 0, queue: "steering", count: 2 } },
+  { _tag: "Event", seq: 8, event: { _tag: "StructuredOutput", turn: 1, value: { ok: true }, content: [textPart] } },
+  { _tag: "Event", seq: 9, event: { _tag: "Completed", turns: 1, text: "hello", transcript, usage } },
 ]
 
 describe("Wire", () => {

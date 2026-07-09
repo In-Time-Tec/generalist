@@ -26,7 +26,7 @@ Terminal outcomes are data frames, not connection failures:
 
 Every logical run emits exactly one `Ended` frame after `Event(Completed)`, `Suspended`, or `Failed`. `Ended` does not close the session or require an attachment stream to end; clients may remain attached for the next `send`.
 
-`EventSchema(toolkit)` mirrors every current `AgentEvent.Event` tag: `TurnStarted`, `ModelPart`, `ToolExecutionStarted`, `ToolProgress`, `ToolExecutionCompleted`, `ApprovalRequested`, `TurnCompleted`, `StructuredOutput`, and `Completed`. `ModelPart.part` and `StructuredOutput.content` use Effect AI response-part schemas for the supplied toolkit. Tool-call and tool-result fields are strict for that toolkit.
+`EventSchema(toolkit)` mirrors every current `AgentEvent.Event` tag: `TurnStarted`, `ModelPart`, `ToolExecutionStarted`, `ToolProgress`, `ToolExecutionCompleted`, `ApprovalRequested`, `SteeringDrained`, `TurnCompleted`, `StructuredOutput`, and `Completed`. `ModelPart.part` and `StructuredOutput.content` use Effect AI response-part schemas for the supplied toolkit. Tool-call and tool-result fields are strict for that toolkit.
 
 `LooseEventSchema` and `LooseServerFrame` are for browser display and replay. They accept unknown tool-call and tool-result names with unknown params/results. They are not a server-side execution contract.
 
