@@ -1,18 +1,18 @@
 import { Console, Effect } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Prompt } from "effect/unstable/ai"
 import { Session } from "@batonfx/core"
 
-const message = (entry: Ai.Prompt.Message): Session.AppendInput => ({ _tag: "Message", message: entry })
+const message = (entry: Prompt.Message): Session.AppendInput => ({ _tag: "Message", message: entry })
 
-const user = (text: string): Ai.Prompt.Message =>
-  Ai.Prompt.makeMessage("user", { content: [Ai.Prompt.makePart("text", { text })] })
+const user = (text: string): Prompt.Message =>
+  Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
-const assistant = (text: string): Ai.Prompt.Message =>
-  Ai.Prompt.makeMessage("assistant", { content: [Ai.Prompt.makePart("text", { text })] })
+const assistant = (text: string): Prompt.Message =>
+  Prompt.makeMessage("assistant", { content: [Prompt.makePart("text", { text })] })
 
 const program = Effect.gen(function* () {
   const store = yield* Session.SessionStore
-  yield* store.append(message(Ai.Prompt.makeMessage("system", { content: "You are a travel planner." })))
+  yield* store.append(message(Prompt.makeMessage("system", { content: "You are a travel planner." })))
   yield* store.append(message(user("Plan a trip to Boise.")))
   yield* store.append(message(assistant("Three days in Boise, starting downtown.")))
   const kept = yield* store.append(message(user("Add a rafting day.")))

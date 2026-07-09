@@ -1,20 +1,21 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor } from "../src/index"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
       streamText,
     }),
   )
 
-const echoTool = Ai.Tool.make("echo", {
+const echoTool = Tool.make("echo", {
   description: "Echo input for tests",
   parameters: Schema.Struct({ text: Schema.String }),
   success: Schema.Unknown,
@@ -34,17 +35,17 @@ const unusedExecutor = ToolExecutor.testLayer({
 })
 
 const toolCallPart = (id: string, name: string, params: unknown) =>
-  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
-const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
 /** Appends a system-style marker carrying its turn to the prompt. */
 const appendMarker = (text: string): ModelMiddleware.Middleware => ({
   transformPrompt: (prompt, context) =>
     Effect.succeed(
-      Ai.Prompt.fromMessages([
+      Prompt.fromMessages([
         ...prompt.content,
-        Ai.Prompt.makeMessage("system", { content: `${text} turn:${context.turn}` }),
+        Prompt.makeMessage("system", { content: `${text} turn:${context.turn}` }),
       ]),
     ),
 })
@@ -53,7 +54,7 @@ const uppercaseDeltas: ModelMiddleware.Middleware = {
   transformPart: (part) =>
     Effect.succeed(
       part.type === "text-delta"
-        ? Option.some(Ai.Response.makePart("text-delta", { id: part.id, delta: part.delta.toUpperCase() }))
+        ? Option.some(Response.makePart("text-delta", { id: part.id, delta: part.delta.toUpperCase() }))
         : Option.some(part),
     ),
 }
@@ -70,7 +71,7 @@ const failingPrompt: ModelMiddleware.Middleware = {
   transformPrompt: () => Effect.fail(new AgentEvent.AgentError({ message: "prompt middleware boom", turn: 0 })),
 }
 
-describe("ModelMiddleware", () => {
+layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
   it.effect("identity default: empty chain behaves like the pre-middleware loop", () =>
     Effect.gen(function* () {
       const agent = Agent.make({ name: "identity-agent" })
@@ -94,7 +95,7 @@ describe("ModelMiddleware", () => {
     const prompts: Array<string> = []
     let calls = 0
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "prompt-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "prompt-agent", toolkit: Toolkit.make(echoTool) })
 
       yield* Agent.generate(agent, { prompt: "use the echo tool" })
 
@@ -194,7 +195,7 @@ describe("ModelMiddleware", () => {
 
   it.effect("tool-call drop guard: dropping a tool-call part fails the run", () =>
     Effect.gen(function* () {
-      const agent = Agent.make({ name: "guard-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "guard-agent", toolkit: Toolkit.make(echoTool) })
 
       const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" })))
 

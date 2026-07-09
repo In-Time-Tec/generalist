@@ -1,4 +1,5 @@
-import * as DialogPrimitive from "@foldkit/ui/dialog"
+import { Message, Model, OutMessage, close, descriptionId, init, open, titleId, update, view } from "@foldkit/ui/dialog"
+import type { InitConfig, RenderInfo, ViewInputs } from "@foldkit/ui/dialog"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -7,29 +8,33 @@ import { cn } from "@/lib/utils"
 
 // MODEL
 
-export const Model = DialogPrimitive.Model
-export type Model = DialogPrimitive.Model
-export type InitConfig = DialogPrimitive.InitConfig
-export const init = DialogPrimitive.init
+export { Model, init }
+export type { InitConfig }
+export const DialogModel = Model
+export type DialogModel = typeof Model.Type
+export const dialogInit = init
 
 // MESSAGE
 
-export const Message = DialogPrimitive.Message
-export type Message = DialogPrimitive.Message
-export const OutMessage = DialogPrimitive.OutMessage
-export type OutMessage = DialogPrimitive.OutMessage
+export { Message, OutMessage }
+export type DialogMessage = typeof Message.Type
+export type DialogOutMessage = typeof OutMessage.Type
+export const DialogMessage = Message
+export const DialogOutMessage = OutMessage
 
 // UPDATE
 
-export const update = DialogPrimitive.update
-export const open = DialogPrimitive.open
-export const close = DialogPrimitive.close
+export { close, open, update }
+export const dialogClose = close
+export const dialogOpen = open
+export const dialogUpdate = update
 
 // VIEW
 
-export const view = DialogPrimitive.view
-export const titleId = DialogPrimitive.titleId
-export const descriptionId = DialogPrimitive.descriptionId
+export { descriptionId, titleId, view }
+export const dialogDescriptionId = descriptionId
+export const dialogTitleId = titleId
+export const dialogView = view
 
 const dialogClass = "items-center justify-center bg-transparent p-0 open:flex"
 
@@ -42,7 +47,7 @@ const closeClass =
   "absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
 
 const xIcon = (): Html => {
-  const h = html<DialogPrimitive.Message>()
+  const h = html<DialogMessage>()
   return h.svg(
     [
       h.Attribute("xmlns", "http://www.w3.org/2000/svg"),
@@ -59,13 +64,15 @@ const xIcon = (): Html => {
 }
 
 export type ContentSlots = Readonly<{
-  close: DialogPrimitive.RenderInfo["closeButton"]
+  close: RenderInfo["closeButton"]
 }>
 
 export type ContentConfig = Readonly<{
   class?: string
   showCloseButton?: boolean
 }>
+
+export type DialogContentConfig = ContentConfig
 
 /**
  * Builds the `viewInputs` for `h.submodel`: a styled overlay and centered
@@ -75,9 +82,9 @@ export type ContentConfig = Readonly<{
 export const content = (
   config: ContentConfig,
   toChildren: (slots: ContentSlots) => ReadonlyArray<Html>,
-): DialogPrimitive.ViewInputs => ({
+): ViewInputs => ({
   toView: ({ backdrop, closeButton, dialog, isVisible, panel }) => {
-    const h = html<DialogPrimitive.Message>()
+    const h = html<DialogMessage>()
     const showCloseButton = config.showCloseButton ?? true
 
     return h.dialog(
@@ -105,6 +112,8 @@ export const content = (
   },
 })
 
+export const dialogContent = content
+
 export const header = <ParentMessage>(
   config: SlotConfig<ParentMessage>,
   children: ReadonlyArray<Html | string>,
@@ -121,7 +130,7 @@ export const header = <ParentMessage>(
 }
 
 export const title = <ParentMessage>(
-  config: SlotConfig<ParentMessage> & Readonly<{ model: Model }>,
+  config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>,
   children: ReadonlyArray<Html | string>,
 ): Html => {
   const h = html<ParentMessage>()
@@ -137,7 +146,7 @@ export const title = <ParentMessage>(
 }
 
 export const description = <ParentMessage>(
-  config: SlotConfig<ParentMessage> & Readonly<{ model: Model }>,
+  config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>,
   children: ReadonlyArray<Html | string>,
 ): Html => {
   const h = html<ParentMessage>()

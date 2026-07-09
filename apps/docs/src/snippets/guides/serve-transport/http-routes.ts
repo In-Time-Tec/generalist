@@ -1,25 +1,25 @@
 import { Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 import { SessionRegistry, Sse, Ws } from "@batonfx/transport"
 
-const searchTool = Ai.Tool.make("web_search", {
+const searchTool = Tool.make("web_search", {
   description: "Search the web",
   parameters: Schema.Struct({ query: Schema.String }),
   success: Schema.String,
 })
 
-const toolkit = Ai.Toolkit.make(searchTool)
+const toolkit = Toolkit.make(searchTool)
 
 const agent = Agent.make({ name: "research-agent", toolkit })
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () => Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: "Answer." })),
+    streamText: () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Answer." })),
   }),
 )
 
@@ -109,7 +109,7 @@ const sessionRegistryLayer = SessionRegistry.layerMemory({ agent }).pipe(
       }),
       Approvals.autoApprove,
       ModelMiddleware.identityLayer,
-      Ai.Chat.layerPersisted({ storeId: "research-agent" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
+      Chat.layerPersisted({ storeId: "research-agent" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
     ),
   ),
 )

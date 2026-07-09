@@ -1,6 +1,5 @@
 import { Context, Effect, Layer, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { Prompt } from "effect/unstable/ai"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
 
@@ -13,7 +12,7 @@ export interface Key {
 /** @experimental */
 export interface Item {
   readonly id: string
-  readonly parts: ReadonlyArray<Ai.Prompt.Part>
+  readonly parts: ReadonlyArray<Prompt.Part>
   readonly metadata?: Metadata
 }
 
@@ -21,14 +20,14 @@ export interface Item {
 export interface RecallInput {
   readonly key: Key
   readonly turn: number
-  readonly prompt: Ai.Prompt.Prompt
+  readonly prompt: Prompt.Prompt
 }
 
 /** @experimental */
 export interface RememberInput {
   readonly key: Key
   readonly turn: number
-  readonly transcript: Ai.Prompt.Prompt
+  readonly transcript: Prompt.Prompt
   readonly terminal: boolean
 }
 

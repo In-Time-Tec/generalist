@@ -1,4 +1,4 @@
-import * as InputPrimitive from "@foldkit/ui/input"
+import { view } from "@foldkit/ui/input"
 import type { Attribute, ChildAttribute, Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -30,7 +30,7 @@ export const input = <ParentMessage>(config: InputConfig<ParentMessage>): Html =
   const h = html<ParentMessage>()
   const { attributes = [], class: className, ...primitiveConfig } = config
 
-  return InputPrimitive.view<ParentMessage>({
+  return view<ParentMessage>({
     ...primitiveConfig,
     toView: (inputAttributes) =>
       h.input([

@@ -1,4 +1,4 @@
-import * as ButtonPrimitive from "@foldkit/ui/button"
+import { view } from "@foldkit/ui/button"
 import { type VariantProps, cva } from "class-variance-authority"
 import type { Attribute, ChildAttribute, Html } from "foldkit/html"
 import { html } from "foldkit/html"
@@ -53,7 +53,7 @@ export const button = <ParentMessage>(
   const h = html<ParentMessage>()
   const { attributes = [], class: className, dataSlot = "button", size, variant, ...primitiveConfig } = config
 
-  return ButtonPrimitive.view<ParentMessage>({
+  return view<ParentMessage>({
     ...primitiveConfig,
     toView: (buttonAttributes) =>
       h.button(

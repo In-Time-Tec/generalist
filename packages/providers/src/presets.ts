@@ -1,4 +1,4 @@
-import * as OpenAiCompat from "@effect/ai-openai-compat"
+import { OpenAiClient } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Effect, Redacted } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
@@ -7,10 +7,7 @@ import { openAiCompatible, type OpenAiCompatibleInput } from "./openai-compat"
 /** @experimental */
 export interface PresetInput extends Omit<OpenAiCompatibleInput, "provider"> {
   readonly apiKey?: Config.Config<Redacted.Redacted<string>>
-  readonly clientConfig?: Omit<
-    NonNullable<Parameters<typeof OpenAiCompat.OpenAiClient.layerConfig>[0]>,
-    "apiKey" | "apiUrl"
-  >
+  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey" | "apiUrl">
 }
 
 /** @experimental */
@@ -27,7 +24,7 @@ const preset = (provider: string, baseUrl: string, input: PresetInput) =>
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   }).pipe(
     Effect.provide(
-      OpenAiCompat.OpenAiClient.layerConfig({
+      OpenAiClient.layerConfig({
         ...input.clientConfig,
         ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
         apiUrl: Config.succeed(baseUrl),

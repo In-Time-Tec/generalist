@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Option } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Tool } from "effect/unstable/ai"
 import { McpToolSource } from "../src/index"
 import { addInputSchema, makeFixture, makeFixtureWith, statsOutputSchema } from "./fixture"
 
@@ -31,8 +31,8 @@ describe("McpToolSource", () => {
 
         expect(aiTools.map((tool) => tool.name)).toEqual(["calc_add", "calc_stats", "calc_boom", "calc_hang"])
         const add = aiTools[0]
-        expect(add === undefined ? undefined : Ai.Tool.getDescription(add)).toBe("Add two numbers")
-        expect(add === undefined ? undefined : Ai.Tool.getJsonSchema(add)).toEqual(addInputSchema)
+        expect(add === undefined ? undefined : Tool.getDescription(add)).toBe("Add two numbers")
+        expect(add === undefined ? undefined : Tool.getJsonSchema(add)).toEqual(addInputSchema)
       }),
     ),
   )

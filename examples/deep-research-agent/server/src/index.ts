@@ -1,14 +1,14 @@
-import * as BunHttpServer from "@effect/platform-bun/BunHttpServer"
-import * as BunRuntime from "@effect/platform-bun/BunRuntime"
-import { Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { layer } from "@effect/platform-bun/BunHttpServer"
+import { runMain } from "@effect/platform-bun/BunRuntime"
+import { Approvals, ModelMiddleware } from "@batonfx/core"
 import { SessionRegistry, Sse, Ws } from "@batonfx/transport"
 import { Config, Effect, Layer, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Chat } from "effect/unstable/ai"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
 import { agent } from "./agent"
 import { withOpenRouterOrDeterministic } from "./model"
-import * as SearchProvider from "./search-provider"
+import { searchProviderLayer } from "./search-provider"
 import { toolkit, toolkitLayer } from "./tools"
 
 const OpenSessionInput = Schema.Struct({
@@ -93,17 +93,12 @@ export const routesLayer = HttpRouter.use((router) =>
   }),
 )
 
-const persistenceLayer = Ai.Chat.layerPersisted({ storeId: "deep-research-agent" }).pipe(
+const persistenceLayer = Chat.layerPersisted({ storeId: "deep-research-agent" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),
 )
 
 /** @experimental */
-export const toolExecutorLayer = Layer.unwrap(
-  Effect.gen(function* () {
-    const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitLayer))
-    return ToolExecutor.fromToolkit(handledToolkit)
-  }),
-).pipe(Layer.provide(SearchProvider.layer))
+export const toolkitHandlersLayer = toolkitLayer.pipe(Layer.provide(searchProviderLayer))
 
 /** @experimental */
 export const modelLayer = withOpenRouterOrDeterministic({
@@ -116,7 +111,7 @@ export const sessionRegistryLayer = SessionRegistry.layerMemory({ agent }).pipe(
   Layer.provide(
     Layer.mergeAll(
       modelLayer,
-      toolExecutorLayer,
+      toolkitHandlersLayer,
       Approvals.autoApprove,
       ModelMiddleware.identityLayer,
       persistenceLayer,
@@ -134,7 +129,7 @@ export const appLayer = Layer.mergeAll(routesLayer, HttpRouter.cors())
 /** @experimental */
 export const serverLayer = (port: number) =>
   HttpRouter.serve(appLayer, { disableLogger: false }).pipe(
-    Layer.provideMerge(BunHttpServer.layer({ port })),
+    Layer.provideMerge(layer({ port })),
     Layer.provideMerge(sessionRegistryLayer),
     Layer.provideMerge(FetchHttpClient.layer),
   )
@@ -147,5 +142,5 @@ export const main = Effect.fn("DeepResearchAgent.Server.main")(function* () {
 })
 
 if (import.meta.main) {
-  BunRuntime.runMain(main())
+  runMain(main())
 }

@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 
 const invoiceSchema = Schema.Struct({ total: Schema.Number, currency: Schema.String })
@@ -7,10 +7,9 @@ const invoiceSchema = Schema.Struct({ total: Schema.Number, currency: Schema.Str
 const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data." })
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
-    streamText: () =>
-      Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." })),
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
+    streamText: () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." })),
     generateText: () => Effect.succeed([{ type: "text", text: '{"total":42,"currency":"USD"}' }]),
   }),
 )

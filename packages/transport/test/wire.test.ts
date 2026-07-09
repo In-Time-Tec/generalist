@@ -1,35 +1,35 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentEvent } from "@batonfx/core"
 import { Wire } from "../src/index"
 
-const echoTool = Ai.Tool.make("echo", {
+const echoTool = Tool.make("echo", {
   parameters: Schema.Struct({ text: Schema.String }),
   success: Schema.String,
   failure: Schema.String,
   failureMode: "return",
 })
 
-const toolkit = Ai.Toolkit.make(echoTool)
+const toolkit = Toolkit.make(echoTool)
 
-const usage = new Ai.Response.Usage({
+const usage = new Response.Usage({
   inputTokens: { uncached: undefined, total: 1, cacheRead: undefined, cacheWrite: undefined },
   outputTokens: { total: 2, text: 2, reasoning: undefined },
 })
 
-const textDelta = Ai.Response.makePart("text-delta", { id: "text", delta: "hello" })
+const textDelta = Response.makePart("text-delta", { id: "text", delta: "hello" })
 
-const textPart = Ai.Response.makePart("text", { text: "hello" })
+const textPart = Response.makePart("text", { text: "hello" })
 
-const toolCall = Ai.Response.makePart("tool-call", {
+const toolCall = Response.makePart("tool-call", {
   id: "call-1",
   name: "echo",
   params: { text: "hello" },
   providerExecuted: false,
 })
 
-const toolResult = Ai.Response.toolResultPart({
+const toolResult = Response.toolResultPart({
   id: "call-1",
   name: "echo",
   isFailure: false,
@@ -39,8 +39,8 @@ const toolResult = Ai.Response.toolResultPart({
   preliminary: false,
 })
 
-const transcript = Ai.Prompt.fromMessages([
-  Ai.Prompt.makeMessage("user", { content: [Ai.Prompt.makePart("text", { text: "hello" })] }),
+const transcript = Prompt.fromMessages([
+  Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "hello" })] }),
 ])
 
 const eventFrames = (): ReadonlyArray<Wire.ServerFrameType> => [

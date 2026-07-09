@@ -2,7 +2,7 @@ import { spawn } from "node:child_process"
 import { connect, createServer } from "node:net"
 import { describe, expect, live } from "@effect/vitest"
 import { Effect, Fiber, Schema, Stream } from "effect"
-import * as Encoding from "effect/unstable/encoding"
+import { Sse } from "effect/unstable/encoding"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Wire } from "@batonfx/transport"
 import { toolkit } from "../src/tools"
@@ -103,7 +103,7 @@ const openSessionWithRetry = (
 const collectSseFrames = (response: HttpClientResponse.HttpClientResponse) =>
   Effect.sync(() => {
     const frames: Array<Wire.LooseServerFrameType> = []
-    const parser = Encoding.Sse.makeParser((event) => {
+    const parser = Sse.makeParser((event) => {
       if (event._tag === "Event") {
         frames.push(Schema.decodeUnknownSync(Wire.ServerFrame(toolkit))(JSON.parse(event.data)))
       }

@@ -1,4 +1,5 @@
-import * as ListboxPrimitive from "@foldkit/ui/listbox"
+import { Message, Model, Orientation, OutMessage, Selected, buttonId, create, init } from "@foldkit/ui/listbox"
+import type { AnchorConfig, GroupHeading, InitConfig, ViewInputs } from "@foldkit/ui/listbox"
 import type { Html } from "foldkit/html"
 import { childAttributes, html } from "foldkit/html"
 
@@ -6,34 +7,35 @@ import { cn } from "@/lib/utils"
 
 // MODEL
 
-export const Model = ListboxPrimitive.Model
-export type Model = ListboxPrimitive.Model
-export type InitConfig = ListboxPrimitive.InitConfig
-export type AnchorConfig = ListboxPrimitive.AnchorConfig
-export const Orientation = ListboxPrimitive.Orientation
-export type Orientation = ListboxPrimitive.Orientation
-export const init = ListboxPrimitive.init
+export { Model, Orientation, init }
+export type SelectModel = typeof Model.Type
+export type SelectOrientation = typeof Orientation.Type
+export type { AnchorConfig, InitConfig }
 
 // MESSAGE
 
-export const Message = ListboxPrimitive.Message
-export type Message = ListboxPrimitive.Message
-export const OutMessage = ListboxPrimitive.OutMessage
-export type OutMessage<Value extends string = string> = ListboxPrimitive.OutMessage<Value>
-export const Selected = ListboxPrimitive.Selected
-export type Selected<Value extends string = string> = ListboxPrimitive.Selected<Value>
+export { Message, OutMessage, Selected }
+export type SelectMessage = typeof Message.Type
+export type SelectSelected<Value extends string = string> = Readonly<{
+  readonly _tag: "Selected"
+  readonly value: Value
+  readonly wasAdded: boolean
+}>
+export type SelectOutMessage<Value extends string = string> = SelectSelected<Value>
 
 // UPDATE
 
-export const create: typeof ListboxPrimitive.create = ListboxPrimitive.create
+export { create }
 
 // VIEW
 
-export const buttonId = ListboxPrimitive.buttonId
+export { buttonId }
 
-export type GroupHeading = ListboxPrimitive.GroupHeading
+export type { GroupHeading }
 
-const DEFAULT_ANCHOR: ListboxPrimitive.AnchorConfig = { placement: "bottom-start", gap: 4, padding: 8 }
+const DEFAULT_ANCHOR: AnchorConfig = { placement: "bottom-start", gap: 4, padding: 8 }
+
+type PrimitiveItemConfig = ReturnType<ViewInputs<string, string>["itemToConfig"]>
 
 const wrapperClass = "relative inline-block"
 
@@ -60,7 +62,7 @@ const labelClass = "px-2 py-1.5 text-xs text-muted-foreground"
 const separatorClass = "pointer-events-none -mx-1 my-1 h-px bg-border"
 
 const chevronDownIcon = (): Html => {
-  const h = html<ListboxPrimitive.Message>()
+  const h = html<SelectMessage>()
   return h.svg(
     [
       h.Attribute("xmlns", "http://www.w3.org/2000/svg"),
@@ -78,7 +80,7 @@ const chevronDownIcon = (): Html => {
 }
 
 const checkIcon = (): Html => {
-  const h = html<ListboxPrimitive.Message>()
+  const h = html<SelectMessage>()
   return h.svg(
     [
       h.Attribute("xmlns", "http://www.w3.org/2000/svg"),
@@ -102,7 +104,7 @@ export type RootConfig<Item extends string = string> = Readonly<{
   itemToConfig: (
     item: Item,
     context: Readonly<{ isActive: boolean; isDisabled: boolean; isSelected: boolean }>,
-  ) => ListboxPrimitive.ItemConfig
+  ) => PrimitiveItemConfig
   trigger: Html
   class?: string
   triggerClass?: string
@@ -112,12 +114,12 @@ export type RootConfig<Item extends string = string> = Readonly<{
   isItemDisabled?: (item: Item, index: number) => boolean
   itemToSearchText?: (item: Item, index: number) => string
   itemGroupKey?: (item: Item, index: number) => string
-  groupToHeading?: (groupKey: string) => ListboxPrimitive.GroupHeading | undefined
+  groupToHeading?: (groupKey: string) => GroupHeading | undefined
   ariaLabel?: string
   ariaLabelledBy?: string
   name?: string
   form?: string
-  anchor?: ListboxPrimitive.AnchorConfig
+  anchor?: AnchorConfig
 }>
 
 /**
@@ -129,10 +131,8 @@ export type RootConfig<Item extends string = string> = Readonly<{
  * item groups declared via `itemGroupKey`. The transition classes fire when
  * the consumer passes `isAnimated: true` to `init`.
  */
-export const root = <Item extends string = string>(
-  config: RootConfig<Item>,
-): ListboxPrimitive.ViewInputs<Item, Item> => {
-  const h = html<ListboxPrimitive.Message>()
+export const root = <Item extends string = string>(config: RootConfig<Item>): ViewInputs<Item, Item> => {
+  const h = html<SelectMessage>()
   const sizeClass = config.size === "sm" ? triggerSizeSmallClass : triggerSizeDefaultClass
   return {
     items: config.items,
@@ -180,8 +180,8 @@ export type ItemConfig = Readonly<{
  * check-icon indicator that shows via CSS when the option carries the
  * primitive's `data-selected` attribute.
  */
-export const item = (config: ItemConfig, children: ReadonlyArray<Html | string>): ListboxPrimitive.ItemConfig => {
-  const h = html<ListboxPrimitive.Message>()
+export const item = (config: ItemConfig, children: ReadonlyArray<Html | string>): PrimitiveItemConfig => {
+  const h = html<SelectMessage>()
   return {
     className: cn(itemClass, config.class),
     content: h.div(
@@ -196,8 +196,8 @@ export type LabelConfig = Readonly<{
 }>
 
 /** Styled group label for `groupToHeading`: returns the primitive's `GroupHeading`. */
-export const label = (config: LabelConfig, children: ReadonlyArray<Html | string>): ListboxPrimitive.GroupHeading => {
-  const h = html<ListboxPrimitive.Message>()
+export const label = (config: LabelConfig, children: ReadonlyArray<Html | string>): GroupHeading => {
+  const h = html<SelectMessage>()
   return {
     className: cn(labelClass, config.class),
     content: h.span([h.DataAttribute("slot", "select-label")], [...children]),

@@ -1,14 +1,14 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { ModelRegistry } from "../src/index"
 
 const modelLayer = (delta: string) =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: delta }]),
-      streamText: () => Stream.make(Ai.Response.makePart("text-delta", { id: "text", delta })),
+      streamText: () => Stream.make(Response.makePart("text-delta", { id: "text", delta })),
     }),
   )
 
@@ -38,7 +38,7 @@ describe("ModelRegistry", () => {
 
       const response = yield* ModelRegistry.provide(
         { provider: "test", model: "deterministic" },
-        Ai.LanguageModel.generateText({ prompt: "hello" }),
+        LanguageModel.generateText({ prompt: "hello" }),
       )
 
       expect(response.text).toBe("registered output")
@@ -77,7 +77,7 @@ describe("ModelRegistry", () => {
 
       const keyedResponse = yield* ModelRegistry.provide(
         { provider: "test", model: "deterministic", registrationKey: "eu" },
-        Ai.LanguageModel.generateText({ prompt: "hello" }),
+        LanguageModel.generateText({ prompt: "hello" }),
       )
       expect(keyedResponse.text).toBe("keyed")
     }).pipe(Effect.provide(ModelRegistry.memoryLayer())),
@@ -87,11 +87,11 @@ describe("ModelRegistry", () => {
     Effect.gen(function* () {
       const first = yield* ModelRegistry.provide(
         { provider: "prov-a", model: "model-a" },
-        Ai.LanguageModel.generateText({ prompt: "hello" }),
+        LanguageModel.generateText({ prompt: "hello" }),
       )
       const second = yield* ModelRegistry.provide(
         { provider: "prov-b", model: "model-b" },
-        Ai.LanguageModel.generateText({ prompt: "hello" }),
+        LanguageModel.generateText({ prompt: "hello" }),
       )
 
       expect(first.text).toBe("from-a")
@@ -115,7 +115,7 @@ describe("ModelRegistry", () => {
       const registrations = yield* ModelRegistry.registrations()
       const response = yield* ModelRegistry.provide(
         { provider: "test", model: "deterministic" },
-        Ai.LanguageModel.generateText({ prompt: "hello" }),
+        LanguageModel.generateText({ prompt: "hello" }),
       )
 
       expect(registrations).toHaveLength(1)

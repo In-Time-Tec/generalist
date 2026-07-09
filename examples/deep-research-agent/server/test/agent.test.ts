@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Prompt } from "effect/unstable/ai"
 import { agent } from "../src/agent"
 
 describe("deep-research-agent definition", () => {
@@ -8,12 +8,12 @@ describe("deep-research-agent definition", () => {
     Effect.gen(function* () {
       const continueDecision = yield* agent.policy.decide({
         turn: 6,
-        history: Ai.Prompt.empty,
+        history: Prompt.empty,
         pendingToolResults: [],
       })
       const stopDecision = yield* agent.policy.decide({
         turn: 7,
-        history: Ai.Prompt.empty,
+        history: Prompt.empty,
         pendingToolResults: [],
       })
 

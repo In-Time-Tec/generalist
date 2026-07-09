@@ -1,13 +1,13 @@
-import * as BunHttpServer from "@effect/platform-bun/BunHttpServer"
-import * as BunRuntime from "@effect/platform-bun/BunRuntime"
+import { layer } from "@effect/platform-bun/BunHttpServer"
+import { runMain } from "@effect/platform-bun/BunRuntime"
 import { Layer } from "effect"
 import { FetchHttpClient, HttpRouter } from "effect/unstable/http"
 import { appLayer, sessionRegistryLayer } from "./server"
 
 const serverLayer = HttpRouter.serve(appLayer).pipe(
-  Layer.provideMerge(BunHttpServer.layer({ port: 4000 })),
+  Layer.provideMerge(layer({ port: 4000 })),
   Layer.provideMerge(sessionRegistryLayer),
   Layer.provideMerge(FetchHttpClient.layer),
 )
 
-BunRuntime.runMain(Layer.launch(serverLayer))
+runMain(Layer.launch(serverLayer))

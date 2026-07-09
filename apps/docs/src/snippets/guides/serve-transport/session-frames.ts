@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Chat, LanguageModel, Response } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 import { SessionRegistry } from "@batonfx/transport"
@@ -7,14 +7,14 @@ import { SessionRegistry } from "@batonfx/transport"
 const agent = Agent.make({ name: "chat-agent" })
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () => Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: "Hello from Baton." })),
+    streamText: () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Hello from Baton." })),
   }),
 )
 
-const persistenceLayer = Ai.Chat.layerPersisted({ storeId: "serve-transport-demo" }).pipe(
+const persistenceLayer = Chat.layerPersisted({ storeId: "serve-transport-demo" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),
 )
 

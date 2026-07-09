@@ -1,9 +1,8 @@
 import connectServer from "../../snippets/guides/mcp/connect-server.ts?raw"
 import scriptedSource from "../../snippets/guides/mcp/scripted-source.ts?raw"
 import scriptedSourceExpected from "../../snippets/guides/mcp/scripted-source.expected.txt?raw"
-import * as Prose from "../../prose"
-
-export const mcp = Prose.definePage({
+import { bullets, code, codeBlock, command, definePage, h2, link, p, table } from "../../prose"
+export const mcp = definePage({
   path: "/docs/guides/mcp",
   title: "How to use MCP servers as tool sources",
   navTitle: "Use MCP tool sources",
@@ -11,81 +10,78 @@ export const mcp = Prose.definePage({
   description:
     "Connect to an MCP server with McpToolSource, expose its discovered tools as a Baton toolkit, and proxy tool calls through the MCP executor.",
   content: [
-    Prose.p(
-      Prose.code("@batonfx/mcp"),
+    p(
+      code("@batonfx/mcp"),
       " connects to an MCP server, discovers its tools, and exposes them in two pieces: ",
-      Prose.code("BatonMcp.toolkit(source)"),
+      code("BatonMcp.toolkit(source)"),
       " builds the toolkit the model sees, and ",
-      Prose.code("BatonMcp.toolExecutorLayer(source)"),
+      code("BatonMcp.toolExecutorLayer(source)"),
       " proxies tool calls to the server instead of local handlers. The bridge keeps MCP SDK dependencies out of ",
-      Prose.code("@batonfx/core"),
+      code("@batonfx/core"),
       ".",
     ),
-    Prose.command("Terminal", "bun add @batonfx/mcp"),
-    Prose.h2("connect-to-a-server", "1. Connect to a server"),
-    Prose.p(
-      Prose.code("McpToolSource.layer"),
+    command("Terminal", "bun add @batonfx/mcp"),
+    h2("connect-to-a-server", "1. Connect to a server"),
+    p(
+      code("McpToolSource.layer"),
       " opens the connection, lists the tools once, and closes the client when the layer's scope ends. Discovered tool names are prefixed with the source name: a ",
-      Prose.code("search"),
+      code("search"),
       " tool on the ",
-      Prose.code("files"),
+      code("files"),
       " server becomes ",
-      Prose.code("files_search"),
+      code("files_search"),
       ".",
     ),
-    Prose.codeBlock({ label: "connect-server.ts", source: connectServer }),
-    Prose.table(
+    codeBlock({ label: "connect-server.ts", source: connectServer }),
+    table(
       ["Transport", "Fields"],
       [
-        [
-          [Prose.code('{ kind: "stdio" }')],
-          [Prose.code("command"), ", optional ", Prose.code("args"), " and ", Prose.code("env")],
-        ],
-        [[Prose.code('{ kind: "http" }')], [Prose.code("url"), ", optional ", Prose.code("headers")]],
+        [[code('{ kind: "stdio" }')], [code("command"), ", optional ", code("args"), " and ", code("env")]],
+        [[code('{ kind: "http" }')], [code("url"), ", optional ", code("headers")]],
       ],
     ),
-    Prose.p(
+    p(
       "Hosts that run several servers side by side register each under its own tag with ",
-      Prose.code("McpToolSource.layerTagged"),
+      code("McpToolSource.layerTagged"),
       ".",
     ),
-    Prose.h2("how-calls-behave", "2. How calls behave"),
-    Prose.bullets(
+    h2("how-calls-behave", "2. How calls behave"),
+    bullets(
       [
         "MCP tool failures become Baton tool ",
-        Prose.code("Failure"),
+        code("Failure"),
         " outcomes, so the model sees a failed tool result and can react. MCP tools never ",
-        Prose.code("Suspend"),
+        code("Suspend"),
         ".",
       ],
       [
         "Every ",
-        Prose.code("tools/call"),
+        code("tools/call"),
         " passes the running fiber's ",
-        Prose.code("AbortSignal"),
+        code("AbortSignal"),
         " to the SDK, so interrupting a Baton run cancels the in-flight MCP request on the server.",
       ],
       [
         "An optional ",
-        Prose.code("callTimeout"),
+        code("callTimeout"),
         " bounds each call; on expiry the call fails with ",
-        Prose.code("McpToolCallError"),
+        code("McpToolCallError"),
         " and the loop continues.",
       ],
     ),
-    Prose.h2("test-without-a-live-server", "3. Test without a live server"),
-    Prose.p(
-      Prose.code("McpToolSource.Interface"),
+    h2("test-without-a-live-server", "3. Test without a live server"),
+    p(
+      code("McpToolSource.Interface"),
       " is plain data plus effects, so tests hand the adapter an in-memory source instead of a connection. This is the ",
-      Prose.link("https://github.com/In-Time-Tec/batonfx/tree/main/examples/mcp-agent", "examples/mcp-agent"),
+      link("https://github.com/In-Time-Tec/batonfx/tree/main/examples/mcp-agent", "examples/mcp-agent"),
       " program, runnable with zero credentials.",
     ),
-    Prose.codeBlock({ label: "scripted-source.ts", source: scriptedSource, expectedOutput: scriptedSourceExpected }),
-    Prose.p(
+    codeBlock({ label: "scripted-source.ts", source: scriptedSource, expectedOutput: scriptedSourceExpected }),
+    p(
       "Local tools and MCP tools use the same executor seam, so start with ",
-      Prose.link("/docs/guides/define-tools", "How to define tools and toolkits"),
+      link("/docs/guides/define-tools", "How to define tools and toolkits"),
       " if you have not built a toolkit before. The full interface is in ",
-      Prose.link("/docs/reference/mcp", "the @batonfx/mcp reference"),
+      link("/docs/reference/mcp", "the @batonfx/mcp reference"),
       ".",
     ),
   ],

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Response } from "effect/unstable/ai"
 import { Wire } from "@batonfx/transport"
 import { Chat, Connection } from "../src/index"
 
@@ -23,7 +23,7 @@ describe("Chat", () => {
       eventFrame(1, {
         _tag: "ModelPart",
         turn: 0,
-        part: Ai.Response.makePart("text-delta", { id: "text-1", delta: "Hello " }),
+        part: Response.makePart("text-delta", { id: "text-1", delta: "Hello " }),
       }),
     )
     ;[model] = updateWith(
@@ -31,11 +31,11 @@ describe("Chat", () => {
       eventFrame(2, {
         _tag: "ModelPart",
         turn: 0,
-        part: Ai.Response.makePart("text-delta", { id: "text-1", delta: "world" }),
+        part: Response.makePart("text-delta", { id: "text-1", delta: "world" }),
       }),
     )
 
-    const call = Ai.Response.makePart("tool-call", {
+    const call = Response.makePart("tool-call", {
       id: "call-1",
       name: "lookup",
       params: { q: "baton" },
@@ -57,7 +57,7 @@ describe("Chat", () => {
     if (pendingTool?._tag !== "ToolEntry") throw new Error("expected pending tool entry")
     expect(Chat.toolStatusOf(pendingTool)).toBe("input-streaming")
 
-    const result = Ai.Response.makePart("tool-result", {
+    const result = Response.makePart("tool-result", {
       id: "call-1",
       name: "lookup",
       result: { ok: true },

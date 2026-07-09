@@ -1,20 +1,21 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Guardrail, ModelMiddleware, ToolExecutor } from "../src/index"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
       streamText,
     }),
   )
 
-const echoTool = Ai.Tool.make("echo", {
+const echoTool = Tool.make("echo", {
   description: "Echo input for guardrail tests",
   parameters: Schema.Struct({ text: Schema.String }),
   success: Schema.Unknown,
@@ -33,12 +34,12 @@ const unusedExecutor = ToolExecutor.testLayer({
   execute: () => Effect.die("unexpected tool execution"),
 })
 
-const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
 const toolCallPart = (id: string, name: string, params: unknown) =>
-  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
-describe("Guardrail", () => {
+layer(unusedToolHandlerLayer)("Guardrail", (it) => {
   it.effect("validateInput allows Option.none and receives context", () => {
     let modelCalled = false
     let seenContext: ModelMiddleware.TurnContext | undefined
@@ -124,18 +125,18 @@ describe("Guardrail", () => {
 
   it.effect("redactInput rewrites text-bearing prompt fields without corrupting tool payloads", () => {
     const middleware = Guardrail.redactInput({ pattern: /secret/g, replacement: "MASK" })
-    const file = Ai.Prompt.makePart("file", {
+    const file = Prompt.makePart("file", {
       mediaType: "text/plain",
       fileName: "secret-file.txt",
       data: "secret file data",
     })
-    const toolCall = Ai.Prompt.makePart("tool-call", {
+    const toolCall = Prompt.makePart("tool-call", {
       id: "call-secret",
       name: "echo",
       params: { text: "secret params" },
       providerExecuted: false,
     })
-    const toolResult = Ai.Prompt.makePart("tool-result", {
+    const toolResult = Prompt.makePart("tool-result", {
       id: "result-secret",
       name: "echo",
       isFailure: false,
@@ -143,22 +144,22 @@ describe("Guardrail", () => {
     })
     return Effect.gen(function* () {
       const redacted = yield* middleware.transformPrompt!(
-        Ai.Prompt.fromMessages([
-          Ai.Prompt.makeMessage("system", { content: "system secret" }),
-          Ai.Prompt.makeMessage("user", {
-            content: [Ai.Prompt.makePart("text", { text: "user secret" }), file],
+        Prompt.fromMessages([
+          Prompt.makeMessage("system", { content: "system secret" }),
+          Prompt.makeMessage("user", {
+            content: [Prompt.makePart("text", { text: "user secret" }), file],
           }),
-          Ai.Prompt.makeMessage("assistant", {
+          Prompt.makeMessage("assistant", {
             content: [
-              Ai.Prompt.makePart("text", { text: "assistant secret" }),
-              Ai.Prompt.makePart("reasoning", { text: "reasoning secret" }),
+              Prompt.makePart("text", { text: "assistant secret" }),
+              Prompt.makePart("reasoning", { text: "reasoning secret" }),
               toolCall,
             ],
           }),
-          Ai.Prompt.makeMessage("tool", {
+          Prompt.makeMessage("tool", {
             content: [
               toolResult,
-              Ai.Prompt.makePart("tool-approval-response", {
+              Prompt.makePart("tool-approval-response", {
                 approvalId: "approval-secret",
                 approved: false,
                 reason: "approval secret",
@@ -249,7 +250,7 @@ describe("Guardrail", () => {
   it.effect("filterOutput never drops tool-call parts", () => {
     let calls = 0
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "filter-tool-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "filter-tool-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool" }))
 

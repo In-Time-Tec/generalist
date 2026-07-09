@@ -1,12 +1,13 @@
 import { Chat, Connection } from "@batonfx/foldkit"
 import { Cause, Effect, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
-import * as Command from "foldkit/command"
+import type { Command } from "foldkit/command"
+import { define, mapMessages } from "foldkit/command"
 import { m } from "foldkit/message"
 import type { ApplicationInit } from "foldkit/runtime"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import * as Subscription from "foldkit/subscription"
-
+import type { Subscriptions } from "foldkit/subscription"
+import { lift } from "foldkit/subscription"
 const SERVER_URL = "http://localhost:4000"
 
 export interface Model {
@@ -33,7 +34,7 @@ export type Message = typeof GotChatMessage.Type | typeof FailedOpenSession.Type
 
 export const Message: Schema.Schema<Message> = Schema.Union([GotChatMessage, FailedOpenSession])
 
-const OpenSession = Command.define(
+const OpenSession = define(
   "OpenSession",
   GotChatMessage,
   FailedOpenSession,
@@ -53,10 +54,10 @@ export const init: ApplicationInit<Model, Message, void, Connection.AgentConnect
   [OpenSession()],
 ]
 
-type ProgramCommand = Command.Command<Message, never, Connection.AgentConnection>
+type ProgramCommand = Command<Message, never, Connection.AgentConnection>
 
 const asProgramCommands = (
-  commands: ReadonlyArray<Command.Command<Message, unknown, Connection.AgentConnection>>,
+  commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
 ): ReadonlyArray<ProgramCommand> => commands as unknown as ReadonlyArray<ProgramCommand>
 
 export const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
@@ -65,7 +66,7 @@ export const update = (model: Model, message: Message): readonly [Model, Readonl
       const [chat, chatCommands] = Chat.update(model.chat, message.message)
       return [
         { chat },
-        asProgramCommands(Command.mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
+        asProgramCommands(mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
       ]
     }
     case "FailedOpenSession":
@@ -73,9 +74,7 @@ export const update = (model: Model, message: Message): readonly [Model, Readonl
   }
 }
 
-export const subscriptions: Subscription.Subscriptions<Model, Message, Connection.AgentConnection> = Subscription.lift(
-  Chat.subscriptions,
-)({
+export const subscriptions: Subscriptions<Model, Message, Connection.AgentConnection> = lift(Chat.subscriptions)({
   toChildModel: (model: Model) => model.chat,
   toParentMessage: (chatMessage) => GotChatMessage({ message: chatMessage }),
 })

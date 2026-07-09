@@ -2,8 +2,8 @@ import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
 import { button } from "@/components/ui/button"
-import * as Command from "@/components/ui/command"
-import * as Dialog from "@/components/ui/dialog"
+import { commandDialog, item, root } from "@/components/ui/command"
+import { description, dialogContent, title, view } from "@/components/ui/dialog"
 import { kbd } from "@/components/ui/kbd"
 
 import {
@@ -67,19 +67,19 @@ const searchPalette = (model: Model): Html => {
   return h.submodel({
     slotId: "search-dialog",
     model: model.searchDialog,
-    view: Dialog.view,
-    viewInputs: Dialog.content(Command.commandDialog({ showCloseButton: false, class: "gap-0" }), () => [
-      Dialog.title({ model: model.searchDialog, class: "sr-only" }, ["Search"]),
-      Dialog.description({ model: model.searchDialog, class: "sr-only" }, ["Search the documentation."]),
+    view: view,
+    viewInputs: dialogContent(commandDialog({ showCloseButton: false, class: "gap-0" }), () => [
+      title({ model: model.searchDialog, class: "sr-only" }, ["Search"]),
+      description({ model: model.searchDialog, class: "sr-only" }, ["Search the documentation."]),
       h.submodel({
         slotId: "search-command",
         model: model.searchCommand,
         view: SearchCommand.view,
-        viewInputs: Command.root({
+        viewInputs: root({
           items: results.map((result) => result.path),
           itemToConfig: (path) => {
             const result = resultByPath.get(path)
-            return Command.item({}, result === undefined ? [path] : [searchResultView(result)])
+            return item({}, result === undefined ? [path] : [searchResultView(result)])
           },
           itemToDisplayText: (path) => resultByPath.get(path)?.title ?? path,
           placeholder: "Search docs...",

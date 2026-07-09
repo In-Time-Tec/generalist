@@ -1,8 +1,8 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 
-const reportTool = Ai.Tool.make("fetch_report", {
+const reportTool = Tool.make("fetch_report", {
   description: "Fetch a long-running report",
   parameters: Schema.Struct({ name: Schema.String }),
   success: Schema.String,
@@ -11,16 +11,18 @@ const reportTool = Ai.Tool.make("fetch_report", {
 const agent = Agent.make({
   name: "reporting-agent",
   instructions: "Fetch the report the user names.",
-  toolkit: Ai.Toolkit.make(reportTool),
+  toolkit: Toolkit.make(reportTool),
 })
 
+const toolkitLayer = agent.toolkit.toLayer({ fetch_report: () => Effect.die("durable host handles waits") })
+
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () =>
       Stream.make(
-        Ai.Response.makePart("tool-call", {
+        Response.makePart("tool-call", {
           id: "report-1",
           name: "fetch_report",
           params: { name: "quarterly" },
@@ -49,7 +51,9 @@ const program = Agent.stream(agent, { prompt: "Fetch the quarterly report." }).p
         `suspended reason=${suspension.reason} token=${suspension.token} transcript-messages=${transcriptMessages}`,
       ),
   ),
-  Effect.provide(Layer.mergeAll(modelLayer, durableHostExecutor, Approvals.autoApprove, ModelMiddleware.identityLayer)),
+  Effect.provide(
+    Layer.mergeAll(modelLayer, toolkitLayer, durableHostExecutor, Approvals.autoApprove, ModelMiddleware.identityLayer),
+  ),
 )
 
 await Effect.runPromise(program)

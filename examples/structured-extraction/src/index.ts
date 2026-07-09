@@ -1,16 +1,16 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const invoiceSchema = Schema.Struct({ total: Schema.Number, currency: Schema.String })
 
 const modelLayer = (
   streamText: ModelParams["streamText"],
   generateText: ModelParams["generateText"],
-): Layer.Layer<Ai.LanguageModel.LanguageModel> =>
-  Layer.effect(Ai.LanguageModel.LanguageModel, Ai.LanguageModel.make({ streamText, generateText }))
+): Layer.Layer<LanguageModel.LanguageModel> =>
+  Layer.effect(LanguageModel.LanguageModel, LanguageModel.make({ streamText, generateText }))
 
 const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data." })
 
@@ -24,7 +24,7 @@ const program = Effect.gen(function* () {
   Effect.provide(
     Layer.mergeAll(
       modelLayer(
-        () => Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." })),
+        () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." })),
         () => Effect.succeed([{ type: "text", text: '{"total":42,"currency":"USD"}' }]),
       ),
       ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),

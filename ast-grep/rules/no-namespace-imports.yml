@@ -1,0 +1,17 @@
+id: no-namespace-imports
+language: TypeScript
+severity: error
+message: Do not use namespace imports. Import exported names directly; alias only for a real local-name collision or provider variant.
+rule:
+  any:
+    - pattern: import * as $NAME from "$SOURCE"
+    - pattern: import type * as $NAME from "$SOURCE"
+files:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.ts.txt"
+  - "apps/docs/src/snippets/**/*.txt"
+ignores:
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "node_modules/**"

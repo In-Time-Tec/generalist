@@ -13,10 +13,9 @@ import {
   Schema,
   Stream,
 } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Chat, Prompt, Tool } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals } from "@batonfx/core"
-import * as Wire from "./wire"
-
+import type { ClientApproval, EventType, LooseServerFrameType, RunFailure, SessionStatus } from "./wire"
 /** @experimental */
 export class SessionError extends Schema.TaggedErrorClass<SessionError>()("@batonfx/transport/SessionError", {
   message: Schema.String,
@@ -40,13 +39,13 @@ export class SubscriberLagged extends Schema.TaggedErrorClass<SubscriberLagged>(
 export interface SessionInfo {
   readonly sessionId: string
   readonly chatId: string
-  readonly status: Wire.SessionStatus
+  readonly status: SessionStatus
   readonly lastSeq: number
   readonly idleSince: Option.Option<number>
 }
 
 /** @experimental */
-export interface MemoryOptions<Tools extends Record<string, Ai.Tool.Any>> {
+export interface MemoryOptions<Tools extends Record<string, Tool.Any>> {
   readonly agent: Agent.Agent<Tools>
   readonly ringBufferCapacity?: number
   readonly subscriberQueueCapacity?: number
@@ -61,16 +60,16 @@ export interface Interface {
     readonly chatId?: string
     readonly system?: string
   }) => Effect.Effect<SessionInfo, SessionError>
-  readonly send: (sessionId: string, prompt: Ai.Prompt.RawInput) => Effect.Effect<void, SessionError | SessionBusy>
+  readonly send: (sessionId: string, prompt: Prompt.RawInput) => Effect.Effect<void, SessionError | SessionBusy>
   readonly resolveApproval: (
     sessionId: string,
     token: string,
-    decision: Wire.ClientApproval,
+    decision: ClientApproval,
   ) => Effect.Effect<void, SessionError | SessionBusy>
   readonly attach: (
     sessionId: string,
     afterSeq?: number,
-  ) => Stream.Stream<Wire.LooseServerFrameType, SessionError | SubscriberLagged>
+  ) => Stream.Stream<LooseServerFrameType, SessionError | SubscriberLagged>
   readonly interrupt: (sessionId: string) => Effect.Effect<void, SessionError>
   readonly info: (sessionId: string) => Effect.Effect<SessionInfo, SessionError>
 }
@@ -80,7 +79,7 @@ export class SessionRegistry extends Context.Service<SessionRegistry, Interface>
   "@batonfx/transport/SessionRegistry",
 ) {}
 
-type SubscriberQueue = Queue.Queue<Wire.LooseServerFrameType, SessionError | SubscriberLagged>
+type SubscriberQueue = Queue.Queue<LooseServerFrameType, SessionError | SubscriberLagged>
 
 type RunReservation =
   | { readonly _tag: "Missing" }
@@ -91,9 +90,9 @@ interface SessionState {
   readonly sessionId: string
   readonly chatId: string
   readonly system?: string
-  readonly status: Wire.SessionStatus
+  readonly status: SessionStatus
   readonly lastSeq: number
-  readonly ring: ReadonlyArray<Wire.LooseServerFrameType>
+  readonly ring: ReadonlyArray<LooseServerFrameType>
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
   readonly runFiber: Option.Option<Fiber.Fiber<void>>
   readonly interruptRequested: boolean
@@ -111,7 +110,7 @@ interface RegistryState {
   readonly nextSubscriberId: number
 }
 
-type FrameWithoutSeq = Wire.LooseServerFrameType extends infer Frame
+type FrameWithoutSeq = LooseServerFrameType extends infer Frame
   ? Frame extends unknown
     ? Omit<Frame, "seq">
     : never
@@ -130,12 +129,10 @@ const infoFrom = (session: SessionState): SessionInfo => ({
   idleSince: session.idleSince,
 })
 
-const trimRing = (
-  ring: ReadonlyArray<Wire.LooseServerFrameType>,
-  capacity: number,
-): ReadonlyArray<Wire.LooseServerFrameType> => (ring.length <= capacity ? ring : ring.slice(ring.length - capacity))
+const trimRing = (ring: ReadonlyArray<LooseServerFrameType>, capacity: number): ReadonlyArray<LooseServerFrameType> =>
+  ring.length <= capacity ? ring : ring.slice(ring.length - capacity)
 
-const stripEventTranscript = (event: AgentEvent.Event, strip: boolean): Wire.EventType => {
+const stripEventTranscript = (event: AgentEvent.Event, strip: boolean): EventType => {
   if (!strip) return event
   if (event._tag === "TurnCompleted") {
     const { transcript: _transcript, ...rest } = event
@@ -148,7 +145,7 @@ const stripEventTranscript = (event: AgentEvent.Event, strip: boolean): Wire.Eve
   return event
 }
 
-const runFailureFromCause = (cause: Cause.Cause<Agent.RunError | SessionError>, turn: number): Wire.RunFailure => {
+const runFailureFromCause = (cause: Cause.Cause<Agent.RunError | SessionError>, turn: number): RunFailure => {
   const error = Cause.squash(cause)
   if (error instanceof AgentEvent.AgentError) return error
   if (error instanceof AgentEvent.TurnLimitExceeded) return error
@@ -157,22 +154,22 @@ const runFailureFromCause = (cause: Cause.Cause<Agent.RunError | SessionError>, 
   return new AgentEvent.AgentError({ message, turn, cause: error })
 }
 
-const toApprovalDecision = (decision: Wire.ClientApproval): Approvals.Decision => {
+const toApprovalDecision = (decision: ClientApproval): Approvals.Decision => {
   if (decision._tag === "Approved") return { _tag: "Approved" }
   return decision.reason === undefined ? { _tag: "Denied" } : { _tag: "Denied", reason: decision.reason }
 }
 
 /** @experimental */
-export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
+export const layerMemory = <Tools extends Record<string, Tool.Any>>(
   options: MemoryOptions<Tools>,
-): Layer.Layer<SessionRegistry, never, Agent.RunServices | Ai.Chat.Persistence> =>
+): Layer.Layer<SessionRegistry, never, Agent.RunServices<Tools> | Chat.Persistence> =>
   Layer.effect(
     SessionRegistry,
     Effect.gen(function* () {
       const scope = yield* Effect.scope
-      const context = yield* Effect.context<Agent.RunServices | Ai.Chat.Persistence>()
-      const approvals = yield* Approvals.Approvals
-      const persistence = yield* Ai.Chat.Persistence
+      const context = yield* Effect.context<Agent.RunServices<Tools> | Chat.Persistence>()
+      const approvals = yield* Effect.serviceOption(Approvals.Approvals)
+      const persistence = yield* Chat.Persistence
       const state = yield* Ref.make<RegistryState>({ sessions: new Map(), nextSubscriberId: 0 })
       const ringBufferCapacity = options.ringBufferCapacity ?? 1024
       const subscriberQueueCapacity = options.subscriberQueueCapacity ?? 128
@@ -229,15 +226,12 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
       const failEvictedSubscriber = (sessionId: string, queue: SubscriberQueue) =>
         Queue.fail(queue, sessionError(`Session ${sessionId} was evicted`)).pipe(Effect.asVoid)
 
-      const publish = (
-        sessionId: string,
-        input: FrameWithoutSeq,
-      ): Effect.Effect<Wire.LooseServerFrameType, SessionError> =>
+      const publish = (sessionId: string, input: FrameWithoutSeq): Effect.Effect<LooseServerFrameType, SessionError> =>
         Ref.modify(state, (current) => {
           const session = current.sessions.get(sessionId)
           if (session === undefined)
-            return [Option.none<readonly [Wire.LooseServerFrameType, ReadonlyMap<number, SubscriberQueue>]>(), current]
-          const frame = { ...input, seq: session.lastSeq + 1 } as Wire.LooseServerFrameType
+            return [Option.none<readonly [LooseServerFrameType, ReadonlyMap<number, SubscriberQueue>]>(), current]
+          const frame = { ...input, seq: session.lastSeq + 1 } as LooseServerFrameType
           const updated = {
             ...session,
             lastSeq: frame.seq,
@@ -265,7 +259,7 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
           ),
         )
 
-      const setStatus = (sessionId: string, status: Wire.SessionStatus): Effect.Effect<void, SessionError> =>
+      const setStatus = (sessionId: string, status: SessionStatus): Effect.Effect<void, SessionError> =>
         Clock.currentTimeMillis.pipe(
           Effect.flatMap((now) =>
             updateSession(sessionId, (session) => ({
@@ -278,7 +272,7 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
           Effect.asVoid,
         )
 
-      const finalizeRun = (sessionId: string, status: Wire.SessionStatus): Effect.Effect<void, SessionError> =>
+      const finalizeRun = (sessionId: string, status: SessionStatus): Effect.Effect<void, SessionError> =>
         Clock.currentTimeMillis.pipe(
           Effect.flatMap((now) =>
             updateSession(sessionId, (session) => ({
@@ -310,30 +304,41 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
 
       const makeApprovals = (
         resume: Agent.Resume | undefined,
-        decision: Wire.ClientApproval | undefined,
-      ): Effect.Effect<Approvals.Interface> => {
+        decision: ClientApproval | undefined,
+      ): Effect.Effect<Option.Option<Approvals.Interface>> => {
         if (resume === undefined || decision === undefined) return Effect.succeed(approvals)
+        const fallbackApprovals = Option.getOrElse(approvals, () =>
+          Approvals.Approvals.of({
+            check: () =>
+              Effect.succeed({
+                _tag: "Denied",
+                reason: "Approvals service is required for approval-gated tools",
+              }),
+          }),
+        )
         return Ref.make(false).pipe(
           Effect.map((consumed) =>
-            Approvals.Approvals.of({
-              check: (request) => {
-                if (request.call.id !== resume.call.id) return approvals.check(request)
-                return Ref.modify(consumed, (used) => [!used, true]).pipe(
-                  Effect.flatMap((useOverride) =>
-                    useOverride ? Effect.succeed(toApprovalDecision(decision)) : approvals.check(request),
-                  ),
-                )
-              },
-            }),
+            Option.some(
+              Approvals.Approvals.of({
+                check: (request) => {
+                  if (request.call.id !== resume.call.id) return fallbackApprovals.check(request)
+                  return Ref.modify(consumed, (used) => [!used, true]).pipe(
+                    Effect.flatMap((useOverride) =>
+                      useOverride ? Effect.succeed(toApprovalDecision(decision)) : fallbackApprovals.check(request),
+                    ),
+                  )
+                },
+              }),
+            ),
           ),
         )
       }
 
       const runStream = (
         session: SessionState,
-        prompt: Ai.Prompt.RawInput,
+        prompt: Prompt.RawInput,
         resume: Agent.Resume | undefined,
-        approvalDecision: Wire.ClientApproval | undefined,
+        approvalDecision: ClientApproval | undefined,
       ): Effect.Effect<void> =>
         Effect.gen(function* () {
           const overrideApprovals = yield* makeApprovals(resume, approvalDecision)
@@ -344,7 +349,7 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
             persistence: { chatId: session.chatId },
             ...(resume === undefined ? {} : { resume }),
           }
-          return yield* Agent.stream(options.agent, runOptions).pipe(
+          const run = Agent.stream(options.agent, runOptions).pipe(
             Stream.runForEach((event) =>
               (event._tag === "TurnStarted"
                 ? setStatus(session.sessionId, { _tag: "Running", turn: event.turn })
@@ -370,10 +375,13 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
               },
               onSuccess: () => finalizeRun(session.sessionId, { _tag: "Idle" }),
             }),
-            Effect.provideService(Approvals.Approvals, overrideApprovals),
-            Effect.provide(context),
             Effect.catchCause(() => Effect.void),
           )
+          const runContext = Option.match(overrideApprovals, {
+            onNone: () => context,
+            onSome: (overrideService) => Context.add(context, Approvals.Approvals, overrideService),
+          })
+          return yield* run.pipe(Effect.provide(runContext))
         })
 
       const reserveRun = (
@@ -411,9 +419,9 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
 
       const beginRun = (
         sessionId: string,
-        prompt: Ai.Prompt.RawInput,
+        prompt: Prompt.RawInput,
         resume?: Agent.Resume,
-        approvalDecision?: Wire.ClientApproval,
+        approvalDecision?: ClientApproval,
       ): Effect.Effect<void, SessionError | SessionBusy> =>
         Effect.gen(function* () {
           const runSession = yield* reserveRun(sessionId, resume)
@@ -442,10 +450,10 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
         sessionId: string,
         seq: number,
         chatId: string,
-      ): Effect.Effect<Wire.LooseServerFrameType, SessionError> =>
+      ): Effect.Effect<LooseServerFrameType, SessionError> =>
         persistence.getOrCreate(chatId).pipe(
           Effect.flatMap((chat) => Ref.get(chat.history)),
-          Effect.map((transcript) => ({ _tag: "Snapshot", seq, transcript }) as Wire.LooseServerFrameType),
+          Effect.map((transcript) => ({ _tag: "Snapshot", seq, transcript }) as LooseServerFrameType),
           Effect.mapError((error) => sessionError(errorMessage(error))),
         )
 
@@ -557,7 +565,7 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
         attach: (sessionId, afterSeq) =>
           Stream.unwrap(
             Effect.gen(function* () {
-              const queue = yield* Queue.make<Wire.LooseServerFrameType, SessionError | SubscriberLagged>({
+              const queue = yield* Queue.make<LooseServerFrameType, SessionError | SubscriberLagged>({
                 capacity: subscriberQueueCapacity,
                 strategy: "dropping",
               })
@@ -567,7 +575,7 @@ export const layerMemory = <Tools extends Record<string, Ai.Tool.Any>>(
                   return [
                     Option.none<{
                       readonly subscriberId: number
-                      readonly replay: ReadonlyArray<Wire.LooseServerFrameType>
+                      readonly replay: ReadonlyArray<LooseServerFrameType>
                       readonly stale: boolean
                       readonly snapshotSeq: number
                       readonly chatId: string

@@ -38,7 +38,8 @@ SPEC.md
    ├─ ADR-0013-in-process-multi-agent.md
    ├─ ADR-0014-transport-wire-and-session-registry.md
    ├─ ADR-0015-transport-sse-websocket-client.md
-   └─ ADR-0016-foldkit-adapter.md
+   ├─ ADR-0016-foldkit-adapter.md
+   └─ ADR-0017-effect-toolkit-as-tool-runtime.md
 ```
 
 ## Packages
@@ -86,3 +87,4 @@ SPEC.md
 - ADR-0014 — Transport Wire and Session Registry: `docs/spec/decisions/ADR-0014-transport-wire-and-session-registry.md`
 - ADR-0015 — Transport SSE, WebSocket, and Client Adapters: `docs/spec/decisions/ADR-0015-transport-sse-websocket-client.md`
 - ADR-0016 — FoldKit Adapter: `docs/spec/decisions/ADR-0016-foldkit-adapter.md`
+- ADR-0017 — Effect Toolkit as Tool Runtime: `docs/spec/decisions/ADR-0017-effect-toolkit-as-tool-runtime.md`

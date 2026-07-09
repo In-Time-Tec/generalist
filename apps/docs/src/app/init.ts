@@ -2,7 +2,7 @@ import { Option } from "effect"
 import { Runtime } from "foldkit"
 import { Url } from "foldkit/url"
 
-import * as Dialog from "@/components/ui/dialog"
+import { dialogInit } from "@/components/ui/dialog"
 
 import { legacyRedirects } from "../content/registry"
 import { toPath, urlToRoute } from "../route/route"
@@ -18,7 +18,7 @@ export const init: Runtime.RoutingApplicationInit<Model, Message> = (url: Url) =
     {
       route,
       url,
-      searchDialog: Dialog.init({
+      searchDialog: dialogInit({
         id: "search-dialog",
         isAnimated: false,
         focusSelector: '[data-slot="command-input"]',

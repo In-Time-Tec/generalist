@@ -1,11 +1,10 @@
 import { Cause, Context, Effect, Layer, Option, Sink, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-import * as AgentEvent from "./agent-event"
-import * as ToolContext from "./tool-context"
-
+import { Response, Tool, Toolkit } from "effect/unstable/ai"
+import { AgentError, AgentSuspended } from "./agent-event"
+import { ToolContext } from "./tool-context"
 /** @experimental */
 export interface Request {
-  readonly call: Ai.Response.ToolCallPart<string, unknown>
+  readonly call: Response.ToolCallPart<string, unknown>
   readonly turn: number
   readonly agentName: string
   readonly sessionId: string
@@ -35,11 +34,14 @@ export type Outcome = Success | Failure | Suspend
 
 /** @experimental */
 export interface Interface {
-  readonly execute: (request: Request) => Effect.Effect<Outcome, AgentEvent.AgentError, ToolContext.ToolContext>
+  readonly execute: (request: Request) => Effect.Effect<Outcome, AgentError, ToolContext>
 }
 
 /** @experimental */
 export class ToolExecutor extends Context.Service<ToolExecutor, Interface>()("@batonfx/core/ToolExecutor") {}
+
+/** @experimental */
+export type ToolkitInput<Tools extends Record<string, Tool.Any>> = Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
 
 const failureMessage = (cause: Cause.Cause<unknown>): string => {
   const error = Cause.squash(cause)
@@ -59,8 +61,8 @@ const resultMessage = (result: unknown): string => {
   }
 }
 
-const executeWithToolkit = <Tools extends Record<string, Ai.Tool.Any>>(
-  toolkit: Ai.Toolkit.WithHandler<Tools>,
+const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.WithHandler<Tools>,
   request: Request,
 ): Effect.Effect<Outcome> => {
   if (toolkit.tools[request.call.name] === undefined) {
@@ -68,7 +70,7 @@ const executeWithToolkit = <Tools extends Record<string, Ai.Tool.Any>>(
   }
   return toolkit.handle(request.call.name as never, request.call.params as never).pipe(
     Effect.flatMap((results) =>
-      (results as Stream.Stream<Ai.Tool.HandlerResult<Ai.Tool.Any>, unknown>).pipe(
+      (results as Stream.Stream<Tool.HandlerResult<Tool.Any>, unknown>).pipe(
         Stream.filter((item) => item.preliminary === false),
         Stream.run(Sink.last()),
       ),
@@ -89,7 +91,7 @@ const executeWithToolkit = <Tools extends Record<string, Ai.Tool.Any>>(
     Effect.catchCause((cause) => {
       if (Cause.hasInterrupts(cause)) return Effect.interrupt
       const error = Cause.squash(cause)
-      if (error instanceof AgentEvent.AgentSuspended) {
+      if (error instanceof AgentSuspended) {
         return Effect.succeed<Outcome>({ _tag: "Suspend", token: error.token })
       }
       return Effect.succeed(failureOutcome(failureMessage(cause)))
@@ -98,15 +100,44 @@ const executeWithToolkit = <Tools extends Record<string, Ai.Tool.Any>>(
 }
 
 /** @experimental */
-export const fromToolkit = <Tools extends Record<string, Ai.Tool.Any>>(
-  toolkit: Ai.Toolkit.WithHandler<Tools>,
-): Layer.Layer<ToolExecutor> =>
-  Layer.succeed(
-    ToolExecutor,
-    ToolExecutor.of({
-      execute: (request) => executeWithToolkit(toolkit, request),
-    }),
+export function executeToolkit<Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.WithHandler<Tools>,
+  request: Request,
+): Effect.Effect<Outcome>
+export function executeToolkit<Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.Toolkit<Tools>,
+  request: Request,
+): Effect.Effect<Outcome, never, Tool.HandlersFor<Tools>>
+export function executeToolkit<Tools extends Record<string, Tool.Any>>(
+  toolkit: ToolkitInput<Tools>,
+  request: Request,
+): Effect.Effect<Outcome, never, Tool.HandlersFor<Tools>> {
+  return ("handle" in toolkit ? Effect.succeed(toolkit) : toolkit).pipe(
+    Effect.flatMap((handled) => executeWithToolkit(handled, request)),
   )
+}
+
+/** @experimental */
+export function fromToolkit<Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.WithHandler<Tools>,
+): Layer.Layer<ToolExecutor>
+export function fromToolkit<Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.Toolkit<Tools>,
+): Layer.Layer<ToolExecutor, never, Tool.HandlersFor<Tools>>
+export function fromToolkit<Tools extends Record<string, Tool.Any>>(
+  toolkit: ToolkitInput<Tools>,
+): Layer.Layer<ToolExecutor, never, Tool.HandlersFor<Tools>> {
+  return Layer.effect(
+    ToolExecutor,
+    ("handle" in toolkit ? Effect.succeed(toolkit) : toolkit).pipe(
+      Effect.map((handled) =>
+        ToolExecutor.of({
+          execute: (request) => executeWithToolkit(handled, request),
+        }),
+      ),
+    ),
+  )
+}
 
 /** @experimental */
 export const testLayer = (implementation: Interface): Layer.Layer<ToolExecutor> =>

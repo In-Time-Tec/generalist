@@ -12,16 +12,16 @@ Baton adds no storage of its own — it delegates entirely to `effect/unstable/a
 
 ```ts
 import { Effect, Layer } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Chat } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent } from "@batonfx/core"
 
 // A memory-backed persistence stack for a standalone chat app.
-const persistenceLayer = Ai.Chat.layerPersisted({ storeId: "my-app-chats" }).pipe(
+const persistenceLayer = Chat.layerPersisted({ storeId: "my-app-chats" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),
 )
 // Or SQL-backed on the app's own database (requires a SqlClient in context):
-//   Ai.Chat.layerPersisted({ storeId: "my-app-chats" }).pipe(
+//   Chat.layerPersisted({ storeId: "my-app-chats" }).pipe(
 //     Layer.provide(Persistence.layerBackingSql),
 //   )
 

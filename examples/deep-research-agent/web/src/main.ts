@@ -1,18 +1,28 @@
 import { Chat, Connection } from "@batonfx/foldkit"
 import { Cause, Effect, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
-import * as Command from "foldkit/command"
+import { define, mapMessage, mapMessages, type Command } from "foldkit/command"
 import type { Document, Html } from "foldkit/html"
 import { html } from "foldkit/html"
 import { m } from "foldkit/message"
 import type { ApplicationInit } from "foldkit/runtime"
 import { ts } from "foldkit/schema"
-import * as Subscription from "foldkit/subscription"
+import { lift, type Subscriptions } from "foldkit/subscription"
 
 import { badge } from "@/components/ui/badge"
-import * as Conversation from "@/components/ui/conversation"
+import {
+  conversation,
+  conversationContent,
+  conversationEmptyState,
+  conversationScrollButton,
+} from "@/components/ui/conversation"
 import { loader } from "@/components/ui/loader"
-import * as MessageScroller from "@/components/ui/message-scroller"
+import {
+  MessageScrollerMessage,
+  MessageScrollerModel,
+  messageScrollerInit,
+  messageScrollerUpdate,
+} from "@/components/ui/message-scroller"
 import { message, messageContent } from "@/components/ui/message"
 import { promptInput, promptInputSubmit, promptInputTextarea, promptInputToolbar } from "@/components/ui/prompt-input"
 import { reasoning, reasoningContent, reasoningTrigger } from "@/components/ui/reasoning"
@@ -35,7 +45,7 @@ export const SessionState: Schema.Schema<SessionState> = Schema.Union([SessionOp
 export const Model = Schema.Struct({
   chat: Chat.Model,
   session: SessionState,
-  scroller: MessageScroller.Model,
+  scroller: MessageScrollerModel,
   expandedToolCallIds: Schema.Array(Schema.String),
 })
 
@@ -44,7 +54,7 @@ export type Model = typeof Model.Type
 // MESSAGE
 
 export const GotChatMessage = m("GotChatMessage", { message: Chat.Message })
-export const GotScrollerMessage = m("GotScrollerMessage", { message: MessageScroller.Message })
+export const GotScrollerMessage = m("GotScrollerMessage", { message: MessageScrollerMessage })
 export const OpenedSession = m("OpenedSession", { sessionId: Schema.String })
 export const FailedOpenSession = m("FailedOpenSession", { reason: Schema.String })
 export const ToggledExpanded = m("ToggledExpanded", { key: Schema.String })
@@ -65,7 +75,7 @@ export const init: ApplicationInit<Model, Message, void, Connection.AgentConnect
   {
     chat: Chat.initialModel(null),
     session: SessionOpening(),
-    scroller: MessageScroller.init({ id: "conversation-scroller" }),
+    scroller: messageScrollerInit({ id: "conversation-scroller" }),
     expandedToolCallIds: [],
   },
   [OpenSession()],
@@ -74,7 +84,7 @@ export const init: ApplicationInit<Model, Message, void, Connection.AgentConnect
 // COMMAND
 
 /** Opens a Baton session on the server before the WebSocket attaches to it. */
-export const OpenSession = Command.define(
+export const OpenSession = define(
   "OpenSession",
   OpenedSession,
   FailedOpenSession,
@@ -91,7 +101,7 @@ export const OpenSession = Command.define(
 
 // UPDATE
 
-type ProgramCommand = Command.Command<Message, never, Connection.AgentConnection>
+type ProgramCommand = Command<Message, never, Connection.AgentConnection>
 
 const toggle = (keys: ReadonlyArray<string>, key: string): ReadonlyArray<string> =>
   keys.includes(key) ? keys.filter((existing) => existing !== key) : [...keys, key]
@@ -105,7 +115,7 @@ const toggle = (keys: ReadonlyArray<string>, key: string): ReadonlyArray<string>
  * Commands are lifted into the program's own Message type.
  */
 const asProgramCommands = (
-  commands: ReadonlyArray<Command.Command<Message, unknown, Connection.AgentConnection>>,
+  commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
 ): ReadonlyArray<ProgramCommand> => commands as unknown as ReadonlyArray<ProgramCommand>
 
 export const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
@@ -118,17 +128,15 @@ export const update = (model: Model, message: Message): readonly [Model, Readonl
       const [chat, chatCommands] = Chat.update(model.chat, message.message)
       return [
         { ...model, chat },
-        asProgramCommands(Command.mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
+        asProgramCommands(mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
       ]
     }
     case "GotScrollerMessage": {
-      const [scroller, scrollerCommands] = MessageScroller.update(model.scroller, message.message)
+      const [scroller, scrollerCommands] = messageScrollerUpdate(model.scroller, message.message)
       return [
         { ...model, scroller },
         asProgramCommands(
-          scrollerCommands.map(
-            Command.mapMessage((scrollerMessage) => GotScrollerMessage({ message: scrollerMessage })),
-          ),
+          scrollerCommands.map(mapMessage((scrollerMessage) => GotScrollerMessage({ message: scrollerMessage }))),
         ),
       ]
     }
@@ -139,9 +147,7 @@ export const update = (model: Model, message: Message): readonly [Model, Readonl
 
 // SUBSCRIPTION
 
-export const subscriptions: Subscription.Subscriptions<Model, Message, Connection.AgentConnection> = Subscription.lift(
-  Chat.subscriptions,
-)({
+export const subscriptions: Subscriptions<Model, Message, Connection.AgentConnection> = lift(Chat.subscriptions)({
   toChildModel: (model: Model) => model.chat,
   toParentMessage: (chatMessage) => GotChatMessage({ message: chatMessage }),
 })
@@ -397,7 +403,7 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
         "empty-state",
         [],
         [
-          Conversation.conversationEmptyState({
+          conversationEmptyState({
             title: "Ask a research question",
             description: "The agent plans briefly, calls web_search, and synthesizes a cited answer.",
           }),
@@ -478,15 +484,15 @@ export const view = (model: Model): Document => {
       [
         headerView(model),
         sessionBannerView(model.session),
-        Conversation.conversation({ class: "min-h-0 flex-1" }, [
-          Conversation.conversationContent(
+        conversation({ class: "min-h-0 flex-1" }, [
+          conversationContent(
             {
               model: model.scroller,
               toParentMessage: (scrollerMessage) => GotScrollerMessage({ message: scrollerMessage }),
             },
             transcriptView(model),
           ),
-          Conversation.conversationScrollButton({
+          conversationScrollButton({
             model: model.scroller,
             toParentMessage: (scrollerMessage) => GotScrollerMessage({ message: scrollerMessage }),
           }),

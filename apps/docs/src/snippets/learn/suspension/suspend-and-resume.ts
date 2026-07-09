@@ -1,38 +1,40 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, AgentEvent, Approvals, ModelMiddleware } from "@batonfx/core"
 
-const deployTool = Ai.Tool.make("deploy", {
+const deployTool = Tool.make("deploy", {
   description: "Deploy a service to production",
   parameters: Schema.Struct({ service: Schema.String }),
   success: Schema.String,
   needsApproval: true,
 })
 
+const toolkit = Toolkit.make(deployTool)
+
 const agent = Agent.make({
   name: "release-agent",
   instructions: "Deploy what the user asks for.",
-  toolkit: Ai.Toolkit.make(deployTool),
+  toolkit,
 })
 
 let modelCalls = 0
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () => {
       modelCalls += 1
       return modelCalls === 1
         ? Stream.make(
-            Ai.Response.makePart("tool-call", {
+            Response.makePart("tool-call", {
               id: "deploy-1",
               name: "deploy",
               params: { service: "api" },
               providerExecuted: false,
             }),
           )
-        : Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: "The api service is deployed." }))
+        : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "The api service is deployed." }))
     },
   }),
 )
@@ -41,9 +43,7 @@ let approvalChecks = 0
 
 const layers = Layer.mergeAll(
   modelLayer,
-  ToolExecutor.testLayer({
-    execute: () => Effect.succeed({ _tag: "Success", result: "deployed api", encodedResult: "deployed api" }),
-  }),
+  toolkit.toLayer({ deploy: () => Effect.succeed("deployed api") }),
   Approvals.testLayer({
     check: () => {
       approvalChecks += 1
@@ -55,7 +55,7 @@ const layers = Layer.mergeAll(
   ModelMiddleware.identityLayer,
 )
 
-let transcript: Ai.Prompt.Prompt = Ai.Prompt.empty
+let transcript: Prompt.Prompt = Prompt.empty
 
 const program = Effect.gen(function* () {
   const suspension = yield* Agent.stream(agent, { prompt: "Deploy the api service." }).pipe(

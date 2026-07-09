@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Option, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 
 const dropReasoning: ModelMiddleware.Middleware = {
@@ -9,13 +9,13 @@ const dropReasoning: ModelMiddleware.Middleware = {
 const agent = Agent.make({ name: "terse-agent" })
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () =>
       Stream.make(
-        Ai.Response.makePart("reasoning-delta", { id: "thinking", delta: "Considering the question at length." }),
-        Ai.Response.makePart("text-delta", { id: "assistant", delta: "Blue." }),
+        Response.makePart("reasoning-delta", { id: "thinking", delta: "Considering the question at length." }),
+        Response.makePart("text-delta", { id: "assistant", delta: "Blue." }),
       ),
   }),
 )

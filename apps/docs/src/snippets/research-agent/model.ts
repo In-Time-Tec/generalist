@@ -1,13 +1,13 @@
 import { OpenRouter } from "@batonfx/providers"
 import { Config, Effect, Layer, Option, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
 interface WebSearchSuccess {
   readonly results: ReadonlyArray<{ readonly title: string; readonly url: string; readonly snippet: string }>
 }
 
-const findWebSearchResult = (prompt: Ai.Prompt.Prompt): WebSearchSuccess | undefined => {
+const findWebSearchResult = (prompt: Prompt.Prompt): WebSearchSuccess | undefined => {
   for (const message of prompt.content) {
     if (message.role !== "tool") continue
     for (const part of message.content) {
@@ -19,7 +19,7 @@ const findWebSearchResult = (prompt: Ai.Prompt.Prompt): WebSearchSuccess | undef
   return undefined
 }
 
-const latestUserQuestion = (prompt: Ai.Prompt.Prompt): string => {
+const latestUserQuestion = (prompt: Prompt.Prompt): string => {
   const last = prompt.content.findLast((message) => message.role === "user")
   if (last === undefined) return "the topic"
   for (const part of last.content) {
@@ -41,17 +41,17 @@ const synthesizeAnswer = (found: WebSearchSuccess): string => {
   ].join("\n")
 }
 
-const scriptedModel: Layer.Layer<Ai.LanguageModel.LanguageModel> = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+const scriptedModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effect(
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: (options) => {
       const found = findWebSearchResult(options.prompt)
       if (found !== undefined) {
-        return Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: synthesizeAnswer(found) }))
+        return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: synthesizeAnswer(found) }))
       }
       return Stream.make(
-        Ai.Response.makePart("tool-call", {
+        Response.makePart("tool-call", {
           id: "search-1",
           name: "web_search",
           params: { query: latestUserQuestion(options.prompt) },
@@ -62,7 +62,7 @@ const scriptedModel: Layer.Layer<Ai.LanguageModel.LanguageModel> = Layer.effect(
   }),
 )
 
-export const modelLayer: Layer.Layer<Ai.LanguageModel.LanguageModel> = Layer.unwrap(
+export const modelLayer: Layer.Layer<LanguageModel.LanguageModel> = Layer.unwrap(
   Effect.gen(function* () {
     const registration = yield* OpenRouter.openRouter({ model: "openai/gpt-4o-mini" }).pipe(
       Effect.provide(OpenRouter.openRouterClientLayerConfig({ apiKey: Config.redacted("OPENROUTER_API_KEY") })),

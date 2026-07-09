@@ -2,9 +2,9 @@ import { Effect, Match, Option, Schema } from "effect"
 import { Command } from "foldkit"
 import { load, pushUrl, replaceUrl } from "foldkit/navigation"
 import { evo } from "foldkit/struct"
-import * as Url from "foldkit/url"
+import { toString } from "foldkit/url"
 
-import * as Dialog from "@/components/ui/dialog"
+import { dialogClose, dialogOpen, dialogUpdate } from "@/components/ui/dialog"
 
 import { legacyRedirects } from "../content/registry"
 import { isSidebarGroupOpen, readSidebarGroups, writeSidebarGroups, SidebarGroups } from "../layout/sidebarStorage"
@@ -36,7 +36,7 @@ export const update = (model: Model, message: Message): Update =>
         Match.value(request).pipe(
           Match.withReturnType<Update>(),
           Match.tagsExhaustive({
-            Internal: ({ url }) => [model, [NavigateInternal({ url: Url.toString(url) })]],
+            Internal: ({ url }) => [model, [NavigateInternal({ url: toString(url) })]],
             External: ({ href }) => [model, [LoadExternal({ href })]],
           }),
         ),
@@ -59,7 +59,7 @@ export const update = (model: Model, message: Message): Update =>
       },
       PressedSearchShortcut: () => {
         if (model.searchDialog.isOpen) {
-          const [closedDialog, dialogCommands] = Dialog.close(model.searchDialog)
+          const [closedDialog, dialogCommands] = dialogClose(model.searchDialog)
           const [closedCommand, commandCommands] = SearchCommand.close(model.searchCommand)
           return [
             evo(model, { searchDialog: () => closedDialog, searchCommand: () => closedCommand }),
@@ -73,7 +73,7 @@ export const update = (model: Model, message: Message): Update =>
             ],
           ]
         }
-        const [nextDialog, dialogCommands] = Dialog.open(model.searchDialog)
+        const [nextDialog, dialogCommands] = dialogOpen(model.searchDialog)
         const [nextCommand, commandCommands] = SearchCommand.open(initialSearchCommand())
         return [
           evo(model, { searchDialog: () => nextDialog, searchCommand: () => nextCommand }),
@@ -86,7 +86,7 @@ export const update = (model: Model, message: Message): Update =>
         ]
       },
       GotSearchDialogMessage: ({ message: dialogMessage }) => {
-        const [nextDialog, dialogCommands] = Dialog.update(model.searchDialog, dialogMessage)
+        const [nextDialog, dialogCommands] = dialogUpdate(model.searchDialog, dialogMessage)
         return [
           evo(model, { searchDialog: () => nextDialog }),
           Command.mapMessages(dialogCommands, (childMessage) => GotSearchDialogMessage({ message: childMessage })),
@@ -104,7 +104,7 @@ export const update = (model: Model, message: Message): Update =>
         return Option.match(maybeOutMessage, {
           onNone: (): Update => {
             if (commandJustDismissed) {
-              const [closedDialog, closeCommands] = Dialog.close(model.searchDialog)
+              const [closedDialog, closeCommands] = dialogClose(model.searchDialog)
               return [
                 evo(model, { searchCommand: () => nextCommand, searchDialog: () => closedDialog }),
                 [
@@ -118,7 +118,7 @@ export const update = (model: Model, message: Message): Update =>
             return [evo(model, { searchCommand: () => nextCommand }), forwardedCommands]
           },
           onSome: (outMessage): Update => {
-            const [closedDialog, closeCommands] = Dialog.close(model.searchDialog)
+            const [closedDialog, closeCommands] = dialogClose(model.searchDialog)
             return [
               evo(model, { searchCommand: () => nextCommand, searchDialog: () => closedDialog }),
               [

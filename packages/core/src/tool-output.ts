@@ -1,6 +1,5 @@
 import { Context, Effect, HashMap, Layer, Option, Ref, Schema } from "effect"
-import * as ToolExecutor from "./tool-executor"
-
+import { type Success } from "./tool-executor"
 /** @experimental A bounded tool result: inline content plus optional spilled overflow references. */
 export interface ToolOutput {
   readonly inline: unknown
@@ -60,9 +59,9 @@ const preview = (value: string, maxBytes: number): string => decoder.decode(enco
 
 /** @experimental */
 export const bound = (
-  result: ToolExecutor.Success,
+  result: Success,
   options: { readonly toolCallId: string; readonly maxBytes: number },
-): Effect.Effect<ToolExecutor.Success, ToolOutputError> =>
+): Effect.Effect<Success, ToolOutputError> =>
   Effect.gen(function* () {
     const encoded = serialized(result.encodedResult)
     const bytes = encoder.encode(encoded).byteLength

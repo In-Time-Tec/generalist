@@ -1,28 +1,29 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Cause, Effect, Exit, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentEvent, AgentTool, Approvals, ModelMiddleware, ToolContext, ToolExecutor } from "../src/index"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
       streamText,
     }),
   )
 
-const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
 const toolCallPart = (id: string, name: string, params: unknown) =>
-  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
 const activeToolNames = (options: Parameters<ModelParams["streamText"]>[0]) => options.tools.map((tool) => tool.name)
 
-const parentToolkit = (toolkit: Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>) =>
-  Ai.Toolkit.make(...Object.values(toolkit.tools)) as Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>>
+const parentToolkit = (toolkit: Toolkit.WithHandler<Record<string, Tool.Any>>) =>
+  Toolkit.make(...Object.values(toolkit.tools)) as Toolkit.Toolkit<Record<string, Tool.Any>>
 
 const request = (name: string, params: unknown): ToolExecutor.Request => ({
   call: toolCallPart(`call-${name}`, name, params),
@@ -31,22 +32,22 @@ const request = (name: string, params: unknown): ToolExecutor.Request => ({
   sessionId: "session-1",
 })
 
-const gatedTool = Ai.Tool.make("gated", {
+const gatedTool = Tool.make("gated", {
   description: "Needs child approval",
   parameters: Schema.Struct({ text: Schema.String }),
   success: Schema.String,
   needsApproval: true,
 })
 
-describe("AgentTool", () => {
+layer(unusedToolHandlerLayer)("AgentTool", (it) => {
   it.effect("ToolExecutor.fromToolkit maps returned handler failures to failed outcomes", () => {
-    const failingTool = Ai.Tool.make("failing", {
+    const failingTool = Tool.make("failing", {
       parameters: Schema.Struct({}),
       success: Schema.String,
       failure: Schema.String,
       failureMode: "return",
     })
-    const toolkit = Ai.Toolkit.make(failingTool)
+    const toolkit = Toolkit.make(failingTool)
     return Effect.gen(function* () {
       const handled = yield* toolkit.pipe(
         Effect.provide(toolkit.toLayer({ failing: () => Effect.fail("child failed") })),
@@ -60,11 +61,11 @@ describe("AgentTool", () => {
   })
 
   it.effect("ToolExecutor.fromToolkit preserves handler interruptions", () => {
-    const interruptingTool = Ai.Tool.make("interrupting", {
+    const interruptingTool = Tool.make("interrupting", {
       parameters: Schema.Struct({}),
       success: Schema.String,
     })
-    const toolkit = Ai.Toolkit.make(interruptingTool)
+    const toolkit = Toolkit.make(interruptingTool)
     return Effect.gen(function* () {
       const handled = yield* toolkit.pipe(Effect.provide(toolkit.toLayer({ interrupting: () => Effect.interrupt })))
       const exit = yield* ToolExecutor.ToolExecutor.use((executor) =>
@@ -112,7 +113,7 @@ describe("AgentTool", () => {
   it.effect("propagates child suspension so the parent run suspends", () => {
     let parentCalls = 0
     return Effect.gen(function* () {
-      const child = Agent.make({ name: "reviewer", toolkit: Ai.Toolkit.make(gatedTool) })
+      const child = Agent.make({ name: "reviewer", toolkit: Toolkit.make(gatedTool) })
       const childTool = AgentTool.asTool(child, { name: "ask_reviewer" })
       const parent = Agent.make({ name: "parent", toolkit: parentToolkit(childTool) })
 
@@ -142,7 +143,7 @@ describe("AgentTool", () => {
               : Stream.make(textDelta("parent should never see this"))
           }),
           ToolExecutor.fromToolkit(
-            AgentTool.asTool(Agent.make({ name: "reviewer", toolkit: Ai.Toolkit.make(gatedTool) }), {
+            AgentTool.asTool(Agent.make({ name: "reviewer", toolkit: Toolkit.make(gatedTool) }), {
               name: "ask_reviewer",
             }),
           ),

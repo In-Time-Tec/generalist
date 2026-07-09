@@ -1,8 +1,8 @@
 import { Schema } from "effect"
 import { Url } from "foldkit/url"
 
-import * as Command from "@/components/ui/command"
-import * as Dialog from "@/components/ui/dialog"
+import { CommandModel } from "@/components/ui/command"
+import { DialogModel } from "@/components/ui/dialog"
 
 import { SidebarGroups } from "../layout/sidebarStorage"
 import { Route } from "../route/route"
@@ -13,8 +13,8 @@ export type ThemePreference = typeof ThemePreference.Type
 export const Model = Schema.Struct({
   route: Route,
   url: Url,
-  searchDialog: Dialog.Model,
-  searchCommand: Command.Model,
+  searchDialog: DialogModel,
+  searchCommand: CommandModel,
   copiedCode: Schema.Option(Schema.String),
   themePreference: ThemePreference,
   maybeActiveSectionId: Schema.Option(Schema.String),

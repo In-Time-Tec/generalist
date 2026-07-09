@@ -2,9 +2,9 @@ import { Cause, Context, Effect, Layer, Option, Queue, Ref, Schema, Scope, Strea
 import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import * as Errors from "./errors"
-import * as Wire from "./wire"
-
+import { TransportError } from "./errors"
+import { ClientFrame, LooseServerFrame } from "./wire"
+import type { ClientFrameType, LooseServerFrameType } from "./wire"
 /** @experimental */
 export type ConnectionStatus =
   | { readonly _tag: "Connecting" }
@@ -14,8 +14,8 @@ export type ConnectionStatus =
 
 /** @experimental */
 export interface Connection {
-  readonly frames: Stream.Stream<Wire.LooseServerFrameType, Errors.TransportError>
-  readonly send: (frame: Wire.ClientFrameType) => Effect.Effect<void, Errors.TransportError>
+  readonly frames: Stream.Stream<LooseServerFrameType, TransportError>
+  readonly send: (frame: ClientFrameType) => Effect.Effect<void, TransportError>
   readonly status: Stream.Stream<ConnectionStatus>
 }
 
@@ -32,20 +32,20 @@ export class AgentClient extends Context.Service<AgentClient, AgentClientInterfa
   "@batonfx/transport/AgentClient",
 ) {}
 
-const ServerFrameJson = Schema.fromJsonString(Wire.LooseServerFrame)
-const ClientFrameJson = Schema.fromJsonString(Wire.ClientFrame)
+const ServerFrameJson = Schema.fromJsonString(LooseServerFrame)
+const ClientFrameJson = Schema.fromJsonString(ClientFrame)
 
-const transportError = (message: string): Errors.TransportError => new Errors.TransportError({ message })
+const transportError = (message: string): TransportError => new TransportError({ message })
 
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 
-const decodeServerText = (text: string): Effect.Effect<Wire.LooseServerFrameType, Errors.TransportError> =>
+const decodeServerText = (text: string): Effect.Effect<LooseServerFrameType, TransportError> =>
   Schema.decodeUnknownEffect(ServerFrameJson)(text).pipe(
     Effect.mapError((error) => transportError(errorMessage(error))),
   )
 
-const encodeClientText = (frame: Wire.ClientFrameType): Effect.Effect<string, Errors.TransportError> =>
+const encodeClientText = (frame: ClientFrameType): Effect.Effect<string, TransportError> =>
   Effect.sync(() => Schema.encodeUnknownSync(ClientFrameJson)(frame)).pipe(
     Effect.catchCause(() => Effect.fail(transportError("failed to encode client frame"))),
   )
@@ -67,15 +67,15 @@ const urlWithAfterSeq = (url: string, afterSeq: number | undefined): string => {
 export const sseFrames = (options: {
   readonly url: string
   readonly afterSeq?: number
-}): Stream.Stream<Wire.LooseServerFrameType, Errors.TransportError, HttpClient.HttpClient> =>
+}): Stream.Stream<LooseServerFrameType, TransportError, HttpClient.HttpClient> =>
   HttpClientResponse.stream(HttpClient.get(urlWithAfterSeq(options.url, options.afterSeq))).pipe(
     Stream.decodeText,
-    Stream.pipeThroughChannel(Sse.decodeDataSchema(Wire.LooseServerFrame)),
+    Stream.pipeThroughChannel(Sse.decodeDataSchema(LooseServerFrame)),
     Stream.map((event) => event.data),
     Stream.mapError((error) => transportError(errorMessage(error))),
   )
 
-const attachFrame = (sessionId: string, afterSeq: Option.Option<number>): Wire.ClientFrameType =>
+const attachFrame = (sessionId: string, afterSeq: Option.Option<number>): ClientFrameType =>
   Option.match(afterSeq, {
     onNone: () => ({ _tag: "Attach", sessionId }),
     onSome: (seq) => ({ _tag: "Attach", sessionId, afterSeq: seq }),
@@ -93,14 +93,14 @@ export const layerWebSocket: Layer.Layer<AgentClient, never, Socket.WebSocketCon
       connect: (options) =>
         Effect.gen(function* () {
           const scope = yield* Effect.scope
-          const framesQueue = yield* Queue.unbounded<Wire.LooseServerFrameType, Errors.TransportError>()
+          const framesQueue = yield* Queue.unbounded<LooseServerFrameType, TransportError>()
           const statusQueue = yield* Queue.unbounded<ConnectionStatus>()
           const writerRef = yield* Ref.make<
             Option.Option<(chunk: string | Uint8Array | Socket.CloseEvent) => Effect.Effect<void, Socket.SocketError>>
           >(Option.none())
           const lastSeq = yield* Ref.make<Option.Option<number>>(Option.none())
 
-          const writeClient = (frame: Wire.ClientFrameType): Effect.Effect<void, Errors.TransportError> =>
+          const writeClient = (frame: ClientFrameType): Effect.Effect<void, TransportError> =>
             Effect.gen(function* () {
               const writer = yield* Ref.get(writerRef)
               if (Option.isNone(writer)) return yield* Effect.fail(transportError("WebSocket is not open"))
@@ -108,7 +108,7 @@ export const layerWebSocket: Layer.Layer<AgentClient, never, Socket.WebSocketCon
               yield* writer.value(text).pipe(Effect.mapError((error) => transportError(error.message)))
             })
 
-          const failFrames = (error: Errors.TransportError): Effect.Effect<never, Errors.TransportError> =>
+          const failFrames = (error: TransportError): Effect.Effect<never, TransportError> =>
             Queue.fail(framesQueue, error).pipe(Effect.andThen(Effect.fail(error)))
 
           const runSocket = (first: boolean, attempt: number): Effect.Effect<void> =>
@@ -151,7 +151,7 @@ export const layerWebSocket: Layer.Layer<AgentClient, never, Socket.WebSocketCon
                 onFailure: (cause) => {
                   if (Cause.hasInterrupts(cause)) return Effect.interrupt
                   const error = Cause.findErrorOption(cause)
-                  if (Option.isSome(error) && error.value instanceof Errors.TransportError) return Effect.void
+                  if (Option.isSome(error) && error.value instanceof TransportError) return Effect.void
                   return Effect.sleep(reconnectDelay(attempt)).pipe(Effect.andThen(runSocket(false, attempt + 1)))
                 },
               }),

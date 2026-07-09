@@ -1,29 +1,31 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor, TurnPolicy } from "@batonfx/core"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, AgentEvent, Approvals, ModelMiddleware, TurnPolicy } from "@batonfx/core"
 
-const lookupTool = Ai.Tool.make("lookup", {
+const lookupTool = Tool.make("lookup", {
   description: "Look up one fact",
   parameters: Schema.Struct({ topic: Schema.String }),
   success: Schema.String,
 })
 
+const toolkit = Toolkit.make(lookupTool)
+
 const agent = Agent.make({
   name: "looper",
-  toolkit: Ai.Toolkit.make(lookupTool),
+  toolkit,
   policy: TurnPolicy.recurs(1),
 })
 
 let calls = 0
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () => {
       calls += 1
       return Stream.make(
-        Ai.Response.makePart("tool-call", {
+        Response.makePart("tool-call", {
           id: `lookup-${calls}`,
           name: "lookup",
           params: { topic: `fact-${calls}` },
@@ -45,14 +47,7 @@ const program = Effect.gen(function* () {
   Effect.provide(
     Layer.mergeAll(
       modelLayer,
-      ToolExecutor.testLayer({
-        execute: (request) =>
-          Effect.succeed({
-            _tag: "Success",
-            result: `found ${request.call.id}`,
-            encodedResult: `found ${request.call.id}`,
-          }),
-      }),
+      toolkit.toLayer({ lookup: ({ topic }) => Effect.succeed(`found ${topic}`) }),
       Approvals.autoApprove,
       ModelMiddleware.identityLayer,
     ),

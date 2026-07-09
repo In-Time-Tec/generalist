@@ -1,44 +1,71 @@
 import { Cause, type Duration, Effect, Fiber, Option, Queue, Ref, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-import * as AgentEvent from "./agent-event"
-import * as Approvals from "./approvals"
-import * as Compaction from "./compaction"
-import * as Instructions from "./instructions"
-import * as Memory from "./memory"
-import * as ModelMiddleware from "./model-middleware"
-import * as ModelResilience from "./model-resilience"
-import * as Permissions from "./permissions"
-import * as Session from "./session"
-import * as SkillSource from "./skill-source"
-import * as Steering from "./steering"
-import * as ToolContext from "./tool-context"
-import * as ToolExecutor from "./tool-executor"
-import * as ToolOutput from "./tool-output"
-import * as TurnPolicy from "./turn-policy"
+import { Chat, LanguageModel, Prompt, Response, Telemetry, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
+import {
+  addUsage,
+  AgentError,
+  AgentSuspended,
+  type Completed,
+  type Event,
+  MiddlewareViolation,
+  type StructuredOutput,
+  type ToolProgress,
+  type TurnCompleted,
+  TurnLimitExceeded,
+} from "./agent-event"
+import { Approvals } from "./approvals"
+import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage, isContextOverflow } from "./compaction"
+import { Instructions, openEpoch } from "./instructions"
+import { type Item, type Key, Memory, type MemoryError } from "./memory"
+import { type Middleware, ModelMiddleware, type TurnContext } from "./model-middleware"
+import { ModelResilience, apply } from "./model-resilience"
+import { type Answer, type Pending, type PermissionError, Permissions, RuleStore } from "./permissions"
+import { type Entry, SessionStore, type SessionStoreError } from "./session"
+import { SkillSource, type SkillSourceError, selectListings } from "./skill-source"
+import { type Message, Steering } from "./steering"
+import { ToolContext } from "./tool-context"
+import { type Outcome, type Request, type Success, ToolExecutor, executeToolkit } from "./tool-executor"
+import { bound } from "./tool-output"
+import { defaultPolicy, type TurnOverrides, type TurnPolicy } from "./turn-policy"
 
+type CompactionResult = import("./compaction").Result
 /** @experimental An agent definition: a plain value, not a service. */
-export interface Agent<Tools extends Record<string, Ai.Tool.Any>> {
+export interface Agent<Tools extends Record<string, Tool.Any> = {}> {
   readonly name: string
   readonly instructions?: string
-  readonly toolkit: Ai.Toolkit.Toolkit<Tools>
-  readonly policy: TurnPolicy.TurnPolicy
+  readonly toolkit: Toolkit.Toolkit<Tools>
+  readonly policy: TurnPolicy
 }
 
 /** @experimental */
-export interface MakeOptions<Tools extends Record<string, Ai.Tool.Any>> {
-  readonly name: string
+export interface MakeOptions<Tools extends Record<string, Tool.Any> = {}> {
   readonly instructions?: string
-  readonly toolkit?: Ai.Toolkit.Toolkit<Tools>
-  readonly policy?: TurnPolicy.TurnPolicy
+  readonly toolkit?: Toolkit.Toolkit<Tools>
+  readonly policy?: TurnPolicy
 }
 
-/** @experimental Defaults: empty toolkit, `TurnPolicy.defaultPolicy`. */
-export const make = <Tools extends Record<string, Ai.Tool.Any>>(options: MakeOptions<Tools>): Agent<Tools> => ({
-  name: options.name,
-  ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
-  toolkit: options.toolkit ?? (Ai.Toolkit.empty as unknown as Ai.Toolkit.Toolkit<Tools>),
-  policy: options.policy ?? TurnPolicy.defaultPolicy,
-})
+/** @experimental */
+export interface MakeObjectOptions<Tools extends Record<string, Tool.Any> = {}> extends MakeOptions<Tools> {
+  readonly name: string
+}
+
+/** @experimental Defaults: empty toolkit, `defaultPolicy`. */
+export function make<Tools extends Record<string, Tool.Any> = {}>(
+  name: string,
+  options?: MakeOptions<Tools>,
+): Agent<Tools>
+export function make<Tools extends Record<string, Tool.Any> = {}>(options: MakeObjectOptions<Tools>): Agent<Tools>
+export function make<Tools extends Record<string, Tool.Any> = {}>(
+  nameOrOptions: string | MakeObjectOptions<Tools>,
+  options: MakeOptions<Tools> = {},
+): Agent<Tools> {
+  const resolved = typeof nameOrOptions === "string" ? { ...options, name: nameOrOptions } : nameOrOptions
+  return {
+    name: resolved.name,
+    ...(resolved.instructions === undefined ? {} : { instructions: resolved.instructions }),
+    toolkit: resolved.toolkit ?? (Toolkit.empty as unknown as Toolkit.Toolkit<Tools>),
+    policy: resolved.policy ?? defaultPolicy,
+  }
+}
 
 /** @experimental Re-entry after `AgentSuspended`: execute this call first. */
 export interface Resume {
@@ -52,13 +79,13 @@ export interface Resume {
 /** @experimental */
 export interface RunOptions {
   /** User input for the first turn. Ignored when `resume` is set. */
-  readonly prompt: Ai.Prompt.RawInput
+  readonly prompt: Prompt.RawInput
   /**
    * Prior transcript. When set it is used VERBATIM as the initial chat
    * history (no system message is prepended); otherwise the chat starts
    * with a system message derived from the agent (see below).
    */
-  readonly history?: Ai.Prompt.RawInput
+  readonly history?: Prompt.RawInput
   /** Overrides the derived system message when `history` is not set. */
   readonly system?: string
   readonly resume?: Resume
@@ -72,7 +99,7 @@ export interface RunOptions {
   }
   /** @experimental Consult the Memory service for this run. */
   readonly memory?: {
-    readonly key: Memory.Key
+    readonly key: Key
   }
   /**
    * @experimental Run this agent on a persisted chat. Requires `Chat.Persistence`
@@ -96,32 +123,26 @@ export const defaultObjectPrompt = "Return the final structured output for the t
 export interface ObjectRunOptions<StructuredOutputSchema extends ObjectSchema> extends RunOptions {
   readonly schema: StructuredOutputSchema
   readonly objectName?: string
-  readonly objectPrompt?: Ai.Prompt.RawInput
+  readonly objectPrompt?: Prompt.RawInput
 }
 
 interface StructuredRunConfig<StructuredOutputSchema extends ObjectSchema> {
   readonly schema: StructuredOutputSchema
   readonly objectName: string
-  readonly objectPrompt: Ai.Prompt.RawInput
+  readonly objectPrompt: Prompt.RawInput
 }
 
 /** @experimental The error channel of `stream` and `generate`. */
-export type RunError =
-  | AgentEvent.AgentError
-  | AgentEvent.AgentSuspended
-  | AgentEvent.TurnLimitExceeded
-  | AgentEvent.MiddlewareViolation
+export type RunError = AgentError | AgentSuspended | TurnLimitExceeded | MiddlewareViolation
 
 /** @experimental Services required to run an agent. */
-export type RunServices =
-  | Ai.LanguageModel.LanguageModel
-  | ToolExecutor.ToolExecutor
-  | Approvals.Approvals
-  | ModelMiddleware.ModelMiddleware
+export type RunServices<Tools extends Record<string, Tool.Any> = {}> =
+  | LanguageModel.LanguageModel
+  | Tool.HandlersFor<Tools>
 
-type AnyToolCall = Ai.Response.ToolCallPart<string, unknown>
+type AnyToolCall = Response.ToolCallPart<string, unknown>
 
-type PendingToolResult = Ai.Response.ToolResultPart<string, unknown, unknown>
+type PendingToolResult = Response.ToolResultPart<string, unknown, unknown>
 
 const skillListingBudgetTokens = 2_048
 
@@ -129,7 +150,7 @@ const activateSkillToolName = "activate_skill"
 
 const activateSkillParameters = Schema.Struct({ name: Schema.String })
 
-const activateSkillTool = Ai.Tool.make(activateSkillToolName, {
+const activateSkillTool = Tool.make(activateSkillToolName, {
   description: "Load the full body for one listed Baton skill by name before applying that skill.",
   parameters: activateSkillParameters,
   success: Schema.Struct({
@@ -147,8 +168,8 @@ const appendInstructionFragment = (base: string | undefined, fragment: string | 
   return `${base}\n\n${fragment}`
 }
 
-const successResult = (call: AnyToolCall, outcome: ToolExecutor.Success): PendingToolResult =>
-  Ai.Response.toolResultPart({
+const successResult = (call: AnyToolCall, outcome: Success): PendingToolResult =>
+  Response.toolResultPart({
     id: call.id,
     name: call.name,
     isFailure: false,
@@ -159,7 +180,7 @@ const successResult = (call: AnyToolCall, outcome: ToolExecutor.Success): Pendin
   })
 
 const failedResult = (call: AnyToolCall, message: string): PendingToolResult =>
-  Ai.Response.toolResultPart({
+  Response.toolResultPart({
     id: call.id,
     name: call.name,
     isFailure: true,
@@ -170,7 +191,7 @@ const failedResult = (call: AnyToolCall, message: string): PendingToolResult =>
   })
 
 const suspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "approval") =>
-  new AgentEvent.AgentSuspended({
+  new AgentSuspended({
     token,
     reason,
     tool_call_id: call.id,
@@ -178,19 +199,19 @@ const suspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "appr
     tool_params: call.params,
   })
 
-const withSystem = (instructions: string, prompt: Ai.Prompt.Prompt): Ai.Prompt.Prompt =>
-  Ai.Prompt.fromMessages([Ai.Prompt.makeMessage("system", { content: instructions }), ...prompt.content])
+const withSystem = (instructions: string, prompt: Prompt.Prompt): Prompt.Prompt =>
+  Prompt.fromMessages([Prompt.makeMessage("system", { content: instructions }), ...prompt.content])
 
 const skillListingsInstructions = (listings: string): string =>
   `Available skills:\n${listings}\n\nCall ${activateSkillToolName} with a listed skill name to load its full body before using it.`
 
-const isUserMessagePart = (part: Ai.Prompt.Part): part is Ai.Prompt.UserMessagePart =>
+const isUserMessagePart = (part: Prompt.Part): part is Prompt.UserMessagePart =>
   part.type === "text" || part.type === "file"
 
 const approvalRequired = (
-  tool: Ai.Tool.Any | undefined,
+  tool: Tool.Any | undefined,
   call: AnyToolCall,
-  messages: ReadonlyArray<Ai.Prompt.Message>,
+  messages: ReadonlyArray<Prompt.Message>,
 ): Effect.Effect<boolean> => {
   const needsApproval = tool?.needsApproval
   if (needsApproval === undefined) return Effect.succeed(false)
@@ -203,10 +224,10 @@ const approvalRequired = (
 
 /** Fold the prompt through every `transformPrompt` hook in array order. */
 const applyPromptChain = (
-  chain: ReadonlyArray<ModelMiddleware.Middleware>,
-  prompt: Ai.Prompt.Prompt,
-  context: ModelMiddleware.TurnContext,
-): Effect.Effect<Ai.Prompt.Prompt, AgentEvent.AgentError> =>
+  chain: ReadonlyArray<Middleware>,
+  prompt: Prompt.Prompt,
+  context: TurnContext,
+): Effect.Effect<Prompt.Prompt, AgentError> =>
   Effect.gen(function* () {
     let current = prompt
     for (const middleware of chain) {
@@ -219,12 +240,12 @@ const applyPromptChain = (
 
 /** Thread a stream part through every `transformPart` hook; the first `none()` short-circuits. */
 const applyPartChain = (
-  chain: ReadonlyArray<ModelMiddleware.Middleware>,
-  part: Ai.Response.StreamPart<any>,
-  context: ModelMiddleware.TurnContext,
-): Effect.Effect<Option.Option<Ai.Response.StreamPart<any>>, AgentEvent.AgentError> =>
+  chain: ReadonlyArray<Middleware>,
+  part: Response.StreamPart<any>,
+  context: TurnContext,
+): Effect.Effect<Option.Option<Response.StreamPart<any>>, AgentError> =>
   Effect.gen(function* () {
-    let current: Option.Option<Ai.Response.StreamPart<any>> = Option.some(part)
+    let current: Option.Option<Response.StreamPart<any>> = Option.some(part)
     for (const middleware of chain) {
       if (Option.isNone(current)) break
       if (middleware.transformPart !== undefined) {
@@ -234,20 +255,22 @@ const applyPartChain = (
     return current
   })
 
-const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
+const streamInternal = <Tools extends Record<string, Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
   agent: Agent<Tools>,
   options: RunOptions,
   structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
-): Stream.Stream<AgentEvent.Event, RunError, RunServices | StructuredOutputSchema["DecodingServices"]> =>
+): Stream.Stream<Event, RunError, RunServices<Tools> | StructuredOutputSchema["DecodingServices"]> =>
   Stream.unwrap(
     Effect.gen(function* () {
-      const executor = yield* ToolExecutor.ToolExecutor
-      const approvals = yield* Approvals.Approvals
-      const chain = yield* ModelMiddleware.ModelMiddleware
+      const executor = yield* Effect.serviceOption(ToolExecutor)
+      const approvals = yield* Effect.serviceOption(Approvals)
+      const chain = yield* Effect.serviceOption(ModelMiddleware).pipe(
+        Effect.map(Option.match({ onNone: () => [], onSome: (service) => service })),
+      )
 
       if (options.history !== undefined && options.persistence !== undefined) {
         return yield* Effect.fail(
-          new AgentEvent.AgentError({
+          new AgentError({
             message: "RunOptions.history and RunOptions.persistence are mutually exclusive",
             turn: 0,
           }),
@@ -259,7 +282,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         (!Number.isFinite(options.toolOutputMaxBytes) || options.toolOutputMaxBytes < 0)
       ) {
         return yield* Effect.fail(
-          new AgentEvent.AgentError({
+          new AgentError({
             message: "RunOptions.toolOutputMaxBytes must be a non-negative finite number",
             turn: 0,
           }),
@@ -271,7 +294,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         (!Number.isFinite(options.compaction.contextWindow) || options.compaction.contextWindow <= 0)
       ) {
         return yield* Effect.fail(
-          new AgentEvent.AgentError({
+          new AgentError({
             message: "RunOptions.compaction.contextWindow must be a positive finite number",
             turn: 0,
           }),
@@ -280,23 +303,23 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
 
       const sessionId = options.sessionId ?? "local"
 
-      const instructionsService = yield* Effect.serviceOption(Instructions.Instructions)
-      const skillSourceService = yield* Effect.serviceOption(SkillSource.SkillSource)
+      const instructionsService = yield* Effect.serviceOption(Instructions)
+      const skillSourceService = yield* Effect.serviceOption(SkillSource)
       const skillRuntime = Option.isNone(skillSourceService)
         ? undefined
         : {
             source: skillSourceService.value,
             skills: yield* skillSourceService.value.all.pipe(
-              Effect.mapError((error) => new AgentEvent.AgentError({ message: error.message, turn: 0, cause: error })),
+              Effect.mapError((error) => new AgentError({ message: error.message, turn: 0, cause: error })),
             ),
           }
       const selectedSkills =
-        skillRuntime === undefined ? [] : SkillSource.selectListings(skillRuntime.skills, skillListingBudgetTokens, [])
+        skillRuntime === undefined ? [] : selectListings(skillRuntime.skills, skillListingBudgetTokens, [])
       const skillListings = selectedSkills.map((skill) => skill.listing).join("\n")
       const hasActivatableSkills = selectedSkills.length > 0
       const instructionsEpoch =
         options.system === undefined && options.history === undefined && Option.isSome(instructionsService)
-          ? yield* Instructions.openEpoch(instructionsService.value, { agentName: agent.name, turn: 0 })
+          ? yield* openEpoch(instructionsService.value, { agentName: agent.name, turn: 0 })
           : undefined
       const baseSystem =
         options.system ??
@@ -313,17 +336,17 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       )
 
       // Resolve `Chat.Persistence` optionally so `stream`'s `R` does not grow.
-      const persistenceService = yield* Effect.serviceOption(Ai.Chat.Persistence)
-      const resilienceService = yield* Effect.serviceOption(ModelResilience.ModelResilience)
-      const permissionsService = yield* Effect.serviceOption(Permissions.Permissions)
-      const steeringService = yield* Effect.serviceOption(Steering.Steering)
-      const compactionService = yield* Effect.serviceOption(Compaction.Compaction)
-      const memoryService = yield* Effect.serviceOption(Memory.Memory)
-      const sessionService = yield* Effect.serviceOption(Session.SessionStore)
-      const tokenizerService = yield* Effect.serviceOption(Ai.Tokenizer.Tokenizer)
+      const persistenceService = yield* Effect.serviceOption(Chat.Persistence)
+      const resilienceService = yield* Effect.serviceOption(ModelResilience)
+      const permissionsService = yield* Effect.serviceOption(Permissions)
+      const steeringService = yield* Effect.serviceOption(Steering)
+      const compactionService = yield* Effect.serviceOption(Compaction)
+      const memoryService = yield* Effect.serviceOption(Memory)
+      const sessionService = yield* Effect.serviceOption(SessionStore)
+      const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
       const persistenceOptions = options.persistence
       const memoryOptions = options.memory
-      const memoryRuntime: { readonly key: Memory.Key; readonly service: Memory.Interface } | undefined =
+      const memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined =
         memoryOptions === undefined
           ? undefined
           : {
@@ -331,7 +354,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
               service: yield* Option.match(memoryService, {
                 onNone: () =>
                   Effect.fail(
-                    new AgentEvent.AgentError({
+                    new AgentError({
                       message: "RunOptions.memory requires Memory in context",
                       turn: 0,
                     }),
@@ -339,13 +362,13 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
                 onSome: Effect.succeed,
               }),
             }
-      const persisted: Ai.Chat.Persisted | undefined =
+      const persisted: Chat.Persisted | undefined =
         persistenceOptions === undefined
           ? undefined
           : yield* Option.match(persistenceService, {
               onNone: () =>
                 Effect.fail(
-                  new AgentEvent.AgentError({
+                  new AgentError({
                     message: "RunOptions.persistence requires Chat.Persistence in context",
                     turn: 0,
                   }),
@@ -359,9 +382,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
                       : { timeToLive: persistenceOptions.timeToLive },
                   )
                   .pipe(
-                    Effect.mapError(
-                      (error) => new AgentEvent.AgentError({ message: errorMessage(error), turn: 0, cause: error }),
-                    ),
+                    Effect.mapError((error) => new AgentError({ message: errorMessage(error), turn: 0, cause: error })),
                   ),
             })
 
@@ -374,19 +395,17 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
 
       const freshChat =
         options.history !== undefined
-          ? Ai.Chat.fromPrompt(options.history)
+          ? Chat.fromPrompt(options.history)
           : system !== undefined
-            ? Ai.Chat.fromPrompt([Ai.Prompt.makeMessage("system", { content: system })])
-            : Ai.Chat.empty
-      const chat: Ai.Chat.Service = persisted ?? (yield* freshChat)
+            ? Chat.fromPrompt([Prompt.makeMessage("system", { content: system })])
+            : Chat.empty
+      const chat: Chat.Service = persisted ?? (yield* freshChat)
 
-      const savePersisted: Effect.Effect<void, AgentEvent.AgentError> =
+      const savePersisted: Effect.Effect<void, AgentError> =
         persisted === undefined
           ? Effect.void
           : persisted.save.pipe(
-              Effect.mapError(
-                (error) => new AgentEvent.AgentError({ message: errorMessage(error), turn: 0, cause: error }),
-              ),
+              Effect.mapError((error) => new AgentError({ message: errorMessage(error), turn: 0, cause: error })),
             )
 
       const failSuspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "approval") =>
@@ -396,49 +415,49 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         text: "",
         turn: 0,
         pending: [] as Array<PendingToolResult>,
-        finish: undefined as
-          | { readonly usage: Ai.Response.Usage; readonly reason: Ai.Response.FinishReason }
-          | undefined,
-        usage: undefined as Ai.Response.Usage | undefined,
+        finish: undefined as { readonly usage: Response.Usage; readonly reason: Response.FinishReason } | undefined,
+        usage: undefined as Response.Usage | undefined,
         contextTokens: undefined as number | undefined,
       }
 
       const activatedSkillBodies = new Map<string, string>()
-      const activatedSkillTools = new Map<string, Ai.Tool.Any>()
+      const activatedSkillTools = new Map<string, Tool.Any>()
 
       let sessionSyncedMessages = 0
       let sessionInitialized = false
 
-      const activeSession = Option.isSome(compactionService) ? sessionService : Option.none<Session.Interface>()
+      const activeSession = Option.isSome(compactionService)
+        ? sessionService
+        : Option.none<typeof SessionStore.Service>()
 
-      const sessionError = (turn: number, error: Session.SessionStoreError): AgentEvent.AgentError =>
-        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+      const sessionError = (turn: number, error: SessionStoreError): AgentError =>
+        new AgentError({ message: error.message, turn, cause: error })
 
-      const compactionError = (turn: number, error: Compaction.CompactionError): AgentEvent.AgentError =>
-        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+      const compactionError = (turn: number, error: CompactionError): AgentError =>
+        new AgentError({ message: error.message, turn, cause: error })
 
-      const memoryError = (turn: number, error: Memory.MemoryError): AgentEvent.AgentError =>
-        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+      const memoryError = (turn: number, error: MemoryError): AgentError =>
+        new AgentError({ message: error.message, turn, cause: error })
 
-      const skillError = (turn: number, error: SkillSource.SkillSourceError): AgentEvent.AgentError =>
-        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+      const skillError = (turn: number, error: SkillSourceError): AgentError =>
+        new AgentError({ message: error.message, turn, cause: error })
 
       const isSkillActivationCall = (call: AnyToolCall): boolean =>
         call.name === activateSkillToolName && skillRuntime !== undefined && hasActivatableSkills
 
       const insertRecalledItems = (
         turn: number,
-        prompt: Ai.Prompt.Prompt,
-        items: ReadonlyArray<Memory.Item>,
-      ): Effect.Effect<Ai.Prompt.Prompt, AgentEvent.AgentError> =>
+        prompt: Prompt.Prompt,
+        items: ReadonlyArray<Item>,
+      ): Effect.Effect<Prompt.Prompt, AgentError> =>
         Effect.gen(function* () {
           const parts = items.flatMap((item) => item.parts)
           if (parts.length === 0) return prompt
-          const userParts: Array<Ai.Prompt.UserMessagePart> = []
+          const userParts: Array<Prompt.UserMessagePart> = []
           for (const part of parts) {
             if (!isUserMessagePart(part)) {
               return yield* Effect.fail(
-                new AgentEvent.AgentError({
+                new AgentError({
                   message: `Memory recalled unsupported prompt part type: ${part.type}`,
                   turn,
                 }),
@@ -446,14 +465,14 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
             }
             userParts.push(part)
           }
-          const memoryMessage = Ai.Prompt.makeMessage("user", { content: userParts })
+          const memoryMessage = Prompt.makeMessage("user", { content: userParts })
           const [first, ...rest] = prompt.content
           return first?.role === "system"
-            ? Ai.Prompt.fromMessages([first, memoryMessage, ...rest])
-            : Ai.Prompt.fromMessages([memoryMessage, ...prompt.content])
+            ? Prompt.fromMessages([first, memoryMessage, ...rest])
+            : Prompt.fromMessages([memoryMessage, ...prompt.content])
         })
 
-      const recallInitialPrompt = (prompt: Ai.Prompt.Prompt): Effect.Effect<Ai.Prompt.Prompt, AgentEvent.AgentError> =>
+      const recallInitialPrompt = (prompt: Prompt.Prompt): Effect.Effect<Prompt.Prompt, AgentError> =>
         memoryRuntime === undefined
           ? Effect.succeed(prompt)
           : memoryRuntime.service.recall({ key: memoryRuntime.key, turn: 0, prompt }).pipe(
@@ -463,19 +482,16 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
 
       const rememberTurn = (
         turn: number,
-        transcript: Ai.Prompt.Prompt,
+        transcript: Prompt.Prompt,
         terminal: boolean,
-      ): Effect.Effect<void, AgentEvent.AgentError> =>
+      ): Effect.Effect<void, AgentError> =>
         memoryRuntime === undefined
           ? Effect.void
           : memoryRuntime.service
               .remember({ key: memoryRuntime.key, turn, transcript, terminal })
               .pipe(Effect.mapError((error) => memoryError(turn, error)))
 
-      const syncSession = (
-        turn: number,
-        transcript: Ai.Prompt.Prompt,
-      ): Effect.Effect<ReadonlyArray<Session.Entry>, AgentEvent.AgentError> =>
+      const syncSession = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, AgentError> =>
         Option.match(activeSession, {
           onNone: () => Effect.succeed([]),
           onSome: (session) =>
@@ -498,37 +514,32 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
             }),
         })
 
-      const countTokens = (turn: number, prompt: Ai.Prompt.Prompt): Effect.Effect<number, AgentEvent.AgentError> => {
+      const countTokens = (turn: number, prompt: Prompt.Prompt): Effect.Effect<number, AgentError> => {
         if (state.contextTokens !== undefined) return Effect.succeed(state.contextTokens)
         return Option.match(tokenizerService, {
           onNone: () => Effect.succeed(0),
           onSome: (tokenizer) =>
             tokenizer.tokenize(prompt).pipe(
               Effect.map((tokens) => tokens.length),
-              Effect.mapError(
-                (error) => new AgentEvent.AgentError({ message: errorMessage(error), turn, cause: error }),
-              ),
+              Effect.mapError((error) => new AgentError({ message: errorMessage(error), turn, cause: error })),
             ),
         })
       }
 
       const compactionUsage = (
         turn: number,
-        history: Ai.Prompt.Prompt,
-        prompt: Ai.Prompt.Prompt,
-      ): Effect.Effect<Compaction.Usage, AgentEvent.AgentError> =>
-        countTokens(turn, Ai.Prompt.concat(history, prompt)).pipe(
+        history: Prompt.Prompt,
+        prompt: Prompt.Prompt,
+      ): Effect.Effect<Usage, AgentError> =>
+        countTokens(turn, Prompt.concat(history, prompt)).pipe(
           Effect.map((contextTokens) => ({
             contextTokens,
             contextWindow: options.compaction?.contextWindow ?? Number.POSITIVE_INFINITY,
-            reserveTokens: Compaction.DEFAULT_RESERVE_TOKENS,
+            reserveTokens: DEFAULT_RESERVE_TOKENS,
           })),
         )
 
-      const applyCompactionResult = (
-        turn: number,
-        result: Compaction.Result,
-      ): Effect.Effect<void, AgentEvent.AgentError> =>
+      const applyCompactionResult = (turn: number, result: CompactionResult): Effect.Effect<void, AgentError> =>
         Effect.gen(function* () {
           yield* Ref.set(chat.history, result.history)
           sessionSyncedMessages = result.history.content.length
@@ -545,9 +556,9 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
 
       const preparePrompt = (
         turn: number,
-        prompt: Ai.Prompt.Prompt,
+        prompt: Prompt.Prompt,
         overflow: boolean,
-      ): Effect.Effect<Ai.Prompt.Prompt, AgentEvent.AgentError, Ai.LanguageModel.LanguageModel> =>
+      ): Effect.Effect<Prompt.Prompt, AgentError, LanguageModel.LanguageModel> =>
         Option.match(compactionService, {
           onNone: () => Effect.succeed(prompt),
           onSome: (compaction) =>
@@ -579,20 +590,20 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const boundedSuccessResult = (
         turn: number,
         call: AnyToolCall,
-        outcome: ToolExecutor.Success,
-      ): Effect.Effect<PendingToolResult, AgentEvent.AgentError> =>
+        outcome: Success,
+      ): Effect.Effect<PendingToolResult, AgentError> =>
         (options.toolOutputMaxBytes === undefined
           ? Effect.succeed(outcome)
-          : ToolOutput.bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes }).pipe(
-              Effect.mapError((error) => new AgentEvent.AgentError({ message: error.message, turn, cause: error })),
+          : bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes }).pipe(
+              Effect.mapError((error) => new AgentError({ message: error.message, turn, cause: error })),
             )
         ).pipe(Effect.map((bounded) => successResult(call, bounded)))
 
       const outcomeEvents = (
         turn: number,
         call: AnyToolCall,
-        outcome: ToolExecutor.Outcome,
-      ): Effect.Effect<Stream.Stream<AgentEvent.Event, RunError>, AgentEvent.AgentError> => {
+        outcome: Outcome,
+      ): Effect.Effect<Stream.Stream<Event, RunError>, AgentError> => {
         switch (outcome._tag) {
           case "Success":
             return (
@@ -602,37 +613,45 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
             ).pipe(
               Effect.map((result) => {
                 state.pending.push(result)
-                return Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
+                return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
               }),
             )
           case "Failure": {
             const result = failedResult(call, outcome.message)
             state.pending.push(result)
-            return Effect.succeed(
-              Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }]),
-            )
+            return Effect.succeed(Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }]))
           }
           case "Suspend":
             return Effect.succeed(failSuspended(call, outcome.token, "tool-wait"))
         }
       }
 
+      const defaultExecute = (request: Request): Effect.Effect<Outcome, never, Tool.HandlersFor<Tools>> => {
+        if (agent.toolkit.tools[request.call.name] !== undefined) {
+          return executeToolkit(agent.toolkit, request)
+        }
+        const activated = activatedSkillTools.get(request.call.name)
+        return activated === undefined
+          ? Effect.succeed({ _tag: "Failure", message: `Tool ${request.call.name} is not registered` })
+          : (executeToolkit(Toolkit.make(activated), request) as Effect.Effect<Outcome>)
+      }
+
       const executeApproved = (
         turn: number,
         call: AnyToolCall,
-        request: ToolExecutor.Request,
-      ): Stream.Stream<AgentEvent.Event, RunError> =>
+        request: Request,
+      ): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> =>
         Stream.concat(
-          Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
+          Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
           Stream.unwrap(
             Effect.gen(function* () {
-              const progressQueue = yield* Queue.unbounded<AgentEvent.ToolProgress, Cause.Done>()
+              const progressQueue = yield* Queue.unbounded<ToolProgress, Cause.Done>()
               const signal = yield* Effect.abortSignal
-              const context = ToolContext.ToolContext.of({
+              const context = ToolContext.of({
                 signal,
                 sessionId,
                 emit: (progress) => {
-                  const event: AgentEvent.ToolProgress = {
+                  const event: ToolProgress = {
                     _tag: "ToolProgress",
                     turn,
                     toolCallId: progress.toolCallId,
@@ -644,9 +663,12 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
               })
               const execution = isSkillActivationCall(call)
                 ? activateSkillOutcome(turn, call)
-                : executor.execute(request)
+                : (Option.match(executor, {
+                    onNone: () => defaultExecute(request),
+                    onSome: (service) => service.execute(request),
+                  }) as Effect.Effect<Outcome, AgentError, ToolContext | Tool.HandlersFor<Tools>>)
               const fiber = yield* execution.pipe(
-                Effect.provideService(ToolContext.ToolContext, context),
+                Effect.provideService(ToolContext, context),
                 Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
                 Effect.forkScoped({ startImmediately: true }),
               )
@@ -660,23 +682,20 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           ),
         )
 
-      const permissionError = (turn: number, error: Permissions.PermissionError): AgentEvent.AgentError =>
-        new AgentEvent.AgentError({ message: error.message, turn, cause: error })
+      const permissionError = (turn: number, error: PermissionError): AgentError =>
+        new AgentError({ message: error.message, turn, cause: error })
 
       const permissionDeniedEvents = (
         turn: number,
         call: AnyToolCall,
         reason: string | undefined,
-      ): Stream.Stream<AgentEvent.Event> => {
+      ): Stream.Stream<Event> => {
         const result = failedResult(call, reason ?? "Permission denied")
         state.pending.push(result)
-        return Stream.fromIterable<AgentEvent.Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
+        return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
       }
 
-      const activateSkillOutcome = (
-        turn: number,
-        call: AnyToolCall,
-      ): Effect.Effect<ToolExecutor.Outcome, AgentEvent.AgentError> =>
+      const activateSkillOutcome = (turn: number, call: AnyToolCall): Effect.Effect<Outcome, AgentError> =>
         Effect.gen(function* () {
           if (skillRuntime === undefined) return { _tag: "Failure", message: "SkillSource is not available" }
           const params = Schema.decodeUnknownOption(activateSkillParameters)(call.params)
@@ -704,8 +723,8 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           return { _tag: "Success", result: output, encodedResult: output }
         })
 
-      const rememberAlways = (turn: number, call: AnyToolCall): Effect.Effect<void, AgentEvent.AgentError> =>
-        Effect.serviceOption(Permissions.RuleStore).pipe(
+      const rememberAlways = (turn: number, call: AnyToolCall): Effect.Effect<void, AgentError> =>
+        Effect.serviceOption(RuleStore).pipe(
           Effect.flatMap(
             Option.match({
               onNone: () => Effect.void,
@@ -720,28 +739,34 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const approvalEvents = (
         turn: number,
         call: AnyToolCall,
-        messages: ReadonlyArray<Ai.Prompt.Message>,
-        request: ToolExecutor.Request,
-        tool: Ai.Tool.Any | undefined,
-      ): Stream.Stream<AgentEvent.Event, RunError> =>
+        messages: ReadonlyArray<Prompt.Message>,
+        request: Request,
+        tool: Tool.Any | undefined,
+      ): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> =>
         Stream.unwrap(
           approvalRequired(tool, call, messages).pipe(
-            Effect.map((isRequired): Stream.Stream<AgentEvent.Event, RunError> => {
+            Effect.map((isRequired): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> => {
               if (!isRequired) return executeApproved(turn, call, request)
+              if (Option.isNone(approvals)) {
+                const result = failedResult(call, "Approvals service is required for approval-gated tools")
+                state.pending.push(result)
+                return Stream.fromIterable<Event>([
+                  { _tag: "ApprovalRequested", turn, call },
+                  { _tag: "ToolExecutionCompleted", turn, call, result },
+                ])
+              }
               return Stream.concat(
-                Stream.fromIterable<AgentEvent.Event>([{ _tag: "ApprovalRequested", turn, call }]),
+                Stream.fromIterable<Event>([{ _tag: "ApprovalRequested", turn, call }]),
                 Stream.unwrap(
-                  approvals.check(request).pipe(
-                    Effect.map((decision): Stream.Stream<AgentEvent.Event, RunError> => {
+                  approvals.value.check(request).pipe(
+                    Effect.map((decision): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> => {
                       switch (decision._tag) {
                         case "Approved":
                           return executeApproved(turn, call, request)
                         case "Denied": {
                           const result = failedResult(call, decision.reason ?? "Tool call denied")
                           state.pending.push(result)
-                          return Stream.fromIterable<AgentEvent.Event>([
-                            { _tag: "ToolExecutionCompleted", turn, call, result },
-                          ])
+                          return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
                         }
                         case "Pending":
                           return failSuspended(call, decision.token, "approval")
@@ -757,9 +782,9 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const permissionAnsweredEvents = (
         turn: number,
         call: AnyToolCall,
-        request: ToolExecutor.Request,
-        answer: Permissions.Answer,
-      ): Stream.Stream<AgentEvent.Event, RunError> => {
+        request: Request,
+        answer: Answer,
+      ): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> => {
         switch (answer._tag) {
           case "Approved":
             return executeApproved(turn, call, request)
@@ -773,10 +798,10 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const permissionAskEvents = (
         turn: number,
         call: AnyToolCall,
-        request: ToolExecutor.Request,
+        request: Request,
         token: string,
-      ): Stream.Stream<AgentEvent.Event, RunError> => {
-        const pending: Permissions.Pending = {
+      ): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> => {
+        const pending: Pending = {
           token,
           tool: call.name,
           params: call.params,
@@ -786,7 +811,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         }
         if (Option.isNone(permissionsService)) return failSuspended(call, token, "approval")
         return Stream.concat(
-          Stream.fromIterable<AgentEvent.Event>([{ _tag: "ApprovalRequested", turn, call }]),
+          Stream.fromIterable<Event>([{ _tag: "ApprovalRequested", turn, call }]),
           Stream.unwrap(
             permissionsService.value.await(pending).pipe(
               Effect.mapError((error) => permissionError(turn, error)),
@@ -804,10 +829,10 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const toolCallEvents = (
         turn: number,
         call: AnyToolCall,
-        messages: ReadonlyArray<Ai.Prompt.Message>,
-      ): Stream.Stream<AgentEvent.Event, RunError> => {
-        const request: ToolExecutor.Request = { call, turn, agentName: agent.name, sessionId }
-        const tool = currentToolkit().tools[call.name] as Ai.Tool.Any | undefined
+        messages: ReadonlyArray<Prompt.Message>,
+      ): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> => {
+        const request: Request = { call, turn, agentName: agent.name, sessionId }
+        const tool = currentToolkit().tools[call.name] as Tool.Any | undefined
         if (Option.isNone(permissionsService)) return approvalEvents(turn, call, messages, request, tool)
         return Stream.unwrap(
           permissionsService.value
@@ -821,7 +846,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
             })
             .pipe(
               Effect.mapError((error) => permissionError(turn, error)),
-              Effect.map((decision): Stream.Stream<AgentEvent.Event, RunError> => {
+              Effect.map((decision): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> => {
                 switch (decision._tag) {
                   case "Allow":
                     return approvalEvents(turn, call, messages, request, tool)
@@ -835,16 +860,16 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         )
       }
 
-      const captureFinishPart = (part: Ai.Response.FinishPart): Effect.Effect<void> =>
+      const captureFinishPart = (part: Response.FinishPart): Effect.Effect<void> =>
         Effect.gen(function* () {
           const span = yield* Effect.currentSpan
           state.finish = {
-            usage: state.finish === undefined ? part.usage : AgentEvent.addUsage(state.finish.usage, part.usage),
+            usage: state.finish === undefined ? part.usage : addUsage(state.finish.usage, part.usage),
             reason: part.reason,
           }
-          state.usage = state.usage === undefined ? part.usage : AgentEvent.addUsage(state.usage, part.usage)
+          state.usage = state.usage === undefined ? part.usage : addUsage(state.usage, part.usage)
           state.contextTokens = part.usage.inputTokens.total ?? state.contextTokens
-          Ai.Telemetry.addGenAIAnnotations(span, {
+          Telemetry.addGenAIAnnotations(span, {
             operation: { name: "chat" },
             usage: {
               inputTokens: part.usage.inputTokens.total,
@@ -854,11 +879,11 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           })
         }).pipe(Effect.orDie)
 
-      const captureStructuredUsage = (content: ReadonlyArray<Ai.Response.Part<any>>): Effect.Effect<void> =>
+      const captureStructuredUsage = (content: ReadonlyArray<Response.Part<any>>): Effect.Effect<void> =>
         Effect.sync(() => {
           for (const part of content) {
             if (part.type === "finish") {
-              state.usage = state.usage === undefined ? part.usage : AgentEvent.addUsage(state.usage, part.usage)
+              state.usage = state.usage === undefined ? part.usage : addUsage(state.usage, part.usage)
             }
           }
         })
@@ -867,22 +892,20 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         Option.match(resilienceService, {
           onNone: () => effect,
           onSome: (resilience) =>
-            Effect.flatMap(Ai.LanguageModel.LanguageModel, (model) =>
-              effect.pipe(
-                Effect.provideService(Ai.LanguageModel.LanguageModel, ModelResilience.apply(model, resilience)),
-              ),
+            Effect.flatMap(LanguageModel.LanguageModel, (model) =>
+              effect.pipe(Effect.provideService(LanguageModel.LanguageModel, apply(model, resilience))),
             ),
         })
 
       const partEvents = (
         turn: number,
-        part: Ai.Response.StreamPart<Record<string, Ai.Tool.Any>>,
-        messages: ReadonlyArray<Ai.Prompt.Message>,
-      ): Stream.Stream<AgentEvent.Event, RunError> => {
+        part: Response.StreamPart<Record<string, Tool.Any>>,
+        messages: ReadonlyArray<Prompt.Message>,
+      ): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> => {
         if (part.type === "error") {
-          return Stream.fail(new AgentEvent.AgentError({ message: errorMessage(part.error), turn, cause: part.error }))
+          return Stream.fail(new AgentError({ message: errorMessage(part.error), turn, cause: part.error }))
         }
-        const modelPart = Stream.fromIterable<AgentEvent.Event>([{ _tag: "ModelPart", turn, part }])
+        const modelPart = Stream.fromIterable<Event>([{ _tag: "ModelPart", turn, part }])
         if (part.type === "tool-call") {
           const call = part as AnyToolCall
           return call.providerExecuted === true
@@ -904,19 +927,19 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       // persistence) sees the transformed stream.
       const applyPartToEvents = (
         turn: number,
-        part: Ai.Response.StreamPart<any>,
-        messages: ReadonlyArray<Ai.Prompt.Message>,
-      ): Stream.Stream<AgentEvent.Event, RunError> =>
+        part: Response.StreamPart<any>,
+        messages: ReadonlyArray<Prompt.Message>,
+      ): Stream.Stream<Event, RunError, Tool.HandlersFor<Tools>> =>
         Stream.unwrap(
           applyPartChain(chain, part, { agentName: agent.name, turn }).pipe(
             Effect.map(
               Option.match({
                 onSome: (transformed) =>
-                  partEvents(turn, transformed as Ai.Response.StreamPart<Record<string, Ai.Tool.Any>>, messages),
-                onNone: (): Stream.Stream<AgentEvent.Event, RunError> =>
+                  partEvents(turn, transformed as Response.StreamPart<Record<string, Tool.Any>>, messages),
+                onNone: (): Stream.Stream<Event, RunError> =>
                   part.type === "tool-call"
                     ? Stream.fail(
-                        new AgentEvent.MiddlewareViolation({
+                        new MiddlewareViolation({
                           turn,
                           detail: "ModelMiddleware dropped a tool-call part",
                         }),
@@ -927,39 +950,39 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           ),
         )
 
-      const currentToolkit = (): Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>> =>
-        Ai.Toolkit.make(
+      const currentToolkit = (): Toolkit.Toolkit<Record<string, Tool.Any>> =>
+        Toolkit.make(
           ...Object.values(agent.toolkit.tools),
           ...(hasActivatableSkills ? [activateSkillTool] : []),
           ...activatedSkillTools.values(),
-        ) as unknown as Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>>
+        ) as unknown as Toolkit.Toolkit<Record<string, Tool.Any>>
 
-      const activeToolkit = (activeTools: ReadonlyArray<string>): Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>> =>
-        Ai.Toolkit.make(
+      const activeToolkit = (activeTools: ReadonlyArray<string>): Toolkit.Toolkit<Record<string, Tool.Any>> =>
+        Toolkit.make(
           ...Object.values(currentToolkit().tools).filter((tool) => activeTools.includes(tool.name)),
-        ) as unknown as Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>>
+        ) as unknown as Toolkit.Toolkit<Record<string, Tool.Any>>
 
       const modelTurn = (
         turn: number,
-        prompt: Ai.Prompt.RawInput,
-        overrides?: TurnPolicy.TurnOverrides,
-      ): Stream.Stream<AgentEvent.Event, RunError, Ai.LanguageModel.LanguageModel> => {
+        prompt: Prompt.RawInput,
+        overrides?: TurnOverrides,
+      ): Stream.Stream<Event, RunError, RunServices<Tools>> => {
         const toolkit = overrides?.activeTools === undefined ? currentToolkit() : activeToolkit(overrides.activeTools)
         const attempt = (
-          activePrompt: Ai.Prompt.Prompt,
+          activePrompt: Prompt.Prompt,
           retryOverflow: boolean,
         ): Stream.Stream<
-          { readonly part: Ai.Response.StreamPart<any>; readonly messages: ReadonlyArray<Ai.Prompt.Message> },
-          AgentEvent.AgentError,
-          Ai.LanguageModel.LanguageModel
+          { readonly part: Response.StreamPart<any>; readonly messages: ReadonlyArray<Prompt.Message> },
+          AgentError,
+          LanguageModel.LanguageModel
         > =>
           Stream.unwrap(
             Ref.get(chat.history).pipe(
               Effect.map((historyBeforeAttempt) => {
                 let emitted = false
-                const messages = Ai.Prompt.concat(historyBeforeAttempt, activePrompt).content
+                const messages = Prompt.concat(historyBeforeAttempt, activePrompt).content
                 return chat.streamText({ prompt: activePrompt, toolkit, disableToolCallResolution: true }).pipe(
-                  Stream.map((part) => ({ part: part as Ai.Response.StreamPart<any>, messages })),
+                  Stream.map((part) => ({ part: part as Response.StreamPart<any>, messages })),
                   Stream.tap(() =>
                     Effect.sync(() => {
                       emitted = true
@@ -968,12 +991,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
                   Stream.catchCause((cause) => {
                     if (Cause.hasInterrupts(cause)) return Stream.fromEffect(Effect.interrupt)
                     const error = Cause.squash(cause)
-                    if (
-                      retryOverflow &&
-                      !emitted &&
-                      Compaction.isContextOverflow(error) &&
-                      Option.isSome(compactionService)
-                    ) {
+                    if (retryOverflow && !emitted && isContextOverflow(error) && Option.isSome(compactionService)) {
                       return Stream.unwrap(
                         Effect.gen(function* () {
                           yield* Ref.set(chat.history, historyBeforeAttempt)
@@ -982,14 +1000,14 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
                         }),
                       )
                     }
-                    return Stream.make({ part: Ai.Response.makePart("error", { error }), messages })
+                    return Stream.make({ part: Response.makePart("error", { error }), messages })
                   }),
                 )
               }),
             ),
           )
         const parts = Stream.unwrap(
-          applyPromptChain(chain, Ai.Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
+          applyPromptChain(chain, Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
             Effect.flatMap((transformedPrompt) => preparePrompt(turn, transformedPrompt, false)),
             Effect.map((preparedPrompt) =>
               attempt(preparedPrompt, true).pipe(
@@ -1002,11 +1020,9 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           onNone: () => parts,
           onSome: (resilience) =>
             Stream.unwrap(
-              Ai.LanguageModel.LanguageModel.pipe(
+              LanguageModel.LanguageModel.pipe(
                 Effect.map((model) =>
-                  parts.pipe(
-                    Stream.provideService(Ai.LanguageModel.LanguageModel, ModelResilience.apply(model, resilience)),
-                  ),
+                  parts.pipe(Stream.provideService(LanguageModel.LanguageModel, apply(model, resilience))),
                 ),
               ),
             ),
@@ -1014,14 +1030,14 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         return overrides?.model === undefined ? resilientParts : resilientParts.pipe(Stream.provide(overrides.model))
       }
 
-      const turnCompletedEvent = (turn: number, transcript: Ai.Prompt.Prompt): AgentEvent.TurnCompleted => ({
+      const turnCompletedEvent = (turn: number, transcript: Prompt.Prompt): TurnCompleted => ({
         _tag: "TurnCompleted",
         turn,
         transcript,
         ...(state.finish === undefined ? {} : { usage: state.finish.usage, finishReason: state.finish.reason }),
       })
 
-      const terminalCompletedEvent = (turn: number, transcript: Ai.Prompt.Prompt): AgentEvent.Completed => ({
+      const terminalCompletedEvent = (turn: number, transcript: Prompt.Prompt): Completed => ({
         _tag: "Completed",
         turns: turn + 1,
         text: state.text,
@@ -1032,15 +1048,11 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       const structuredFinalEvents = (
         turn: number,
         config: StructuredRunConfig<StructuredOutputSchema>,
-      ): Stream.Stream<
-        AgentEvent.Event,
-        RunError,
-        Ai.LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
-      > =>
+      ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> =>
         Stream.fromEffect(
           Effect.gen(function* () {
             const structuredTurn = turn + 1
-            const transformedPrompt = yield* applyPromptChain(chain, Ai.Prompt.make(config.objectPrompt), {
+            const transformedPrompt = yield* applyPromptChain(chain, Prompt.make(config.objectPrompt), {
               agentName: agent.name,
               turn: structuredTurn,
             })
@@ -1053,36 +1065,32 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
               }),
             ).pipe(
               Effect.mapError(
-                (error) =>
-                  new AgentEvent.AgentError({ message: errorMessage(error), turn: structuredTurn, cause: error }),
+                (error) => new AgentError({ message: errorMessage(error), turn: structuredTurn, cause: error }),
               ),
             )
             yield* captureStructuredUsage(response.content)
             yield* savePersisted
             const transcript = yield* Ref.get(chat.history)
-            const structuredOutput: AgentEvent.StructuredOutput = {
+            const structuredOutput: StructuredOutput = {
               _tag: "StructuredOutput",
               turn: structuredTurn,
               value: response.value,
-              content: response.content as ReadonlyArray<Ai.Response.Part<Record<string, Ai.Tool.Any>>>,
+              content: response.content as ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
             }
             return [structuredOutput, terminalCompletedEvent(structuredTurn, transcript)]
           }),
-        ).pipe(Stream.flatMap((events) => Stream.fromIterable<AgentEvent.Event>(events)))
+        ).pipe(Stream.flatMap((events) => Stream.fromIterable<Event>(events)))
 
-      const promptFromSteeringMessages = (messages: ReadonlyArray<Steering.Message>): Ai.Prompt.Prompt =>
-        messages.reduce<Ai.Prompt.Prompt>(
-          (prompt, message) => Ai.Prompt.concat(prompt, message.prompt),
-          Ai.Prompt.empty,
-        )
+      const promptFromSteeringMessages = (messages: ReadonlyArray<Message>): Prompt.Prompt =>
+        messages.reduce<Prompt.Prompt>((prompt, message) => Prompt.concat(prompt, message.prompt), Prompt.empty)
 
-      const takeSteering = (): Effect.Effect<ReadonlyArray<Steering.Message>> =>
+      const takeSteering = (): Effect.Effect<ReadonlyArray<Message>> =>
         Option.match(steeringService, {
           onNone: () => Effect.succeed([]),
           onSome: (service) => service.takeSteering(),
         })
 
-      const takeFollowUp = (): Effect.Effect<ReadonlyArray<Steering.Message>> =>
+      const takeFollowUp = (): Effect.Effect<ReadonlyArray<Message>> =>
         Option.match(steeringService, {
           onNone: () => Effect.succeed([]),
           onSome: (service) => service.takeFollowUp(),
@@ -1093,42 +1101,39 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       ): Effect.Effect<
         {
           readonly events: Stream.Stream<
-            AgentEvent.Event,
+            Event,
             RunError,
-            Ai.LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
+            LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
           >
           readonly next?: {
-            readonly prompt: Ai.Prompt.RawInput
-            readonly overrides?: TurnPolicy.TurnOverrides
+            readonly prompt: Prompt.RawInput
+            readonly overrides?: TurnOverrides
           }
         },
-        AgentEvent.AgentError
+        AgentError
       > =>
         Effect.gen(function* () {
           const transcript = yield* Ref.get(chat.history)
           yield* syncSession(turn, transcript)
           const pending = state.pending
           yield* rememberTurn(turn, transcript, pending.length === 0)
-          const completed: AgentEvent.Event = turnCompletedEvent(turn, transcript)
+          const completed: Event = turnCompletedEvent(turn, transcript)
           if (pending.length === 0) {
             const followUp = yield* takeFollowUp()
             if (followUp.length > 0) {
               return {
-                events: Stream.fromIterable<AgentEvent.Event>([completed]),
+                events: Stream.fromIterable<Event>([completed]),
                 next: { prompt: promptFromSteeringMessages(followUp) },
               }
             }
             if (structured !== undefined) {
               return {
-                events: Stream.concat(
-                  Stream.fromIterable<AgentEvent.Event>([completed]),
-                  structuredFinalEvents(turn, structured),
-                ),
+                events: Stream.concat(Stream.fromIterable<Event>([completed]), structuredFinalEvents(turn, structured)),
               }
             }
             yield* savePersisted
             return {
-              events: Stream.fromIterable<AgentEvent.Event>([completed, terminalCompletedEvent(turn, transcript)]),
+              events: Stream.fromIterable<Event>([completed, terminalCompletedEvent(turn, transcript)]),
             }
           }
           const decision = yield* agent.policy.decide({
@@ -1139,9 +1144,9 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           if (decision._tag === "Stop") {
             return {
               events: Stream.concat(
-                Stream.fromIterable<AgentEvent.Event>([completed]),
+                Stream.fromIterable<Event>([completed]),
                 Stream.fail(
-                  new AgentEvent.TurnLimitExceeded({
+                  new TurnLimitExceeded({
                     turn: turn + 1,
                     pending: pending.map((result) => ({
                       tool_call_id: result.id,
@@ -1154,15 +1159,15 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
           }
           state.pending = []
           const steering = yield* takeSteering()
-          const toolPrompt = Ai.Prompt.fromResponseParts(pending)
+          const toolPrompt = Prompt.fromResponseParts(pending)
           const basePrompt =
-            steering.length === 0 ? toolPrompt : Ai.Prompt.concat(promptFromSteeringMessages(steering), toolPrompt)
+            steering.length === 0 ? toolPrompt : Prompt.concat(promptFromSteeringMessages(steering), toolPrompt)
           const prompt =
             decision.overrides?.instructions === undefined
               ? basePrompt
               : withSystem(decision.overrides.instructions, basePrompt)
           return {
-            events: Stream.fromIterable<AgentEvent.Event>([completed]),
+            events: Stream.fromIterable<Event>([completed]),
             next: { prompt, ...(decision.overrides === undefined ? {} : { overrides: decision.overrides }) },
           }
         })
@@ -1175,20 +1180,16 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
 
       const runTurn = (
         turn: number,
-        prompt: Ai.Prompt.RawInput,
-        overrides?: TurnPolicy.TurnOverrides,
-      ): Stream.Stream<
-        AgentEvent.Event,
-        RunError,
-        Ai.LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
-      > => {
+        prompt: Prompt.RawInput,
+        overrides?: TurnOverrides,
+      ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> => {
         let next:
           | {
-              readonly prompt: Ai.Prompt.RawInput
-              readonly overrides?: TurnPolicy.TurnOverrides
+              readonly prompt: Prompt.RawInput
+              readonly overrides?: TurnOverrides
             }
           | undefined
-        const currentTurn = Stream.fromIterable<AgentEvent.Event>([{ _tag: "TurnStarted", turn }]).pipe(
+        const currentTurn = Stream.fromIterable<Event>([{ _tag: "TurnStarted", turn }]).pipe(
           Stream.concat(resetTurnState(turn)),
           Stream.concat(modelTurn(turn, prompt, overrides)),
           Stream.concat(
@@ -1211,18 +1212,14 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
 
       const resumeStream = (
         resume: Resume,
-      ): Stream.Stream<
-        AgentEvent.Event,
-        RunError,
-        Ai.LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
-      > => {
+      ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> => {
         let next:
           | {
-              readonly prompt: Ai.Prompt.RawInput
-              readonly overrides?: TurnPolicy.TurnOverrides
+              readonly prompt: Prompt.RawInput
+              readonly overrides?: TurnOverrides
             }
           | undefined
-        const call = Ai.Response.makePart("tool-call", {
+        const call = Response.makePart("tool-call", {
           id: resume.call.id,
           name: resume.call.name,
           params: resume.call.params,
@@ -1253,9 +1250,7 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
       }
 
       const baseInitialPrompt =
-        seedSystem === undefined
-          ? Ai.Prompt.make(options.prompt)
-          : withSystem(seedSystem, Ai.Prompt.make(options.prompt))
+        seedSystem === undefined ? Prompt.make(options.prompt) : withSystem(seedSystem, Prompt.make(options.prompt))
       const initialPrompt =
         options.resume === undefined ? yield* recallInitialPrompt(baseInitialPrompt) : baseInitialPrompt
       const runStream = options.resume === undefined ? runTurn(0, initialPrompt) : resumeStream(options.resume)
@@ -1269,12 +1264,12 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
         Stream.catchCause((cause) => {
           if (Cause.hasInterrupts(cause)) return Stream.fromEffect(Effect.interrupt)
           const error = Cause.squash(cause)
-          if (error instanceof AgentEvent.AgentSuspended) {
+          if (error instanceof AgentSuspended) {
             return Stream.unwrap(
               Ref.get(chat.history).pipe(
                 Effect.map((transcript) =>
                   Stream.concat(
-                    Stream.fromIterable<AgentEvent.Event>([turnCompletedEvent(state.turn, transcript)]),
+                    Stream.fromIterable<Event>([turnCompletedEvent(state.turn, transcript)]),
                     Stream.failCause<RunError>(cause),
                   ),
                 ),
@@ -1288,17 +1283,17 @@ const streamInternal = <Tools extends Record<string, Ai.Tool.Any>, StructuredOut
   ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } }))
 
 /** @experimental The text primitive; everything else derives from it. */
-export const stream = <Tools extends Record<string, Ai.Tool.Any>>(
+export const stream = <Tools extends Record<string, Tool.Any>>(
   agent: Agent<Tools>,
   options: RunOptions,
-): Stream.Stream<AgentEvent.Event, RunError, RunServices> =>
-  streamInternal(agent, options, undefined) as Stream.Stream<AgentEvent.Event, RunError, RunServices>
+): Stream.Stream<Event, RunError, RunServices<Tools>> =>
+  streamInternal(agent, options, undefined) as Stream.Stream<Event, RunError, RunServices<Tools>>
 
 /** @experimental `stream` plus one terminal structured-output turn before `Completed`. */
-export const streamObject = <Tools extends Record<string, Ai.Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
+export const streamObject = <Tools extends Record<string, Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
   agent: Agent<Tools>,
   options: ObjectRunOptions<StructuredOutputSchema>,
-): Stream.Stream<AgentEvent.Event, RunError, RunServices | StructuredOutputSchema["DecodingServices"]> =>
+): Stream.Stream<Event, RunError, RunServices<Tools> | StructuredOutputSchema["DecodingServices"]> =>
   streamInternal(agent, options, {
     schema: options.schema,
     objectName: options.objectName ?? "output",
@@ -1309,7 +1304,7 @@ export const streamObject = <Tools extends Record<string, Ai.Tool.Any>, Structur
 export interface Result {
   readonly text: string
   readonly turns: number
-  readonly transcript: Ai.Prompt.Prompt
+  readonly transcript: Prompt.Prompt
 }
 
 /** @experimental Result of a non-streaming structured-output run. */
@@ -1318,37 +1313,36 @@ export interface ObjectResult<A> extends Result {
 }
 
 /** @experimental `stream` folded to its `Completed` event. */
-export const generate = <Tools extends Record<string, Ai.Tool.Any>>(
+export const generate = <Tools extends Record<string, Tool.Any>>(
   agent: Agent<Tools>,
   options: RunOptions,
-): Effect.Effect<Result, RunError, RunServices> =>
+): Effect.Effect<Result, RunError, RunServices<Tools>> =>
   Stream.runLast(stream(agent, options)).pipe(
     Effect.flatMap(
       Option.match({
-        onNone: () =>
-          Effect.fail(new AgentEvent.AgentError({ message: "Agent run ended without a Completed event", turn: 0 })),
+        onNone: () => Effect.fail(new AgentError({ message: "Agent run ended without a Completed event", turn: 0 })),
         onSome: (event) =>
           event._tag === "Completed"
             ? Effect.succeed({ text: event.text, turns: event.turns, transcript: event.transcript })
-            : Effect.fail(new AgentEvent.AgentError({ message: "Agent run ended without a Completed event", turn: 0 })),
+            : Effect.fail(new AgentError({ message: "Agent run ended without a Completed event", turn: 0 })),
       }),
     ),
   )
 
 /** @experimental `streamObject` folded to its `StructuredOutput` and `Completed` events. */
-export const generateObject = <Tools extends Record<string, Ai.Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
+export const generateObject = <Tools extends Record<string, Tool.Any>, StructuredOutputSchema extends ObjectSchema>(
   agent: Agent<Tools>,
   options: ObjectRunOptions<StructuredOutputSchema>,
 ): Effect.Effect<
   ObjectResult<StructuredOutputSchema["Type"]>,
   RunError,
-  RunServices | StructuredOutputSchema["DecodingServices"]
+  RunServices<Tools> | StructuredOutputSchema["DecodingServices"]
 > =>
   Stream.runFold(
     streamObject(agent, options),
     () => ({
       value: Option.none<StructuredOutputSchema["Type"]>(),
-      completed: Option.none<AgentEvent.Completed>(),
+      completed: Option.none<Completed>(),
     }),
     (acc, event) => {
       if (event._tag === "StructuredOutput") {
@@ -1363,14 +1357,12 @@ export const generateObject = <Tools extends Record<string, Ai.Tool.Any>, Struct
     Effect.flatMap(({ value, completed }) =>
       Option.match(completed, {
         onNone: () =>
-          Effect.fail(
-            new AgentEvent.AgentError({ message: "Agent object run ended without a Completed event", turn: 0 }),
-          ),
+          Effect.fail(new AgentError({ message: "Agent object run ended without a Completed event", turn: 0 })),
         onSome: (event) =>
           Option.match(value, {
             onNone: () =>
               Effect.fail(
-                new AgentEvent.AgentError({
+                new AgentError({
                   message: "Agent object run ended without a StructuredOutput event",
                   turn: 0,
                 }),

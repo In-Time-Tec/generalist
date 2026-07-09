@@ -1,15 +1,15 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Prompt } from "effect/unstable/ai"
 import { Session } from "../src/index"
 
-const user = (text: string): Ai.Prompt.Message =>
-  Ai.Prompt.makeMessage("user", { content: [Ai.Prompt.makePart("text", { text })] })
+const user = (text: string): Prompt.Message =>
+  Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
-const assistant = (text: string): Ai.Prompt.Message =>
-  Ai.Prompt.makeMessage("assistant", { content: [Ai.Prompt.makePart("text", { text })] })
+const assistant = (text: string): Prompt.Message =>
+  Prompt.makeMessage("assistant", { content: [Prompt.makePart("text", { text })] })
 
-const promptTexts = (prompt: Ai.Prompt.Prompt): ReadonlyArray<string> =>
+const promptTexts = (prompt: Prompt.Prompt): ReadonlyArray<string> =>
   prompt.content.map((message) => {
     if (message.role === "system") return message.content
     return message.content.map((part) => (part.type === "text" ? part.text : "")).join("")

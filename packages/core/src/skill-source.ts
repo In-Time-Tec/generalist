@@ -1,6 +1,5 @@
 import { Context, Effect, Layer, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { Tool } from "effect/unstable/ai"
 /** @experimental Parsed SKILL.md frontmatter. */
 export interface Frontmatter {
   readonly name: string
@@ -27,7 +26,7 @@ export interface Skill {
   readonly frontmatter: Frontmatter
   readonly listing: string
   readonly body: Effect.Effect<string, SkillSourceError>
-  readonly tools: ReadonlyArray<Ai.Tool.Any>
+  readonly tools: ReadonlyArray<Tool.Any>
 }
 
 /** @experimental Per-entry description character cap. */

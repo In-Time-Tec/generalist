@@ -1,7 +1,8 @@
 import { Chat } from "../src/index"
 import { Wire } from "@batonfx/transport"
-import * as Ai from "effect/unstable/ai"
-import * as Story from "foldkit/story"
+import { Response } from "effect/unstable/ai"
+import { Command, expectOutMessage, message, model, story } from "foldkit/story"
+import type { StorySimulation } from "foldkit/story"
 import { describe, expect, test } from "vitest"
 
 const sessionId = "foldkit-story-session"
@@ -10,14 +11,21 @@ const eventFrame = (seq: number, event: Wire.EventType): Wire.LooseServerFrameTy
 
 const receivedFrame = (frame: Wire.LooseServerFrameType) => Chat.ReceivedAgent({ incoming: frame })
 
-const toolCall = Ai.Response.makePart("tool-call", {
+const withModel = <Model>(initialModel: Model) =>
+  Object.assign(
+    <M, Message, OutMessage = undefined>(simulation: StorySimulation<M, Message, OutMessage>) =>
+      ({ ...simulation, model: initialModel }) as unknown as StorySimulation<M, Message, OutMessage>,
+    { _phantomModel: undefined },
+  )
+
+const toolCall = Response.makePart("tool-call", {
   id: "lookup-1",
   name: "lookup",
   params: { query: "baton foldkit" },
   providerExecuted: false,
 })
 
-const toolResult = Ai.Response.makePart("tool-result", {
+const toolResult = Response.makePart("tool-result", {
   id: "lookup-1",
   name: "lookup",
   result: { answer: "transport binding" },
@@ -38,12 +46,12 @@ const frames: ReadonlyArray<Wire.LooseServerFrameType> = [
   eventFrame(7, {
     _tag: "ModelPart",
     turn: 1,
-    part: Ai.Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Check the transport stream." }),
+    part: Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Check the transport stream." }),
   }),
   eventFrame(8, {
     _tag: "ModelPart",
     turn: 1,
-    part: Ai.Response.makePart("text-delta", { id: "answer-1", delta: "Final answer" }),
+    part: Response.makePart("text-delta", { id: "answer-1", delta: "Final answer" }),
   }),
   eventFrame(9, { _tag: "TurnCompleted", turn: 1 }),
   eventFrame(10, { _tag: "Completed", turns: 2, text: "Final answer" }),
@@ -51,48 +59,48 @@ const frames: ReadonlyArray<Wire.LooseServerFrameType> = [
 
 describe("Chat Story", () => {
   test("scripted agent frames drive tool call, execution, and completion state", () => {
-    Story.story(
+    story(
       Chat.update,
-      Story.with(Chat.initialModel(null)),
-      Story.message(Chat.OpenedSession({ sessionId })),
-      Story.model((model) => {
-        expect(model.sessionId).toBe(sessionId)
-        expect(model.connection).toBe("connecting")
+      withModel(Chat.initialModel(null)),
+      message(Chat.OpenedSession({ sessionId })),
+      model((currentModel) => {
+        expect(currentModel.sessionId).toBe(sessionId)
+        expect(currentModel.connection).toBe("connecting")
       }),
-      Story.message(Chat.ChangedDraft({ text: "Render this run" })),
-      Story.message(Chat.SubmittedMessage()),
-      Story.Command.expectExact(Chat.SendUserMessage({ sessionId, text: "Render this run" })),
-      Story.Command.resolve(Chat.SendUserMessage({ sessionId, text: "Render this run" }), Chat.SentUserMessage()),
-      Story.message(receivedFrame(frames[0]!)),
-      Story.message(receivedFrame(frames[1]!)),
-      Story.model((model) => {
-        const tool = model.entries[1]
+      message(Chat.ChangedDraft({ text: "Render this run" })),
+      message(Chat.SubmittedMessage()),
+      Command.expectExact(Chat.SendUserMessage({ sessionId, text: "Render this run" })),
+      Command.resolve(Chat.SendUserMessage({ sessionId, text: "Render this run" }), Chat.SentUserMessage()),
+      message(receivedFrame(frames[0]!)),
+      message(receivedFrame(frames[1]!)),
+      model((currentModel) => {
+        const tool = currentModel.entries[1]
         if (tool?._tag !== "ToolEntry") throw new Error("expected tool call entry")
         expect(Chat.toolStatusOf(tool)).toBe("input-streaming")
       }),
-      Story.message(receivedFrame(frames[2]!)),
-      Story.model((model) => {
-        const tool = model.entries[1]
+      message(receivedFrame(frames[2]!)),
+      model((currentModel) => {
+        const tool = currentModel.entries[1]
         if (tool?._tag !== "ToolEntry") throw new Error("expected executing tool entry")
         expect(Chat.toolStatusOf(tool)).toBe("input-available")
       }),
-      ...frames.slice(3).map((frame) => Story.message(receivedFrame(frame))),
-      Story.expectOutMessage(Chat.RunCompleted({ text: "Final answer" })),
-      Story.model((model) => {
-        expect(model.run).toEqual(Chat.Idle())
-        expect(model.streaming).toBeNull()
-        expect(Chat.conversationItems(model).map((item) => item._tag)).toEqual([
+      ...frames.slice(3).map((frame) => message(receivedFrame(frame))),
+      expectOutMessage(Chat.RunCompleted({ text: "Final answer" })),
+      model((currentModel) => {
+        expect(currentModel.run).toEqual(Chat.Idle())
+        expect(currentModel.streaming).toBeNull()
+        expect(Chat.conversationItems(currentModel).map((item) => item._tag)).toEqual([
           "UserConversationItem",
           "ToolConversationItem",
           "AssistantConversationItem",
         ])
 
-        const tool = model.entries[1]
+        const tool = currentModel.entries[1]
         if (tool?._tag !== "ToolEntry") throw new Error("expected completed tool entry")
         expect(tool.progress).toEqual(["looking up"])
         expect(Chat.toolStatusOf(tool)).toBe("output-available")
 
-        const assistant = model.entries[2]
+        const assistant = currentModel.entries[2]
         expect(assistant).toEqual(
           Chat.AssistantEntry({ text: "Final answer", reasoning: "Check the transport stream." }),
         )

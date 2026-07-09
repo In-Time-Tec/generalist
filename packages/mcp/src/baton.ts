@@ -1,48 +1,35 @@
-import { ToolExecutor } from "@batonfx/core"
 import { Effect, Layer } from "effect"
-import * as Ai from "effect/unstable/ai"
-import type * as McpToolSource from "./mcp-tool-source"
+import { Tool, Toolkit } from "effect/unstable/ai"
+import type { Interface, JsonValue } from "./mcp-tool-source"
 
 /**
- * Discovered MCP tools as a Baton toolkit. Pair with {@link toolExecutorLayer}
- * so tool calls are proxied to the MCP server instead of local handlers.
+ * Discovered MCP tools as a Baton toolkit. Pair with {@link toolkitLayer}
+ * so tool calls are proxied to the MCP server through Effect AI handlers.
  *
  * @experimental
  */
-export const toolkit = (
-  source: McpToolSource.Interface,
-): Effect.Effect<Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>>> =>
-  source.aiTools.pipe(
-    Effect.map((tools) => Ai.Toolkit.make(...tools) as Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>>),
-  )
-
-const failure = (message: string): ToolExecutor.Outcome => ({ _tag: "Failure", message })
-
-const execute = (source: McpToolSource.Interface, request: ToolExecutor.Request): Effect.Effect<ToolExecutor.Outcome> =>
-  source.tools.pipe(
-    Effect.flatMap((tools) => {
-      const tool = tools.find((candidate) => candidate.name === request.call.name)
-      if (tool === undefined) {
-        return Effect.succeed(failure(`Tool ${request.call.name} is not registered`))
-      }
-      return source.callTool(tool.rawName, request.call.params as McpToolSource.JsonValue).pipe(
-        Effect.map((result): ToolExecutor.Outcome => ({ _tag: "Success", result, encodedResult: result })),
-        Effect.catchTag("McpToolCallError", (error) => Effect.succeed(failure(error.message))),
-      )
-    }),
-  )
+export const toolkit = (source: Interface): Effect.Effect<Toolkit.Toolkit<Record<string, Tool.Any>>> =>
+  source.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools) as Toolkit.Toolkit<Record<string, Tool.Any>>))
 
 /**
- * Baton `ToolExecutor` that proxies tool calls to the MCP server. Outcomes are
- * `Success` (from `callTool`) or `Failure` (from `McpToolCallError`) — MCP
- * tools never `Suspend`.
+ * Effect AI handler layer that proxies MCP tool calls to the MCP server.
  *
  * @experimental
  */
-export const toolExecutorLayer = (source: McpToolSource.Interface): Layer.Layer<ToolExecutor.ToolExecutor> =>
-  Layer.succeed(
-    ToolExecutor.ToolExecutor,
-    ToolExecutor.ToolExecutor.of({
-      execute: (request) => execute(source, request),
+export const toolkitLayer = (source: Interface): Layer.Layer<Tool.Handler<any>> =>
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const mcpToolkit = yield* toolkit(source)
+      const tools = yield* source.tools
+      const handlers = Object.fromEntries(
+        tools.map((tool) => [
+          tool.name,
+          (params: unknown) =>
+            source
+              .callTool(tool.rawName, params as JsonValue)
+              .pipe(Effect.catchTag("McpToolCallError", (error) => Effect.fail(error.message))),
+        ]),
+      ) as Toolkit.HandlersFrom<typeof mcpToolkit.tools>
+      return mcpToolkit.toLayer(handlers)
     }),
   )

@@ -1,31 +1,31 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Exit, Schedule, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { AiError, LanguageModel, Response } from "effect/unstable/ai"
 import { ModelResilience } from "../src/index"
 
-const transientError = Ai.AiError.make({
+const transientError = AiError.make({
   module: "TestLanguageModel",
   method: "streamText",
-  reason: new Ai.AiError.RateLimitError({}),
+  reason: new AiError.RateLimitError({}),
 })
 
-const terminalError = Ai.AiError.make({
+const terminalError = AiError.make({
   module: "TestLanguageModel",
   method: "streamText",
-  reason: new Ai.AiError.UnknownError({ description: "terminal model failure" }),
+  reason: new AiError.UnknownError({ description: "terminal model failure" }),
 })
 
-const textPart = (text: string) => Ai.Response.makePart("text", { text })
+const textPart = (text: string) => Response.makePart("text", { text })
 
-const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
-const languageModel = (overrides: Partial<Ai.LanguageModel.Service>): Ai.LanguageModel.Service =>
+const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel.Service =>
   ({
-    generateText: () => Effect.succeed(new Ai.LanguageModel.GenerateTextResponse([])),
-    generateObject: () => Effect.succeed(new Ai.LanguageModel.GenerateObjectResponse({}, [])),
+    generateText: () => Effect.succeed(new LanguageModel.GenerateTextResponse([])),
+    generateObject: () => Effect.succeed(new LanguageModel.GenerateObjectResponse({}, [])),
     streamText: () => Stream.empty,
     ...overrides,
-  }) as Ai.LanguageModel.Service
+  }) as LanguageModel.Service
 
 const retryOnce = ModelResilience.make({
   retrySchedule: Schedule.recurs(1),
@@ -66,7 +66,7 @@ describe("ModelResilience", () => {
           calls += 1
           return calls === 1
             ? Effect.fail(transientError)
-            : Effect.succeed(new Ai.LanguageModel.GenerateTextResponse([textPart("ok")]))
+            : Effect.succeed(new LanguageModel.GenerateTextResponse([textPart("ok")]))
         },
       }),
       retryOnce,
@@ -106,8 +106,8 @@ describe("ModelResilience", () => {
           calls += 1
           return calls === 1
             ? Effect.fail(transientError)
-            : Effect.succeed(new Ai.LanguageModel.GenerateObjectResponse({ ok: true }, [textPart('{"ok":true}')]))
-        }) as unknown as Ai.LanguageModel.Service["generateObject"],
+            : Effect.succeed(new LanguageModel.GenerateObjectResponse({ ok: true }, [textPart('{"ok":true}')]))
+        }) as unknown as LanguageModel.Service["generateObject"],
       }),
       retryOnce,
     )
@@ -235,7 +235,7 @@ describe("ModelResilience", () => {
       languageModel({
         streamText: () => {
           calls += 1
-          return Stream.make(Ai.Response.makePart("error", { error: transientError }))
+          return Stream.make(Response.makePart("error", { error: transientError }))
         },
       }),
       ModelResilience.make({

@@ -1,36 +1,37 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
 import { SessionRegistry } from "@batonfx/transport"
 
-const deployTool = Ai.Tool.make("deploy", {
+const deployTool = Tool.make("deploy", {
   description: "Deploy a service",
   parameters: Schema.Struct({ service: Schema.String }),
   success: Schema.String,
   needsApproval: true,
 })
 
-const agent = Agent.make({ name: "release-agent", toolkit: Ai.Toolkit.make(deployTool) })
+const toolkit = Toolkit.make(deployTool)
+const agent = Agent.make({ name: "release-agent", toolkit })
 
 let calls = 0
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () => {
       calls += 1
       return calls === 1
         ? Stream.make(
-            Ai.Response.makePart("tool-call", {
+            Response.makePart("tool-call", {
               id: "deploy-1",
               name: "deploy",
               params: { service: "api" },
               providerExecuted: false,
             }),
           )
-        : Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: "Deployed api to production." }))
+        : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Deployed api to production." }))
     },
   }),
 )
@@ -39,12 +40,10 @@ const registryLayer = SessionRegistry.layerMemory({ agent }).pipe(
   Layer.provide(
     Layer.mergeAll(
       modelLayer,
-      ToolExecutor.testLayer({
-        execute: () => Effect.succeed({ _tag: "Success", result: "deployed", encodedResult: "deployed" }),
-      }),
+      toolkit.toLayer({ deploy: () => Effect.succeed("deployed") }),
       Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "deploy-token-1" }) }),
       ModelMiddleware.identityLayer,
-      Ai.Chat.layerPersisted({ storeId: "approval-demo" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
+      Chat.layerPersisted({ storeId: "approval-demo" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
     ),
   ),
 )

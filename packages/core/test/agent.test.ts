@@ -1,6 +1,6 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentEvent,
@@ -18,28 +18,29 @@ import {
   ToolOutput,
   TurnPolicy,
 } from "../src/index"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const modelLayer = (
   streamText: ModelParams["streamText"],
   generateText: ModelParams["generateText"] = () => Effect.succeed([{ type: "text", text: "unused" }]),
 ) =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText,
       streamText,
     }),
   )
 
-const echoTool = Ai.Tool.make("echo", {
+const echoTool = Tool.make("echo", {
   description: "Echo input for tests",
   parameters: Schema.Struct({ text: Schema.String }),
   success: Schema.Unknown,
 })
 
-const gatedTool = Ai.Tool.make("gated", {
+const gatedTool = Tool.make("gated", {
   description: "Requires approval",
   parameters: Schema.Struct({ text: Schema.String }),
   success: Schema.Unknown,
@@ -75,14 +76,14 @@ const unusedExecutor = ToolExecutor.testLayer({
 })
 
 const toolCallPart = (id: string, name: string, params: unknown) =>
-  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
 const providerToolCallPart = (id: string, name: string, params: unknown) =>
-  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: true })
+  Response.makePart("tool-call", { id, name, params, providerExecuted: true })
 
-const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
-const systemText = (prompt: Ai.Prompt.Prompt): string | undefined => {
+const systemText = (prompt: Prompt.Prompt): string | undefined => {
   for (const message of prompt.content) {
     if (message.role === "system") return message.content
   }
@@ -90,10 +91,10 @@ const systemText = (prompt: Ai.Prompt.Prompt): string | undefined => {
 }
 
 const usage = (
-  inputTokens: Partial<Ai.Response.Usage["inputTokens"]>,
-  outputTokens: Partial<Ai.Response.Usage["outputTokens"]>,
+  inputTokens: Partial<Response.Usage["inputTokens"]>,
+  outputTokens: Partial<Response.Usage["outputTokens"]>,
 ) =>
-  new Ai.Response.Usage({
+  new Response.Usage({
     inputTokens: {
       uncached: inputTokens.uncached,
       total: inputTokens.total,
@@ -107,22 +108,22 @@ const usage = (
     },
   })
 
-const finishPart = (reason: Ai.Response.FinishReason, reportedUsage: Ai.Response.Usage) =>
-  Ai.Response.makePart("finish", { reason, usage: reportedUsage, response: undefined })
+const finishPart = (reason: Response.FinishReason, reportedUsage: Response.Usage) =>
+  Response.makePart("finish", { reason, usage: reportedUsage, response: undefined })
 
 const objectSchema = Schema.Struct({ ok: Schema.Boolean })
 
-const transientModelError = Ai.AiError.make({
+const transientModelError = AiError.make({
   module: "AgentTestLanguageModel",
   method: "streamText",
-  reason: new Ai.AiError.RateLimitError({}),
+  reason: new AiError.RateLimitError({}),
 })
 
 const contextOverflowError = (description: string) =>
-  Ai.AiError.make({
+  AiError.make({
     module: "AgentTestLanguageModel",
     method: "streamText",
-    reason: new Ai.AiError.UnknownError({ description }),
+    reason: new AiError.UnknownError({ description }),
   })
 
 const retryTransientModelError = ModelResilience.layer({
@@ -130,7 +131,7 @@ const retryTransientModelError = ModelResilience.layer({
   classify: (error) => (error === transientModelError ? "transient" : "terminal"),
 })
 
-describe("Agent", () => {
+layer(unusedToolHandlerLayer)("Agent", (it) => {
   it("adds usage fieldwise without inventing absent leaves", () => {
     const first = usage({ uncached: 1, total: 10, cacheWrite: 3 }, { total: 4, text: 2 })
     const second = usage({ uncached: 4, total: 20, cacheRead: 5 }, { total: 6, reasoning: 7 })
@@ -265,6 +266,133 @@ describe("Agent", () => {
     ),
   )
 
+  it.effect("runs a no-tool agent with only a language model layer", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make("minimal-agent", { instructions: "Answer directly." })
+
+      const result = yield* Agent.generate(agent, { prompt: "hello" })
+
+      expect(result.text).toBe("minimal done")
+    }).pipe(Effect.provide(modelLayer(() => Stream.make(textDelta("minimal done"))))),
+  )
+
+  it.effect("executes Effect toolkit handlers without a ToolExecutor layer", () => {
+    let calls = 0
+    let handled = false
+    const toolkit = Toolkit.make(echoTool)
+    return Effect.gen(function* () {
+      const agent = Agent.make("toolkit-handler-agent", { toolkit })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use echo" }))
+
+      expect(handled).toBe(true)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+      expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-effect-toolkit", "echo", { text: "from model" }))
+              : Stream.make(
+                  textDelta(JSON.stringify(options.prompt.content).includes("handled by toolkit") ? "done" : "missing"),
+                )
+          }),
+          toolkit.toLayer({
+            echo: ({ text }) =>
+              Effect.sync(() => {
+                handled = true
+                return { echoed: text, marker: "handled by toolkit" }
+              }),
+          }),
+        ),
+      ),
+    )
+  })
+
+  it.effect("keeps ToolExecutor as an override when it is provided", () => {
+    let calls = 0
+    let toolkitHandlerCalls = 0
+    let executorCalls = 0
+    const toolkit = Toolkit.make(echoTool)
+    return Effect.gen(function* () {
+      const agent = Agent.make("tool-executor-override-agent", { toolkit })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use echo" }))
+
+      expect(toolkitHandlerCalls).toBe(0)
+      expect(executorCalls).toBe(1)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-override", "echo", { text: "from model" }))
+              : Stream.make(
+                  textDelta(
+                    JSON.stringify(options.prompt.content).includes("handled by executor") ? "done" : "missing",
+                  ),
+                )
+          }),
+          toolkit.toLayer({
+            echo: () =>
+              Effect.sync(() => {
+                toolkitHandlerCalls += 1
+                return { marker: "handled by toolkit" }
+              }),
+          }),
+          ToolExecutor.testLayer({
+            execute: () =>
+              Effect.sync(() => {
+                executorCalls += 1
+                return {
+                  _tag: "Success",
+                  result: { marker: "handled by executor" },
+                  encodedResult: { marker: "handled by executor" },
+                }
+              }),
+          }),
+        ),
+      ),
+    )
+  })
+
+  it.effect("fails approval-gated tools closed when Approvals is absent", () => {
+    let calls = 0
+    return Effect.gen(function* () {
+      const agent = Agent.make("missing-approvals-agent", { toolkit: Toolkit.make(gatedTool) })
+
+      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use gated" }))
+      const completion = events.find((event) => event._tag === "ToolExecutionCompleted")
+
+      expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
+      expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
+      if (completion?._tag === "ToolExecutionCompleted") {
+        expect(completion.result.isFailure).toBe(true)
+        expect(JSON.stringify(completion.result.encodedResult)).toContain("Approvals service is required")
+      }
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("tool-call-missing-approvals", "gated", { text: "from model" }))
+              : Stream.make(textDelta("after failed approval"))
+          }),
+          Toolkit.make(gatedTool).toLayer({
+            gated: () => Effect.die("approval-gated call must not execute"),
+          }),
+        ),
+      ),
+    )
+  })
+
   it.effect("uses an Instructions baseline for the first-turn system message", () => {
     let capturedSystem: string | undefined
     return Effect.gen(function* () {
@@ -383,7 +511,7 @@ describe("Agent", () => {
     let firstTools: ReadonlyArray<string> = []
     let secondTools: ReadonlyArray<string> = []
     let deployBodyReads = 0
-    const reviewTool = Ai.Tool.make("review_tool", {
+    const reviewTool = Tool.make("review_tool", {
       description: "Review helper",
       parameters: Schema.Struct({ target: Schema.String }),
       success: Schema.Unknown,
@@ -554,7 +682,7 @@ describe("Agent", () => {
     return Effect.gen(function* () {
       const agent = Agent.make({
         name: "tool-test-agent",
-        toolkit: Ai.Toolkit.make(echoTool),
+        toolkit: Toolkit.make(echoTool),
       })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
@@ -592,7 +720,7 @@ describe("Agent", () => {
     let calls = 0
     let requestSessionId = ""
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "context-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "context-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(
         Agent.stream(agent, { prompt: "use the context tool", sessionId: "session-1" }),
@@ -643,13 +771,13 @@ describe("Agent", () => {
   it.effect("provides ToolContext to default toolkit handlers", () => {
     let calls = 0
     let handlerSessionId = ""
-    const handledTool = Ai.Tool.make("handled-context", {
+    const handledTool = Tool.make("handled-context", {
       description: "Reads Baton ToolContext from a toolkit handler",
       parameters: Schema.Struct({ text: Schema.String }),
       success: Schema.Unknown,
       dependencies: [ToolContext.ToolContext],
     })
-    const toolkit = Ai.Toolkit.make(handledTool)
+    const toolkit = Toolkit.make(handledTool)
     return Effect.gen(function* () {
       const handledToolkit = yield* toolkit.pipe(
         Effect.provide(
@@ -694,7 +822,7 @@ describe("Agent", () => {
     let calls = 0
     let approvalSessionId = ""
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "gated-session-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+      const agent = Agent.make({ name: "gated-session-agent", toolkit: Toolkit.make(gatedTool) })
 
       const events = yield* Stream.runCollect(
         Agent.stream(agent, { prompt: "needs approval", sessionId: "session-approval" }),
@@ -729,7 +857,7 @@ describe("Agent", () => {
     let calls = 0
     let secondPrompt = ""
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "permission-deny-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+      const agent = Agent.make({ name: "permission-deny-agent", toolkit: Toolkit.make(gatedTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "needs permission" }))
 
@@ -765,7 +893,7 @@ describe("Agent", () => {
     let calls = 0
     let secondPrompt = ""
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "permission-allow-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+      const agent = Agent.make({ name: "permission-allow-agent", toolkit: Toolkit.make(gatedTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "needs approval" }))
 
@@ -795,7 +923,7 @@ describe("Agent", () => {
   it.effect("suspends permission asks through the existing approval suspension path", () => {
     const events: Array<AgentEvent.Event> = []
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "permission-ask-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+      const agent = Agent.make({ name: "permission-ask-agent", toolkit: Toolkit.make(gatedTool) })
 
       const failure = yield* Effect.flip(
         Stream.runForEach(Agent.stream(agent, { prompt: "needs permission" }), (event) =>
@@ -834,7 +962,7 @@ describe("Agent", () => {
   it.effect("executes permission Approved answers without consulting Approvals again", () => {
     let calls = 0
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "permission-approved-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+      const agent = Agent.make({ name: "permission-approved-agent", toolkit: Toolkit.make(gatedTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "ask then approve" }))
 
@@ -866,7 +994,7 @@ describe("Agent", () => {
     let calls = 0
     const remembered: Array<Permissions.Rule> = []
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "permission-always-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+      const agent = Agent.make({ name: "permission-always-agent", toolkit: Toolkit.make(gatedTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "ask always" }))
 
@@ -953,14 +1081,14 @@ describe("Agent", () => {
 
   it.effect("does not duplicate a pre-populated Session path when Compaction is active", () => {
     let calls = 0
-    const seed = Ai.Prompt.makeMessage("user", { content: [Ai.Prompt.makePart("text", { text: "seed" })] })
+    const seed = Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "seed" })] })
     return Effect.gen(function* () {
       const session = yield* Session.SessionStore
       yield* session.append({ _tag: "Message", message: seed })
       const agent = Agent.make({ name: "prepopulated-session-agent" })
 
       const events = yield* Stream.runCollect(
-        Agent.stream(agent, { prompt: "next", history: Ai.Prompt.fromMessages([seed]) }),
+        Agent.stream(agent, { prompt: "next", history: Prompt.fromMessages([seed]) }),
       )
       const path = yield* session.path()
       const seedEntries = path.filter(
@@ -1012,8 +1140,8 @@ describe("Agent", () => {
               Effect.succeed(
                 Option.some({
                   _tag: "Microcompact",
-                  history: Ai.Prompt.make("compacted history"),
-                  prompt: Ai.Prompt.make("compacted prompt"),
+                  history: Prompt.make("compacted history"),
+                  prompt: Prompt.make("compacted prompt"),
                 }),
               ),
           }),
@@ -1030,7 +1158,7 @@ describe("Agent", () => {
     let summaryCalls = 0
     let secondPrompt = ""
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "default-compaction-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "default-compaction-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context" }))
       const session = yield* Session.SessionStore
@@ -1078,7 +1206,7 @@ describe("Agent", () => {
     let streamCalls = 0
     let secondPrompt = ""
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "system-compaction-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "system-compaction-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(
         Agent.stream(agent, { prompt: "old context", system: "You are a careful test agent" }),
@@ -1120,7 +1248,7 @@ describe("Agent", () => {
     let summaryCalls = 0
     let secondPrompt = ""
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "reserve-compaction-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "reserve-compaction-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context" }))
 
@@ -1187,8 +1315,8 @@ describe("Agent", () => {
                 if (request.overflow) overflowRequests += 1
                 return Option.some({
                   _tag: "Microcompact",
-                  history: Ai.Prompt.empty,
-                  prompt: Ai.Prompt.make("after overflow"),
+                  history: Prompt.empty,
+                  prompt: Prompt.make("after overflow"),
                 })
               }),
           }),
@@ -1219,7 +1347,7 @@ describe("Agent", () => {
           Compaction.testLayer({
             maybeCompact: () =>
               Effect.succeed(
-                Option.some({ _tag: "Microcompact", history: Ai.Prompt.empty, prompt: Ai.Prompt.make("retry") }),
+                Option.some({ _tag: "Microcompact", history: Prompt.empty, prompt: Prompt.make("retry") }),
               ),
           }),
           unusedExecutor,
@@ -1252,7 +1380,7 @@ describe("Agent", () => {
           Compaction.testLayer({
             maybeCompact: () =>
               Effect.succeed(
-                Option.some({ _tag: "Microcompact", history: Ai.Prompt.empty, prompt: Ai.Prompt.make("retry") }),
+                Option.some({ _tag: "Microcompact", history: Prompt.empty, prompt: Prompt.make("retry") }),
               ),
           }),
           unusedExecutor,
@@ -1265,12 +1393,12 @@ describe("Agent", () => {
 
   it.effect("drains steering after tool calls and before tool results", () => {
     let calls = 0
-    let secondMessages: ReadonlyArray<Ai.Prompt.Message> = []
+    let secondMessages: ReadonlyArray<Prompt.Message> = []
     return Effect.gen(function* () {
       const steering = yield* Steering.Steering
       yield* steering.steer({ prompt: "steer one" })
       yield* steering.steer({ prompt: "steer two" })
-      const agent = Agent.make({ name: "steering-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "steering-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool" }))
 
@@ -1315,7 +1443,7 @@ describe("Agent", () => {
       const steering = yield* Steering.Steering
       yield* steering.steer({ prompt: "first steer" })
       yield* steering.steer({ prompt: "second steer" })
-      const agent = Agent.make({ name: "steering-one-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "steering-one-agent", toolkit: Toolkit.make(echoTool) })
 
       yield* Stream.runDrain(Agent.stream(agent, { prompt: "use tool" }))
       const remaining = yield* steering.takeSteering()
@@ -1480,7 +1608,7 @@ describe("Agent", () => {
 
   it.effect("interrupting Agent.stream while needsApproval awaits exits interrupted", () => {
     let started: Deferred.Deferred<void> | undefined
-    const waitingApprovalTool = Ai.Tool.make("waiting-approval", {
+    const waitingApprovalTool = Tool.make("waiting-approval", {
       description: "Requires waiting approval",
       parameters: Schema.Struct({ text: Schema.String }),
       success: Schema.Unknown,
@@ -1496,7 +1624,7 @@ describe("Agent", () => {
       started = currentStarted
       const agent = Agent.make({
         name: "interrupt-waiting-approval-agent",
-        toolkit: Ai.Toolkit.make(waitingApprovalTool),
+        toolkit: Toolkit.make(waitingApprovalTool),
       })
       const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "needs approval" })).pipe(
         Effect.forkChild({ startImmediately: true }),
@@ -1554,7 +1682,7 @@ describe("Agent", () => {
 
   it.effect("preserves interrupt causes while needsApproval is evaluating", () => {
     let started: Deferred.Deferred<void> | undefined
-    const interruptibleApprovalTool = Ai.Tool.make("interruptible-approval", {
+    const interruptibleApprovalTool = Tool.make("interruptible-approval", {
       description: "Requires interruptible approval",
       parameters: Schema.Struct({ text: Schema.String }),
       success: Schema.Unknown,
@@ -1570,7 +1698,7 @@ describe("Agent", () => {
       started = currentStarted
       const agent = Agent.make({
         name: "interrupt-approval-agent",
-        toolkit: Ai.Toolkit.make(interruptibleApprovalTool),
+        toolkit: Toolkit.make(interruptibleApprovalTool),
       })
       const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "needs approval" })).pipe(
         Effect.forkChild({ startImmediately: true }),
@@ -1629,7 +1757,7 @@ describe("Agent", () => {
     let aborted = false
     return Effect.gen(function* () {
       const started = yield* Deferred.make<void>()
-      const agent = Agent.make({ name: "abort-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "abort-agent", toolkit: Toolkit.make(echoTool) })
       const run = Stream.runDrain(Agent.stream(agent, { prompt: "abort the tool" })).pipe(
         Effect.provide(
           Layer.mergeAll(
@@ -1669,7 +1797,7 @@ describe("Agent", () => {
     let secondPrompt = ""
     const largeOutput = "x".repeat(256)
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "spill-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "spill-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(
         Agent.stream(agent, { prompt: "use big tool", sessionId: "spill-session", toolOutputMaxBytes: 48 }),
@@ -1722,7 +1850,7 @@ describe("Agent", () => {
     const secondUsage = usage({ total: 7, cacheRead: 3 }, { total: 5, text: 4, reasoning: 1 })
     const expectedUsage = AgentEvent.addUsage(firstUsage, secondUsage)
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "multi-usage-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "multi-usage-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
 
@@ -1836,7 +1964,7 @@ describe("Agent", () => {
     let structuredPrompt = ""
     const structuredUsage = usage({ total: 5 }, { total: 2 })
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "structured-tool-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "structured-tool-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(Agent.streamObject(agent, { prompt: "use tool", schema: objectSchema }))
 
@@ -1890,7 +2018,7 @@ describe("Agent", () => {
       expect(failure._tag).toBe("@batonfx/core/AgentError")
       if (failure._tag === "@batonfx/core/AgentError") {
         expect(failure.turn).toBe(1)
-        expect(Ai.AiError.isAiError(failure.cause)).toBe(true)
+        expect(AiError.isAiError(failure.cause)).toBe(true)
       }
     }).pipe(
       Effect.provide(
@@ -1911,7 +2039,7 @@ describe("Agent", () => {
     let calls = 0
     let sawResumedToolResult = false
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "resume-structured-agent", toolkit: Ai.Toolkit.make(echoTool) })
+      const agent = Agent.make({ name: "resume-structured-agent", toolkit: Toolkit.make(echoTool) })
 
       const events = yield* Stream.runCollect(
         Agent.streamObject(agent, {
@@ -2011,7 +2139,7 @@ describe("Agent", () => {
       Effect.provide(
         Layer.mergeAll(
           modelLayer(() =>
-            Stream.fromIterable([textDelta("partial"), Ai.Response.makePart("error", { error: streamError })]),
+            Stream.fromIterable([textDelta("partial"), Response.makePart("error", { error: streamError })]),
           ),
           unusedExecutor,
           Approvals.autoApprove,
@@ -2022,10 +2150,10 @@ describe("Agent", () => {
   })
 
   it.effect("fails typed when the stream channel fails", () => {
-    const streamFailure = Ai.AiError.make({
+    const streamFailure = AiError.make({
       module: "TestLanguageModel",
       method: "streamText",
-      reason: new Ai.AiError.UnknownError({ description: "stream channel exploded" }),
+      reason: new AiError.UnknownError({ description: "stream channel exploded" }),
     })
     return Effect.gen(function* () {
       const agent = Agent.make({ name: "channel-error-agent" })
@@ -2175,7 +2303,7 @@ describe("Agent", () => {
         Layer.mergeAll(
           modelLayer(() => {
             calls += 1
-            return Stream.make(Ai.Response.makePart("error", { error: transientModelError }))
+            return Stream.make(Response.makePart("error", { error: transientModelError }))
           }),
           unusedExecutor,
           Approvals.autoApprove,
@@ -2202,7 +2330,7 @@ describe("Agent", () => {
     return Effect.gen(function* () {
       const agent = Agent.make({
         name: "override-model-retry-agent",
-        toolkit: Ai.Toolkit.make(echoTool),
+        toolkit: Toolkit.make(echoTool),
         policy: TurnPolicy.make(() => Effect.succeed(TurnPolicy.decision.continue({ model: overrideModel }))),
       })
 
@@ -2233,7 +2361,7 @@ describe("Agent", () => {
     return Effect.gen(function* () {
       const agent = Agent.make({
         name: "policy-stop-agent",
-        toolkit: Ai.Toolkit.make(echoTool),
+        toolkit: Toolkit.make(echoTool),
         policy: TurnPolicy.recurs(0),
       })
 
@@ -2266,7 +2394,7 @@ describe("Agent", () => {
     return Effect.gen(function* () {
       const agent = Agent.make({
         name: "override-agent",
-        toolkit: Ai.Toolkit.make(echoTool),
+        toolkit: Toolkit.make(echoTool),
         policy: TurnPolicy.make(() =>
           Effect.succeed(TurnPolicy.decision.continue({ instructions: "injected system content" })),
         ),
@@ -2299,7 +2427,7 @@ describe("Agent", () => {
     Effect.gen(function* () {
       const agent = Agent.make({
         name: "suspend-agent",
-        toolkit: Ai.Toolkit.make(echoTool),
+        toolkit: Toolkit.make(echoTool),
       })
 
       const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "wait please" })))
@@ -2331,7 +2459,7 @@ describe("Agent", () => {
     return Effect.gen(function* () {
       const agent = Agent.make({
         name: "resume-agent",
-        toolkit: Ai.Toolkit.make(echoTool),
+        toolkit: Toolkit.make(echoTool),
       })
 
       const events = yield* Stream.runCollect(
@@ -2381,7 +2509,7 @@ describe("Agent", () => {
 
   it.effect("passes provider-executed tool calls through without local gating or execution", () =>
     Effect.gen(function* () {
-      const agent = Agent.make({ name: "provider-tool-agent", toolkit: Ai.Toolkit.make(gatedTool) })
+      const agent = Agent.make({ name: "provider-tool-agent", toolkit: Toolkit.make(gatedTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "provider already handled it" }))
 
@@ -2410,7 +2538,7 @@ describe("Agent", () => {
     let sawParams: unknown
     let sawToolCallId = ""
     let sawMessages = ""
-    const dynamicTool = Ai.Tool.make("dynamic", {
+    const dynamicTool = Tool.make("dynamic", {
       description: "Dynamic approval test tool",
       parameters: Schema.Struct({ amount: Schema.Number }),
       success: Schema.Unknown,
@@ -2422,7 +2550,7 @@ describe("Agent", () => {
       },
     })
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "dynamic-approval-agent", toolkit: Ai.Toolkit.make(dynamicTool) })
+      const agent = Agent.make({ name: "dynamic-approval-agent", toolkit: Toolkit.make(dynamicTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "safe amount" }))
 
@@ -2458,14 +2586,14 @@ describe("Agent", () => {
   it.effect("evaluates needsApproval functions and gates when they return true", () => {
     let calls = 0
     let approvals = 0
-    const dynamicTool = Ai.Tool.make("dynamic-gated", {
+    const dynamicTool = Tool.make("dynamic-gated", {
       description: "Dynamic approval gated test tool",
       parameters: Schema.Struct({ amount: Schema.Number }),
       success: Schema.Unknown,
       needsApproval: (params) => params.amount > 100,
     })
     return Effect.gen(function* () {
-      const agent = Agent.make({ name: "dynamic-gated-agent", toolkit: Ai.Toolkit.make(dynamicTool) })
+      const agent = Agent.make({ name: "dynamic-gated-agent", toolkit: Toolkit.make(dynamicTool) })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "large amount" }))
 
@@ -2500,9 +2628,9 @@ describe("Agent", () => {
     let calls = 0
     const failingNeedsApproval = (() => Effect.fail(new Error("approval predicate failed"))) as unknown as (
       params: { readonly amount: number },
-      context: Ai.Tool.NeedsApprovalContext,
+      context: Tool.NeedsApprovalContext,
     ) => boolean
-    const throwingTool = Ai.Tool.make("throwing-approval", {
+    const throwingTool = Tool.make("throwing-approval", {
       description: "Throwing approval test tool",
       parameters: Schema.Struct({ amount: Schema.Number }),
       success: Schema.Unknown,
@@ -2510,7 +2638,7 @@ describe("Agent", () => {
         throw new Error("approval predicate exploded")
       },
     })
-    const failingTool = Ai.Tool.make("failing-approval", {
+    const failingTool = Tool.make("failing-approval", {
       description: "Failing approval test tool",
       parameters: Schema.Struct({ amount: Schema.Number }),
       success: Schema.Unknown,
@@ -2519,7 +2647,7 @@ describe("Agent", () => {
     return Effect.gen(function* () {
       const agent = Agent.make({
         name: "fail-closed-agent",
-        toolkit: Ai.Toolkit.make(throwingTool, failingTool),
+        toolkit: Toolkit.make(throwingTool, failingTool),
       })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "needs approval fail closed" }))
@@ -2558,7 +2686,7 @@ describe("Agent", () => {
     return Effect.gen(function* () {
       const agent = Agent.make({
         name: "approval-agent",
-        toolkit: Ai.Toolkit.make(gatedTool),
+        toolkit: Toolkit.make(gatedTool),
       })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the gated tool" }))
@@ -2589,7 +2717,7 @@ describe("Agent", () => {
     return Effect.gen(function* () {
       const agent = Agent.make({
         name: "denied-agent",
-        toolkit: Ai.Toolkit.make(gatedTool),
+        toolkit: Toolkit.make(gatedTool),
       })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the gated tool" }))
@@ -2621,7 +2749,7 @@ describe("Agent", () => {
     Effect.gen(function* () {
       const agent = Agent.make({
         name: "pending-agent",
-        toolkit: Ai.Toolkit.make(gatedTool),
+        toolkit: Toolkit.make(gatedTool),
       })
 
       const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use the gated tool" })))
@@ -2649,7 +2777,7 @@ describe("Agent", () => {
     return Effect.gen(function* () {
       const agent = Agent.make({
         name: "ungated-agent",
-        toolkit: Ai.Toolkit.make(echoTool),
+        toolkit: Toolkit.make(echoTool),
       })
 
       const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))

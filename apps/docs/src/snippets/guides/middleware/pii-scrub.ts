@@ -1,8 +1,8 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Guardrail, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 
-const lastUserText = (prompt: Ai.Prompt.Prompt): string => {
+const lastUserText = (prompt: Prompt.Prompt): string => {
   const userMessages = prompt.content.filter((message) => message.role === "user")
   const last = userMessages.at(-1)
   if (last === undefined) return ""
@@ -13,12 +13,12 @@ const lastUserText = (prompt: Ai.Prompt.Prompt): string => {
 }
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: (options) =>
       Stream.make(
-        Ai.Response.makePart("text-delta", {
+        Response.makePart("text-delta", {
           id: "assistant",
           delta: `Received: ${lastUserText(options.prompt)} Escalate to oncall@example.com if needed.`,
         }),

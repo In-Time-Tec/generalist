@@ -1,5 +1,4 @@
 import { Effect, Layer } from "effect"
-import { ToolExecutor } from "@batonfx/core"
 import { DocsIndex, toolkit } from "./search-tool"
 
 const searchDocsHandler = Effect.fn("Docs.searchDocs")(function* (params: { readonly query: string }) {
@@ -17,9 +16,4 @@ export const docsIndexLayer: Layer.Layer<DocsIndex> = Layer.succeed(
   }),
 )
 
-export const toolExecutorLayer: Layer.Layer<ToolExecutor.ToolExecutor> = Layer.unwrap(
-  Effect.gen(function* () {
-    const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitLayer))
-    return ToolExecutor.fromToolkit(handledToolkit)
-  }),
-).pipe(Layer.provide(docsIndexLayer))
+export const docsToolLayer = toolkitLayer.pipe(Layer.provide(docsIndexLayer))

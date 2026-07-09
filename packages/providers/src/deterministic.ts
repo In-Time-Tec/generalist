@@ -1,15 +1,15 @@
-import * as OpenAi from "@effect/ai-openai"
+import { OpenAiClient } from "@effect/ai-openai"
 import { ModelRegistry } from "@batonfx/core"
 import { Effect, Layer, Option, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 import { openAi, type RegistrationOptions, type WithOpenAiOptions } from "./openai"
 
 const deterministicModelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "deterministic response" }]),
-    streamText: () => Stream.make(Ai.Response.makePart("text-delta", { id: "text", delta: "deterministic response" })),
+    streamText: () => Stream.make(Response.makePart("text-delta", { id: "text", delta: "deterministic response" })),
   }),
 )
 
@@ -48,7 +48,7 @@ export const withOpenAiOrDeterministic = (options: WithOpenAiOrDeterministicOpti
         model: options.fallbackModel,
       })
       const openAiRegistration = yield* openAi(options).pipe(
-        Effect.provide(OpenAi.OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
+        Effect.provide(OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
         Effect.provide(FetchHttpClient.layer),
         Effect.asSome,
         Effect.catchTag("ConfigError", () => Effect.succeedNone),

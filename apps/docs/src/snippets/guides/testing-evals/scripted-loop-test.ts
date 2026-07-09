@@ -1,37 +1,39 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
 
-const lookupTool = Ai.Tool.make("lookup_order", {
+const lookupTool = Tool.make("lookup_order", {
   description: "Look up an order by id",
   parameters: Schema.Struct({ orderId: Schema.String }),
   success: Schema.String,
 })
 
+const toolkit = Toolkit.make(lookupTool)
+
 const agent = Agent.make({
   name: "support-agent",
   instructions: "Answer using the order data returned by tools.",
-  toolkit: Ai.Toolkit.make(lookupTool),
+  toolkit,
 })
 
 let calls = 0
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () => {
       calls += 1
       return calls === 1
         ? Stream.make(
-            Ai.Response.makePart("tool-call", {
+            Response.makePart("tool-call", {
               id: "lookup-1",
               name: "lookup_order",
               params: { orderId: "42" },
               providerExecuted: false,
             }),
           )
-        : Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: "Order 42 shipped yesterday." }))
+        : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Order 42 shipped yesterday." }))
     },
   }),
 )
@@ -40,11 +42,11 @@ const executedCalls: Array<unknown> = []
 
 const layers = Layer.mergeAll(
   modelLayer,
-  ToolExecutor.testLayer({
-    execute: (request) =>
+  toolkit.toLayer({
+    lookup_order: (params) =>
       Effect.sync(() => {
-        executedCalls.push(request.call.params)
-        return { _tag: "Success", result: "shipped yesterday", encodedResult: "shipped yesterday" }
+        executedCalls.push(params)
+        return "shipped yesterday"
       }),
   }),
   Approvals.autoApprove,

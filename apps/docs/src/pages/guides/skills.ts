@@ -2,9 +2,8 @@ import activateSkill from "../../snippets/guides/skills/activate-skill.ts?raw"
 import activateSkillExpected from "../../snippets/guides/skills/activate-skill.expected.txt?raw"
 import skillLoader from "../../snippets/guides/skills/skill-loader.ts?raw"
 import skillMd from "../../snippets/guides/skills/SKILL.md?raw"
-import * as Prose from "../../prose"
-
-export const skills = Prose.definePage({
+import { bullets, callout, code, codeBlock, definePage, h2, link, p } from "../../prose"
+export const skills = definePage({
   path: "/docs/guides/skills",
   title: "How to add skills",
   navTitle: "Skills",
@@ -12,90 +11,90 @@ export const skills = Prose.definePage({
   description:
     "Provide a SkillSource, let the loop advertise listings and the activate_skill tool, and load SKILL.md directories from the filesystem.",
   content: [
-    Prose.p(
+    p(
       "A skill is reusable instruction material the agent loads on demand: startup context carries only one-line listings, and the model calls the built-in ",
-      Prose.code("activate_skill"),
+      code("activate_skill"),
       " tool to pull in a skill's full body when the task matches. Provide a ",
-      Prose.code("SkillSource"),
+      code("SkillSource"),
       " layer and the loop handles the rest: listing injection, the activation tool, and lazy body loading.",
     ),
-    Prose.h2("write-a-skill", "1. Write a SKILL.md"),
-    Prose.p(
+    h2("write-a-skill", "1. Write a SKILL.md"),
+    p(
       "Skills follow the agentskills ",
-      Prose.code("SKILL.md"),
+      code("SKILL.md"),
       " format: a directory holding a ",
-      Prose.code("SKILL.md"),
+      code("SKILL.md"),
       " with YAML-style frontmatter and a Markdown body. Only ",
-      Prose.code("description"),
+      code("description"),
       " is required; ",
-      Prose.code("name"),
+      code("name"),
       " defaults to the directory name:",
     ),
-    Prose.codeBlock({ label: "release-notes/SKILL.md", language: "markdown", source: skillMd }),
-    Prose.h2("provide-a-source", "2. Provide a source and watch activation"),
-    Prose.p(
+    codeBlock({ label: "release-notes/SKILL.md", language: "markdown", source: skillMd }),
+    h2("provide-a-source", "2. Provide a source and watch activation"),
+    p(
       "For skills defined in code, build ",
-      Prose.code("SkillSource.Skill"),
+      code("SkillSource.Skill"),
       " values and provide ",
-      Prose.code("SkillSource.fromSkills"),
+      code("SkillSource.fromSkills"),
       ". The loop appends the listings to the system message, advertises ",
-      Prose.code("activate_skill"),
+      code("activate_skill"),
       ", handles the activation call itself (it never reaches your executor), and returns ",
-      Prose.code("{ name, body, allowedTools }"),
+      code("{ name, body, allowedTools }"),
       " to the model as an ordinary tool result:",
     ),
-    Prose.codeBlock({ label: "activate-skill.ts", source: activateSkill, expectedOutput: activateSkillExpected }),
-    Prose.callout(
+    codeBlock({ label: "activate-skill.ts", source: activateSkill, expectedOutput: activateSkillExpected }),
+    callout(
       "info",
       "Bodies are lazy",
-      Prose.code("Skill.body"),
+      code("Skill.body"),
       " is an Effect evaluated only on activation, and each body loads once per run. Non-activated skills cost one listing line each.",
     ),
-    Prose.h2("load-from-the-filesystem", "3. Load skill directories from the filesystem"),
-    Prose.p(
-      Prose.code("SkillLoader.layer"),
+    h2("load-from-the-filesystem", "3. Load skill directories from the filesystem"),
+    p(
+      code("SkillLoader.layer"),
       " from ",
-      Prose.code("@batonfx/skills"),
+      code("@batonfx/skills"),
       " discovers ",
-      Prose.code("SKILL.md"),
+      code("SKILL.md"),
       " files under your roots (defaults: ",
-      Prose.code(".agents/skills"),
+      code(".agents/skills"),
       ", ",
-      Prose.code(".claude/skills"),
+      code(".claude/skills"),
       ", ",
-      Prose.code(".pi/skills"),
+      code(".pi/skills"),
       "), namespaces nested directories as ",
-      Prose.code("parent:child"),
+      code("parent:child"),
       ", and reads only frontmatter up front:",
     ),
-    Prose.codeBlock({ label: "skill-loader.ts", source: skillLoader }),
-    Prose.p(
+    codeBlock({ label: "skill-loader.ts", source: skillLoader }),
+    p(
       "Provide ",
-      Prose.code("FileSystem"),
+      code("FileSystem"),
       " and ",
-      Prose.code("Path"),
+      code("Path"),
       " from your platform runtime. Later roots win on name collisions.",
     ),
-    Prose.h2("mind-the-budget", "4. Mind the listing budget"),
-    Prose.p(
+    h2("mind-the-budget", "4. Mind the listing budget"),
+    p(
       "The loop selects listings under a fixed 2,048-token budget with ",
-      Prose.code("SkillSource.selectListings"),
+      code("SkillSource.selectListings"),
       ": skills marked ",
-      Prose.code("disableModelInvocation"),
+      code("disableModelInvocation"),
       " are excluded, and least-recently-used listings drop first when over budget. Descriptions are capped at ",
-      Prose.code("DESCRIPTION_CAP"),
+      code("DESCRIPTION_CAP"),
       " (1,536 characters), so front-load the sentence that tells the model when to activate.",
     ),
-    Prose.h2("next-steps", "Next steps"),
-    Prose.bullets(
+    h2("next-steps", "Next steps"),
+    bullets(
       [
         "Compose skills with the rest of the system message: ",
-        Prose.link("/docs/guides/instructions", "How to compose instructions and context sources"),
+        link("/docs/guides/instructions", "How to compose instructions and context sources"),
         ".",
       ],
       [
         "Remember facts across runs instead of re-teaching them: ",
-        Prose.link("/docs/guides/memory", "How to add memory"),
+        link("/docs/guides/memory", "How to add memory"),
         ".",
       ],
     ),

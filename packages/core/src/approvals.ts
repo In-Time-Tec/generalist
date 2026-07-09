@@ -1,6 +1,5 @@
 import { Context, Effect, Layer } from "effect"
-import * as ToolExecutor from "./tool-executor"
-
+import { type Request } from "./tool-executor"
 /** @experimental */
 export interface Approved {
   readonly _tag: "Approved"
@@ -23,7 +22,7 @@ export type Decision = Approved | Denied | Pending
 
 /** @experimental */
 export interface Interface {
-  readonly check: (request: ToolExecutor.Request) => Effect.Effect<Decision>
+  readonly check: (request: Request) => Effect.Effect<Decision>
 }
 
 /** @experimental Enforcement point for `Ai.Tool.needsApproval`, which

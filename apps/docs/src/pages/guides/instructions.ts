@@ -1,9 +1,8 @@
 import contextSources from "../../snippets/guides/instructions/context-sources.ts?raw"
 import contextSourcesExpected from "../../snippets/guides/instructions/context-sources.expected.txt?raw"
 import instructionFiles from "../../snippets/guides/instructions/instruction-files.ts?raw"
-import * as Prose from "../../prose"
-
-export const instructions = Prose.definePage({
+import { bullets, callout, code, codeBlock, definePage, h2, link, p, table } from "../../prose"
+export const instructions = definePage({
   path: "/docs/guides/instructions",
   title: "How to compose instructions and context sources",
   navTitle: "Instructions",
@@ -11,87 +10,87 @@ export const instructions = Prose.definePage({
   description:
     "Register ordered ContextSources with Instructions.layer, mix static baselines with dynamic sources, and load AGENTS.md files as sources.",
   content: [
-    Prose.p(
+    p(
       "The ",
-      Prose.code("Instructions"),
+      code("Instructions"),
       " service replaces a single instruction string with an ordered registry of ",
-      Prose.code("ContextSource"),
+      code("ContextSource"),
       " values. At run start the loop opens a context epoch: baseline sources render once into the system message, dynamic sources are frozen for later update rendering. Persona, house style, repository files, and host state compose as sources instead of string concatenation.",
     ),
-    Prose.h2("register-sources", "1. Register ordered sources"),
-    Prose.p(
+    h2("register-sources", "1. Register ordered sources"),
+    p(
       "Build baselines with ",
-      Prose.code("Instructions.staticSource(id, text)"),
+      code("Instructions.staticSource(id, text)"),
       " and write dynamic sources as plain objects with ",
-      Prose.code('cache: "dynamic"'),
+      code('cache: "dynamic"'),
       ". Provide them in order with ",
-      Prose.code("Instructions.layer"),
+      code("Instructions.layer"),
       ". When the registry produces a non-empty baseline, it replaces ",
-      Prose.code("agent.instructions"),
+      code("agent.instructions"),
       ", and rendered fragments join with one blank line:",
     ),
-    Prose.codeBlock({ label: "context-sources.ts", source: contextSources, expectedOutput: contextSourcesExpected }),
-    Prose.callout(
+    codeBlock({ label: "context-sources.ts", source: contextSources, expectedOutput: contextSourcesExpected }),
+    callout(
       "info",
       "Precedence",
       "An explicit ",
-      Prose.code("RunOptions.system"),
+      code("RunOptions.system"),
       " wins over the registry, and a ",
-      Prose.code("RunOptions.history"),
+      code("RunOptions.history"),
       " transcript is used verbatim. Both skip epoch rendering entirely.",
     ),
-    Prose.h2("baseline-vs-dynamic", "2. Choose baseline or dynamic per source"),
-    Prose.table(
+    h2("baseline-vs-dynamic", "2. Choose baseline or dynamic per source"),
+    table(
       ["Cache class", "Rendered", "Use for"],
       [
         [
-          [Prose.code('"baseline"')],
+          [code('"baseline"')],
           ["Once, at run start, into the system message"],
           ["Persona, style rules, repository instructions"],
         ],
         [
-          [Prose.code('"dynamic"')],
-          ["On demand via ", Prose.code("Instructions.renderUpdate"), " for incremental context updates"],
+          [code('"dynamic"')],
+          ["On demand via ", code("Instructions.renderUpdate"), " for incremental context updates"],
           ["Workspace state, clocks, anything that changes mid-session"],
         ],
       ],
     ),
-    Prose.p(
+    p(
       "Keeping the baseline stable is what makes provider prompt caching effective; dynamic text stays out of it by construction. A source returning ",
-      Prose.code("Option.none()"),
+      code("Option.none()"),
       " contributes nothing.",
     ),
-    Prose.h2("load-instruction-files", "3. Load AGENTS.md files as sources"),
-    Prose.p(
-      Prose.code("InstructionFiles.loadInstructionFiles"),
+    h2("load-instruction-files", "3. Load AGENTS.md files as sources"),
+    p(
+      code("InstructionFiles.loadInstructionFiles"),
       " from ",
-      Prose.code("@batonfx/skills"),
+      code("@batonfx/skills"),
       " walks ancestor directories for ",
-      Prose.code("AGENTS.md"),
+      code("AGENTS.md"),
       " or ",
-      Prose.code("CLAUDE.md"),
+      code("CLAUDE.md"),
       " (root first, nearest last), plus any ",
-      Prose.code("globalFiles"),
+      code("globalFiles"),
       " you list. Map the results into static sources:",
     ),
-    Prose.codeBlock({ label: "instruction-files.ts", source: instructionFiles }),
-    Prose.p(
+    codeBlock({ label: "instruction-files.ts", source: instructionFiles }),
+    p(
       "The effect requires ",
-      Prose.code("FileSystem"),
+      code("FileSystem"),
       " and ",
-      Prose.code("Path"),
+      code("Path"),
       "; provide them from your platform runtime. Core never reads the filesystem itself.",
     ),
-    Prose.h2("next-steps", "Next steps"),
-    Prose.bullets(
+    h2("next-steps", "Next steps"),
+    bullets(
       [
         "Add lazily-loaded skills next to the baseline listing: ",
-        Prose.link("/docs/guides/skills", "How to add skills"),
+        link("/docs/guides/skills", "How to add skills"),
         ".",
       ],
       [
         "See how epochs interact with summarized history: ",
-        Prose.link("/docs/guides/compaction", "How to stay inside the context window"),
+        link("/docs/guides/compaction", "How to stay inside the context window"),
         ".",
       ],
     ),

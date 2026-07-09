@@ -1,6 +1,5 @@
 import { Cause, Context, Effect, Layer, Schedule, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { AiError, LanguageModel, Response } from "effect/unstable/ai"
 /** @experimental Classification of a model-call failure. */
 export type Classification = "transient" | "terminal"
 
@@ -15,7 +14,7 @@ export class ModelResilience extends Context.Service<ModelResilience, Interface>
 
 /** @experimental */
 export const defaultClassify = (error: unknown): Classification =>
-  Ai.AiError.isAiError(error) && error.isRetryable ? "transient" : "terminal"
+  AiError.isAiError(error) && error.isRetryable ? "transient" : "terminal"
 
 /** @experimental */
 export const none: Interface = { classify: () => "terminal", retrySchedule: Schedule.recurs(0) }
@@ -48,19 +47,16 @@ const retryStreamSchedule = (resilience: Interface): Schedule.Schedule<unknown, 
   ) as Schedule.Schedule<unknown, unknown>
 
 /** @experimental */
-export const apply = (model: Ai.LanguageModel.Service, resilience: Interface): Ai.LanguageModel.Service =>
+export const apply = (model: LanguageModel.Service, resilience: Interface): LanguageModel.Service =>
   ({
     ...model,
     generateText: ((options: never) =>
-      retryEffect(
-        () => model.generateText(options),
-        resilience,
-      )) as unknown as Ai.LanguageModel.Service["generateText"],
+      retryEffect(() => model.generateText(options), resilience)) as unknown as LanguageModel.Service["generateText"],
     generateObject: ((options: never) =>
       retryEffect(
         () => model.generateObject(options),
         resilience,
-      )) as unknown as Ai.LanguageModel.Service["generateObject"],
+      )) as unknown as LanguageModel.Service["generateObject"],
     streamText: ((options: never) =>
       Stream.suspend(() => {
         let emitted = false
@@ -73,8 +69,8 @@ export const apply = (model: Ai.LanguageModel.Service, resilience: Interface): A
           Stream.catchCause((cause) => {
             if (Cause.hasInterrupts(cause)) return Stream.failCause(cause)
             const error = Cause.squash(cause)
-            return emitted ? Stream.make(Ai.Response.makePart("error", { error })) : Stream.failCause(cause)
+            return emitted ? Stream.make(Response.makePart("error", { error })) : Stream.failCause(cause)
           }),
         )
-      }).pipe(Stream.retry(retryStreamSchedule(resilience)))) as unknown as Ai.LanguageModel.Service["streamText"],
-  }) as Ai.LanguageModel.Service
+      }).pipe(Stream.retry(retryStreamSchedule(resilience)))) as unknown as LanguageModel.Service["streamText"],
+  }) as LanguageModel.Service

@@ -1,35 +1,35 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-import * as Model from "../src/model"
-import * as SearchProvider from "../src/search-provider"
+import { LanguageModel, Prompt } from "effect/unstable/ai"
+import { withOpenRouterOrDeterministic } from "../src/model"
+import { testLayer } from "../src/search-provider"
 import { toolkit, toolkitLayer } from "../src/tools"
 
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 
-const modelLayer = Model.withOpenRouterOrDeterministic({
+const modelLayer = withOpenRouterOrDeterministic({
   model: "openai/gpt-4o-mini",
   apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })
 
 const handledToolkit = toolkit.pipe(
   Effect.provide(toolkitLayer),
-  Effect.provide(SearchProvider.testLayer({ search: () => Effect.succeed([]) })),
+  Effect.provide(testLayer({ search: () => Effect.succeed([]) })),
 )
 
-const collectStreamText = (prompt: Ai.Prompt.RawInput) =>
-  Ai.LanguageModel.streamText({ prompt, toolkit: handledToolkit, disableToolCallResolution: true }).pipe(
+const collectStreamText = (prompt: Prompt.RawInput) =>
+  LanguageModel.streamText({ prompt, toolkit: handledToolkit, disableToolCallResolution: true }).pipe(
     Stream.runCollect,
     Effect.map((chunk) => [...chunk]),
   )
 
-const generateText = (prompt: Ai.Prompt.RawInput) =>
-  Ai.LanguageModel.generateText({ prompt }).pipe(Effect.map((response) => response.text))
+const generateText = (prompt: Prompt.RawInput) =>
+  LanguageModel.generateText({ prompt }).pipe(Effect.map((response) => response.text))
 
 describe("DeepResearchAgent model", () => {
   it.effect("builds an OpenRouter model layer when OPENROUTER_API_KEY is set", () =>
     Effect.gen(function* () {
-      const model = yield* Ai.LanguageModel.LanguageModel
+      const model = yield* LanguageModel.LanguageModel
 
       expect(model.streamText).toBeTypeOf("function")
       expect(model.generateText).toBeTypeOf("function")

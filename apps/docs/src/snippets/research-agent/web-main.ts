@@ -2,15 +2,16 @@ import { Chat, Connection } from "@batonfx/foldkit"
 import { Cause, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import * as Command from "foldkit/command"
+import type { Command } from "foldkit/command"
+import { define, mapMessages } from "foldkit/command"
 import type { Document, Html } from "foldkit/html"
 import { html } from "foldkit/html"
 import { m } from "foldkit/message"
 import type { ApplicationInit } from "foldkit/runtime"
-import * as Runtime from "foldkit/runtime"
+import { makeApplication, run } from "foldkit/runtime"
 import { ts } from "foldkit/schema"
-import * as Subscription from "foldkit/subscription"
-
+import type { Subscriptions } from "foldkit/subscription"
+import { lift } from "foldkit/subscription"
 const SERVER_HTTP_URL = "http://localhost:4000"
 
 const SessionOpening = ts("SessionOpening")
@@ -36,7 +37,7 @@ const Message = Schema.Union([GotChatMessage, OpenedSession, FailedOpenSession])
 
 type Message = typeof Message.Type
 
-const OpenSession = Command.define(
+const OpenSession = define(
   "OpenSession",
   OpenedSession,
   FailedOpenSession,
@@ -56,10 +57,10 @@ const init: ApplicationInit<Model, Message, void, Connection.AgentConnection> = 
   [OpenSession()],
 ]
 
-type ProgramCommand = Command.Command<Message, never, Connection.AgentConnection>
+type ProgramCommand = Command<Message, never, Connection.AgentConnection>
 
 const asProgramCommands = (
-  commands: ReadonlyArray<Command.Command<Message, unknown, Connection.AgentConnection>>,
+  commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
 ): ReadonlyArray<ProgramCommand> => commands as unknown as ReadonlyArray<ProgramCommand>
 
 const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
@@ -72,15 +73,13 @@ const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<
       const [chat, chatCommands] = Chat.update(model.chat, message.message)
       return [
         { ...model, chat },
-        asProgramCommands(Command.mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
+        asProgramCommands(mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
       ]
     }
   }
 }
 
-const subscriptions: Subscription.Subscriptions<Model, Message, Connection.AgentConnection> = Subscription.lift(
-  Chat.subscriptions,
-)({
+const subscriptions: Subscriptions<Model, Message, Connection.AgentConnection> = lift(Chat.subscriptions)({
   toChildModel: (model: Model) => model.chat,
   toParentMessage: (chatMessage) => GotChatMessage({ message: chatMessage }),
 })
@@ -106,13 +105,13 @@ const entryView = (entry: Chat.ChatEntry): Html => {
   }
 }
 
-const approvalView = (run: Extract<Chat.RunState, { _tag: "AwaitingApproval" }>): Html => {
+const approvalView = (awaitingApproval: Extract<Chat.RunState, { _tag: "AwaitingApproval" }>): Html => {
   const h = html<Message>()
   return h.div(
     [h.Class("rounded-xl border border-amber-400 bg-amber-50 p-4")],
     [
-      h.p([h.Class("font-semibold")], [`The agent wants to run ${run.toolName}`]),
-      h.pre([h.Class("mt-1 overflow-auto text-xs")], [JSON.stringify(run.params)]),
+      h.p([h.Class("font-semibold")], [`The agent wants to run ${awaitingApproval.toolName}`]),
+      h.pre([h.Class("mt-1 overflow-auto text-xs")], [JSON.stringify(awaitingApproval.params)]),
       h.div(
         [h.Class("mt-3 flex gap-2")],
         [
@@ -198,7 +197,7 @@ const resources = Connection.layerWebSocket({ url: "ws://localhost:4000/ws" }).p
   Layer.provide(Socket.layerWebSocketConstructorGlobal),
 )
 
-const application = Runtime.makeApplication({
+const application = makeApplication({
   Model,
   init,
   update,
@@ -208,4 +207,4 @@ const application = Runtime.makeApplication({
   container: document.getElementById("root"),
 })
 
-Runtime.run(application)
+run(application)

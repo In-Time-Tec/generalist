@@ -1,51 +1,52 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Memory, ModelMiddleware, ToolExecutor } from "../src/index"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-1" }
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
       streamText,
     }),
   )
 
-const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
 const toolCallPart = (id: string, name: string, params: unknown) =>
-  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
-const textPart = (text: string) => Ai.Prompt.makePart("text", { text })
+const textPart = (text: string) => Prompt.makePart("text", { text })
 
-const lookupTool = Ai.Tool.make("lookup", {
+const lookupTool = Tool.make("lookup", {
   description: "Lookup test memory fixture",
   parameters: Schema.Struct({}),
   success: Schema.Unknown,
 })
 
-const waitTool = Ai.Tool.make("wait", {
+const waitTool = Tool.make("wait", {
   description: "Suspending test memory fixture",
   parameters: Schema.Struct({}),
   success: Schema.Unknown,
 })
 
-const messageText = (message: Ai.Prompt.Message): string => {
+const messageText = (message: Prompt.Message): string => {
   if (typeof message.content === "string") return message.content
   return message.content
-    .filter((part): part is Ai.Prompt.TextPart => part.type === "text")
+    .filter((part): part is Prompt.TextPart => part.type === "text")
     .map((part) => part.text)
     .join("")
 }
 
 const unusedExecutor = ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool execution") })
 
-describe("Memory", () => {
+layer(unusedToolHandlerLayer)("Memory", (it) => {
   it.effect("fails fast when memory options are set without a Memory service", () => {
     let modelCalls = 0
     const agent = Agent.make({ name: "memory-agent" })
@@ -76,8 +77,8 @@ describe("Memory", () => {
   })
 
   it.effect("inserts recalled items after system and before the run prompt before middleware", () => {
-    let modelPrompt: Ai.Prompt.Prompt | undefined
-    let middlewarePrompt: Ai.Prompt.Prompt | undefined
+    let modelPrompt: Prompt.Prompt | undefined
+    let middlewarePrompt: Prompt.Prompt | undefined
     const agent = Agent.make({ name: "memory-agent", instructions: "system instructions" })
     return Effect.gen(function* () {
       const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
@@ -119,7 +120,7 @@ describe("Memory", () => {
     const remembers: Array<Memory.RememberInput> = []
     let recalls = 0
     let calls = 0
-    const agent = Agent.make({ name: "memory-agent", toolkit: Ai.Toolkit.make(lookupTool) })
+    const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return Effect.gen(function* () {
       const result = yield* Agent.generate(agent, { prompt: "use a tool", memory: { key } })
 
@@ -157,7 +158,7 @@ describe("Memory", () => {
 
   it.effect("does not recall on resume", () => {
     let recalls = 0
-    const agent = Agent.make({ name: "memory-agent", toolkit: Ai.Toolkit.make(lookupTool) })
+    const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return Effect.gen(function* () {
       const result = yield* Agent.generate(agent, {
         prompt: "ignored on resume",
@@ -191,7 +192,7 @@ describe("Memory", () => {
 
   it.effect("does not remember a suspending run", () => {
     const remembers: Array<Memory.RememberInput> = []
-    const agent = Agent.make({ name: "memory-agent", toolkit: Ai.Toolkit.make(waitTool) })
+    const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(waitTool) })
     return Effect.gen(function* () {
       const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "wait", memory: { key } })))
 

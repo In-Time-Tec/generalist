@@ -1,13 +1,12 @@
 import { Context, Effect, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { Tool, Toolkit } from "effect/unstable/ai"
 export interface DocsIndexInterface {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<string>>
 }
 
 export class DocsIndex extends Context.Service<DocsIndex, DocsIndexInterface>()("app/DocsIndex") {}
 
-export const searchDocsTool = Ai.Tool.make("search_docs", {
+export const searchDocsTool = Tool.make("search_docs", {
   description: "Search the documentation index and return matching page titles",
   parameters: Schema.Struct({ query: Schema.String }),
   success: Schema.Struct({ titles: Schema.Array(Schema.String) }),
@@ -15,4 +14,4 @@ export const searchDocsTool = Ai.Tool.make("search_docs", {
   dependencies: [DocsIndex],
 })
 
-export const toolkit = Ai.Toolkit.make(searchDocsTool)
+export const toolkit = Toolkit.make(searchDocsTool)

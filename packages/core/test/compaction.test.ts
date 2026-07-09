@@ -1,34 +1,34 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { Compaction, Session, ToolOutput } from "../src/index"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
-const user = (text: string): Ai.Prompt.Message =>
-  Ai.Prompt.makeMessage("user", { content: [Ai.Prompt.makePart("text", { text })] })
+const user = (text: string): Prompt.Message =>
+  Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
-const assistantToolCall = (id: string): Ai.Prompt.Message =>
-  Ai.Prompt.makeMessage("assistant", {
-    content: [Ai.Prompt.makePart("tool-call", { id, name: "echo", params: { text: "call" }, providerExecuted: false })],
+const assistantToolCall = (id: string): Prompt.Message =>
+  Prompt.makeMessage("assistant", {
+    content: [Prompt.makePart("tool-call", { id, name: "echo", params: { text: "call" }, providerExecuted: false })],
   })
 
-const toolResult = (id: string, result: unknown): Ai.Prompt.Message =>
-  Ai.Prompt.makeMessage("tool", {
-    content: [Ai.Prompt.makePart("tool-result", { id, name: "echo", isFailure: false, result })],
+const toolResult = (id: string, result: unknown): Prompt.Message =>
+  Prompt.makeMessage("tool", {
+    content: [Prompt.makePart("tool-result", { id, name: "echo", isFailure: false, result })],
   })
 
-const entry = (id: string, message: Ai.Prompt.Message): Session.MessageEntry => ({
+const entry = (id: string, message: Prompt.Message): Session.MessageEntry => ({
   _tag: "Message",
   id,
   parentId: id === "0" ? null : String(Number(id) - 1),
   message,
 })
 
-const modelLayer = (generateText: ModelParams["generateText"]): Layer.Layer<Ai.LanguageModel.LanguageModel> =>
+const modelLayer = (generateText: ModelParams["generateText"]): Layer.Layer<LanguageModel.LanguageModel> =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText,
       streamText: () => Stream.empty,
     }),
@@ -97,8 +97,8 @@ describe("Compaction", () => {
         agentName: "token-budget-agent",
         sessionId: "session",
         turn: 1,
-        history: Ai.Prompt.fromMessages([user(padding)]),
-        prompt: Ai.Prompt.fromMessages([toolResult("call-large", large)]),
+        history: Prompt.fromMessages([user(padding)]),
+        prompt: Prompt.fromMessages([toolResult("call-large", large)]),
         path: [entry("0", user("old")), entry("1", user("recent"))],
         usage: { contextTokens: 2_000, contextWindow: 1_000, reserveTokens: 0 },
         overflow: false,
@@ -135,8 +135,8 @@ describe("Compaction", () => {
         agentName: "compact-agent",
         sessionId: "session",
         turn: 1,
-        history: Ai.Prompt.empty,
-        prompt: Ai.Prompt.fromMessages([toolResult("call-large", large)]),
+        history: Prompt.empty,
+        prompt: Prompt.fromMessages([toolResult("call-large", large)]),
         path: [],
         usage: { contextTokens: 2_000, contextWindow: 1_000, reserveTokens: 10 },
         overflow: false,
@@ -183,7 +183,7 @@ describe("Compaction", () => {
         sessionId: "session",
         turn: 2,
         history: Session.buildContext(path),
-        prompt: Ai.Prompt.make("continue"),
+        prompt: Prompt.make("continue"),
         path,
         usage: { contextTokens: 100, contextWindow: 10, reserveTokens: 1 },
         overflow: false,
@@ -226,7 +226,7 @@ describe("Compaction", () => {
       const store = yield* Session.SessionStore
       yield* store.append({
         _tag: "Message",
-        message: Ai.Prompt.makeMessage("system", { content: "You are a careful reviewer" }),
+        message: Prompt.makeMessage("system", { content: "You are a careful reviewer" }),
       })
       yield* store.append({ _tag: "Message", message: user("old goal") })
       yield* store.append({ _tag: "Message", message: user("recent tail") })
@@ -242,7 +242,7 @@ describe("Compaction", () => {
         sessionId: "session",
         turn: 2,
         history: Session.buildContext(path),
-        prompt: Ai.Prompt.make("continue"),
+        prompt: Prompt.make("continue"),
         path,
         usage: { contextTokens: 100, contextWindow: 10, reserveTokens: 1 },
         overflow: false,
@@ -285,8 +285,8 @@ describe("Compaction", () => {
         agentName: "summary-head-agent",
         sessionId: "session",
         turn: 2,
-        history: Ai.Prompt.empty,
-        prompt: Ai.Prompt.make("continue"),
+        history: Prompt.empty,
+        prompt: Prompt.make("continue"),
         path: [entry("0", toolResult("call-head", large)), entry("1", user("recent"))],
         usage: { contextTokens: 100, contextWindow: 1, reserveTokens: 0 },
         overflow: false,
@@ -309,15 +309,15 @@ describe("Compaction", () => {
     )
   })
 
-  it.effect("truncate uses Ai.Tokenizer to keep the newest context", () => {
+  it.effect("truncate uses Tokenizer to keep the newest context", () => {
     const service = Compaction.truncate(2)
     return Effect.gen(function* () {
       const compacted = yield* service.maybeCompact({
         agentName: "truncate-agent",
         sessionId: "session",
         turn: 0,
-        history: Ai.Prompt.fromMessages([user("old"), user("middle")]),
-        prompt: Ai.Prompt.fromMessages([user("new")]),
+        history: Prompt.fromMessages([user("old"), user("middle")]),
+        prompt: Prompt.fromMessages([user("new")]),
         usage: { contextTokens: 3, contextWindow: 2, reserveTokens: 0 },
         overflow: false,
       })
@@ -333,11 +333,11 @@ describe("Compaction", () => {
       Effect.provide(
         Layer.mergeAll(
           Layer.succeed(
-            Ai.Tokenizer.Tokenizer,
-            Ai.Tokenizer.Tokenizer.of({
-              tokenize: (input) => Effect.succeed(Ai.Prompt.make(input).content.map((_, index) => index)),
+            Tokenizer.Tokenizer,
+            Tokenizer.Tokenizer.of({
+              tokenize: (input) => Effect.succeed(Prompt.make(input).content.map((_, index) => index)),
               truncate: (input, tokens) =>
-                Effect.succeed(Ai.Prompt.fromMessages(Ai.Prompt.make(input).content.slice(-tokens))),
+                Effect.succeed(Prompt.fromMessages(Prompt.make(input).content.slice(-tokens))),
             }),
           ),
           modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),

@@ -1,7 +1,7 @@
 import { Config, Console, Effect, Layer } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "@batonfx/core"
 import { McpToolSource } from "@batonfx/mcp"
-import * as BatonMcp from "@batonfx/mcp/baton"
+import { toolkit, toolkitLayer } from "@batonfx/mcp/baton"
 import { OpenRouter } from "@batonfx/providers"
 
 const sourceLayer = McpToolSource.layer({
@@ -12,11 +12,11 @@ const sourceLayer = McpToolSource.layer({
 
 const program = Effect.gen(function* () {
   const source = yield* McpToolSource.McpToolSource
-  const toolkit = yield* BatonMcp.toolkit(source)
+  const mcpToolkit = yield* toolkit(source)
   const agent = Agent.make({
     name: "file-agent",
     instructions: "Use the filesystem tools to answer.",
-    toolkit,
+    toolkit: mcpToolkit,
   })
   const result = yield* ModelRegistry.provide(
     { provider: "openrouter", model: "openai/gpt-4o-mini" },
@@ -25,7 +25,7 @@ const program = Effect.gen(function* () {
     Effect.provide(
       Layer.mergeAll(
         OpenRouter.withOpenRouter({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
-        BatonMcp.toolExecutorLayer(source),
+        toolkitLayer(source),
         Approvals.autoApprove,
         ModelMiddleware.identityLayer,
       ),

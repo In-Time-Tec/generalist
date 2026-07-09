@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Memory, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 import { WorkingMemory } from "@batonfx/memory"
 
@@ -8,13 +8,13 @@ const key: Memory.Key = { agent: "support-agent", subject: "user-ada" }
 const agent = Agent.make({ name: "support-agent" })
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: (options) => {
       const content = JSON.stringify(options.prompt.content)
       const text = content.includes("Ada prefers dark mode") ? "Ada prefers dark mode." : "Noted."
-      return Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: text }))
+      return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: text }))
     },
   }),
 )

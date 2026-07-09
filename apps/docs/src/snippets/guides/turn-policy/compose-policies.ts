@@ -1,8 +1,8 @@
 import { Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, TurnPolicy } from "@batonfx/core"
 
-const submitAnswerTool = Ai.Tool.make("submit_answer", {
+const submitAnswerTool = Tool.make("submit_answer", {
   description: "Submit the final answer",
   parameters: Schema.Struct({ answer: Schema.String }),
   success: Schema.String,
@@ -10,6 +10,6 @@ const submitAnswerTool = Ai.Tool.make("submit_answer", {
 
 export const agent = Agent.make({
   name: "researcher",
-  toolkit: Ai.Toolkit.make(submitAnswerTool),
+  toolkit: Toolkit.make(submitAnswerTool),
   policy: TurnPolicy.both(TurnPolicy.recurs(4), TurnPolicy.untilToolCall("submit_answer")),
 })

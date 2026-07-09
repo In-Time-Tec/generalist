@@ -3,8 +3,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { Context, Duration, Effect, Layer, Ref, Schema, Scope } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { Tool } from "effect/unstable/ai"
 /** @experimental */
 export type JsonValue = typeof Schema.Json.Type
 
@@ -50,7 +49,7 @@ export interface Interface {
   readonly server: string
   readonly tools: Effect.Effect<ReadonlyArray<DiscoveredTool>>
   readonly callTool: (rawName: string, input: JsonValue) => Effect.Effect<JsonValue, McpToolCallError>
-  readonly aiTools: Effect.Effect<ReadonlyArray<Ai.Tool.Any>>
+  readonly aiTools: Effect.Effect<ReadonlyArray<Tool.Any>>
 }
 
 /** @experimental */
@@ -89,11 +88,13 @@ const discoveredTool = (
 const callArguments = (input: JsonValue): Record<string, unknown> | undefined =>
   typeof input === "object" && input !== null && !Array.isArray(input) ? (input as Record<string, unknown>) : undefined
 
-const aiToolFromDiscovered = (tool: DiscoveredTool): Ai.Tool.Any =>
-  Ai.Tool.dynamic(tool.name, {
+const aiToolFromDiscovered = (tool: DiscoveredTool): Tool.Any =>
+  Tool.dynamic(tool.name, {
     description: tool.description,
     parameters: tool.inputSchema as never,
     success: Schema.Unknown,
+    failure: Schema.String,
+    failureMode: "return",
   })
 
 /** @experimental */

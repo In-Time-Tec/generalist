@@ -3,7 +3,7 @@
 import { AgentEvent } from "@batonfx/core"
 import { Chat } from "@batonfx/foldkit"
 import { Wire } from "@batonfx/transport"
-import * as Ai from "effect/unstable/ai"
+import { Response } from "effect/unstable/ai"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
 import { GotChatMessage, OpenedSession, SessionReady, init, type Model, update } from "./main"
@@ -32,14 +32,14 @@ const submittedQuestionModel = (): Model => {
   return submitted
 }
 
-const toolCall = Ai.Response.makePart("tool-call", {
+const toolCall = Response.makePart("tool-call", {
   id: "search-1",
   name: "web_search",
   params: { query: "What makes Baton standalone?" },
   providerExecuted: false,
 })
 
-const toolResult = Ai.Response.makePart("tool-result", {
+const toolResult = Response.makePart("tool-result", {
   id: "search-1",
   name: "web_search",
   result: {
@@ -63,12 +63,12 @@ const completionFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
   eventFrame(6, {
     _tag: "ModelPart",
     turn: 1,
-    part: Ai.Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Compare transport frames." }),
+    part: Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Compare transport frames." }),
   }),
   eventFrame(7, {
     _tag: "ModelPart",
     turn: 1,
-    part: Ai.Response.makePart("text-delta", { id: "assistant", delta: "Final cited answer" }),
+    part: Response.makePart("text-delta", { id: "assistant", delta: "Final cited answer" }),
   }),
   eventFrame(8, { _tag: "TurnCompleted", turn: 1 }),
   eventFrame(9, { _tag: "Completed", turns: 2, text: "Final cited answer\n\nSources:\n[1] Baton docs" }),

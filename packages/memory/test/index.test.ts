@@ -1,25 +1,25 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { EmbeddingModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
 import { combinedLayer, VectorStore } from "../src/index"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 
-const textPart = (text: string) => Ai.Prompt.makePart("text", { text })
-const user = (text: string) => Ai.Prompt.makeMessage("user", { content: [textPart(text)] })
-const assistant = (text: string) => Ai.Prompt.makeMessage("assistant", { content: [textPart(text)] })
-const prompt = (...messages: ReadonlyArray<Ai.Prompt.Message>) => Ai.Prompt.fromMessages(messages)
+const textPart = (text: string) => Prompt.makePart("text", { text })
+const user = (text: string) => Prompt.makeMessage("user", { content: [textPart(text)] })
+const assistant = (text: string) => Prompt.makeMessage("assistant", { content: [textPart(text)] })
+const prompt = (...messages: ReadonlyArray<Prompt.Message>) => Prompt.fromMessages(messages)
 
 const itemText = (item: Memory.Item): string =>
   item.parts
-    .filter((part): part is Ai.Prompt.TextPart => part.type === "text")
+    .filter((part): part is Prompt.TextPart => part.type === "text")
     .map((part) => part.text)
     .join("")
 
 const embeddingLayer = Layer.effect(
-  Ai.EmbeddingModel.EmbeddingModel,
-  Ai.EmbeddingModel.make({
+  EmbeddingModel.EmbeddingModel,
+  EmbeddingModel.make({
     embedMany: ({ inputs }) =>
       Effect.succeed({
         results: inputs.map(() => [1, 0]),

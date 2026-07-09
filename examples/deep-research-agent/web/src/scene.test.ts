@@ -4,7 +4,15 @@ import { Chat } from "@batonfx/foldkit"
 import { Option } from "effect"
 import { Scene } from "foldkit"
 import { describe, expect, test } from "vitest"
-import * as MessageScroller from "./components/ui/message-scroller"
+import {
+  CompletedScrollToBottom,
+  GrewContent,
+  Message,
+  ObserveContentGrowth,
+  ScrollToBottom,
+  ScrolledViewport,
+  TrackViewportScroll,
+} from "./components/ui/message-scroller"
 import { GotChatMessage, GotScrollerMessage, SessionReady, init, type Model, update, view } from "./main"
 
 const baseModel = (): Model => ({
@@ -23,22 +31,12 @@ const renderedText = (node: unknown): string => {
 }
 
 const resolveScrollerMounts = Scene.Mount.resolveAll(
-  [
-    MessageScroller.TrackViewportScroll,
-    MessageScroller.ScrolledViewport({ isAtBottom: true }),
-    (message: MessageScroller.Message) => GotScrollerMessage({ message }),
-  ],
-  [
-    MessageScroller.ObserveContentGrowth,
-    MessageScroller.GrewContent(),
-    (message: MessageScroller.Message) => GotScrollerMessage({ message }),
-  ],
+  [TrackViewportScroll, ScrolledViewport({ isAtBottom: true }), (message: Message) => GotScrollerMessage({ message })],
+  [ObserveContentGrowth, GrewContent(), (message: Message) => GotScrollerMessage({ message })],
 )
 
-const resolveScrollerCommand = Scene.Command.resolve(
-  MessageScroller.ScrollToBottom,
-  MessageScroller.CompletedScrollToBottom(),
-  (message: MessageScroller.Message) => GotScrollerMessage({ message }),
+const resolveScrollerCommand = Scene.Command.resolve(ScrollToBottom, CompletedScrollToBottom(), (message: Message) =>
+  GotScrollerMessage({ message }),
 )
 
 describe("deep-research-agent web view", () => {

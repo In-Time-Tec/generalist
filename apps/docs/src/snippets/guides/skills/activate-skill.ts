@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, SkillSource, ToolExecutor } from "@batonfx/core"
 
 const frontmatter: SkillSource.Frontmatter = {
@@ -20,14 +20,14 @@ const agent = Agent.make({ name: "release-assistant", instructions: "Use skills 
 let calls = 0
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: (options) => {
       calls += 1
       if (calls === 1) {
         return Stream.make(
-          Ai.Response.makePart("tool-call", {
+          Response.makePart("tool-call", {
             id: "skill-1",
             name: "activate_skill",
             params: { name: "release-notes" },
@@ -37,7 +37,7 @@ const modelLayer = Layer.effect(
       }
       const bodyLoaded = JSON.stringify(options.prompt.content).includes("one sentence per change")
       return Stream.make(
-        Ai.Response.makePart("text-delta", {
+        Response.makePart("text-delta", {
           id: "assistant",
           delta: bodyLoaded ? "Skill body loaded; drafting the release notes." : "Skill body missing.",
         }),

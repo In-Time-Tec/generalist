@@ -1,6 +1,5 @@
 import { Context, Effect, Layer, Option } from "effect"
-import * as AgentEvent from "./agent-event"
-
+import { AgentError } from "./agent-event"
 /** @experimental Context available while rendering instruction sources. */
 export interface RenderContext {
   readonly agentName: string
@@ -11,7 +10,7 @@ export interface RenderContext {
 export interface ContextSource {
   readonly id: string
   readonly cache: "baseline" | "dynamic"
-  readonly render: (context: RenderContext) => Effect.Effect<Option.Option<string>, AgentEvent.AgentError>
+  readonly render: (context: RenderContext) => Effect.Effect<Option.Option<string>, AgentError>
 }
 
 /** @experimental Instructions registry service boundary. */
@@ -36,10 +35,7 @@ export const staticSource = (id: string, text: string): ContextSource => ({
 })
 
 /** @experimental Render baseline sources and freeze dynamic sources for an epoch. */
-export const openEpoch = (
-  instructions: Interface,
-  context: RenderContext,
-): Effect.Effect<ContextEpoch, AgentEvent.AgentError> =>
+export const openEpoch = (instructions: Interface, context: RenderContext): Effect.Effect<ContextEpoch, AgentError> =>
   Effect.gen(function* () {
     const baseline: Array<string> = []
     const dynamic: Array<ContextSource> = []
@@ -60,7 +56,7 @@ export const openEpoch = (
 export const renderUpdate = (
   epoch: ContextEpoch,
   context: RenderContext,
-): Effect.Effect<Option.Option<string>, AgentEvent.AgentError> =>
+): Effect.Effect<Option.Option<string>, AgentError> =>
   Effect.gen(function* () {
     const fragments: Array<string> = []
 

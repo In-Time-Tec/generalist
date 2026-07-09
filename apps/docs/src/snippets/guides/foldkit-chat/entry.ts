@@ -1,7 +1,7 @@
 import { Connection } from "@batonfx/foldkit"
 import { Layer } from "effect"
 import { Socket } from "effect/unstable/socket"
-import * as Runtime from "foldkit/runtime"
+import { makeApplication, run } from "foldkit/runtime"
 import { Model, init, subscriptions, update } from "./model"
 import { view } from "./view"
 
@@ -9,7 +9,7 @@ const resources = Connection.layerWebSocket({ url: "ws://localhost:4000/ws" }).p
   Layer.provide(Socket.layerWebSocketConstructorGlobal),
 )
 
-const application = Runtime.makeApplication({
+const application = makeApplication({
   Model,
   init,
   update,
@@ -19,4 +19,4 @@ const application = Runtime.makeApplication({
   container: document.getElementById("root"),
 })
 
-Runtime.run(application)
+run(application)

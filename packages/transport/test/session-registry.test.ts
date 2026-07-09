@@ -1,17 +1,17 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scheduler, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import * as Ai from "effect/unstable/ai"
+import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
 import { SessionRegistry } from "../src/index"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
       streamText,
     }),
@@ -19,13 +19,13 @@ const modelLayer = (streamText: ModelParams["streamText"]) =>
 
 const assistantText = (id: string, text: string) =>
   Stream.fromIterable([
-    Ai.Response.makePart("text-start", { id }),
-    Ai.Response.makePart("text-delta", { id, delta: text }),
-    Ai.Response.makePart("text-end", { id }),
+    Response.makePart("text-start", { id }),
+    Response.makePart("text-delta", { id, delta: text }),
+    Response.makePart("text-end", { id }),
   ])
 
 const toolCallPart = (id: string, name: string, params: unknown) =>
-  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
 const collectThroughEnded = (sessionId: string, afterSeq?: number) =>
   SessionRegistry.SessionRegistry.use((registry) =>
@@ -35,21 +35,17 @@ const collectThroughEnded = (sessionId: string, afterSeq?: number) =>
     ),
   )
 
-const persistenceLayer = Ai.Chat.layerPersisted({ storeId: "transport-test" }).pipe(
+const persistenceLayer = Chat.layerPersisted({ storeId: "transport-test" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),
 )
 
 const dependencies = (streamText: ModelParams["streamText"]) =>
-  Layer.mergeAll(
-    modelLayer(streamText),
-    ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool execution") }),
-    Approvals.autoApprove,
-    ModelMiddleware.identityLayer,
-    persistenceLayer,
-  )
+  Layer.mergeAll(modelLayer(streamText), Approvals.autoApprove, ModelMiddleware.identityLayer, persistenceLayer)
 
-const baseLayers = (agent: Agent.Agent<Record<string, Ai.Tool.Any>>, streamText: ModelParams["streamText"]) =>
-  SessionRegistry.layerMemory({ agent }).pipe(Layer.provide(dependencies(streamText)))
+const baseLayers = <Tools extends Record<string, Tool.Any>>(
+  agent: Agent.Agent<Tools>,
+  streamText: ModelParams["streamText"],
+) => SessionRegistry.layerMemory({ agent }).pipe(Layer.provide(dependencies(streamText)))
 
 describe("SessionRegistry.layerMemory", () => {
   it.effect("open returns idle session info", () =>
@@ -295,13 +291,15 @@ describe("SessionRegistry.layerMemory", () => {
   })
 
   it.effect("emits suspension as data and resolves approved approvals", () => {
-    const gated = Ai.Tool.make("gated", {
+    const gated = Tool.make("gated", {
       parameters: Schema.Struct({ text: Schema.String }),
       success: Schema.String,
       needsApproval: true,
     })
-    const agent = Agent.make({ name: "approval-agent", toolkit: Ai.Toolkit.make(gated) })
+    const toolkit = Toolkit.make(gated)
+    const agent = Agent.make({ name: "approval-agent", toolkit })
     let calls = 0
+    let handled = false
     return Effect.gen(function* () {
       yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-approval" }))
       const firstFiber = yield* collectThroughEnded("s-approval").pipe(Effect.forkChild)
@@ -318,6 +316,7 @@ describe("SessionRegistry.layerMemory", () => {
       )
       const second = yield* Fiber.join(secondFiber)
 
+      expect(handled).toBe(true)
       expect(second.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
       expect(second.at(-1)?._tag).toBe("Ended")
     }).pipe(
@@ -325,15 +324,17 @@ describe("SessionRegistry.layerMemory", () => {
         SessionRegistry.layerMemory({ agent }).pipe(
           Layer.provide(
             Layer.mergeAll(
-              modelLayer((options) => {
+              modelLayer(() => {
                 calls += 1
-                const content = JSON.stringify(options.prompt.content)
                 if (calls === 1) return Stream.make(toolCallPart("call-approval", "gated", { text: "approved" }))
-                expect(content).toContain("approved")
                 return assistantText("reply", "approved done")
               }),
-              ToolExecutor.testLayer({
-                execute: () => Effect.succeed({ _tag: "Success", result: "approved", encodedResult: "approved" }),
+              toolkit.toLayer({
+                gated: () =>
+                  Effect.sync(() => {
+                    handled = true
+                    return "approved"
+                  }),
               }),
               Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-token" }) }),
               ModelMiddleware.identityLayer,
@@ -346,12 +347,13 @@ describe("SessionRegistry.layerMemory", () => {
   })
 
   it.effect("approval resolution override is consumed after the resumed call", () => {
-    const gated = Ai.Tool.make("gated", {
+    const gated = Tool.make("gated", {
       parameters: Schema.Struct({ text: Schema.String }),
       success: Schema.String,
       needsApproval: true,
     })
-    const agent = Agent.make({ name: "one-shot-approval-agent", toolkit: Ai.Toolkit.make(gated) })
+    const toolkit = Toolkit.make(gated)
+    const agent = Agent.make({ name: "one-shot-approval-agent", toolkit })
     let modelCalls = 0
     let approvalChecks = 0
     return Effect.gen(function* () {
@@ -382,9 +384,7 @@ describe("SessionRegistry.layerMemory", () => {
                 if (modelCalls === 2) return Stream.make(toolCallPart("call-repeat", "gated", { text: "second" }))
                 return assistantText("reply", "done")
               }),
-              ToolExecutor.testLayer({
-                execute: () => Effect.succeed({ _tag: "Success", result: "approved", encodedResult: "approved" }),
-              }),
+              toolkit.toLayer({ gated: () => Effect.succeed("approved") }),
               Approvals.testLayer({
                 check: () =>
                   Effect.sync(() => {

@@ -1,21 +1,22 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Ref, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "../src/index"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
       streamText,
     }),
   )
 
-const echoTool = Ai.Tool.make("echo", {
+const echoTool = Tool.make("echo", {
   description: "Echo input for tests",
   parameters: Schema.Struct({ text: Schema.String }),
   success: Schema.Unknown,
@@ -26,28 +27,28 @@ const unusedExecutor = ToolExecutor.testLayer({
 })
 
 const toolCallPart = (id: string, name: string, params: unknown) =>
-  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
-const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
 // A full text-start/delta/end sequence — required for `Chat` to assemble the
 // streamed deltas into a recorded assistant message in stored history.
 const assistantText = (id: string, text: string) =>
   Stream.fromIterable([
-    Ai.Response.makePart("text-start", { id }),
-    Ai.Response.makePart("text-delta", { id, delta: text }),
-    Ai.Response.makePart("text-end", { id }),
+    Response.makePart("text-start", { id }),
+    Response.makePart("text-delta", { id, delta: text }),
+    Response.makePart("text-end", { id }),
   ])
 
 // `Chat.layerPersisted` over an in-memory backing store — the standalone,
 // memory-backed persistence stack the issue prescribes for tests.
-const persistenceLayer = Ai.Chat.layerPersisted({ storeId: "test" }).pipe(Layer.provide(Persistence.layerBackingMemory))
+const persistenceLayer = Chat.layerPersisted({ storeId: "test" }).pipe(Layer.provide(Persistence.layerBackingMemory))
 
 // Text-content of every message/part serialized, so assertions can look for a
 // substring anywhere in the persisted transcript.
 const historyText = (chatId: string) =>
   Effect.gen(function* () {
-    const persistence = yield* Ai.Chat.Persistence
+    const persistence = yield* Chat.Persistence
     const chat = yield* persistence.get(chatId)
     const history = yield* Ref.get(chat.history)
     return JSON.stringify(history.content)
@@ -55,13 +56,13 @@ const historyText = (chatId: string) =>
 
 const systemMessageCount = (chatId: string) =>
   Effect.gen(function* () {
-    const persistence = yield* Ai.Chat.Persistence
+    const persistence = yield* Chat.Persistence
     const chat = yield* persistence.get(chatId)
     const history = yield* Ref.get(chat.history)
     return history.content.filter((message) => message.role === "system").length
   })
 
-describe("Agent persistence", () => {
+layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
   it.effect("continuity: a second run sees the first run's user and assistant messages", () =>
     Effect.gen(function* () {
       const agent = Agent.make({ name: "continuity-agent", instructions: "system seed" })
@@ -208,7 +209,7 @@ describe("Agent persistence", () => {
       const agent = Agent.make({
         name: "suspend-agent",
         instructions: "system",
-        toolkit: Ai.Toolkit.make(echoTool),
+        toolkit: Toolkit.make(echoTool),
       })
 
       const failure = yield* Effect.flip(

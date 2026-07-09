@@ -1,9 +1,8 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
-import * as Session from "./session"
-import * as ToolExecutor from "./tool-executor"
-import * as ToolOutput from "./tool-output"
-
+import { LanguageModel, Prompt, Tokenizer, Toolkit } from "effect/unstable/ai"
+import { type Entry, type EntryId, buildContext } from "./session"
+import { type Success } from "./tool-executor"
+import { bound } from "./tool-output"
 /** @experimental Default headroom kept for the next model response. */
 export const DEFAULT_RESERVE_TOKENS = 16_384
 
@@ -36,9 +35,9 @@ export interface Usage {
 
 /** @experimental What to keep verbatim and what the summary replaces. */
 export interface Plan {
-  readonly firstKeptEntryId: Session.EntryId
-  readonly head: ReadonlyArray<Session.Entry>
-  readonly recent: ReadonlyArray<Session.Entry>
+  readonly firstKeptEntryId: EntryId
+  readonly head: ReadonlyArray<Entry>
+  readonly recent: ReadonlyArray<Entry>
 }
 
 /** @experimental Request passed to a compaction implementation. */
@@ -46,9 +45,9 @@ export interface Request {
   readonly agentName: string
   readonly sessionId: string
   readonly turn: number
-  readonly history: Ai.Prompt.Prompt
-  readonly prompt: Ai.Prompt.Prompt
-  readonly path?: ReadonlyArray<Session.Entry>
+  readonly history: Prompt.Prompt
+  readonly prompt: Prompt.Prompt
+  readonly path?: ReadonlyArray<Entry>
   readonly usage: Usage
   readonly overflow: boolean
   readonly toolOutputMaxBytes?: number
@@ -57,17 +56,17 @@ export interface Request {
 /** @experimental Result from tool-output microcompaction. */
 export interface MicrocompactResult {
   readonly _tag: "Microcompact"
-  readonly history: Ai.Prompt.Prompt
-  readonly prompt: Ai.Prompt.Prompt
+  readonly history: Prompt.Prompt
+  readonly prompt: Prompt.Prompt
 }
 
 /** @experimental Result from summary checkpointing. */
 export interface SummarizeResult {
   readonly _tag: "Summarize"
-  readonly history: Ai.Prompt.Prompt
-  readonly prompt: Ai.Prompt.Prompt
+  readonly history: Prompt.Prompt
+  readonly prompt: Prompt.Prompt
   readonly summary: string
-  readonly firstKeptEntryId: Session.EntryId
+  readonly firstKeptEntryId: EntryId
 }
 
 /** @experimental Compaction result applied by the agent loop. */
@@ -76,18 +75,18 @@ export type Result = MicrocompactResult | SummarizeResult
 /** @experimental Compaction strategy: decide, cut, summarize. */
 export interface Strategy {
   readonly shouldCompact: (usage: Usage) => boolean
-  readonly cut: (entries: ReadonlyArray<Session.Entry>, keepRecentTokens: number) => Option.Option<Plan>
+  readonly cut: (entries: ReadonlyArray<Entry>, keepRecentTokens: number) => Option.Option<Plan>
   readonly summarize: (
     plan: Plan,
     request: Request,
-  ) => Effect.Effect<string, CompactionError, Ai.LanguageModel.LanguageModel>
+  ) => Effect.Effect<string, CompactionError, LanguageModel.LanguageModel>
 }
 
 /** @experimental Compaction service boundary consulted by the loop. */
 export interface Interface {
   readonly maybeCompact: (
     request: Request,
-  ) => Effect.Effect<Option.Option<Result>, CompactionError, Ai.LanguageModel.LanguageModel>
+  ) => Effect.Effect<Option.Option<Result>, CompactionError, LanguageModel.LanguageModel>
 }
 
 /** @experimental Compaction service failure. */
@@ -104,7 +103,7 @@ export interface DefaultOptions {
   readonly reserveTokens?: number
   readonly keepRecentTokens?: number
   readonly contextWindow?: number
-  readonly summaryModel?: Layer.Layer<Ai.LanguageModel.LanguageModel>
+  readonly summaryModel?: Layer.Layer<LanguageModel.LanguageModel>
   readonly summaryPrompt?: string
 }
 
@@ -117,38 +116,37 @@ const APPROX_CHARS_PER_TOKEN = 4
 
 const estimateTokens = (text: string): number => Math.ceil(text.length / APPROX_CHARS_PER_TOKEN)
 
-const estimateEntryTokens = (entry: Session.Entry): number => estimateTokens(serialized(entry))
+const estimateEntryTokens = (entry: Entry): number => estimateTokens(serialized(entry))
 
-const estimatePromptTokens = (prompt: Ai.Prompt.Prompt): number => estimateTokens(serialized(prompt.content))
+const estimatePromptTokens = (prompt: Prompt.Prompt): number => estimateTokens(serialized(prompt.content))
 
-const fits = (history: Ai.Prompt.Prompt, prompt: Ai.Prompt.Prompt, usage: Usage): boolean =>
+const fits = (history: Prompt.Prompt, prompt: Prompt.Prompt, usage: Usage): boolean =>
   Number.isFinite(usage.contextWindow) &&
-  estimatePromptTokens(Ai.Prompt.concat(history, prompt)) <= usage.contextWindow - usage.reserveTokens
+  estimatePromptTokens(Prompt.concat(history, prompt)) <= usage.contextWindow - usage.reserveTokens
 
-const isPromptToolResult = (part: Ai.Prompt.Part): part is Ai.Prompt.ToolResultPart => part.type === "tool-result"
+const isPromptToolResult = (part: Prompt.Part): part is Prompt.ToolResultPart => part.type === "tool-result"
 
-const messageHasToolCall = (message: Ai.Prompt.Message): boolean =>
+const messageHasToolCall = (message: Prompt.Message): boolean =>
   typeof message.content !== "string" && message.content.some((part) => part.type === "tool-call")
 
-const isToolMessage = (entry: Session.Entry | undefined): boolean =>
-  entry?._tag === "Message" && entry.message.role === "tool"
+const isToolMessage = (entry: Entry | undefined): boolean => entry?._tag === "Message" && entry.message.role === "tool"
 
-const isAssistantToolCallEntry = (entry: Session.Entry | undefined): boolean =>
+const isAssistantToolCallEntry = (entry: Entry | undefined): boolean =>
   entry?._tag === "Message" && entry.message.role === "assistant" && messageHasToolCall(entry.message)
 
 const compactToolPart = (
-  part: Ai.Prompt.ToolResultPart,
+  part: Prompt.ToolResultPart,
   maxBytes: number,
-): Effect.Effect<readonly [Ai.Prompt.ToolResultPart, boolean], CompactionError> =>
+): Effect.Effect<readonly [Prompt.ToolResultPart, boolean], CompactionError> =>
   Effect.gen(function* () {
     if (part.isFailure) return [part, false] as const
-    const success: ToolExecutor.Success = { _tag: "Success", result: part.result, encodedResult: part.result }
-    const bounded = yield* ToolOutput.bound(success, { toolCallId: part.id, maxBytes }).pipe(
+    const success: Success = { _tag: "Success", result: part.result, encodedResult: part.result }
+    const bounded = yield* bound(success, { toolCallId: part.id, maxBytes }).pipe(
       Effect.mapError((error) => new CompactionError({ message: error.message, cause: error })),
     )
     if (bounded === success) return [part, false] as const
     return [
-      Ai.Prompt.makePart("tool-result", {
+      Prompt.makePart("tool-result", {
         id: part.id,
         name: part.name,
         isFailure: false,
@@ -159,19 +157,19 @@ const compactToolPart = (
   })
 
 const microcompactPrompt = (
-  prompt: Ai.Prompt.Prompt,
+  prompt: Prompt.Prompt,
   maxBytes: number,
-): Effect.Effect<readonly [Ai.Prompt.Prompt, boolean], CompactionError> =>
+): Effect.Effect<readonly [Prompt.Prompt, boolean], CompactionError> =>
   Effect.gen(function* () {
     let changed = false
-    const messages: Array<Ai.Prompt.Message> = []
+    const messages: Array<Prompt.Message> = []
     for (const message of prompt.content) {
       if (typeof message.content === "string") {
         messages.push(message)
       } else {
         let messageChanged = false
-        const content: Array<Ai.Prompt.Part> = []
-        for (const part of message.content as ReadonlyArray<Ai.Prompt.Part>) {
+        const content: Array<Prompt.Part> = []
+        for (const part of message.content as ReadonlyArray<Prompt.Part>) {
           if (!isPromptToolResult(part)) {
             content.push(part)
           } else {
@@ -181,34 +179,25 @@ const microcompactPrompt = (
             content.push(compacted)
           }
         }
-        messages.push(messageChanged ? ({ ...message, content } as Ai.Prompt.Message) : message)
+        messages.push(messageChanged ? ({ ...message, content } as Prompt.Message) : message)
       }
     }
-    return [changed ? Ai.Prompt.fromMessages(messages) : prompt, changed] as const
+    return [changed ? Prompt.fromMessages(messages) : prompt, changed] as const
   })
 
-const checkpointMessage = (summary: string): Ai.Prompt.Message =>
-  Ai.Prompt.makeMessage("user", {
-    content: [
-      Ai.Prompt.makePart("text", { text: `<conversation-checkpoint>\n${summary}\n</conversation-checkpoint>` }),
-    ],
+const checkpointMessage = (summary: string): Prompt.Message =>
+  Prompt.makeMessage("user", {
+    content: [Prompt.makePart("text", { text: `<conversation-checkpoint>\n${summary}\n</conversation-checkpoint>` })],
   })
 
-const summaryPrompt = (template: string, prompt: Ai.Prompt.Prompt): Ai.Prompt.Prompt =>
-  Ai.Prompt.make(`${template}\n\nConversation to summarize:\n${serialized(prompt.content)}`)
+const summaryPrompt = (template: string, prompt: Prompt.Prompt): Prompt.Prompt =>
+  Prompt.make(`${template}\n\nConversation to summarize:\n${serialized(prompt.content)}`)
 
-const systemMessages = (entries: ReadonlyArray<Session.Entry>): ReadonlyArray<Ai.Prompt.Message> =>
+const systemMessages = (entries: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Message> =>
   entries.flatMap((entry) => (entry._tag === "Message" && entry.message.role === "system" ? [entry.message] : []))
 
-const compactedHistory = (
-  summary: string,
-  head: ReadonlyArray<Session.Entry>,
-  recent: ReadonlyArray<Session.Entry>,
-): Ai.Prompt.Prompt =>
-  Ai.Prompt.concat(
-    Ai.Prompt.fromMessages([...systemMessages(head), checkpointMessage(summary)]),
-    Session.buildContext(recent),
-  )
+const compactedHistory = (summary: string, head: ReadonlyArray<Entry>, recent: ReadonlyArray<Entry>): Prompt.Prompt =>
+  Prompt.concat(Prompt.fromMessages([...systemMessages(head), checkpointMessage(summary)]), buildContext(recent))
 
 const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => ({
   contextTokens: Number.isFinite(usage.contextTokens) ? usage.contextTokens : 0,
@@ -219,18 +208,18 @@ const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => ({
     options.reserveTokens ?? (Number.isFinite(usage.reserveTokens) ? usage.reserveTokens : DEFAULT_RESERVE_TOKENS),
 })
 
-const makeMicrocompact = (history: Ai.Prompt.Prompt, prompt: Ai.Prompt.Prompt): MicrocompactResult => ({
+const makeMicrocompact = (history: Prompt.Prompt, prompt: Prompt.Prompt): MicrocompactResult => ({
   _tag: "Microcompact",
   history,
   prompt,
 })
 
-const safeCutIndex = (entries: ReadonlyArray<Session.Entry>, keepRecentTokens: number): number => {
+const safeCutIndex = (entries: ReadonlyArray<Entry>, keepRecentTokens: number): number => {
   let total = 0
   let index = entries.length
   while (index > 0 && total < keepRecentTokens) {
     index -= 1
-    total += estimateEntryTokens(entries[index] as Session.Entry)
+    total += estimateEntryTokens(entries[index] as Entry)
   }
   while (index > 0 && (isToolMessage(entries[index]) || isAssistantToolCallEntry(entries[index - 1]))) {
     index -= 1
@@ -253,14 +242,14 @@ export const defaultStrategy = (options: DefaultOptions = {}): Strategy => ({
   },
   summarize: (plan, request) => {
     const effect = Effect.gen(function* () {
-      const head = Session.buildContext(plan.head)
+      const head = buildContext(plan.head)
       const [compactedHead] =
         request.toolOutputMaxBytes === undefined
           ? ([head, false] as const)
           : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
       const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
-      const model = yield* Ai.LanguageModel.LanguageModel
-      return yield* model.generateText({ prompt, toolkit: Ai.Toolkit.empty, toolChoice: "none" }).pipe(
+      const model = yield* LanguageModel.LanguageModel
+      return yield* model.generateText({ prompt, toolkit: Toolkit.empty, toolChoice: "none" }).pipe(
         Effect.map((response) => response.text),
         Effect.mapError((error) => new CompactionError({ message: String(error), cause: error })),
       )
@@ -310,7 +299,7 @@ export const layer = (
   strategy: Strategy = defaultStrategy(options),
 ): Layer.Layer<Compaction> => Layer.succeed(Compaction, Compaction.of(make(strategy, options)))
 
-/** @experimental Truncate-only compaction over `Ai.Tokenizer`. */
+/** @experimental Truncate-only compaction over `Tokenizer`. */
 export const truncate = (maxTokens: number): Interface => ({
   maybeCompact: (input) =>
     Effect.gen(function* () {
@@ -321,12 +310,12 @@ export const truncate = (maxTokens: number): Interface => ({
       ) {
         return Option.none<Result>()
       }
-      const tokenizer = yield* Effect.serviceOption(Ai.Tokenizer.Tokenizer)
+      const tokenizer = yield* Effect.serviceOption(Tokenizer.Tokenizer)
       if (Option.isNone(tokenizer)) return Option.none<Result>()
       const prompt = yield* tokenizer.value
-        .truncate(Ai.Prompt.concat(input.history, input.prompt), maxTokens)
+        .truncate(Prompt.concat(input.history, input.prompt), maxTokens)
         .pipe(Effect.mapError((error) => new CompactionError({ message: String(error), cause: error })))
-      return Option.some<Result>(makeMicrocompact(Ai.Prompt.empty, prompt))
+      return Option.some<Result>(makeMicrocompact(Prompt.empty, prompt))
     }),
 })
 

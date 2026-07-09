@@ -1,37 +1,46 @@
-import * as ComboboxPrimitive from "@foldkit/ui/combobox"
+import { Message, Model, OutMessage, Selected, create, init } from "@foldkit/ui/combobox"
+import type { AnchorConfig, GroupHeading, InitConfig, ViewInputs } from "@foldkit/ui/combobox"
 import type { Html } from "foldkit/html"
 import { childAttributes, html } from "foldkit/html"
 
-import type * as Dialog from "@/components/ui/dialog"
+import type { ContentConfig } from "@/components/ui/dialog"
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 
 // MODEL
 
-export const Model = ComboboxPrimitive.Model
-export type Model = ComboboxPrimitive.Model
-export type InitConfig = ComboboxPrimitive.InitConfig
-export type AnchorConfig = ComboboxPrimitive.AnchorConfig
-export const init = ComboboxPrimitive.init
+export { Model, init }
+export type { AnchorConfig, InitConfig }
+export const CommandModel = Model
+export type CommandModel = typeof Model.Type
+export const commandInit = init
 
 // MESSAGE
 
-export const Message = ComboboxPrimitive.Message
-export type Message = ComboboxPrimitive.Message
-export const OutMessage = ComboboxPrimitive.OutMessage
-export type OutMessage<Value extends string = string> = ComboboxPrimitive.OutMessage<Value>
-export const Selected = ComboboxPrimitive.Selected
-export type Selected<Value extends string = string> = ComboboxPrimitive.Selected<Value>
+export { Message, OutMessage, Selected }
+export type CommandMessage = typeof Message.Type
+export type CommandSelected<Value extends string = string> = Readonly<{
+  readonly _tag: "Selected"
+  readonly value: Value
+  readonly wasAdded: boolean
+}>
+export type CommandOutMessage<Value extends string = string> = CommandSelected<Value>
+export const CommandMessage = Message
+export const CommandOutMessage = OutMessage
+export const CommandSelected = Selected
 
 // UPDATE
 
-export const create: typeof ComboboxPrimitive.create = ComboboxPrimitive.create
+export { create }
+export const commandCreate: typeof create = create
 
 // VIEW
 
-export type GroupHeading = ComboboxPrimitive.GroupHeading
+export type { GroupHeading }
 
-const DEFAULT_ANCHOR: ComboboxPrimitive.AnchorConfig = { placement: "bottom-start", gap: 4, padding: 8 }
+const DEFAULT_ANCHOR: AnchorConfig = { placement: "bottom-start", gap: 4, padding: 8 }
+
+type PrimitiveItemConfig = ReturnType<ViewInputs<string>["itemToConfig"]>
 
 const wrapperClass = "flex w-full flex-col rounded-md bg-popover text-popover-foreground"
 
@@ -57,7 +66,7 @@ const separatorClass = "pointer-events-none -mx-1 h-px bg-border"
 const shortcutClass = "ml-auto text-xs tracking-widest text-muted-foreground"
 
 const searchIcon = (): Html => {
-  const h = html<ComboboxPrimitive.Message>()
+  const h = html<CommandMessage>()
   return h.svg(
     [
       h.Attribute("xmlns", "http://www.w3.org/2000/svg"),
@@ -79,21 +88,21 @@ export type RootConfig<Item extends string = string> = Readonly<{
   itemToConfig: (
     item: Item,
     context: Readonly<{ isActive: boolean; isDisabled: boolean; isSelected: boolean }>,
-  ) => ComboboxPrimitive.ItemConfig
+  ) => PrimitiveItemConfig
   class?: string
   inputClass?: string
   placeholder?: string
   itemToDisplayText?: (item: Item, index: number) => string
   isItemDisabled?: (item: Item, index: number) => boolean
   itemGroupKey?: (item: Item, index: number) => string
-  groupToHeading?: (groupKey: string) => ComboboxPrimitive.GroupHeading | undefined
+  groupToHeading?: (groupKey: string) => GroupHeading | undefined
   isDisabled?: boolean
   openOnFocus?: boolean
   // The primitive stamps `role="combobox"` on the input; supply one of these
   // (or an external <label>) so the command input has an accessible name.
   ariaLabel?: string
   ariaLabelledBy?: string
-  anchor?: ComboboxPrimitive.AnchorConfig
+  anchor?: AnchorConfig
 }>
 
 /**
@@ -107,8 +116,8 @@ export type RootConfig<Item extends string = string> = Readonly<{
  * array is empty. The transition classes fire when the consumer passes
  * `isAnimated: true` to `init`.
  */
-export const root = <Item extends string = string>(config: RootConfig<Item>): ComboboxPrimitive.ViewInputs<Item> => {
-  const h = html<ComboboxPrimitive.Message>()
+export const root = <Item extends string = string>(config: RootConfig<Item>): ViewInputs<Item> => {
+  const h = html<CommandMessage>()
   return {
     items: config.items,
     itemToConfig: config.itemToConfig,
@@ -150,8 +159,8 @@ export type ItemConfig = Readonly<{
  * `ItemConfig` with shadcn command-item classes, highlighting the active
  * option via the primitive's `data-active` attribute.
  */
-export const item = (config: ItemConfig, children: ReadonlyArray<Html | string>): ComboboxPrimitive.ItemConfig => {
-  const h = html<ComboboxPrimitive.Message>()
+export const item = (config: ItemConfig, children: ReadonlyArray<Html | string>): PrimitiveItemConfig => {
+  const h = html<CommandMessage>()
   return {
     className: cn(itemClass, config.class),
     content: h.div([h.DataAttribute("slot", "command-item"), h.Class("flex w-full items-center gap-2")], [...children]),
@@ -163,8 +172,8 @@ export type LabelConfig = Readonly<{
 }>
 
 /** Styled group heading for `groupToHeading`: returns the primitive's `GroupHeading`. */
-export const label = (config: LabelConfig, children: ReadonlyArray<Html | string>): ComboboxPrimitive.GroupHeading => {
-  const h = html<ComboboxPrimitive.Message>()
+export const label = (config: LabelConfig, children: ReadonlyArray<Html | string>): GroupHeading => {
+  const h = html<CommandMessage>()
   return {
     className: cn(labelClass, config.class),
     content: h.span([h.DataAttribute("slot", "command-group-heading")], [...children]),
@@ -199,7 +208,7 @@ export type CommandDialogConfig = Readonly<{
  * its children. The padding is stripped so the command input row sits flush
  * against the dialog frame, matching shadcn's `CommandDialog`.
  */
-export const commandDialog = (config: CommandDialogConfig = {}): Dialog.ContentConfig => ({
+export const commandDialog = (config: CommandDialogConfig = {}): ContentConfig => ({
   class: cn("overflow-hidden p-0", config.class),
   ...(config.showCloseButton !== undefined ? { showCloseButton: config.showCloseButton } : {}),
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Redacted } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { EmbeddingModel } from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { anthropic, withAnthropic } from "@batonfx/providers/anthropic"
 import { withOpenAiOrDeterministic } from "@batonfx/providers/deterministic"
@@ -129,9 +129,11 @@ describe("providers", () => {
   )
 
   it("builds embedding layers without live calls", () => {
-    const openAiLayer: Layer.Layer<Ai.EmbeddingModel.EmbeddingModel, Config.ConfigError> =
-      Embedding.withOpenAiEmbedding({ model: "text-embedding-3-small", apiKey })
-    const compatibleLayer: Layer.Layer<Ai.EmbeddingModel.EmbeddingModel, Config.ConfigError> =
+    const openAiLayer: Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError> = Embedding.withOpenAiEmbedding({
+      model: "text-embedding-3-small",
+      apiKey,
+    })
+    const compatibleLayer: Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError> =
       Embedding.withOpenAiCompatibleEmbedding({ model: "embed-test", baseUrl: "http://localhost:11434/v1", apiKey })
 
     expect(openAiLayer).toBeDefined()

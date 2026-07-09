@@ -1,17 +1,16 @@
 import { Effect, Layer } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 /** @experimental Snapshot given to a policy before each follow-up turn. */
 export interface TurnInfo {
   readonly turn: number // 0-based count of completed model turns so far
-  readonly history: Ai.Prompt.Prompt
-  readonly pendingToolResults: ReadonlyArray<Ai.Response.ToolResultPart<string, unknown, unknown>>
+  readonly history: Prompt.Prompt
+  readonly pendingToolResults: ReadonlyArray<Response.ToolResultPart<string, unknown, unknown>>
 }
 
 /** @experimental Per-turn overrides applied when a policy continues. */
 export interface TurnOverrides {
   readonly instructions?: string
-  readonly model?: Layer.Layer<Ai.LanguageModel.LanguageModel>
+  readonly model?: Layer.Layer<LanguageModel.LanguageModel>
   readonly activeTools?: ReadonlyArray<string>
 }
 

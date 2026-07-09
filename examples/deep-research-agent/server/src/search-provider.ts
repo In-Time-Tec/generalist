@@ -209,6 +209,9 @@ export const layer = Layer.unwrap(
 )
 
 /** @experimental */
+export const searchProviderLayer = layer
+
+/** @experimental */
 export const testLayer = (implementation: Interface) => Layer.succeed(Service, Service.of(implementation))
 
 /** @experimental */

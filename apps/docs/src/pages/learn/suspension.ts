@@ -1,8 +1,7 @@
 import suspendAndResume from "../../snippets/learn/suspension/suspend-and-resume.ts?raw"
 import suspendAndResumeExpected from "../../snippets/learn/suspension/suspend-and-resume.expected.txt?raw"
-import * as Prose from "../../prose"
-
-export const suspension = Prose.definePage({
+import { code, codeBlock, definePage, h2, link, p, table } from "../../prose"
+export const suspension = definePage({
   path: "/docs/learn/suspension",
   title: "Suspension as a typed error",
   navTitle: "Suspension",
@@ -10,94 +9,94 @@ export const suspension = Prose.definePage({
   description:
     "AgentSuspended on the error channel is the human-in-the-loop contract: the host stores a token and re-enters the run with RunOptions.resume.",
   content: [
-    Prose.p(
+    p(
       "Suspension is not failure handling. It is the human-in-the-loop contract: a typed statement that the run did not finish and must be re-entered once someone (a person, an external system, a durable runtime) resolves a token out-of-band. Batonfx puts that statement on the stream's error channel as ",
-      Prose.code("AgentSuspended"),
+      code("AgentSuspended"),
       ".",
     ),
-    Prose.h2("the-shape", "A typed error with a deliberate shape"),
-    Prose.p("The error carries five fields:"),
-    Prose.table(
+    h2("the-shape", "A typed error with a deliberate shape"),
+    p("The error carries five fields:"),
+    table(
       ["Field", "Meaning"],
       [
-        [[Prose.code("token")], "Opaque handle the host resolves out-of-band"],
+        [[code("token")], "Opaque handle the host resolves out-of-band"],
         [
-          [Prose.code("reason")],
+          [code("reason")],
           [
-            Prose.code('"approval"'),
+            code('"approval"'),
             " from an Approvals ",
-            Prose.code("Pending"),
+            code("Pending"),
             " decision, or ",
-            Prose.code('"tool-wait"'),
+            code('"tool-wait"'),
             " from a ToolExecutor ",
-            Prose.code("Suspend"),
+            code("Suspend"),
             " outcome",
           ],
         ],
-        [[Prose.code("tool_call_id")], "Id of the pending tool call"],
-        [[Prose.code("tool_name")], "Name of the pending tool"],
-        [[Prose.code("tool_params")], "Params of the pending tool call"],
+        [[code("tool_call_id")], "Id of the pending tool call"],
+        [[code("tool_name")], "Name of the pending tool"],
+        [[code("tool_params")], "Params of the pending tool call"],
       ],
     ),
-    Prose.p(
+    p(
       "There are exactly two producers. ",
-      Prose.code("Approvals.check"),
+      code("Approvals.check"),
       " returning ",
-      Prose.code("Pending"),
+      code("Pending"),
       " suspends a ",
-      Prose.code("needsApproval"),
+      code("needsApproval"),
       " tool before it executes; ",
-      Prose.code("ToolExecutor.execute"),
+      code("ToolExecutor.execute"),
       " returning ",
-      Prose.code("Suspend"),
+      code("Suspend"),
       " parks a call whose result will arrive later. A ",
-      Prose.link("/docs/guides/permissions", "permission rule"),
+      link("/docs/guides/permissions", "permission rule"),
       " that asks and gets no in-process answer suspends through the same ",
-      Prose.code('"approval"'),
+      code('"approval"'),
       " path.",
     ),
-    Prose.h2("suspend-resolve-resume", "Suspend, resolve, resume"),
-    Prose.p(
+    h2("suspend-resolve-resume", "Suspend, resolve, resume"),
+    p(
       "The host's job is three steps: catch ",
-      Prose.code("AgentSuspended"),
+      code("AgentSuspended"),
       ", store the token and the transcript, and later re-enter the run with ",
-      Prose.code("RunOptions.resume"),
+      code("RunOptions.resume"),
       " carrying the pending call. This run suspends on an approval and resumes to completion, with zero credentials:",
     ),
-    Prose.codeBlock({
+    codeBlock({
       label: "suspend-and-resume.ts",
       source: suspendAndResume,
       expectedOutput: suspendAndResumeExpected,
     }),
-    Prose.p(
+    p(
       "Three details of the re-entry contract are visible here. First, just before failing, the stream emits a trailing ",
-      Prose.code("TurnCompleted"),
+      code("TurnCompleted"),
       " whose transcript includes the suspending turn; that is what the snippet stores and passes back as ",
-      Prose.code("history"),
+      code("history"),
       ". Second, the resumed run executes the pending call first, before any model call, then re-feeds its result and continues under the normal turn policy. Third, gates are consulted again on re-entry: the ",
-      Prose.code("Approvals"),
+      code("Approvals"),
       " layer answers ",
-      Prose.code("Approved"),
+      code("Approved"),
       " the second time because the host has resolved the token, which is exactly how a real host answers from its own approval record.",
     ),
-    Prose.h2("why-the-shape-mirrors-a-tool-call", "Why the shape mirrors a tool call"),
-    Prose.p(
+    h2("why-the-shape-mirrors-a-tool-call", "Why the shape mirrors a tool call"),
+    p(
       "The field shape (id, name, params) is deliberately the shape of a tool call, because that is what a durable host must persist to re-enter later. Store those three fields plus the token and the transcript, and a resume days later reconstructs the exact call identity the model emitted. Relayfx does precisely this, persisting the suspension as a durable wait row keyed by the tool call id; see ",
-      Prose.link("/docs/learn/baton-and-relay", "where durability lives"),
+      link("/docs/learn/baton-and-relay", "where durability lives"),
       ". Batonfx itself never persists suspensions: it defines the contract and leaves storage to the host.",
     ),
-    Prose.h2("why-an-error-and-not-a-callback", "Why an error and not a callback"),
-    Prose.p(
+    h2("why-an-error-and-not-a-callback", "Why an error and not a callback"),
+    p(
       "A callback-based pause lives outside the type system: nothing forces you to handle it, and it composes poorly with scopes and interruption. A typed error on the ",
-      Prose.code("RunError"),
+      code("RunError"),
       " channel composes with everything Effect already gives you: ",
-      Prose.code("catchIf"),
+      code("catchIf"),
       " and ",
-      Prose.code("catchTag"),
+      code("catchTag"),
       ", scoped resource cleanup on the way out, interruption, and retry combinators. A suspension tears the run down cleanly through ordinary error propagation, which is what makes it safe to resume from a different process entirely. For approvals over a live connection, where the wire carries the token to a browser and back, see ",
-      Prose.link("/docs/guides/approvals", "How to require human approval"),
+      link("/docs/guides/approvals", "How to require human approval"),
       " and ",
-      Prose.link("/docs/guides/serve-transport", "How to serve an agent over SSE and WebSocket"),
+      link("/docs/guides/serve-transport", "How to serve an agent over SSE and WebSocket"),
       ".",
     ),
   ],

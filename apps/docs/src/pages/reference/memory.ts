@@ -1,126 +1,118 @@
-import * as Prose from "../../prose"
-
-export const memoryReference = Prose.definePage({
+import { code, command, definePage, h2, lead, link, p, table } from "../../prose"
+export const memoryReference = definePage({
   path: "/docs/reference/memory",
   title: "@batonfx/memory",
   navTitle: "memory",
   group: "Reference",
   description: "WorkingMemory, SemanticRecall, the VectorStore seam, and the combined layer.",
   content: [
-    Prose.lead(
+    lead(
       "@batonfx/memory implements the core Memory seam twice (a recency window with optional summarization, and embedding-based semantic recall) plus the VectorStore seam they share.",
     ),
-    Prose.command("Install", "bun add @batonfx/core @batonfx/memory"),
-    Prose.p("Published on npm at 0.1.1. Requires ", Prose.code("@batonfx/core"), "."),
-    Prose.h2("exports", "Exports map"),
-    Prose.table(
+    command("Install", "bun add @batonfx/core @batonfx/memory"),
+    p("Published on npm at 0.1.1. Requires ", code("@batonfx/core"), "."),
+    h2("exports", "Exports map"),
+    table(
       ["Subpath", "Contents"],
       [
         [
-          [Prose.code(".")],
+          [code(".")],
           [
             "Namespaces ",
-            Prose.code("WorkingMemory"),
+            code("WorkingMemory"),
             ", ",
-            Prose.code("SemanticRecall"),
+            code("SemanticRecall"),
             ", ",
-            Prose.code("VectorStore"),
+            code("VectorStore"),
             ", plus ",
-            Prose.code("combinedLayer"),
+            code("combinedLayer"),
           ],
         ],
       ],
     ),
-    Prose.h2("working-memory", "WorkingMemory"),
-    Prose.p(
-      Prose.code("WorkingMemory.layer(options?)"),
+    h2("working-memory", "WorkingMemory"),
+    p(
+      code("WorkingMemory.layer(options?)"),
       " provides ",
-      Prose.code("Memory.Memory"),
+      code("Memory.Memory"),
       " backed by an in-process store per ",
-      Prose.code("Memory.Key"),
+      code("Memory.Key"),
       ". It keeps the most recent user/assistant text messages verbatim; overflow beyond the window is optionally folded into a rolling summary. Recall returns the summary (wrapped in ",
-      Prose.code("<working-memory-summary>"),
+      code("<working-memory-summary>"),
       " tags) followed by the recent items.",
     ),
-    Prose.table(
+    table(
       ["Option", "Default", "Notes"],
       [
-        [[Prose.code("maxMessages")], [Prose.code("20")], "Recency window size"],
+        [[code("maxMessages")], [code("20")], "Recency window size"],
         [
-          [Prose.code("summarize.model")],
+          [code("summarize.model")],
           "none",
-          ["A ", Prose.code("LanguageModel"), " layer; without it, overflow is dropped and the summary unchanged"],
+          ["A ", code("LanguageModel"), " layer; without it, overflow is dropped and the summary unchanged"],
         ],
-        [
-          [Prose.code("summarize.prompt")],
-          "built-in summary prompt",
-          "Instruction for folding overflow into the summary",
-        ],
+        [[code("summarize.prompt")], "built-in summary prompt", "Instruction for folding overflow into the summary"],
       ],
     ),
-    Prose.h2("semantic-recall", "SemanticRecall"),
-    Prose.p(
-      Prose.code("SemanticRecall.layer(options?)"),
+    h2("semantic-recall", "SemanticRecall"),
+    p(
+      code("SemanticRecall.layer(options?)"),
       " provides ",
-      Prose.code("Memory.Memory"),
+      code("Memory.Memory"),
       " and requires ",
-      Prose.code("VectorStore"),
+      code("VectorStore"),
       " and ",
-      Prose.code("Ai.EmbeddingModel"),
+      code("Ai.EmbeddingModel"),
       ". Recall embeds the run's user text and queries the store; remember fires only on terminal runs, embedding the final user/assistant exchange as one document.",
     ),
-    Prose.table(
+    table(
       ["Option", "Default", "Notes"],
       [
-        [[Prose.code("limit")], [Prose.code("5")], "Maximum matches returned per recall"],
-        [[Prose.code("minScore")], "none", "Minimum cosine score to include a match"],
+        [[code("limit")], [code("5")], "Maximum matches returned per recall"],
+        [[code("minScore")], "none", "Minimum cosine score to include a match"],
       ],
     ),
-    Prose.p("Match metadata carries the source document metadata plus ", Prose.code("score"), "."),
-    Prose.h2("vector-store", "VectorStore"),
-    Prose.p(
+    p("Match metadata carries the source document metadata plus ", code("score"), "."),
+    h2("vector-store", "VectorStore"),
+    p(
       "The storage seam: ",
-      Prose.code("{ upsert(documents), query(query) }"),
+      code("{ upsert(documents), query(query) }"),
       " failing with ",
-      Prose.code("VectorStoreError"),
+      code("VectorStoreError"),
       ". Documents are scoped by ",
-      Prose.code("Memory.Key"),
+      code("Memory.Key"),
       "; queries never cross keys.",
     ),
-    Prose.table(
+    table(
       ["Type", "Shape"],
       [
-        [[Prose.code("Document")], [Prose.code("{ id, key, text, metadata? }")]],
-        [
-          [Prose.code("Embedded")],
-          [Prose.code("Document"), " plus ", Prose.code("{ embedding: ReadonlyArray<number> }")],
-        ],
-        [[Prose.code("Match")], [Prose.code("{ document: Embedded, score: number }")]],
-        [[Prose.code("Query")], [Prose.code("{ key, embedding, limit, minScore? }")]],
+        [[code("Document")], [code("{ id, key, text, metadata? }")]],
+        [[code("Embedded")], [code("Document"), " plus ", code("{ embedding: ReadonlyArray<number> }")]],
+        [[code("Match")], [code("{ document: Embedded, score: number }")]],
+        [[code("Query")], [code("{ key, embedding, limit, minScore? }")]],
       ],
     ),
-    Prose.p(
-      Prose.code("VectorStore.memoryLayer"),
+    p(
+      code("VectorStore.memoryLayer"),
       " is the in-process implementation using cosine similarity; it rejects non-finite vectors and mismatched dimensions. ",
-      Prose.code("testLayer(implementation)"),
+      code("testLayer(implementation)"),
       " wraps an explicit interface; a Postgres/pgvector store implements the same two functions.",
     ),
-    Prose.h2("combined", "combinedLayer"),
-    Prose.p(
-      Prose.code("combinedLayer({ working?, semantic? })"),
+    h2("combined", "combinedLayer"),
+    p(
+      code("combinedLayer({ working?, semantic? })"),
       " merges both implementations with ",
-      Prose.code("Memory.merge"),
+      code("Memory.merge"),
       ": recalls concatenate (working first), remembers fan out. It carries SemanticRecall's requirements (",
-      Prose.code("VectorStore"),
+      code("VectorStore"),
       " and ",
-      Prose.code("Ai.EmbeddingModel"),
+      code("Ai.EmbeddingModel"),
       ").",
     ),
-    Prose.p(
+    p(
       "Embedding layers live in ",
-      Prose.link("/docs/reference/providers", "@batonfx/providers"),
+      link("/docs/reference/providers", "@batonfx/providers"),
       ". See ",
-      Prose.link("/docs/guides/memory", "How to add memory"),
+      link("/docs/guides/memory", "How to add memory"),
       ".",
     ),
   ],

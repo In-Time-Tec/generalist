@@ -1,12 +1,13 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import * as Encoding from "effect/unstable/encoding"
+import { Sse } from "effect/unstable/encoding"
 import { Headers, HttpBody, HttpServerRequest } from "effect/unstable/http"
-import * as Ai from "effect/unstable/ai"
-import { SessionRegistry, Sse, Wire } from "../src/index"
+import { Toolkit } from "effect/unstable/ai"
+import { SessionRegistry, Wire } from "../src/index"
+import { lastEventId, respond, streamSuccess } from "../src/sse"
 
-const toolkit = Ai.Toolkit.empty
+const toolkit = Toolkit.empty
 
 const endedFrame: Wire.LooseServerFrameType = { _tag: "Ended", seq: 1 }
 
@@ -41,9 +42,9 @@ const streamBodyText = (body: HttpBody.HttpBody) => {
   return body._tag === "Stream" ? body.stream.pipe(Stream.decodeText, Stream.runCollect) : Effect.succeed([])
 }
 
-const parseSse = (text: string): ReadonlyArray<Encoding.Sse.Event> => {
-  const parsed: Array<Encoding.Sse.Event> = []
-  const parser = Encoding.Sse.makeParser((event) => {
+const parseSse = (text: string): ReadonlyArray<Sse.Event> => {
+  const parsed: Array<Sse.Event> = []
+  const parser = Sse.makeParser((event) => {
     if (event._tag === "Event") parsed.push(event)
   })
   parser.feed(text)
@@ -52,14 +53,14 @@ const parseSse = (text: string): ReadonlyArray<Encoding.Sse.Event> => {
 
 describe("Sse", () => {
   it("parses Last-Event-ID as a non-negative integer", () => {
-    expect(Option.getOrUndefined(Sse.lastEventId(Headers.fromInput({ "Last-Event-ID": "12" })))).toBe(12)
-    expect(Option.isNone(Sse.lastEventId(Headers.fromInput({ "Last-Event-ID": "1.5" })))).toBe(true)
-    expect(Option.isNone(Sse.lastEventId(Headers.fromInput({ "Last-Event-ID": "-1" })))).toBe(true)
+    expect(Option.getOrUndefined(lastEventId(Headers.fromInput({ "Last-Event-ID": "12" })))).toBe(12)
+    expect(Option.isNone(lastEventId(Headers.fromInput({ "Last-Event-ID": "1.5" })))).toBe(true)
+    expect(Option.isNone(lastEventId(Headers.fromInput({ "Last-Event-ID": "-1" })))).toBe(true)
   })
 
   it.effect("respond encodes registry frames as SSE events with seq ids", () =>
     Effect.gen(function* () {
-      const response = yield* Sse.respond(toolkit)({
+      const response = yield* respond(toolkit)({
         sessionId: "s-sse",
         request: request("http://test/sessions/s-sse/events"),
       })
@@ -79,7 +80,7 @@ describe("Sse", () => {
     (() => {
       let received: number | undefined
       return Effect.gen(function* () {
-        yield* Sse.respond(toolkit)({
+        yield* respond(toolkit)({
           sessionId: "s-resume",
           request: request("http://test/sessions/s-resume/events?after_seq=3", { "Last-Event-ID": "4" }),
         })
@@ -100,7 +101,7 @@ describe("Sse", () => {
     (() => {
       let received: number | undefined
       return Effect.gen(function* () {
-        yield* Sse.respond(toolkit)({
+        yield* respond(toolkit)({
           sessionId: "s-query",
           request: request("http://test/sessions/s-query/events?after_seq=7"),
         })
@@ -119,7 +120,7 @@ describe("Sse", () => {
 
   it.effect("emits heartbeat comments without frame data", () =>
     Effect.gen(function* () {
-      const response = yield* Sse.respond(toolkit)({
+      const response = yield* respond(toolkit)({
         sessionId: "s-heartbeat",
         request: request("http://test/sessions/s-heartbeat/events"),
         keepAlive: "10 millis",
@@ -137,6 +138,6 @@ describe("Sse", () => {
   )
 
   it("exposes HttpApi StreamSse schema", () => {
-    expect(Sse.streamSuccess(toolkit)._tag).toBe("StreamSse")
+    expect(streamSuccess(toolkit)._tag).toBe("StreamSse")
   })
 })

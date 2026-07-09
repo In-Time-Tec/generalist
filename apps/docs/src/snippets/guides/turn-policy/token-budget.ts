@@ -1,8 +1,8 @@
 import { Effect } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Prompt } from "effect/unstable/ai"
 import { Agent, TurnPolicy } from "@batonfx/core"
 
-const approximateTokens = (history: Ai.Prompt.Prompt): number => Math.ceil(JSON.stringify(history.content).length / 4)
+const approximateTokens = (history: Prompt.Prompt): number => Math.ceil(JSON.stringify(history.content).length / 4)
 
 export const tokenBudget = (maxTokens: number): TurnPolicy.TurnPolicy =>
   TurnPolicy.make((info) =>

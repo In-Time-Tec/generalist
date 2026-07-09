@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { ConfigProvider, Effect, Fiber, SchemaAST, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import * as SearchProvider from "../src/search-provider"
+import { cannedResultsFor, layer, testLayer } from "../src/search-provider"
 import { toolkit, toolkitLayer, webSearchTool } from "../src/tools"
 
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
@@ -24,7 +24,7 @@ describe("web_search tool", () => {
     Effect.gen(function* () {
       const output = yield* runWebSearch("anything").pipe(
         Effect.provide(
-          SearchProvider.testLayer({
+          testLayer({
             search: () =>
               Effect.succeed([{ title: "Injected", url: "https://example.test", snippet: "from fake provider" }]),
           }),
@@ -40,11 +40,11 @@ describe("web_search tool", () => {
   it.effect("uses the canned search path when no EXA_API_KEY is configured", () =>
     Effect.gen(function* () {
       const output = yield* runWebSearch("baton agent framework").pipe(
-        Effect.provide(SearchProvider.layer),
+        Effect.provide(layer),
         Effect.provide(withEnv({})),
       )
 
-      expect(output).toEqual({ results: SearchProvider.cannedResultsFor("baton agent framework") })
+      expect(output).toEqual({ results: cannedResultsFor("baton agent framework") })
     }),
   )
 

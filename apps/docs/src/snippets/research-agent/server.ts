@@ -1,12 +1,12 @@
 import { Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 import { SessionRegistry, Sse, Ws } from "@batonfx/transport"
 import { Effect, Layer, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Chat } from "effect/unstable/ai"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
 import { agent } from "./agent"
 import { modelLayer } from "./model"
-import * as SearchProvider from "./search-provider"
+import { cannedLayer } from "./search-provider"
 import { toolkit, toolkitLayer } from "./tools"
 
 const OpenSessionInput = Schema.Struct({
@@ -83,9 +83,9 @@ export const toolExecutorLayer = Layer.unwrap(
     const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitLayer))
     return ToolExecutor.fromToolkit(handledToolkit)
   }),
-).pipe(Layer.provide(SearchProvider.cannedLayer))
+).pipe(Layer.provide(cannedLayer))
 
-const persistenceLayer = Ai.Chat.layerPersisted({ storeId: "research-agent" }).pipe(
+const persistenceLayer = Chat.layerPersisted({ storeId: "research-agent" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),
 )
 

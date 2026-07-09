@@ -1,7 +1,7 @@
 id: no-aliased-named-imports
 language: TypeScript
-severity: error
-message: Do not alias named imports. Import the exported name directly or use namespace access that preserves the upstream name.
+severity: hint
+message: Prefer importing exported names directly. Use an alias only for a real local-name collision or provider variant that would otherwise require a wrapper/re-export.
 rule:
   all:
     - kind: import_specifier
@@ -9,6 +9,8 @@ rule:
 files:
   - "**/*.ts"
   - "**/*.tsx"
+  - "**/*.ts.txt"
+  - "apps/docs/src/snippets/**/*.txt"
 ignores:
   - "**/dist/**"
   - "**/coverage/**"

@@ -1,15 +1,6 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-import {
-  Agent,
-  Approvals,
-  Compaction,
-  Memory,
-  ModelMiddleware,
-  ModelRegistry,
-  SkillSource,
-  ToolExecutor,
-} from "@batonfx/core"
+import { Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, Approvals, Compaction, Memory, ModelMiddleware, ModelRegistry, SkillSource } from "@batonfx/core"
 import { Chat, Connection } from "@batonfx/foldkit"
 import { WorkingMemory } from "@batonfx/memory"
 import { Deterministic } from "@batonfx/providers"
@@ -29,17 +20,23 @@ const researchSkill: SkillSource.Skill = {
   tools: [],
 }
 
-const approvalTool = Ai.Tool.make("publish_release", {
+const approvalTool = Tool.make("publish_release", {
   description: "Publish a release after human approval",
   parameters: Schema.Struct({ version: Schema.String }),
   success: Schema.String,
   needsApproval: true,
 })
 
+const toolkit = Toolkit.make(approvalTool)
+
+const toolkitLayer = toolkit.toLayer({
+  publish_release: ({ version }) => Effect.succeed(`published ${version}`),
+})
+
 const agent = Agent.make({
   name: "capstone-assistant",
   instructions: "Use selected skills, remember stable facts, and ask before publishing.",
-  toolkit: Ai.Toolkit.make(approvalTool),
+  toolkit,
 })
 
 const key: Memory.Key = { agent: "capstone-assistant", subject: "local-user" }
@@ -54,7 +51,7 @@ const chatFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
     event: {
       _tag: "ModelPart",
       turn: 0,
-      part: Ai.Response.makePart("text-delta", { id: "assistant", delta: "deterministic response" }),
+      part: Response.makePart("text-delta", { id: "assistant", delta: "deterministic response" }),
     },
   },
   { _tag: "Event", seq: 2, event: { _tag: "TurnCompleted", turn: 0 } },
@@ -83,14 +80,7 @@ const program = Effect.gen(function* () {
   Effect.provide(
     Layer.mergeAll(
       Deterministic.withDeterministic({ model: "capstone" }),
-      ToolExecutor.testLayer({
-        execute: (request) =>
-          Effect.succeed({
-            _tag: "Success",
-            result: `published ${String((request.call.params as { readonly version?: string }).version ?? "unknown")}`,
-            encodedResult: `published ${String((request.call.params as { readonly version?: string }).version ?? "unknown")}`,
-          }),
-      }),
+      toolkitLayer,
       Approvals.autoApprove,
       ModelMiddleware.identityLayer,
       SkillSource.fromSkills([researchSkill]),

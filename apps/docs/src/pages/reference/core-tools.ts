@@ -1,167 +1,155 @@
-import * as Prose from "../../prose"
-
-export const coreToolsReference = Prose.definePage({
+import { code, command, definePage, h2, lead, link, p, table } from "../../prose"
+export const coreToolsReference = definePage({
   path: "/docs/reference/core-tools",
   title: "Tools and execution",
   navTitle: "Tools",
   group: "Reference",
   description: "ToolExecutor, ToolContext, ToolOutput and its store, and AgentTool for agents-as-tools.",
   content: [
-    Prose.lead(
+    lead(
       "Four namespaces of @batonfx/core cover tool execution: ToolExecutor runs calls, ToolContext is the ambient per-call context, ToolOutput bounds large results, and AgentTool wraps an agent as a tool.",
     ),
-    Prose.command("Install", "bun add @batonfx/core"),
-    Prose.h2("tool-executor", "ToolExecutor"),
-    Prose.p(
+    command("Install", "bun add @batonfx/core"),
+    h2("tool-executor", "ToolExecutor"),
+    p(
       "One of the four required run services. The interface is a single function ",
-      Prose.code("execute: (request: Request) => Effect<Outcome, AgentError, ToolContext>"),
+      code("execute: (request: Request) => Effect<Outcome, AgentError, ToolContext>"),
       ".",
     ),
-    Prose.table(
+    table(
       ["Request field", "Type", "Notes"],
       [
-        [[Prose.code("call")], [Prose.code("Ai.Response.ToolCallPart<string, unknown>")], "The model's tool call"],
-        [[Prose.code("turn")], [Prose.code("number")], "0-based turn issuing the call"],
-        [[Prose.code("agentName")], [Prose.code("string")], "Name of the running agent"],
-        [[Prose.code("sessionId")], [Prose.code("string")], "Host-assigned run/session identity"],
+        [[code("call")], [code("Ai.Response.ToolCallPart<string, unknown>")], "The model's tool call"],
+        [[code("turn")], [code("number")], "0-based turn issuing the call"],
+        [[code("agentName")], [code("string")], "Name of the running agent"],
+        [[code("sessionId")], [code("string")], "Host-assigned run/session identity"],
       ],
     ),
-    Prose.table(
+    table(
       ["Outcome", "Fields", "Loop behavior"],
       [
         [
-          [Prose.code("Success")],
-          [Prose.code("result"), ", ", Prose.code("encodedResult")],
+          [code("Success")],
+          [code("result"), ", ", code("encodedResult")],
           "Re-fed to the model as a successful tool result",
         ],
-        [
-          [Prose.code("Failure")],
-          [Prose.code("message")],
-          "Re-fed to the model as a failed tool result; the run continues",
-        ],
-        [
-          [Prose.code("Suspend")],
-          [Prose.code("token")],
-          ["The run fails with ", Prose.code('AgentSuspended{ reason: "tool-wait" }')],
-        ],
+        [[code("Failure")], [code("message")], "Re-fed to the model as a failed tool result; the run continues"],
+        [[code("Suspend")], [code("token")], ["The run fails with ", code('AgentSuspended{ reason: "tool-wait" }')]],
       ],
     ),
-    Prose.table(
+    table(
       ["Constructor", "Notes"],
       [
         [
-          [Prose.code("ToolExecutor.fromToolkit(toolkit)")],
+          [code("ToolExecutor.fromToolkit(toolkit)")],
           [
             "Executes via a handled ",
-            Prose.code("Ai.Toolkit.WithHandler"),
+            code("Ai.Toolkit.WithHandler"),
             ". Unregistered names produce ",
-            Prose.code("Failure"),
+            code("Failure"),
             "; a handler that dies with ",
-            Prose.code("AgentSuspended"),
+            code("AgentSuspended"),
             " produces ",
-            Prose.code("Suspend"),
+            code("Suspend"),
             " with its token",
           ],
         ],
-        [[Prose.code("ToolExecutor.testLayer(implementation)")], "Layer from an explicit interface"],
+        [[code("ToolExecutor.testLayer(implementation)")], "Layer from an explicit interface"],
       ],
     ),
-    Prose.h2("tool-context", "ToolContext"),
-    Prose.p("Ambient context available to a tool handler for the current call."),
-    Prose.table(
+    h2("tool-context", "ToolContext"),
+    p("Ambient context available to a tool handler for the current call."),
+    table(
       ["Member", "Type", "Notes"],
       [
-        [[Prose.code("signal")], [Prose.code("AbortSignal")], "Aborted when the run is interrupted"],
+        [[code("signal")], [code("AbortSignal")], "Aborted when the run is interrupted"],
         [
-          [Prose.code("emit")],
-          [Prose.code("(progress: Progress) => Effect<void>")],
+          [code("emit")],
+          [code("(progress: Progress) => Effect<void>")],
           [
             "Emits a ",
-            Prose.code("ToolProgress"),
+            code("ToolProgress"),
             " event; ",
-            Prose.code("Progress"),
+            code("Progress"),
             " is ",
-            Prose.code("{ toolCallId, message?, data? }"),
+            code("{ toolCallId, message?, data? }"),
           ],
         ],
-        [[Prose.code("sessionId")], [Prose.code("string")], "Host-assigned run/session identity"],
+        [[code("sessionId")], [code("string")], "Host-assigned run/session identity"],
       ],
     ),
-    Prose.p(
-      Prose.code("ToolContext.layerDefault"),
+    p(
+      code("ToolContext.layerDefault"),
       " provides a never-aborting signal, a no-op ",
-      Prose.code("emit"),
+      code("emit"),
       ", and sessionId ",
-      Prose.code('"local"'),
+      code('"local"'),
       ". ",
-      Prose.code("ToolContext.testLayer(implementation)"),
+      code("ToolContext.testLayer(implementation)"),
       " provides an explicit one.",
     ),
-    Prose.h2("tool-output", "ToolOutput and ToolOutputStore"),
-    Prose.p(
+    h2("tool-output", "ToolOutput and ToolOutputStore"),
+    p(
       "A bounded tool result is ",
-      Prose.code("ToolOutput = { inline: unknown; outputPaths?: ReadonlyArray<string> }"),
+      code("ToolOutput = { inline: unknown; outputPaths?: ReadonlyArray<string> }"),
       ". ",
-      Prose.code("ToolOutputStore"),
+      code("ToolOutputStore"),
       " is the optional seam that stores overflow out of context: ",
-      Prose.code("put(toolCallId, content) => Effect<Option<string>, ToolOutputError>"),
+      code("put(toolCallId, content) => Effect<Option<string>, ToolOutputError>"),
       ".",
     ),
-    Prose.table(
+    table(
       ["Export", "Notes"],
       [
         [
-          [Prose.code("ToolOutput.bound(result, { toolCallId, maxBytes })")],
+          [code("ToolOutput.bound(result, { toolCallId, maxBytes })")],
           [
             "Returns the result unchanged when it fits, no store is present, or the store declines; otherwise replaces it with a truncated preview ",
-            Prose.code("{ truncated, bytes, maxBytes, preview }"),
+            code("{ truncated, bytes, maxBytes, preview }"),
             " plus the spilled ",
-            Prose.code("outputPaths"),
+            code("outputPaths"),
           ],
         ],
-        [[Prose.code("ToolOutput.layerNoop")], ["Store that always declines (", Prose.code("Option.none"), ")"]],
-        [
-          [Prose.code("ToolOutput.layerMemory")],
-          ["In-memory store issuing ", Prose.code("mem:tool-output-<n>"), " paths"],
-        ],
-        [[Prose.code("ToolOutput.testLayer(implementation)")], "Layer from an explicit store interface"],
-        [[Prose.code("ToolOutputError")], ["Tagged error with ", Prose.code("message")]],
+        [[code("ToolOutput.layerNoop")], ["Store that always declines (", code("Option.none"), ")"]],
+        [[code("ToolOutput.layerMemory")], ["In-memory store issuing ", code("mem:tool-output-<n>"), " paths"]],
+        [[code("ToolOutput.testLayer(implementation)")], "Layer from an explicit store interface"],
+        [[code("ToolOutputError")], ["Tagged error with ", code("message")]],
       ],
     ),
-    Prose.p(
+    p(
       "The loop applies ",
-      Prose.code("bound"),
+      code("bound"),
       " to successful outcomes when ",
-      Prose.code("RunOptions.toolOutputMaxBytes"),
+      code("RunOptions.toolOutputMaxBytes"),
       " is set.",
     ),
-    Prose.h2("agent-tool", "AgentTool"),
-    Prose.p(
-      Prose.code("AgentTool.asTool(agent, options?)"),
+    h2("agent-tool", "AgentTool"),
+    p(
+      code("AgentTool.asTool(agent, options?)"),
       " returns a handled toolkit exposing the agent as one tool. The tool declares ",
-      Prose.code("failure: Schema.String"),
+      code("failure: Schema.String"),
       " and ",
-      Prose.code('failureMode: "return"'),
+      code('failureMode: "return"'),
       ", so child failures come back to the parent model as failed tool results. A child ",
-      Prose.code("AgentSuspended"),
+      code("AgentSuspended"),
       " is not translated; it escapes as a defect.",
     ),
-    Prose.table(
+    table(
       ["Option", "Default"],
       [
-        [[Prose.code("name")], [Prose.code("agent.name")]],
-        [[Prose.code("description")], "none"],
-        [[Prose.code("parameters")], [Prose.code("Schema.Struct({ prompt: Schema.String })")]],
-        [[Prose.code("success")], [Prose.code("Schema.String")]],
-        [[Prose.code("toPrompt")], [Prose.code("(params) => params.prompt")]],
-        [[Prose.code("fromResult")], [Prose.code("(result) => result.text")]],
+        [[code("name")], [code("agent.name")]],
+        [[code("description")], "none"],
+        [[code("parameters")], [code("Schema.Struct({ prompt: Schema.String })")]],
+        [[code("success")], [code("Schema.String")]],
+        [[code("toPrompt")], [code("(params) => params.prompt")]],
+        [[code("fromResult")], [code("(result) => result.text")]],
       ],
     ),
-    Prose.p(
+    p(
       "For handler wiring and spill behavior in practice, see ",
-      Prose.link("/docs/guides/define-tools", "How to define tools and toolkits"),
+      link("/docs/guides/define-tools", "How to define tools and toolkits"),
       ". For agents-as-tools composition, see ",
-      Prose.link("/docs/guides/multi-agent", "How to coordinate multiple agents"),
+      link("/docs/guides/multi-agent", "How to coordinate multiple agents"),
       ".",
     ),
   ],

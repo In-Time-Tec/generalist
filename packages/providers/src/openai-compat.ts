@@ -1,4 +1,4 @@
-import * as OpenAiCompat from "@effect/ai-openai-compat"
+import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
@@ -8,7 +8,7 @@ import type { RegistrationOptions } from "./openai"
 export interface OpenAiCompatibleInput extends RegistrationOptions {
   readonly provider?: string
   readonly model: string
-  readonly config?: Omit<typeof OpenAiCompat.OpenAiLanguageModel.Config.Service, "model">
+  readonly config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">
 }
 
 /** @experimental */
@@ -16,7 +16,7 @@ export const openAiCompatible = (input: OpenAiCompatibleInput) =>
   ModelRegistry.registrationFromLayer({
     provider: input.provider ?? "openai-compatible",
     model: input.model,
-    layer: OpenAiCompat.OpenAiLanguageModel.layer({
+    layer: OpenAiLanguageModel.layer({
       model: input.model,
       ...(input.config === undefined ? {} : { config: input.config }),
     }),
@@ -25,20 +25,17 @@ export const openAiCompatible = (input: OpenAiCompatibleInput) =>
   })
 
 /** @experimental */
-export const openAiCompatibleClientLayerConfig = OpenAiCompat.OpenAiClient.layerConfig
+export const openAiCompatibleClientLayerConfig = OpenAiClient.layerConfig
 
 /** @experimental */
 export interface WithOpenAiCompatibleOptions extends OpenAiCompatibleInput {
   readonly apiKey?: Config.Config<Redacted.Redacted<string>>
   readonly baseUrl?: string
-  readonly clientConfig?: Omit<
-    NonNullable<Parameters<typeof OpenAiCompat.OpenAiClient.layerConfig>[0]>,
-    "apiKey" | "apiUrl"
-  >
+  readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey" | "apiUrl">
 }
 
 const clientLayerConfig = (options: WithOpenAiCompatibleOptions) =>
-  OpenAiCompat.OpenAiClient.layerConfig({
+  OpenAiClient.layerConfig({
     ...options.clientConfig,
     ...(options.apiKey === undefined ? {} : { apiKey: options.apiKey }),
     ...(options.baseUrl === undefined ? {} : { apiUrl: Config.succeed(options.baseUrl) }),

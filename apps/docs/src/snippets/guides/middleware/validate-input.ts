@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Option, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Guardrail, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 
 const blockInjection = Guardrail.validateInput((prompt) =>
@@ -13,10 +13,10 @@ const blockInjection = Guardrail.validateInput((prompt) =>
 const agent = Agent.make({ name: "guarded-agent" })
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () => Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: "Hello." })),
+    streamText: () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Hello." })),
   }),
 )
 

@@ -1,7 +1,7 @@
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
-import * as MessageScroller from "@/components/ui/message-scroller"
+import { Message, Model, content, init, root, scrollButton, update, viewport } from "@/components/ui/message-scroller"
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 
@@ -14,9 +14,9 @@ import { cn } from "@/lib/utils"
  *
  * ```ts
  * // MODEL
- * scroller: MessageScroller.init({ id: 'chat-scroller' })
+ * scroller: init({ id: 'chat-scroller' })
  *
- * // UPDATE: delegate to MessageScroller.update and lift its Commands
+ * // UPDATE: delegate to update and lift its Commands
  *
  * // VIEW
  * conversation({}, [
@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils"
  */
 export const conversation = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
-  return MessageScroller.root(
+  return root(
     {
       attributes: [h.Role("log"), ...(config.attributes ?? [])],
       class: cn("relative flex-1", config.class),
@@ -38,8 +38,8 @@ export const conversation = <ParentMessage>(config: SlotConfig<ParentMessage>, c
 
 export type ConversationContentConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
-    model: MessageScroller.Model
-    toParentMessage: (message: MessageScroller.Message) => ParentMessage
+    model: Model
+    toParentMessage: (message: Message) => ParentMessage
   }>
 
 /** Scrolling column of turns: the scroller viewport wrapping the growth-observed content element. */
@@ -47,14 +47,14 @@ export const conversationContent = <ParentMessage>(
   config: ConversationContentConfig<ParentMessage>,
   children: ReadonlyArray<Html>,
 ): Html =>
-  MessageScroller.viewport(
+  viewport(
     {
       model: config.model,
       toParentMessage: config.toParentMessage,
       attributes: config.attributes ?? [],
     },
     [
-      MessageScroller.content(
+      content(
         { toParentMessage: config.toParentMessage, class: cn("flex flex-col gap-8 p-4", config.class) },
         children,
       ),
@@ -95,13 +95,13 @@ export const conversationEmptyState = <ParentMessage>(
 
 export type ConversationScrollButtonConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
-    model: MessageScroller.Model
-    toParentMessage: (message: MessageScroller.Message) => ParentMessage
+    model: Model
+    toParentMessage: (message: Message) => ParentMessage
   }>
 
 /** Floating scroll-to-bottom button. Render it as a sibling of `conversationContent`, inside `conversation`. */
 export const conversationScrollButton = <ParentMessage>(config: ConversationScrollButtonConfig<ParentMessage>): Html =>
-  MessageScroller.scrollButton({
+  scrollButton({
     model: config.model,
     toParentMessage: config.toParentMessage,
     class: cn("dark:bg-background dark:hover:bg-muted", config.class),

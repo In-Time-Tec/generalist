@@ -1,10 +1,10 @@
 import { Effect, HashMap, Layer, Ref } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
 
 /** @experimental */
 export interface SummarizeOptions {
-  readonly model: Layer.Layer<Ai.LanguageModel.LanguageModel>
+  readonly model: Layer.Layer<LanguageModel.LanguageModel>
   readonly prompt?: string
 }
 
@@ -44,11 +44,11 @@ const memoryError = (error: unknown): Memory.MemoryError => new Memory.MemoryErr
 
 const keyId = (key: Memory.Key): string => JSON.stringify([key.agent, key.subject])
 
-const textPart = (text: string) => Ai.Prompt.makePart("text", { text })
+const textPart = (text: string) => Prompt.makePart("text", { text })
 
-const textFromParts = (parts: ReadonlyArray<Ai.Prompt.Part>): string =>
+const textFromParts = (parts: ReadonlyArray<Prompt.Part>): string =>
   parts
-    .filter((part): part is Ai.Prompt.TextPart => part.type === "text")
+    .filter((part): part is Prompt.TextPart => part.type === "text")
     .map((part) => part.text)
     .join("")
 
@@ -56,7 +56,7 @@ const roleLabel = (role: StoredRole): string => (role === "user" ? "User" : "Ass
 
 const formatItem = (item: IncomingItem): string => `${roleLabel(item.role)}: ${item.text}`
 
-const normalize = (prompt: Ai.Prompt.Prompt): ReadonlyArray<IncomingItem> =>
+const normalize = (prompt: Prompt.Prompt): ReadonlyArray<IncomingItem> =>
   prompt.content.flatMap((message) => {
     if (message.role !== "user" && message.role !== "assistant") return []
     const text = textFromParts(message.content).trim()
@@ -114,10 +114,10 @@ const summarizeOverflow = (
   overflow: ReadonlyArray<StoredItem>,
 ): Effect.Effect<string | undefined, Memory.MemoryError> =>
   Effect.gen(function* () {
-    const model = yield* Ai.LanguageModel.LanguageModel
+    const model = yield* LanguageModel.LanguageModel
     const response = yield* model.generateText({
       prompt: renderSummaryPrompt(options.prompt ?? defaultSummaryPrompt, summary, overflow),
-      toolkit: Ai.Toolkit.empty,
+      toolkit: Toolkit.empty,
       toolChoice: "none",
     })
     const text = response.text.trim()
@@ -183,6 +183,9 @@ export const make = (options: Options = {}): Effect.Effect<Memory.Interface> =>
       }
     }),
   )
+
+/** @experimental */
+export const makeWorkingMemory = make
 
 /** @experimental */
 export const layer = (options: Options = {}): Layer.Layer<Memory.Memory> =>

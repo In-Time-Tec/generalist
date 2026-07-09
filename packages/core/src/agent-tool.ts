@@ -1,13 +1,13 @@
 import { Cause, Effect, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
-import * as Agent from "./agent"
-import * as AgentEvent from "./agent-event"
+import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { type Agent, type Result, type RunServices, generate } from "./agent"
+import { AgentError, AgentSuspended, MiddlewareViolation, TurnLimitExceeded } from "./agent-event"
 
 const defaultParameters = Schema.Struct({ prompt: Schema.String })
 
 type DefaultParameters = typeof defaultParameters
 type DefaultSuccess = typeof Schema.String
-type AgentToolTool<Name extends string, Parameters extends Schema.Top, Success extends Schema.Top> = Ai.Tool.Tool<
+type AgentToolTool<Name extends string, Parameters extends Schema.Top, Success extends Schema.Top> = Tool.Tool<
   Name,
   {
     readonly parameters: Parameters
@@ -26,24 +26,24 @@ export interface AsToolOptions<
   readonly description?: string
   readonly parameters?: Parameters
   readonly success?: Success
-  readonly toPrompt?: (params: Parameters["Type"]) => Ai.Prompt.RawInput
-  readonly fromResult?: (result: Agent.Result) => Success["Type"]
+  readonly toPrompt?: (params: Parameters["Type"]) => Prompt.RawInput
+  readonly fromResult?: (result: Result) => Success["Type"]
 }
 
 /** @experimental */
-export type Toolkit = Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>
+export type AgentToolToolkit = Toolkit.WithHandler<Record<string, Tool.Any>>
 
 const errorMessage = (error: unknown): string => {
-  if (error instanceof AgentEvent.AgentSuspended) {
+  if (error instanceof AgentSuspended) {
     return `suspended on ${error.tool_name}: ${error.reason}`
   }
-  if (error instanceof AgentEvent.AgentError) {
+  if (error instanceof AgentError) {
     return `failed on turn ${error.turn}: ${error.message}`
   }
-  if (error instanceof AgentEvent.TurnLimitExceeded) {
+  if (error instanceof TurnLimitExceeded) {
     return `turn limit exceeded at turn ${error.turn}`
   }
-  if (error instanceof AgentEvent.MiddlewareViolation) {
+  if (error instanceof MiddlewareViolation) {
     return `middleware violation on turn ${error.turn}: ${error.detail}`
   }
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -53,61 +53,61 @@ const causeMessage = (agentName: string, cause: Cause.Cause<unknown>): string =>
   `sub-agent '${agentName}' could not complete: ${errorMessage(Cause.squash(cause))}`
 
 const lazyHandled = <Name extends string, Parameters extends Schema.Top, Success extends Schema.Top>(
-  toolkit: Ai.Toolkit.Toolkit<Record<Name, AgentToolTool<Name, Parameters, Success>>>,
+  toolkit: Toolkit.Toolkit<Record<Name, AgentToolTool<Name, Parameters, Success>>>,
   name: Name,
-  handler: (params: Parameters["Type"]) => Effect.Effect<Success["Type"], string, Agent.RunServices>,
-): Toolkit => ({
-  tools: toolkit.tools as Record<string, Ai.Tool.Any>,
+  handler: (
+    params: Parameters["Type"],
+  ) => Effect.Effect<Success["Type"], string, RunServices<Record<string, Tool.Any>>>,
+): AgentToolToolkit => ({
+  tools: toolkit.tools as Record<string, Tool.Any>,
   handle: (toolName, params) =>
     toolkit.pipe(
       Effect.provide(
         toolkit.toLayer({
           [name]: handler,
-        } as unknown as Ai.Toolkit.HandlersFrom<Record<Name, AgentToolTool<Name, Parameters, Success>>>),
+        } as unknown as Toolkit.HandlersFrom<Record<Name, AgentToolTool<Name, Parameters, Success>>>),
       ),
       Effect.flatMap((handled) =>
-        (handled as unknown as Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>).handle(toolName, params),
+        (handled as unknown as Toolkit.WithHandler<Record<string, Tool.Any>>).handle(toolName, params),
       ),
-    ) as ReturnType<Toolkit["handle"]>,
+    ) as ReturnType<AgentToolToolkit["handle"]>,
 })
 
 /** @experimental */
 export const asTool = <
-  Tools extends Record<string, Ai.Tool.Any>,
+  Tools extends Record<string, Tool.Any>,
   const Name extends string = string,
   Parameters extends Schema.Top = DefaultParameters,
   Success extends Schema.Top = DefaultSuccess,
 >(
-  agent: Agent.Agent<Tools>,
+  agent: Agent<Tools>,
   options: AsToolOptions<Parameters, Success> = {},
-): Toolkit => {
+): AgentToolToolkit => {
   const name = (options.name ?? agent.name) as Name
   const parameters = (options.parameters ?? defaultParameters) as Parameters
   const success = (options.success ?? Schema.String) as Success
   const toPrompt = (options.toPrompt ?? ((params: DefaultParameters["Type"]) => params.prompt)) as (
     params: Parameters["Type"],
-  ) => Ai.Prompt.RawInput
-  const fromResult = (options.fromResult ?? ((result: Agent.Result) => result.text)) as (
-    result: Agent.Result,
-  ) => Success["Type"]
-  const tool = Ai.Tool.make(name, {
+  ) => Prompt.RawInput
+  const fromResult = (options.fromResult ?? ((result: Result) => result.text)) as (result: Result) => Success["Type"]
+  const tool = Tool.make(name, {
     ...(options.description === undefined ? {} : { description: options.description }),
     parameters,
     success,
     failure: Schema.String,
     failureMode: "return",
   }) as AgentToolTool<Name, Parameters, Success>
-  const toolkit = Ai.Toolkit.make(tool) as unknown as Ai.Toolkit.Toolkit<
+  const toolkit = Toolkit.make(tool) as unknown as Toolkit.Toolkit<
     Record<Name, AgentToolTool<Name, Parameters, Success>>
   >
-  const handler = (params: Parameters["Type"]): Effect.Effect<Success["Type"], string, Agent.RunServices> =>
+  const handler = (params: Parameters["Type"]): Effect.Effect<Success["Type"], string, RunServices<Tools>> =>
     Effect.gen(function* () {
       const prompt = yield* Effect.try({ try: () => toPrompt(params), catch: errorMessage })
-      const result = yield* Agent.generate(agent, { prompt }).pipe(
+      const result = yield* generate(agent, { prompt }).pipe(
         Effect.catchCause((cause) => {
           if (Cause.hasInterrupts(cause)) return Effect.interrupt
           const error = Cause.squash(cause)
-          if (error instanceof AgentEvent.AgentSuspended) return Effect.die(error)
+          if (error instanceof AgentSuspended) return Effect.die(error)
           return Effect.fail(causeMessage(agent.name, cause))
         }),
       )

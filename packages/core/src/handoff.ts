@@ -1,9 +1,9 @@
 import { Effect, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
-import * as Agent from "./agent"
-import * as AgentEvent from "./agent-event"
-import * as AgentTool from "./agent-tool"
-import type * as TurnPolicy from "./turn-policy"
+import { AiError, Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { type Agent, type Result, type RunError, type RunOptions, type RunServices, generate, make } from "./agent"
+import { AgentError } from "./agent-event"
+import { asTool } from "./agent-tool"
+import { type TurnPolicy } from "./turn-policy"
 
 const defaultTransferParameters = Schema.Struct({ prompt: Schema.String })
 
@@ -18,15 +18,15 @@ export interface TransferOptions<
   readonly description?: string
   readonly parameters?: Parameters
   readonly success?: Success
-  readonly toPrompt?: (params: Parameters["Type"]) => Ai.Prompt.RawInput
-  readonly fromResult?: (result: Agent.Result) => Success["Type"]
+  readonly toPrompt?: (params: Parameters["Type"]) => Prompt.RawInput
+  readonly fromResult?: (result: Result) => Success["Type"]
 }
 
 /** @experimental One child run in a bounded fan-out. */
-export interface FanOutChild<Tools extends Record<string, Ai.Tool.Any>> {
-  readonly agent: Agent.Agent<Tools>
-  readonly prompt: Ai.Prompt.RawInput
-  readonly options?: Omit<Agent.RunOptions, "prompt">
+export interface FanOutChild<Tools extends Record<string, Tool.Any>> {
+  readonly agent: Agent<Tools>
+  readonly prompt: Prompt.RawInput
+  readonly options?: Omit<RunOptions, "prompt">
 }
 
 /** @experimental Options for bounded same-process fan-out. */
@@ -36,26 +36,26 @@ export interface FanOutOptions {
 
 /** @experimental Built supervisor agent and handled toolkit for its transfer tools. */
 export interface Supervisor {
-  readonly agent: Agent.Agent<Record<string, Ai.Tool.Any>>
-  readonly toolkit: Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>
+  readonly agent: Agent<Record<string, Tool.Any>>
+  readonly toolkit: Toolkit.WithHandler<Record<string, Tool.Any>>
 }
 
 /** @experimental Options for building a transfer-tool supervisor. */
 export interface SupervisorOptions {
   readonly name: string
   readonly instructions?: string
-  readonly specialists: ReadonlyArray<Agent.Agent<Record<string, Ai.Tool.Any>>>
-  readonly policy?: TurnPolicy.TurnPolicy
+  readonly specialists: ReadonlyArray<Agent<Record<string, Tool.Any>>>
+  readonly policy?: TurnPolicy
 }
 
 const transferName = (agentName: string): string => `transfer_to_${agentName}`
 
-const positiveConcurrency = (value: number | undefined): Effect.Effect<number, AgentEvent.AgentError> => {
+const positiveConcurrency = (value: number | undefined): Effect.Effect<number, AgentError> => {
   const concurrency = value ?? 4
   return Number.isInteger(concurrency) && concurrency > 0
     ? Effect.succeed(concurrency)
     : Effect.fail(
-        new AgentEvent.AgentError({
+        new AgentError({
           message: "Handoff.fanOut concurrency must be a positive integer",
           turn: 0,
         }),
@@ -63,9 +63,9 @@ const positiveConcurrency = (value: number | undefined): Effect.Effect<number, A
 }
 
 const mergeHandled = (
-  toolkits: ReadonlyArray<Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>>,
-): Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>> => {
-  const tools: Record<string, Ai.Tool.Any> = {}
+  toolkits: ReadonlyArray<Toolkit.WithHandler<Record<string, Tool.Any>>>,
+): Toolkit.WithHandler<Record<string, Tool.Any>> => {
+  const tools: Record<string, Tool.Any> = {}
   for (const toolkit of toolkits) {
     Object.assign(tools, toolkit.tools)
   }
@@ -75,10 +75,10 @@ const mergeHandled = (
       const toolkit = toolkits.find((candidate) => candidate.tools[name] !== undefined)
       return toolkit === undefined
         ? Effect.fail(
-            Ai.AiError.make({
+            AiError.make({
               module: "Handoff",
               method: `${String(name)}.handle`,
-              reason: new Ai.AiError.ToolNotFoundError({
+              reason: new AiError.ToolNotFoundError({
                 toolName: String(name),
                 availableTools: Object.keys(tools),
               }),
@@ -90,36 +90,36 @@ const mergeHandled = (
 }
 
 const toolkitFromHandled = (
-  toolkit: Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>,
-): Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>> =>
-  Ai.Toolkit.make(...Object.values(toolkit.tools)) as Ai.Toolkit.Toolkit<Record<string, Ai.Tool.Any>>
+  toolkit: Toolkit.WithHandler<Record<string, Tool.Any>>,
+): Toolkit.Toolkit<Record<string, Tool.Any>> =>
+  Toolkit.make(...Object.values(toolkit.tools)) as Toolkit.Toolkit<Record<string, Tool.Any>>
 
 /** @experimental Build a `transfer_to_<agent.name>` same-process handoff tool. */
 export const transferTool = <
-  Tools extends Record<string, Ai.Tool.Any>,
+  Tools extends Record<string, Tool.Any>,
   Parameters extends Schema.Top = DefaultTransferParameters,
   Success extends Schema.Top = typeof Schema.String,
 >(
-  target: Agent.Agent<Tools>,
+  target: Agent<Tools>,
   options: TransferOptions<Parameters, Success> = {},
-): Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>> =>
-  AgentTool.asTool(target, {
+): Toolkit.WithHandler<Record<string, Tool.Any>> =>
+  asTool(target, {
     name: options.nameOverride ?? transferName(target.name),
     description: options.description ?? `Transfer to ${target.name}`,
     ...(options.parameters === undefined ? {} : { parameters: options.parameters }),
     ...(options.success === undefined ? {} : { success: options.success }),
     ...(options.toPrompt === undefined ? {} : { toPrompt: options.toPrompt }),
     ...(options.fromResult === undefined ? {} : { fromResult: options.fromResult }),
-  }) as Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>
+  }) as Toolkit.WithHandler<Record<string, Tool.Any>>
 
 /** @experimental Run isolated child agents concurrently and preserve input order. */
-export const fanOut = <Tools extends Record<string, Ai.Tool.Any>>(
+export const fanOut = <Tools extends Record<string, Tool.Any>>(
   children: ReadonlyArray<FanOutChild<Tools>>,
   options: FanOutOptions = {},
-): Effect.Effect<ReadonlyArray<Agent.Result>, Agent.RunError, Agent.RunServices> =>
+): Effect.Effect<ReadonlyArray<Result>, RunError, RunServices<Tools>> =>
   positiveConcurrency(options.concurrency).pipe(
     Effect.flatMap((concurrency) =>
-      Effect.forEach(children, (child) => Agent.generate(child.agent, { ...child.options, prompt: child.prompt }), {
+      Effect.forEach(children, (child) => generate(child.agent, { ...child.options, prompt: child.prompt }), {
         concurrency,
       }),
     ),
@@ -130,7 +130,7 @@ export const supervisor = (options: SupervisorOptions): Supervisor => {
   const transferTools = options.specialists.map((specialist) => transferTool(specialist))
   const toolkit = mergeHandled(transferTools)
   return {
-    agent: Agent.make({
+    agent: make({
       name: options.name,
       ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
       toolkit: toolkitFromHandled(toolkit),

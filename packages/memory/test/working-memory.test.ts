@@ -1,20 +1,20 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
 import { WorkingMemory } from "../src/index"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 const otherKey: Memory.Key = { agent: "memory-agent", subject: "subject-b" }
 
-const textPart = (text: string) => Ai.Prompt.makePart("text", { text })
-const user = (text: string) => Ai.Prompt.makeMessage("user", { content: [textPart(text)] })
-const assistant = (text: string) => Ai.Prompt.makeMessage("assistant", { content: [textPart(text)] })
-const prompt = (...messages: ReadonlyArray<Ai.Prompt.Message>) => Ai.Prompt.fromMessages(messages)
+const textPart = (text: string) => Prompt.makePart("text", { text })
+const user = (text: string) => Prompt.makeMessage("user", { content: [textPart(text)] })
+const assistant = (text: string) => Prompt.makeMessage("assistant", { content: [textPart(text)] })
+const prompt = (...messages: ReadonlyArray<Prompt.Message>) => Prompt.fromMessages(messages)
 
 const itemText = (item: Memory.Item): string =>
   item.parts
-    .filter((part): part is Ai.Prompt.TextPart => part.type === "text")
+    .filter((part): part is Prompt.TextPart => part.type === "text")
     .map((part) => part.text)
     .join("")
 
@@ -40,8 +40,8 @@ describe("WorkingMemory", () => {
     let summaryCalls = 0
     let summaryPrompt = ""
     const summaryModel = Layer.effect(
-      Ai.LanguageModel.LanguageModel,
-      Ai.LanguageModel.make({
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
         generateText: (options) =>
           Effect.sync(() => {
             summaryCalls += 1

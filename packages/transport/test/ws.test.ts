@@ -2,10 +2,10 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Queue, Ref, Schema, Stream } from "effect"
 import { Headers, HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import * as Ai from "effect/unstable/ai"
+import { Toolkit } from "effect/unstable/ai"
 import { SessionRegistry, Wire, Ws } from "../src/index"
 
-const toolkit = Ai.Toolkit.empty
+const toolkit = Toolkit.empty
 
 const endedFrame: Wire.LooseServerFrameType = { _tag: "Ended", seq: 1 }
 

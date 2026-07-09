@@ -2,11 +2,11 @@ import { Duration, Effect, Option, Schema, Stream } from "effect"
 import { Sse } from "effect/unstable/encoding"
 import { Headers, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiSchema } from "effect/unstable/httpapi"
-import * as Ai from "effect/unstable/ai"
-import * as Errors from "./errors"
-import * as SessionRegistry from "./session-registry"
-import * as Wire from "./wire"
-
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { TransportError } from "./errors"
+import { SessionError, SessionRegistry } from "./session-registry"
+import { ServerFrame } from "./wire"
+import type { LooseServerFrameType } from "./wire"
 const cursorFromString = (value: string): Option.Option<number> => {
   if (!/^\d+$/.test(value)) return Option.none()
   const parsed = Number(value)
@@ -28,17 +28,16 @@ export const lastEventId = (headers: Headers.Headers): Option.Option<number> =>
   Headers.get(headers, "last-event-id").pipe(Option.flatMap(cursorFromString))
 
 /** @experimental */
-export const streamSuccess = <T extends Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>>(
-  toolkit: T,
-) => HttpApiSchema.StreamSse({ data: Wire.ServerFrame(toolkit), error: Errors.TransportError })
+export const streamSuccess = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
+  HttpApiSchema.StreamSse({ data: ServerFrame(toolkit), error: TransportError })
 
 const afterSeqFromRequest = (request: HttpServerRequest.HttpServerRequest): Option.Option<number> =>
   lastEventId(request.headers).pipe(Option.orElse(() => queryAfterSeq(request.url)))
 
 const encodeFrame =
-  <T extends Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>>(toolkit: T) =>
-  (frame: Wire.LooseServerFrameType): string => {
-    const encoded = Schema.encodeUnknownSync(Wire.ServerFrame(toolkit))(frame)
+  <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
+  (frame: LooseServerFrameType): string => {
+    const encoded = Schema.encodeUnknownSync(ServerFrame(toolkit))(frame)
     return Sse.encoder.write({
       _tag: "Event",
       id: String(frame.seq),
@@ -49,17 +48,13 @@ const encodeFrame =
 
 /** @experimental */
 export const respond =
-  <T extends Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>>(toolkit: T) =>
+  <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
   (options: {
     readonly sessionId: string
     readonly request: HttpServerRequest.HttpServerRequest
     readonly keepAlive?: Duration.Input
-  }): Effect.Effect<
-    HttpServerResponse.HttpServerResponse,
-    SessionRegistry.SessionError,
-    SessionRegistry.SessionRegistry
-  > =>
-    SessionRegistry.SessionRegistry.use((registry) => {
+  }): Effect.Effect<HttpServerResponse.HttpServerResponse, SessionError, SessionRegistry> =>
+    SessionRegistry.use((registry) => {
       const cursor = Option.getOrUndefined(afterSeqFromRequest(options.request))
       const frames = registry.attach(options.sessionId, cursor).pipe(Stream.map(encodeFrame(toolkit)))
       const heartbeats = Stream.tick(options.keepAlive ?? "15 seconds").pipe(Stream.map(() => ": keep-alive\n\n"))

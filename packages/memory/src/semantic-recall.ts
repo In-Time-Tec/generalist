@@ -1,8 +1,8 @@
 import { Effect, Layer, Ref } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { EmbeddingModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
-import * as VectorStore from "./vector-store"
-
+import { VectorStore } from "./vector-store"
+import type { Match } from "./vector-store"
 /** @experimental */
 export interface Options {
   readonly limit?: number
@@ -13,22 +13,22 @@ const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name
 
 const memoryError = (error: unknown): Memory.MemoryError => new Memory.MemoryError({ message: errorMessage(error) })
 
-const textPart = (text: string) => Ai.Prompt.makePart("text", { text })
+const textPart = (text: string) => Prompt.makePart("text", { text })
 
-const textFromParts = (parts: ReadonlyArray<Ai.Prompt.Part>): string =>
+const textFromParts = (parts: ReadonlyArray<Prompt.Part>): string =>
   parts
-    .filter((part): part is Ai.Prompt.TextPart => part.type === "text")
+    .filter((part): part is Prompt.TextPart => part.type === "text")
     .map((part) => part.text)
     .join("")
 
-const userText = (prompt: Ai.Prompt.Prompt): string =>
+const userText = (prompt: Prompt.Prompt): string =>
   prompt.content
-    .filter((message): message is Ai.Prompt.UserMessage => message.role === "user")
+    .filter((message): message is Prompt.UserMessage => message.role === "user")
     .map((message) => textFromParts(message.content))
     .filter((text) => text.length > 0)
     .join("\n\n")
 
-const finalExchangeText = (prompt: Ai.Prompt.Prompt): string | undefined => {
+const finalExchangeText = (prompt: Prompt.Prompt): string | undefined => {
   let assistant: string | undefined
   let assistantIndex = -1
   for (let index = prompt.content.length - 1; index >= 0; index -= 1) {
@@ -51,7 +51,7 @@ const finalExchangeText = (prompt: Ai.Prompt.Prompt): string | undefined => {
   return undefined
 }
 
-const itemFromMatch = (match: VectorStore.Match): Memory.Item => ({
+const itemFromMatch = (match: Match): Memory.Item => ({
   id: match.document.id,
   parts: [textPart(match.document.text)],
   metadata: { ...match.document.metadata, score: match.score },
@@ -60,10 +60,10 @@ const itemFromMatch = (match: VectorStore.Match): Memory.Item => ({
 /** @experimental */
 export const make = (
   options: Options = {},
-): Effect.Effect<Memory.Interface, never, VectorStore.VectorStore | Ai.EmbeddingModel.EmbeddingModel> =>
+): Effect.Effect<Memory.Interface, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
   Effect.gen(function* () {
-    const store = yield* VectorStore.VectorStore
-    const embeddingModel = yield* Ai.EmbeddingModel.EmbeddingModel
+    const store = yield* VectorStore
+    const embeddingModel = yield* EmbeddingModel.EmbeddingModel
     const counter = yield* Ref.make(0)
     const limit = options.limit ?? 5
 
@@ -113,7 +113,10 @@ export const make = (
   })
 
 /** @experimental */
+export const makeSemanticRecall = make
+
+/** @experimental */
 export const layer = (
   options: Options = {},
-): Layer.Layer<Memory.Memory, never, VectorStore.VectorStore | Ai.EmbeddingModel.EmbeddingModel> =>
+): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel> =>
   Layer.effect(Memory.Memory, make(options).pipe(Effect.map(Memory.Memory.of)))

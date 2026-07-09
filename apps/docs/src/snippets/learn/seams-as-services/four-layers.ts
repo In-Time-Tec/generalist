@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 
 const agent = Agent.make({
@@ -8,11 +8,11 @@ const agent = Agent.make({
 })
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () =>
-      Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: "Four layers, nothing else." })),
+      Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Four layers, nothing else." })),
   }),
 )
 

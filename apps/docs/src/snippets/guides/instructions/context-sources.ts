@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Option, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Instructions, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 
 const persona = Instructions.staticSource("persona", "You are the release-notes assistant.")
@@ -21,13 +21,13 @@ const instructionsLayer = Instructions.layer([persona, houseStyle, workspaceStat
 const agent = Agent.make({ name: "release-notes", instructions: "This fallback is replaced by the registry." })
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: (options) => {
       const system = options.prompt.content.find((message) => message.role === "system")
       const text = system === undefined || typeof system.content !== "string" ? "no system message" : system.content
-      return Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: text }))
+      return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: text }))
     },
   }),
 )

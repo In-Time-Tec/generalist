@@ -1,30 +1,31 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
 import { SessionRegistry, Sse } from "@batonfx/transport"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
-const modelLayer = (streamText: ModelParams["streamText"]): Layer.Layer<Ai.LanguageModel.LanguageModel> =>
+const modelLayer = (streamText: ModelParams["streamText"]): Layer.Layer<LanguageModel.LanguageModel> =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
       streamText,
     }),
   )
 
-const deployTool = Ai.Tool.make("deploy", {
+const deployTool = Tool.make("deploy", {
   description: "Deploy a service",
   parameters: Schema.Struct({ service: Schema.String }),
   success: Schema.String,
   needsApproval: true,
 })
 
-const toolkit = Ai.Toolkit.make(deployTool)
+const toolkit = Toolkit.make(deployTool)
 const agent = Agent.make({ name: "release-agent", toolkit })
-const persistenceLayer = Ai.Chat.layerPersisted({ storeId: "hitl-over-sse" }).pipe(
+const toolkitLayer = toolkit.toLayer({ deploy: () => Effect.die("approval should suspend before execution") })
+const persistenceLayer = Chat.layerPersisted({ storeId: "hitl-over-sse" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),
 )
 
@@ -54,7 +55,7 @@ const program = Effect.gen(function* () {
         Layer.mergeAll(
           modelLayer(() =>
             Stream.make(
-              Ai.Response.makePart("tool-call", {
+              Response.makePart("tool-call", {
                 id: "deploy-1",
                 name: "deploy",
                 params: { service: "api" },
@@ -62,7 +63,7 @@ const program = Effect.gen(function* () {
               }),
             ),
           ),
-          ToolExecutor.testLayer({ execute: () => Effect.die("approval should suspend before execution") }),
+          toolkitLayer,
           Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approve-deploy-1" }) }),
           ModelMiddleware.identityLayer,
           persistenceLayer,

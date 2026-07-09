@@ -1,6 +1,5 @@
 import { Context, Effect, HashMap, Layer, Option, Ref, Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { Prompt } from "effect/unstable/ai"
 /** @experimental Opaque session entry id. */
 export type EntryId = string
 
@@ -17,7 +16,7 @@ export interface BaseEntry {
 /** @experimental A verbatim conversation message. */
 export interface MessageEntry extends BaseEntry {
   readonly _tag: "Message"
-  readonly message: Ai.Prompt.Message
+  readonly message: Prompt.Message
 }
 
 /** @experimental A compaction boundary for prompt projection. */
@@ -162,20 +161,20 @@ const setLeafState = (state: State, id: EntryId | null): readonly [Result<void>,
   return [success(undefined), { ...state, leaf: id }]
 }
 
-const messageFromText = (role: "user" | "system", text: string): Ai.Prompt.Message =>
+const messageFromText = (role: "user" | "system", text: string): Prompt.Message =>
   role === "system"
-    ? Ai.Prompt.makeMessage("system", { content: text })
-    : Ai.Prompt.makeMessage("user", { content: [Ai.Prompt.makePart("text", { text })] })
+    ? Prompt.makeMessage("system", { content: text })
+    : Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
-const checkpointMessage = (summary: string): Ai.Prompt.Message =>
+const checkpointMessage = (summary: string): Prompt.Message =>
   messageFromText("user", `<conversation-checkpoint>\n${summary}\n</conversation-checkpoint>`)
 
-const branchSummaryMessage = (summary: string): Ai.Prompt.Message =>
+const branchSummaryMessage = (summary: string): Prompt.Message =>
   messageFromText("system", `<abandoned-branch-summary>\n${summary}\n</abandoned-branch-summary>`)
 
-const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Ai.Prompt.Message> => {
+const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Message> => {
   const compactionIndex = path.findLastIndex((entry) => entry._tag === "Compaction")
-  const messages: Array<Ai.Prompt.Message> = []
+  const messages: Array<Prompt.Message> = []
   const keptIndex =
     compactionIndex === -1
       ? -1
@@ -201,8 +200,7 @@ const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Ai.Prompt.
 }
 
 /** @experimental Purely projects a root-to-leaf session path into model context. */
-export const buildContext = (path: ReadonlyArray<Entry>): Ai.Prompt.Prompt =>
-  Ai.Prompt.fromMessages(projectedMessages(path))
+export const buildContext = (path: ReadonlyArray<Entry>): Prompt.Prompt => Prompt.fromMessages(projectedMessages(path))
 
 /** @experimental Ref-backed non-durable session store. */
 export const memoryLayer: Layer.Layer<SessionStore> = Layer.effect(

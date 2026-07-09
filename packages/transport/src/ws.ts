@@ -1,36 +1,36 @@
 import { Cause, Effect, Fiber, Option, Ref, Schema, Scope, Stream } from "effect"
 import { HttpServerError, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import * as Ai from "effect/unstable/ai"
-import * as Errors from "./errors"
-import * as SessionRegistry from "./session-registry"
-import * as Wire from "./wire"
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { TransportError } from "./errors"
+import { SessionRegistry } from "./session-registry"
+import { ClientFrame, ServerFrame } from "./wire"
+import type { ClientFrameType, LooseServerFrameType } from "./wire"
+const ClientFrameJson = Schema.fromJsonString(ClientFrame)
 
-const ClientFrameJson = Schema.fromJsonString(Wire.ClientFrame)
-
-const transportError = (message: string): Errors.TransportError => new Errors.TransportError({ message })
+const transportError = (message: string): TransportError => new TransportError({ message })
 
 const encodeServerFrame =
-  <T extends Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>>(toolkit: T) =>
-  (frame: Wire.LooseServerFrameType): string =>
-    JSON.stringify(Schema.encodeUnknownSync(Wire.ServerFrame(toolkit))(frame))
+  <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
+  (frame: LooseServerFrameType): string =>
+    JSON.stringify(Schema.encodeUnknownSync(ServerFrame(toolkit))(frame))
 
-const decodeClientFrame = (text: string): Effect.Effect<Wire.ClientFrameType, Errors.TransportError> =>
+const decodeClientFrame = (text: string): Effect.Effect<ClientFrameType, TransportError> =>
   Schema.decodeUnknownEffect(ClientFrameJson)(text).pipe(
     Effect.mapError(() => transportError("malformed client frame")),
   )
 
 /** @experimental One-session-per-socket WebSocket handler. */
-export const handle = <T extends Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>>(
+export const handle = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(
   toolkit: T,
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   HttpServerError.HttpServerError | Socket.SocketError,
-  HttpServerRequest.HttpServerRequest | SessionRegistry.SessionRegistry | Scope.Scope
+  HttpServerRequest.HttpServerRequest | SessionRegistry | Scope.Scope
 > =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest
-    const registry = yield* SessionRegistry.SessionRegistry
+    const registry = yield* SessionRegistry
     const scope = yield* Effect.scope
     const socket = yield* request.upgrade
     const writer = yield* socket.writer
@@ -49,7 +49,7 @@ export const handle = <T extends Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<
 
     const close = (code: number, reason: string) => writer(new Socket.CloseEvent(code, reason))
 
-    const writeFrame = (frame: Wire.LooseServerFrameType) => writer(encodeFrame(frame))
+    const writeFrame = (frame: LooseServerFrameType) => writer(encodeFrame(frame))
 
     const startAttach = (sessionId: string, afterSeq: number | undefined) =>
       interruptAttachment.pipe(
@@ -67,7 +67,7 @@ export const handle = <T extends Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<
         Effect.flatMap((fiber) => Ref.set(attachment, Option.some(fiber))),
       )
 
-    const dispatch = (frame: Wire.ClientFrameType) => {
+    const dispatch = (frame: ClientFrameType) => {
       switch (frame._tag) {
         case "Attach":
           return startAttach(frame.sessionId, frame.afterSeq)

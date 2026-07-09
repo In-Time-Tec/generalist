@@ -1,6 +1,5 @@
 import { Chunk, Context, Effect, Layer, Option, Ref, Schema, Semaphore } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { LanguageModel, Model } from "effect/unstable/ai"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
 
@@ -54,7 +53,7 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()("@batonfx/core/ModelRegistry") {}
 
 /** @experimental */
-export type ModelEnvironment = Ai.LanguageModel.LanguageModel | Ai.Model.ProviderName | Ai.Model.ModelName
+export type ModelEnvironment = LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName
 type Registry = Chunk.Chunk<Registration>
 
 const registrationVariantKey = (value: { readonly registrationKey?: string }) => value.registrationKey ?? null
@@ -84,10 +83,10 @@ export const registrationFromLayer = <R>(input: {
   readonly provider: string
   readonly model: string
   readonly registrationKey?: string
-  readonly layer: Layer.Layer<Ai.LanguageModel.LanguageModel, never, R>
+  readonly layer: Layer.Layer<LanguageModel.LanguageModel, never, R>
   readonly metadata?: Metadata
 }) =>
-  Ai.Model.make(input.provider, input.model, input.layer).captureRequirements.pipe(
+  Model.make(input.provider, input.model, input.layer).captureRequirements.pipe(
     Effect.map(
       (layer): Registration => ({
         provider: input.provider,

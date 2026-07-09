@@ -1,4 +1,4 @@
-import * as TextareaPrimitive from "@foldkit/ui/textarea"
+import { view } from "@foldkit/ui/textarea"
 import type { Attribute, ChildAttribute, Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -33,7 +33,7 @@ export const textarea = <ParentMessage>(config: TextareaConfig<ParentMessage>): 
   const h = html<ParentMessage>()
   const { attributes = [], class: className, dataSlot = "textarea", ...primitiveConfig } = config
 
-  return TextareaPrimitive.view<ParentMessage>({
+  return view<ParentMessage>({
     ...primitiveConfig,
     toView: (textareaAttributes) =>
       h.textarea(

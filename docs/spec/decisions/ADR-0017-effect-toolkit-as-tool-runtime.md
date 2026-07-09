@@ -1,0 +1,41 @@
+# ADR-0017 — Effect Toolkit as Tool Runtime
+
+## Status
+
+Accepted.
+
+## Context
+
+Effect AI already defines the canonical tool model: `Tool.make`, `Toolkit.make`, and `Toolkit.toLayer`. Baton had grown an additional required `ToolExecutor` layer even for ordinary in-process tools, plus required `Approvals` and `ModelMiddleware` layers for runs that did not use those features. That made the happy path look like a second framework instead of an Effect-native agent loop over Effect AI.
+
+## Decision
+
+Baton treats Effect AI `Tool` and `Toolkit` values as the public tool runtime. Authors define tools with `Ai.Tool.make`, group them with `Ai.Toolkit.make`, implement handlers with `toolkit.toLayer(...)`, and pass the toolkit to `Agent.make`.
+
+`Agent.make` accepts the name first: `Agent.make("assistant", { instructions, toolkit, policy })`. The object form remains accepted only as a migration convenience; documentation uses the name-first form.
+
+`Agent.stream` and derived helpers require only `Ai.LanguageModel.LanguageModel` for a no-tool run. `ModelMiddleware` defaults to the empty chain when absent. `Approvals` is resolved only when a tool declares `needsApproval`; if the service is absent for an approval-gated call, Baton fails closed by feeding a failed tool result back to the model. `ToolExecutor` is an optional override seam. When it is absent, Baton executes framework tool calls through the active Effect toolkit handlers in the current Effect context.
+
+The advanced `ToolExecutor` seam stays for durable hosts, remote tool runners, MCP adapters, and suspension. It overrides local toolkit handler execution when provided, and it remains the only way for a host to return `Suspend` from a tool call.
+
+## Execution plan
+
+1. Update the agent loop so no-tool runs do not require `ToolExecutor`, `Approvals`, or `ModelMiddleware`.
+2. Route ordinary local tool calls through `Toolkit.toLayer` handlers when no `ToolExecutor` is provided.
+3. Keep `ToolExecutor` as an override with unchanged outcome semantics.
+4. Update tests, examples, docs snippets, and references to show the Effect-native path first and the override seam only for durable or remote execution.
+5. Align Relay to consume Effect toolkits at the SDK/runtime boundary instead of exposing a duplicate registered-tool authoring shape.
+
+## Consequences
+
+- Baton's tool story matches upstream Effect AI instead of duplicating it.
+- Simple agents need fewer layers and less ceremony.
+- Tests can swap tool behavior with ordinary Effect layers.
+- Durable runtimes still have a seam for waits, remote execution, and persisted approvals.
+- Relay can derive its durable tool registry from the same Effect toolkit definitions that Baton executes locally.
+
+## Related docs
+
+- `docs/spec/01-baton-agent-framework.md`
+- `docs/spec/04-permissions-policy.md`
+- `docs/spec/10-multi-agent.md`

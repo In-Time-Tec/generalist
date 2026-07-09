@@ -3,7 +3,7 @@ import { Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import * as Ai from "effect/unstable/ai"
+import { Response } from "effect/unstable/ai"
 import { Client, Wire } from "../src/index"
 
 const endedFrame = (seq: number): Wire.LooseServerFrameType => ({ _tag: "Ended", seq })
@@ -13,7 +13,7 @@ const eventText = (frame: Wire.LooseServerFrameType): string =>
 
 const httpClientLayer = (body: string): Layer.Layer<HttpClient.HttpClient> => {
   const baseRequest = HttpClientRequest.get("http://test/events")
-  const response = HttpClientResponse.fromWeb(baseRequest, new Response(body, { status: 200 }))
+  const response = HttpClientResponse.fromWeb(baseRequest, new globalThis.Response(body, { status: 200 }))
   const client = {
     execute: () => Effect.succeed(response),
     get: () => Effect.succeed(response),
@@ -105,7 +105,7 @@ describe("Client", () => {
             event: {
               _tag: "ModelPart",
               turn: 0,
-              part: Ai.Response.makePart("tool-call", {
+              part: Response.makePart("tool-call", {
                 id: "unknown",
                 name: "missing",
                 params: { x: 1 },

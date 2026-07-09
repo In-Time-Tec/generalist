@@ -4,7 +4,8 @@ import { html } from "foldkit/html"
 
 import type { ButtonConfig } from "@/components/ui/button"
 import { button } from "@/components/ui/button"
-import * as SelectComponent from "@/components/ui/select"
+import { item, root } from "@/components/ui/select"
+import type { RootConfig } from "@/components/ui/select"
 import { spinner } from "@/components/ui/spinner"
 import type { TextareaConfig } from "@/components/ui/textarea"
 import { textarea } from "@/components/ui/textarea"
@@ -256,7 +257,7 @@ export const promptInputSubmit = <ParentMessage>(
   )
 }
 
-export type PromptInputModelSelectConfig<Item extends string = string> = SelectComponent.RootConfig<Item>
+export type PromptInputModelSelectConfig<Item extends string = string> = RootConfig<Item>
 
 /**
  * Model picker composing the select component with the trigger chrome
@@ -266,8 +267,8 @@ export type PromptInputModelSelectConfig<Item extends string = string> = SelectC
  */
 export const promptInputModelSelect = <Item extends string = string>(
   config: PromptInputModelSelectConfig<Item>,
-): ReturnType<typeof SelectComponent.root<Item>> =>
-  SelectComponent.root({
+): ReturnType<typeof root<Item>> =>
+  root({
     ...config,
     triggerClass: cn(
       "border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-accent",
@@ -276,7 +277,7 @@ export const promptInputModelSelect = <Item extends string = string>(
   })
 
 /** Styled model option for `itemToConfig`, passing through the select component's item. */
-export const promptInputModelSelectItem = SelectComponent.item
+export const promptInputModelSelectItem = item
 
 /** Strip above the textarea for queued attachments. Compose attachment components (or any chips) inside it. */
 export const promptInputAttachments = <ParentMessage>(

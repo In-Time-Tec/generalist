@@ -1,12 +1,11 @@
 import { Cause, Equivalence, Effect, Option, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-import * as Command from "foldkit/command"
+import { Prompt } from "effect/unstable/ai"
+import { define, type Command } from "foldkit/command"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import * as Subscription from "foldkit/subscription"
+import { make } from "foldkit/subscription"
 import { Wire } from "@batonfx/transport"
-import * as Connection from "./connection"
-
+import { AgentConnection, Incoming, SendFailed } from "./connection"
 const CompletedFields = { isFailure: Schema.Boolean, result: Schema.Unknown }
 const UserEntryFields = { text: Schema.String }
 const AssistantEntryFields = { text: Schema.String, reasoning: Schema.NullOr(Schema.String) }
@@ -35,7 +34,7 @@ const AwaitingApprovalFields = {
   params: Schema.Unknown,
 }
 const ClickedDenyFields = { reason: Schema.NullOr(Schema.String) }
-const ReceivedAgentFields = { incoming: Connection.Incoming }
+const ReceivedAgentFields = { incoming: Incoming }
 const ModelStreaming = Schema.Struct({
   turn: Schema.Number,
   text: Schema.String,
@@ -330,7 +329,7 @@ export const ConversationItem: Schema.Schema<ConversationItem> = Schema.Union([
 ])
 
 /** @experimental */
-export type ChatCommand = Command.Command<Message, any, Connection.AgentConnection>
+export type ChatCommand = Command<Message, any, AgentConnection>
 
 /** @experimental */
 export const initialModel = (sessionId: string | null = null): Model => ({
@@ -346,19 +345,19 @@ export const initialModel = (sessionId: string | null = null): Model => ({
 type FailedAgentCommandMessage = typeof FailedAgentCommand.Type
 
 const commandFailed = (error: unknown): FailedAgentCommandMessage =>
-  FailedAgentCommand({ reason: error instanceof Connection.SendFailed ? error.reason : String(error) })
+  FailedAgentCommand({ reason: error instanceof SendFailed ? error.reason : String(error) })
 
-const catchCommandFailure = <A>(effect: Effect.Effect<A, Connection.SendFailed, Connection.AgentConnection>) =>
+const catchCommandFailure = <A>(effect: Effect.Effect<A, SendFailed, AgentConnection>) =>
   effect.pipe(Effect.catchCause((cause) => Effect.succeed(commandFailed(Cause.squash(cause)))))
 
 /** @experimental */
-export const SendUserMessage = Command.define(
+export const SendUserMessage = define(
   "SendUserMessage",
   { sessionId: Schema.String, text: Schema.String },
   SentUserMessage,
   FailedAgentCommand,
 )(({ sessionId, text }) =>
-  Connection.AgentConnection.use((connection) =>
+  AgentConnection.use((connection) =>
     catchCommandFailure(
       connection.send({ _tag: "SendMessage", sessionId, prompt: text }).pipe(Effect.as(SentUserMessage())),
     ),
@@ -366,7 +365,7 @@ export const SendUserMessage = Command.define(
 )
 
 /** @experimental */
-export const ResolveApproval = Command.define(
+export const ResolveApproval = define(
   "ResolveApproval",
   {
     sessionId: Schema.String,
@@ -382,7 +381,7 @@ export const ResolveApproval = Command.define(
     : reason === null
       ? { _tag: "Denied" }
       : { _tag: "Denied", reason }
-  return Connection.AgentConnection.use((connection) =>
+  return AgentConnection.use((connection) =>
     catchCommandFailure(
       connection.send({ _tag: "ResolveApproval", sessionId, token, decision }).pipe(Effect.as(ResolvedApproval())),
     ),
@@ -390,13 +389,13 @@ export const ResolveApproval = Command.define(
 })
 
 /** @experimental */
-export const CancelRun = Command.define(
+export const CancelRun = define(
   "CancelRun",
   { sessionId: Schema.String },
   CancelledRun,
   FailedAgentCommand,
 )(({ sessionId }) =>
-  Connection.AgentConnection.use((connection) =>
+  AgentConnection.use((connection) =>
     catchCommandFailure(connection.send({ _tag: "Cancel", sessionId }).pipe(Effect.as(CancelledRun()))),
   ),
 )
@@ -616,7 +615,7 @@ const reasoningFromContent = (content: ReadonlyArray<unknown>): string | null =>
   return reasoning.length === 0 ? null : reasoning
 }
 
-const projectPrompt = (prompt: Ai.Prompt.Prompt): ReadonlyArray<ChatEntry> => {
+const projectPrompt = (prompt: Prompt.Prompt): ReadonlyArray<ChatEntry> => {
   let entries: ReadonlyArray<ChatEntry> = []
   for (const message of prompt.content) {
     if (message.role === "user") {
@@ -747,7 +746,7 @@ export const conversationItems = (model: Model): ReadonlyArray<ConversationItem>
   return [...entries, ...streaming, ...waiting, ...approval, ...failure]
 }
 
-const isServerFrame = (incoming: Connection.Incoming): incoming is Wire.LooseServerFrameType =>
+const isServerFrame = (incoming: Incoming): incoming is Wire.LooseServerFrameType =>
   incoming._tag === "Event" ||
   incoming._tag === "Suspended" ||
   incoming._tag === "Failed" ||
@@ -851,7 +850,7 @@ export const update = (
 }
 
 /** @experimental */
-export const subscriptions = Subscription.make<Model, Message, Connection.AgentConnection>()((entry) => ({
+export const subscriptions = make<Model, Message, AgentConnection>()((entry) => ({
   agentFrames: entry(
     { sessionId: Schema.NullOr(Schema.String), afterSeq: Schema.Number },
     {
@@ -860,7 +859,7 @@ export const subscriptions = Subscription.make<Model, Message, Connection.AgentC
       dependenciesToStream: ({ sessionId }, readDependencies) => {
         if (sessionId === null) return Stream.empty
         return Stream.unwrap(
-          Connection.AgentConnection.use((connection) => {
+          AgentConnection.use((connection) => {
             const afterSeq = readDependencies().afterSeq
             return Effect.succeed(
               connection

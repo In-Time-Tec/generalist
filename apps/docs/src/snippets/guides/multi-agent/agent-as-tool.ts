@@ -1,5 +1,5 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
 
 const summarizer = Agent.make({
@@ -14,24 +14,26 @@ const summarizeToolkit = AgentTool.asTool(summarizer, {
   toPrompt: (params) => `Summarize this: ${params.document}`,
 })
 
+const parentToolkit = Toolkit.make(...Object.values(summarizeToolkit.tools))
+
 const parent = Agent.make({
   name: "editor",
   instructions: "Use the summarize tool before answering.",
-  toolkit: Ai.Toolkit.make(...Object.values(summarizeToolkit.tools)),
+  toolkit: parentToolkit,
 })
 
 let calls = 0
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () => {
       calls += 1
       switch (calls) {
         case 1:
           return Stream.make(
-            Ai.Response.makePart("tool-call", {
+            Response.makePart("tool-call", {
               id: "summarize-1",
               name: "summarize",
               params: { document: "Baton is an Effect-native agent loop." },
@@ -40,11 +42,11 @@ const modelLayer = Layer.effect(
           )
         case 2:
           return Stream.make(
-            Ai.Response.makePart("text-delta", { id: "assistant", delta: "Baton runs agent loops on Effect." }),
+            Response.makePart("text-delta", { id: "assistant", delta: "Baton runs agent loops on Effect." }),
           )
         default:
           return Stream.make(
-            Ai.Response.makePart("text-delta", {
+            Response.makePart("text-delta", {
               id: "assistant",
               delta: "Summary ready: Baton runs agent loops on Effect.",
             }),
@@ -59,6 +61,7 @@ const program = Agent.generate(parent, { prompt: "Summarize the intro document."
   Effect.provide(
     Layer.mergeAll(
       modelLayer,
+      parentToolkit.toLayer({ summarize: () => Effect.die("agent tool bridge handles summarize") }),
       ToolExecutor.fromToolkit(summarizeToolkit),
       Approvals.autoApprove,
       ModelMiddleware.identityLayer,

@@ -3,8 +3,8 @@ import { m } from "foldkit/message"
 import { UrlRequest } from "foldkit/navigation"
 import { Url } from "foldkit/url"
 
-import * as Command from "@/components/ui/command"
-import * as Dialog from "@/components/ui/dialog"
+import { CommandMessage } from "@/components/ui/command"
+import { DialogMessage } from "@/components/ui/dialog"
 
 import { SidebarGroups } from "../layout/sidebarStorage"
 import { ThemePreference } from "./model"
@@ -14,8 +14,8 @@ export const ChangedUrl = m("ChangedUrl", { url: Url })
 export const CompletedNavigateInternal = m("CompletedNavigateInternal")
 export const CompletedLoadExternal = m("CompletedLoadExternal")
 export const PressedSearchShortcut = m("PressedSearchShortcut")
-export const GotSearchDialogMessage = m("GotSearchDialogMessage", { message: Dialog.Message })
-export const GotSearchCommandMessage = m("GotSearchCommandMessage", { message: Command.Message })
+export const GotSearchDialogMessage = m("GotSearchDialogMessage", { message: DialogMessage })
+export const GotSearchCommandMessage = m("GotSearchCommandMessage", { message: CommandMessage })
 export const ClickedCopyCode = m("ClickedCopyCode", { source: Schema.String })
 export const CompletedCopyCode = m("CompletedCopyCode", { source: Schema.String })
 export const ClearedCopiedCode = m("ClearedCopiedCode", { source: Schema.String })

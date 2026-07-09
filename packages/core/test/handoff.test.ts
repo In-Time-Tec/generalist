@@ -1,29 +1,30 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "../src/index"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 
-type ModelParams = Parameters<typeof Ai.LanguageModel.make>[0]
+type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
-    Ai.LanguageModel.LanguageModel,
-    Ai.LanguageModel.make({
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
       streamText,
     }),
   )
 
-const textDelta = (delta: string) => Ai.Response.makePart("text-delta", { id: "text", delta })
+const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
 const toolCallPart = (id: string, name: string, params: unknown) =>
-  Ai.Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+  Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
-const promptText = (prompt: Ai.Prompt.Prompt): string => JSON.stringify(prompt.content)
+const promptText = (prompt: Prompt.Prompt): string => JSON.stringify(prompt.content)
 
 const activeToolNames = (options: Parameters<ModelParams["streamText"]>[0]) => options.tools.map((tool) => tool.name)
 
-describe("Handoff", () => {
+layer(unusedToolHandlerLayer)("Handoff", (it) => {
   it("names transfer tools by specialist", () => {
     const specialist = Agent.make({ name: "math" })
     const transfer = Handoff.transferTool(specialist)
@@ -111,10 +112,10 @@ describe("Handoff", () => {
 
   it.effect("propagates fanOut child run errors", () => {
     const child = Agent.make({ name: "failing-child" })
-    const modelError = Ai.AiError.make({
+    const modelError = AiError.make({
       module: "HandoffTest",
       method: "streamText",
-      reason: new Ai.AiError.UnknownError({ description: "child failed" }),
+      reason: new AiError.UnknownError({ description: "child failed" }),
     })
     return Effect.gen(function* () {
       const failure = yield* Effect.flip(Handoff.fanOut([{ agent: child, prompt: "fail" }]))

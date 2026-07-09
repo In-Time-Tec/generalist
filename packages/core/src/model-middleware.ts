@@ -1,7 +1,6 @@
 import { Context, Effect, Layer, Option } from "effect"
-import * as Ai from "effect/unstable/ai"
-import * as AgentEvent from "./agent-event"
-
+import { Prompt, Response } from "effect/unstable/ai"
+import { AgentError } from "./agent-event"
 /** @experimental Turn-scoped info handed to middleware. */
 export interface TurnContext {
   readonly agentName: string
@@ -11,10 +10,7 @@ export interface TurnContext {
 /** @experimental A single middleware. Both hooks are optional; omitted hooks are identity. */
 export interface Middleware {
   /** Transform the prompt for a turn before it is sent to the model. */
-  readonly transformPrompt?: (
-    prompt: Ai.Prompt.Prompt,
-    context: TurnContext,
-  ) => Effect.Effect<Ai.Prompt.Prompt, AgentEvent.AgentError>
+  readonly transformPrompt?: (prompt: Prompt.Prompt, context: TurnContext) => Effect.Effect<Prompt.Prompt, AgentError>
   /**
    * Transform or drop a model stream part before the loop processes it.
    * Return `Option.none()` to drop the part (it is not folded, not emitted, not persisted).
@@ -22,9 +18,9 @@ export interface Middleware {
    * is a middleware bug; the loop fails the run with MiddlewareViolation if it happens.
    */
   readonly transformPart?: (
-    part: Ai.Response.StreamPart<any>,
+    part: Response.StreamPart<any>,
     context: TurnContext,
-  ) => Effect.Effect<Option.Option<Ai.Response.StreamPart<any>>, AgentEvent.AgentError>
+  ) => Effect.Effect<Option.Option<Response.StreamPart<any>>, AgentError>
 }
 
 /** @experimental Service holding the middleware chain, applied in array order. */

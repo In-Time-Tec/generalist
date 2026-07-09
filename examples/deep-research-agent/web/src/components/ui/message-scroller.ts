@@ -1,9 +1,9 @@
 import { Effect, Function, Match, Option, Queue, Schema, Stream } from "effect"
-import * as Command from "foldkit/command"
+import { define, type Command } from "foldkit/command"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 import { m } from "foldkit/message"
-import * as Mount from "foldkit/mount"
+import { defineStream, mapMessage } from "foldkit/mount"
 import { evo } from "foldkit/struct"
 
 import { button } from "@/components/ui/button"
@@ -72,6 +72,10 @@ export const init = (config: InitConfig): Model => ({
   isAtBottom: true,
 })
 
+export const MessageScrollerModel = Model
+export type MessageScrollerModel = Model
+export const messageScrollerInit = init
+
 /** The DOM id the viewport part renders with, and the ScrollToBottom Command targets. */
 export const viewportId = (model: Model): string => `${model.id}-viewport`
 
@@ -94,10 +98,13 @@ export type ClickedScrollToBottom = typeof ClickedScrollToBottom.Type
 export type CompletedScrollToBottom = typeof CompletedScrollToBottom.Type
 export type Message = typeof Message.Type
 
+export const MessageScrollerMessage = Message
+export type MessageScrollerMessage = Message
+
 // COMMAND
 
 /** Scrolls the viewport element to its end: smooth for the button click, instant for follow re-pinning. */
-export const ScrollToBottom = Command.define(
+export const ScrollToBottom = define(
   "ScrollToBottom",
   { viewportId: Schema.String, behavior: Schema.Literals(["smooth", "instant"]) },
   CompletedScrollToBottom,
@@ -124,7 +131,7 @@ const isScrolledToBottom = (element: Element): boolean =>
  * at-bottom state at mount, then a `ScrolledViewport` whenever the viewport
  * crosses the at-bottom threshold in either direction.
  */
-export const TrackViewportScroll = Mount.defineStream(
+export const TrackViewportScroll = defineStream(
   "TrackViewportScroll",
   ScrolledViewport,
 )(
@@ -160,7 +167,7 @@ export const TrackViewportScroll = Mount.defineStream(
  * `update` can re-pin the viewport while following. Height shrinkage is
  * ignored.
  */
-export const ObserveContentGrowth = Mount.defineStream(
+export const ObserveContentGrowth = defineStream(
   "ObserveContentGrowth",
   GrewContent,
 )(
@@ -191,7 +198,7 @@ export const ObserveContentGrowth = Mount.defineStream(
 
 // UPDATE
 
-export type UpdateReturn = readonly [Model, ReadonlyArray<Command.Command<Message>>]
+export type UpdateReturn = readonly [Model, ReadonlyArray<Command<Message>>]
 
 const withUpdateReturn = Match.withReturnType<UpdateReturn>()
 
@@ -231,6 +238,8 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       CompletedScrollToBottom: () => [model, []],
     }),
   )
+
+export const messageScrollerUpdate = update
 
 // VIEW
 
@@ -281,7 +290,7 @@ export const viewport = <ParentMessage>(config: ViewportConfig<ParentMessage>, c
   return h.div(
     [
       h.Id(viewportId(config.model)),
-      h.OnMount(Mount.mapMessage(TrackViewportScroll(), config.toParentMessage)),
+      h.OnMount(mapMessage(TrackViewportScroll(), config.toParentMessage)),
       ...(config.attributes ?? []),
       h.DataAttribute("slot", "message-scroller-viewport"),
       h.Class(
@@ -305,7 +314,7 @@ export const content = <ParentMessage>(config: ContentConfig<ParentMessage>, chi
   const h = html<ParentMessage>()
   return h.div(
     [
-      h.OnMount(Mount.mapMessage(ObserveContentGrowth(), config.toParentMessage)),
+      h.OnMount(mapMessage(ObserveContentGrowth(), config.toParentMessage)),
       ...(config.attributes ?? []),
       h.DataAttribute("slot", "message-scroller-content"),
       h.Class(cn("flex h-max min-h-full flex-col gap-8", config.class)),

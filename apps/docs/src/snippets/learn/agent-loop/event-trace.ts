@@ -1,53 +1,46 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
-import { Agent, type AgentEvent, Approvals, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, type AgentEvent, Approvals, ModelMiddleware } from "@batonfx/core"
 
-const searchTool = Ai.Tool.make("search_docs", {
+const searchTool = Tool.make("search_docs", {
   description: "Search the project docs",
   parameters: Schema.Struct({ query: Schema.String }),
   success: Schema.String,
 })
 
+const toolkit = Toolkit.make(searchTool)
+
 const agent = Agent.make({
   name: "docs-assistant",
   instructions: "Answer using the search results.",
-  toolkit: Ai.Toolkit.make(searchTool),
+  toolkit,
 })
 
 let calls = 0
 
 const modelLayer = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
     streamText: () => {
       calls += 1
       return calls === 1
         ? Stream.make(
-            Ai.Response.makePart("tool-call", {
+            Response.makePart("tool-call", {
               id: "search-1",
               name: "search_docs",
               params: { query: "turn policy" },
               providerExecuted: false,
             }),
           )
-        : Stream.make(
-            Ai.Response.makePart("text-delta", { id: "assistant", delta: "TurnPolicy caps follow-up turns." }),
-          )
+        : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "TurnPolicy caps follow-up turns." }))
     },
   }),
 )
 
 const layers = Layer.mergeAll(
   modelLayer,
-  ToolExecutor.testLayer({
-    execute: () =>
-      Effect.succeed({
-        _tag: "Success",
-        result: "TurnPolicy is a plain value with a default of recurs(8).",
-        encodedResult: "TurnPolicy is a plain value with a default of recurs(8).",
-      }),
-  }),
+  toolkit.toLayer({ search_docs: () => Effect.succeed("TurnPolicy is a plain value with a default of recurs(8).") }),
   Approvals.autoApprove,
   ModelMiddleware.identityLayer,
 )

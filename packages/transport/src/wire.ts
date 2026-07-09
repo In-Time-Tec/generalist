@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentEvent } from "@batonfx/core"
 
 /** @experimental A run failure that is not an approval/tool-wait suspension. */
@@ -73,15 +73,15 @@ const LooseToolResultPart = Schema.Struct({
 const unionOrNever = (schemas: ReadonlyArray<Schema.Top>): Schema.Top =>
   schemas.length === 0 ? Schema.Never : Schema.Union(schemas as [Schema.Top, ...Array<Schema.Top>])
 
-const toolSchemas = (toolkit: Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>) =>
-  Object.values(toolkit.tools) as ReadonlyArray<Ai.Tool.Any>
+const toolSchemas = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>) =>
+  Object.values(toolkit.tools) as ReadonlyArray<Tool.Any>
 
-const toolCallSchema = (toolkit: Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>): Schema.Top =>
-  unionOrNever(toolSchemas(toolkit).map((tool) => Ai.Response.ToolCallPart(tool.name, tool.parametersSchema)))
+const toolCallSchema = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>): Schema.Top =>
+  unionOrNever(toolSchemas(toolkit).map((tool) => Response.ToolCallPart(tool.name, tool.parametersSchema)))
 
-const toolResultSchema = (toolkit: Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>): Schema.Top =>
+const toolResultSchema = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>): Schema.Top =>
   unionOrNever(
-    toolSchemas(toolkit).map((tool) => Ai.Response.ToolResultPart(tool.name, tool.successSchema, tool.failureSchema)),
+    toolSchemas(toolkit).map((tool) => Response.ToolResultPart(tool.name, tool.successSchema, tool.failureSchema)),
   )
 
 const EventSchemaWith = (
@@ -123,9 +123,9 @@ const EventSchemaWith = (
     Schema.Struct({
       _tag: Schema.tag("TurnCompleted"),
       turn: Schema.Number,
-      transcript: Schema.optionalKey(Ai.Prompt.Prompt),
-      usage: Schema.optionalKey(Ai.Response.Usage),
-      finishReason: Schema.optionalKey(Ai.Response.FinishReason),
+      transcript: Schema.optionalKey(Prompt.Prompt),
+      usage: Schema.optionalKey(Response.Usage),
+      finishReason: Schema.optionalKey(Response.FinishReason),
       metadata: OptionalMetadata,
     }),
     Schema.Struct({
@@ -139,27 +139,25 @@ const EventSchemaWith = (
       _tag: Schema.tag("Completed"),
       turns: Schema.Number,
       text: Schema.String,
-      transcript: Schema.optionalKey(Ai.Prompt.Prompt),
-      usage: Schema.optionalKey(Ai.Response.Usage),
+      transcript: Schema.optionalKey(Prompt.Prompt),
+      usage: Schema.optionalKey(Response.Usage),
       metadata: OptionalMetadata,
     }),
   ]) as unknown as Schema.Codec<EventType, unknown, never, never>
 
 /** @experimental Codec for one Baton loop event using the supplied toolkit. */
-export const EventSchema = <T extends Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>>(
-  toolkit: T,
-) =>
+export const EventSchema = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
   EventSchemaWith(
-    Ai.Response.StreamPart(toolkit),
-    Ai.Response.Part(toolkit),
+    Response.StreamPart(toolkit),
+    Response.Part(toolkit),
     toolCallSchema(toolkit),
     toolResultSchema(toolkit),
   )
 
 /** @experimental Loose event codec for browser display of unknown tool names. */
 export const LooseEventSchema = EventSchemaWith(
-  Schema.Union([Ai.Response.StreamPart(Ai.Toolkit.empty), LooseToolCallPart, LooseToolResultPart]),
-  Schema.Union([Ai.Response.Part(Ai.Toolkit.empty), LooseToolCallPart, LooseToolResultPart]),
+  Schema.Union([Response.StreamPart(Toolkit.empty), LooseToolCallPart, LooseToolResultPart]),
+  Schema.Union([Response.Part(Toolkit.empty), LooseToolCallPart, LooseToolResultPart]),
   LooseToolCallPart,
   LooseToolResultPart,
 )
@@ -172,9 +170,9 @@ export type EventType =
   | AgentEvent.ToolProgress
   | AgentEvent.ToolExecutionCompleted
   | AgentEvent.ApprovalRequested
-  | (Omit<AgentEvent.TurnCompleted, "transcript"> & { readonly transcript?: Ai.Prompt.Prompt })
+  | (Omit<AgentEvent.TurnCompleted, "transcript"> & { readonly transcript?: Prompt.Prompt })
   | AgentEvent.StructuredOutput
-  | (Omit<AgentEvent.Completed, "transcript"> & { readonly transcript?: Ai.Prompt.Prompt })
+  | (Omit<AgentEvent.Completed, "transcript"> & { readonly transcript?: Prompt.Prompt })
 
 /** @experimental Server to client frame type. */
 export type ServerFrameType =
@@ -182,7 +180,7 @@ export type ServerFrameType =
   | { readonly _tag: "Failed"; readonly seq: number; readonly error: RunFailure }
   | { readonly _tag: "Suspended"; readonly seq: number; readonly suspension: AgentEvent.AgentSuspended }
   | { readonly _tag: "Ended"; readonly seq: number }
-  | { readonly _tag: "Snapshot"; readonly seq: number; readonly transcript: Ai.Prompt.Prompt }
+  | { readonly _tag: "Snapshot"; readonly seq: number; readonly transcript: Prompt.Prompt }
   | { readonly _tag: "SessionStatus"; readonly seq: number; readonly status: SessionStatus }
 
 const ServerFrameWith = (event: Schema.Top) =>
@@ -191,14 +189,13 @@ const ServerFrameWith = (event: Schema.Top) =>
     Schema.Struct({ _tag: Schema.tag("Failed"), seq: Schema.Number, error: RunFailure }),
     Schema.Struct({ _tag: Schema.tag("Suspended"), seq: Schema.Number, suspension: AgentEvent.AgentSuspended }),
     Schema.Struct({ _tag: Schema.tag("Ended"), seq: Schema.Number }),
-    Schema.Struct({ _tag: Schema.tag("Snapshot"), seq: Schema.Number, transcript: Ai.Prompt.Prompt }),
+    Schema.Struct({ _tag: Schema.tag("Snapshot"), seq: Schema.Number, transcript: Prompt.Prompt }),
     Schema.Struct({ _tag: Schema.tag("SessionStatus"), seq: Schema.Number, status: SessionStatus }),
   ]) as unknown as Schema.Codec<ServerFrameType, unknown, never, never>
 
 /** @experimental Server frame codec using the supplied toolkit. */
-export const ServerFrame = <T extends Ai.Toolkit.Any | Ai.Toolkit.WithHandler<Record<string, Ai.Tool.Any>>>(
-  toolkit: T,
-) => ServerFrameWith(EventSchema(toolkit))
+export const ServerFrame = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
+  ServerFrameWith(EventSchema(toolkit))
 
 /** @experimental Loose server frame codec for browser display of unknown tool names. */
 export const LooseServerFrame = ServerFrameWith(LooseEventSchema)

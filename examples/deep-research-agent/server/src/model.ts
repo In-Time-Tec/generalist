@@ -1,9 +1,9 @@
 import { OpenRouter } from "@batonfx/providers"
 import { Effect, Layer, Option, Stream } from "effect"
-import * as Ai from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
-type StreamText = Parameters<typeof Ai.LanguageModel.make>[0]["streamText"]
+type StreamText = Parameters<typeof LanguageModel.make>[0]["streamText"]
 
 interface WebSearchSuccess {
   readonly results: ReadonlyArray<{
@@ -13,7 +13,7 @@ interface WebSearchSuccess {
   }>
 }
 
-const findWebSearchResult = (prompt: Ai.Prompt.Prompt): WebSearchSuccess | undefined => {
+const findWebSearchResult = (prompt: Prompt.Prompt): WebSearchSuccess | undefined => {
   for (const message of prompt.content) {
     if (message.role !== "tool") continue
     for (const part of message.content) {
@@ -25,7 +25,7 @@ const findWebSearchResult = (prompt: Ai.Prompt.Prompt): WebSearchSuccess | undef
   return undefined
 }
 
-const latestUserQuestion = (prompt: Ai.Prompt.Prompt): string => {
+const latestUserQuestion = (prompt: Prompt.Prompt): string => {
   const userMessages = prompt.content.filter((message) => message.role === "user")
   const last = userMessages.at(-1)
   if (last === undefined) return "the topic"
@@ -62,11 +62,11 @@ const synthesizeAnswer = (result: WebSearchSuccess): string => {
 const scriptedStreamText: StreamText = (options) => {
   const priorResult = findWebSearchResult(options.prompt)
   if (priorResult !== undefined) {
-    return Stream.make(Ai.Response.makePart("text-delta", { id: "assistant", delta: synthesizeAnswer(priorResult) }))
+    return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: synthesizeAnswer(priorResult) }))
   }
   const query = latestUserQuestion(options.prompt)
   return Stream.make(
-    Ai.Response.makePart("tool-call", {
+    Response.makePart("tool-call", {
       id: "search-1",
       name: "web_search",
       params: { query },
@@ -75,10 +75,10 @@ const scriptedStreamText: StreamText = (options) => {
   )
 }
 
-/** @experimental A closed `Ai.LanguageModel` requiring nothing, scripted to demonstrate the plan -> search -> synthesize loop. */
-const scriptedDeterministicModel: Layer.Layer<Ai.LanguageModel.LanguageModel> = Layer.effect(
-  Ai.LanguageModel.LanguageModel,
-  Ai.LanguageModel.make({
+/** @experimental A closed `LanguageModel` requiring nothing, scripted to demonstrate the plan -> search -> synthesize loop. */
+const scriptedDeterministicModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effect(
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "deterministic response" }]),
     streamText: scriptedStreamText,
   }),
@@ -93,12 +93,12 @@ export interface WithOpenRouterOrDeterministicOptions extends OpenRouter.WithOpe
  * OpenRouter: try to build a real OpenRouter model layer from `options`, and
  * fall back to the scripted deterministic model above when the API key
  * config does not resolve. Unlike the packaged helper this returns a closed
- * `Ai.LanguageModel` directly (not a `ModelRegistry` registration), which is
+ * `LanguageModel` directly (not a `ModelRegistry` registration), which is
  * what `SessionRegistry.layerMemory` needs for its single-agent server.
  */
 export const withOpenRouterOrDeterministic = (
   options: WithOpenRouterOrDeterministicOptions,
-): Layer.Layer<Ai.LanguageModel.LanguageModel> =>
+): Layer.Layer<LanguageModel.LanguageModel> =>
   Layer.unwrap(
     Effect.gen(function* () {
       const openRouterRegistration = yield* OpenRouter.openRouter(options).pipe(

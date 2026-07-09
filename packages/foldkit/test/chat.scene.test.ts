@@ -2,24 +2,25 @@
 
 import { Chat, Connection } from "../src/index"
 import { Wire } from "@batonfx/transport"
-import * as Ai from "effect/unstable/ai"
+import { Response } from "effect/unstable/ai"
 import type { Document, Html } from "foldkit/html"
 import { html } from "foldkit/html"
-import * as Scene from "foldkit/scene"
+import { Command, click, expect, placeholder, role, scene, type } from "foldkit/scene"
+import type { SceneSimulation } from "foldkit/scene"
 import { describe, test } from "vitest"
 
 const sessionId = "foldkit-scene-session"
 
 const eventFrame = (seq: number, event: Wire.EventType): Wire.LooseServerFrameType => ({ _tag: "Event", seq, event })
 
-const toolCall = Ai.Response.makePart("tool-call", {
+const toolCall = Response.makePart("tool-call", {
   id: "lookup-1",
   name: "lookup",
   params: { query: "baton foldkit" },
   providerExecuted: false,
 })
 
-const toolResult = Ai.Response.makePart("tool-result", {
+const toolResult = Response.makePart("tool-result", {
   id: "lookup-1",
   name: "lookup",
   result: { answer: "transport binding" },
@@ -39,18 +40,25 @@ const frames: ReadonlyArray<Wire.LooseServerFrameType> = [
   eventFrame(6, {
     _tag: "ModelPart",
     turn: 1,
-    part: Ai.Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Check the transport stream." }),
+    part: Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Check the transport stream." }),
   }),
   eventFrame(7, {
     _tag: "ModelPart",
     turn: 1,
-    part: Ai.Response.makePart("text-delta", { id: "answer-1", delta: "Final answer" }),
+    part: Response.makePart("text-delta", { id: "answer-1", delta: "Final answer" }),
   }),
   eventFrame(8, { _tag: "TurnCompleted", turn: 1 }),
   eventFrame(9, { _tag: "Completed", turns: 2, text: "Final answer" }),
 ]
 
 const reduceMessage = (model: Chat.Model, message: Chat.Message): Chat.Model => Chat.update(model, message)[0]
+
+const withModel = <Model>(initialModel: Model) =>
+  Object.assign(
+    <M, Message, OutMessage = undefined>(simulation: SceneSimulation<M, Message, OutMessage>) =>
+      ({ ...simulation, model: initialModel }) as unknown as SceneSimulation<M, Message, OutMessage>,
+    { _phantomModel: undefined },
+  )
 
 const scriptedModel = (): Chat.Model => {
   let model = Chat.initialModel(null)
@@ -117,28 +125,28 @@ const view = (model: Chat.Model): Document => {
 
 describe("Chat Scene", () => {
   test("renders scripted stream rows for user, tool execution, and assistant completion", () => {
-    Scene.scene(
+    scene(
       { update: Chat.update, view },
-      Scene.with(scriptedModel()),
-      Scene.expect(Scene.role("article", { name: "User message" })).toContainText("Render this run"),
-      Scene.expect(Scene.role("article", { name: "Tool lookup" })).toContainText("lookup"),
-      Scene.expect(Scene.role("article", { name: "Tool lookup" })).toContainText("output-available"),
-      Scene.expect(Scene.role("article", { name: "Tool lookup" })).toContainText('"answer":"transport binding"'),
-      Scene.expect(Scene.role("article", { name: "Assistant message" })).toContainText("Check the transport stream."),
-      Scene.expect(Scene.role("article", { name: "Assistant message" })).toContainText("Final answer"),
+      withModel(scriptedModel()),
+      expect(role("article", { name: "User message" })).toContainText("Render this run"),
+      expect(role("article", { name: "Tool lookup" })).toContainText("lookup"),
+      expect(role("article", { name: "Tool lookup" })).toContainText("output-available"),
+      expect(role("article", { name: "Tool lookup" })).toContainText('"answer":"transport binding"'),
+      expect(role("article", { name: "Assistant message" })).toContainText("Check the transport stream."),
+      expect(role("article", { name: "Assistant message" })).toContainText("Final answer"),
     )
   })
 
   test("send message dispatches the Baton send command", () => {
     const model = reduceMessage(Chat.initialModel(null), Chat.OpenedSession({ sessionId }))
-    Scene.scene(
+    scene(
       { update: Chat.update, view },
-      Scene.with(model),
-      Scene.type(Scene.placeholder("Message"), "hello baton"),
-      Scene.click(Scene.role("button", { name: "Send" })),
-      Scene.Command.expectExact(Chat.SendUserMessage({ sessionId, text: "hello baton" })),
-      Scene.Command.resolve(Chat.SendUserMessage({ sessionId, text: "hello baton" }), Chat.SentUserMessage()),
-      Scene.expect(Scene.role("article", { name: "User message" })).toContainText("hello baton"),
+      withModel(model),
+      type(placeholder("Message"), "hello baton"),
+      click(role("button", { name: "Send" })),
+      Command.expectExact(Chat.SendUserMessage({ sessionId, text: "hello baton" })),
+      Command.resolve(Chat.SendUserMessage({ sessionId, text: "hello baton" }), Chat.SentUserMessage()),
+      expect(role("article", { name: "User message" })).toContainText("hello baton"),
     )
   })
 })

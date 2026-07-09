@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import * as CatalogSubpath from "@batonfx/providers/catalog"
+import { ModelCatalog, layer } from "@batonfx/providers/catalog"
 import { Catalog } from "../src/index"
 
 describe("Catalog", () => {
@@ -57,7 +57,7 @@ describe("Catalog", () => {
   it("exports the catalog namespace and subpath", () => {
     expect(typeof Catalog.layer).toBe("function")
     expect(typeof Catalog.testLayer).toBe("function")
-    expect(typeof CatalogSubpath.layer).toBe("function")
-    expect(CatalogSubpath.ModelCatalog).toBeDefined()
+    expect(typeof layer).toBe("function")
+    expect(ModelCatalog).toBeDefined()
   })
 })

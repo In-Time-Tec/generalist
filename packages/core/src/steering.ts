@@ -1,12 +1,11 @@
 import { Context, Effect, Exit, Layer, Queue } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { Prompt } from "effect/unstable/ai"
 /** @experimental How many queued messages to drain at a boundary. */
 export type QueueMode = "all" | "one-at-a-time"
 
 /** @experimental Prompt injected into a live agent run. */
 export interface Message {
-  readonly prompt: Ai.Prompt.RawInput
+  readonly prompt: Prompt.RawInput
 }
 
 /** @experimental Options for the in-memory steering layer. */

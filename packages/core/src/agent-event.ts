@@ -1,6 +1,5 @@
 import { Schema } from "effect"
-import * as Ai from "effect/unstable/ai"
-
+import { Prompt, Response, Tool } from "effect/unstable/ai"
 /** @experimental Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, unknown>>
 
@@ -15,7 +14,7 @@ export interface TurnStarted {
 export interface ModelPart {
   readonly _tag: "ModelPart"
   readonly turn: number
-  readonly part: Ai.Response.StreamPart<Record<string, Ai.Tool.Any>>
+  readonly part: Response.StreamPart<Record<string, Tool.Any>>
   readonly metadata?: Metadata
 }
 
@@ -23,7 +22,7 @@ export interface ModelPart {
 export interface ToolExecutionStarted {
   readonly _tag: "ToolExecutionStarted"
   readonly turn: number
-  readonly call: Ai.Response.ToolCallPart<string, unknown>
+  readonly call: Response.ToolCallPart<string, unknown>
   readonly metadata?: Metadata
 }
 
@@ -41,8 +40,8 @@ export interface ToolProgress {
 export interface ToolExecutionCompleted {
   readonly _tag: "ToolExecutionCompleted"
   readonly turn: number
-  readonly call: Ai.Response.ToolCallPart<string, unknown>
-  readonly result: Ai.Response.ToolResultPart<string, unknown, unknown>
+  readonly call: Response.ToolCallPart<string, unknown>
+  readonly result: Response.ToolResultPart<string, unknown, unknown>
   readonly metadata?: Metadata
 }
 
@@ -50,7 +49,7 @@ export interface ToolExecutionCompleted {
 export interface ApprovalRequested {
   readonly _tag: "ApprovalRequested"
   readonly turn: number
-  readonly call: Ai.Response.ToolCallPart<string, unknown>
+  readonly call: Response.ToolCallPart<string, unknown>
   readonly metadata?: Metadata
 }
 
@@ -63,9 +62,9 @@ export interface ApprovalRequested {
 export interface TurnCompleted {
   readonly _tag: "TurnCompleted"
   readonly turn: number
-  readonly transcript: Ai.Prompt.Prompt
-  readonly usage?: Ai.Response.Usage
-  readonly finishReason?: Ai.Response.FinishReason
+  readonly transcript: Prompt.Prompt
+  readonly usage?: Response.Usage
+  readonly finishReason?: Response.FinishReason
   readonly metadata?: Metadata
 }
 
@@ -74,7 +73,7 @@ export interface StructuredOutput {
   readonly _tag: "StructuredOutput"
   readonly turn: number
   readonly value: unknown
-  readonly content: ReadonlyArray<Ai.Response.Part<Record<string, Ai.Tool.Any>>>
+  readonly content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>
   readonly metadata?: Metadata
 }
 
@@ -83,8 +82,8 @@ export interface Completed {
   readonly _tag: "Completed"
   readonly turns: number
   readonly text: string
-  readonly transcript: Ai.Prompt.Prompt
-  readonly usage?: Ai.Response.Usage
+  readonly transcript: Prompt.Prompt
+  readonly usage?: Response.Usage
   readonly metadata?: Metadata
 }
 
@@ -92,8 +91,8 @@ const addUsageField = (left: number | undefined, right: number | undefined): num
   left === undefined && right === undefined ? undefined : (left ?? 0) + (right ?? 0)
 
 /** @experimental Fieldwise sum of upstream model usage values. */
-export const addUsage = (left: Ai.Response.Usage, right: Ai.Response.Usage): Ai.Response.Usage =>
-  new Ai.Response.Usage({
+export const addUsage = (left: Response.Usage, right: Response.Usage): Response.Usage =>
+  new Response.Usage({
     inputTokens: {
       uncached: addUsageField(left.inputTokens.uncached, right.inputTokens.uncached),
       total: addUsageField(left.inputTokens.total, right.inputTokens.total),
