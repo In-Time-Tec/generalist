@@ -14,7 +14,7 @@
 - [x] Expand the closed `Session.Entry` union for memory, skills, steering, tool calls, tool results, and handoffs without introducing another prompt format.
 - [x] Preserve Effect AI `Prompt` roles/parts for prompt-native entries and render context notes as tagged system messages.
 - [x] Run scoped Baton validation for the session context slice.
-- [ ] Publish Baton patch release and merge/push to `main` and `release`.
+- [x] Publish Baton patch release and merge/push to `main` and `release`.
 - [ ] Bump Relay to the new Baton patch, verify, merge/push to `main` and `release`.
 
 ## Remaining plan audit
