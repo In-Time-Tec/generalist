@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Amended: child `AgentSuspended` propagates to the parent run instead of collapsing into a failed tool result, so sub-agents participate in HITL.
+Accepted. Amended: child `AgentSuspended` collapses into a failed tool result at the parent tool boundary, so Baton does not create a second suspension protocol for agent-as-tool calls.
 
 ## Context
 
@@ -12,7 +12,7 @@ Baton needs a first-class in-process multi-agent story while keeping durable, ad
 
 Add `AgentTool` and `Handoff` to `@batonfx/core`.
 
-`AgentTool.asTool` exposes a child agent as an Effect AI tool handler. It runs the child in the current Effect context and converts child run failures into failed parent tool results, except child `AgentSuspended`, which is re-raised so the parent run suspends with the child's token.
+`AgentTool.asTool` exposes a child agent as an Effect AI tool handler. It runs the child in the current Effect context and converts child run failures, including child suspension, into failed parent tool results.
 
 `Handoff.transferTool` names child-agent tools with `transfer_to_<name>`. `Handoff.supervisor` builds a supervisor agent plus the handled transfer toolkit needed by `ToolExecutor.fromToolkit`. `Handoff.fanOut` runs isolated child agents concurrently and propagates child run errors because there is no tool boundary.
 
@@ -20,7 +20,7 @@ Add `AgentTool` and `Handoff` to `@batonfx/core`.
 
 - Baton supports rich same-process composition without introducing a bespoke orchestrator.
 - Durable/addressable children and cross-process handoff remain host responsibilities.
-- Parent runs suspend when a sub-agent tool suspends: `ToolExecutor.fromToolkit` maps the re-raised child `AgentSuspended` to a `Suspend` outcome with the child's token, and the parent fails with `AgentSuspended` for its own pending sub-agent call.
+- Parent runs receive child suspension as an ordinary failed tool result and can decide what to do next through the model loop.
 - Fan-out callers handle child run errors directly.
 
 ## Related docs

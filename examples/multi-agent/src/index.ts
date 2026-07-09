@@ -16,8 +16,8 @@ const modelLayer = Layer.effect(
 )
 
 const children = [
-  { agent: Agent.make({ name: "planner" }), prompt: "Plan the work" },
-  { agent: Agent.make({ name: "reviewer" }), prompt: "Review the work" },
+  { agent: Agent.make("planner"), prompt: "Plan the work" },
+  { agent: Agent.make("reviewer"), prompt: "Review the work" },
 ]
 
 const program = Handoff.fanOut(children, { concurrency: 2 }).pipe(

@@ -13,7 +13,7 @@ Baton owns:
 - `Handoff.fanOut`, bounded same-process child-run fan-out;
 - `Handoff.supervisor`, a convenience builder for a routing agent and handled transfer toolkit;
 - conversion of child run failures at a tool boundary into failed tool results;
-- propagation of child suspension so the parent run suspends too.
+- conversion of child suspension at a tool boundary into failed tool results.
 
 Baton does not own durable child state, address books, cross-process routing, shared transcripts, streaming child events into the parent stream, or handoff input filters in this milestone.
 
@@ -25,7 +25,7 @@ The handler runs `Agent.generate` for the child in the current Effect context. I
 
 At the tool boundary, child `AgentError`, `TurnLimitExceeded`, `MiddlewareViolation`, and defects thrown by prompt/result mappers become a failed tool result with a string message.
 
-Child `AgentSuspended` propagates instead of collapsing into a string: the handler re-raises it, `ToolExecutor.fromToolkit` maps it to a `Suspend` outcome carrying the child's token, and the parent run fails with its own `AgentSuspended` (`reason: "tool-wait"`, the parent's sub-agent tool call identity, the child's token). The host resolves the token out-of-band and resumes the parent with the parent's pending call; the re-entered handler runs the child again, whose approval checks consult the host's `Approvals` service with the resolved decision. Durable cross-process HITL remains a host concern.
+Child `AgentSuspended` is also collapsed into a failed tool result. The parent agent receives the failure as ordinary tool context and can decide whether to continue, retry, ask the user, or transfer elsewhere. Durable cross-process HITL remains a host concern.
 
 ## Handoff
 

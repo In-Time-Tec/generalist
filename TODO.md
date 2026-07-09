@@ -19,6 +19,7 @@
 - [x] Refine `Memory.forget` to support exact item ids per the north-star plan.
 - [x] Bump Relay to Baton `0.3.5`, verify durable memory forget, merge/push to `main` and `release`.
 - [x] Rework Baton `Agent.make` defaults to carry `model`, `memory`, and `metadata`, with model defaults resolved through `ModelRegistry` and memory defaults used unless run options override them.
+- [x] Collapse child `AgentSuspended` values into failed parent tool results at `AgentTool.asTool` boundaries so Baton does not create a second suspension protocol around Effect AI toolkits.
 
 ## Remaining plan audit
 

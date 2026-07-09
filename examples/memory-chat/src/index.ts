@@ -14,7 +14,7 @@ const modelLayer = (streamText: ModelParams["streamText"]): Layer.Layer<Language
   )
 
 const key: Memory.Key = { agent: "memory-agent", subject: "user-ada" }
-const agent = Agent.make({ name: "memory-agent" })
+const agent = Agent.make("memory-agent")
 
 const program = Effect.gen(function* () {
   yield* Agent.generate(agent, { prompt: "Ada likes Effect.", memory: { key } })

@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
-import { Cause, Effect, Exit, Layer, Schedule, Schema, Stream } from "effect"
+import { Effect, Exit, Layer, Schedule, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, AgentEvent, AgentTool, Approvals, ModelMiddleware, ToolContext, ToolExecutor } from "../src/index"
+import { Agent, AgentTool, Approvals, ModelMiddleware, ToolContext, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -280,25 +280,25 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     )
   })
 
-  it.effect("propagates child suspension so the parent run suspends", () => {
+  it.effect("returns child suspension as a failed parent tool result", () => {
     let parentCalls = 0
     return Effect.gen(function* () {
       const child = Agent.make({ name: "reviewer", toolkit: Toolkit.make(gatedTool) })
       const childTool = AgentTool.asTool(child, { name: "ask_reviewer" })
       const parent = Agent.make({ name: "parent", toolkit: parentToolkit(childTool) })
 
-      const exit = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" })).pipe(Effect.exit)
+      const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      const error = exit._tag === "Failure" ? Cause.squash(exit.cause) : undefined
-      expect(error).toBeInstanceOf(AgentEvent.AgentSuspended)
-      if (error instanceof AgentEvent.AgentSuspended) {
-        expect(error.token).toBe("approval-1")
-        expect(error.reason).toBe("tool-wait")
-        expect(error.tool_name).toBe("ask_reviewer")
-        expect(error.tool_call_id).toBe("call-reviewer")
-        expect(parentCalls).toBe(1)
+      const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
+      expect(toolCompleted?._tag).toBe("ToolExecutionCompleted")
+      if (toolCompleted?._tag === "ToolExecutionCompleted") {
+        expect(toolCompleted.result.isFailure).toBe(true)
+        expect(JSON.stringify(toolCompleted.result.result)).toContain("sub-agent 'reviewer' could not complete")
+        expect(JSON.stringify(toolCompleted.result.result)).toContain("suspended on gated: approval")
       }
+      const completed = events.at(-1)
+      expect(completed?._tag === "Completed" && completed.text).toBe("parent saw reviewer failure")
+      expect(parentCalls).toBe(2)
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
@@ -310,7 +310,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             parentCalls += 1
             return parentCalls === 1
               ? Stream.make(toolCallPart("call-reviewer", "ask_reviewer", { prompt: "child approval task" }))
-              : Stream.make(textDelta("parent should never see this"))
+              : Stream.make(textDelta("parent saw reviewer failure"))
           }),
           ToolExecutor.fromToolkit(
             AgentTool.asTool(Agent.make({ name: "reviewer", toolkit: Toolkit.make(gatedTool) }), {

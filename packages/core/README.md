@@ -41,7 +41,7 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "my-app-chats" }).pipe(
 //     Layer.provide(Persistence.layerBackingSql),
 //   )
 
-const agent = Agent.make({ name: "assistant", instructions: "You are a helpful assistant." })
+const agent = Agent.make("assistant", { instructions: "You are a helpful assistant." })
 
 // Run 1 and run 2 share the same chatId, so run 2 sees run 1's history.
 const program = Effect.gen(function* () {

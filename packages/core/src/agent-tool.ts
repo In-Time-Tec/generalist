@@ -107,8 +107,6 @@ export const asTool = <
       const result = yield* generate(agent, { prompt }).pipe(
         Effect.catchCause((cause) => {
           if (Cause.hasInterrupts(cause)) return Effect.interrupt
-          const error = Cause.squash(cause)
-          if (error instanceof AgentSuspended) return Effect.die(error)
           return Effect.fail(causeMessage(agent.name, cause))
         }),
       )
