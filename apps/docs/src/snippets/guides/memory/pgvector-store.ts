@@ -68,6 +68,10 @@ export const pgvectorLayer: Layer.Layer<VectorStore.VectorStore, never, PgClient
               }),
             ),
           ),
+      delete: (input) =>
+        client
+          .run("delete from memory_documents where agent = $1 and subject = $2", [input.key.agent, input.key.subject])
+          .pipe(Effect.asVoid, Effect.mapError(storeError)),
     })
   }),
 )

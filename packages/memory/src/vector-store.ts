@@ -29,6 +29,11 @@ export interface Query {
 }
 
 /** @experimental */
+export interface DeleteInput {
+  readonly key: Memory.Key
+}
+
+/** @experimental */
 export class VectorStoreError extends Schema.TaggedErrorClass<VectorStoreError>()("@batonfx/memory/VectorStoreError", {
   message: Schema.String,
 }) {}
@@ -37,6 +42,7 @@ export class VectorStoreError extends Schema.TaggedErrorClass<VectorStoreError>(
 export interface Interface {
   readonly upsert: (documents: ReadonlyArray<Embedded>) => Effect.Effect<void, VectorStoreError>
   readonly query: (query: Query) => Effect.Effect<ReadonlyArray<Match>, VectorStoreError>
+  readonly delete: (input: DeleteInput) => Effect.Effect<void, VectorStoreError>
 }
 
 /** @experimental */
@@ -106,6 +112,8 @@ const make = Ref.make(HashMap.empty<string, Embedded>()).pipe(
           }
           return matches.toSorted((left, right) => right.score - left.score).slice(0, input.limit)
         }),
+      delete: (input) =>
+        Ref.update(documents, (current) => HashMap.filter(current, (document) => !sameKey(document.key, input.key))),
     }),
   ),
 )

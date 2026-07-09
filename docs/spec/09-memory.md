@@ -1,6 +1,6 @@
 # 09 — Memory
 
-Baton memory is an optional core seam for recall before the first model turn and remember after completed turns. Core owns only the timing and prompt insertion contract. Concrete non-durable implementations live in `@batonfx/memory`; durable implementations remain host-owned.
+Baton memory is an optional core seam for recall before the first model turn, remember after completed turns, and host-requested lifecycle cleanup. Core owns only the timing, prompt insertion, and service operation contract. Concrete non-durable implementations live in `@batonfx/memory`; durable implementations remain host-owned.
 
 ## Scope
 
@@ -10,6 +10,7 @@ Baton owns:
 - the per-run `RunOptions.memory.key` contract;
 - recall insertion into the initial prompt;
 - remember calls after completed turns;
+- host-requested forget lifecycle cleanup;
 - loud error mapping into `AgentError`.
 
 Baton core does not own vector stores, embedding models, summarization, extraction, ranking, durable storage, or automatic key derivation. `@batonfx/memory` owns only in-process, non-durable implementations over core's seam.
@@ -32,15 +33,21 @@ Baton calls `remember({ key, turn, transcript, terminal })` after each completed
 
 Terminal remember runs before persisted-chat save and before `Completed`. Suspension does not remember at the suspension point; the host re-enters with `RunOptions.resume`, and the resumed run's completed turns remember normally.
 
+## Forget
+
+`Memory.forget({ key })` is a host-requested lifecycle cleanup operation for non-durable memory implementations. Baton never calls it from the agent loop and never infers when a subject should be cleaned up. Hosts call it when their own lifecycle indicates that in-process memory for a key should be dropped.
+
+Forget is store-agnostic. Implementations may delete all non-durable working state for the exact `Memory.Key`, delegate to a backing store that supports delete-by-key, or no-op when no state is retained. It does not introduce durability, retention policy, or cross-key behavior.
+
 ## Missing services and errors
 
 `Agent.stream` resolves `Memory` with `Effect.serviceOption`, so `RunServices` does not grow. If `RunOptions.memory` is absent, missing `Memory` preserves current behavior. If `RunOptions.memory` is set and `Memory` is absent, Baton fails before the first model call with `AgentError { message: "RunOptions.memory requires Memory in context", turn: 0 }`.
 
-`MemoryError` from `recall` or `remember` maps to `AgentError { message, turn, cause }` and fails the run. Hosts that want best-effort memory wrap their implementation to ignore or recover from memory failures.
+`MemoryError` from `recall` or `remember` maps to `AgentError { message, turn, cause }` and fails the run. `MemoryError` from host-called `forget` is returned to the host. Hosts that want best-effort memory wrap their implementation to ignore or recover from memory failures.
 
 ## Service helpers
 
-`Memory.merge(first, second)` recalls from both memories with `first` items first and remembers to both. `noopLayer` provides a memory that recalls nothing and records nothing. `testLayer(implementation)` provides exact recall/remember behavior for tests.
+`Memory.merge(first, second)` recalls from both memories with `first` items first, remembers to both, and forgets from both. `noopLayer` provides a memory that recalls nothing, records nothing, and forgets successfully. `testLayer(implementation)` provides exact recall/remember/forget behavior for tests.
 
 ## `@batonfx/memory`
 
@@ -69,6 +76,8 @@ Embedding and vector-store failures map to `MemoryError`; hosts that want best-e
 `WorkingMemory.layer(options?)` provides an in-process bounded recent text tail per `Memory.Key`. Recall returns the rolling summary first when present, followed by recent user/assistant messages in order as role-prefixed text items.
 
 Remember normalizes full transcripts to text-bearing user/assistant messages, deduplicates against the stored tail, and keeps `maxMessages` recent messages. Overflow is dropped unless `summarize` is configured. When summarization is configured, overflow plus any existing summary are summarized with the caller-provided language-model layer, not the agent loop's ambient model.
+
+Forget drops the exact key's in-process working-memory state.
 
 ## Combined memory
 

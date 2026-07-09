@@ -180,6 +180,7 @@ export const make = (options: Options = {}): Effect.Effect<Memory.Interface> =>
             yield* Ref.update(states, HashMap.set(id, nextState))
           })
         },
+        forget: (input) => Ref.update(states, HashMap.remove(keyId(input.key))),
       }
     }),
   )

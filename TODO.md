@@ -15,6 +15,7 @@
 - [x] Preserve Effect AI `Prompt` roles/parts for prompt-native entries and render context notes as tagged system messages.
 - [x] Run scoped Baton validation for the session context slice.
 - [x] Publish Baton patch release and merge/push to `main` and `release`.
+- [x] Add Phase 5 memory lifecycle progress with host-requested `Memory.forget` cleanup.
 - [ ] Bump Relay to the new Baton patch, verify, merge/push to `main` and `release`.
 
 ## Remaining plan audit

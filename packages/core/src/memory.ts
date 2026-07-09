@@ -32,6 +32,11 @@ export interface RememberInput {
 }
 
 /** @experimental */
+export interface ForgetInput {
+  readonly key: Key
+}
+
+/** @experimental */
 export class MemoryError extends Schema.TaggedErrorClass<MemoryError>()("@batonfx/core/MemoryError", {
   message: Schema.String,
 }) {}
@@ -40,6 +45,7 @@ export class MemoryError extends Schema.TaggedErrorClass<MemoryError>()("@batonf
 export interface Interface {
   readonly recall: (input: RecallInput) => Effect.Effect<ReadonlyArray<Item>, MemoryError>
   readonly remember: (input: RememberInput) => Effect.Effect<void, MemoryError>
+  readonly forget: (input: ForgetInput) => Effect.Effect<void, MemoryError>
 }
 
 /** @experimental */
@@ -48,6 +54,7 @@ export class Memory extends Context.Service<Memory, Interface>()("@batonfx/core/
 const noop: Interface = {
   recall: () => Effect.succeed([]),
   remember: () => Effect.void,
+  forget: () => Effect.void,
 }
 
 /** @experimental */
@@ -57,6 +64,7 @@ export const merge = (first: Interface, second: Interface): Interface => ({
       Effect.map(([firstItems, secondItems]) => [...firstItems, ...secondItems]),
     ),
   remember: (input) => Effect.all([first.remember(input), second.remember(input)], { discard: true }),
+  forget: (input) => Effect.all([first.forget(input), second.forget(input)], { discard: true }),
 })
 
 /** @experimental */

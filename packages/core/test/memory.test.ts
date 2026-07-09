@@ -110,6 +110,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           Memory.testLayer({
             recall: () => Effect.succeed([{ id: "item-1", parts: [textPart("remembered context")] }]),
             remember: () => Effect.void,
+            forget: () => Effect.void,
           }),
         ),
       ),
@@ -150,6 +151,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 return []
               }),
             remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
+            forget: () => Effect.void,
           }),
         ),
       ),
@@ -184,6 +186,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 return []
               }),
             remember: () => Effect.void,
+            forget: () => Effect.void,
           }),
         ),
       ),
@@ -208,6 +211,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           Memory.testLayer({
             recall: () => Effect.succeed([]),
             remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
+            forget: () => Effect.void,
           }),
         ),
       ),
@@ -243,8 +247,59 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           Memory.testLayer({
             recall: () => Effect.fail(memoryError),
             remember: () => Effect.void,
+            forget: () => Effect.void,
           }),
         ),
+      ),
+    )
+  })
+
+  it.effect("noopLayer forget succeeds", () =>
+    Effect.gen(function* () {
+      const memory = yield* Memory.Memory
+
+      yield* memory.forget({ key })
+    }).pipe(Effect.provide(Memory.noopLayer)),
+  )
+
+  it.effect("merge calls both forget implementations", () => {
+    const forgotten: Array<string> = []
+    const first: Memory.Interface = {
+      recall: () => Effect.succeed([]),
+      remember: () => Effect.void,
+      forget: (input) => Effect.sync(() => forgotten.push(`first:${input.key.subject}`)).pipe(Effect.asVoid),
+    }
+    const second: Memory.Interface = {
+      recall: () => Effect.succeed([]),
+      remember: () => Effect.void,
+      forget: (input) => Effect.sync(() => forgotten.push(`second:${input.key.subject}`)).pipe(Effect.asVoid),
+    }
+
+    return Effect.gen(function* () {
+      yield* Memory.merge(first, second).forget({ key })
+
+      expect(forgotten).toEqual(["first:subject-1", "second:subject-1"])
+    })
+  })
+
+  it.effect("testLayer exposes forget", () => {
+    let forgotten: Memory.ForgetInput | undefined
+    return Effect.gen(function* () {
+      const memory = yield* Memory.Memory
+
+      yield* memory.forget({ key })
+
+      expect(forgotten).toEqual({ key })
+    }).pipe(
+      Effect.provide(
+        Memory.testLayer({
+          recall: () => Effect.succeed([]),
+          remember: () => Effect.void,
+          forget: (input) =>
+            Effect.sync(() => {
+              forgotten = input
+            }),
+        }),
       ),
     )
   })

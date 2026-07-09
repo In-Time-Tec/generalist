@@ -79,4 +79,23 @@ describe("VectorStore", () => {
       expect(failure.message).toContain("dimension")
     }).pipe(Effect.provide(VectorStore.memoryLayer)),
   )
+
+  it.effect("deletes documents for the exact memory key", () =>
+    Effect.gen(function* () {
+      const store = yield* VectorStore.VectorStore
+
+      yield* store.upsert([
+        document("same-id", key, "visible", [1, 0]),
+        document("same-id", otherSubject, "other subject", [1, 0]),
+      ])
+
+      yield* store.delete({ key })
+
+      const deletedMatches = yield* store.query({ key, embedding: [1, 0], limit: 10 })
+      const remainingMatches = yield* store.query({ key: otherSubject, embedding: [1, 0], limit: 10 })
+
+      expect(deletedMatches).toEqual([])
+      expect(remainingMatches.map((match) => match.document.text)).toEqual(["other subject"])
+    }).pipe(Effect.provide(VectorStore.memoryLayer)),
+  )
 })
