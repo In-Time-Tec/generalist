@@ -34,6 +34,7 @@ export interface RememberInput {
 /** @experimental */
 export interface ForgetInput {
   readonly key: Key
+  readonly id?: string | undefined
 }
 
 /** @experimental */

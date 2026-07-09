@@ -125,4 +125,31 @@ describe("WorkingMemory", () => {
       expect(retained.map(itemText)).toEqual(["User: three", "Assistant: four"])
     }).pipe(Effect.provide(WorkingMemory.layer({ maxMessages: 2 }))),
   )
+
+  it.effect("forgets one recalled item id within the exact memory key", () =>
+    Effect.gen(function* () {
+      const memory = yield* Memory.Memory
+
+      yield* memory.remember({
+        key,
+        turn: 0,
+        terminal: true,
+        transcript: prompt(user("one"), assistant("two")),
+      })
+      yield* memory.remember({
+        key: otherKey,
+        turn: 0,
+        terminal: true,
+        transcript: prompt(user("three"), assistant("four")),
+      })
+
+      yield* memory.forget({ key, id: "working-1" })
+
+      const retained = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
+      const otherRetained = yield* memory.recall({ key: otherKey, turn: 0, prompt: prompt(user("current")) })
+
+      expect(retained.map(itemText)).toEqual(["Assistant: two"])
+      expect(otherRetained.map(itemText)).toEqual(["User: three", "Assistant: four"])
+    }).pipe(Effect.provide(WorkingMemory.layer({ maxMessages: 2 }))),
+  )
 })

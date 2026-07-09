@@ -31,6 +31,7 @@ export interface Query {
 /** @experimental */
 export interface DeleteInput {
   readonly key: Memory.Key
+  readonly id?: string | undefined
 }
 
 /** @experimental */
@@ -113,7 +114,12 @@ const make = Ref.make(HashMap.empty<string, Embedded>()).pipe(
           return matches.toSorted((left, right) => right.score - left.score).slice(0, input.limit)
         }),
       delete: (input) =>
-        Ref.update(documents, (current) => HashMap.filter(current, (document) => !sameKey(document.key, input.key))),
+        Ref.update(documents, (current) =>
+          HashMap.filter(current, (document) => {
+            if (!sameKey(document.key, input.key)) return true
+            return input.id === undefined ? false : document.id !== input.id
+          }),
+        ),
     }),
   ),
 )

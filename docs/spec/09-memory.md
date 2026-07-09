@@ -35,9 +35,9 @@ Terminal remember runs before persisted-chat save and before `Completed`. Suspen
 
 ## Forget
 
-`Memory.forget({ key })` is a host-requested lifecycle cleanup operation for non-durable memory implementations. Baton never calls it from the agent loop and never infers when a subject should be cleaned up. Hosts call it when their own lifecycle indicates that in-process memory for a key should be dropped.
+`Memory.forget({ key, id? })` is a host-requested lifecycle cleanup operation for non-durable memory implementations. Baton never calls it from the agent loop and never infers when a subject should be cleaned up. Hosts call it when their own lifecycle indicates that in-process memory for a key or one recalled item should be dropped.
 
-Forget is store-agnostic. Implementations may delete all non-durable working state for the exact `Memory.Key`, delegate to a backing store that supports delete-by-key, or no-op when no state is retained. It does not introduce durability, retention policy, or cross-key behavior.
+Forget is store-agnostic. Omitting `id` deletes all non-durable working state for the exact `Memory.Key`. Supplying `id` narrows deletion to one implementation-owned `Memory.Item.id` under that exact key. Implementations may delegate to a backing store that supports delete-by-key and delete-by-id, or no-op when no state is retained. It does not introduce durability, retention policy, or cross-key behavior.
 
 ## Missing services and errors
 
@@ -59,7 +59,7 @@ The package exports `VectorStore`, `SemanticRecall`, `WorkingMemory`, and `combi
 
 `VectorStore` stores `Document { id, key, text, metadata? }` values with embeddings and queries by cosine similarity. The in-process `memoryLayer` stores documents in a `Ref<HashMap>` and is non-durable.
 
-Key isolation is part of the contract: query candidates must match both `key.agent` and `key.subject` exactly before scoring. Upsert replaces only the same `(agent, subject, id)` tuple. A matching-key embedding dimension mismatch fails with `VectorStoreError` instead of being silently ignored.
+Key isolation is part of the contract: query candidates must match both `key.agent` and `key.subject` exactly before scoring. Upsert replaces only the same `(agent, subject, id)` tuple. Delete without `id` removes the exact key; delete with `id` removes the exact `(agent, subject, id)` tuple. A matching-key embedding dimension mismatch fails with `VectorStoreError` instead of being silently ignored.
 
 External stores such as pgvector or Chroma are host adapters, not part of this milestone.
 
@@ -77,7 +77,7 @@ Embedding and vector-store failures map to `MemoryError`; hosts that want best-e
 
 Remember normalizes full transcripts to text-bearing user/assistant messages, deduplicates against the stored tail, and keeps `maxMessages` recent messages. Overflow is dropped unless `summarize` is configured. When summarization is configured, overflow plus any existing summary are summarized with the caller-provided language-model layer, not the agent loop's ambient model.
 
-Forget drops the exact key's in-process working-memory state.
+Forget without `id` drops the exact key's in-process working-memory state. Forget with `id` removes one recalled item id within the exact key; the special `working-summary` id removes the summary while preserving the recent tail.
 
 ## Combined memory
 

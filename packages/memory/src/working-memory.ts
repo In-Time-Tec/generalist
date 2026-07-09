@@ -180,7 +180,22 @@ export const make = (options: Options = {}): Effect.Effect<Memory.Interface> =>
             yield* Ref.update(states, HashMap.set(id, nextState))
           })
         },
-        forget: (input) => Ref.update(states, HashMap.remove(keyId(input.key))),
+        forget: (input) =>
+          Ref.update(states, (current) => {
+            const id = keyId(input.key)
+            if (input.id === undefined) return HashMap.remove(current, id)
+            const existing = HashMap.get(current, id)
+            if (existing._tag === "None") return current
+            const summary = input.id === "working-summary" ? undefined : existing.value.summary
+            const recent = existing.value.recent.filter((item) => item.id !== input.id)
+            if (summary === undefined && recent.length === 0) return HashMap.remove(current, id)
+            const nextState: KeyState = {
+              recent,
+              counter: existing.value.counter,
+              ...(summary === undefined ? {} : { summary }),
+            }
+            return HashMap.set(current, id, nextState)
+          }),
       }
     }),
   )

@@ -91,6 +91,39 @@ describe("SemanticRecall", () => {
     }).pipe(Effect.provide(memoryLayer)),
   )
 
+  it.effect("forgets one semantic memory id within the exact memory key", () =>
+    Effect.gen(function* () {
+      const memory = yield* Memory.Memory
+
+      yield* memory.remember({
+        key,
+        turn: 0,
+        terminal: true,
+        transcript: prompt(user("What color is the sky?"), assistant("blue")),
+      })
+      yield* memory.remember({
+        key,
+        turn: 1,
+        terminal: true,
+        transcript: prompt(user("What color is the ocean?"), assistant("blue")),
+      })
+      yield* memory.remember({
+        key: otherKey,
+        turn: 0,
+        terminal: true,
+        transcript: prompt(user("What color is the door?"), assistant("blue")),
+      })
+
+      yield* memory.forget({ key, id: "semantic-1" })
+
+      const retained = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
+      const otherRetained = yield* memory.recall({ key: otherKey, turn: 0, prompt: prompt(user("color")) })
+
+      expect(retained.map(itemText)).toEqual(["User: What color is the ocean?\nAssistant: blue"])
+      expect(otherRetained.map(itemText)).toEqual(["User: What color is the door?\nAssistant: blue"])
+    }).pipe(Effect.provide(memoryLayer)),
+  )
+
   it.effect("maps embedding failures to MemoryError", () => {
     const embeddingError = AiError.make({
       module: "SemanticRecallTest",

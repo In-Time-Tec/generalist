@@ -109,7 +109,7 @@ export const make = (
           Effect.mapError(memoryError),
         )
       },
-      forget: (input) => store.delete({ key: input.key }).pipe(Effect.mapError(memoryError)),
+      forget: (input) => store.delete(input).pipe(Effect.mapError(memoryError)),
     }
   })
 

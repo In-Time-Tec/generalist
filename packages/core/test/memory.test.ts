@@ -267,18 +267,20 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     const first: Memory.Interface = {
       recall: () => Effect.succeed([]),
       remember: () => Effect.void,
-      forget: (input) => Effect.sync(() => forgotten.push(`first:${input.key.subject}`)).pipe(Effect.asVoid),
+      forget: (input) =>
+        Effect.sync(() => forgotten.push(`first:${input.key.subject}:${input.id ?? "all"}`)).pipe(Effect.asVoid),
     }
     const second: Memory.Interface = {
       recall: () => Effect.succeed([]),
       remember: () => Effect.void,
-      forget: (input) => Effect.sync(() => forgotten.push(`second:${input.key.subject}`)).pipe(Effect.asVoid),
+      forget: (input) =>
+        Effect.sync(() => forgotten.push(`second:${input.key.subject}:${input.id ?? "all"}`)).pipe(Effect.asVoid),
     }
 
     return Effect.gen(function* () {
-      yield* Memory.merge(first, second).forget({ key })
+      yield* Memory.merge(first, second).forget({ key, id: "memory-id" })
 
-      expect(forgotten).toEqual(["first:subject-1", "second:subject-1"])
+      expect(forgotten).toEqual(["first:subject-1:memory-id", "second:subject-1:memory-id"])
     })
   })
 
@@ -287,9 +289,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     return Effect.gen(function* () {
       const memory = yield* Memory.Memory
 
-      yield* memory.forget({ key })
+      yield* memory.forget({ key, id: "memory-id" })
 
-      expect(forgotten).toEqual({ key })
+      expect(forgotten).toEqual({ key, id: "memory-id" })
     }).pipe(
       Effect.provide(
         Memory.testLayer({

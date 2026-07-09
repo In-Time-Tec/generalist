@@ -16,6 +16,7 @@
 - [x] Run scoped Baton validation for the session context slice.
 - [x] Publish Baton patch release and merge/push to `main` and `release`.
 - [x] Add Phase 5 memory lifecycle progress with host-requested `Memory.forget` cleanup.
+- [x] Refine `Memory.forget` to support exact item ids per the north-star plan.
 - [ ] Bump Relay to the new Baton patch, verify, merge/push to `main` and `release`.
 
 ## Remaining plan audit

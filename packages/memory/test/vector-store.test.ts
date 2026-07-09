@@ -98,4 +98,24 @@ describe("VectorStore", () => {
       expect(remainingMatches.map((match) => match.document.text)).toEqual(["other subject"])
     }).pipe(Effect.provide(VectorStore.memoryLayer)),
   )
+
+  it.effect("deletes one document id within the exact memory key", () =>
+    Effect.gen(function* () {
+      const store = yield* VectorStore.VectorStore
+
+      yield* store.upsert([
+        document("first", key, "first", [1, 0]),
+        document("second", key, "second", [0, 1]),
+        document("first", otherSubject, "other subject", [1, 0]),
+      ])
+
+      yield* store.delete({ key, id: "first" })
+
+      const deletedKeyMatches = yield* store.query({ key, embedding: [1, 0], limit: 10 })
+      const otherSubjectMatches = yield* store.query({ key: otherSubject, embedding: [1, 0], limit: 10 })
+
+      expect(deletedKeyMatches.map((match) => match.document.text)).toEqual(["second"])
+      expect(otherSubjectMatches.map((match) => match.document.text)).toEqual(["other subject"])
+    }).pipe(Effect.provide(VectorStore.memoryLayer)),
+  )
 })
