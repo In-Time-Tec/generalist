@@ -10,6 +10,8 @@
 
 ## Current slice
 
+- [x] Add the public Effect-native MCP OAuth lifecycle and host-owned redacted token store.
+
 - [x] Prove Baton `Session.buildContext` dropped non-message context entries before the Phase 5 context-engineering slice.
 - [x] Expand the closed `Session.Entry` union for memory, skills, steering, tool calls, tool results, and handoffs without introducing another prompt format.
 - [x] Preserve Effect AI `Prompt` roles/parts for prompt-native entries and render context notes as tagged system messages.

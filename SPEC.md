@@ -23,7 +23,8 @@ SPEC.md
 │  ├─ 11-transport.md                          wire frames and in-process session registry contract
 │  ├─ 12-foldkit-adapter.md                    FoldKit resource/subscription/chat adapter contract
 │  ├─ 13-test-kit.md                           deterministic scripted model and capture contract
-│  └─ 14-package-distribution.md               compiled artifacts and release verification
+│  ├─ 14-package-distribution.md               compiled artifacts and release verification
+│  └─ 15-mcp-oauth.md                           MCP OAuth lifecycle and host token boundary
 └─ docs/spec/decisions/
    ├─ ADR-0001-baton-standalone-agent-framework.md
    ├─ ADR-0002-tool-context-output-spill.md
@@ -46,7 +47,8 @@ SPEC.md
    ├─ ADR-0019-manifest-backed-hosted-skills.md
    ├─ ADR-0020-public-deterministic-test-model.md
    ├─ ADR-0021-portable-turn-policy-snapshots.md
-   └─ ADR-0022-compiled-esm-package-artifacts.md
+   ├─ ADR-0022-compiled-esm-package-artifacts.md
+   └─ ADR-0023-mcp-oauth-lifecycle.md
 ```
 
 ## Packages
@@ -78,6 +80,7 @@ SPEC.md
 - FoldKit adapter contract: `docs/spec/12-foldkit-adapter.md`
 - Deterministic test-kit contract: `docs/spec/13-test-kit.md`
 - Package distribution contract: `docs/spec/14-package-distribution.md`
+- MCP OAuth contract: `docs/spec/15-mcp-oauth.md`
 
 ## Decisions
 
@@ -103,3 +106,4 @@ SPEC.md
 - ADR-0020 — Public Deterministic Test Model: `docs/spec/decisions/ADR-0020-public-deterministic-test-model.md`
 - ADR-0021 — Portable Turn Policy Snapshots: `docs/spec/decisions/ADR-0021-portable-turn-policy-snapshots.md`
 - ADR-0022 — Compiled ESM Package Artifacts: `docs/spec/decisions/ADR-0022-compiled-esm-package-artifacts.md`
+- ADR-0023 — MCP OAuth Lifecycle: `docs/spec/decisions/ADR-0023-mcp-oauth-lifecycle.md`

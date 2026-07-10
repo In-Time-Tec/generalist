@@ -4,6 +4,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { Context, Duration, Effect, Layer, Ref, Schema, Scope } from "effect"
 import { Tool } from "effect/unstable/ai"
+import type { Interface as OAuthInterface } from "./oauth.js"
 /** @experimental */
 export type JsonValue = typeof Schema.Json.Type
 
@@ -15,7 +16,12 @@ export type McpTransport =
       readonly args?: ReadonlyArray<string>
       readonly env?: Record<string, string>
     }
-  | { readonly kind: "http"; readonly url: string; readonly headers?: Record<string, string> }
+  | {
+      readonly kind: "http"
+      readonly url: string
+      readonly headers?: Record<string, string>
+      readonly oauth?: OAuthInterface
+    }
 
 /** @experimental */
 export interface CallOptions {
@@ -168,10 +174,10 @@ const buildTransport = (server: string, transport: McpTransport): Effect.Effect<
             ...(transport.args === undefined ? {} : { args: [...transport.args] }),
             ...(transport.env === undefined ? {} : { env: transport.env }),
           })
-        : (new StreamableHTTPClientTransport(
-            new URL(transport.url),
-            transport.headers === undefined ? {} : { requestInit: { headers: transport.headers } },
-          ) as Transport),
+        : (new StreamableHTTPClientTransport(new URL(transport.url), {
+            ...(transport.headers === undefined ? {} : { requestInit: { headers: transport.headers } }),
+            ...(transport.oauth === undefined ? {} : { authProvider: transport.oauth.provider }),
+          }) as Transport),
     catch: (error) => new McpConnectionError({ server, message: errorMessage(error) }),
   })
 

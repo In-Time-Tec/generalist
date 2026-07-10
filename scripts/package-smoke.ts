@@ -118,7 +118,27 @@ const program = Effect.gen(function* () {
   )
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "typecheck.ts"),
-    `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}\n`,
+    `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}
+import { OAuth, McpToolSource } from "@batonfx/mcp"
+import { Effect, Layer, Option, Redacted } from "effect"
+const tokenStore: OAuth.TokenStoreInterface = {
+  load: () => Effect.succeed(Option.none()),
+  save: (_server, tokens) => Effect.sync(() => void Redacted.value(tokens)),
+  remove: () => Effect.void,
+}
+const storeLayer: Layer.Layer<OAuth.TokenStore> = OAuth.tokenStoreTestLayer(tokenStore)
+const oauthLayer = OAuth.layer({
+  serverUrl: "https://mcp.example/rpc",
+  redirectUrl: "http://127.0.0.1/callback",
+  clientMetadata: { redirect_uris: ["http://127.0.0.1/callback"] },
+}).pipe(Layer.provide(storeLayer))
+const proof = Effect.gen(function* () {
+  const oauth = yield* OAuth.OAuth
+  const transport: McpToolSource.McpTransport = { kind: "http", url: "https://mcp.example/rpc", oauth }
+  return transport
+}).pipe(Effect.provide(oauthLayer))
+void proof
+`,
   )
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "runtime.mjs"),
