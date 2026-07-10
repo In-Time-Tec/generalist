@@ -41,7 +41,8 @@ bun run lint          # oxlint + ast-grep
 bun run typecheck     # turbo tsc --noEmit
 bun run test          # turbo vitest
 bun run test:coverage
-bun run build         # turbo bun build
+bun run build         # turbo package and app builds
+bun run package:smoke # packed Node and Bun consumers
 ```
 
 ## For AI agents

@@ -2,7 +2,7 @@ import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
-import type { RegistrationOptions } from "./openai"
+import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
 export interface OpenAiCompatibleInput extends RegistrationOptions {

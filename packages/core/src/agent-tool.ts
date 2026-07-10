@@ -1,7 +1,7 @@
 import { Cause, Effect, Schema } from "effect"
 import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
-import { type Agent, type Result, type RunServices, generate } from "./agent"
-import { AgentError, AgentSuspended, MiddlewareViolation, TurnLimitExceeded } from "./agent-event"
+import { type Agent, type Result, type RunServices, generate } from "./agent.js"
+import { AgentError, AgentSuspended, MiddlewareViolation, TurnLimitExceeded } from "./agent-event.js"
 
 const defaultParameters = Schema.Struct({ prompt: Schema.String })
 

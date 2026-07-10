@@ -9,5 +9,11 @@
     "web": "bun run --cwd web dev",
     "test": "bun --cwd ../.. vitest run examples/deep-research-agent --passWithNoTests",
     "typecheck": "bun run --cwd server typecheck && bun run --cwd web typecheck"
+  },
+  "devDependencies": {
+    "@batonfx/core": "workspace:*",
+    "@batonfx/foldkit": "workspace:*",
+    "@batonfx/providers": "workspace:*",
+    "@batonfx/transport": "workspace:*"
   }
 }

@@ -1,7 +1,7 @@
 import { Crypto, Effect } from "effect"
 import { HttpClient, Url } from "effect/unstable/http"
 import { SkillSource } from "@batonfx/core"
-import { type Limits, make as makeHostedCatalog, resolveRelative } from "./hosted-catalog"
+import { type Limits, make as makeHostedCatalog, resolveRelative } from "./hosted-catalog.js"
 
 /** @experimental Generic HTTP skill catalog options. */
 export interface Options extends Limits {

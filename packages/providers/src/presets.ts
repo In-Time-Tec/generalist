@@ -2,7 +2,7 @@ import { OpenAiClient } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Effect, Redacted } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
-import { openAiCompatible, type OpenAiCompatibleInput } from "./openai-compat"
+import { openAiCompatible, type OpenAiCompatibleInput } from "./openai-compat.js"
 
 /** @experimental */
 export interface PresetInput extends Omit<OpenAiCompatibleInput, "provider"> {

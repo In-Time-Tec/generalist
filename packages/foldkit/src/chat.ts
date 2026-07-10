@@ -5,7 +5,7 @@ import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
 import { make } from "foldkit/subscription"
 import { Wire } from "@batonfx/transport"
-import { AgentConnection, Incoming, SendFailed } from "./connection"
+import { AgentConnection, Incoming, SendFailed } from "./connection.js"
 const CompletedFields = { isFailure: Schema.Boolean, result: Schema.Unknown }
 const UserEntryFields = { text: Schema.String }
 const AssistantEntryFields = { text: Schema.String, reasoning: Schema.NullOr(Schema.String) }

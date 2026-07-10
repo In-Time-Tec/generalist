@@ -1,7 +1,7 @@
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
-import { Message, Model, content, init, root, scrollButton, update, viewport } from "@/components/ui/message-scroller"
+import { Message, Model, content, root, scrollButton, viewport } from "@/components/ui/message-scroller"
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 

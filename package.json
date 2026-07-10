@@ -12,7 +12,8 @@
     "check:release": "bun scripts/check-release.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "oxlint packages apps && ast-grep scan --config sgconfig.yml",
+    "lint": "oxlint packages apps examples scripts && ast-grep scan --config sgconfig.yml",
+    "package:smoke": "bun scripts/package-smoke.ts",
     "test": "bun turbo test",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
@@ -71,6 +72,7 @@
   },
   "devDependencies": {
     "@ast-grep/cli": "catalog:",
+    "@effect/platform-bun": "catalog:",
     "@effect/vitest": "catalog:",
     "@tsconfig/bun": "catalog:",
     "@types/bun": "catalog:",

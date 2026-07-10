@@ -90,8 +90,8 @@ export const OpenSession = define(
   FailedOpenSession,
 )(
   Effect.gen(function* () {
-    const response = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, { body: HttpBody.jsonUnsafe({}) })
-    const body = (yield* response.json) as { readonly sessionId: string }
+    const httpResponse = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, { body: HttpBody.jsonUnsafe({}) })
+    const body = (yield* httpResponse.json) as { readonly sessionId: string }
     return OpenedSession({ sessionId: body.sessionId })
   }).pipe(
     Effect.provide(FetchHttpClient.layer),
@@ -118,21 +118,21 @@ const asProgramCommands = (
   commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
 ): ReadonlyArray<ProgramCommand> => commands as unknown as ReadonlyArray<ProgramCommand>
 
-export const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
-  switch (message._tag) {
+export const update = (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
+  switch (currentMessage._tag) {
     case "OpenedSession":
-      return [{ ...model, chat: { ...model.chat, sessionId: message.sessionId }, session: SessionReady() }, []]
+      return [{ ...model, chat: { ...model.chat, sessionId: currentMessage.sessionId }, session: SessionReady() }, []]
     case "FailedOpenSession":
-      return [{ ...model, session: SessionFailed({ message: message.reason }) }, []]
+      return [{ ...model, session: SessionFailed({ message: currentMessage.reason }) }, []]
     case "GotChatMessage": {
-      const [chat, chatCommands] = Chat.update(model.chat, message.message)
+      const [chat, chatCommands] = Chat.update(model.chat, currentMessage.message)
       return [
         { ...model, chat },
         asProgramCommands(mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
       ]
     }
     case "GotScrollerMessage": {
-      const [scroller, scrollerCommands] = messageScrollerUpdate(model.scroller, message.message)
+      const [scroller, scrollerCommands] = messageScrollerUpdate(model.scroller, currentMessage.message)
       return [
         { ...model, scroller },
         asProgramCommands(
@@ -141,7 +141,7 @@ export const update = (model: Model, message: Message): readonly [Model, Readonl
       ]
     }
     case "ToggledExpanded":
-      return [{ ...model, expandedToolCallIds: toggle(model.expandedToolCallIds, message.key) }, []]
+      return [{ ...model, expandedToolCallIds: toggle(model.expandedToolCallIds, currentMessage.key) }, []]
   }
 }
 

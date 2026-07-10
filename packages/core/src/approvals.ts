@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect"
-import { type Request } from "./tool-executor"
+import { type Request } from "./tool-executor.js"
 /** @experimental */
 export interface Approved {
   readonly _tag: "Approved"

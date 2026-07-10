@@ -5,10 +5,13 @@
   "private": false,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir dist --target bun --format esm",
+    "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
     "lint": "bun --cwd ../.. oxlint packages/memory/src packages/memory/test",
     "test": "bun --cwd ../.. vitest run packages/memory/test --passWithNoTests",
     "typecheck": "bun tsc --noEmit"
@@ -22,5 +25,27 @@
     "@types/bun": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "description": "Non-durable memory implementations for Baton agents",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/In-Time-Tec/batonfx.git",
+    "directory": "packages/memory"
+  },
+  "homepage": "https://github.com/In-Time-Tec/batonfx#readme",
+  "bugs": {
+    "url": "https://github.com/In-Time-Tec/batonfx/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

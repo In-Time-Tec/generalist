@@ -21,8 +21,9 @@ SPEC.md
 │  ├─ 09-memory.md                             recall and remember seam contract
 │  ├─ 10-multi-agent.md                        in-process multi-agent contract
 │  ├─ 11-transport.md                          wire frames and in-process session registry contract
-│  ├─ 12-foldkit-adapter.md                     FoldKit resource/subscription/chat adapter contract
-│  └─ 13-test-kit.md                            deterministic scripted model and capture contract
+│  ├─ 12-foldkit-adapter.md                    FoldKit resource/subscription/chat adapter contract
+│  ├─ 13-test-kit.md                           deterministic scripted model and capture contract
+│  └─ 14-package-distribution.md               compiled artifacts and release verification
 └─ docs/spec/decisions/
    ├─ ADR-0001-baton-standalone-agent-framework.md
    ├─ ADR-0002-tool-context-output-spill.md
@@ -44,7 +45,8 @@ SPEC.md
    ├─ ADR-0018-in-process-session-run-queue.md
    ├─ ADR-0019-manifest-backed-hosted-skills.md
    ├─ ADR-0020-public-deterministic-test-model.md
-   └─ ADR-0021-portable-turn-policy-snapshots.md
+   ├─ ADR-0021-portable-turn-policy-snapshots.md
+   └─ ADR-0022-compiled-esm-package-artifacts.md
 ```
 
 ## Packages
@@ -75,6 +77,7 @@ SPEC.md
 - Transport contract: `docs/spec/11-transport.md`
 - FoldKit adapter contract: `docs/spec/12-foldkit-adapter.md`
 - Deterministic test-kit contract: `docs/spec/13-test-kit.md`
+- Package distribution contract: `docs/spec/14-package-distribution.md`
 
 ## Decisions
 
@@ -99,3 +102,4 @@ SPEC.md
 - ADR-0019 — Manifest-backed Hosted Skills: `docs/spec/decisions/ADR-0019-manifest-backed-hosted-skills.md`
 - ADR-0020 — Public Deterministic Test Model: `docs/spec/decisions/ADR-0020-public-deterministic-test-model.md`
 - ADR-0021 — Portable Turn Policy Snapshots: `docs/spec/decisions/ADR-0021-portable-turn-policy-snapshots.md`
+- ADR-0022 — Compiled ESM Package Artifacts: `docs/spec/decisions/ADR-0022-compiled-esm-package-artifacts.md`

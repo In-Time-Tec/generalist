@@ -3,7 +3,7 @@ import { ModelRegistry } from "@batonfx/core"
 import { Effect, Layer, Option, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
-import { openAi, type RegistrationOptions, type WithOpenAiOptions } from "./openai"
+import { openAi, type RegistrationOptions, type WithOpenAiOptions } from "./openai.js"
 
 const deterministicModelLayer = Layer.effect(
   LanguageModel.LanguageModel,

@@ -2,10 +2,10 @@ import { Cause, Effect, Fiber, Option, Ref, Schema, Scope, Stream } from "effect
 import { HttpServerError, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Tool, Toolkit } from "effect/unstable/ai"
-import { TransportError } from "./errors"
-import { SessionRegistry } from "./session-registry"
-import { ClientFrame, ServerFrame } from "./wire"
-import type { ClientFrameType, LooseServerFrameType } from "./wire"
+import { TransportError } from "./errors.js"
+import { SessionRegistry } from "./session-registry.js"
+import { ClientFrame, ServerFrame } from "./wire.js"
+import type { ClientFrameType, LooseServerFrameType } from "./wire.js"
 const ClientFrameJson = Schema.fromJsonString(ClientFrame)
 
 const transportError = (message: string): TransportError => new TransportError({ message })

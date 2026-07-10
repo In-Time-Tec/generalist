@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Layer, Path, PlatformError, Stream } from "effect"
 import { SkillSource } from "@batonfx/core"
-import { parseDocument, parseFrontmatter, splitDocument } from "./skill-document"
+import { parseDocument, parseFrontmatter, splitDocument } from "./skill-document.js"
 
 /** @experimental Filesystem skill-loader options. */
 export interface LoadOptions {

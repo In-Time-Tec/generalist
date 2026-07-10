@@ -1,1 +1,1 @@
-export * as McpToolSource from "./mcp-tool-source"
+export * as McpToolSource from "./mcp-tool-source.js"

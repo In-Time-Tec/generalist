@@ -1,7 +1,7 @@
 import { Crypto, Effect } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { SkillSource } from "@batonfx/core"
-import { type Limits, make as makeHostedCatalog, resolveRelative, validateSkillPath } from "./hosted-catalog"
+import { type Limits, make as makeHostedCatalog, resolveRelative, validateSkillPath } from "./hosted-catalog.js"
 
 /** @experimental Manifest-backed S3 catalog options. */
 export interface Options extends Limits {

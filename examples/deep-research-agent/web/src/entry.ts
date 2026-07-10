@@ -2,7 +2,7 @@ import { Connection } from "@batonfx/foldkit"
 import { Layer } from "effect"
 import { Socket } from "effect/unstable/socket"
 import { makeApplication, run } from "foldkit/runtime"
-import { Message, Model, init, subscriptions, update, view } from "./main"
+import { Model, init, subscriptions, update, view } from "./main"
 
 const WS_URL = "ws://localhost:4000/ws"
 

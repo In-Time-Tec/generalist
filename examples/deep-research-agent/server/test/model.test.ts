@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Config, ConfigProvider, Effect, Layer, Stream } from "effect"
+import { Config, ConfigProvider, Effect, Stream } from "effect"
 import { LanguageModel, Prompt } from "@batonfx/core"
 import { withOpenRouterOrDeterministic } from "../src/model"
 import { testLayer } from "../src/search-provider"

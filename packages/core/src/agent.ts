@@ -12,24 +12,30 @@ import {
   type ToolProgress,
   type TurnCompleted,
   TurnLimitExceeded,
-} from "./agent-event"
-import { Approvals } from "./approvals"
-import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage, isContextOverflow } from "./compaction"
-import { Instructions, openEpoch } from "./instructions"
-import { type Item, type Key, Memory, type MemoryError } from "./memory"
-import { type Middleware, ModelMiddleware, type TurnContext } from "./model-middleware"
-import { type ModelEnvironment, type ModelSelection, Service } from "./model-registry"
-import { ModelResilience, apply } from "./model-resilience"
-import { type Answer, type Pending, type PermissionError, Permissions, RuleStore } from "./permissions"
-import { type Entry, SessionStore, type SessionStoreError } from "./session"
-import { SkillSource, type SkillSourceError, selectListings } from "./skill-source"
-import { type Message, Steering } from "./steering"
-import { ToolContext } from "./tool-context"
-import { type Outcome, type Request, type Success, ToolExecutor, executeToolkit } from "./tool-executor"
-import { bound } from "./tool-output"
-import { defaultPolicy, type TurnOverrides, type TurnPolicy } from "./turn-policy"
+} from "./agent-event.js"
+import { Approvals } from "./approvals.js"
+import {
+  Compaction,
+  type CompactionError,
+  DEFAULT_RESERVE_TOKENS,
+  type Usage,
+  isContextOverflow,
+} from "./compaction.js"
+import { Instructions, openEpoch } from "./instructions.js"
+import { type Item, type Key, Memory, type MemoryError } from "./memory.js"
+import { type Middleware, ModelMiddleware, type TurnContext } from "./model-middleware.js"
+import { type ModelEnvironment, type ModelSelection, Service } from "./model-registry.js"
+import { ModelResilience, apply } from "./model-resilience.js"
+import { type Answer, type Pending, type PermissionError, Permissions, RuleStore } from "./permissions.js"
+import { type Entry, SessionStore, type SessionStoreError } from "./session.js"
+import { SkillSource, type SkillSourceError, selectListings } from "./skill-source.js"
+import { type Message, Steering } from "./steering.js"
+import { ToolContext } from "./tool-context.js"
+import { type Outcome, type Request, type Success, ToolExecutor, executeToolkit } from "./tool-executor.js"
+import { bound } from "./tool-output.js"
+import { defaultPolicy, type TurnOverrides, type TurnPolicy } from "./turn-policy.js"
 
-type CompactionResult = import("./compaction").Result
+type CompactionResult = import("./compaction.js").Result
 /** @experimental An agent definition: a plain value, not a service. */
 export interface Agent<Tools extends Record<string, Tool.Any> = {}, HasModel extends boolean = boolean> {
   readonly name: string

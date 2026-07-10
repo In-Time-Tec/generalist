@@ -1,5 +1,5 @@
 import { Context, Effect, HashMap, Layer, Option, Ref, Schema } from "effect"
-import { type Success } from "./tool-executor"
+import { type Success } from "./tool-executor.js"
 /** @experimental A bounded tool result: inline content plus optional spilled overflow references. */
 export interface ToolOutput {
   readonly inline: unknown

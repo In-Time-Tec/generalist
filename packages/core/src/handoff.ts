@@ -1,9 +1,9 @@
 import { Effect, Schema } from "effect"
 import { AiError, Prompt, Tool, Toolkit } from "effect/unstable/ai"
-import { type Agent, type Result, type RunError, type RunOptions, type RunServices, generate, make } from "./agent"
-import { AgentError } from "./agent-event"
-import { asTool } from "./agent-tool"
-import { type TurnPolicy } from "./turn-policy"
+import { type Agent, type Result, type RunError, type RunOptions, type RunServices, generate, make } from "./agent.js"
+import { AgentError } from "./agent-event.js"
+import { asTool } from "./agent-tool.js"
+import { type TurnPolicy } from "./turn-policy.js"
 
 const defaultTransferParameters = Schema.Struct({ prompt: Schema.String })
 

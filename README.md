@@ -39,6 +39,8 @@ bun add @batonfx/providers @batonfx/mcp @batonfx/skills @batonfx/memory
 bun add @batonfx/transport @batonfx/foldkit @batonfx/test
 ```
 
+The published packages contain compiled ESM and declarations and support Node 22+ and Bun 1.3+; use the equivalent `npm install` commands in a Node project.
+
 ## Capability matrix
 
 | Capability                                                          | Package              | Stable tier for 0.1.0                         |
@@ -111,6 +113,7 @@ bun run typecheck:examples
 bun run check:release
 bun run test
 bun run build
+bun run package:smoke
 ```
 
 ## Provenance

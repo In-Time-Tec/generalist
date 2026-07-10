@@ -1,2 +1,2 @@
-export * as Chat from "./chat"
-export * as Connection from "./connection"
+export * as Chat from "./chat.js"
+export * as Connection from "./connection.js"

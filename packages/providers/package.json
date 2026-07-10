@@ -5,18 +5,45 @@
   "private": false,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./catalog": "./src/catalog.ts",
-    "./openai": "./src/openai.ts",
-    "./anthropic": "./src/anthropic.ts",
-    "./openrouter": "./src/openrouter.ts",
-    "./openai-compat": "./src/openai-compat.ts",
-    "./deterministic": "./src/deterministic.ts",
-    "./presets": "./src/presets.ts",
-    "./embedding": "./src/embedding.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./catalog": {
+      "types": "./dist/catalog.d.ts",
+      "import": "./dist/catalog.js"
+    },
+    "./openai": {
+      "types": "./dist/openai.d.ts",
+      "import": "./dist/openai.js"
+    },
+    "./anthropic": {
+      "types": "./dist/anthropic.d.ts",
+      "import": "./dist/anthropic.js"
+    },
+    "./openrouter": {
+      "types": "./dist/openrouter.d.ts",
+      "import": "./dist/openrouter.js"
+    },
+    "./openai-compat": {
+      "types": "./dist/openai-compat.d.ts",
+      "import": "./dist/openai-compat.js"
+    },
+    "./deterministic": {
+      "types": "./dist/deterministic.d.ts",
+      "import": "./dist/deterministic.js"
+    },
+    "./presets": {
+      "types": "./dist/presets.d.ts",
+      "import": "./dist/presets.js"
+    },
+    "./embedding": {
+      "types": "./dist/embedding.d.ts",
+      "import": "./dist/embedding.js"
+    }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/catalog.ts ./src/openai.ts ./src/anthropic.ts ./src/openrouter.ts ./src/openai-compat.ts ./src/deterministic.ts ./src/presets.ts ./src/embedding.ts --outdir dist --target bun --format esm",
+    "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
     "lint": "bun --cwd ../.. oxlint packages/providers/src packages/providers/test",
     "test": "bun --cwd ../.. vitest run packages/providers/test --passWithNoTests",
     "typecheck": "bun tsc --noEmit"
@@ -34,5 +61,27 @@
     "@types/bun": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "description": "Effect AI provider registration helpers and model metadata for Baton",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/In-Time-Tec/batonfx.git",
+    "directory": "packages/providers"
+  },
+  "homepage": "https://github.com/In-Time-Tec/batonfx#readme",
+  "bugs": {
+    "url": "https://github.com/In-Time-Tec/batonfx/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

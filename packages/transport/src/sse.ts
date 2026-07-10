@@ -3,10 +3,10 @@ import { Sse } from "effect/unstable/encoding"
 import { Headers, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiSchema } from "effect/unstable/httpapi"
 import { Tool, Toolkit } from "effect/unstable/ai"
-import { TransportError } from "./errors"
-import { SessionError, SessionRegistry } from "./session-registry"
-import { ServerFrame } from "./wire"
-import type { LooseServerFrameType } from "./wire"
+import { TransportError } from "./errors.js"
+import { SessionError, SessionRegistry } from "./session-registry.js"
+import { ServerFrame } from "./wire.js"
+import type { LooseServerFrameType } from "./wire.js"
 const cursorFromString = (value: string): Option.Option<number> => {
   if (!/^\d+$/.test(value)) return Option.none()
   const parsed = Number(value)

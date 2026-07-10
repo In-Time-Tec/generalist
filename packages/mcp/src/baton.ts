@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
-import type { Interface, JsonValue } from "./mcp-tool-source"
+import type { Interface, JsonValue } from "./mcp-tool-source.js"
 
 /**
  * Discovered MCP tools as a Baton toolkit. Pair with {@link toolkitLayer}

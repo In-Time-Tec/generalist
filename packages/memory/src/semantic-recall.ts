@@ -1,8 +1,8 @@
 import { Effect, Layer, Ref } from "effect"
 import { EmbeddingModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
-import { VectorStore } from "./vector-store"
-import type { Match } from "./vector-store"
+import { VectorStore } from "./vector-store.js"
+import type { Match } from "./vector-store.js"
 /** @experimental */
 export interface Options {
   readonly limit?: number

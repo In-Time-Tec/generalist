@@ -1,18 +1,18 @@
 import { Effect, Layer } from "effect"
 import { EmbeddingModel } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
-import { makeSemanticRecall } from "./semantic-recall"
-import { VectorStore } from "./vector-store"
-import { makeWorkingMemory } from "./working-memory"
+import { makeSemanticRecall } from "./semantic-recall.js"
+import { VectorStore } from "./vector-store.js"
+import { makeWorkingMemory } from "./working-memory.js"
 
-export * as SemanticRecall from "./semantic-recall"
-export * as VectorStore from "./vector-store"
-export * as WorkingMemory from "./working-memory"
+export * as SemanticRecall from "./semantic-recall.js"
+export * as VectorStore from "./vector-store.js"
+export * as WorkingMemory from "./working-memory.js"
 
 /** @experimental */
 export interface CombinedOptions {
-  readonly working?: import("./working-memory").Options
-  readonly semantic?: import("./semantic-recall").Options
+  readonly working?: import("./working-memory.js").Options
+  readonly semantic?: import("./semantic-recall.js").Options
 }
 
 /** @experimental */

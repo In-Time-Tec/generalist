@@ -2,9 +2,9 @@ import { Cause, Context, Effect, Layer, Option, Queue, Ref, Schema, Scope, Strea
 import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import { TransportError } from "./errors"
-import { ClientFrame, LooseServerFrame } from "./wire"
-import type { ClientFrameType, LooseServerFrameType } from "./wire"
+import { TransportError } from "./errors.js"
+import { ClientFrame, LooseServerFrame } from "./wire.js"
+import type { ClientFrameType, LooseServerFrameType } from "./wire.js"
 /** @experimental */
 export type ConnectionStatus =
   | { readonly _tag: "Connecting" }

@@ -1,7 +1,7 @@
 import { Crypto, Effect, Encoding, Layer, Schema, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse, Url } from "effect/unstable/http"
 import { SkillSource } from "@batonfx/core"
-import { parseDocument, validateName } from "./skill-document"
+import { parseDocument, validateName } from "./skill-document.js"
 
 /** @experimental Baton hosted skill manifest entry. */
 export const ManifestSkill = Schema.Struct({

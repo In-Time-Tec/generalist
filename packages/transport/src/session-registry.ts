@@ -17,7 +17,7 @@ import {
 } from "effect"
 import { Chat, Prompt, Tool } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals } from "@batonfx/core"
-import type { ClientApproval, EventType, LooseServerFrameType, RunFailure, SessionStatus } from "./wire"
+import type { ClientApproval, EventType, LooseServerFrameType, RunFailure, SessionStatus } from "./wire.js"
 /** @experimental */
 export class SessionError extends Schema.TaggedErrorClass<SessionError>()("@batonfx/transport/SessionError", {
   message: Schema.String,

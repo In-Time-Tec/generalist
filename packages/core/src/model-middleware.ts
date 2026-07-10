@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Option } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
-import { AgentError } from "./agent-event"
+import { AgentError } from "./agent-event.js"
 /** @experimental Turn-scoped info handed to middleware. */
 export interface TurnContext {
   readonly agentName: string

@@ -17,6 +17,7 @@
       },
       "devDependencies": {
         "@ast-grep/cli": "catalog:",
+        "@effect/platform-bun": "catalog:",
         "@effect/vitest": "catalog:",
         "@tsconfig/bun": "catalog:",
         "@types/bun": "catalog:",
@@ -80,6 +81,12 @@
     },
     "examples/deep-research-agent": {
       "name": "@batonfx/example-deep-research-agent",
+      "devDependencies": {
+        "@batonfx/core": "workspace:*",
+        "@batonfx/foldkit": "workspace:*",
+        "@batonfx/providers": "workspace:*",
+        "@batonfx/transport": "workspace:*",
+      },
     },
     "examples/deep-research-agent/server": {
       "name": "@batonfx/example-deep-research-agent-server",

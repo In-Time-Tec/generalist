@@ -1,7 +1,7 @@
 import { Cause, Context, Effect, Layer, Option, Schedule, Schema, Sink, Stream } from "effect"
 import { Response, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentError, AgentSuspended } from "./agent-event"
-import { ToolContext } from "./tool-context"
+import { AgentError, AgentSuspended } from "./agent-event.js"
+import { ToolContext } from "./tool-context.js"
 /** @experimental */
 export interface Request {
   readonly call: Response.ToolCallPart<string, unknown>

@@ -21,7 +21,11 @@ if (!workflow.includes("workflow_dispatch:")) fail("publish workflow must be man
 if (/\n\s+push:\n/.test(workflow)) fail("publish workflow must not publish on push to main")
 if (!workflow.includes("version:")) fail("publish workflow must accept an explicit version input")
 if (!workflow.includes("dry_run:")) fail("publish workflow must accept a dry_run input")
-if (!workflow.includes("bun publish --access public --dry-run")) fail("publish workflow must dry-run every package")
+if (!workflow.includes("npm publish --access public --dry-run")) fail("publish workflow must dry-run every package")
+if (!workflow.includes("bun run package:smoke")) fail("publish workflow must verify packed packages")
+if (!workflow.includes("PACKAGE_ARTIFACT_DIR")) fail("publish workflow must retain verified tarballs")
+if (!workflow.includes("release-artifacts/core.tgz")) fail("publish workflow must publish verified tarballs")
+if (!workflow.includes("node-version: 22")) fail("publish workflow must verify the supported Node baseline")
 if (!workflow.includes("workspace:")) {
   fail("publish workflow must rewrite workspace dependencies")
 }

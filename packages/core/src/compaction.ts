@@ -1,8 +1,8 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { LanguageModel, Prompt, Tokenizer, Toolkit } from "effect/unstable/ai"
-import { type Entry, type EntryId, buildContext } from "./session"
-import { type Success } from "./tool-executor"
-import { bound } from "./tool-output"
+import { type Entry, type EntryId, buildContext } from "./session.js"
+import { type Success } from "./tool-executor.js"
+import { bound } from "./tool-output.js"
 /** @experimental Default headroom kept for the next model response. */
 export const DEFAULT_RESERVE_TOKENS = 16_384
 

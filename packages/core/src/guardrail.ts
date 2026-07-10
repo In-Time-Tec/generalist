@@ -1,7 +1,7 @@
 import { Effect, Option } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
-import { AgentError } from "./agent-event"
-import type { Middleware, TurnContext } from "./model-middleware"
+import { AgentError } from "./agent-event.js"
+import type { Middleware, TurnContext } from "./model-middleware.js"
 
 interface RedactOptions {
   readonly pattern: RegExp
