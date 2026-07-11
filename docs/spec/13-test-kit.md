@@ -4,7 +4,7 @@
 
 ## Script vocabulary
 
-`TestModel.text(text)` and `TestModel.toolCall(name, params, options?)` create response parts. A bare part at the top level is promoted to a one-part model turn, preserving concise scripts such as:
+`TestModel.text(text)`, `TestModel.reasoning(text)`, and `TestModel.toolCall(name, params, options?)` create response parts. Reasoning is Baton's public Effect AI reasoning content, distinct from assistant text. A bare part at the top level is promoted to a one-part model turn, preserving concise scripts such as:
 
 ```ts
 TestModel.layer([TestModel.toolCall("web_search", { query: "Relay docs" }), TestModel.text("Found them")])
@@ -16,7 +16,7 @@ TestModel.layer([TestModel.toolCall("web_search", { query: "Relay docs" }), Test
 
 `TestModel.failure(error, options?)` consumes one slot and fails with the supplied `AiError.AiError`. This lets tests prove retry classification and schedules without a live provider.
 
-Text parts compile to `text-start`, `text-delta`, and `text-end` for streaming calls and one `text` part for non-streaming calls. Tool calls retain explicit ids and `providerExecuted`; omitted ids are derived deterministically from request and part indices.
+Text parts compile to `text-start`, `text-delta`, and `text-end` for streaming calls and one `text` part for non-streaming calls. Reasoning parts compile to `reasoning-start`, `reasoning-delta`, and `reasoning-end` for streaming calls and one `reasoning` part for non-streaming calls, so agent transcripts and re-fed prompts preserve reasoning without adding it to assistant text. Tool calls retain explicit ids and `providerExecuted`; omitted ids are derived deterministically from request and part indices.
 
 ## Stateful fixture
 

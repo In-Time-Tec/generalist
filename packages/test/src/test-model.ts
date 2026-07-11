@@ -8,6 +8,12 @@ export interface TextPart {
 }
 
 /** @experimental */
+export interface ReasoningPart {
+  readonly _tag: "Reasoning"
+  readonly text: string
+}
+
+/** @experimental */
 export interface ToolCallPart {
   readonly _tag: "ToolCall"
   readonly name: string
@@ -17,7 +23,7 @@ export interface ToolCallPart {
 }
 
 /** @experimental */
-export type Part = TextPart | ToolCallPart
+export type Part = TextPart | ReasoningPart | ToolCallPart
 
 /** @experimental */
 export interface StepOptions {
@@ -113,7 +119,7 @@ const invalidRequest = (method: Operation, description: string): AiError.AiError
   })
 
 const normalizeStep = (step: Step): TurnStep | ObjectStep | FailureStep =>
-  step._tag === "Text" || step._tag === "ToolCall" ? { _tag: "Turn", parts: [step] } : step
+  step._tag === "Text" || step._tag === "Reasoning" || step._tag === "ToolCall" ? { _tag: "Turn", parts: [step] } : step
 
 const operation = (method: "streamText" | "generateText", options: LanguageModel.ProviderOptions): Operation =>
   method === "generateText" && options.responseFormat.type === "json" ? "generateObject" : method
@@ -158,7 +164,11 @@ const compileToolCall = (
 const compileGenerate = (step: TurnStep, requestIndex: number): Array<Response.PartEncoded> => [
   ...step.parts.map(
     (part, partIndex): Response.PartEncoded =>
-      part._tag === "Text" ? { type: "text", text: part.text } : compileToolCall(part, requestIndex, partIndex),
+      part._tag === "Text"
+        ? { type: "text", text: part.text }
+        : part._tag === "Reasoning"
+          ? { type: "reasoning", text: part.text }
+          : compileToolCall(part, requestIndex, partIndex),
   ),
   finish(finishReason(step), step.usage ?? emptyUsage()),
 ]
@@ -171,10 +181,11 @@ const compileStream = (step: TurnStep, requestIndex: number): Array<Response.Str
       output.push(compileToolCall(part, requestIndex, partIndex))
       continue
     }
-    const id = `test-text-${requestIndex}-${partIndex}`
-    output.push({ type: "text-start", id })
-    output.push({ type: "text-delta", id, delta: part.text })
-    output.push({ type: "text-end", id })
+    const kind = part._tag === "Text" ? "text" : "reasoning"
+    const id = `test-${kind}-${requestIndex}-${partIndex}`
+    output.push({ type: `${kind}-start`, id })
+    output.push({ type: `${kind}-delta`, id, delta: part.text })
+    output.push({ type: `${kind}-end`, id })
   }
   output.push(finish(finishReason(step), step.usage ?? emptyUsage()))
   return output
@@ -255,6 +266,9 @@ const executeStream = (
 
 /** @experimental */
 export const text = (value: string): TextPart => ({ _tag: "Text", text: value })
+
+/** @experimental */
+export const reasoning = (value: string): ReasoningPart => ({ _tag: "Reasoning", text: value })
 
 /** @experimental */
 export const toolCall = (name: string, params: unknown, options: ToolCallOptions = {}): ToolCallPart => ({

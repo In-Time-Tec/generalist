@@ -120,7 +120,10 @@ const program = Effect.gen(function* () {
     path.join(consumerDirectory, "typecheck.ts"),
     `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}
 import { OAuth, McpToolSource } from "@batonfx/mcp"
+import { TestModel } from "@batonfx/test"
 import { Effect, Layer, Option, Redacted } from "effect"
+const reasoning: TestModel.ReasoningPart = TestModel.reasoning("package smoke")
+void reasoning
 const tokenStore: OAuth.TokenStoreInterface = {
   load: () => Effect.succeed(Option.none()),
   save: (_server, tokens) => Effect.sync(() => void Redacted.value(tokens)),

@@ -91,6 +91,44 @@ describe("TestModel", () => {
     }),
   )
 
+  it.effect("emits reasoning separately from assistant text and preserves it in the next prompt", () =>
+    Effect.gen(function* () {
+      const fixture = yield* TestModel.make([
+        TestModel.turn([
+          TestModel.reasoning("I should call echo"),
+          TestModel.toolCall("echo", { text: "reasoned" }, { id: "reasoning-call" }),
+        ]),
+        TestModel.turn([TestModel.reasoning("The tool answered"), TestModel.text("final answer")]),
+      ])
+      const events = yield* Agent.stream(Agent.make("reasoning-agent", { toolkit: echoToolkit }), {
+        prompt: "think",
+      }).pipe(
+        Stream.runCollect,
+        Effect.provide(Layer.merge(fixture.layer, echoToolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) }))),
+      )
+      const modelParts = events.filter((event) => event._tag === "ModelPart").map((event) => event.part)
+      const requests = yield* fixture.requests
+
+      expect(modelParts.map((part) => part.type)).toEqual([
+        "reasoning-start",
+        "reasoning-delta",
+        "reasoning-end",
+        "tool-call",
+        "finish",
+        "reasoning-start",
+        "reasoning-delta",
+        "reasoning-end",
+        "text-start",
+        "text-delta",
+        "text-end",
+        "finish",
+      ])
+      expect(events.find((event) => event._tag === "Completed")?.text).toBe("final answer")
+      expect(JSON.stringify(requests[1]?.prompt)).toContain('"text":"I should call echo"')
+      expect(JSON.stringify(requests[1]?.prompt)).toContain('"type":"reasoning"')
+    }),
+  )
+
   it.effect("decodes structured objects and rejects operation mismatches", () =>
     Effect.gen(function* () {
       const fixture = yield* TestModel.make([TestModel.object({ answer: "yes" }), TestModel.object({ bad: true })])
