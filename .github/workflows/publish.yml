@@ -136,7 +136,7 @@ jobs:
         run: |
           for tarball in release-artifacts/core.tgz release-artifacts/test.tgz release-artifacts/skills.tgz release-artifacts/memory.tgz release-artifacts/providers.tgz release-artifacts/mcp.tgz release-artifacts/transport.tgz release-artifacts/foldkit.tgz; do
             echo "--- npm publish --dry-run ${tarball}"
-            npm publish --access public --dry-run "$tarball"
+            npm publish --access public --dry-run "./$tarball"
           done
 
       - name: Upload verified packages
@@ -153,7 +153,7 @@ jobs:
         run: |
           for tarball in release-artifacts/core.tgz release-artifacts/test.tgz release-artifacts/skills.tgz release-artifacts/memory.tgz release-artifacts/providers.tgz release-artifacts/mcp.tgz release-artifacts/transport.tgz release-artifacts/foldkit.tgz; do
             echo "--- npm publish ${tarball}"
-            npm publish --access public "$tarball"
+            npm publish --access public "./$tarball"
           done
 
       - name: Tag release
