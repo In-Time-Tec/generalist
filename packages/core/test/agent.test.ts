@@ -2528,6 +2528,114 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ),
   )
 
+  it.effect("checkpoints completed sibling tool results before suspension and preserves them on resume", () => {
+    let suspendedTranscript: Prompt.Prompt | undefined
+    let ordinaryExecutions = 0
+    let suspendedExecutions = 0
+    let modelCalls = 0
+    let resumedPrompt = ""
+    const assertExchange = (prompt: Prompt.Prompt, expectedResultIds: ReadonlyArray<string>) => {
+      const assistantIndex = prompt.content.findIndex(
+        (message) =>
+          message.role === "assistant" &&
+          message.content.some((part) => part.type === "tool-call" && part.id === "tool-call-ordinary"),
+      )
+      expect(assistantIndex).toBeGreaterThanOrEqual(0)
+      const assistant = prompt.content[assistantIndex]
+      expect(assistant?.role).toBe("assistant")
+      if (assistant?.role !== "assistant") throw new Error("missing assistant tool calls")
+      expect(assistant.content.filter((part) => part.type === "tool-call").map((part) => part.id)).toEqual([
+        "tool-call-ordinary",
+        "tool-call-child",
+      ])
+      const resultIds: Array<string> = []
+      for (const message of prompt.content.slice(assistantIndex + 1)) {
+        if (message.role !== "tool") break
+        resultIds.push(...message.content.filter((part) => part.type === "tool-result").map((part) => part.id))
+      }
+      expect(resultIds).toEqual(expectedResultIds)
+    }
+    const executor = ToolExecutor.testLayer({
+      execute: (request) => {
+        if (request.call.id === "tool-call-ordinary") {
+          ordinaryExecutions += 1
+          return Effect.succeed({
+            _tag: "Success" as const,
+            result: { text: "README.md" },
+            encodedResult: { text: "README.md" },
+          })
+        }
+        suspendedExecutions += 1
+        return suspendedExecutions === 1
+          ? Effect.succeed({ _tag: "Suspend" as const, token: "wait-child" })
+          : Effect.succeed({
+              _tag: "Success" as const,
+              result: { text: "child complete" },
+              encodedResult: { text: "child complete" },
+            })
+      },
+    })
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "sibling-suspend-agent", toolkit: Toolkit.make(echoTool) })
+      const first = Agent.stream(agent, { prompt: "run ordinary and child tools" }).pipe(
+        Stream.tap((event) =>
+          Effect.sync(() => {
+            if (event._tag === "TurnCompleted") suspendedTranscript = event.transcript
+          }),
+        ),
+        Stream.runDrain,
+        Effect.flip,
+      )
+      const suspension = yield* first
+
+      expect(suspension._tag).toBe("@batonfx/core/AgentSuspended")
+      expect(suspendedTranscript).toBeDefined()
+      if (suspendedTranscript === undefined) return yield* Effect.die("missing suspension checkpoint")
+      assertExchange(suspendedTranscript, ["tool-call-ordinary"])
+      const checkpoint = JSON.stringify(suspendedTranscript?.content)
+      expect(checkpoint).toContain("tool-call-ordinary")
+      expect(checkpoint).toContain("README.md")
+      expect(checkpoint).toContain("tool-call-child")
+      expect(checkpoint).not.toContain("child complete")
+
+      const resumed = yield* Stream.runCollect(
+        Agent.stream(agent, {
+          prompt: "ignored",
+          history: suspendedTranscript,
+          resume: { call: { id: "tool-call-child", name: "echo", params: { text: "child" } } },
+        }),
+      )
+
+      expect(resumed.at(-1)?._tag).toBe("Completed")
+      expect(ordinaryExecutions).toBe(1)
+      expect(suspendedExecutions).toBe(2)
+      expect(resumedPrompt.match(/tool-call-ordinary/g)).toHaveLength(2)
+      expect(resumedPrompt.match(/README\.md/g)).toHaveLength(1)
+      expect(resumedPrompt.match(/tool-call-child/g)).toHaveLength(2)
+      expect(resumedPrompt.match(/child complete/g)).toHaveLength(1)
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            modelCalls += 1
+            if (modelCalls === 1) {
+              return Stream.fromIterable([
+                toolCallPart("tool-call-ordinary", "echo", { text: "ordinary" }),
+                toolCallPart("tool-call-child", "echo", { text: "child" }),
+              ])
+            }
+            assertExchange(options.prompt, ["tool-call-ordinary", "tool-call-child"])
+            resumedPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("completed after resume"))
+          }),
+          executor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
   it.effect("resumes a suspended run by executing the pending call first", () => {
     let calls = 0
     let sawOriginalPrompt = false

@@ -478,7 +478,7 @@ const streamInternal = <
             )
 
       const failSuspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "approval") =>
-        Stream.unwrap(savePersisted.pipe(Effect.as(Stream.fail<RunError>(suspended(call, token, reason)))))
+        Stream.fail<RunError>(suspended(call, token, reason))
 
       const state = {
         text: "",
@@ -1349,14 +1349,19 @@ const streamInternal = <
           const error = Cause.squash(cause)
           if (error instanceof AgentSuspended) {
             return Stream.unwrap(
-              Ref.get(chat.history).pipe(
-                Effect.map((transcript) =>
-                  Stream.concat(
-                    Stream.fromIterable<Event>([turnCompletedEvent(state.turn, transcript)]),
-                    Stream.failCause<RunError>(cause),
-                  ),
-                ),
-              ),
+              Effect.gen(function* () {
+                const transcript = yield* Ref.get(chat.history)
+                const checkpoint =
+                  state.pending.length === 0
+                    ? transcript
+                    : Prompt.concat(transcript, Prompt.fromResponseParts(state.pending))
+                yield* Ref.set(chat.history, checkpoint)
+                yield* savePersisted
+                return Stream.concat(
+                  Stream.fromIterable<Event>([turnCompletedEvent(state.turn, checkpoint)]),
+                  Stream.failCause<RunError>(cause),
+                )
+              }),
             )
           }
           return Stream.failCause<RunError>(cause)

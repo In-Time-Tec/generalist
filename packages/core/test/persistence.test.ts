@@ -220,6 +220,8 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
       const suspendedTranscript = yield* historyText("s1")
       // The assistant turn carrying the pending tool call survived to the store.
       expect(suspendedTranscript).toContain("tool-call-suspend")
+      expect(suspendedTranscript).toContain("tool-call-ordinary")
+      expect(suspendedTranscript).toContain("ordinary complete")
 
       const events = yield* Stream.runCollect(
         Agent.stream(agent, {
@@ -237,22 +239,33 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           modelLayer((options) => {
             calls += 1
             if (calls === 1) {
-              return Stream.make(toolCallPart("tool-call-suspend", "echo", { text: "hold" }))
+              return Stream.fromIterable([
+                toolCallPart("tool-call-ordinary", "echo", { text: "ordinary" }),
+                toolCallPart("tool-call-suspend", "echo", { text: "hold" }),
+              ])
             }
             // After resume, the model turn runs on the persisted chat and must
             // see the earlier user message from stored context.
-            resumeSawStoredContext = JSON.stringify(options.prompt.content).includes("please wait")
+            const content = JSON.stringify(options.prompt.content)
+            resumeSawStoredContext =
+              content.includes("please wait") && content.includes("ordinary complete") && content.includes("resumed")
             return Stream.make(textDelta("done after resume"))
           }),
           ToolExecutor.testLayer({
             execute: (request) =>
-              request.call.id === "tool-call-suspend" && JSON.stringify(request.call.params).includes("hold")
-                ? Effect.succeed({ _tag: "Suspend", token: "wait-token" })
-                : Effect.succeed({
+              request.call.id === "tool-call-ordinary"
+                ? Effect.succeed({
                     _tag: "Success",
-                    result: { echoed: request.call.params },
-                    encodedResult: { echoed: request.call.params },
-                  }),
+                    result: { text: "ordinary complete" },
+                    encodedResult: { text: "ordinary complete" },
+                  })
+                : request.call.id === "tool-call-suspend" && JSON.stringify(request.call.params).includes("hold")
+                  ? Effect.succeed({ _tag: "Suspend", token: "wait-token" })
+                  : Effect.succeed({
+                      _tag: "Success",
+                      result: { echoed: request.call.params },
+                      encodedResult: { echoed: request.call.params },
+                    }),
           }),
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
