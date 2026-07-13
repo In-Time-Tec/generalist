@@ -486,7 +486,6 @@ const streamInternal = <
         pending: [] as Array<PendingToolResult>,
         finish: undefined as { readonly usage: Response.Usage; readonly reason: Response.FinishReason } | undefined,
         usage: undefined as Response.Usage | undefined,
-        contextTokens: undefined as number | undefined,
       }
 
       const activatedSkillBodies = new Map<string, string>()
@@ -584,9 +583,8 @@ const streamInternal = <
         })
 
       const countTokens = (turn: number, prompt: Prompt.Prompt): Effect.Effect<number, AgentError> => {
-        if (state.contextTokens !== undefined) return Effect.succeed(state.contextTokens)
         return Option.match(tokenizerService, {
-          onNone: () => Effect.succeed(0),
+          onNone: () => Effect.succeed(Math.ceil(JSON.stringify(prompt.content).length / 4)),
           onSome: (tokenizer) =>
             tokenizer.tokenize(prompt).pipe(
               Effect.map((tokens) => tokens.length),
@@ -937,7 +935,6 @@ const streamInternal = <
             reason: part.reason,
           }
           state.usage = state.usage === undefined ? part.usage : addUsage(state.usage, part.usage)
-          state.contextTokens = part.usage.inputTokens.total ?? state.contextTokens
           Telemetry.addGenAIAnnotations(span, {
             operation: { name: "chat" },
             usage: {
