@@ -1234,7 +1234,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     )
   })
 
-  it.effect("measures the fully assembled prompt for each proactive compaction decision", () => {
+  it.effect("uses serialized prompt length without a Tokenizer after stale low provider usage", () => {
     let streamCalls = 0
     let secondPrompt = ""
     const measuredTokens: Array<number> = []
@@ -1285,7 +1285,6 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
                   : Option.none()
               }),
           }),
-          characterTokenizerLayer,
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
         ),
