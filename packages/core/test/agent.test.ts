@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Stream } from "effect"
-import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentEvent,
@@ -35,6 +35,14 @@ const modelLayer = (
       streamText,
     }),
   )
+
+const characterTokenizerLayer = Layer.succeed(
+  Tokenizer.Tokenizer,
+  Tokenizer.Tokenizer.of({
+    tokenize: (input) => Effect.succeed([...JSON.stringify(Prompt.make(input).content)].map((_, index) => index)),
+    truncate: (input) => Effect.succeed(Prompt.make(input)),
+  }),
+)
 
 const echoTool = Tool.make("echo", {
   description: "Echo input for tests",
@@ -1219,6 +1227,108 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               ),
           }),
           unusedExecutor,
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("uses serialized prompt length without a Tokenizer after stale low provider usage", () => {
+    let streamCalls = 0
+    let secondPrompt = ""
+    const measuredTokens: Array<number> = []
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "current-prompt-compaction-agent", toolkit: Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "short", compaction: { contextWindow: 200 } }),
+      )
+
+      expect(streamCalls).toBe(2)
+      expect(measuredTokens[0]).toBeLessThan(200)
+      expect(measuredTokens[1]).toBeGreaterThan(200)
+      expect(secondPrompt).toContain("threshold compaction")
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer((options) => {
+            streamCalls += 1
+            if (streamCalls === 1) {
+              return Stream.make(
+                toolCallPart("tool-call-current-prompt", "echo", { text: "expand" }),
+                finishPart("stop", usage({ total: 1 }, { total: 1 })),
+              )
+            }
+            secondPrompt = JSON.stringify(options.prompt.content)
+            return Stream.make(textDelta("done"))
+          }),
+          ToolExecutor.testLayer({
+            execute: () =>
+              Effect.succeed({
+                _tag: "Success",
+                result: "x".repeat(800),
+                encodedResult: "x".repeat(800),
+              }),
+          }),
+          Compaction.testLayer({
+            maybeCompact: (request) =>
+              Effect.sync(() => {
+                measuredTokens.push(request.usage.contextTokens)
+                return request.usage.contextTokens > 200
+                  ? Option.some({
+                      _tag: "Microcompact",
+                      history: Prompt.empty,
+                      prompt: Prompt.make("threshold compaction"),
+                    })
+                  : Option.none()
+              }),
+          }),
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+        ),
+      ),
+    )
+  })
+
+  it.effect("remeasures rebuilt context after compaction", () => {
+    let streamCalls = 0
+    const measuredTokens: Array<number> = []
+    return Effect.gen(function* () {
+      const agent = Agent.make({ name: "post-compaction-measurement-agent", toolkit: Toolkit.make(echoTool) })
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "x".repeat(800), compaction: { contextWindow: 10_000 } }),
+      )
+
+      expect(streamCalls).toBe(2)
+      expect(measuredTokens[0]).toBeGreaterThan(800)
+      expect(measuredTokens[1]).toBeLessThan(1_000)
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          modelLayer(() => {
+            streamCalls += 1
+            return streamCalls === 1
+              ? Stream.make(
+                  toolCallPart("tool-call-after-compaction", "echo", { text: "small" }),
+                  finishPart("stop", usage({ total: 9_999 }, { total: 1 })),
+                )
+              : Stream.make(textDelta("done"))
+          }),
+          echoExecutor,
+          Compaction.testLayer({
+            maybeCompact: (request) =>
+              Effect.sync(() => {
+                measuredTokens.push(request.usage.contextTokens)
+                return measuredTokens.length === 1
+                  ? Option.some({ _tag: "Microcompact", history: Prompt.empty, prompt: Prompt.make("compacted") })
+                  : Option.none()
+              }),
+          }),
+          characterTokenizerLayer,
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
         ),
