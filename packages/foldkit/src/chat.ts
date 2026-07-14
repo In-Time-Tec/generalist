@@ -864,11 +864,13 @@ export const subscriptions = make<Model, Message, AgentConnection>()((entry) => 
         return Stream.unwrap(
           AgentConnection.use((connection) => {
             const afterSeq = readDependencies().afterSeq
-            return Effect.succeed(
-              connection
-                .frames(afterSeq < 0 ? { sessionId } : { sessionId, afterSeq })
-                .pipe(Stream.map((incoming) => ReceivedAgent({ incoming }))),
-            )
+            return connection
+              .session(afterSeq < 0 ? { sessionId } : { sessionId, afterSeq })
+              .pipe(
+                Effect.map((sessionConnection) =>
+                  sessionConnection.frames.pipe(Stream.map((incoming) => ReceivedAgent({ incoming }))),
+                ),
+              )
           }),
         )
       },
