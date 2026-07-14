@@ -213,7 +213,7 @@ Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, 
 
 ## Integrations
 
-- **MCP** arrives via `@batonfx/mcp`, not Baton core. The bridge converts an MCP server's tools into `Ai.Tool.dynamic` values (a toolkit Baton consumes as-is) plus a `ToolExecutor` layer (`@batonfx/mcp/baton`) that proxies calls to the server. Each `tools/call` passes the fiber's `AbortSignal` and the optional configured `callTimeout` as SDK `RequestOptions`, so interrupting a run aborts the in-flight request and a hung server cannot wedge the loop. Baton core keeps its `effect`-only dependency rule; the MCP SDK dependency lives entirely in `@batonfx/mcp`.
+- **MCP** arrives via `@batonfx/mcp`, not Baton core. The `@batonfx/mcp/baton` `route` acquires one scoped connection and returns `BatonTools`: the `Ai.Tool.dynamic` toolkit Baton consumes as-is plus a ready-to-provide `ToolExecutor` layer that proxies calls to the same server. Each `tools/call` passes the fiber's `AbortSignal` and the optional configured `callTimeout` as SDK `RequestOptions`, so interrupting a run aborts the in-flight request and a hung server cannot wedge the loop. Connection failures stay typed on route acquisition; MCP call errors become structured failed tool results so the Agent can continue. Baton core keeps its `effect`-only dependency rule; the MCP SDK dependency lives entirely in `@batonfx/mcp`.
 - **Transport** arrives via `@batonfx/transport`, not Baton core. It converts `AgentEvent` streams into replayable wire frames and owns an in-process `SessionRegistry`; durable registries remain host-side.
 
 ## Composing with a durable runtime
@@ -237,6 +237,7 @@ Baton is designed to be composed behind a durable runtime's own agent-loop inter
 - `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
 - `docs/spec/decisions/ADR-0027-memory-item-user-content.md`
+- `docs/spec/decisions/ADR-0028-scoped-mcp-baton-tools.md`
 - `docs/spec/02-session-event-log.md`
 - `docs/spec/03-instructions-and-context-epoch.md`
 - `docs/spec/04-permissions-policy.md`
@@ -247,4 +248,5 @@ Baton is designed to be composed behind a durable runtime's own agent-loop inter
 - `docs/spec/09-memory.md`
 - `docs/spec/10-multi-agent.md`
 - `docs/spec/11-transport.md`
+- `docs/spec/16-mcp-baton-tools.md`
 - `README.md`

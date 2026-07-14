@@ -10,17 +10,6 @@ import { OAuthPendingError, OAuthProviderError } from "./oauth.js"
 export type JsonValue = Schema.Json
 
 /** @experimental */
-export type McpAiTool = Tool.Dynamic<
-  string,
-  {
-    readonly parameters: JsonSchema
-    readonly success: typeof Schema.Unknown
-    readonly failure: typeof Schema.String
-    readonly failureMode: "return"
-  }
->
-
-/** @experimental */
 export type McpTransport =
   | {
       readonly kind: "stdio"
@@ -52,6 +41,23 @@ export class McpToolCallError extends Schema.TaggedErrorClass<McpToolCallError>(
   tool: Schema.String,
   message: Schema.String,
 }) {}
+
+/** @experimental */
+export const McpToolFailure = Schema.Struct(McpToolCallError.fields)
+
+/** @experimental */
+export type McpToolFailure = typeof McpToolFailure.Type
+
+/** @experimental */
+export type McpAiTool = Tool.Dynamic<
+  string,
+  {
+    readonly parameters: JsonSchema
+    readonly success: typeof Schema.Unknown
+    readonly failure: typeof Schema.String | typeof McpToolFailure
+    readonly failureMode: "return"
+  }
+>
 
 /** @experimental */
 export interface DiscoveredTool {
@@ -98,18 +104,26 @@ const joinedText = (content: unknown): string => {
     .join("\n")
 }
 
-const jsonValue = (value: unknown): JsonValue => Schema.decodeUnknownSync(Schema.Json)(value)
-
 const discoveredTool = (
   server: string,
   tool: { name: string; description?: string | undefined; inputSchema: unknown; outputSchema?: unknown },
-): DiscoveredTool => ({
-  name: `${server}_${tool.name}`,
-  rawName: tool.name,
-  description: tool.description ?? "",
-  inputSchema: jsonValue(tool.inputSchema),
-  outputSchema: tool.outputSchema === undefined ? {} : jsonValue(tool.outputSchema),
-})
+): Effect.Effect<DiscoveredTool, McpConnectionError> =>
+  Effect.all({
+    inputSchema: Schema.decodeUnknownEffect(Schema.Json)(tool.inputSchema),
+    outputSchema:
+      tool.outputSchema === undefined
+        ? Effect.succeed<JsonValue>({})
+        : Schema.decodeUnknownEffect(Schema.Json)(tool.outputSchema),
+  }).pipe(
+    Effect.mapError((error) => McpConnectionError.make({ server, message: error.message })),
+    Effect.map(({ inputSchema, outputSchema }) => ({
+      name: `${server}_${tool.name}`,
+      rawName: tool.name,
+      description: tool.description ?? "",
+      inputSchema,
+      outputSchema,
+    })),
+  )
 
 const callArguments = (input: JsonValue): Record<string, unknown> | undefined =>
   typeof input === "object" && input !== null && !Array.isArray(input) ? (input as Record<string, unknown>) : undefined
@@ -119,7 +133,7 @@ const aiToolFromDiscovered = (tool: DiscoveredTool): McpAiTool =>
     description: tool.description,
     parameters: tool.inputSchema as JsonSchema,
     success: Schema.Unknown,
-    failure: Schema.String,
+    failure: McpToolFailure,
     failureMode: "return",
   })
 
@@ -151,9 +165,8 @@ export const fromTransport: {
         try: () => client.listTools(),
         catch: (error) => connectionError(name, error),
       })
-      const discovered = yield* Ref.make<ReadonlyArray<DiscoveredTool>>(
-        listed.tools.map((tool) => discoveredTool(name, tool)),
-      )
+      const discoveredTools = yield* Effect.forEach(listed.tools, (tool) => discoveredTool(name, tool))
+      const discovered = yield* Ref.make<ReadonlyArray<DiscoveredTool>>(discoveredTools)
 
       const callTimeoutMillis = options?.callTimeout === undefined ? undefined : Duration.toMillis(options.callTimeout)
 
@@ -177,7 +190,13 @@ export const fromTransport: {
                 }),
               )
             }
-            if (result.structuredContent !== undefined) return Effect.succeed(jsonValue(result.structuredContent))
+            if (result.structuredContent !== undefined) {
+              return Schema.decodeUnknownEffect(Schema.Json)(result.structuredContent).pipe(
+                Effect.mapError((error) =>
+                  McpToolCallError.make({ server: name, tool: rawName, message: error.message }),
+                ),
+              )
+            }
             return Effect.succeed<JsonValue>(joinedText(result.content))
           }),
         )

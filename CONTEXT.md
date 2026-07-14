@@ -24,6 +24,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - **TestModel**: the scripted Effect AI language model in `@batonfx/test`. A stateful fixture owns one atomic response cursor, captures normalized provider requests, and exposes direct and `ModelRegistry` layers for deterministic prompt, tool, steering, queue, compaction, structured-output, and retry tests without credentials.
 - **ModelCatalog**: the optional provider-package service for static model metadata such as context windows, output limits, pricing, and modalities. It lives in `@batonfx/providers`; core never depends on it.
 - **MCP OAuth**: the `@batonfx/mcp` authorization lifecycle for authenticated remote servers. Baton owns discovery, PKCE, callback exchange, refresh integration, and typed failures; hosts own browser/callback UI and redacted token persistence.
+- **MCP BatonTools**: the scoped `@batonfx/mcp/baton` route result that keeps one discovered toolkit, its Effect AI handlers, the Baton `ToolExecutor` layer, and the owning MCP connection lifetime together.
 - **ModelResilience**: the optional model-call retry seam. It classifies live model-call failures as `transient` or `terminal` and supplies the retry schedule applied inside a single model call; streamed turns retry only before any part has been emitted.
 - **ModelMiddleware**: the interceptor seam for everything going into (`transformPrompt`) or out of (`transformPart`) the model — PII scrubbing, prompt-injection screening, output filtering, logging. Ships a `layerIdentity` default and no built-in filters.
 - **Guardrail**: ergonomic `ModelMiddleware.Middleware` combinators for input validation, prompt/output regex redaction, and output filtering. Guardrails are not a separate subsystem; they compose through `ModelMiddleware.layer([...])`.
@@ -72,3 +73,4 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Providers contract: `docs/spec/08-providers.md`
 - Memory contract: `docs/spec/09-memory.md`
 - Deterministic test-kit contract: `docs/spec/13-test-kit.md`
+- MCP Baton tools contract: `docs/spec/16-mcp-baton-tools.md`

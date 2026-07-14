@@ -12,11 +12,9 @@ export const mcp = definePage({
   content: [
     p(
       code("@batonfx/mcp"),
-      " connects to an MCP server, discovers its tools, and exposes them in two pieces: ",
-      code("BatonMcp.toolkit(source)"),
-      " builds the toolkit the model sees, and ",
-      code("BatonMcp.toolExecutorLayer(source)"),
-      " proxies tool calls to the server instead of local handlers. The bridge keeps MCP SDK dependencies out of ",
+      " connects to an MCP server, discovers its tools, and exposes one scoped ",
+      code("route"),
+      " containing the toolkit the model sees and the executor layer that proxies calls to the same connection. The bridge keeps MCP SDK dependencies out of ",
       code("@batonfx/core"),
       ".",
     ),
@@ -24,7 +22,9 @@ export const mcp = definePage({
     h2("connect-to-a-server", "1. Connect to a server"),
     p(
       code("McpToolSource.layer"),
-      " opens the connection, lists the tools once, and closes the client when the layer's scope ends. Discovered tool names are prefixed with the source name: a ",
+      " remains the lower-level source API. The usual ",
+      code("route"),
+      " API opens the connection, lists the tools once, and closes the client when its Effect scope ends. Discovered tool names are prefixed with the source name: a ",
       code("search"),
       " tool on the ",
       code("files"),

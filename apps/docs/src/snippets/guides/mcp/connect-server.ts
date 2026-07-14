@@ -1,22 +1,18 @@
 import { Config, Console, Effect, Layer } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "@batonfx/core"
-import { McpToolSource } from "@batonfx/mcp"
-import { toolkit, toolkitLayer } from "@batonfx/mcp/baton"
+import { route } from "@batonfx/mcp/baton"
 import { OpenRouter } from "@batonfx/providers"
 
-const sourceLayer = McpToolSource.layer({
-  name: "files",
-  transport: { kind: "stdio", command: "bunx", args: ["@modelcontextprotocol/server-filesystem", "."] },
-  callTimeout: "30 seconds",
-})
-
 const program = Effect.gen(function* () {
-  const source = yield* McpToolSource.McpToolSource
-  const mcpToolkit = yield* toolkit(source)
+  const tools = yield* route({
+    name: "files",
+    transport: { kind: "stdio", command: "bunx", args: ["@modelcontextprotocol/server-filesystem", "."] },
+    callTimeout: "30 seconds",
+  })
   const agent = Agent.make({
     name: "file-agent",
     instructions: "Use the filesystem tools to answer.",
-    toolkit: mcpToolkit,
+    toolkit: tools.toolkit,
   })
   const result = yield* ModelRegistry.provide(
     { provider: "openrouter", model: "openai/gpt-4o-mini" },
@@ -28,13 +24,13 @@ const program = Effect.gen(function* () {
           model: "openai/gpt-4o-mini",
           apiKey: Config.redacted("OPENROUTER_API_KEY"),
         }),
-        toolkitLayer(source),
+        tools.executorLayer,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
     ),
   )
   yield* Console.log(result.text)
-}).pipe(Effect.provide(sourceLayer))
+}).pipe(Effect.scoped)
 
 await Effect.runPromise(program)

@@ -24,7 +24,8 @@ SPEC.md
 │  ├─ 12-foldkit-adapter.md                    FoldKit resource/subscription/chat adapter contract
 │  ├─ 13-test-kit.md                           deterministic scripted model and capture contract
 │  ├─ 14-package-distribution.md               compiled artifacts and release verification
-│  └─ 15-mcp-oauth.md                           MCP OAuth lifecycle and host token boundary
+│  ├─ 15-mcp-oauth.md                           MCP OAuth lifecycle and host token boundary
+│  └─ 16-mcp-baton-tools.md                     scoped MCP connection and Baton tool integration
 └─ docs/spec/decisions/
    ├─ ADR-0001-baton-standalone-agent-framework.md
    ├─ ADR-0002-tool-context-output-spill.md
@@ -52,7 +53,8 @@ SPEC.md
    ├─ ADR-0024-public-api-import-and-layer-conventions.md
    ├─ ADR-0025-authoritative-transformed-response.md
    ├─ ADR-0026-working-memory-summary-model.md
-   └─ ADR-0027-memory-item-user-content.md
+   ├─ ADR-0027-memory-item-user-content.md
+   └─ ADR-0028-scoped-mcp-baton-tools.md
 ```
 
 ## Packages
@@ -85,6 +87,7 @@ SPEC.md
 - Deterministic test-kit contract: `docs/spec/13-test-kit.md`
 - Package distribution contract: `docs/spec/14-package-distribution.md`
 - MCP OAuth contract: `docs/spec/15-mcp-oauth.md`
+- MCP Baton tools contract: `docs/spec/16-mcp-baton-tools.md`
 
 ## Decisions
 
@@ -115,3 +118,4 @@ SPEC.md
 - ADR-0025 — Authoritative Transformed Response: `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
 - ADR-0026 — Working-memory Summary Model Composition: `docs/spec/decisions/ADR-0026-working-memory-summary-model.md`
 - ADR-0027 — Memory Item User Content: `docs/spec/decisions/ADR-0027-memory-item-user-content.md`
+- ADR-0028 — Scoped MCP Baton Tools: `docs/spec/decisions/ADR-0028-scoped-mcp-baton-tools.md`

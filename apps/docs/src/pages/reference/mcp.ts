@@ -22,7 +22,10 @@ export const mcpReference = definePage({
       ["Subpath", "Contents"],
       [
         [[code(".")], ["Namespace ", code("McpToolSource")]],
-        [[code("./baton")], [code("toolkit(source)"), " and ", code("toolExecutorLayer(source)")]],
+        [
+          [code("./baton")],
+          [code("route(options)"), ", ", code("toolkit(source)"), " and ", code("toolkitLayer(source)")],
+        ],
       ],
     ),
     h2("mcp-tool-source", "McpToolSource"),
@@ -75,24 +78,26 @@ export const mcpReference = definePage({
     table(
       ["Export", "Notes"],
       [
+        [
+          [code("route({ name, transport, callTimeout? })")],
+          [
+            "Scoped acquisition returning ",
+            code("BatonTools { toolkit, executorLayer }"),
+            ". The executor layer installs both handlers and ",
+            code("ToolExecutor"),
+          ],
+        ],
         [[code("toolkit(source)")], ["Discovered MCP tools as an ", code("Ai.Toolkit"), " for ", code("Agent.make")]],
         [
-          [code("toolExecutorLayer(source)")],
+          [code("toolkitLayer(source)")],
           [
-            "A ",
-            code("ToolExecutor"),
-            " that proxies calls to the MCP server. Outcomes are ",
-            code("Success"),
-            " or ",
-            code("Failure"),
-            "; MCP tools never ",
-            code("Suspend"),
+            "Lower-level Effect AI handlers for an already acquired source. Structured MCP failures retain their tag, server, tool, and message fields",
           ],
         ],
       ],
     ),
     p(
-      "Pair the two: the toolkit tells the model what exists, the executor routes the calls. See ",
+      "Prefer route so the toolkit, handlers, executor, and connection lifetime cannot drift. Use the lower-level exports only when the host already owns the source. See ",
       link("/docs/guides/mcp", "How to use MCP servers as tool sources"),
       ".",
     ),

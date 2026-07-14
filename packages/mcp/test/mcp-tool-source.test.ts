@@ -27,13 +27,19 @@ describe("McpToolSource", () => {
         const tools = yield* source.tools
 
         expect(source.server).toBe("calc")
-        expect(tools.map((tool) => tool.name)).toEqual(["calc_add", "calc_stats", "calc_boom", "calc_hang"])
+        expect(tools.map((tool) => tool.name)).toEqual([
+          "calc_add",
+          "calc_barrier_add",
+          "calc_stats",
+          "calc_boom",
+          "calc_hang",
+        ])
         const add = tools[0]
         expect(add?.rawName).toBe("add")
         expect(add?.description).toBe("Add two numbers")
         expect(add?.inputSchema).toEqual(addInputSchema)
         expect(add?.outputSchema).toEqual({})
-        expect(tools[1]?.outputSchema).toEqual(statsOutputSchema)
+        expect(tools[2]?.outputSchema).toEqual(statsOutputSchema)
       }),
     ),
   )
@@ -44,7 +50,13 @@ describe("McpToolSource", () => {
         const { source } = yield* makeFixture
         const aiTools = yield* source.aiTools
 
-        expect(aiTools.map((tool) => tool.name)).toEqual(["calc_add", "calc_stats", "calc_boom", "calc_hang"])
+        expect(aiTools.map((tool) => tool.name)).toEqual([
+          "calc_add",
+          "calc_barrier_add",
+          "calc_stats",
+          "calc_boom",
+          "calc_hang",
+        ])
         const add = aiTools[0]
         expect(add === undefined ? undefined : Tool.getDescription(add)).toBe("Add two numbers")
         expect(add === undefined ? undefined : Tool.getJsonSchema(add)).toEqual(addInputSchema)

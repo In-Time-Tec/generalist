@@ -1,15 +1,28 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer } from "effect"
-import { toolkit, toolkitLayer } from "../src/baton"
-import { makeFixture } from "./fixture"
+import { Agent, Approvals, ModelMiddleware, Response, ToolContext, ToolExecutor } from "@batonfx/core"
+import { TestModel } from "@batonfx/test"
+import { Context, Effect, Layer, Schema, Stream } from "effect"
+import { route, toolkit, toolkitLayer } from "../src/baton"
+import { McpToolSource } from "../src/index"
+import { makeFixture, makeTransportFixture } from "./fixture"
 
 describe("baton adapter", () => {
+  it("exports the complete scoped route", () => {
+    expect(typeof route).toBe("function")
+  })
+
   it.effect("exposes discovered tools as a toolkit", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const { source } = yield* makeFixture
         const kit = yield* toolkit(source)
-        expect(Object.keys(kit.tools).toSorted()).toEqual(["calc_add", "calc_boom", "calc_hang", "calc_stats"])
+        expect(Object.keys(kit.tools).toSorted()).toEqual([
+          "calc_add",
+          "calc_barrier_add",
+          "calc_boom",
+          "calc_hang",
+          "calc_stats",
+        ])
       }),
     ),
   )
@@ -35,5 +48,122 @@ describe("baton adapter", () => {
         expect(error.message).toContain("boom failed")
       }),
     ),
+  )
+
+  it.effect("runs an Agent through a discovered MCP tool and owns the connection scope", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeTransportFixture
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const tools = yield* route({ name: "calc", transport: fixture.transport })
+          const model = yield* TestModel.make([
+            TestModel.toolCall("calc_add", { a: 20, b: 22 }, { id: "add-1" }),
+            TestModel.text("the answer is 42"),
+          ])
+          const agent = Agent.make({ name: "mcp-agent", toolkit: tools.toolkit })
+          const services = yield* Layer.build(
+            Layer.mergeAll(model.layer, tools.executorLayer, Approvals.autoApprove, ModelMiddleware.layerIdentity),
+          )
+          const result = yield* Agent.generate(agent, { prompt: "add the numbers" }).pipe(Effect.provide(services))
+          const prompts = yield* model.prompts
+          const secondPrompt = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(prompts[1])
+
+          expect(result.text).toBe("the answer is 42")
+          expect(secondPrompt).toContain("42")
+          expect(fixture.closes.count).toBe(0)
+        }),
+      )
+      expect(fixture.closes.count).toBeGreaterThanOrEqual(1)
+    }),
+  )
+
+  it.effect("preserves structured MCP failures as failed Agent tool results", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fixture = yield* makeTransportFixture
+        const tools = yield* route({ name: "calc", transport: fixture.transport })
+        const model = yield* TestModel.make([
+          TestModel.toolCall("calc_boom", {}, { id: "boom-1" }),
+          TestModel.text("recovered from the tool failure"),
+        ])
+        const agent = Agent.make({ name: "mcp-agent", toolkit: tools.toolkit })
+        const services = yield* Layer.build(
+          Layer.mergeAll(model.layer, tools.executorLayer, Approvals.autoApprove, ModelMiddleware.layerIdentity),
+        )
+        const events = yield* Agent.stream(agent, { prompt: "call boom" }).pipe(
+          Stream.runCollect,
+          Effect.provide(services),
+        )
+        const completed = events.find((event) => event._tag === "ToolExecutionCompleted")
+
+        expect(completed?._tag).toBe("ToolExecutionCompleted")
+        if (completed?._tag === "ToolExecutionCompleted") {
+          expect(completed.result.isFailure).toBe(true)
+          expect(completed.result.result).toEqual({
+            error: '{"_tag":"McpToolCallError","server":"calc","tool":"boom","message":"boom failed"}',
+          })
+        }
+        const final = events.at(-1)
+        expect(final?._tag === "Completed" && final.text).toBe("recovered from the tool failure")
+      }),
+    ),
+  )
+
+  it.effect("supports concurrent calls through one routed executor", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fixture = yield* makeTransportFixture
+        const tools = yield* route({ name: "calc", transport: fixture.transport })
+        const services = yield* Layer.build(Layer.mergeAll(tools.executorLayer, ToolContext.layerDefault))
+        const executor = Context.get(services, ToolExecutor.ToolExecutor)
+        const execute = (id: string, a: number, b: number) =>
+          executor
+            .execute({
+              call: Response.makePart("tool-call", {
+                id,
+                name: "calc_barrier_add",
+                params: { a, b },
+                providerExecuted: false,
+              }),
+              turn: 0,
+              agentName: "concurrent-agent",
+              sessionId: "concurrent-session",
+            })
+            .pipe(Effect.provide(services))
+        const outcomes = yield* Effect.all([execute("add-1", 20, 22), execute("add-2", 19, 23)], {
+          concurrency: 2,
+        })
+
+        expect(outcomes).toEqual([
+          { _tag: "Success", result: "42", encodedResult: "42" },
+          { _tag: "Success", result: "42", encodedResult: "42" },
+        ])
+        expect(fixture.concurrent.max).toBe(2)
+      }),
+    ),
+  )
+
+  it.effect("recognizes a custom SDK transport before declarative kind metadata", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fixture = yield* makeTransportFixture
+        const transport = Object.assign(fixture.transport, { kind: "http" as const })
+        const tools = yield* route({ name: "calc", transport })
+
+        expect(Object.keys(tools.toolkit.tools)).toContain("calc_add")
+      }),
+    ),
+  )
+
+  it.effect("keeps transport construction failures typed on route acquisition", () =>
+    Effect.gen(function* () {
+      const error = yield* route({ name: "broken", transport: { kind: "http", url: "://invalid" } }).pipe(
+        Effect.scoped,
+        Effect.flip,
+      )
+
+      expect(error).toBeInstanceOf(McpToolSource.McpConnectionError)
+      if (error._tag === "McpConnectionError") expect(error.server).toBe("broken")
+    }),
   )
 })

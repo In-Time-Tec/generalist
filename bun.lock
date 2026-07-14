@@ -245,6 +245,7 @@
         "effect": "catalog:",
       },
       "devDependencies": {
+        "@batonfx/test": "workspace:*",
         "@effect/vitest": "catalog:",
         "@types/bun": "catalog:",
         "typescript": "catalog:",
