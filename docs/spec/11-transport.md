@@ -16,7 +16,7 @@ Baton does not own durable storage, cross-process sessions, multiplexing, EventS
 
 Consumers canonically import `Client`, `Errors`, `SessionRegistry`, `Sse`, `Wire`, and `Ws` from `@batonfx/transport`. The established transport subpaths remain compatibility imports exposing the same module surfaces under ADR-0024.
 
-`SessionRegistry` remains the public transport facade. Its in-memory implementation privately separates deterministic run, queue, approval, interruption, and close coordination from the per-session frame journal that owns sequence allocation, bounded replay, subscriber delivery, and snapshot replay plans. These collaborators are implementation details rather than additional `Context` services. Core `SessionStore` neither supplies nor consumes this transport state.
+`SessionRegistry` remains the public transport facade. Its in-memory implementation privately separates deterministic run, queue, approval, interruption, and close coordination from the per-session frame journal that owns sequence allocation, bounded replay, subscriber delivery, transcript versions, and snapshot replay plans. Each open session also owns a reference to the persisted `Chat` instance used by its active run, so terminal failure and interruption can publish the chat's finalized local history without a second persistence lookup. These collaborators are implementation details rather than additional `Context` services. Core `SessionStore` neither supplies nor consumes this transport state.
 
 ## Wire contract
 
@@ -48,7 +48,11 @@ When `stripTranscripts` is true, `TurnCompleted` and `Completed` event frames om
 
 Approval resolution has priority over queued ordinary prompts. A prompt accepted while a session is suspended remains queued until the matching approval is resolved and the resumed run reaches a terminal outcome. Failed and interrupted runs retain accepted prompts and start the next one. An idle sweep does not evict a session with accepted queued work. Releasing the registry layer interrupts active runs and drops pending prompts because Baton transport queues are explicitly non-durable.
 
-`attach(sessionId, afterSeq?)` replays ring-buffered frames with `seq > afterSeq`, then streams live frames. If `afterSeq` predates the ring floor, the attachment receives a subscriber-local `Snapshot` frame for the persisted transcript before live frames. Snapshots are not inserted into the shared ring.
+`attach(sessionId, afterSeq?)` captures one journal-owned replay boundary, replays frames with `seq > afterSeq`, then streams live frames. Opening a session acquires its persisted chat and reads the initial transcript before constructing the journal. Each run refreshes that chat through persistence before model execution, preserving updates from another session or writer that shares the `chatId`, and records the exact instance used by the run. Thereafter every frame publication advances an immutable replay point containing the latest loop-published transcript and the new frame sequence; `TurnCompleted` and `Completed` publish their transcript in the same serialized transition as their frame. Failure and interruption read the already-finalized active chat `Ref` before terminal frame publication and publish that transcript with the first terminal frame. Attachment never reads external persistence after capturing a frame sequence.
+
+The replay origin is `afterSeq`, or `-1` when the cursor is omitted. The origin is available only when the journal can prove that every strictly newer frame is retained. A future cursor, a cursor predating the ring floor, a cursorless attach after truncation, and an empty frame journal opened over pre-existing history are unavailable origins. For an unavailable origin, attachment emits a subscriber-local `Snapshot` from the captured replay point followed only by frames with a strictly greater sequence. Subscriber registration and replay capture are one serialized transition, so publication concurrent with attachment appears exactly once either in the captured boundary or in the subscriber queue. Snapshots are not inserted into the shared ring.
+
+The journal lock protects only in-memory sequence, transcript, ring, and subscriber state. Persistence reads complete before journal construction, and transcript values supplied by loop events or the session-owned chat `Ref` are already materialized, so no persistence integration runs while a journal transition is held open. Persistence failures from `open` and journal capture failures remain `SessionError` values.
 
 `resolveApproval` resumes only a suspended approval with a matching token. `Approved` re-enters with a one-shot approvals override that approves the suspended call. `Denied` re-enters with a one-shot denial so the model receives the same failed tool-result path as core approval denial. Tool-wait suspension is surfaced as `Suspended` but not resolved by this client frame.
 
@@ -100,7 +104,7 @@ One socket has immutable authority for at most one session. It begins `Unattache
 
 ## Client contract
 
-The default client decodes server frames with `Wire.LooseServerFrame`, so browser clients can display unknown tool-call and tool-result names without importing the server toolkit. Hosts that need strict decoding can add their own decode layer around the wire schema.
+The default client decodes server frames with `Wire.LooseServerFrame`, so browser clients can display unknown tool-call and tool-result names without importing the server toolkit. Hosts that need strict decoding can add their own decode layer around the wire schema. A `Snapshot` is an authoritative replay reset and is applied before ordinary sequence deduplication, including when its sequence is `-1` for pre-existing history or lower than an unavailable future cursor.
 
 The WebSocket client reconnects with bounded exponential backoff while its scope is open. On every connection it sends `Attach { sessionId, afterSeq }`, where `afterSeq` is the last seen server frame `seq` when available. It does not buffer commands while disconnected; `send` fails with `TransportError` unless a writer is currently open.
 

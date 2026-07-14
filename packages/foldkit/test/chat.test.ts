@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Exit, Layer, Option, Schema, Stream } from "effect"
-import { Response } from "effect/unstable/ai"
+import { Prompt, Response } from "effect/unstable/ai"
 import { Errors, Wire } from "@batonfx/transport"
 import { Chat, Connection } from "../src/index"
 
@@ -95,6 +95,25 @@ describe("Chat", () => {
     expect(next).toEqual(model)
     expect(commands).toEqual([])
     expect(Option.isNone(out)).toBe(true)
+  })
+
+  it("applies authoritative snapshots before ordinary sequence deduplication", () => {
+    const initial = Chat.initialModel("s-chat")
+    const [fromInitial] = updateWith(initial, {
+      _tag: "Snapshot",
+      seq: -1,
+      transcript: Prompt.make("persisted history"),
+    })
+    expect(fromInitial.entries).toEqual([Chat.UserEntry({ text: "persisted history" })])
+
+    const future = { ...fromInitial, lastSeq: 5 }
+    const [recovered] = updateWith(future, {
+      _tag: "Snapshot",
+      seq: 2,
+      transcript: Prompt.make("authoritative history"),
+    })
+    expect(recovered.lastSeq).toBe(2)
+    expect(recovered.entries).toEqual([Chat.UserEntry({ text: "authoritative history" })])
   })
 
   it("surfaces approval suspension and emits approval commands", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scheduler, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
@@ -375,6 +375,123 @@ describe("SessionRegistry.layerMemory", () => {
         }).pipe(Layer.provide(dependencies(() => assistantText("reply", "snap")))),
       ),
     ),
+  )
+
+  it.effect("cursorless attachment after truncation starts with a complete snapshot", () =>
+    Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-cursorless-snapshot" }))
+      const first = yield* collectThroughEnded("s-cursorless-snapshot").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.send("s-cursorless-snapshot", "complete prompt"),
+      )
+      yield* Fiber.join(first)
+
+      const replay = yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.attach("s-cursorless-snapshot").pipe(Stream.take(1), Stream.runCollect),
+      )
+
+      expect(replay[0]?._tag).toBe("Snapshot")
+      const content =
+        replay[0]?._tag === "Snapshot"
+          ? yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(replay[0].transcript.content)
+          : ""
+      expect(content).toContain("complete prompt")
+    }).pipe(
+      provideTestLayer(
+        SessionRegistry.layerMemory({
+          agent: Agent.make({ name: "cursorless-snapshot-agent" }),
+          ringBufferCapacity: 2,
+          stripTranscripts: true,
+        }).pipe(Layer.provide(dependencies(() => assistantText("reply", "complete reply")))),
+      ),
+    ),
+  )
+
+  it.effect("failed runs snapshot the accepted prompt and emitted response at the terminal boundary", () =>
+    Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-failed-snapshot" }))
+      const ended = yield* collectThroughEnded("s-failed-snapshot").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-failed-snapshot", "failed prompt"))
+      yield* Fiber.join(ended)
+
+      const replay = yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.attach("s-failed-snapshot").pipe(Stream.take(1), Stream.runCollect),
+      )
+      expect(replay[0]?._tag).toBe("Snapshot")
+      const content =
+        replay[0]?._tag === "Snapshot"
+          ? yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(replay[0].transcript.content)
+          : ""
+      expect(content).toContain("failed prompt")
+      expect(content).toContain("partial response")
+    }).pipe(
+      provideTestLayer(
+        SessionRegistry.layerMemory({
+          agent: Agent.make({ name: "failed-snapshot-agent" }),
+          ringBufferCapacity: 0,
+          stripTranscripts: true,
+        }).pipe(
+          Layer.provide(
+            dependencies(() =>
+              Stream.concat(
+                assistantText("partial", "partial response"),
+                Stream.fail(
+                  AiError.make({
+                    module: "SessionRegistryTest",
+                    method: "streamText",
+                    reason: AiError.UnknownError.make({ description: "model failed" }),
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  )
+
+  it.effect("refreshes persisted history between sessions that share a chat", () =>
+    Effect.gen(function* () {
+      const prompts = yield* Ref.make<ReadonlyArray<string>>([])
+      let modelCalls = 0
+      yield* Effect.gen(function* () {
+        yield* SessionRegistry.SessionRegistry.use((registry) =>
+          registry.open({ sessionId: "s-shared-first", chatId: "shared-chat" }),
+        )
+        yield* SessionRegistry.SessionRegistry.use((registry) =>
+          registry.open({ sessionId: "s-shared-second", chatId: "shared-chat" }),
+        )
+
+        const firstEnded = yield* collectThroughEnded("s-shared-first").pipe(Effect.forkChild)
+        yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-shared-first", "first shared"))
+        yield* Fiber.join(firstEnded)
+
+        const secondEnded = yield* collectThroughEnded("s-shared-second").pipe(Effect.forkChild)
+        yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-shared-second", "second shared"))
+        yield* Fiber.join(secondEnded)
+
+        const recorded = yield* Ref.get(prompts)
+        expect(recorded[1]).toContain("first shared")
+        expect(recorded[1]).toContain("first reply")
+        expect(recorded[1]).toContain("second shared")
+      }).pipe(
+        provideTestLayer(
+          baseLayers(Agent.make({ name: "shared-chat-agent" }), (options) => {
+            modelCalls += 1
+            const reply = modelCalls === 1 ? "first reply" : "second reply"
+            return Stream.concat(
+              Stream.fromEffect(
+                Schema.encodeEffect(Schema.UnknownFromJsonString)(options.prompt.content).pipe(
+                  Effect.orDie,
+                  Effect.flatMap((prompt) => Ref.update(prompts, (current) => [...current, prompt])),
+                ),
+              ).pipe(Stream.drain),
+              assistantText(`shared-${modelCalls}`, reply),
+            )
+          }),
+        ),
+      )
+    }),
   )
 
   it.effect("interrupt cancels an active run and finalizes session state", () => {

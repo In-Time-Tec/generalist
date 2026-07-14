@@ -1,4 +1,5 @@
 import { Effect, Option, Queue, Ref, Semaphore } from "effect"
+import { Prompt } from "effect/unstable/ai"
 import { SessionError, SubscriberLagged } from "./session-registry-errors.js"
 import type { LooseServerFrameType } from "./wire.js"
 
@@ -10,15 +11,21 @@ export type FrameWithoutSeq = LooseServerFrameType extends infer Frame
 
 export type SubscriberQueue = Queue.Queue<LooseServerFrameType, SessionError | SubscriberLagged>
 
+export interface ReplayPoint {
+  readonly throughSeq: number
+  readonly transcript: Prompt.Prompt
+}
+
 export interface ReplayPlan {
   readonly subscriberId: number
   readonly replay: ReadonlyArray<LooseServerFrameType>
-  readonly stale: boolean
-  readonly snapshotSeq: number
+  readonly snapshot: Option.Option<ReplayPoint>
 }
 
 interface State {
   readonly lastSeq: number
+  readonly replayPoint: ReplayPoint
+  readonly originMinusOneAvailable: boolean
   readonly ring: ReadonlyArray<LooseServerFrameType>
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
   readonly nextSubscriberId: number
@@ -26,7 +33,10 @@ interface State {
 }
 
 export interface FrameJournal {
-  readonly publish: (input: FrameWithoutSeq) => Effect.Effect<LooseServerFrameType, SessionError>
+  readonly publish: (
+    input: FrameWithoutSeq,
+    transcript?: Prompt.Prompt,
+  ) => Effect.Effect<LooseServerFrameType, SessionError>
   readonly subscribe: (queue: SubscriberQueue, afterSeq?: number) => Effect.Effect<ReplayPlan, SessionError>
   readonly removeSubscriber: (subscriberId: number) => Effect.Effect<void>
   readonly lastSeq: Effect.Effect<number>
@@ -37,6 +47,7 @@ export interface FrameJournal {
 interface Options {
   readonly sessionId: string
   readonly capacity: number
+  readonly initialTranscript: Prompt.Prompt
   readonly onAllocated?: (frame: LooseServerFrameType) => Effect.Effect<void>
   readonly onDelivered?: (frame: LooseServerFrameType) => Effect.Effect<void>
 }
@@ -51,6 +62,8 @@ export const makeFrameJournal = (options: Options): Effect.Effect<FrameJournal> 
   Effect.gen(function* () {
     const state = yield* Ref.make<State>({
       lastSeq: -1,
+      replayPoint: { throughSeq: -1, transcript: options.initialTranscript },
+      originMinusOneAvailable: options.initialTranscript.content.length === 0,
       ring: [],
       subscribers: new Map(),
       nextSubscriberId: 0,
@@ -79,7 +92,7 @@ export const makeFrameJournal = (options: Options): Effect.Effect<FrameJournal> 
       )
 
     return {
-      publish: (input) =>
+      publish: (input, transcript) =>
         locked(
           Effect.gen(function* () {
             const current = yield* Ref.get(state)
@@ -101,6 +114,10 @@ export const makeFrameJournal = (options: Options): Effect.Effect<FrameJournal> 
             yield* Ref.set(state, {
               ...current,
               lastSeq: frame.seq,
+              replayPoint: {
+                throughSeq: frame.seq,
+                transcript: transcript ?? current.replayPoint.transcript,
+              },
               ring: trimRing([...current.ring, frame], options.capacity),
               subscribers,
             })
@@ -113,13 +130,16 @@ export const makeFrameJournal = (options: Options): Effect.Effect<FrameJournal> 
             if (current.closed) return [Option.none(), current]
             const subscriberId = current.nextSubscriberId
             const floor = current.ring[0]?.seq ?? current.lastSeq + 1
-            const cursor = afterSeq ?? floor - 1
-            const stale = afterSeq !== undefined && afterSeq < floor - 1
-            const replay = stale ? [] : current.ring.filter((frame) => frame.seq > cursor)
+            const cursor = afterSeq ?? -1
+            const unavailable =
+              cursor > current.lastSeq || cursor < floor - 1 || (cursor === -1 && !current.originMinusOneAvailable)
+            const snapshot = unavailable ? Option.some(current.replayPoint) : Option.none<ReplayPoint>()
+            const boundary = Option.isSome(snapshot) ? snapshot.value.throughSeq : cursor
+            const replay = current.ring.filter((frame) => frame.seq > boundary)
             const subscribers = new Map(current.subscribers)
             subscribers.set(subscriberId, queue)
             return [
-              Option.some({ subscriberId, replay, stale, snapshotSeq: current.lastSeq }),
+              Option.some({ subscriberId, replay, snapshot }),
               { ...current, subscribers, nextSubscriberId: subscriberId + 1 },
             ]
           }).pipe(

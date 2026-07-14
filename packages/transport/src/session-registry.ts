@@ -85,6 +85,7 @@ export class SessionRegistry extends Context.Service<SessionRegistry, Interface>
 interface SessionState {
   readonly sessionId: string
   readonly chatId: string
+  readonly chat: Ref.Ref<Chat.Persisted>
   readonly system?: string
   readonly coordination: CoordinationState
   readonly journal: FrameJournal
@@ -187,8 +188,12 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
           }),
         )
 
-      const publish = (sessionId: string, input: FrameWithoutSeq): Effect.Effect<LooseServerFrameType, SessionError> =>
-        lookup(sessionId).pipe(Effect.flatMap((session) => session.journal.publish(input)))
+      const publish = (
+        sessionId: string,
+        input: FrameWithoutSeq,
+        transcript?: Prompt.Prompt,
+      ): Effect.Effect<LooseServerFrameType, SessionError> =>
+        lookup(sessionId).pipe(Effect.flatMap((session) => session.journal.publish(input, transcript)))
 
       const setStatus = (sessionId: string, runId: number, status: SessionStatus): Effect.Effect<void, SessionError> =>
         Clock.currentTimeMillis.pipe(
@@ -213,6 +218,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
         runId: number,
         status: SessionStatus,
         outcome?: FrameWithoutSeq,
+        transcript?: Prompt.Prompt,
       ): Effect.Effect<void, SessionError> =>
         Clock.currentTimeMillis.pipe(
           Effect.flatMap((now) =>
@@ -229,7 +235,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
           Effect.flatMap((finalized) =>
             finalized
               ? Effect.gen(function* () {
-                  if (outcome !== undefined) yield* publish(sessionId, outcome)
+                  if (outcome !== undefined) yield* publish(sessionId, outcome, transcript)
                   yield* publish(sessionId, { _tag: "SessionStatus", status })
                   yield* publish(sessionId, { _tag: "Ended" })
                 }).pipe(Effect.asVoid)
@@ -239,7 +245,14 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
 
       const finalizeInterrupted = (sessionId: string, runId: number): Effect.Effect<void> => {
         const error = AgentEvent.AgentError.make({ message: "Session interrupted", turn: 0 })
-        return finalizeRun(sessionId, runId, { _tag: "Failed", error }, { _tag: "Failed", error }).pipe(Effect.ignore)
+        return lookup(sessionId).pipe(
+          Effect.flatMap((session) => Ref.get(session.chat)),
+          Effect.flatMap((chat) => Ref.get(chat.history)),
+          Effect.flatMap((transcript) =>
+            finalizeRun(sessionId, runId, { _tag: "Failed", error }, { _tag: "Failed", error }, transcript),
+          ),
+          Effect.ignore,
+        )
       }
 
       let drainAfterInterrupt = (_sessionId: string, _runId: number): Effect.Effect<void> => Effect.void
@@ -304,37 +317,58 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
                 : Effect.void
               ).pipe(
                 Effect.andThen(
-                  publish(session.sessionId, { _tag: "Event", event: stripEventTranscript(event, stripTranscripts) }),
+                  publish(
+                    session.sessionId,
+                    { _tag: "Event", event: stripEventTranscript(event, stripTranscripts) },
+                    event._tag === "TurnCompleted" || event._tag === "Completed" ? event.transcript : undefined,
+                  ),
                 ),
               ),
             ),
             Effect.matchCauseEffect({
-              onFailure: (cause) => {
-                const error = Cause.squash(cause)
-                if (Schema.is(AgentEvent.AgentSuspended)(error)) {
-                  return finalizeRun(
-                    session.sessionId,
-                    session.coordination.runId,
-                    { _tag: "Suspended", suspension: error },
-                    { _tag: "Suspended", suspension: error },
-                  )
-                }
-                const failure = runFailureFromCause(cause, 0)
-                return finalizeRun(
-                  session.sessionId,
-                  session.coordination.runId,
-                  { _tag: "Failed", error: failure },
-                  { _tag: "Failed", error: failure },
-                )
-              },
+              onFailure: (cause) =>
+                Ref.get(session.chat).pipe(
+                  Effect.flatMap((chat) => Ref.get(chat.history)),
+                  Effect.flatMap((transcript) => {
+                    const error = Cause.squash(cause)
+                    if (Schema.is(AgentEvent.AgentSuspended)(error)) {
+                      return finalizeRun(
+                        session.sessionId,
+                        session.coordination.runId,
+                        { _tag: "Suspended", suspension: error },
+                        { _tag: "Suspended", suspension: error },
+                        transcript,
+                      )
+                    }
+                    const failure = runFailureFromCause(cause, 0)
+                    return finalizeRun(
+                      session.sessionId,
+                      session.coordination.runId,
+                      { _tag: "Failed", error: failure },
+                      { _tag: "Failed", error: failure },
+                      transcript,
+                    )
+                  }),
+                ),
               onSuccess: () => finalizeRun(session.sessionId, session.coordination.runId, { _tag: "Idle" }),
             }),
             Effect.ignoreCause,
           )
-          const runContext = Option.match(overrideApprovals, {
+          const approvalsContext = Option.match(overrideApprovals, {
             onNone: () => context,
             onSome: (overrideService) => Context.add(context, Approvals.Approvals, overrideService),
           })
+          const runPersistence = Chat.Persistence.of({
+            get: (chatId, chatOptions) =>
+              chatId === session.chatId
+                ? persistence.get(chatId, chatOptions).pipe(Effect.tap((chat) => Ref.set(session.chat, chat)))
+                : persistence.get(chatId, chatOptions),
+            getOrCreate: (chatId, chatOptions) =>
+              chatId === session.chatId
+                ? persistence.getOrCreate(chatId, chatOptions).pipe(Effect.tap((chat) => Ref.set(session.chat, chat)))
+                : persistence.getOrCreate(chatId, chatOptions),
+          })
+          const runContext = Context.add(approvalsContext, Chat.Persistence, runPersistence)
           return yield* run.pipe(Effect.provide(runContext))
         })
 
@@ -472,17 +506,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
           yield* launchRun(runSession, prompt, resume, approvalDecision)
         })
 
-      const snapshotFrame = (
-        sessionId: string,
-        seq: number,
-        chatId: string,
-      ): Effect.Effect<LooseServerFrameType, SessionError> =>
-        persistence.getOrCreate(chatId).pipe(
-          Effect.flatMap((chat) => Ref.get(chat.history)),
-          Effect.map((transcript) => ({ _tag: "Snapshot", seq, transcript }) as LooseServerFrameType),
-          Effect.mapError((error) => error.pipe(errorMessage, sessionError)),
-        )
-
       const sweep = Clock.currentTimeMillis.pipe(
         Effect.flatMap((now) =>
           Ref.modify(state, (current) => {
@@ -546,10 +569,12 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
             const sessionId = openOptions.sessionId ?? `session-${yield* Random.nextIntBetween(100000, 1000000)}`
             const chatId = openOptions.chatId ?? sessionId
             const now = yield* Clock.currentTimeMillis
-            yield* persistence
+            const chat = yield* persistence
               .getOrCreate(chatId)
               .pipe(Effect.mapError((error) => error.pipe(errorMessage, sessionError)))
-            const journal = yield* makeFrameJournal({ sessionId, capacity: ringBufferCapacity })
+            const initialTranscript = yield* Ref.get(chat.history)
+            const chatRef = yield* Ref.make(chat)
+            const journal = yield* makeFrameJournal({ sessionId, capacity: ringBufferCapacity, initialTranscript })
             const [session, inserted] = yield* Ref.modify(
               state,
               (current): readonly [readonly [SessionState, boolean], RegistryState] => {
@@ -558,6 +583,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
                 const created: SessionState = {
                   sessionId,
                   chatId,
+                  chat: chatRef,
                   ...(openOptions.system === undefined ? {} : { system: openOptions.system }),
                   coordination: coordination.make(now),
                   journal,
@@ -607,15 +633,24 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
                 strategy: "dropping",
               })
               const session = yield* lookup(sessionId)
-              const details = yield* session.journal.subscribe(queue, afterSeq)
-              const prefix = details.stale
-                ? Stream.fromEffect(snapshotFrame(sessionId, details.snapshotSeq, session.chatId))
-                : Stream.fromIterable(details.replay)
-              return Stream.concat(prefix, Stream.fromQueue(queue)).pipe(
-                Stream.ensuring(session.journal.removeSubscriber(details.subscriberId)),
+              const details = yield* Effect.acquireRelease(session.journal.subscribe(queue, afterSeq), (subscription) =>
+                session.journal.removeSubscriber(subscription.subscriberId),
               )
+              const prefix = Option.match(details.snapshot, {
+                onNone: () => Stream.fromIterable(details.replay),
+                onSome: (snapshot) =>
+                  Stream.concat(
+                    Stream.make({
+                      _tag: "Snapshot" as const,
+                      seq: snapshot.throughSeq,
+                      transcript: snapshot.transcript,
+                    }),
+                    Stream.fromIterable(details.replay),
+                  ),
+              })
+              return Stream.concat(prefix, Stream.fromQueue(queue))
             }),
-          ),
+          ).pipe(Stream.scoped),
         interrupt: (sessionId) =>
           Ref.modify(state, (current): readonly [Option.Option<InterruptAction>, RegistryState] => {
             const session = current.sessions.get(sessionId)
