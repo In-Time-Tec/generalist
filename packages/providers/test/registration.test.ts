@@ -1,5 +1,5 @@
 import { describe, expect, it, layer as testLayer } from "@effect/vitest"
-import { Config, ConfigProvider, Effect, Layer, Redacted, Schema } from "effect"
+import { Config, ConfigProvider, Effect, Layer, Redacted, Ref, Schema } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
@@ -96,33 +96,107 @@ describe("providers", () => {
     })
   })
 
-  testLayer(
-    Layer.mergeAll(
-      Deterministic.withOpenAiOrDeterministicFetch({
-        model: "gpt-test",
-        fallbackModel: "fallback",
-        apiKey: Config.fail(new ConfigProvider.SourceError({ message: "missing test key" })),
-      }),
-      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
-      unexpectedToolLayer,
-    ),
-  )((test) => {
-    test.effect("keeps the deterministic fallback when OpenAI config is missing", () => {
-      const agent = Agent.make("fallback-agent", { toolkit: unexpectedToolkit })
-      return Effect.gen(function* () {
-        const registered = yield* ModelRegistry.registrations()
-        const result = yield* ModelRegistry.provide(
-          { provider: "deterministic", model: "fallback" },
-          Agent.generate({ prompt: "hello" })(agent),
-        )
+  it.effect("propagates an OpenAI configuration source failure instead of selecting the fallback", () => {
+    const sourceFailure = new ConfigProvider.SourceError({ message: "test config source unavailable" })
 
-        expect(registered.map((item) => [item.provider, item.model])).toEqual([["deterministic", "fallback"]])
-        expect(result.text).toBe("deterministic response")
-      })
-    })
+    return Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        Effect.scoped(
+          Layer.build(
+            Deterministic.withOpenAiOrDeterministicFetch({
+              model: "gpt-test",
+              fallbackModel: "fallback",
+              apiKey: Config.redacted("OPENAI_API_KEY"),
+            }),
+          ),
+        ),
+      )
+
+      expect(failure._tag).toBe("ConfigError")
+      expect(failure.cause._tag).toBe("SourceError")
+      if (failure.cause._tag === "SourceError") {
+        expect(failure.cause.message).toBe("test config source unavailable")
+      }
+    }).pipe(
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.make(() => Effect.fail(sourceFailure)),
+      ),
+    )
   })
+
+  it.effect("propagates an OpenAI client configuration failure instead of selecting the fallback", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        Effect.scoped(
+          Layer.build(
+            Deterministic.withOpenAiOrDeterministicFetch({
+              model: "gpt-test",
+              fallbackModel: "fallback",
+              apiKey,
+              clientConfig: {
+                apiUrl: Config.fail(
+                  new ConfigProvider.SourceError({ message: "test client configuration unavailable" }),
+                ),
+              },
+            }),
+          ),
+        ),
+      )
+
+      expect(failure._tag).toBe("ConfigError")
+      expect(failure.cause._tag).toBe("SourceError")
+      if (failure.cause._tag === "SourceError") {
+        expect(failure.cause.message).toBe("test client configuration unavailable")
+      }
+    }),
+  )
+
+  it.effect("selects deterministic-only registration concurrently when OpenAI configuration is absent", () => {
+    const fallbackLayer = Deterministic.withOpenAiOrDeterministicFetch({
+      model: "gpt-test",
+      fallbackModel: "fallback",
+      apiKey: Config.redacted("OPENAI_API_KEY"),
+    })
+    const registrations = Effect.scoped(
+      Layer.build(fallbackLayer).pipe(
+        Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context))),
+      ),
+    )
+
+    return Effect.gen(function* () {
+      const results = yield* Effect.all([registrations, registrations], { concurrency: 2 })
+
+      expect(results.map((items) => items.map((item) => [item.provider, item.model]))).toEqual([
+        [["deterministic", "fallback"]],
+        [["deterministic", "fallback"]],
+      ])
+    }).pipe(Effect.provideService(ConfigProvider.ConfigProvider, ConfigProvider.fromUnknown({})))
+  })
+
+  it.effect("propagates malformed OpenAI configuration instead of selecting the fallback", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        Effect.scoped(
+          Layer.build(
+            Deterministic.withOpenAiOrDeterministicFetch({
+              model: "gpt-test",
+              fallbackModel: "fallback",
+              apiKey: Config.finite("OPENAI_API_KEY").pipe(Config.map((value) => Redacted.make(String(value)))),
+            }),
+          ),
+        ),
+      )
+
+      expect(failure._tag).toBe("ConfigError")
+      expect(failure.cause._tag).toBe("SchemaError")
+    }).pipe(
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromUnknown({ OPENAI_API_KEY: "not-a-number" }),
+      ),
+    ),
+  )
 
   testLayer(
     Layer.mergeAll(
@@ -242,8 +316,9 @@ describe("providers", () => {
     const deterministicRequirements: Assert<Equal<Layer.Services<typeof deterministicLayer>, HttpClient.HttpClient>> =
       true
     const deterministicFetchRequirements: Assert<Equal<Layer.Services<typeof deterministicFetchLayer>, never>> = true
-    const deterministicErrors: Assert<Equal<Layer.Error<typeof deterministicLayer>, never>> = true
-    const deterministicFetchErrors: Assert<Equal<Layer.Error<typeof deterministicFetchLayer>, never>> = true
+    const deterministicErrors: Assert<Equal<Layer.Error<typeof deterministicLayer>, Config.ConfigError>> = true
+    const deterministicFetchErrors: Assert<Equal<Layer.Error<typeof deterministicFetchLayer>, Config.ConfigError>> =
+      true
     const basePresets = tuple(
       Presets.groq({ model: "model", apiKey }),
       Presets.mistral({ model: "model", apiKey }),
@@ -323,12 +398,16 @@ describe("providers", () => {
 
   it.effect("builds the base deterministic fallback with the host HttpClient", () =>
     Effect.gen(function* () {
+      const apiKeyReads = yield* Ref.make(0)
+      const countedApiKey = apiKey.pipe(
+        Config.mapOrFail((value) => Ref.updateAndGet(apiKeyReads, (count) => count + 1).pipe(Effect.as(value))),
+      )
       const registered = yield* Effect.scoped(
         Layer.build(
           withOpenAiOrDeterministic({
             model: "gpt-test",
             fallbackModel: "fallback",
-            apiKey,
+            apiKey: countedApiKey,
           }),
         ).pipe(Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context)))),
       )
@@ -337,6 +416,7 @@ describe("providers", () => {
         ["deterministic", "fallback"],
         ["openai", "gpt-test"],
       ])
+      expect(yield* Ref.get(apiKeyReads)).toBe(1)
     }).pipe(Effect.provideService(HttpClient.HttpClient, hostHttpClient)),
   )
 

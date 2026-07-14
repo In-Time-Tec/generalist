@@ -41,7 +41,7 @@ Existing applications that relied on the former implicit fetch transport migrate
 
 ## Deterministic model
 
-`Deterministic.deterministicModel(input)` registers a local `Ai.LanguageModel` that emits `deterministic response`. `withDeterministic` installs it as a `ModelRegistry` layer. `withOpenAiOrDeterministic` always registers the deterministic fallback and registers OpenAI only when its config resolves while preserving the `HttpClient` requirement; `withOpenAiOrDeterministicFetch` explicitly selects the fetch client.
+`Deterministic.deterministicModel(input)` registers a local `Ai.LanguageModel` that emits `deterministic response`. `withDeterministic` installs it as a `ModelRegistry` layer. `withOpenAiOrDeterministic` always registers the deterministic fallback and registers OpenAI only when its API-key config is present while preserving the `HttpClient` requirement; `withOpenAiOrDeterministicFetch` explicitly selects the fetch client. Missing API-key data selects deterministic-only registration. Malformed values, configuration-source failures, and OpenAI client or model construction failures remain typed failures and never select the fallback.
 
 The deterministic helper is for tests and local development only. It is not a replay, fixture, or durable execution mechanism.
 
