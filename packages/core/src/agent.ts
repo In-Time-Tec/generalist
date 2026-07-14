@@ -1,6 +1,19 @@
-import { Cause, type Duration, Effect, Fiber, Option, Queue, Ref, Schema, Stream } from "effect"
+import {
+  Cause,
+  Channel,
+  type Duration,
+  Effect,
+  Exit,
+  Fiber,
+  Option,
+  Queue,
+  Ref,
+  Schema,
+  Semaphore,
+  Stream,
+} from "effect"
 import { dual } from "effect/Function"
-import { Chat, LanguageModel, Prompt, Response, Telemetry, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, Chat, LanguageModel, Prompt, Response, Telemetry, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import {
   addUsage,
   AgentError,
@@ -200,6 +213,16 @@ export type RunServices<Tools extends Record<string, Tool.Any> = {}, HasModel ex
 type AnyToolCall = Response.ToolCallPart<string, unknown>
 
 type PendingToolResult = Response.ToolResultPart<string, unknown, unknown>
+
+const chatLocks = new WeakMap<Chat.Service, Semaphore.Semaphore>()
+
+const lockForChat = (chat: Chat.Service): Semaphore.Semaphore => {
+  const existing = chatLocks.get(chat)
+  if (existing !== undefined) return existing
+  const created = Semaphore.makeUnsafe(1)
+  chatLocks.set(chat, created)
+  return created
+}
 
 const skillListingBudgetTokens = 2_048
 
@@ -482,6 +505,7 @@ const streamInternal = <
             ? Chat.fromPrompt([Prompt.makeMessage("system", { content: system })])
             : Chat.empty
       const chat: Chat.Service = persisted ?? (yield* freshChat)
+      const chatLock = lockForChat(chat)
 
       const savePersisted: Effect.Effect<void, AgentError> =
         persisted === undefined
@@ -1015,32 +1039,24 @@ const streamInternal = <
         return modelPart
       }
 
-      // Run every model part through the middleware chain BEFORE the fold that
-      // dispatches tool calls / accumulates text, so middleware sees raw model
-      // output and everything downstream (events, tool dispatch, Relay
-      // persistence) sees the transformed stream.
-      const applyPartToEvents = (
+      const transformPart = (
         turn: number,
         part: Response.StreamPart<any>,
-        messages: ReadonlyArray<Prompt.Message>,
-      ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> =>
-        Stream.unwrap(
-          applyPartChain(chain, part, { agentName: agent.name, turn }).pipe(
-            Effect.map(
-              Option.match({
-                onSome: (transformed) =>
-                  partEvents(turn, transformed as Response.StreamPart<Record<string, Tool.Any>>, messages),
-                onNone: (): Stream.Stream<Event, RunError> =>
-                  part.type === "tool-call"
-                    ? Stream.fail(
-                        MiddlewareViolation.make({
-                          turn,
-                          detail: "ModelMiddleware dropped a tool-call part",
-                        }),
-                      )
-                    : Stream.empty,
-              }),
-            ),
+      ): Effect.Effect<Option.Option<Response.StreamPart<any>>, RunError> =>
+        applyPartChain(chain, part, { agentName: agent.name, turn }).pipe(
+          Effect.flatMap(
+            Option.match({
+              onSome: (transformed) => Effect.succeed(Option.some(transformed)),
+              onNone: () =>
+                part.type === "tool-call"
+                  ? Effect.fail(
+                      MiddlewareViolation.make({
+                        turn,
+                        detail: "ModelMiddleware dropped a tool-call part",
+                      }),
+                    )
+                  : Effect.succeed(Option.none()),
+            }),
           ),
         )
 
@@ -1067,45 +1083,93 @@ const streamInternal = <
           retryOverflow: boolean,
         ): Stream.Stream<
           { readonly part: Response.StreamPart<any>; readonly messages: ReadonlyArray<Prompt.Message> },
-          AgentError,
+          RunError,
           LanguageModel.LanguageModel
-        > =>
-          Stream.unwrap(
-            Ref.get(chat.history).pipe(
-              Effect.map((historyBeforeAttempt) => {
-                let emitted = false
-                const messages = Prompt.concat(historyBeforeAttempt, activePrompt).content
-                return chat.streamText({ prompt: activePrompt, toolkit, disableToolCallResolution: true }).pipe(
-                  Stream.map((part) => ({ part: part as Response.StreamPart<any>, messages })),
+        > => {
+          let emitted = false
+          const transformedParts = new Array<Response.StreamPart<any>>()
+          const singleFailure = (cause: Cause.Cause<unknown>) => {
+            const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+            return reason !== undefined && Cause.isFailReason(reason) ? Option.some(reason.error) : Option.none()
+          }
+          const retryableOverflow = (cause: Cause.Cause<unknown>, hasEmitted: boolean): boolean => {
+            const failure = singleFailure(cause)
+            return (
+              retryOverflow &&
+              !hasEmitted &&
+              Option.isSome(failure) &&
+              isContextOverflow(failure.value) &&
+              Option.isSome(compactionService)
+            )
+          }
+          return Stream.fromChannel(
+            Channel.acquireUseRelease(
+              chatLock.take(1).pipe(Effect.andThen(Ref.get(chat.history))),
+              (history) => {
+                const responsePrompt = Prompt.concat(history, activePrompt)
+                const messages = responsePrompt.content
+                const rawParts = LanguageModel.streamText({
+                  prompt: responsePrompt,
+                  toolkit,
+                  disableToolCallResolution: true,
+                }).pipe(
                   Stream.tap(() =>
                     Effect.sync(() => {
                       emitted = true
                     }),
                   ),
                   Stream.catchCause((cause) => {
-                    if (Cause.hasInterrupts(cause)) return Stream.fromEffect(Effect.interrupt)
-                    const error = Cause.squash(cause)
-                    if (retryOverflow && !emitted && isContextOverflow(error) && Option.isSome(compactionService)) {
-                      return Stream.unwrap(
-                        Effect.gen(function* () {
-                          yield* Ref.set(chat.history, historyBeforeAttempt)
-                          const compactedPrompt = yield* preparePrompt(turn, activePrompt, true)
-                          return attempt(compactedPrompt, false)
-                        }),
-                      )
-                    }
-                    return Stream.make({ part: Response.makePart("error", { error }), messages })
+                    if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
+                    if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
+                    const error = singleFailure(cause)
+                    if (Option.isNone(error)) return Stream.failCause(cause)
+                    return Stream.make(Response.makePart("error", { error: error.value }))
                   }),
                 )
-              }),
+                return rawParts.pipe(
+                  Stream.mapEffect((part) => transformPart(turn, part)),
+                  Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
+                  Stream.tap((part) =>
+                    Effect.sync(() => {
+                      transformedParts.push(part)
+                    }),
+                  ),
+                  Stream.map((part) => ({ part, messages })),
+                  Stream.toChannel,
+                )
+              },
+              (history, exit) =>
+                (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted)
+                  ? Effect.void
+                  : Ref.set(
+                      chat.history,
+                      Prompt.concat(Prompt.concat(history, activePrompt), Prompt.fromResponseParts(transformedParts)),
+                    ).pipe(Effect.andThen(persisted === undefined ? Effect.void : persisted.save), Effect.orDie)
+                ).pipe(Effect.ensuring(chatLock.release(1)), Effect.asVoid),
+            ),
+          ).pipe(
+            Stream.catchCause((cause) => {
+              if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
+              if (retryableOverflow(cause, emitted)) {
+                return Stream.unwrap(
+                  preparePrompt(turn, activePrompt, true).pipe(
+                    Effect.map((compactedPrompt) => attempt(compactedPrompt, false)),
+                  ),
+                )
+              }
+              return Stream.failCause(cause)
+            }),
+            Stream.mapError((error) =>
+              AiError.isAiError(error) ? AgentError.make({ message: errorMessage(error), turn, cause: error }) : error,
             ),
           )
+        }
         const parts = Stream.unwrap(
           applyPromptChain(chain, Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
             Effect.flatMap((transformedPrompt) => preparePrompt(turn, transformedPrompt, false)),
             Effect.map((preparedPrompt) =>
               attempt(preparedPrompt, true).pipe(
-                Stream.flatMap(({ part, messages }) => applyPartToEvents(turn, part, messages)),
+                Stream.flatMap(({ part, messages }) => partEvents(turn, part, messages)),
               ),
             ),
           ),
@@ -1354,15 +1418,9 @@ const streamInternal = <
       const initialPrompt =
         options.resume === undefined ? yield* recallInitialPrompt(baseInitialPrompt) : baseInitialPrompt
       const runStream = options.resume === undefined ? runTurn(0, initialPrompt) : resumeStream(options.resume)
-      // On suspension, emit the finalized transcript as a trailing `TurnCompleted`
-      // before re-failing. `chat.streamText` appends the assistant message (e.g. the
-      // pending tool call) to `chat.history` on channel release, which completes during
-      // teardown — after the suspend point — so a durable host reading the transcript
-      // here sees the suspending turn. Only tool-wait/approval suspensions get this; the
-      // trailing event is invisible to consumers that observe just the error.
       return runStream.pipe(
         Stream.catchCause((cause) => {
-          if (Cause.hasInterrupts(cause)) return Stream.fromEffect(Effect.interrupt)
+          if (Cause.hasInterrupts(cause)) return Stream.failCause(cause)
           const error = Cause.squash(cause)
           if (Schema.is(AgentSuspended)(error)) {
             return Stream.unwrap(
