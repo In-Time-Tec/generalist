@@ -124,7 +124,7 @@ import { VectorStore } from "@batonfx/memory"
 import { OAuth, McpToolSource } from "@batonfx/mcp"
 import { TestModel } from "@batonfx/test"
 import { SessionRegistry } from "@batonfx/transport"
-import { Effect, Layer, Option, Redacted } from "effect"
+import { Crypto, Effect, Layer, Option, Redacted } from "effect"
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
     ? (<Value>() => Value extends Right ? 1 : 2) extends <Value>() => Value extends Left ? 1 : 2
@@ -189,13 +189,21 @@ const tokenStore: OAuth.TokenStoreInterface = {
   remove: () => Effect.void,
 }
 const storeLayer: Layer.Layer<OAuth.TokenStore> = OAuth.tokenStoreTestLayer(tokenStore)
+const cryptoLayer = Layer.succeed(
+  Crypto.Crypto,
+  Crypto.make({
+    randomBytes: (size) => new Uint8Array(size),
+    digest: (_algorithm, data) => Effect.succeed(data),
+  }),
+)
 const oauthLayer = OAuth.layer({
   serverUrl: "https://mcp.example/rpc",
   redirectUrl: "http://127.0.0.1/callback",
   clientMetadata: { redirect_uris: ["http://127.0.0.1/callback"] },
-}).pipe(Layer.provide(storeLayer))
+}).pipe(Layer.provide(Layer.merge(storeLayer, cryptoLayer)))
 const proof = Effect.gen(function* () {
   const oauth = yield* OAuth.OAuth
+  yield* oauth.pending
   const transport: McpToolSource.McpTransport = { kind: "http", url: "https://mcp.example/rpc", oauth }
   return transport
 }).pipe(Effect.provide(oauthLayer))

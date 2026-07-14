@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Option, Stream } from "effect"
+import { Console, Effect, Layer, Stream } from "effect"
 import { Agent, Approvals, Instructions, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 const persona = Instructions.staticSource("persona", "You are the release-notes assistant.")
@@ -8,14 +8,7 @@ const houseStyle = Instructions.staticSource(
   "Write one sentence per change. Never use exclamation marks.",
 )
 
-const workspaceState: Instructions.ContextSource = {
-  id: "workspace-state",
-  cache: "dynamic",
-  render: (context) =>
-    Effect.succeed(Option.some(`Rendering update for ${context.agentName} at turn ${context.turn}.`)),
-}
-
-const instructionsLayer = Instructions.layer([persona, houseStyle, workspaceState])
+const instructionsLayer = Instructions.layer([persona, houseStyle])
 
 const agent = Agent.make({ name: "release-notes", instructions: "This fallback is replaced by the registry." })
 

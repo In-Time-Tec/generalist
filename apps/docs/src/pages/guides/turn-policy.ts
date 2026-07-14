@@ -43,13 +43,13 @@ export const turnPolicy = definePage({
     p(
       "To steer late turns rather than end them, return ",
       code("TurnPolicy.decision.continue(overrides)"),
-      " from a custom policy. Overrides apply to the next turn only: ",
+      " from a custom policy. Overrides are selected for the next model call: ",
       code("instructions"),
-      " replaces the system message, ",
+      " prepends a system message that remains in chat history, ",
       code("model"),
-      " swaps the model layer, and ",
+      " swaps the model layer for that call, and ",
       code("activeTools"),
-      " narrows the advertised toolkit:",
+      " narrows the toolkit for that call:",
     ),
     codeBlock({ label: "override-turns.ts", source: overrideTurns }),
     p(

@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Layer, Stream } from "effect"
-import { LanguageModel, Prompt } from "effect/unstable/ai"
+import { Context, Deferred, Effect, Fiber, Layer, Ref, Scope, Stream } from "effect"
+import { AiError, LanguageModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
 import { WorkingMemory } from "../src/index"
 
@@ -16,6 +16,18 @@ const itemText = (item: Memory.Item): string =>
   item.parts
     .filter((part): part is Prompt.TextPart => part.type === "text")
     .map((part) => part.text)
+    .join("")
+
+const promptText = (value: Prompt.Prompt): string =>
+  value.content
+    .map((message) =>
+      typeof message.content === "string"
+        ? message.content
+        : message.content
+            .filter((part): part is Prompt.TextPart => part.type === "text")
+            .map((part) => part.text)
+            .join(""),
+    )
     .join("")
 
 let summaryCalls = 0
@@ -145,6 +157,218 @@ layer(WorkingMemory.layer({ maxMessages: 2, summarize: { model: summaryModel } }
         "User: three",
         "Assistant: four",
       ])
+    }),
+  )
+})
+
+const modelFailure = AiError.make({
+  module: "WorkingMemory",
+  method: "generateText",
+  reason: AiError.UnknownError.make({ description: "summary failed" }),
+})
+
+const rememberOverflow = (memory: Memory.Interface, transcript: Prompt.Prompt) =>
+  memory.remember({ key, turn: 0, terminal: true, transcript })
+
+layer(Layer.empty)((it) => {
+  it.effect("acquires the composed summary model once, reuses it across overflows, and releases it once", () =>
+    Effect.gen(function* () {
+      const acquisitions = yield* Ref.make(0)
+      const releases = yield* Ref.make(0)
+      const calls = yield* Ref.make(0)
+      const service = yield* LanguageModel.make({
+        generateText: () =>
+          Ref.updateAndGet(calls, (count) => count + 1).pipe(
+            Effect.map((count) => [{ type: "text" as const, text: `summary-${count}` }]),
+          ),
+        streamText: () => Stream.empty,
+      })
+      const model = Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.acquireRelease(Ref.update(acquisitions, (count) => count + 1).pipe(Effect.as(service)), () =>
+          Ref.update(releases, (count) => count + 1),
+        ),
+      )
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 2, summarize: {} }).pipe(
+        Layer.provide(WorkingMemory.summaryModelLayer.pipe(Layer.provide(model))),
+      )
+
+      yield* Effect.scoped(
+        Layer.build(memoryLayer).pipe(
+          Effect.flatMap((context) =>
+            Effect.gen(function* () {
+              const memory = yield* Memory.Memory
+              yield* rememberOverflow(memory, prompt(user("one"), assistant("two"), user("three")))
+              yield* rememberOverflow(memory, prompt(user("one"), assistant("two"), user("three"), assistant("four")))
+            }).pipe(Effect.provide(context)),
+          ),
+        ),
+      )
+
+      expect(yield* Ref.get(acquisitions)).toBe(1)
+      expect(yield* Ref.get(calls)).toBe(2)
+      expect(yield* Ref.get(releases)).toBe(1)
+    }),
+  )
+
+  it.effect("acquires the deprecated layer-valued model once in the working-memory scope", () =>
+    Effect.gen(function* () {
+      const acquisitions = yield* Ref.make(0)
+      const releases = yield* Ref.make(0)
+      const calls = yield* Ref.make(0)
+      const service = yield* LanguageModel.make({
+        generateText: () =>
+          Ref.update(calls, (count) => count + 1).pipe(Effect.as([{ type: "text" as const, text: "legacy-summary" }])),
+        streamText: () => Stream.empty,
+      })
+      const model = Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.acquireRelease(Ref.update(acquisitions, (count) => count + 1).pipe(Effect.as(service)), () =>
+          Ref.update(releases, (count) => count + 1),
+        ),
+      )
+      const options = { maxMessages: 2, summarize: { model, prompt: "Preserve facts." } }
+      const memoryLayer: Layer.Layer<Memory.Memory> = WorkingMemory.layer(options)
+      const makeEffect: Effect.Effect<Memory.Interface, never, Scope.Scope> = WorkingMemory.make(options)
+
+      expect(makeEffect).toBeDefined()
+
+      yield* Effect.scoped(
+        Layer.build(memoryLayer).pipe(
+          Effect.flatMap((context) =>
+            Effect.gen(function* () {
+              const memory = yield* Memory.Memory
+              yield* rememberOverflow(memory, prompt(user("one"), assistant("two"), user("three")))
+              yield* rememberOverflow(memory, prompt(user("one"), assistant("two"), user("three"), assistant("four")))
+            }).pipe(Effect.provide(context)),
+          ),
+        ),
+      )
+
+      expect(yield* Ref.get(acquisitions)).toBe(1)
+      expect(yield* Ref.get(calls)).toBe(2)
+      expect(yield* Ref.get(releases)).toBe(1)
+    }),
+  )
+
+  it.effect("releases the composed summary model after a model-call failure", () =>
+    Effect.gen(function* () {
+      const releases = yield* Ref.make(0)
+      const service = yield* LanguageModel.make({
+        generateText: () => Effect.fail(modelFailure),
+        streamText: () => Stream.empty,
+      })
+      const model = Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.acquireRelease(Effect.succeed(service), () => Ref.update(releases, (count) => count + 1)),
+      )
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
+        Layer.provide(WorkingMemory.summaryModelLayer.pipe(Layer.provide(model))),
+      )
+
+      const failure = yield* Effect.flip(
+        Effect.scoped(
+          Layer.build(memoryLayer).pipe(
+            Effect.flatMap((context) =>
+              rememberOverflow(Context.get(context, Memory.Memory), prompt(user("one"), assistant("two"))),
+            ),
+          ),
+        ),
+      )
+
+      expect(failure._tag).toBe("@batonfx/core/MemoryError")
+      expect(yield* Ref.get(releases)).toBe(1)
+    }),
+  )
+
+  it.effect("keeps summary model acquisition failures visible at the layer boundary", () =>
+    Effect.gen(function* () {
+      const model = Layer.effect(LanguageModel.LanguageModel, Effect.fail(modelFailure))
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
+        Layer.provide(WorkingMemory.summaryModelLayer.pipe(Layer.provide(model))),
+      )
+
+      const failure = yield* Effect.flip(Effect.scoped(Layer.build(memoryLayer)))
+
+      expect(failure).toBe(modelFailure)
+    }),
+  )
+
+  it.effect("releases the composed summary model when summary generation is interrupted", () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>()
+      const releases = yield* Ref.make(0)
+      const service = yield* LanguageModel.make({
+        generateText: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
+        streamText: () => Stream.empty,
+      })
+      const model = Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.acquireRelease(Effect.succeed(service), () => Ref.update(releases, (count) => count + 1)),
+      )
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
+        Layer.provide(WorkingMemory.summaryModelLayer.pipe(Layer.provide(model))),
+      )
+      const run = Effect.scoped(
+        Layer.build(memoryLayer).pipe(
+          Effect.flatMap((context) =>
+            rememberOverflow(Context.get(context, Memory.Memory), prompt(user("one"), assistant("two"))),
+          ),
+        ),
+      )
+
+      const fiber = yield* Effect.forkChild(run)
+      yield* Deferred.await(started)
+      yield* Fiber.interrupt(fiber)
+
+      expect(yield* Ref.get(releases)).toBe(1)
+    }),
+  )
+
+  it.effect("serializes concurrent overflow summaries", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make(0)
+      const summaryPrompts = yield* Ref.make<ReadonlyArray<string>>([])
+      const firstStarted = yield* Deferred.make<void>()
+      const releaseFirst = yield* Deferred.make<void>()
+      const service = yield* LanguageModel.make({
+        generateText: (options) =>
+          Ref.update(summaryPrompts, (prompts) => [...prompts, promptText(options.prompt)]).pipe(
+            Effect.andThen(Ref.updateAndGet(calls, (count) => count + 1)),
+            Effect.tap((count) =>
+              count === 1
+                ? Deferred.succeed(firstStarted, undefined).pipe(Effect.andThen(Deferred.await(releaseFirst)))
+                : Effect.void,
+            ),
+            Effect.map((count) => [{ type: "text" as const, text: `summary-${count}` }]),
+          ),
+        streamText: () => Stream.empty,
+      })
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
+        Layer.provide(WorkingMemory.summaryModelLayer),
+        Layer.provide(Layer.succeed(LanguageModel.LanguageModel, service)),
+      )
+
+      yield* Effect.scoped(
+        Layer.build(memoryLayer).pipe(
+          Effect.flatMap((context) =>
+            Effect.gen(function* () {
+              const memory = yield* Memory.Memory
+              const first = yield* Effect.forkChild(rememberOverflow(memory, prompt(user("one"), assistant("two"))))
+              yield* Deferred.await(firstStarted)
+              const second = yield* Effect.forkChild(rememberOverflow(memory, prompt(user("three"), assistant("four"))))
+              yield* Effect.yieldNow
+              expect(yield* Ref.get(calls)).toBe(1)
+              yield* Deferred.succeed(releaseFirst, undefined)
+              yield* Fiber.join(first)
+              yield* Fiber.join(second)
+              expect(yield* Ref.get(calls)).toBe(2)
+              const prompts = yield* Ref.get(summaryPrompts)
+              expect(prompts[1]).toContain("Existing summary:\nsummary-1")
+            }).pipe(Effect.provide(context)),
+          ),
+        ),
+      )
     }),
   )
 })

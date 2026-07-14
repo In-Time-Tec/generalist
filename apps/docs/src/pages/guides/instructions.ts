@@ -7,22 +7,19 @@ export const instructions = definePage({
   title: "How to compose instructions and context sources",
   navTitle: "Instructions",
   group: "Guides",
-  description:
-    "Register ordered ContextSources with Instructions.layer, mix static baselines with dynamic sources, and load AGENTS.md files as sources.",
+  description: "Register ordered baseline ContextSources with Instructions.layer and load AGENTS.md files as sources.",
   content: [
     p(
       "The ",
       code("Instructions"),
       " service replaces a single instruction string with an ordered registry of ",
       code("ContextSource"),
-      " values. At run start the loop opens a context epoch: baseline sources render once into the system message, dynamic sources are frozen for later update rendering. Persona, house style, repository files, and host state compose as sources instead of string concatenation.",
+      " values. At run start the loop opens a context epoch and baseline sources render once into the system message. Persona, house style, and repository files compose as sources instead of string concatenation.",
     ),
     h2("register-sources", "1. Register ordered sources"),
     p(
       "Build baselines with ",
       code("Instructions.staticSource(id, text)"),
-      " and write dynamic sources as plain objects with ",
-      code('cache: "dynamic"'),
       ". Provide them in order with ",
       code("Instructions.layer"),
       ". When the registry produces a non-empty baseline, it replaces ",
@@ -39,7 +36,7 @@ export const instructions = definePage({
       code("RunOptions.history"),
       " transcript is used verbatim. Both skip epoch rendering entirely.",
     ),
-    h2("baseline-vs-dynamic", "2. Choose baseline or dynamic per source"),
+    h2("baseline-contract", "2. Keep Agent instructions in the baseline"),
     table(
       ["Cache class", "Rendered", "Use for"],
       [
@@ -50,15 +47,23 @@ export const instructions = definePage({
         ],
         [
           [code('"dynamic"')],
-          ["On demand via ", code("Instructions.renderUpdate"), " for incremental context updates"],
-          ["Workspace state, clocks, anything that changes mid-session"],
+          ["Not rendered or injected by the Agent"],
+          ["Compatibility with hosts that already own changing-context insertion and persistence"],
         ],
       ],
     ),
     p(
-      "Keeping the baseline stable is what makes provider prompt caching effective; dynamic text stays out of it by construction. A source returning ",
+      "Keeping the baseline stable makes provider prompt caching effective. A source returning ",
       code("Option.none()"),
-      " contributes nothing.",
+      " contributes nothing. ",
+      code("Instructions.renderUpdate"),
+      " is deprecated: Baton does not call it or define insertion, replay, resume, or persistence semantics. For stable content, change the source to ",
+      code('cache: "baseline"'),
+      " or use ",
+      code("staticSource"),
+      ", provide it through ",
+      code("Instructions.layer"),
+      ", and let Agent open the epoch. Changing content has no Agent-integrated replacement; hosts that continue rendering it must own those lifecycle concerns. TurnPolicy instruction overrides are independent: they prepend a system message once to the selected follow-up prompt, and that message remains in chat history.",
     ),
     h2("load-instruction-files", "3. Load AGENTS.md files as sources"),
     p(

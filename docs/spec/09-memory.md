@@ -29,7 +29,7 @@ Resume runs skip recall because turn 0 already happened before suspension.
 
 ## Remember
 
-Baton calls `remember({ key, turn, transcript, terminal })` after each completed streamed turn. `transcript` is the full `Ai.Chat` history at that point. `terminal` is `true` when the run would otherwise complete with no pending tool results and `false` when tool results will be re-fed to a follow-up turn.
+Baton calls `remember({ key, turn, transcript, terminal })` after each completed streamed turn. `transcript` is the full `Ai.Chat` history at that point, including only authoritative post-middleware model responses rather than raw provider parts. `terminal` is `true` when the run would otherwise complete with no pending tool results and `false` when tool results will be re-fed to a follow-up turn.
 
 Terminal remember runs before persisted-chat save and before `Completed`. Suspension does not remember at the suspension point; the host re-enters with `RunOptions.resume`, and the resumed run's completed turns remember normally.
 
@@ -75,7 +75,23 @@ Embedding and vector-store failures map to `MemoryError`; hosts that want best-e
 
 `WorkingMemory.layer(options?)` provides an in-process bounded recent text tail per `Memory.Key`. Recall returns the rolling summary first when present, followed by recent user/assistant messages in order as role-prefixed text items.
 
-Remember normalizes full transcripts to text-bearing user/assistant messages, deduplicates against the stored tail, and keeps `maxMessages` recent messages. Overflow is dropped unless `summarize` is configured. When summarization is configured, overflow plus any existing summary are summarized with the caller-provided language-model layer, not the agent loop's ambient model.
+Remember normalizes full transcripts to text-bearing user/assistant messages, deduplicates against the stored tail, and keeps `maxMessages` recent messages. Overflow is dropped unless `summarize` is configured. When summarization is configured, overflow plus any existing summary are summarized with the caller-provided `WorkingMemory.SummaryModel` service, not the agent loop's ambient model. `WorkingMemory.make` exposes that service as an Effect requirement and `WorkingMemory.layer` exposes it as a layer requirement. The service is captured once when working memory is constructed, reused across overflows, and remains owned by the scope that provided it. Concurrent remember operations are serialized so summary and recent-tail updates cannot overwrite each other.
+
+`WorkingMemory.summaryModelLayer` derives `WorkingMemory.SummaryModel` from the provider-neutral Effect AI `LanguageModel` service. Applications compose their chosen language-model layer into this adapter and then provide it to `WorkingMemory.layer`.
+
+The former `summarize.model` layer-valued option remains temporarily supported for migration. It is deprecated and, when used through `WorkingMemory.layer`, is built once in that layer's owning scope rather than on every overflow. New code provides `SummaryModel` through Effect composition. Before:
+
+```ts
+WorkingMemory.layer({ summarize: { model: modelLayer } })
+```
+
+After:
+
+```ts
+WorkingMemory.layer({ summarize: {} }).pipe(
+  Layer.provide(WorkingMemory.summaryModelLayer.pipe(Layer.provide(modelLayer))),
+)
+```
 
 Forget without `id` drops the exact key's in-process working-memory state. Forget with `id` removes one recalled item id within the exact key; the special `working-summary` id removes the summary while preserving the recent tail.
 
@@ -88,3 +104,5 @@ Forget without `id` drops the exact key's in-process working-memory state. Forge
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0001-baton-standalone-agent-framework.md`
 - `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`
+- `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
+- `docs/spec/decisions/ADR-0026-working-memory-summary-model.md`

@@ -2,10 +2,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
-import { Context, Duration, Effect, Function, Layer, Ref, Schema, Scope } from "effect"
+import { Context, Duration, Effect, Function, Layer, Option, Ref, Schema, Scope } from "effect"
 import type { JsonSchema } from "effect/JsonSchema"
 import { Tool } from "effect/unstable/ai"
-import type { Interface as OAuthInterface } from "./oauth.js"
+import { OAuthPendingError, OAuthProviderError } from "./oauth.js"
 /** @experimental */
 export type JsonValue = Schema.Json
 
@@ -32,7 +32,7 @@ export type McpTransport =
       readonly kind: "http"
       readonly url: string
       readonly headers?: Record<string, string>
-      readonly oauth?: OAuthInterface
+      readonly oauth?: import("./oauth.js").Interface
     }
 
 /** @experimental */
@@ -78,6 +78,12 @@ export class McpToolSource extends Context.Service<McpToolSource, Interface>()(
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 
+const connectionError = (server: string, error: unknown): McpConnectionError | OAuthProviderError =>
+  Schema.is(OAuthProviderError)(error) ? error : McpConnectionError.make({ server, message: errorMessage(error) })
+
+const sanitizedConnectionError = (server: string): McpConnectionError =>
+  McpConnectionError.make({ server, message: "MCP connection failed" })
+
 const joinedText = (content: unknown): string => {
   if (!Array.isArray(content)) return ""
   return content
@@ -122,27 +128,28 @@ export const fromTransport: {
   (
     transport: Transport,
     options?: CallOptions,
-  ): (name: string) => Effect.Effect<Interface, McpConnectionError, Scope.Scope>
-  (name: string, transport: Transport, options?: CallOptions): Effect.Effect<Interface, McpConnectionError, Scope.Scope>
+  ): (name: string) => Effect.Effect<Interface, McpConnectionError | OAuthProviderError, Scope.Scope>
+  (
+    name: string,
+    transport: Transport,
+    options?: CallOptions,
+  ): Effect.Effect<Interface, McpConnectionError | OAuthProviderError, Scope.Scope>
 } = Function.dual(
   (args) => typeof args[0] === "string",
   (name: string, transport: Transport, options?: CallOptions) =>
     Effect.gen(function* () {
       const client = yield* Effect.acquireRelease(
-        Effect.gen(function* () {
-          const created = new Client({ name: `@batonfx/mcp:${name}`, version: "0.0.0" })
-          yield* Effect.tryPromise({
-            try: () => created.connect(transport),
-            catch: (error) => McpConnectionError.make({ server: name, message: errorMessage(error) }),
-          })
-          return created
-        }),
+        Effect.sync(() => new Client({ name: `@batonfx/mcp:${name}`, version: "0.0.0" })),
         (connected) => Effect.promise(() => connected.close()).pipe(Effect.ignore),
       )
+      yield* Effect.tryPromise({
+        try: () => client.connect(transport),
+        catch: (error) => connectionError(name, error),
+      })
 
       const listed = yield* Effect.tryPromise({
         try: () => client.listTools(),
-        catch: (error) => McpConnectionError.make({ server: name, message: errorMessage(error) }),
+        catch: (error) => connectionError(name, error),
       })
       const discovered = yield* Ref.make<ReadonlyArray<DiscoveredTool>>(
         listed.tools.map((tool) => discoveredTool(name, tool)),
@@ -204,8 +211,8 @@ const makeInterface = (options: {
   readonly name: string
   readonly transport: McpTransport
   readonly callTimeout?: Duration.Input
-}): Effect.Effect<Interface, McpConnectionError, Scope.Scope> =>
-  buildTransport(options.name, options.transport).pipe(
+}): Effect.Effect<Interface, McpConnectionError | OAuthPendingError | OAuthProviderError, Scope.Scope> => {
+  const connect = buildTransport(options.name, options.transport).pipe(
     Effect.flatMap((transport) =>
       fromTransport(
         options.name,
@@ -214,13 +221,35 @@ const makeInterface = (options: {
       ),
     ),
   )
+  const oauth = options.transport.kind === "http" ? options.transport.oauth : undefined
+  if (oauth === undefined) return connect
+  return oauth.withTransport(
+    Effect.gen(function* () {
+      const before = yield* oauth.pending
+      return yield* connect.pipe(
+        Effect.catchTag("McpConnectionError", () =>
+          oauth.pending.pipe(
+            Effect.flatMap((current): Effect.Effect<never, McpConnectionError | OAuthPendingError> => {
+              if (Option.isNone(current)) return Effect.fail(sanitizedConnectionError(options.name))
+              if (Option.isSome(before) && before.value.url === current.value.url) {
+                return Effect.fail(sanitizedConnectionError(options.name))
+              }
+              return Effect.fail(OAuthPendingError.make({ authorizationUrl: current.value.url }))
+            }),
+          ),
+        ),
+      )
+    }),
+  )
+}
 
 /** @experimental */
 export const layer = (options: {
   readonly name: string
   readonly transport: McpTransport
   readonly callTimeout?: Duration.Input
-}): Layer.Layer<McpToolSource, McpConnectionError> => Layer.effect(McpToolSource, makeInterface(options))
+}): Layer.Layer<McpToolSource, McpConnectionError | OAuthPendingError | OAuthProviderError> =>
+  Layer.effect(McpToolSource, makeInterface(options))
 
 /** @experimental */
 export const layerTagged: {
@@ -228,7 +257,9 @@ export const layerTagged: {
     readonly name: string
     readonly transport: McpTransport
     readonly callTimeout?: Duration.Input
-  }): <Identifier>(tag: Context.Key<Identifier, Interface>) => Layer.Layer<Identifier, McpConnectionError>
+  }): <Identifier>(
+    tag: Context.Key<Identifier, Interface>,
+  ) => Layer.Layer<Identifier, McpConnectionError | OAuthPendingError | OAuthProviderError>
   <Identifier>(
     tag: Context.Key<Identifier, Interface>,
     options: {
@@ -236,7 +267,7 @@ export const layerTagged: {
       readonly transport: McpTransport
       readonly callTimeout?: Duration.Input
     },
-  ): Layer.Layer<Identifier, McpConnectionError>
+  ): Layer.Layer<Identifier, McpConnectionError | OAuthPendingError | OAuthProviderError>
 } = Function.dual(
   2,
   <Identifier>(

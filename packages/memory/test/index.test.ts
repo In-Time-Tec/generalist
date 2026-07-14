@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Layer } from "effect"
-import { EmbeddingModel, Prompt } from "effect/unstable/ai"
+import { Effect, Layer, Stream } from "effect"
+import { EmbeddingModel, LanguageModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
 import { combinedLayer, VectorStore } from "../src/index"
 
@@ -28,26 +28,43 @@ const embeddingLayer = Layer.effect(
   }),
 )
 
-layer(
-  combinedLayer({ working: { maxMessages: 1 }, semantic: { limit: 5 } }).pipe(
-    Layer.provideMerge(VectorStore.memoryLayer),
-    Layer.provideMerge(embeddingLayer),
-  ),
-)("@batonfx/memory", (it) => {
-  it.effect("combinedLayer recalls working memory before semantic matches", () =>
-    Effect.gen(function* () {
-      const memory = yield* Memory.Memory
+const summaryModel = Layer.effect(
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
+    generateText: () => Effect.succeed([{ type: "text", text: "summary" }]),
+    streamText: () => Stream.empty,
+  }),
+)
 
-      yield* memory.remember({
-        key,
-        turn: 0,
-        terminal: true,
-        transcript: prompt(user("What color is the sky?"), assistant("blue")),
-      })
+const combinedOptions = {
+  working: { maxMessages: 1, summarize: { model: summaryModel, prompt: "Preserve facts." } },
+  semantic: { limit: 5 },
+}
+const memoryLayer: Layer.Layer<Memory.Memory, never, VectorStore.VectorStore | EmbeddingModel.EmbeddingModel> =
+  combinedLayer(combinedOptions)
 
-      const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
+layer(memoryLayer.pipe(Layer.provideMerge(VectorStore.memoryLayer), Layer.provideMerge(embeddingLayer)))(
+  "@batonfx/memory",
+  (it) => {
+    it.effect("combinedLayer recalls working memory before semantic matches", () =>
+      Effect.gen(function* () {
+        const memory = yield* Memory.Memory
 
-      expect(recalled.map(itemText)).toEqual(["Assistant: blue", "User: What color is the sky?\nAssistant: blue"])
-    }),
-  )
-})
+        yield* memory.remember({
+          key,
+          turn: 0,
+          terminal: true,
+          transcript: prompt(user("What color is the sky?"), assistant("blue")),
+        })
+
+        const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
+
+        expect(recalled.map(itemText)).toEqual([
+          "<working-memory-summary>\nsummary\n</working-memory-summary>",
+          "Assistant: blue",
+          "User: What color is the sky?\nAssistant: blue",
+        ])
+      }),
+    )
+  },
+)

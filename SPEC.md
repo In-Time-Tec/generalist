@@ -49,7 +49,9 @@ SPEC.md
    ├─ ADR-0021-portable-turn-policy-snapshots.md
    ├─ ADR-0022-compiled-esm-package-artifacts.md
    ├─ ADR-0023-mcp-oauth-lifecycle.md
-   └─ ADR-0024-public-api-import-and-layer-conventions.md
+   ├─ ADR-0024-public-api-import-and-layer-conventions.md
+   ├─ ADR-0025-authoritative-transformed-response.md
+   └─ ADR-0026-working-memory-summary-model.md
 ```
 
 ## Packages
@@ -109,3 +111,5 @@ SPEC.md
 - ADR-0022 — Compiled ESM Package Artifacts: `docs/spec/decisions/ADR-0022-compiled-esm-package-artifacts.md`
 - ADR-0023 — MCP OAuth Lifecycle: `docs/spec/decisions/ADR-0023-mcp-oauth-lifecycle.md`
 - ADR-0024 — Public API Import and Layer Conventions: `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`
+- ADR-0025 — Authoritative Transformed Response: `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
+- ADR-0026 — Working-memory Summary Model Composition: `docs/spec/decisions/ADR-0026-working-memory-summary-model.md`
