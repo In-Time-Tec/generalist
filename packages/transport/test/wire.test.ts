@@ -65,6 +65,67 @@ const eventFrames = (): ReadonlyArray<Wire.ServerFrameType> => [
 ]
 
 describe("Wire", () => {
+  const invalidSequences = [-1, 1.5, Number.POSITIVE_INFINITY, Number.NaN, Number.MAX_SAFE_INTEGER + 1]
+
+  it.each(invalidSequences)("rejects invalid client frame sequence %s", (afterSeq) => {
+    expect(
+      Option.isNone(Schema.decodeUnknownOption(Wire.ClientFrame)({ _tag: "Attach", sessionId: "session", afterSeq })),
+    ).toBe(true)
+  })
+
+  it.each(invalidSequences)("rejects invalid server frame sequence %s", (seq) => {
+    expect(Option.isNone(Schema.decodeUnknownOption(Wire.ServerFrame(toolkit))({ _tag: "Ended", seq }))).toBe(true)
+    expect(Option.isNone(Schema.decodeUnknownOption(Wire.LooseServerFrame)({ _tag: "Ended", seq }))).toBe(true)
+  })
+
+  it.each([0, Number.MAX_SAFE_INTEGER])("accepts valid sequence boundary %s", (seq) => {
+    expect(
+      Option.getOrUndefined(
+        Schema.decodeUnknownOption(Wire.ClientFrame)({ _tag: "Attach", sessionId: "session", afterSeq: seq }),
+      ),
+    ).toEqual({ _tag: "Attach", sessionId: "session", afterSeq: seq })
+    expect(Option.getOrUndefined(Schema.decodeUnknownOption(Wire.LooseServerFrame)({ _tag: "Ended", seq }))).toEqual({
+      _tag: "Ended",
+      seq,
+    })
+  })
+
+  it("accepts the pre-history sentinel only for snapshot replay boundaries", () => {
+    const snapshot = { _tag: "Snapshot" as const, seq: -1, transcript: Prompt.empty }
+
+    expect(Option.getOrUndefined(Schema.decodeUnknownOption(Wire.LooseServerFrame)(snapshot))).toEqual(snapshot)
+    expect(Option.isNone(Schema.decodeUnknownOption(Wire.LooseServerFrame)({ _tag: "Ended", seq: -1 }))).toBe(true)
+  })
+
+  it.effect("encodes frames lazily and fails with typed wire errors", () =>
+    Effect.gen(function* () {
+      const codec = Wire.codec(toolkit)
+      const invalidServer = { _tag: "Ended" as const, seq: -1 }
+      const invalidClient = { _tag: "Attach" as const, sessionId: "session", afterSeq: 1.5 }
+      const serverEffect = codec.encodeServer(invalidServer)
+      const clientEffect = codec.encodeClient(invalidClient)
+
+      const serverError = yield* Effect.flip(serverEffect)
+      const clientError = yield* Effect.flip(clientEffect)
+
+      expect(serverError._tag).toBe("@batonfx/transport/WireEncodeError")
+      expect(clientError._tag).toBe("@batonfx/transport/WireEncodeError")
+    }),
+  )
+
+  it.effect("preserves existing valid client and server JSON", () =>
+    Effect.gen(function* () {
+      const codec = Wire.codec(toolkit)
+
+      expect(yield* codec.encodeClient({ _tag: "Attach", sessionId: "session", afterSeq: 0 })).toBe(
+        '{"_tag":"Attach","sessionId":"session","afterSeq":0}',
+      )
+      expect(yield* codec.encodeServer({ _tag: "Ended", seq: Number.MAX_SAFE_INTEGER })).toBe(
+        `{"_tag":"Ended","seq":${Number.MAX_SAFE_INTEGER}}`,
+      )
+    }),
+  )
+
   it.effect("strict server frames round-trip every current AgentEvent tag", () =>
     Effect.gen(function* () {
       const schema = Wire.ServerFrame(toolkit)

@@ -3,7 +3,7 @@ import { Cause, Effect, Exit, Fiber, Layer, Schedule, Schema, Scope, Stream } fr
 import { TestClock } from "effect/testing"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import { Response } from "effect/unstable/ai"
+import { Prompt, Response } from "effect/unstable/ai"
 import { Client, Wire } from "../src/index"
 
 const provideTestLayer =
@@ -13,8 +13,11 @@ const provideTestLayer =
 
 const endedFrame = (seq: number): Wire.LooseServerFrameType => ({ _tag: "Ended", seq })
 
-const eventText = (frame: Wire.LooseServerFrameType): string =>
-  `id: ${frame.seq}\nevent: ${frame._tag}\ndata: ${Schema.encodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(frame)}\n\n`
+const eventText = (frame: Wire.LooseServerFrameType, id: string | number = frame.seq): string =>
+  `id: ${id}\nevent: ${frame._tag}\ndata: ${Schema.encodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(frame)}\n\n`
+
+const invalidSequenceEventText = (seq: number): string =>
+  `id: ${seq}\nevent: Ended\ndata: ${JSON.stringify({ _tag: "Ended", seq })}\n\n`
 
 const httpClientLayer = (body: string): Layer.Layer<HttpClient.HttpClient> => {
   const baseRequest = HttpClientRequest.get("http://test/events")
@@ -109,6 +112,44 @@ const encodeServerFrame = (frame: Wire.LooseServerFrameType): string =>
   Schema.encodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(frame)
 
 describe("Client", () => {
+  const invalidSequences = [-1, 1.5, Number.POSITIVE_INFINITY, Number.NaN, Number.MAX_SAFE_INTEGER + 1]
+
+  it.effect("SSE client rejects invalid payload sequences", () =>
+    Effect.gen(function* () {
+      for (const seq of invalidSequences) {
+        const error = yield* Client.sseFrames({ url: "http://test/events" }).pipe(
+          Stream.runDrain,
+          Effect.flip,
+          provideTestLayer(httpClientLayer(invalidSequenceEventText(seq))),
+        )
+        expect(error._tag).toBe("@batonfx/transport/TransportError")
+      }
+    }),
+  )
+
+  it.effect("SSE client rejects an event ID that differs from the payload sequence", () =>
+    Client.sseFrames({ url: "http://test/events" }).pipe(
+      Stream.runDrain,
+      Effect.flip,
+      Effect.map((error) => expect(error._tag).toBe("@batonfx/transport/TransportError")),
+      provideTestLayer(httpClientLayer(eventText(endedFrame(1), 2))),
+    ),
+  )
+
+  it.effect("SSE client rejects invalid event IDs", () =>
+    Effect.gen(function* () {
+      const invalidIds = ["", " ", "+1", "1e2", "0x10", "-1", "1.5", "Infinity", "NaN", "9007199254740992"]
+      for (const id of invalidIds) {
+        const error = yield* Client.sseFrames({ url: "http://test/events" }).pipe(
+          Stream.runDrain,
+          Effect.flip,
+          provideTestLayer(httpClientLayer(eventText(endedFrame(0), id))),
+        )
+        expect(error._tag).toBe("@batonfx/transport/TransportError")
+      }
+    }),
+  )
+
   it.effect("sseFrames decodes text/event-stream with loose server frames", () =>
     Effect.gen(function* () {
       const frames = yield* Client.sseFrames({ url: "http://test/events" }).pipe(Stream.runCollect)
@@ -390,6 +431,34 @@ describe("Client", () => {
           _tag: "Attach",
           sessionId: "s-client",
           afterSeq: 7,
+        })
+      }),
+    ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
+  })
+
+  it.effect("WebSocket client omits the reconnect cursor after a pre-history snapshot", () => {
+    const sockets: Array<FakeWebSocket> = []
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const connection = yield* Client.AgentClient.use((client) =>
+          client.connect({ url: "ws://test", sessionId: "s-client" }),
+        )
+        const framesFiber = yield* connection.frames.pipe(Stream.take(1), Stream.runCollect, Effect.forkChild)
+        const first = yield* socketAt(sockets, 0)
+        first.open()
+        yield* sentAt(first, 0)
+        first.message(encodeServerFrame({ _tag: "Snapshot", seq: -1, transcript: Prompt.empty }))
+        yield* Fiber.join(framesFiber)
+        first.close(4000, "lagged")
+        yield* Effect.yieldNow
+        yield* TestClock.adjust("100 millis")
+        const second = yield* socketAt(sockets, 1)
+        second.open()
+        const attach = yield* sentAt(second, 0)
+
+        expect(typeof attach === "string" && decodeClientFrame(attach)).toEqual({
+          _tag: "Attach",
+          sessionId: "s-client",
         })
       }),
     ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))

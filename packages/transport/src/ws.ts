@@ -4,7 +4,7 @@ import { Socket } from "effect/unstable/socket"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { NotAttached, SessionMismatch, TransportError } from "./errors.js"
 import { SessionRegistry } from "./session-registry.js"
-import { ClientFrame, ServerFrame } from "./wire.js"
+import { ClientFrame, codec } from "./wire.js"
 import type { ClientFrameType, LooseServerFrameType } from "./wire.js"
 const ClientFrameJson = Schema.fromJsonString(ClientFrame)
 
@@ -25,11 +25,6 @@ type SocketState =
 const Unattached: SocketState = { _tag: "Unattached" }
 
 const transportError = (message: string): TransportError => TransportError.make({ message })
-
-const encodeServerFrame =
-  <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
-  (frame: LooseServerFrameType): string =>
-    JSON.stringify(Schema.encodeUnknownSync(ServerFrame(toolkit))(frame))
 
 const decodeClientFrame = (text: string): Effect.Effect<ClientFrameType, TransportError> =>
   Schema.decodeUnknownEffect(ClientFrameJson)(text).pipe(
@@ -61,7 +56,7 @@ export const handle = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string
     const socket = yield* request.upgrade
     const writer = yield* socket.writer
     const state = yield* SynchronizedRef.make<SocketState>(Unattached)
-    const encodeFrame = encodeServerFrame(toolkit)
+    const wireCodec = codec(toolkit)
 
     const interruptAttachment = SynchronizedRef.modifyEffect(state, (current) =>
       current._tag === "Attached"
@@ -79,7 +74,13 @@ export const handle = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string
         Effect.flatMap((shouldClose) => (shouldClose ? writer(new Socket.CloseEvent(code, reason)) : Effect.void)),
       )
 
-    const writeFrame = (frame: LooseServerFrameType) => writer(encodeFrame(frame))
+    const writeFrame = (frame: LooseServerFrameType) =>
+      wireCodec.encodeServer(frame).pipe(
+        Effect.flatMap(writer),
+        Effect.catchTag("@batonfx/transport/WireEncodeError", (error) =>
+          close(1011, "wire encoding failed").pipe(Effect.andThen(Effect.fail(error))),
+        ),
+      )
 
     const startAttach = (sessionId: string, afterSeq: number | undefined) =>
       SynchronizedRef.modifyEffect(state, (current) => {
@@ -92,6 +93,7 @@ export const handle = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string
         return registry.attach(sessionId, afterSeq).pipe(
           Stream.runForEach(writeFrame),
           Effect.catchTags({
+            "@batonfx/transport/WireEncodeError": () => Effect.void,
             "@batonfx/transport/SubscriberLagged": () => close(4000, "lagged"),
             "@batonfx/transport/SessionError": (error) => close(1011, error.message),
           }),
