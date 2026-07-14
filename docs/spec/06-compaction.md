@@ -96,7 +96,7 @@ When no `SessionStore` is provided, Baton can still run an implementation suppli
 
 `Agent.stream` resolves `Compaction`, `SessionStore`, and `Ai.Tokenizer` optionally. These services do not become static `RunServices` requirements.
 
-- At the top of every model turn, before `chat.streamText`, Baton measures the fully assembled current history and prompt. It uses `Ai.Tokenizer` when provided and otherwise uses the deterministic serialized-length estimate. Provider-reported input usage is telemetry and aggregate budget data only; usage from an earlier model request is never reused as the size of a different current prompt. `RunOptions.compaction.contextWindow` or layer defaults supply the context window. If compaction returns a rebuilt history/prompt, Baton replaces the live chat history before calling the model, and the next compaction decision measures that rebuilt current context.
+- At the top of every model turn, before model streaming, Baton measures the fully assembled current history and prompt. Current history contains only the authoritative post-middleware responses committed by prior turns. It uses `Ai.Tokenizer` when provided and otherwise uses the deterministic serialized-length estimate. Provider-reported input usage is telemetry and aggregate budget data only; usage from an earlier model request is never reused as the size of a different current prompt. `RunOptions.compaction.contextWindow` or layer defaults supply the context window. If compaction returns a rebuilt history/prompt, Baton replaces the live chat history before calling the model, and the next compaction decision measures that rebuilt current context.
 - On a pre-emission context-overflow stream failure, Baton restores the attempted history, compacts with `overflow: true`, and retries the same turn once without emitting another `TurnStarted`.
 - Absent `Compaction` preserves current turn, event, session, and completion behavior.
 
@@ -107,3 +107,4 @@ Terminal structured-output compaction is deferred; the same seam can compact nor
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/02-session-event-log.md`
 - `docs/spec/decisions/ADR-0009-compaction-strategy-seam.md`
+- `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`

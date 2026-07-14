@@ -29,7 +29,7 @@ Resume runs skip recall because turn 0 already happened before suspension.
 
 ## Remember
 
-Baton calls `remember({ key, turn, transcript, terminal })` after each completed streamed turn. `transcript` is the full `Ai.Chat` history at that point. `terminal` is `true` when the run would otherwise complete with no pending tool results and `false` when tool results will be re-fed to a follow-up turn.
+Baton calls `remember({ key, turn, transcript, terminal })` after each completed streamed turn. `transcript` is the full `Ai.Chat` history at that point, including only authoritative post-middleware model responses rather than raw provider parts. `terminal` is `true` when the run would otherwise complete with no pending tool results and `false` when tool results will be re-fed to a follow-up turn.
 
 Terminal remember runs before persisted-chat save and before `Completed`. Suspension does not remember at the suspension point; the host re-enters with `RunOptions.resume`, and the resumed run's completed turns remember normally.
 
@@ -88,3 +88,4 @@ Forget without `id` drops the exact key's in-process working-memory state. Forge
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0001-baton-standalone-agent-framework.md`
 - `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`
+- `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
