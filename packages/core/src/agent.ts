@@ -969,13 +969,22 @@ const streamInternal = <
         }).pipe(Effect.orDie)
 
       const captureStructuredUsage = (content: ReadonlyArray<Response.Part<any>>): Effect.Effect<void> =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
+          const span = yield* Effect.currentSpan
           for (const part of content) {
             if (part.type === "finish") {
               state.usage = state.usage === undefined ? part.usage : addUsage(state.usage, part.usage)
+              Telemetry.addGenAIAnnotations(span, {
+                operation: { name: "chat" },
+                usage: {
+                  inputTokens: part.usage.inputTokens.total,
+                  outputTokens: part.usage.outputTokens.total,
+                },
+                response: { finishReasons: [part.reason] },
+              })
             }
           }
-        })
+        }).pipe(Effect.orDie)
 
       const withModelResilience = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         Option.match(resilienceService, {
@@ -1188,12 +1197,11 @@ const streamInternal = <
       })
 
       const structuredFinalEvents = (
-        turn: number,
+        structuredTurn: number,
         config: StructuredRunConfig<StructuredOutputSchema>,
       ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> =>
         Stream.fromEffect(
           Effect.gen(function* () {
-            const structuredTurn = turn + 1
             const transformedPrompt = yield* applyPromptChain(chain, Prompt.make(config.objectPrompt), {
               agentName: agent.name,
               turn: structuredTurn,
@@ -1253,6 +1261,7 @@ const streamInternal = <
             readonly prompt: Prompt.RawInput
             readonly overrides?: TurnOverrides
           }
+          readonly structuredTurn?: number
         },
         AgentError
       > =>
@@ -1272,7 +1281,8 @@ const streamInternal = <
             }
             if (structured !== undefined) {
               return {
-                events: Stream.concat(Stream.fromIterable<Event>([completed]), structuredFinalEvents(turn, structured)),
+                events: Stream.fromIterable<Event>([completed]),
+                structuredTurn: turn + 1,
               }
             }
             yield* savePersisted
@@ -1335,6 +1345,7 @@ const streamInternal = <
               readonly overrides?: TurnOverrides
             }
           | undefined
+        let structuredTurn: number | undefined
         const currentTurn = Stream.fromIterable<Event>([{ _tag: "TurnStarted", turn }]).pipe(
           Stream.concat(resetTurnState(turn)),
           Stream.concat(modelTurn(turn, prompt, overrides)),
@@ -1343,6 +1354,7 @@ const streamInternal = <
               afterTurn(turn).pipe(
                 Effect.map((result) => {
                   next = result.next
+                  structuredTurn = result.structuredTurn
                   return result.events
                 }),
               ),
@@ -1352,7 +1364,14 @@ const streamInternal = <
         )
         return Stream.concat(
           currentTurn,
-          Stream.suspend(() => (next === undefined ? Stream.empty : runTurn(turn + 1, next.prompt, next.overrides))),
+          Stream.suspend(() => {
+            if (structuredTurn !== undefined && structured !== undefined) {
+              return structuredFinalEvents(structuredTurn, structured).pipe(
+                Stream.withSpan("Baton.Agent.turn", { attributes: { "baton.turn": structuredTurn } }),
+              )
+            }
+            return next === undefined ? Stream.empty : runTurn(turn + 1, next.prompt, next.overrides)
+          }),
         )
       }
 

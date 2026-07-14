@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
-import { Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Stream } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Stream, Tracer } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
@@ -122,6 +122,18 @@ const usage = (
 
 const finishPart = (reason: Response.FinishReason, reportedUsage: Response.Usage) =>
   Response.makePart("finish", { reason, usage: reportedUsage, response: undefined })
+
+const testTracer = () => {
+  const spans: Array<Tracer.NativeSpan> = []
+  const tracer = Tracer.make({
+    span: (options) => {
+      const span = new Tracer.NativeSpan(options)
+      spans.push(span)
+      return span
+    },
+  })
+  return { spans, tracer }
+}
 
 const objectSchema = Schema.Struct({ ok: Schema.Boolean })
 
@@ -2085,6 +2097,91 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "attributes a direct terminal structured call to its own ordered turn span", () => {
+    const streamedUsage = usage({ total: 7 }, { total: 2 })
+    const structuredUsage = usage({ total: 3 }, { total: 1, text: 1 })
+    const { spans, tracer } = testTracer()
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => Stream.fromIterable([textDelta("normal answer"), finishPart("length", streamedUsage)]),
+          () => Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)]),
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "structured-span-agent" })
+
+        const events = yield* Stream.runCollect(
+          Agent.streamObject(agent, { prompt: "make object", schema: objectSchema }),
+        ).pipe(Effect.withTracer(tracer))
+
+        const runSpan = spans.find((span) => span.name === "Baton.Agent.run")
+        const turnSpans = spans.filter((span) => span.name === "Baton.Agent.turn")
+        expect(turnSpans.map((span) => span.attributes.get("baton.turn"))).toEqual([0, 1])
+        expect(runSpan).toBeDefined()
+        expect(turnSpans.every((span) => Option.getOrUndefined(span.parent) === runSpan)).toBe(true)
+        expect(turnSpans[0]?.attributes.get("gen_ai.usage.input_tokens")).toBe(7)
+        expect(turnSpans[0]?.attributes.get("gen_ai.usage.output_tokens")).toBe(2)
+        expect(turnSpans[0]?.attributes.get("gen_ai.response.finish_reasons")).toEqual(["length"])
+        expect(turnSpans[1]?.attributes.get("gen_ai.usage.input_tokens")).toBe(3)
+        expect(turnSpans[1]?.attributes.get("gen_ai.usage.output_tokens")).toBe(1)
+        expect(turnSpans[1]?.attributes.get("gen_ai.response.finish_reasons")).toEqual(["stop"])
+        expect(turnSpans.map((span) => span.status._tag)).toEqual(["Ended", "Ended"])
+        expect(turnSpans.every((span) => span.status._tag === "Ended" && Exit.isSuccess(span.status.exit))).toBe(true)
+        expect(events.map((event) => event._tag)).toEqual([
+          "TurnStarted",
+          "ModelPart",
+          "ModelPart",
+          "TurnCompleted",
+          "StructuredOutput",
+          "Completed",
+        ])
+        const completed = events.at(-1)
+        if (completed?._tag === "Completed") {
+          expect(completed.usage).toEqual(AgentEvent.addUsage(streamedUsage, structuredUsage))
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "does not start the terminal structured turn before it is consumed", () => {
+    let structuredCalled = false
+    const streamedUsage = usage({ total: 2 }, { total: 1 })
+    const { spans, tracer } = testTracer()
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => Stream.fromIterable([textDelta("normal answer"), finishPart("stop", streamedUsage)]),
+          () => {
+            structuredCalled = true
+            return Effect.succeed([{ type: "text", text: '{"ok":true}' }])
+          },
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "structured-lazy-span-agent" })
+
+        const events = yield* Agent.streamObject(agent, { prompt: "make object", schema: objectSchema }).pipe(
+          Stream.take(4),
+          Stream.runCollect,
+          Effect.withTracer(tracer),
+        )
+
+        expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "ModelPart", "TurnCompleted"])
+        expect(structuredCalled).toBe(false)
+        const turnSpans = spans.filter((span) => span.name === "Baton.Agent.turn")
+        expect(turnSpans.map((span) => span.attributes.get("baton.turn"))).toEqual([0])
+        expect(turnSpans[0]?.status._tag).toBe("Ended")
+      }),
+    ] as const
+  })
+
   ItLayer.make(
     it,
     "generateObject returns the typed structured value",
@@ -2115,6 +2212,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let streamCalls = 0
     let structuredPrompt = ""
     const structuredUsage = usage({ total: 5 }, { total: 2 })
+    const { spans, tracer } = testTracer()
     return [
       Layer.mergeAll(
         modelLayer(
@@ -2136,13 +2234,29 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-tool-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.streamObject(agent, { prompt: "use tool", schema: objectSchema }))
+        const events = yield* Stream.runCollect(
+          Agent.streamObject(agent, { prompt: "use tool", schema: objectSchema }),
+        ).pipe(Effect.withTracer(tracer))
 
         expect(streamCalls).toBe(2)
         expect(structuredPrompt).toContain("from model")
-        expect(events.findIndex((event) => event._tag === "ToolExecutionCompleted")).toBeLessThan(
-          events.findIndex((event) => event._tag === "StructuredOutput"),
-        )
+        expect(events.map((event) => event._tag)).toEqual([
+          "TurnStarted",
+          "ModelPart",
+          "ToolExecutionStarted",
+          "ToolExecutionCompleted",
+          "TurnCompleted",
+          "TurnStarted",
+          "ModelPart",
+          "TurnCompleted",
+          "StructuredOutput",
+          "Completed",
+        ])
+        const runSpan = spans.find((span) => span.name === "Baton.Agent.run")
+        const turnSpans = spans.filter((span) => span.name === "Baton.Agent.turn")
+        expect(turnSpans.map((span) => span.attributes.get("baton.turn"))).toEqual([0, 1, 2])
+        expect(runSpan).toBeDefined()
+        expect(turnSpans.every((span) => Option.getOrUndefined(span.parent) === runSpan)).toBe(true)
         const structured = events.find((event) => event._tag === "StructuredOutput")
         if (structured?._tag === "StructuredOutput") {
           expect(structured.turn).toBe(2)
@@ -2158,39 +2272,128 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(
-    it,
-    "fails AgentError at the structured turn when schema decoding fails",
-    () =>
-      [
-        Layer.mergeAll(
-          modelLayer(
-            () => Stream.make(textDelta("normal answer")),
-            () => Effect.succeed([{ type: "text", text: '{"ok":"nope"}' }]),
-          ),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+  ItLayer.make(it, "fails AgentError at the structured turn when schema decoding fails", () => {
+    const { spans, tracer } = testTracer()
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => Stream.make(textDelta("normal answer")),
+          () => Effect.succeed([{ type: "text", text: '{"ok":"nope"}' }]),
         ),
-        Effect.gen(function* () {
-          const agent = Agent.make({ name: "structured-decode-agent" })
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "structured-decode-agent" })
 
-          const failure = yield* Effect.flip(
-            Stream.runCollect(Agent.streamObject(agent, { prompt: "bad object", schema: objectSchema })),
-          )
+        const failure = yield* Effect.flip(
+          Stream.runCollect(Agent.streamObject(agent, { prompt: "bad object", schema: objectSchema })).pipe(
+            Effect.withTracer(tracer),
+          ),
+        )
 
-          expect(failure._tag).toBe("@batonfx/core/AgentError")
-          if (failure._tag === "@batonfx/core/AgentError") {
-            expect(failure.turn).toBe(1)
-            expect(AiError.isAiError(failure.cause)).toBe(true)
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        if (failure._tag === "@batonfx/core/AgentError") {
+          expect(failure.turn).toBe(1)
+          expect(AiError.isAiError(failure.cause)).toBe(true)
+        }
+        const structuredSpan = spans.find(
+          (span) => span.name === "Baton.Agent.turn" && span.attributes.get("baton.turn") === 1,
+        )
+        expect(structuredSpan?.status._tag).toBe("Ended")
+        if (structuredSpan?.status._tag === "Ended") {
+          expect(Exit.isFailure(structuredSpan.status.exit)).toBe(true)
+          if (Exit.isFailure(structuredSpan.status.exit)) {
+            expect(Cause.hasFails(structuredSpan.status.exit.cause)).toBe(true)
           }
-        }),
-      ] as const,
-  )
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "closes the terminal structured turn span on a defect", () => {
+    const { spans, tracer } = testTracer()
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => Stream.make(textDelta("normal answer")),
+          () => Effect.die("structured defect"),
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "structured-defect-agent" })
+
+        const exit = yield* Stream.runDrain(
+          Agent.streamObject(agent, { prompt: "defect object", schema: objectSchema }),
+        ).pipe(Effect.withTracer(tracer), Effect.exit)
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) expect(Cause.hasDies(exit.cause)).toBe(true)
+        const structuredSpan = spans.find(
+          (span) => span.name === "Baton.Agent.turn" && span.attributes.get("baton.turn") === 1,
+        )
+        expect(structuredSpan?.status._tag).toBe("Ended")
+        if (structuredSpan?.status._tag === "Ended") {
+          expect(Exit.isFailure(structuredSpan.status.exit)).toBe(true)
+          if (Exit.isFailure(structuredSpan.status.exit)) {
+            expect(Cause.hasDies(structuredSpan.status.exit.cause)).toBe(true)
+          }
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "closes the terminal structured turn span on interruption", () => {
+    const { spans, tracer } = testTracer()
+    let structuredStarted: Deferred.Deferred<void> | undefined
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => Stream.make(textDelta("normal answer")),
+          () =>
+            structuredStarted === undefined
+              ? Effect.die("structured turn started before test initialization")
+              : Deferred.succeed(structuredStarted, undefined).pipe(Effect.andThen(Effect.never)),
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        structuredStarted = yield* Deferred.make<void>()
+        const agent = Agent.make({ name: "structured-interrupt-agent" })
+        const fiber = yield* Stream.runDrain(
+          Agent.streamObject(agent, { prompt: "interrupt object", schema: objectSchema }),
+        ).pipe(Effect.withTracer(tracer), Effect.forkChild)
+
+        yield* Deferred.await(structuredStarted)
+        yield* Fiber.interrupt(fiber)
+        const exit = yield* Fiber.await(fiber)
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) expect(Cause.hasInterrupts(exit.cause)).toBe(true)
+        const structuredSpan = spans.find(
+          (span) => span.name === "Baton.Agent.turn" && span.attributes.get("baton.turn") === 1,
+        )
+        expect(structuredSpan?.status._tag).toBe("Ended")
+        if (structuredSpan?.status._tag === "Ended") {
+          expect(Exit.isFailure(structuredSpan.status.exit)).toBe(true)
+          if (Exit.isFailure(structuredSpan.status.exit)) {
+            expect(Cause.hasInterrupts(structuredSpan.status.exit.cause)).toBe(true)
+          }
+        }
+      }),
+    ] as const
+  })
 
   ItLayer.make(it, "performs the terminal structured turn after resume", () => {
     let calls = 0
     let sawResumedToolResult = false
+    const { spans, tracer } = testTracer()
     return [
       Layer.mergeAll(
         modelLayer(
@@ -2218,7 +2421,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             resume: { call: { id: "tool-call-resume-structured", name: "echo", params: { text: "resumed" } } },
             schema: objectSchema,
           }),
-        )
+        ).pipe(Effect.withTracer(tracer))
 
         expect(calls).toBe(1)
         expect(sawResumedToolResult).toBe(true)
@@ -2232,6 +2435,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           "StructuredOutput",
           "Completed",
         ])
+        const runSpan = spans.find((span) => span.name === "Baton.Agent.run")
+        const turnSpans = spans.filter((span) => span.name === "Baton.Agent.turn")
+        expect(turnSpans.map((span) => span.attributes.get("baton.turn"))).toEqual([0, 1, 2])
+        expect(runSpan).toBeDefined()
+        expect(turnSpans.every((span) => Option.getOrUndefined(span.parent) === runSpan)).toBe(true)
         const structured = events.find((event) => event._tag === "StructuredOutput")
         if (structured?._tag === "StructuredOutput") expect(structured.turn).toBe(2)
         const completed = events.at(-1)
