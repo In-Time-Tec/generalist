@@ -14,6 +14,8 @@ Create `@batonfx/providers` as a thin helper package over `@batonfx/core` and up
 
 Base provider, preset, deterministic fallback, and embedding constructors preserve the upstream Effect Platform `HttpClient` requirement. This keeps transport ownership, decoration, testing, and resource lifetime in the host layer graph. Explicitly named `*Fetch` conveniences provide `FetchHttpClient.layer` for applications that intentionally choose the global fetch transport; unnamed constructors never select a transport.
 
+The deterministic OpenAI fallback resolves the API-key `Config` through `Config.option` at the provider-selection boundary. Only missing API-key data selects deterministic-only registration. Invalid configuration, configuration-source failures, and failures while constructing the OpenAI client or model propagate through the Layer error channel; the helper does not perform runtime provider failover.
+
 Do not add provider-specific runtime seams to core. Do not fork providers. Do not add embedding registration to `ModelRegistry` in this milestone.
 
 ## Consequences
@@ -23,3 +25,4 @@ Do not add provider-specific runtime seams to core. Do not fork providers. Do no
 - Provider package dependencies live only in `@batonfx/providers`.
 - Embeddings compose through Effect AI's `EmbeddingModel` tag until a future issue defines any memory-specific integration.
 - Host applications can supply one decorated `HttpClient` across providers, while fetch-backed setup remains available through conspicuously named conveniences.
+- Deterministic fallback layers retain `Config.ConfigError` in their public error type because non-absence configuration failures remain observable.

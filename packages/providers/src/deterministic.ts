@@ -1,6 +1,6 @@
 import { OpenAiClient } from "@effect/ai-openai"
 import { ModelRegistry } from "@batonfx/core"
-import { Effect, Layer, Option, Stream } from "effect"
+import { Config, Effect, Layer, Option, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 import { openAi, type RegistrationOptions, type WithOpenAiOptions } from "./openai.js"
@@ -47,15 +47,20 @@ export const withOpenAiOrDeterministic = (options: WithOpenAiOrDeterministicOpti
         provider: options.fallbackProvider ?? "deterministic",
         model: options.fallbackModel,
       })
-      const providerLayer = OpenAiClient.layerConfig({
-        ...options.clientConfig,
-        apiKey: options.apiKey,
+      const configuredApiKey = yield* Config.option(options.apiKey)
+      const openAiRegistration = yield* Option.match(configuredApiKey, {
+        onNone: () => Effect.succeedNone,
+        onSome: (apiKey) =>
+          Layer.build(
+            OpenAiClient.layerConfig({
+              ...options.clientConfig,
+              apiKey: Config.succeed(apiKey),
+            }),
+          ).pipe(
+            Effect.flatMap((context) => openAi(options).pipe(Effect.provide(context))),
+            Effect.asSome,
+          ),
       })
-      const openAiRegistration = yield* Layer.build(providerLayer).pipe(
-        Effect.flatMap((context) => openAi(options).pipe(Effect.provide(context))),
-        Effect.asSome,
-        Effect.catchTag("ConfigError", () => Effect.succeedNone),
-      )
       return ModelRegistry.layer([
         deterministic,
         ...(Option.isSome(openAiRegistration) ? [openAiRegistration.value] : []),

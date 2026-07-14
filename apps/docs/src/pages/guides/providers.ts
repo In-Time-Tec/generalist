@@ -88,7 +88,7 @@ export const providers = definePage({
     }),
     p(
       code("Deterministic.withOpenAiOrDeterministicFetch"),
-      " installs both registrations in one registry: the deterministic fallback always, and OpenAI only when its key config resolves. The selection stays data, so each environment picks its own pair.",
+      " installs the deterministic fallback always and OpenAI only when its API-key config is present. Missing key data selects deterministic-only registration; invalid values and configuration-source failures remain typed failures. The selection stays data, so each environment picks its own pair.",
     ),
     codeBlock({ label: "openai-or-deterministic.ts", source: openaiOrDeterministic }),
     p(
