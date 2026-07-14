@@ -56,7 +56,8 @@ SPEC.md
    ├─ ADR-0027-memory-item-user-content.md
    ├─ ADR-0028-scoped-mcp-baton-tools.md
    ├─ ADR-0029-mcp-remote-payload-decoding.md
-   └─ ADR-0030-effectful-turn-policy-stop-reasons.md
+   ├─ ADR-0030-effectful-turn-policy-stop-reasons.md
+   └─ ADR-0031-model-registry-operation-lifetime.md
 ```
 
 ## Packages
@@ -123,3 +124,4 @@ SPEC.md
 - ADR-0028 — Scoped MCP Baton Tools: `docs/spec/decisions/ADR-0028-scoped-mcp-baton-tools.md`
 - ADR-0029 — MCP Remote Payload Decoding: `docs/spec/decisions/ADR-0029-mcp-remote-payload-decoding.md`
 - ADR-0030 — Effectful Turn Policy Stop Reasons: `docs/spec/decisions/ADR-0030-effectful-turn-policy-stop-reasons.md`
+- ADR-0031 — Model Registry Operation Lifetime: `docs/spec/decisions/ADR-0031-model-registry-operation-lifetime.md`

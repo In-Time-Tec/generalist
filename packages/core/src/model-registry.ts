@@ -1,4 +1,4 @@
-import { Chunk, Context, Effect, Function, Layer, Option, Ref, Schema, Semaphore } from "effect"
+import { Chunk, Context, Effect, Function, Layer, Option, Ref, Schema, Semaphore, Stream } from "effect"
 import { LanguageModel, Model } from "effect/unstable/ai"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
@@ -43,6 +43,15 @@ export interface RegisterInput {
 export interface Interface {
   readonly register: (input: RegisterInput) => Effect.Effect<void>
   readonly registrations: Effect.Effect<ReadonlyArray<Registration>>
+  readonly operate: <A, E, R>(
+    selection: ModelSelection,
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | LanguageModelNotRegistered, Exclude<R, ModelEnvironment>>
+  readonly stream: <A, E, R>(
+    selection: ModelSelection,
+    stream: Stream.Stream<A, E, R>,
+  ) => Stream.Stream<A, E | LanguageModelNotRegistered, Exclude<R, ModelEnvironment>>
+  /** @deprecated Use `operate`. */
   readonly provide: <A, E, R>(
     selection: ModelSelection,
     effect: Effect.Effect<A, E, R>,
@@ -122,7 +131,7 @@ export const layer: {
 
         const registrations = Ref.get(registry).pipe(Effect.map(Chunk.toReadonlyArray))
 
-        const provide = Effect.fn("ModelRegistry.provide")(function* <A, E, R>(
+        const operate = Effect.fn("ModelRegistry.operate")(function* <A, E, R>(
           selection: ModelSelection,
           effect: Effect.Effect<A, E, R>,
         ) {
@@ -141,10 +150,32 @@ export const layer: {
           return yield* semaphore === undefined ? provided : semaphore.withPermits(1)(provided)
         })
 
+        const stream = <A, E, R>(selection: ModelSelection, operation: Stream.Stream<A, E, R>) =>
+          Stream.unwrap(
+            Effect.gen(function* () {
+              const items = yield* Ref.get(registry)
+              const registration = findRegistration(items, selection)
+              if (registration === undefined) {
+                return yield* LanguageModelNotRegistered.make({
+                  provider: selection.provider,
+                  model: selection.model,
+                  ...(selection.registrationKey === undefined ? {} : { registration_key: selection.registrationKey }),
+                })
+              }
+              if (semaphore !== undefined) {
+                yield* Effect.acquireRelease(semaphore.take(1), () => semaphore.release(1), { interruptible: true })
+              }
+              const context = yield* Layer.build(registration.layer)
+              return operation.pipe(Stream.provideContext(context))
+            }),
+          )
+
         return Service.of({
           register,
           registrations,
-          provide,
+          operate,
+          stream,
+          provide: operate,
         })
       }),
     ),
@@ -214,7 +245,7 @@ export const registrations = Effect.fn("ModelRegistry.registrations.call")(funct
 })
 
 /** @experimental */
-export const provide: {
+export const operate: {
   <A, E, R>(
     effect: Effect.Effect<A, E, R>,
   ): (
@@ -227,6 +258,27 @@ export const provide: {
 } = Function.dual(2, <A, E, R>(selection: ModelSelection, effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
     const service = yield* Service
-    return yield* service.provide(selection, effect)
+    return yield* service.operate(selection, effect)
   }),
 )
+
+/** @experimental */
+export const stream: {
+  <A, E, R>(
+    operation: Stream.Stream<A, E, R>,
+  ): (
+    selection: ModelSelection,
+  ) => Stream.Stream<A, E | LanguageModelNotRegistered, Service | Exclude<R, ModelEnvironment>>
+  <A, E, R>(
+    selection: ModelSelection,
+    operation: Stream.Stream<A, E, R>,
+  ): Stream.Stream<A, E | LanguageModelNotRegistered, Service | Exclude<R, ModelEnvironment>>
+} = Function.dual(2, <A, E, R>(selection: ModelSelection, operation: Stream.Stream<A, E, R>) =>
+  Stream.unwrap(Service.pipe(Effect.map((service) => service.stream(selection, operation)))),
+)
+
+/**
+ * @experimental
+ * @deprecated Use {@link operate}. This alias will not be removed before 1.0.0 and only in a separately planned major release.
+ */
+export const provide: typeof operate = operate
