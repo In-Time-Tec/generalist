@@ -21,6 +21,7 @@ import {
   type Completed,
   type Event,
   MiddlewareViolation,
+  ProgressOverflowError,
   type SteeringDrained,
   type StructuredOutput,
   type ToolProgress,
@@ -137,6 +138,24 @@ export interface Resume {
   }
 }
 
+/** @experimental Bounded buffering behavior for tool progress events. */
+export type ProgressOverflowPolicy =
+  | { readonly _tag: "Backpressure"; readonly capacity: number }
+  | { readonly _tag: "Dropping"; readonly capacity: number }
+  | { readonly _tag: "Sliding"; readonly capacity: number }
+  | { readonly _tag: "Fail"; readonly capacity: number }
+
+const defaultProgressOverflowPolicy: ProgressOverflowPolicy = { _tag: "Backpressure", capacity: 64 }
+
+const progressCapacitySchema = Schema.Finite.pipe(Schema.check(Schema.isInt(), Schema.isGreaterThan(0)))
+
+const progressOverflowPolicySchema = Schema.Union([
+  Schema.TaggedStruct("Backpressure", { capacity: progressCapacitySchema }),
+  Schema.TaggedStruct("Dropping", { capacity: progressCapacitySchema }),
+  Schema.TaggedStruct("Sliding", { capacity: progressCapacitySchema }),
+  Schema.TaggedStruct("Fail", { capacity: progressCapacitySchema }),
+])
+
 /** @experimental */
 export interface RunOptions {
   /** User input for the first turn. Ignored when `resume` is set. */
@@ -154,6 +173,8 @@ export interface RunOptions {
   readonly sessionId?: string
   /** @experimental Spill successful tool outputs whose encoded size exceeds this byte limit. */
   readonly toolOutputMaxBytes?: number
+  /** @experimental Per-tool bounded buffering policy for progress events. Defaults to backpressure at capacity 64. */
+  readonly toolProgress?: ProgressOverflowPolicy
   /** @experimental Context-window hint for optional compaction. */
   readonly compaction?: {
     readonly contextWindow?: number
@@ -205,7 +226,7 @@ interface StructuredRunConfig<StructuredOutputSchema extends ObjectSchema> {
 }
 
 /** @experimental The error channel of `stream` and `generate`. */
-export type RunError = AgentError | AgentSuspended | TurnLimitExceeded | MiddlewareViolation
+export type RunError = AgentError | AgentSuspended | TurnLimitExceeded | MiddlewareViolation | ProgressOverflowError
 
 type ModelRunServices<HasModel extends boolean> = [HasModel] extends [true] ? Service : LanguageModel.LanguageModel
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
@@ -372,6 +393,17 @@ const streamInternal = <
           turn: 0,
         })
       }
+
+      const decodedProgressPolicy = Schema.decodeUnknownOption(progressOverflowPolicySchema)(
+        options.toolProgress === undefined ? defaultProgressOverflowPolicy : options.toolProgress,
+      )
+      if (Option.isNone(decodedProgressPolicy)) {
+        return yield* AgentError.make({
+          message: "RunOptions.toolProgress must select a supported policy with a positive safe-integer capacity",
+          turn: 0,
+        })
+      }
+      const progressPolicy: ProgressOverflowPolicy = decodedProgressPolicy.value
 
       if (
         options.compaction?.contextWindow !== undefined &&
@@ -691,7 +723,9 @@ const streamInternal = <
         turn: number,
         call: AnyToolCall,
         outcome: Outcome,
+        droppedProgress: number,
       ): Effect.Effect<Stream.Stream<Event, RunError>, AgentError> => {
+        const metadata = droppedProgress === 0 ? {} : { metadata: { toolProgress: { dropped: droppedProgress } } }
         switch (outcome._tag) {
           case "Success":
             return (
@@ -701,13 +735,15 @@ const streamInternal = <
             ).pipe(
               Effect.map((result) => {
                 state.pending.push(result)
-                return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
+                return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }])
               }),
             )
           case "Failure": {
             const result = failedResult(call, outcome.message)
             state.pending.push(result)
-            return Effect.succeed(Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }]))
+            return Effect.succeed(
+              Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }]),
+            )
           }
           case "Suspend":
             return Effect.succeed(failSuspended(call, outcome.token, "tool-wait"))
@@ -729,6 +765,18 @@ const streamInternal = <
             })
       }
 
+      const makeProgressQueue = (): Effect.Effect<Queue.Queue<ToolProgress, Cause.Done | ProgressOverflowError>> => {
+        switch (progressPolicy._tag) {
+          case "Backpressure":
+            return Queue.bounded(progressPolicy.capacity)
+          case "Dropping":
+          case "Fail":
+            return Queue.dropping(progressPolicy.capacity)
+          case "Sliding":
+            return Queue.sliding(progressPolicy.capacity)
+        }
+      }
+
       const executeApproved = (
         turn: number,
         call: AnyToolCall,
@@ -738,7 +786,9 @@ const streamInternal = <
           Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
           Stream.unwrap(
             Effect.gen(function* () {
-              const progressQueue = yield* Queue.unbounded<ToolProgress, Cause.Done>()
+              const progressQueue = yield* Effect.acquireRelease(makeProgressQueue(), Queue.shutdown)
+              const droppedProgress = yield* Ref.make(0)
+              const emitSemaphore = yield* Semaphore.make(1)
               const signal = yield* Effect.abortSignal
               const context = ToolContext.of({
                 signal,
@@ -751,7 +801,28 @@ const streamInternal = <
                     ...(progress.message === undefined ? {} : { message: progress.message }),
                     ...(progress.data === undefined ? {} : { data: progress.data }),
                   }
-                  return Queue.offer(progressQueue, event).pipe(Effect.asVoid)
+                  return emitSemaphore.withPermit(
+                    Effect.gen(function* () {
+                      if (progressPolicy._tag === "Sliding") {
+                        const dropped = yield* Effect.sync(() => {
+                          const full = Queue.isFullUnsafe(progressQueue)
+                          Queue.offerUnsafe(progressQueue, event)
+                          return full
+                        })
+                        if (dropped) yield* Ref.update(droppedProgress, (count) => count + 1)
+                        return
+                      }
+                      const offered = yield* Queue.offer(progressQueue, event)
+                      if (progressPolicy._tag === "Dropping" && !offered) {
+                        yield* Ref.update(droppedProgress, (count) => count + 1)
+                      } else if (progressPolicy._tag === "Fail" && !offered) {
+                        yield* Queue.fail(
+                          progressQueue,
+                          ProgressOverflowError.make({ turn, toolCallId: call.id, capacity: progressPolicy.capacity }),
+                        )
+                      }
+                    }),
+                  )
                 },
               })
               const execution: Effect.Effect<
@@ -779,7 +850,13 @@ const streamInternal = <
               return Stream.concat(
                 Stream.fromQueue(progressQueue),
                 Stream.fromEffect(Fiber.join(fiber)).pipe(
-                  Stream.flatMap((outcome) => Stream.unwrap(outcomeEvents(turn, call, outcome))),
+                  Stream.flatMap((outcome) =>
+                    Stream.unwrap(
+                      Ref.get(droppedProgress).pipe(
+                        Effect.flatMap((dropped) => outcomeEvents(turn, call, outcome, dropped)),
+                      ),
+                    ),
+                  ),
                 ),
               )
             }),

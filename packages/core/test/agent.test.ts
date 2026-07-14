@@ -95,6 +95,12 @@ const providerToolCallPart = (id: string, name: string, params: unknown) =>
 
 const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
+const progressMessages = (events: Iterable<AgentEvent.Event>) =>
+  [...events].filter((event) => event._tag === "ToolProgress").map((event) => event.message)
+
+const toolCompletionMetadata = (events: Iterable<AgentEvent.Event>) =>
+  [...events].find((event) => event._tag === "ToolExecutionCompleted")?.metadata
+
 const systemText = (prompt: Prompt.Prompt): string | undefined => {
   for (const message of prompt.content) {
     if (message.role === "system") return message.content
@@ -215,6 +221,37 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           expect(failure._tag).toBe("@batonfx/core/AgentError")
           expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
             "RunOptions.toolOutputMaxBytes must be a non-negative finite number",
+          )
+        }
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails before model calls when tool progress capacity is invalid", () => {
+    let modelCalls = 0
+    const invalidValues = [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN, Number.POSITIVE_INFINITY]
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("unexpected"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "invalid-progress-capacity-agent" })
+
+        for (const capacity of invalidValues) {
+          const failure = yield* Effect.flip(
+            Stream.runDrain(Agent.stream(agent, { prompt: "hello", toolProgress: { _tag: "Backpressure", capacity } })),
+          )
+
+          expect(failure._tag).toBe("@batonfx/core/AgentError")
+          expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
+            "RunOptions.toolProgress must select a supported policy with a positive safe-integer capacity",
           )
         }
         expect(modelCalls).toBe(0)
@@ -852,6 +889,376 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           expect(progress.message).toBe("working")
           expect(progress.data).toEqual({ phase: "started" })
         }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "backpressures tool progress at the configured capacity", () => {
+    let calls = 0
+    let firstProgress!: Deferred.Deferred<void>
+    let releaseConsumer!: Deferred.Deferred<void>
+    let thirdOfferStarted!: Deferred.Deferred<void>
+    let thirdOfferCompleted!: Deferred.Deferred<void>
+    return [
+      Layer.unwrap(
+        Effect.gen(function* () {
+          firstProgress = yield* Deferred.make<void>()
+          releaseConsumer = yield* Deferred.make<void>()
+          thirdOfferStarted = yield* Deferred.make<void>()
+          thirdOfferCompleted = yield* Deferred.make<void>()
+          return Layer.mergeAll(
+            modelLayer(() => {
+              calls += 1
+              return calls === 1
+                ? Stream.make(toolCallPart("tool-call-backpressure", "echo", { text: "from model" }))
+                : Stream.make(textDelta("after progress"))
+            }),
+            ToolExecutor.testLayer({
+              execute: () =>
+                Effect.gen(function* () {
+                  const context = yield* ToolContext.ToolContext
+                  yield* context.emit({ toolCallId: "tool-call-backpressure", message: "one" })
+                  yield* context.emit({ toolCallId: "tool-call-backpressure", message: "two" })
+                  yield* Deferred.succeed(thirdOfferStarted, undefined)
+                  yield* context.emit({ toolCallId: "tool-call-backpressure", message: "three" })
+                  yield* Deferred.succeed(thirdOfferCompleted, undefined)
+                  return { _tag: "Success", result: { ok: true }, encodedResult: { ok: true } }
+                }),
+            }),
+            Approvals.autoApprove,
+            ModelMiddleware.identityLayer,
+          )
+        }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "backpressure-agent", toolkit: Toolkit.make(echoTool) })
+        const run = Agent.stream(agent, {
+          prompt: "use the tool",
+          toolProgress: { _tag: "Backpressure", capacity: 1 },
+        }).pipe(
+          Stream.runForEach((event) =>
+            event._tag !== "ToolProgress" || event.message !== "one"
+              ? Effect.void
+              : Deferred.succeed(firstProgress, undefined).pipe(Effect.andThen(Deferred.await(releaseConsumer))),
+          ),
+        )
+        const fiber = yield* run.pipe(Effect.forkChild({ startImmediately: true }))
+
+        yield* Deferred.await(firstProgress)
+        yield* Deferred.await(thirdOfferStarted)
+        yield* Effect.yieldNow
+        expect(yield* Deferred.isDone(thirdOfferCompleted)).toBe(false)
+
+        yield* Deferred.succeed(releaseConsumer, undefined)
+        yield* Fiber.join(fiber)
+        expect(yield* Deferred.isDone(thirdOfferCompleted)).toBe(true)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "bounds tool progress with backpressure by default", () => {
+    let calls = 0
+    let firstProgress!: Deferred.Deferred<void>
+    let releaseConsumer!: Deferred.Deferred<void>
+    let overflowOfferStarted!: Deferred.Deferred<void>
+    let overflowOfferCompleted!: Deferred.Deferred<void>
+    return [
+      Layer.unwrap(
+        Effect.gen(function* () {
+          firstProgress = yield* Deferred.make<void>()
+          releaseConsumer = yield* Deferred.make<void>()
+          overflowOfferStarted = yield* Deferred.make<void>()
+          overflowOfferCompleted = yield* Deferred.make<void>()
+          return Layer.mergeAll(
+            modelLayer(() => {
+              calls += 1
+              return calls === 1
+                ? Stream.make(toolCallPart("tool-call-default-progress", "echo", { text: "from model" }))
+                : Stream.make(textDelta("after progress"))
+            }),
+            ToolExecutor.testLayer({
+              execute: () =>
+                Effect.gen(function* () {
+                  const context = yield* ToolContext.ToolContext
+                  for (let index = 0; index < 66; index += 1) {
+                    if (index === 65) yield* Deferred.succeed(overflowOfferStarted, undefined)
+                    yield* context.emit({ toolCallId: "tool-call-default-progress", message: String(index) })
+                    if (index === 0) yield* Deferred.await(firstProgress)
+                    if (index === 65) yield* Deferred.succeed(overflowOfferCompleted, undefined)
+                  }
+                  return { _tag: "Success", result: { ok: true }, encodedResult: { ok: true } }
+                }),
+            }),
+            Approvals.autoApprove,
+            ModelMiddleware.identityLayer,
+          )
+        }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "default-progress-agent", toolkit: Toolkit.make(echoTool) })
+        const fiber = yield* Agent.stream(agent, { prompt: "use the tool" }).pipe(
+          Stream.runForEach((event) =>
+            event._tag !== "ToolProgress" || event.message !== "0"
+              ? Effect.void
+              : Deferred.succeed(firstProgress, undefined).pipe(Effect.andThen(Deferred.await(releaseConsumer))),
+          ),
+          Effect.forkChild({ startImmediately: true }),
+        )
+
+        yield* Deferred.await(firstProgress)
+        yield* Deferred.await(overflowOfferStarted)
+        yield* Effect.yieldNow
+        expect(yield* Deferred.isDone(overflowOfferCompleted)).toBe(false)
+
+        yield* Deferred.succeed(releaseConsumer, undefined)
+        yield* Fiber.join(fiber)
+        expect(yield* Deferred.isDone(overflowOfferCompleted)).toBe(true)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "makes dropping and sliding progress loss observable", () => {
+    let calls = 0
+    let consumerStarted!: Deferred.Deferred<void>
+    let producerFinished!: Deferred.Deferred<void>
+    let releaseConsumer!: Deferred.Deferred<void>
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls % 2 === 1
+            ? Stream.make(toolCallPart(`tool-call-lossy-${calls}`, "echo", { text: "from model" }))
+            : Stream.make(textDelta("after progress"))
+        }),
+        ToolExecutor.testLayer({
+          execute: (request) =>
+            Effect.gen(function* () {
+              const context = yield* ToolContext.ToolContext
+              yield* context.emit({ toolCallId: request.call.id, message: "one" })
+              yield* Deferred.await(consumerStarted)
+              yield* context.emit({ toolCallId: request.call.id, message: "two" })
+              yield* context.emit({ toolCallId: request.call.id, message: "three" })
+              yield* Deferred.succeed(producerFinished, undefined)
+              return { _tag: "Success", result: { ok: true }, encodedResult: { ok: true } }
+            }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "lossy-progress-agent", toolkit: Toolkit.make(echoTool) })
+
+        const run = (policy: Agent.ProgressOverflowPolicy) =>
+          Effect.gen(function* () {
+            consumerStarted = yield* Deferred.make<void>()
+            producerFinished = yield* Deferred.make<void>()
+            releaseConsumer = yield* Deferred.make<void>()
+            const fiber = yield* Agent.stream(agent, { prompt: "use the tool", toolProgress: policy }).pipe(
+              Stream.tap((event) =>
+                event._tag !== "ToolProgress" || event.message !== "one"
+                  ? Effect.void
+                  : Deferred.succeed(consumerStarted, undefined).pipe(Effect.andThen(Deferred.await(releaseConsumer))),
+              ),
+              Stream.runCollect,
+              Effect.forkChild({ startImmediately: true }),
+            )
+            yield* Deferred.await(producerFinished)
+            yield* Deferred.succeed(releaseConsumer, undefined)
+            return yield* Fiber.join(fiber)
+          })
+
+        const droppingEvents = yield* run({ _tag: "Dropping", capacity: 1 })
+        const slidingEvents = yield* run({ _tag: "Sliding", capacity: 1 })
+
+        expect(progressMessages(droppingEvents)).toEqual(["one", "two"])
+        expect(progressMessages(slidingEvents)).toEqual(["one", "three"])
+        expect(toolCompletionMetadata(droppingEvents)).toEqual({ toolProgress: { dropped: 1 } })
+        expect(toolCompletionMetadata(slidingEvents)).toEqual({ toolProgress: { dropped: 1 } })
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails with a typed error when the progress fail policy overflows", () => {
+    let calls = 0
+    const seen: Array<AgentEvent.Event> = []
+    let overflowReached!: Deferred.Deferred<void>
+    let executionFinalized!: Deferred.Deferred<void>
+    let consumerStarted!: Deferred.Deferred<void>
+    let releaseConsumer!: Deferred.Deferred<void>
+    let toolSignal!: AbortSignal
+    return [
+      Layer.unwrap(
+        Effect.gen(function* () {
+          overflowReached = yield* Deferred.make<void>()
+          executionFinalized = yield* Deferred.make<void>()
+          consumerStarted = yield* Deferred.make<void>()
+          releaseConsumer = yield* Deferred.make<void>()
+          return Layer.mergeAll(
+            modelLayer(() => {
+              calls += 1
+              return calls === 1
+                ? Stream.make(toolCallPart("tool-call-fail-progress", "echo", { text: "from model" }))
+                : Stream.make(textDelta("unexpected"))
+            }),
+            ToolExecutor.testLayer({
+              execute: () =>
+                Effect.gen(function* () {
+                  const context = yield* ToolContext.ToolContext
+                  toolSignal = context.signal
+                  yield* context.emit({ toolCallId: "tool-call-fail-progress", message: "one" })
+                  yield* Deferred.await(consumerStarted)
+                  yield* context.emit({ toolCallId: "tool-call-fail-progress", message: "two" })
+                  yield* context.emit({ toolCallId: "tool-call-fail-progress", message: "three" })
+                  yield* Deferred.succeed(overflowReached, undefined)
+                  return yield* Effect.never
+                }).pipe(Effect.ensuring(Deferred.succeed(executionFinalized, undefined))),
+            }),
+            Approvals.autoApprove,
+            ModelMiddleware.identityLayer,
+          )
+        }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "fail-progress-agent", toolkit: Toolkit.make(echoTool) })
+        const fiber = yield* Agent.stream(agent, {
+          prompt: "use the tool",
+          toolProgress: { _tag: "Fail", capacity: 1 },
+        }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => seen.push(event)).pipe(
+              Effect.andThen(
+                event._tag === "ToolProgress" && event.message === "one"
+                  ? Deferred.succeed(consumerStarted, undefined).pipe(Effect.andThen(Deferred.await(releaseConsumer)))
+                  : Effect.void,
+              ),
+            ),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+          Effect.forkChild({ startImmediately: true }),
+        )
+
+        yield* Deferred.await(overflowReached)
+        yield* Deferred.succeed(releaseConsumer, undefined)
+        const failure = yield* Fiber.join(fiber)
+        yield* Deferred.await(executionFinalized)
+
+        expect(failure).toBeInstanceOf(AgentEvent.ProgressOverflowError)
+        if (Schema.is(AgentEvent.ProgressOverflowError)(failure)) {
+          expect(failure.turn).toBe(0)
+          expect(failure.toolCallId).toBe("tool-call-fail-progress")
+          expect(failure.capacity).toBe(1)
+        }
+        expect(progressMessages(seen)).toEqual(["one", "two"])
+        expect(seen.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
+        expect(calls).toBe(1)
+        expect(toolSignal.aborted).toBe(true)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "drains progress before a tool failure completes", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("tool-call-progress-failure", "echo", { text: "from model" }))
+            : Stream.make(textDelta("after failure"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () =>
+            Effect.gen(function* () {
+              const context = yield* ToolContext.ToolContext
+              yield* context.emit({ toolCallId: "tool-call-progress-failure", message: "before failure" })
+              return { _tag: "Failure", message: "tool failed" }
+            }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "progress-failure-agent", toolkit: Toolkit.make(echoTool) })
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, {
+            prompt: "use the tool",
+            toolProgress: { _tag: "Backpressure", capacity: 1 },
+          }),
+        )
+        const tags = events.map((event) => event._tag)
+        const completion = events.find((event) => event._tag === "ToolExecutionCompleted")
+
+        expect(tags.indexOf("ToolProgress")).toBeLessThan(tags.indexOf("ToolExecutionCompleted"))
+        expect(completion?._tag === "ToolExecutionCompleted" && completion.result.isFailure).toBe(true)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "interrupts the producer and shuts down progress when the event stream is abandoned", () => {
+    let calls = 0
+    let thirdOfferStarted!: Deferred.Deferred<void>
+    let thirdOfferCompleted!: Deferred.Deferred<void>
+    let executionFinalized!: Deferred.Deferred<void>
+    let consumerStarted!: Deferred.Deferred<void>
+    let toolSignal!: AbortSignal
+    let toolContext!: ToolContext.Interface
+    return [
+      Layer.unwrap(
+        Effect.gen(function* () {
+          thirdOfferStarted = yield* Deferred.make<void>()
+          thirdOfferCompleted = yield* Deferred.make<void>()
+          executionFinalized = yield* Deferred.make<void>()
+          consumerStarted = yield* Deferred.make<void>()
+          return Layer.mergeAll(
+            modelLayer(() => {
+              calls += 1
+              return Stream.make(toolCallPart("tool-call-abandoned-progress", "echo", { text: "from model" }))
+            }),
+            ToolExecutor.testLayer({
+              execute: () =>
+                Effect.gen(function* () {
+                  const context = yield* ToolContext.ToolContext
+                  toolContext = context
+                  toolSignal = context.signal
+                  yield* context.emit({ toolCallId: "tool-call-abandoned-progress", message: "one" })
+                  yield* Deferred.await(consumerStarted)
+                  yield* context.emit({ toolCallId: "tool-call-abandoned-progress", message: "two" })
+                  yield* Deferred.succeed(thirdOfferStarted, undefined)
+                  yield* context.emit({ toolCallId: "tool-call-abandoned-progress", message: "three" })
+                  yield* Deferred.succeed(thirdOfferCompleted, undefined)
+                  return {
+                    _tag: "Success",
+                    result: { ok: true },
+                    encodedResult: { ok: true },
+                  } satisfies ToolExecutor.Outcome
+                }).pipe(Effect.ensuring(Deferred.succeed(executionFinalized, undefined))),
+            }),
+            Approvals.autoApprove,
+            ModelMiddleware.identityLayer,
+          )
+        }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "abandoned-progress-agent", toolkit: Toolkit.make(echoTool) })
+
+        yield* Agent.stream(agent, {
+          prompt: "use the tool",
+          toolProgress: { _tag: "Backpressure", capacity: 1 },
+        }).pipe(
+          Stream.tap((event) =>
+            event._tag === "ToolProgress"
+              ? Deferred.succeed(consumerStarted, undefined).pipe(Effect.andThen(Deferred.await(thirdOfferStarted)))
+              : Effect.void,
+          ),
+          Stream.takeUntil((event) => event._tag === "ToolProgress"),
+          Stream.runDrain,
+        )
+
+        yield* Deferred.await(executionFinalized)
+        expect(yield* Deferred.isDone(thirdOfferCompleted)).toBe(false)
+        expect(toolSignal.aborted).toBe(true)
+        yield* toolContext.emit({ toolCallId: "tool-call-abandoned-progress", message: "after cancellation" })
       }),
     ] as const
   })

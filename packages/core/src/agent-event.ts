@@ -42,7 +42,11 @@ export interface ToolExecutionCompleted {
   readonly turn: number
   readonly call: Response.ToolCallPart<string, unknown>
   readonly result: Response.ToolResultPart<string, unknown, unknown>
-  readonly metadata?: Metadata
+  readonly metadata?: Metadata & {
+    readonly toolProgress?: {
+      readonly dropped: number
+    }
+  }
 }
 
 /** @experimental Emitted before consulting Approvals for a needsApproval tool. */
@@ -161,6 +165,16 @@ export class MiddlewareViolation extends Schema.TaggedErrorClass<MiddlewareViola
   {
     turn: Schema.Finite,
     detail: Schema.String,
+  },
+) {}
+
+/** @experimental An explicitly failing tool progress queue reached capacity. */
+export class ProgressOverflowError extends Schema.TaggedErrorClass<ProgressOverflowError>()(
+  "@batonfx/core/ProgressOverflowError",
+  {
+    turn: Schema.Finite,
+    toolCallId: Schema.String,
+    capacity: Schema.Finite,
   },
 ) {}
 

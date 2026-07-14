@@ -14,6 +14,8 @@ Large tool outputs also consume model context quickly. Baton needs a small non-d
 
 Add `ToolContext` as a per-tool-call service. The Baton loop provides a fresh context around each framework-executed `ToolExecutor.execute` call. The context contains an `AbortSignal`, a `sessionId`, and `emit(progress)`. Progress updates become `ToolProgress` loop events and are observational only; they are never added to pending tool results.
 
+Progress updates cross a per-tool bounded Effect `Queue`. `RunOptions.toolProgress` accepts explicit `Backpressure`, `Dropping`, `Sliding`, and `Fail` policies with a positive safe-integer capacity. Omitted configuration defaults to backpressure at capacity 64, replacing the former unbounded queue. Lossy policies expose their dropped-update count in terminal `ToolExecutionCompleted.metadata` for completed success and tool-failure outcomes; the fail policy surfaces a typed `ProgressOverflowError`. Queue shutdown and the producer fiber share the event stream's scope, so downstream cancellation interrupts a suspended offer and aborts the tool context.
+
 Add `ToolOutputStore` and `ToolOutput.bound` as the output-spill seam. `ToolOutput.bound` resolves `ToolOutputStore` optionally with `Effect.serviceOption`, so `Agent.stream` does not gain a hard service requirement. A store write returns `Option<string>`: `Some(path)` means the overflow was stored and Baton should replace inline output with a bounded `ToolOutput` envelope, while `None` means the store declines spill. This resolves the no-op-store case without sentinel paths or hard-coded implementation checks.
 
 When spill happens, Baton stores `{ result, encodedResult }` and replaces both `result` and `encodedResult` with:
@@ -36,7 +38,8 @@ The envelope stays in the `Ai.Response` vocabulary. Baton adds loop framing only
 
 - Tool handlers and durable executors can read cancellation/progress/session data through normal Effect service lookup.
 - Hosts can fold `ToolProgress` into their own event logs without affecting the model transcript.
-- Standalone Baton keeps current behavior by default: `sessionId` defaults to `"local"`, progress is emitted only when a tool calls `emit`, and absent/no-op output stores do not alter results.
+- Standalone Baton keeps progress ordering and event payloads by default while replacing unbounded retention with bounded backpressure; `sessionId` defaults to `"local"`, progress is emitted only when a tool calls `emit`, and absent/no-op output stores do not alter results.
+- Loss or overflow requires an explicit non-default policy. Completed success and tool-failure outcomes expose loss through terminal metadata, and overflow under `Fail` uses a typed stream error; suspension, execution-channel failure, and downstream cancellation do not emit loss metadata.
 - Relay can back `ToolOutputStore` with a durable blob store without Baton depending on Relay.
 
 ## Rejected alternatives
@@ -45,6 +48,8 @@ The envelope stays in the `Ai.Response` vocabulary. Baton adds loop framing only
 - Making `ToolOutputStore` a required `Agent.stream` service: rejected; output spill is optional and should not grow the default loop requirement set.
 - Returning a plain `string` from `ToolOutputStore.put`: rejected; a no-op store needs to decline spill without sentinel paths or throwing.
 - Emitting progress as preliminary `Ai.Tool` handler results: rejected for M1; preliminary handler results remain a toolkit detail, while `ToolContext.emit` is the Baton progress seam.
+- Keeping an unbounded progress queue: rejected because a fast tool can outrun a slow event consumer without a finite memory bound.
+- Silently dropping progress by default: rejected because backpressure preserves every update and Effect queue offers suspend interruptibly without blocking a runtime thread.
 - Storing every tool output unconditionally: rejected; small results remain inline and preserve current behavior.
 
 ## Related docs
