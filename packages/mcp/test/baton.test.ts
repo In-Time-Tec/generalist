@@ -52,7 +52,7 @@ describe("baton adapter", () => {
 
   it.effect("runs an Agent through a discovered MCP tool and owns the connection scope", () =>
     Effect.gen(function* () {
-      const fixture = yield* makeTransportFixture
+      const fixture = yield* makeTransportFixture()
       yield* Effect.scoped(
         Effect.gen(function* () {
           const tools = yield* route({ name: "calc", transport: fixture.transport })
@@ -80,7 +80,7 @@ describe("baton adapter", () => {
   it.effect("preserves structured MCP failures as failed Agent tool results", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const fixture = yield* makeTransportFixture
+        const fixture = yield* makeTransportFixture()
         const tools = yield* route({ name: "calc", transport: fixture.transport })
         const model = yield* TestModel.make([
           TestModel.toolCall("calc_boom", {}, { id: "boom-1" }),
@@ -112,7 +112,7 @@ describe("baton adapter", () => {
   it.effect("supports concurrent calls through one routed executor", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const fixture = yield* makeTransportFixture
+        const fixture = yield* makeTransportFixture()
         const tools = yield* route({ name: "calc", transport: fixture.transport })
         const services = yield* Layer.build(Layer.mergeAll(tools.executorLayer, ToolContext.layerDefault))
         const executor = Context.get(services, ToolExecutor.ToolExecutor)
@@ -146,7 +146,7 @@ describe("baton adapter", () => {
   it.effect("recognizes a custom SDK transport before declarative kind metadata", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const fixture = yield* makeTransportFixture
+        const fixture = yield* makeTransportFixture()
         const transport = Object.assign(fixture.transport, { kind: "http" as const })
         const tools = yield* route({ name: "calc", transport })
 

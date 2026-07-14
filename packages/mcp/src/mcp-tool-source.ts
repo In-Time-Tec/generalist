@@ -165,7 +165,9 @@ export const fromTransport: {
         try: () => client.listTools(),
         catch: (error) => connectionError(name, error),
       })
-      const discoveredTools = yield* Effect.forEach(listed.tools, (tool) => discoveredTool(name, tool))
+      const discoveredTools = yield* Effect.forEach(listed.tools, (tool) => discoveredTool(name, tool), {
+        concurrency: 1,
+      })
       const discovered = yield* Ref.make<ReadonlyArray<DiscoveredTool>>(discoveredTools)
 
       const callTimeoutMillis = options?.callTimeout === undefined ? undefined : Duration.toMillis(options.callTimeout)

@@ -84,6 +84,43 @@ describe("McpToolSource", () => {
     ),
   )
 
+  it.effect("fails typed and closes the connection when discovery schemas contain non-JSON values", () =>
+    Effect.gen(function* () {
+      const schemas: ReadonlyArray<"input" | "output"> = ["input", "output"]
+
+      for (const malformedDiscoverySchema of schemas) {
+        const closes = { count: 0 }
+        const error = yield* Effect.scoped(Effect.flip(makeFixtureWith({ malformedDiscoverySchema, closes })))
+
+        expect(error).toBeInstanceOf(McpToolSource.McpConnectionError)
+        expect(error._tag).toBe("McpConnectionError")
+        expect(error.server).toBe("calc")
+        expect(error.message).toContain("default")
+        expect(closes.count).toBeGreaterThanOrEqual(1)
+      }
+    }),
+  )
+
+  it.effect("fails concurrent structured-content decoding in the typed tool error channel", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { source } = yield* makeFixtureWith({ malformedStructuredContent: true })
+        const errors = yield* Effect.all(
+          [Effect.flip(source.callTool("stats", {})), Effect.flip(source.callTool("stats", {}))],
+          { concurrency: 2 },
+        )
+
+        for (const error of errors) {
+          expect(error).toBeInstanceOf(McpToolSource.McpToolCallError)
+          expect(error._tag).toBe("McpToolCallError")
+          expect(error.server).toBe("calc")
+          expect(error.tool).toBe("stats")
+          expect(error.message).toContain("invalid")
+        }
+      }),
+    ),
+  )
+
   it.effect("fails typed when the server reports isError", () =>
     Effect.scoped(
       Effect.gen(function* () {
