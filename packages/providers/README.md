@@ -1,26 +1,59 @@
 # `@batonfx/providers`
 
-Effect AI provider registration helpers and model metadata for Baton.
+Focused composition guide for Effect AI provider registration and model metadata.
 
-See the [Baton documentation](https://github.com/In-Time-Tec/batonfx#readme) for installation, examples, and API guidance.
+## Install
 
-## Imports and migration
-
-Import provider namespaces from the package root:
-
-```ts
-import { Anthropic, Catalog, OpenAi } from "@batonfx/providers"
+```sh
+bun add effect @batonfx/core @batonfx/providers
 ```
 
-Established subpaths remain supported compatibility imports exposing the same module surfaces. They will not be removed before 1.0.0 and only in a separately planned major release.
+## Imports
 
-| Compatibility subpath              | Canonical root namespace |
-| ---------------------------------- | ------------------------ |
-| `@batonfx/providers/catalog`       | `Catalog`                |
-| `@batonfx/providers/openai`        | `OpenAi`                 |
-| `@batonfx/providers/anthropic`     | `Anthropic`              |
-| `@batonfx/providers/openrouter`    | `OpenRouter`             |
-| `@batonfx/providers/openai-compat` | `OpenAiCompatible`       |
-| `@batonfx/providers/deterministic` | `Deterministic`          |
-| `@batonfx/providers/presets`       | `Presets`                |
-| `@batonfx/providers/embedding`     | `Embedding`              |
+```ts
+import { Anthropic, Catalog, Deterministic, OpenAi } from "@batonfx/providers"
+```
+
+## Layer graph
+
+```text
+Deterministic.withDeterministic(selection)
+├─ provides ModelRegistry
+└─ registered LanguageModel selected by ModelRegistry.provide
+   └─ Agent.generate
+```
+
+## Runnable program
+
+Checked source: [`../../examples/package-composition-guides/src/providers.ts`](../../examples/package-composition-guides/src/providers.ts)
+
+```ts
+import { Console, Effect } from "effect"
+import { Agent, ModelRegistry } from "@batonfx/core"
+import { Deterministic } from "@batonfx/providers"
+
+const agent = Agent.make("local-assistant")
+const selection = { provider: "deterministic", model: "local" }
+
+const program = ModelRegistry.provide(
+  selection,
+  Agent.generate(agent, { prompt: "Give me the deterministic response." }),
+).pipe(
+  Effect.flatMap((result) => Console.log(result.text)),
+  Effect.provide(Deterministic.withDeterministic(selection)),
+)
+
+await Effect.runPromise(program)
+```
+
+Run `bun examples/package-composition-guides/src/providers.ts`.
+
+## Errors, requirements, and resources
+
+The layer discharges `ModelRegistry` and `LanguageModel`, leaving `R = never`; success is `void`. The error channel is the agent's schema-backed `RunError` union, including `AgentError`, `AgentSuspended`, `TurnLimitExceeded`, and `MiddlewareViolation`, plus schema-backed `LanguageModelNotRegistered` from model selection. This deterministic layer owns no external resource and introduces no concurrency. Production provider layers can additionally require configuration and `HttpClient`; fetch conveniences supply the client.
+
+## More
+
+- Governing spec: [Providers](../../docs/spec/08-providers.md)
+- Deeper examples: [structured extraction](../../examples/structured-extraction/) and [tool-calling chatbot](../../examples/tool-calling-chatbot/)
+- Canonical root namespaces are `Catalog`, `OpenAi`, `Anthropic`, `OpenRouter`, `OpenAiCompatible`, `Deterministic`, `Presets`, and `Embedding`. Their established package subpaths remain compatibility imports through the stated pre-1.0 deprecation window.

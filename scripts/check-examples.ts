@@ -14,6 +14,8 @@ const singlePackageExamples = [
 
 const multiPackageExamples = ["deep-research-agent"]
 
+const documentationGuidePackages = ["core", "foldkit", "mcp", "memory", "providers", "skills", "test", "transport"]
+
 const credentialNames = [
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
@@ -108,4 +110,46 @@ for (const name of multiPackageExamples) {
   checkWorkspaceVersions(manifest, dir)
   checkWorkspaceVersions(serverManifest, serverDir)
   checkWorkspaceVersions(webManifest, webDir)
+}
+
+const documentationGuidesDir = join("examples", "package-composition-guides")
+for (const file of ["package.json", "tsconfig.json", ...documentationGuidePackages.map((name) => `src/${name}.ts`)]) {
+  if (!existsSync(join(documentationGuidesDir, file))) fail(`${documentationGuidesDir} is missing ${file}`)
+}
+
+const documentationGuidesManifest = parseManifest(join(documentationGuidesDir, "package.json"))
+if (documentationGuidesManifest.private !== true) fail(`${documentationGuidesDir}/package.json must be private`)
+if (documentationGuidesManifest.scripts?.typecheck === undefined) {
+  fail(`${documentationGuidesDir}/package.json must define scripts.typecheck`)
+}
+checkWorkspaceVersions(documentationGuidesManifest, documentationGuidesDir)
+
+for (const name of documentationGuidePackages) {
+  const readme = read(join("packages", name, "README.md"))
+  const headings = [
+    "## Install",
+    "## Imports",
+    "## Layer graph",
+    "## Runnable program",
+    "## Errors, requirements, and resources",
+    "## More",
+  ]
+  let previousHeading = -1
+  for (const heading of headings) {
+    const headingIndex = readme.indexOf(heading)
+    if (headingIndex === -1) fail(`packages/${name}/README.md is missing ${heading}`)
+    if (headingIndex !== readme.lastIndexOf(heading)) fail(`packages/${name}/README.md repeats ${heading}`)
+    if (headingIndex <= previousHeading) fail(`packages/${name}/README.md has composition-guide headings out of order`)
+    previousHeading = headingIndex
+  }
+  if (!readme.includes(`examples/package-composition-guides/src/${name}.ts`)) {
+    fail(`packages/${name}/README.md must link its checked composition guide`)
+  }
+  const snippet = readme.match(/## Runnable program[\s\S]*?```ts\n([\s\S]*?)\n```/)?.[1]
+  if (snippet === undefined) fail(`packages/${name}/README.md must include one TypeScript runnable program`)
+  const checkedSource = read(join(documentationGuidesDir, "src", `${name}.ts`)).trimEnd()
+  if (snippet !== checkedSource) fail(`packages/${name}/README.md runnable program must match its checked source`)
+  if (/from "@batonfx\/[^"/]+\//.test(checkedSource)) {
+    fail(`examples/package-composition-guides/src/${name}.ts must use canonical package-root imports`)
+  }
 }
