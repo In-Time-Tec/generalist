@@ -186,7 +186,7 @@ export const providersReference = definePage({
           [
             "Registry layer with the deterministic fallback (",
             code("fallbackModel"),
-            " required) plus the OpenAI registration when its config resolves; a missing API key falls back silently",
+            " required) plus the OpenAI registration when its API-key config is present; only missing data falls back, while invalid or failing config remains a typed failure",
           ],
         ],
         [
