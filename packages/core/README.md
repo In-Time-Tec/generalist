@@ -4,6 +4,33 @@ Baton is a standalone, **non-durable**, Effect-native agent loop over `effect/un
 
 See [`docs/spec/01-baton-agent-framework.md`](../../docs/spec/01-baton-agent-framework.md) for the full contract.
 
+## Imports and Layers
+
+Import intentional namespaces from the package root. Service Layer variants use a noun after `layer`:
+
+```ts
+import { Layer } from "effect"
+import { Memory, ModelMiddleware, Session, ToolOutput } from "@batonfx/core"
+
+const services = Layer.mergeAll(
+  Memory.layerNoop,
+  ModelMiddleware.layerIdentity,
+  Session.layerMemory,
+  ToolOutput.layerMemory,
+)
+```
+
+Existing names remain exact aliases during the deprecation window. They will not be removed before 1.0.0 and only in a separately planned major release.
+
+| Compatibility name              | Canonical name                  |
+| ------------------------------- | ------------------------------- |
+| `Memory.noopLayer`              | `Memory.layerNoop`              |
+| `ModelMiddleware.identityLayer` | `ModelMiddleware.layerIdentity` |
+| `Session.memoryLayer`           | `Session.layerMemory`           |
+| `ModelRegistry.memoryLayer`     | `ModelRegistry.layerMemory`     |
+
+`layerIdentity` means a transformation that preserves input. `layerNoop` means service operations deliberately take no meaningful action.
+
 ## Tool execution placement
 
 Baton uses Effect AI `Tool` and `Toolkit` values directly. For ordinary in-process tools, provide the handler layer from `toolkit.toLayer(...)` and no `ToolExecutor` is required. `ToolExecutor` is the optional override seam for durable waits and external placement. Its route helpers keep placement explicit while reusing the same toolkit definitions:

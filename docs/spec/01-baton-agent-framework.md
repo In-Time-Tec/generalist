@@ -81,7 +81,7 @@ The Baton-owned modules are:
 | `handoff.ts`          | `Handoff`         | Transfer tools, supervisor construction, and bounded same-process fan-out.                                |
 | `instructions.ts`     | `Instructions`    | Ordered context-source registry, context epoch opener, dynamic update renderer, and test layer.           |
 | `memory.ts`           | `Memory`          | Optional recall/remember seam for per-run long-term memory integration.                                   |
-| `model-middleware.ts` | `ModelMiddleware` | Interceptor seam for model input (prompt) and output (stream parts); `identityLayer` default.             |
+| `model-middleware.ts` | `ModelMiddleware` | Interceptor seam for model input (prompt) and output (stream parts); `layerIdentity` default.             |
 | `model-registry.ts`   | `ModelRegistry`   | Provider-agnostic `LanguageModel` registration/selection.                                                 |
 | `model-resilience.ts` | `ModelResilience` | Optional retry seam for model-call failures inside the loop.                                              |
 | `permissions.ts`      | `Permissions`     | Optional allow/deny/ask policy seam for local tool calls before execution and tool-declared approvals.    |
@@ -93,7 +93,7 @@ The Baton-owned modules are:
 | `tool-output.ts`      | `ToolOutput`      | Optional spill seam for oversized successful tool outputs.                                                |
 | `turn-policy.ts`      | `TurnPolicy`      | Schedule-inspired turn continuation values plus portable snapshots for built-in policies.                 |
 
-Module conventions: `Service`/`Interface`/`layer`/`testLayer` pattern; every exported symbol carries an `@experimental` JSDoc tag; errors are `Schema.TaggedErrorClass`; no `Date.now()` anywhere (callers pass timestamps if ever needed — v1 needs none).
+Module conventions: consumers import module namespaces from `@batonfx/core`; services use the `Service`/`Interface`/`layer`/`testLayer` pattern and noun-after-`layer` variants such as `layerMemory`, `layerNoop`, and `layerIdentity`. Superseded names remain deprecated aliases under ADR-0024. Every exported symbol carries an `@experimental` JSDoc tag; errors are `Schema.TaggedErrorClass`; no `Date.now()` anywhere (callers pass timestamps if ever needed — v1 needs none).
 
 ## Turn semantics
 
@@ -152,7 +152,7 @@ Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run
 
 `ModelMiddleware` (`model-middleware.ts`) is the interceptor seam for everything that goes **into** or comes **out of** the model. It is where PII scrubbing, prompt-injection screening, output filtering, and prompt logging plug in without forking the loop. Baton ships the seam, an identity default, and `Guardrail` middleware combinators only — no model-judge guardrails or detection heuristics.
 
-- **Service** — `ModelMiddleware` holds a `ReadonlyArray<Middleware>` (the chain), applied in array order. If the service is absent, Baton uses the empty chain. `identityLayer` remains available for explicit composition and tests; `layer(middleware)` provides an explicit chain. `Agent.stream` / `Agent.generate` do not require `ModelMiddleware` unless a caller chooses to provide it.
+- **Service** — `ModelMiddleware` holds a `ReadonlyArray<Middleware>` (the chain), applied in array order. If the service is absent, Baton uses the empty chain. `layerIdentity` is available for explicit composition and tests; the deprecated `identityLayer` compatibility alias remains under ADR-0024. `layer(middleware)` provides an explicit chain. `Agent.stream` / `Agent.generate` do not require `ModelMiddleware` unless a caller chooses to provide it.
 - **A `Middleware`** has two optional hooks; an omitted hook is identity:
   - `transformPrompt(prompt, context) => Effect<Ai.Prompt.Prompt, AgentError>` — transform the prompt for a turn before it is sent to the model. Runs for both the initial turn and every follow-up (`Ai.Prompt.fromResponseParts(...)`) turn.
   - `transformPart(part, context) => Effect<Option<Ai.Response.StreamPart>, AgentError>` — transform or drop a single model stream part before the loop processes it. `Option.none()` drops the part: it is not folded, not emitted as `ModelPart`, not persisted.
@@ -231,6 +231,7 @@ Baton is designed to be composed behind a durable runtime's own agent-loop inter
 - `docs/spec/decisions/ADR-0010-adopt-agentskills-standard.md`
 - `docs/spec/decisions/ADR-0011-provider-registration-helpers.md`
 - `docs/spec/decisions/ADR-0012-model-metadata-catalog.md`
+- `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`
 - `docs/spec/02-session-event-log.md`
 - `docs/spec/03-instructions-and-context-epoch.md`
 - `docs/spec/04-permissions-policy.md`

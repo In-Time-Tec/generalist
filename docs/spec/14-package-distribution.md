@@ -10,6 +10,7 @@ Baton owns compiled package artifacts, package metadata, export maps, coordinate
 
 - Every public package ships ESM JavaScript and TypeScript declarations under `dist/`.
 - Public `exports` map only to files under `dist/` and declare `types` before `import`.
+- Package roots expose canonical module namespaces; intentional and compatibility subpaths resolve to the same public module surfaces under ADR-0024.
 - Relative imports emitted in declarations and JavaScript are Node ESM compatible.
 - Third-party and sibling Baton dependencies remain external package imports; package builds do not duplicate them in every entrypoint.
 - Tarballs use an allowlist and exclude source, tests, Turbo state, coverage, and repository-only configuration.
@@ -46,7 +47,7 @@ TypeScript emits ESM JavaScript and declarations without bundling package depend
 - reject files outside the package allowlist;
 - install all tarballs together in a clean consumer;
 - import every public export under Bun and supported Node;
-- typecheck public imports from the packed artifacts; and
+- typecheck public imports from the packed artifacts, including canonical namespace imports, compatibility aliases and subpaths, and exact public Layer output, error, and requirement types; and
 - verify package sizes remain bounded.
 
 CI runs the same package smoke command before reporting a releasable build. The publish workflow runs it again against the release version, retains the verified tarballs as workflow artifacts, and passes those exact files to `npm publish`.
@@ -58,3 +59,4 @@ Missing build output, stale exports, unresolved sibling versions, source-only ex
 ## Decision
 
 The durable distribution decision is recorded in `docs/spec/decisions/ADR-0022-compiled-esm-package-artifacts.md`.
+Public import and Layer compatibility policy is recorded in `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`.

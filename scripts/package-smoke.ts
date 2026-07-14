@@ -119,9 +119,68 @@ const program = Effect.gen(function* () {
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "typecheck.ts"),
     `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}
+import { Agent, Chat, Memory, ModelMiddleware, ModelRegistry, Session, ToolOutput } from "@batonfx/core"
+import { VectorStore } from "@batonfx/memory"
 import { OAuth, McpToolSource } from "@batonfx/mcp"
 import { TestModel } from "@batonfx/test"
+import { SessionRegistry } from "@batonfx/transport"
 import { Effect, Layer, Option, Redacted } from "effect"
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
+    ? (<Value>() => Value extends Right ? 1 : 2) extends <Value>() => Value extends Left ? 1 : 2
+      ? true
+      : false
+    : false
+type Assert<Value extends true> = Value
+type LayerShape<Value extends Layer.Any> = readonly [Layer.Success<Value>, Layer.Error<Value>, Layer.Services<Value>]
+type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
+type MemoryCompatibility = Assert<Equal<typeof Memory.layerNoop, typeof Memory.noopLayer>>
+type MiddlewareCanonical = Assert<
+  Equal<LayerShape<typeof ModelMiddleware.layerIdentity>, readonly [ModelMiddleware.ModelMiddleware, never, never]>
+>
+type MiddlewareCompatibility = Assert<Equal<typeof ModelMiddleware.layerIdentity, typeof ModelMiddleware.identityLayer>>
+type SessionCanonical = Assert<
+  Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionStore, never, never]>
+>
+type SessionCompatibility = Assert<Equal<typeof Session.layerMemory, typeof Session.memoryLayer>>
+type RegistryCanonical = Assert<Equal<typeof ModelRegistry.layerMemory, typeof ModelRegistry.layer>>
+type RegistryCompatibility = Assert<Equal<typeof ModelRegistry.layerMemory, typeof ModelRegistry.memoryLayer>>
+type ToolOutputCanonical = Assert<
+  Equal<LayerShape<typeof ToolOutput.layerMemory>, readonly [ToolOutput.ToolOutputStore, never, never]>
+>
+type VectorStoreCanonical = Assert<
+  Equal<LayerShape<typeof VectorStore.layerMemory>, readonly [VectorStore.VectorStore, never, never]>
+>
+type VectorStoreCompatibility = Assert<Equal<typeof VectorStore.layerMemory, typeof VectorStore.memoryLayer>>
+const sessionRegistryLayer = SessionRegistry.layerMemory({ agent: Agent.make("package-smoke") })
+type SessionRegistryCanonical = Assert<
+  Equal<
+    LayerShape<typeof sessionRegistryLayer>,
+    readonly [SessionRegistry.SessionRegistry, never, Agent.RunServices<{}, false> | Chat.Persistence]
+  >
+>
+type ProviderRoot = typeof import("@batonfx/providers")
+type TransportRoot = typeof import("@batonfx/transport")
+type ProviderCatalogSubpath = Assert<Equal<ProviderRoot["Catalog"], typeof import("@batonfx/providers/catalog")>>
+type ProviderOpenAiSubpath = Assert<Equal<ProviderRoot["OpenAi"], typeof import("@batonfx/providers/openai")>>
+type ProviderAnthropicSubpath = Assert<Equal<ProviderRoot["Anthropic"], typeof import("@batonfx/providers/anthropic")>>
+type ProviderOpenRouterSubpath = Assert<Equal<ProviderRoot["OpenRouter"], typeof import("@batonfx/providers/openrouter")>>
+type ProviderOpenAiCompatibleSubpath = Assert<
+  Equal<ProviderRoot["OpenAiCompatible"], typeof import("@batonfx/providers/openai-compat")>
+>
+type ProviderDeterministicSubpath = Assert<
+  Equal<ProviderRoot["Deterministic"], typeof import("@batonfx/providers/deterministic")>
+>
+type ProviderPresetsSubpath = Assert<Equal<ProviderRoot["Presets"], typeof import("@batonfx/providers/presets")>>
+type ProviderEmbeddingSubpath = Assert<Equal<ProviderRoot["Embedding"], typeof import("@batonfx/providers/embedding")>>
+type TransportClientSubpath = Assert<Equal<TransportRoot["Client"], typeof import("@batonfx/transport/client")>>
+type TransportErrorsSubpath = Assert<Equal<TransportRoot["Errors"], typeof import("@batonfx/transport/errors")>>
+type TransportSseSubpath = Assert<Equal<TransportRoot["Sse"], typeof import("@batonfx/transport/sse")>>
+type TransportWsSubpath = Assert<Equal<TransportRoot["Ws"], typeof import("@batonfx/transport/ws")>>
+type TransportWireSubpath = Assert<Equal<TransportRoot["Wire"], typeof import("@batonfx/transport/wire")>>
+type TransportSessionRegistrySubpath = Assert<
+  Equal<TransportRoot["SessionRegistry"], typeof import("@batonfx/transport/session-registry")>
+>
 const reasoning: TestModel.ReasoningPart = TestModel.reasoning("package smoke")
 void reasoning
 const tokenStore: OAuth.TokenStoreInterface = {
@@ -145,7 +204,23 @@ void proof
   )
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "runtime.mjs"),
-    `const specifiers = ${JSON.stringify(exports)}\nfor (const specifier of specifiers) await import(specifier)\nconsole.log(\`imported \${specifiers.length} Baton exports\`)\n`,
+    `const specifiers = ${JSON.stringify(exports)}
+for (const specifier of specifiers) await import(specifier)
+const { Memory, ModelMiddleware, ModelRegistry, Session } = await import("@batonfx/core")
+const { VectorStore } = await import("@batonfx/memory")
+const aliases = [
+  [Memory.layerNoop, Memory.noopLayer, "Memory.noopLayer"],
+  [ModelMiddleware.layerIdentity, ModelMiddleware.identityLayer, "ModelMiddleware.identityLayer"],
+  [Session.layerMemory, Session.memoryLayer, "Session.memoryLayer"],
+  [ModelRegistry.layerMemory, ModelRegistry.layer, "ModelRegistry.layer"],
+  [ModelRegistry.layerMemory, ModelRegistry.memoryLayer, "ModelRegistry.memoryLayer"],
+  [VectorStore.layerMemory, VectorStore.memoryLayer, "VectorStore.memoryLayer"],
+]
+for (const [canonical, compatibility, name] of aliases) {
+  if (canonical !== compatibility) throw new Error(name + " must preserve runtime identity")
+}
+console.log(\`imported \${specifiers.length} Baton exports\`)
+`,
   )
 
   yield* run("bun", ["install"], consumerDirectory)

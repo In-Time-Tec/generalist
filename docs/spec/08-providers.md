@@ -25,6 +25,8 @@ The package exports provider modules:
 - `OpenRouter.openRouter(input)` registers provider `openrouter`.
 - `OpenAiCompatible.openAiCompatible(input)` registers `input.provider ?? "openai-compatible"`.
 
+Consumers canonically import these namespaces from `@batonfx/providers`. The established provider subpaths remain compatibility imports exposing the same module surfaces under ADR-0024.
+
 Each helper accepts the model name, optional language-model config, optional registration key, and optional metadata. Helpers do not store API keys or client config in registry metadata.
 
 ## All-in-one layers
@@ -86,3 +88,4 @@ Consumers install `@batonfx/providers` when they want provider convenience helpe
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0011-provider-registration-helpers.md`
 - `docs/spec/decisions/ADR-0012-model-metadata-catalog.md`
+- `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`

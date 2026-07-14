@@ -124,8 +124,14 @@ const make = Ref.make(HashMap.empty<string, Embedded>()).pipe(
   ),
 )
 
-/** @experimental */
-export const memoryLayer: Layer.Layer<VectorStore> = Layer.effect(VectorStore, make.pipe(Effect.map(VectorStore.of)))
+/** @experimental Ref-backed non-durable vector store. */
+export const layerMemory: Layer.Layer<VectorStore> = Layer.effect(VectorStore, make.pipe(Effect.map(VectorStore.of)))
+
+/**
+ * @experimental
+ * @deprecated Use {@link layerMemory}. This alias will not be removed before 1.0.0 and only in a separately planned major release.
+ */
+export const memoryLayer: typeof layerMemory = layerMemory
 
 /** @experimental */
 export const testLayer = (implementation: Interface): Layer.Layer<VectorStore> =>
