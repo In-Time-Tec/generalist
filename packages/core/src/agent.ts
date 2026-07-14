@@ -45,7 +45,14 @@ import { type Entry, SessionStore, type SessionStoreError } from "./session.js"
 import { SkillSource, type SkillSourceError, selectListings } from "./skill-source.js"
 import { type Message, Steering } from "./steering.js"
 import { ToolContext } from "./tool-context.js"
-import { type Outcome, type Request, type Success, ToolExecutor, executeToolkit } from "./tool-executor.js"
+import {
+  type Outcome,
+  type Request,
+  RemoteRetryError,
+  type Success,
+  ToolExecutor,
+  executeToolkit,
+} from "./tool-executor.js"
 import { bound } from "./tool-output.js"
 import { defaultPolicy, type TurnOverrides, type TurnPolicy } from "./turn-policy.js"
 
@@ -755,7 +762,15 @@ const streamInternal = <
                 ? activateSkillOutcome(turn, call)
                 : Option.isNone(executor)
                   ? defaultExecute(request)
-                  : executor.value.execute(request)
+                  : executor.value
+                      .execute(request)
+                      .pipe(
+                        Effect.mapError((error) =>
+                          Schema.is(RemoteRetryError)(error)
+                            ? AgentError.make({ message: error.message, turn, cause: error })
+                            : error,
+                        ),
+                      )
               const fiber = yield* execution.pipe(
                 Effect.provideService(ToolContext, context),
                 Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),

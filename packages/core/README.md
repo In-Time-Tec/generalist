@@ -57,17 +57,25 @@ This is a breaking correction from the former `parts: ReadonlyArray<Prompt.Part>
 Baton uses Effect AI `Tool` and `Toolkit` values directly. For ordinary in-process tools, provide the handler layer from `toolkit.toLayer(...)` and no `ToolExecutor` is required. `ToolExecutor` is the optional override seam for durable waits and external placement. Its route helpers keep placement explicit while reusing the same toolkit definitions:
 
 ```ts
-import { Effect } from "effect"
+import { Effect, Schedule } from "effect"
 import { ToolExecutor } from "@batonfx/core"
 
 const executorLayer = ToolExecutor.router([
   ToolExecutor.remote({
     toolkit,
-    execute: ({ call }) =>
-      remoteWorker.call(call.name, call.params).pipe(Effect.map((result) => ({ _tag: "Success", result }))),
+    retrySafe: true,
+    operationKey: ({ call, sessionId }) => `${sessionId}:${call.id}`,
+    maxRetries: 2,
+    schedule: Schedule.exponential("100 millis"),
+    execute: ({ call, operationKey }) =>
+      remoteWorker
+        .call(call.name, call.params, { operationKey })
+        .pipe(Effect.map((result) => ({ _tag: "Success", result }))),
   }),
 ])
 ```
+
+Remote routes execute once by default. Set `retrySafe: false` explicitly for non-idempotent work. Enable retries only when the remote endpoint deduplicates the supplied stable `operationKey`; `maxRetries` bounds even an otherwise unbounded schedule. A legacy `schedule` without `retrySafe: true` is ignored. Client, MCP, sandbox, and custom routes remain one-shot and require no migration.
 
 ## Chat persistence (standalone conversation history)
 
