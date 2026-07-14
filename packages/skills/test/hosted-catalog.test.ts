@@ -1,12 +1,30 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Crypto, Effect, Encoding, Layer, Schema } from "effect"
-import { HttpClient, HttpClientResponse } from "effect/unstable/http"
+import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { SkillSource } from "@batonfx/core"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "../src/index"
 
+const hostedCatalogIsInternal: "HostedCatalog" extends keyof typeof import("../src/index") ? false : true = true
+const httpSourceIsInternal: "source" extends keyof HttpCatalog.Options ? false : true = true
+const s3SourceIsInternal: "source" extends keyof S3Catalog.Options ? false : true = true
+const githubSourceIsInternal: "source" extends keyof GitHubCatalog.Options ? false : true = true
 const digestBytes = new Uint8Array(32).fill(1)
 const digest = Encoding.encodeHex(digestBytes)
 const stringify = Schema.encodeSync(Schema.UnknownFromJsonString)
+const secretSource = "https://user:password@example.invalid/catalog?token=SECRET#fragment"
+
+const withSecretSource = <Options extends object>(options: Options): Options => ({ ...options, source: secretSource })
+
+const expectSafeError = (failure: SkillSource.SkillSourceError, source: string) => {
+  const encoded = stringify(failure)
+  expect(failure.source).toBe(source)
+  expect(failure.cause).toBeUndefined()
+  expect(encoded).not.toContain("user")
+  expect(encoded).not.toContain("password")
+  expect(encoded).not.toContain("token")
+  expect(encoded).not.toContain("SECRET")
+  expect(encoded).not.toContain("fragment")
+}
 
 const provideTestLayer =
   <R, E, RIn>(layer: Layer.Layer<R, E, RIn>) =>
@@ -70,12 +88,187 @@ const manifest = (skillPath: string = "remote/SKILL.md", sha256: string = digest
   })
 
 describe("hosted skill catalogs", () => {
+  it("keeps hosted construction and diagnostic identifiers out of the public boundary", () => {
+    expect(hostedCatalogIsInternal).toBe(true)
+    expect(httpSourceIsInternal).toBe(true)
+    expect(s3SourceIsInternal).toBe(true)
+    expect(githubSourceIsInternal).toBe(true)
+  })
+
+  it.effect("ignores untyped caller diagnostic identifiers on provider validation failures", () =>
+    Effect.gen(function* () {
+      const [httpFailure, s3Failure, githubFailure] = yield* Effect.all(
+        [
+          Effect.flip(HttpCatalog.make(withSecretSource({ manifestUrl: "not a URL" }))),
+          Effect.flip(S3Catalog.make(withSecretSource({ bucket: "company.skills", region: "us-west-2" }))),
+          Effect.flip(
+            GitHubCatalog.make(withSecretSource({ owner: "acme", repo: "agent-skills", ref: "main", root: "skills" })),
+          ),
+        ],
+        { concurrency: 3 },
+      )
+
+      expectSafeError(httpFailure, "http-skill-catalog")
+      expectSafeError(s3Failure, "s3-skill-catalog")
+      expectSafeError(githubFailure, "github-skill-catalog")
+    }).pipe(provideTestLayer(Layer.mergeAll(cryptoLayer(), httpLayer({}, [])))),
+  )
+
+  it.effect("does not forward untyped implementation options into hosted requests", () => {
+    const manifestUrl = "https://skills.example/catalog/skills.json"
+    const bodyUrl = "https://skills.example/catalog/remote/SKILL.md"
+    const reads = { source: 0, manifestHeaders: 0, bodyHeaders: 0 }
+    const options = Object.defineProperties(
+      { manifestUrl },
+      {
+        source: {
+          enumerable: true,
+          get: () => {
+            reads.source += 1
+            return secretSource
+          },
+        },
+        manifestHeaders: {
+          enumerable: true,
+          get: () => {
+            reads.manifestHeaders += 1
+            return { authorization: `Bearer ${secretSource}` }
+          },
+        },
+        bodyHeaders: {
+          enumerable: true,
+          get: () => {
+            reads.bodyHeaders += 1
+            return { authorization: `Bearer ${secretSource}` }
+          },
+        },
+      },
+    ) as HttpCatalog.Options
+    const authorizations: Array<string | undefined> = []
+    const urls: Array<string> = []
+    const recordingHttp = Layer.succeed(
+      HttpClient.HttpClient,
+      HttpClient.make((request, url) => {
+        authorizations.push(request.headers.authorization)
+        const target = url.toString()
+        urls.push(target)
+        const body = target === manifestUrl ? manifest() : document
+        return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(body)))
+      }),
+    )
+    return Effect.gen(function* () {
+      const source = yield* HttpCatalog.make(options)
+      yield* (yield* source.get("remote"))!.body
+
+      expect(reads).toEqual({ source: 0, manifestHeaders: 0, bodyHeaders: 0 })
+      expect(authorizations).toEqual([undefined, undefined])
+      expect(urls).toEqual([manifestUrl, bodyUrl])
+    }).pipe(provideTestLayer(Layer.mergeAll(cryptoLayer(), recordingHttp)))
+  })
+
+  it.effect("redacts decorated transport failures", () => {
+    const manifestUrl = "https://user:password@skills.example/catalog.json?token=SECRET#fragment"
+    const transport = HttpClient.make((request) =>
+      Effect.fail(
+        new HttpClientError.HttpClientError({
+          reason: new HttpClientError.TransportError({ request, cause: secretSource }),
+        }),
+      ),
+    ).pipe(HttpClient.mapRequest(HttpClientRequest.setHeader("authorization", `Bearer ${secretSource}`)))
+    return Effect.gen(function* () {
+      const failure = yield* Effect.flip(HttpCatalog.make({ manifestUrl }))
+
+      expectSafeError(failure, "https://skills.example/catalog.json")
+    }).pipe(provideTestLayer(Layer.mergeAll(cryptoLayer(), Layer.succeed(HttpClient.HttpClient, transport))))
+  })
+
+  it.effect("redacts scheme-like hosted paths that escape the manifest origin", () => {
+    const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
+    const manifestUrl = "https://skills.example/catalog.json"
+    return Effect.gen(function* () {
+      const failure = yield* Effect.flip(HttpCatalog.make({ manifestUrl }))
+
+      expectSafeError(failure, manifestUrl)
+    }).pipe(
+      provideTestLayer(
+        Layer.mergeAll(
+          cryptoLayer(),
+          httpLayer({ [manifestUrl]: { body: manifest("http:SECRET/remote/SKILL.md") } }, requests),
+        ),
+      ),
+    )
+  })
+
+  it.effect("keeps secret-like invalid provider components out of diagnostics", () =>
+    Effect.gen(function* () {
+      const commit = "a".repeat(40)
+      const failures = yield* Effect.all(
+        [
+          Effect.flip(S3Catalog.make({ bucket: secretSource, region: "us-west-2" })),
+          Effect.flip(S3Catalog.make({ bucket: "company-skills", region: secretSource })),
+          Effect.flip(S3Catalog.make({ bucket: "company-skills", region: "us-west-2", prefix: secretSource })),
+          Effect.flip(S3Catalog.make({ bucket: "company-skills", region: "us-west-2", manifestName: secretSource })),
+          Effect.flip(GitHubCatalog.make({ owner: "acme", repo: "agent-skills", ref: secretSource })),
+          Effect.flip(GitHubCatalog.make({ owner: "acme", repo: "agent-skills", ref: commit, root: secretSource })),
+          Effect.flip(
+            GitHubCatalog.make({ owner: "acme", repo: "agent-skills", ref: commit, manifestName: secretSource }),
+          ),
+        ],
+        { concurrency: 3 },
+      )
+
+      expectSafeError(failures[0], "s3-skill-catalog")
+      expectSafeError(failures[1], "s3-skill-catalog")
+      expectSafeError(failures[2], "s3-skill-catalog")
+      expectSafeError(failures[3], "s3://company-skills/")
+      expectSafeError(failures[4], "github-skill-catalog")
+      expectSafeError(failures[5], `github:acme/agent-skills@${commit}`)
+      expectSafeError(failures[6], `github:acme/agent-skills@${commit}`)
+    }).pipe(provideTestLayer(Layer.mergeAll(cryptoLayer(), httpLayer({}, [])))),
+  )
+
+  it.effect("ignores untyped caller diagnostic identifiers on hosted fetch failures", () => {
+    const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
+    const commit = "a".repeat(40)
+    const httpUrl = "https://skills.example/catalog/skills.json"
+    const s3Url = "https://company-skills.s3.us-west-2.amazonaws.com/skills.json"
+    const githubUrl = `https://api.github.com/repos/acme/agent-skills/contents/skills.json?ref=${commit}`
+    return Effect.gen(function* () {
+      const [httpFailure, s3Failure, githubFailure] = yield* Effect.all(
+        [
+          Effect.flip(HttpCatalog.make(withSecretSource({ manifestUrl: httpUrl }))),
+          Effect.flip(S3Catalog.make(withSecretSource({ bucket: "company-skills", region: "us-west-2" }))),
+          Effect.flip(GitHubCatalog.make(withSecretSource({ owner: "acme", repo: "agent-skills", ref: commit }))),
+        ],
+        { concurrency: 3 },
+      )
+
+      expectSafeError(httpFailure, httpUrl)
+      expectSafeError(s3Failure, "s3://company-skills/")
+      expectSafeError(githubFailure, `github:acme/agent-skills@${commit}`)
+    }).pipe(
+      provideTestLayer(
+        Layer.mergeAll(
+          cryptoLayer(),
+          httpLayer(
+            {
+              [httpUrl]: { body: "forbidden", status: 403 },
+              [s3Url]: { body: "forbidden", status: 403 },
+              [githubUrl]: { body: "forbidden", status: 403 },
+            },
+            requests,
+          ),
+        ),
+      ),
+    )
+  })
+
   it.effect("loads HTTP metadata once and keeps verified SKILL.md bodies lazy", () => {
     const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
     const manifestUrl = "https://skills.example/catalog/skills.json"
     const bodyUrl = "https://skills.example/catalog/remote/SKILL.md"
     return Effect.gen(function* () {
-      const source = yield* HttpCatalog.make({ manifestUrl, source: "company-skills" })
+      const source = yield* HttpCatalog.make({ manifestUrl })
       const all = yield* source.all
 
       expect(all.map((skill) => skill.frontmatter.name)).toEqual(["remote"])
@@ -99,10 +292,10 @@ describe("hosted skill catalogs", () => {
     const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
     const manifestUrl = "https://skills.example/catalog/skills.json"
     return Effect.gen(function* () {
-      const failure = yield* Effect.flip(HttpCatalog.make({ manifestUrl, source: "unsafe-catalog" }))
+      const failure = yield* Effect.flip(HttpCatalog.make({ manifestUrl }))
 
       expect(failure._tag).toBe("@batonfx/core/SkillSourceError")
-      expect(failure.source).toBe("unsafe-catalog")
+      expect(failure.source).toBe(manifestUrl)
     }).pipe(
       provideTestLayer(
         Layer.mergeAll(cryptoLayer(), httpLayer({ [manifestUrl]: { body: manifest("../escape/SKILL.md") } }, requests)),
@@ -115,7 +308,7 @@ describe("hosted skill catalogs", () => {
     const manifestUrl = "https://skills.example/catalog/skills.json"
     const bodyUrl = "https://skills.example/catalog/remote/SKILL.md"
     return Effect.gen(function* () {
-      const source = yield* HttpCatalog.make({ manifestUrl, source: "retry-catalog" })
+      const source = yield* HttpCatalog.make({ manifestUrl })
       const skill = yield* source.get("remote")
       const first = yield* Effect.exit(skill!.body)
       const second = yield* Effect.exit(skill!.body)
@@ -139,7 +332,7 @@ describe("hosted skill catalogs", () => {
     const bodyUrl = "https://skills.example/catalog/remote/SKILL.md"
     const drifted = document.replace("Remote review skill", "Changed after publication")
     return Effect.gen(function* () {
-      const source = yield* HttpCatalog.make({ manifestUrl, source: "drift-catalog" })
+      const source = yield* HttpCatalog.make({ manifestUrl })
       const skill = yield* source.get("remote")
       const failure = yield* Effect.flip(skill!.body)
 
@@ -191,10 +384,13 @@ describe("hosted skill catalogs", () => {
     const manifestUrl = "https://user:password@skills.example/private/skills.json?signature=secret#fragment"
     return Effect.gen(function* () {
       const failure = yield* Effect.flip(HttpCatalog.make({ manifestUrl }))
+      const encoded = stringify(failure)
 
       expect(failure.source).toBe("https://skills.example/private/skills.json")
-      expect(failure.source).not.toContain("secret")
-      expect(failure.source).not.toContain("password")
+      expect(failure.cause).toBeUndefined()
+      expect(encoded).not.toContain("secret")
+      expect(encoded).not.toContain("password")
+      expect(encoded).not.toContain("fragment")
     }).pipe(
       provideTestLayer(
         Layer.mergeAll(cryptoLayer(), httpLayer({ [manifestUrl]: { body: "forbidden", status: 403 } }, requests)),

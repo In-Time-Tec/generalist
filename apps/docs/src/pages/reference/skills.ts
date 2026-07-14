@@ -26,8 +26,6 @@ export const skillsReference = definePage({
             code("S3Catalog"),
             ", ",
             code("GitHubCatalog"),
-            ", ",
-            code("HostedCatalog"),
             ", and ",
             code("InstructionFiles"),
           ],
@@ -88,7 +86,7 @@ export const skillsReference = definePage({
       code("Crypto"),
       ". Their matching ",
       code("layer"),
-      " constructors provide one source directly.",
+      " constructors provide one source directly. Shared hosted construction remains internal; custom transport policy is supplied through the ambient HttpClient.",
     ),
     table(
       ["Provider", "Contract"],
