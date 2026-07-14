@@ -1,4 +1,5 @@
 import { Effect, Layer } from "effect"
+import { dual } from "effect/Function"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 /** @experimental Snapshot given to a policy before each follow-up turn. */
 export interface TurnInfo {
@@ -90,19 +91,25 @@ const mergeOverrides = (first?: TurnOverrides, second?: TurnOverrides): TurnOver
 }
 
 /** @experimental Both must continue; overrides merge with `second` winning. */
-export const both = (first: TurnPolicy, second: TurnPolicy): TurnPolicy => ({
-  decide: (info) =>
-    Effect.gen(function* () {
-      const left = yield* first.decide(info)
-      if (left._tag === "Stop") return decision.stop
-      const right = yield* second.decide(info)
-      if (right._tag === "Stop") return decision.stop
-      return decision.continue(mergeOverrides(left.overrides, right.overrides))
-    }),
-  ...(first.snapshot === undefined || second.snapshot === undefined
-    ? {}
-    : { snapshot: { _tag: "Both" as const, first: first.snapshot, second: second.snapshot } }),
-})
+export const both: {
+  (second: TurnPolicy): (first: TurnPolicy) => TurnPolicy
+  (first: TurnPolicy, second: TurnPolicy): TurnPolicy
+} = dual(
+  2,
+  (first: TurnPolicy, second: TurnPolicy): TurnPolicy => ({
+    decide: (info) =>
+      Effect.gen(function* () {
+        const left = yield* first.decide(info)
+        if (left._tag === "Stop") return decision.stop
+        const right = yield* second.decide(info)
+        if (right._tag === "Stop") return decision.stop
+        return decision.continue(mergeOverrides(left.overrides, right.overrides))
+      }),
+    ...(first.snapshot === undefined || second.snapshot === undefined
+      ? {}
+      : { snapshot: { _tag: "Both" as const, first: first.snapshot, second: second.snapshot } }),
+  }),
+)
 
 /** @experimental Default policy: `recurs(8)` — matches Relay's historical cap. */
 export const defaultPolicy: TurnPolicy = recurs(8)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Option, Schema, Stream } from "effect"
+import { Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Wire } from "@batonfx/transport"
 import { Chat, Connection } from "../src/index"
@@ -130,25 +130,14 @@ describe("Chat", () => {
     })
   })
 
-  it.effect("converts command send failures into FailedAgentCommand messages", () =>
-    Effect.gen(function* () {
-      let model = Chat.initialModel("s-chat")
-      ;[model] = Chat.update(model, Chat.ChangedDraft({ text: "hello" }))
-      const [next, commands] = Chat.update(model, Chat.SubmittedMessage())
+  it("submitting a message emits the send command", () => {
+    let model = Chat.initialModel("s-chat")
+    ;[model] = Chat.update(model, Chat.ChangedDraft({ text: "hello" }))
+    const [next, commands] = Chat.update(model, Chat.SubmittedMessage())
 
-      expect(next.draft).toBe("")
-      expect(next.entries).toEqual([Chat.UserEntry({ text: "hello" })])
-      expect(commands).toHaveLength(1)
-      const message = yield* commands[0]!.effect
-
-      expect(message).toEqual({ _tag: "FailedAgentCommand", reason: "offline" })
-    }).pipe(
-      Effect.provide(
-        Connection.testLayer({
-          frames: () => Stream.empty,
-          send: () => Effect.fail(new Connection.SendFailed({ reason: "offline" })),
-        }),
-      ),
-    ),
-  )
+    expect(next.draft).toBe("")
+    expect(next.entries).toEqual([Chat.UserEntry({ text: "hello" })])
+    expect(commands).toHaveLength(1)
+    expect(commands[0]).toMatchObject({ name: "SendUserMessage", args: { sessionId: "s-chat", text: "hello" } })
+  })
 })

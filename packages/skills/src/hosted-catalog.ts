@@ -1,4 +1,4 @@
-import { Crypto, Effect, Encoding, Layer, Schema, Stream } from "effect"
+import { Crypto, Effect, Encoding, Function, Layer, Schema, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse, Url } from "effect/unstable/http"
 import { SkillSource } from "@batonfx/core"
 import { parseDocument, validateName } from "./skill-document.js"
@@ -52,7 +52,7 @@ export interface MakeOptions extends Limits {
 const decoder = new TextDecoder("utf-8", { fatal: true })
 
 const sourceError = (source: string, message: string, cause?: unknown): SkillSource.SkillSourceError =>
-  new SkillSource.SkillSourceError({ source, message, ...(cause === undefined ? {} : { cause }) })
+  SkillSource.SkillSourceError.make({ source, message, ...(cause === undefined ? {} : { cause }) })
 
 const safeInteger = (
   source: string,
@@ -130,10 +130,10 @@ const sameFrontmatter = (left: SkillSource.Frontmatter, right: SkillSource.Front
   JSON.stringify(left) === JSON.stringify(right)
 
 /** @experimental Validate one safe relative SKILL.md path. */
-export const validateSkillPath = (
-  source: string,
-  skillPath: string,
-): Effect.Effect<string, SkillSource.SkillSourceError> => {
+export const validateSkillPath: {
+  (skillPath: string): (source: string) => Effect.Effect<string, SkillSource.SkillSourceError>
+  (source: string, skillPath: string): Effect.Effect<string, SkillSource.SkillSourceError>
+} = Function.dual(2, (source: string, skillPath: string) => {
   const segments = skillPath.split("/")
   return skillPath.length > 0 &&
     !skillPath.startsWith("/") &&
@@ -144,14 +144,13 @@ export const validateSkillPath = (
     segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
     ? Effect.succeed(skillPath)
     : Effect.fail(sourceError(source, `Unsafe hosted skill path: ${skillPath}`))
-}
+})
 
 /** @experimental Resolve a same-origin path beneath a manifest directory. */
-export const resolveRelative = (
-  source: string,
-  manifestUrl: string,
-  skillPath: string,
-): Effect.Effect<string, SkillSource.SkillSourceError> =>
+export const resolveRelative: {
+  (manifestUrl: string, skillPath: string): (source: string) => Effect.Effect<string, SkillSource.SkillSourceError>
+  (source: string, manifestUrl: string, skillPath: string): Effect.Effect<string, SkillSource.SkillSourceError>
+} = Function.dual(3, (source: string, manifestUrl: string, skillPath: string) =>
   Effect.gen(function* () {
     yield* validateSkillPath(source, skillPath)
     const manifest = yield* Effect.fromResult(Url.fromString(manifestUrl)).pipe(
@@ -164,10 +163,11 @@ export const resolveRelative = (
       Effect.mapError((error) => sourceError(source, "Invalid hosted skill URL", error)),
     )
     if (resolved.origin !== manifest.origin || !resolved.pathname.startsWith(directory.pathname)) {
-      return yield* Effect.fail(sourceError(source, `Hosted skill path escapes manifest directory: ${skillPath}`))
+      return yield* sourceError(source, `Hosted skill path escapes manifest directory: ${skillPath}`)
     }
     return resolved.toString()
-  })
+  }),
+)
 
 /** @experimental Build a hosted manifest source over Effect HTTP and Crypto services. */
 export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpClient | Crypto.Crypto> =>
@@ -200,27 +200,23 @@ export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpCl
       Effect.mapError((error) => sourceError(options.source, "Invalid hosted skill manifest", error)),
     )
     if (manifest.skills.length > maxSkills) {
-      return yield* Effect.fail(sourceError(options.source, `Hosted skill manifest exceeds ${maxSkills} skills`))
+      return yield* sourceError(options.source, `Hosted skill manifest exceeds ${maxSkills} skills`)
     }
     const byName = new Map<string, SkillSource.Skill>()
     for (const entry of manifest.skills) {
       yield* validateName(options.source, entry.name)
       if (entry.description.length === 0 || entry.description.length > 1_024) {
-        return yield* Effect.fail(
-          sourceError(options.source, "Hosted skill description must contain 1-1024 characters"),
-        )
+        return yield* sourceError(options.source, "Hosted skill description must contain 1-1024 characters")
       }
       if (!/^[0-9a-f]{64}$/.test(entry.sha256)) {
-        return yield* Effect.fail(sourceError(options.source, `Invalid SHA-256 for hosted skill ${entry.name}`))
+        return yield* sourceError(options.source, `Invalid SHA-256 for hosted skill ${entry.name}`)
       }
       if (byName.has(entry.name)) {
-        return yield* Effect.fail(sourceError(options.source, `Duplicate hosted skill name: ${entry.name}`))
+        return yield* sourceError(options.source, `Duplicate hosted skill name: ${entry.name}`)
       }
       const pathSegments = entry.skillPath.split("/")
       if (pathSegments.at(-1) !== "SKILL.md" || pathSegments.at(-2) !== entry.name) {
-        return yield* Effect.fail(
-          sourceError(options.source, `Hosted skill path directory must match skill name: ${entry.name}`),
-        )
+        return yield* sourceError(options.source, `Hosted skill path directory must match skill name: ${entry.name}`)
       }
       const skillUrl = yield* options.resolveSkillUrl(entry.skillPath)
       const metadata = frontmatter(entry)

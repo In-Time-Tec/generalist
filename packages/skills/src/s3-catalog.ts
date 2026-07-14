@@ -27,7 +27,7 @@ export const make = (options: Options): SkillSource.Source<HttpClient.HttpClient
     !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/.test(options.region)
   ) {
     return Effect.fail(
-      new SkillSource.SkillSourceError({ source, message: "Invalid S3 bucket or region for hosted skill catalog" }),
+      SkillSource.SkillSourceError.make({ source, message: "Invalid S3 bucket or region for hosted skill catalog" }),
     )
   }
   return Effect.gen(function* () {

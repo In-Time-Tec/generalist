@@ -3,6 +3,7 @@ import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Memory, ModelMiddleware, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
+import { ItLayer } from "./it-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -47,219 +48,219 @@ const messageText = (message: Prompt.Message): string => {
 const unusedExecutor = ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool execution") })
 
 layer(unusedToolHandlerLayer)("Memory", (it) => {
-  it.effect("fails fast when memory options are set without a Memory service", () => {
+  ItLayer.make(it, "fails fast when memory options are set without a Memory service", () => {
     let modelCalls = 0
     const agent = Agent.make({ name: "memory-agent" })
-    return Effect.gen(function* () {
-      const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "hello", memory: { key } }))
-
-      expect(failure._tag).toBe("@batonfx/core/AgentError")
-      if (failure._tag === "@batonfx/core/AgentError") {
-        expect(failure.message).toBe("RunOptions.memory requires Memory in context")
-        expect(failure.turn).toBe(0)
-      }
-      expect(modelCalls).toBe(0)
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() =>
-            Stream.sync(() => {
-              modelCalls += 1
-              return textDelta("unexpected")
-            }),
-          ),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+    return [
+      Layer.mergeAll(
+        modelLayer(() =>
+          Stream.sync(() => {
+            modelCalls += 1
+            return textDelta("unexpected")
+          }),
         ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
       ),
-    )
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "hello", memory: { key } }))
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        if (failure._tag === "@batonfx/core/AgentError") {
+          expect(failure.message).toBe("RunOptions.memory requires Memory in context")
+          expect(failure.turn).toBe(0)
+        }
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
   })
 
-  it.effect("inserts recalled items after system and before the run prompt before middleware", () => {
+  ItLayer.make(it, "inserts recalled items after system and before the run prompt before middleware", () => {
     let modelPrompt: Prompt.Prompt | undefined
     let middlewarePrompt: Prompt.Prompt | undefined
     const agent = Agent.make({ name: "memory-agent", instructions: "system instructions" })
-    return Effect.gen(function* () {
-      const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
-
-      expect(result.text).toBe("done")
-      expect(modelPrompt?.content.map(messageText)).toEqual([
-        "system instructions",
-        "remembered context",
-        "live prompt",
-      ])
-      expect(middlewarePrompt?.content.map(messageText)).toEqual(["remembered context", "live prompt"])
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer((options) => {
-            modelPrompt = options.prompt
-            return Stream.make(textDelta("done"))
-          }),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([
-            {
-              transformPrompt: (prompt) => {
-                middlewarePrompt = prompt
-                return Effect.succeed(prompt)
-              },
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          modelPrompt = options.prompt
+          return Stream.make(textDelta("done"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([
+          {
+            transformPrompt: (prompt) => {
+              middlewarePrompt = prompt
+              return Effect.succeed(prompt)
             },
-          ]),
-          Memory.testLayer({
-            recall: () => Effect.succeed([{ id: "item-1", parts: [textPart("remembered context")] }]),
-            remember: () => Effect.void,
-            forget: () => Effect.void,
-          }),
-        ),
+          },
+        ]),
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "item-1", parts: [textPart("remembered context")] }]),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
       ),
-    )
+      Effect.gen(function* () {
+        const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
+
+        expect(result.text).toBe("done")
+        expect(modelPrompt?.content.map(messageText)).toEqual([
+          "system instructions",
+          "remembered context",
+          "live prompt",
+        ])
+        expect(middlewarePrompt?.content.map(messageText)).toEqual(["remembered context", "live prompt"])
+      }),
+    ] as const
   })
 
-  it.effect("remembers each completed turn with terminal state", () => {
+  ItLayer.make(it, "remembers each completed turn with terminal state", () => {
     const remembers: Array<Memory.RememberInput> = []
     let recalls = 0
     let calls = 0
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
-    return Effect.gen(function* () {
-      const result = yield* Agent.generate(agent, { prompt: "use a tool", memory: { key } })
-
-      expect(result.text).toBe("done")
-      expect(recalls).toBe(1)
-      expect(remembers.map((input) => ({ turn: input.turn, terminal: input.terminal }))).toEqual([
-        { turn: 0, terminal: false },
-        { turn: 1, terminal: true },
-      ])
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() => {
-            const call = calls
-            calls += 1
-            return call === 0 ? Stream.make(toolCallPart("call-1", "lookup", {})) : Stream.make(textDelta("done"))
-          }),
-          ToolExecutor.testLayer({
-            execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
-          }),
-          Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
-          Memory.testLayer({
-            recall: () =>
-              Effect.sync(() => {
-                recalls += 1
-                return []
-              }),
-            remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
-            forget: () => Effect.void,
-          }),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          const call = calls
+          calls += 1
+          return call === 0 ? Stream.make(toolCallPart("call-1", "lookup", {})) : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Memory.testLayer({
+          recall: () =>
+            Effect.sync(() => {
+              recalls += 1
+              return []
+            }),
+          remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
+          forget: () => Effect.void,
+        }),
       ),
-    )
+      Effect.gen(function* () {
+        const result = yield* Agent.generate(agent, { prompt: "use a tool", memory: { key } })
+
+        expect(result.text).toBe("done")
+        expect(recalls).toBe(1)
+        expect(remembers.map((input) => ({ turn: input.turn, terminal: input.terminal }))).toEqual([
+          { turn: 0, terminal: false },
+          { turn: 1, terminal: true },
+        ])
+      }),
+    ] as const
   })
 
-  it.effect("does not recall on resume", () => {
+  ItLayer.make(it, "does not recall on resume", () => {
     let recalls = 0
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
-    return Effect.gen(function* () {
-      const result = yield* Agent.generate(agent, {
-        prompt: "ignored on resume",
-        memory: { key },
-        resume: { call: { id: "call-resume", name: "lookup", params: {} } },
-      })
-
-      expect(result.text).toBe("done")
-      expect(recalls).toBe(0)
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() => Stream.make(textDelta("done"))),
-          ToolExecutor.testLayer({
-            execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
-          }),
-          Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
-          Memory.testLayer({
-            recall: () =>
-              Effect.sync(() => {
-                recalls += 1
-                return []
-              }),
-            remember: () => Effect.void,
-            forget: () => Effect.void,
-          }),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(textDelta("done"))),
+        ToolExecutor.testLayer({
+          execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Memory.testLayer({
+          recall: () =>
+            Effect.sync(() => {
+              recalls += 1
+              return []
+            }),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
       ),
-    )
+      Effect.gen(function* () {
+        const result = yield* Agent.generate(agent, {
+          prompt: "ignored on resume",
+          memory: { key },
+          resume: { call: { id: "call-resume", name: "lookup", params: {} } },
+        })
+
+        expect(result.text).toBe("done")
+        expect(recalls).toBe(0)
+      }),
+    ] as const
   })
 
-  it.effect("does not remember a suspending run", () => {
+  ItLayer.make(it, "does not remember a suspending run", () => {
     const remembers: Array<Memory.RememberInput> = []
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(waitTool) })
-    return Effect.gen(function* () {
-      const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "wait", memory: { key } })))
-
-      expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
-      expect(remembers).toEqual([])
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() => Stream.make(toolCallPart("call-1", "wait", {}))),
-          ToolExecutor.testLayer({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
-          Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
-          Memory.testLayer({
-            recall: () => Effect.succeed([]),
-            remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
-            forget: () => Effect.void,
-          }),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(toolCallPart("call-1", "wait", {}))),
+        ToolExecutor.testLayer({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Memory.testLayer({
+          recall: () => Effect.succeed([]),
+          remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
+          forget: () => Effect.void,
+        }),
       ),
-    )
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "wait", memory: { key } })))
+
+        expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
+        expect(remembers).toEqual([])
+      }),
+    ] as const
   })
 
-  it.effect("maps MemoryError to AgentError", () => {
+  ItLayer.make(it, "maps MemoryError to AgentError", () => {
     let modelCalls = 0
-    const memoryError = new Memory.MemoryError({ message: "memory unavailable" })
+    const memoryError = Memory.MemoryError.make({ message: "memory unavailable" })
     const agent = Agent.make({ name: "memory-agent" })
-    return Effect.gen(function* () {
-      const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "hello", memory: { key } }))
-
-      expect(failure._tag).toBe("@batonfx/core/AgentError")
-      if (failure._tag === "@batonfx/core/AgentError") {
-        expect(failure.message).toBe("memory unavailable")
-        expect(failure.turn).toBe(0)
-        expect(failure.cause).toBe(memoryError)
-      }
-      expect(modelCalls).toBe(0)
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() =>
-            Stream.sync(() => {
-              modelCalls += 1
-              return textDelta("unexpected")
-            }),
-          ),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
-          Memory.testLayer({
-            recall: () => Effect.fail(memoryError),
-            remember: () => Effect.void,
-            forget: () => Effect.void,
+    return [
+      Layer.mergeAll(
+        modelLayer(() =>
+          Stream.sync(() => {
+            modelCalls += 1
+            return textDelta("unexpected")
           }),
         ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Memory.testLayer({
+          recall: () => Effect.fail(memoryError),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
       ),
-    )
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "hello", memory: { key } }))
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        if (failure._tag === "@batonfx/core/AgentError") {
+          expect(failure.message).toBe("memory unavailable")
+          expect(failure.turn).toBe(0)
+          expect(failure.cause).toBe(memoryError)
+        }
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
   })
 
-  it.effect("noopLayer forget succeeds", () =>
-    Effect.gen(function* () {
-      const memory = yield* Memory.Memory
+  ItLayer.make(
+    it,
+    "noopLayer forget succeeds",
+    () =>
+      [
+        Memory.noopLayer,
+        Effect.gen(function* () {
+          const memory = yield* Memory.Memory
 
-      yield* memory.forget({ key })
-    }).pipe(Effect.provide(Memory.noopLayer)),
+          yield* memory.forget({ key })
+        }),
+      ] as const,
   )
 
   it.effect("merge calls both forget implementations", () => {
@@ -284,25 +285,24 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     })
   })
 
-  it.effect("testLayer exposes forget", () => {
+  ItLayer.make(it, "testLayer exposes forget", () => {
     let forgotten: Memory.ForgetInput | undefined
-    return Effect.gen(function* () {
-      const memory = yield* Memory.Memory
+    return [
+      Memory.testLayer({
+        recall: () => Effect.succeed([]),
+        remember: () => Effect.void,
+        forget: (input) =>
+          Effect.sync(() => {
+            forgotten = input
+          }),
+      }),
+      Effect.gen(function* () {
+        const memory = yield* Memory.Memory
 
-      yield* memory.forget({ key, id: "memory-id" })
+        yield* memory.forget({ key, id: "memory-id" })
 
-      expect(forgotten).toEqual({ key, id: "memory-id" })
-    }).pipe(
-      Effect.provide(
-        Memory.testLayer({
-          recall: () => Effect.succeed([]),
-          remember: () => Effect.void,
-          forget: (input) =>
-            Effect.sync(() => {
-              forgotten = input
-            }),
-        }),
-      ),
-    )
+        expect(forgotten).toEqual({ key, id: "memory-id" })
+      }),
+    ] as const
   })
 })

@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Schema } from "effect"
+import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
@@ -50,7 +51,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Memory extends Context.Service<Memory, Interface>()("@batonfx/core/Memory") {}
+export class Memory extends Context.Service<Memory, Interface>()("@batonfx/core/memory") {}
 
 const noop: Interface = {
   recall: () => Effect.succeed([]),
@@ -59,14 +60,20 @@ const noop: Interface = {
 }
 
 /** @experimental */
-export const merge = (first: Interface, second: Interface): Interface => ({
-  recall: (input) =>
-    Effect.all([first.recall(input), second.recall(input)]).pipe(
-      Effect.map(([firstItems, secondItems]) => [...firstItems, ...secondItems]),
-    ),
-  remember: (input) => Effect.all([first.remember(input), second.remember(input)], { discard: true }),
-  forget: (input) => Effect.all([first.forget(input), second.forget(input)], { discard: true }),
-})
+export const merge: {
+  (second: Interface): (first: Interface) => Interface
+  (first: Interface, second: Interface): Interface
+} = dual(
+  2,
+  (first: Interface, second: Interface): Interface => ({
+    recall: (input) =>
+      Effect.all([first.recall(input), second.recall(input)]).pipe(
+        Effect.map(([firstItems, secondItems]) => [...firstItems, ...secondItems]),
+      ),
+    remember: (input) => Effect.all([first.remember(input), second.remember(input)], { discard: true }),
+    forget: (input) => Effect.all([first.forget(input), second.forget(input)], { discard: true }),
+  }),
+)
 
 /** @experimental */
 export const noopLayer: Layer.Layer<Memory> = Layer.succeed(Memory, Memory.of(noop))

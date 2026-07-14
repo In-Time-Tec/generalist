@@ -97,7 +97,7 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "deep-research-agent" })
 )
 
 /** @experimental */
-export const toolkitHandlersLayer = toolkitLayer.pipe(Layer.provide(searchProviderLayer))
+export const toolkitHandlersLayer = toolkitLayer.pipe(Layer.provideMerge(searchProviderLayer))
 
 /** @experimental */
 export const modelLayer = withOpenRouterOrDeterministic({

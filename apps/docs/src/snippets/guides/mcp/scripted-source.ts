@@ -19,6 +19,8 @@ const source: McpToolSource.Interface = {
       description: "Search local docs",
       parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
       success: Schema.Unknown,
+      failure: Schema.String,
+      failureMode: "return",
     }),
   ]),
 }

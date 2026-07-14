@@ -42,6 +42,7 @@ if (typeof globalThis.IntersectionObserver === "undefined") {
   globalThis.IntersectionObserver = class {
     root = null
     rootMargin = ""
+    scrollMargin = ""
     thresholds: ReadonlyArray<number> = []
     observe(): void {}
     unobserve(): void {}

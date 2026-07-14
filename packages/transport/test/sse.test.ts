@@ -1,11 +1,16 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Fiber, Layer, Option, Stream } from "effect"
+import { Effect, Fiber, Layer, Option, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Sse } from "effect/unstable/encoding"
 import { Headers, HttpBody, HttpServerRequest } from "effect/unstable/http"
 import { Toolkit } from "effect/unstable/ai"
 import { SessionRegistry, Wire } from "../src/index"
 import { lastEventId, respond, streamSuccess } from "../src/sse"
+
+const provideTestLayer =
+  <R, E, RIn>(layer: Layer.Layer<R, E, RIn>) =>
+  <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
+    Layer.build(layer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
 
 const toolkit = Toolkit.empty
 
@@ -21,12 +26,12 @@ const registryLayer = (attach: SessionRegistry.Interface["attach"]): Layer.Layer
   Layer.succeed(
     SessionRegistry.SessionRegistry,
     SessionRegistry.SessionRegistry.of({
-      open: () => Effect.fail(new SessionRegistry.SessionError({ message: "unused" })),
+      open: () => Effect.fail(SessionRegistry.SessionError.make({ message: "unused" })),
       send: () => Effect.void,
       resolveApproval: () => Effect.void,
       attach,
       interrupt: () => Effect.void,
-      info: () => Effect.fail(new SessionRegistry.SessionError({ message: "unused" })),
+      info: () => Effect.fail(SessionRegistry.SessionError.make({ message: "unused" })),
     }),
   )
 
@@ -39,7 +44,9 @@ const request = (url: string, headers: Headers.Input = {}): HttpServerRequest.Ht
 
 const streamBodyText = (body: HttpBody.HttpBody) => {
   expect(body._tag).toBe("Stream")
-  return body._tag === "Stream" ? body.stream.pipe(Stream.decodeText, Stream.runCollect) : Effect.succeed([])
+  return body._tag === "Stream"
+    ? body.stream.pipe(Stream.decodeText, Stream.runCollect, Effect.orDie)
+    : Effect.succeed([])
 }
 
 const parseSse = (text: string): ReadonlyArray<Sse.Event> => {
@@ -72,8 +79,10 @@ describe("Sse", () => {
       expect(response.headers["baton-sse-version"]).toBe("1")
       expect(events.map((event) => event.id)).toEqual(["0", "1"])
       expect(events.map((event) => event.event)).toEqual(["Event", "Ended"])
-      expect(events.map((event) => JSON.parse(event.data)._tag)).toEqual(["Event", "Ended"])
-    }).pipe(Effect.provide(registryLayer(() => Stream.fromIterable([eventFrame, endedFrame])))),
+      expect(
+        events.map((event) => Schema.decodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(event.data)._tag),
+      ).toEqual(["Event", "Ended"])
+    }).pipe(provideTestLayer(registryLayer(() => Stream.fromIterable([eventFrame, endedFrame])))),
   )
 
   it.effect("passes Last-Event-ID to SessionRegistry.attach before query fallback", () =>
@@ -87,7 +96,7 @@ describe("Sse", () => {
 
         expect(received).toBe(4)
       }).pipe(
-        Effect.provide(
+        provideTestLayer(
           registryLayer((_sessionId, afterSeq) => {
             received = afterSeq
             return Stream.fromIterable([endedFrame])
@@ -108,7 +117,7 @@ describe("Sse", () => {
 
         expect(received).toBe(7)
       }).pipe(
-        Effect.provide(
+        provideTestLayer(
           registryLayer((_sessionId, afterSeq) => {
             received = afterSeq
             return Stream.fromIterable([endedFrame])
@@ -127,14 +136,20 @@ describe("Sse", () => {
       })
       expect(response.body._tag).toBe("Stream")
       const fiber = yield* response.body._tag === "Stream"
-        ? response.body.stream.pipe(Stream.decodeText, Stream.take(1), Stream.runCollect, Effect.forkChild)
+        ? response.body.stream.pipe(
+            Stream.decodeText,
+            Stream.take(1),
+            Stream.runCollect,
+            Effect.orDie,
+            Effect.forkChild,
+          )
         : Effect.die("expected stream body")
 
       yield* TestClock.adjust("10 millis")
       const chunks = yield* Fiber.join(fiber)
 
       expect(chunks.join("")).toContain(": keep-alive\n\n")
-    }).pipe(Effect.provide(registryLayer(() => Stream.never))),
+    }).pipe(provideTestLayer(registryLayer(() => Stream.never))),
   )
 
   it("exposes HttpApi StreamSse schema", () => {

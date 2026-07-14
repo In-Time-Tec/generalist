@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { LanguageModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
@@ -18,7 +18,22 @@ const itemText = (item: Memory.Item): string =>
     .map((part) => part.text)
     .join("")
 
-describe("WorkingMemory", () => {
+let summaryCalls = 0
+let summaryPrompt: unknown
+const summaryModel = Layer.effect(
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
+    generateText: (options) =>
+      Effect.sync(() => {
+        summaryCalls += 1
+        summaryPrompt = options.prompt.content
+        return [{ type: "text", text: "summary" }]
+      }),
+    streamText: () => Stream.empty,
+  }),
+)
+
+layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
   it.effect("keeps a bounded recent tail", () =>
     Effect.gen(function* () {
       const memory = yield* Memory.Memory
@@ -33,54 +48,8 @@ describe("WorkingMemory", () => {
       const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
 
       expect(recalled.map(itemText)).toEqual(["Assistant: two", "User: three"])
-    }).pipe(Effect.provide(WorkingMemory.layer({ maxMessages: 2 }))),
+    }),
   )
-
-  it.effect("summarizes overflow once and recalls summary before the recent tail", () => {
-    let summaryCalls = 0
-    let summaryPrompt = ""
-    const summaryModel = Layer.effect(
-      LanguageModel.LanguageModel,
-      LanguageModel.make({
-        generateText: (options) =>
-          Effect.sync(() => {
-            summaryCalls += 1
-            summaryPrompt = JSON.stringify(options.prompt.content)
-            return [{ type: "text", text: "summary" }]
-          }),
-        streamText: () => Stream.empty,
-      }),
-    )
-
-    return Effect.gen(function* () {
-      const memory = yield* Memory.Memory
-
-      yield* memory.remember({
-        key,
-        turn: 0,
-        terminal: true,
-        transcript: prompt(user("one"), assistant("two"), user("three"), assistant("four")),
-      })
-
-      const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
-
-      expect(summaryCalls).toBe(1)
-      expect(summaryPrompt).toContain("one")
-      expect(summaryPrompt).toContain("two")
-      expect(recalled.map(itemText)).toEqual([
-        "<working-memory-summary>\nsummary\n</working-memory-summary>",
-        "User: three",
-        "Assistant: four",
-      ])
-    }).pipe(
-      Effect.provide(
-        WorkingMemory.layer({
-          maxMessages: 2,
-          summarize: { model: summaryModel },
-        }),
-      ),
-    )
-  })
 
   it.effect("isolates state by memory key", () =>
     Effect.gen(function* () {
@@ -96,7 +65,7 @@ describe("WorkingMemory", () => {
       const recalled = yield* memory.recall({ key: otherKey, turn: 0, prompt: prompt(user("current")) })
 
       expect(recalled).toEqual([])
-    }).pipe(Effect.provide(WorkingMemory.layer({ maxMessages: 2 }))),
+    }),
   )
 
   it.effect("forgets the exact memory key", () =>
@@ -123,7 +92,7 @@ describe("WorkingMemory", () => {
 
       expect(forgotten).toEqual([])
       expect(retained.map(itemText)).toEqual(["User: three", "Assistant: four"])
-    }).pipe(Effect.provide(WorkingMemory.layer({ maxMessages: 2 }))),
+    }),
   )
 
   it.effect("forgets one recalled item id within the exact memory key", () =>
@@ -150,6 +119,32 @@ describe("WorkingMemory", () => {
 
       expect(retained.map(itemText)).toEqual(["Assistant: two"])
       expect(otherRetained.map(itemText)).toEqual(["User: three", "Assistant: four"])
-    }).pipe(Effect.provide(WorkingMemory.layer({ maxMessages: 2 }))),
+    }),
+  )
+})
+
+layer(WorkingMemory.layer({ maxMessages: 2, summarize: { model: summaryModel } }))((it) => {
+  it.effect("summarizes overflow once and recalls summary before the recent tail", () =>
+    Effect.gen(function* () {
+      summaryCalls = 0
+      const memory = yield* Memory.Memory
+
+      yield* memory.remember({
+        key,
+        turn: 0,
+        terminal: true,
+        transcript: prompt(user("one"), assistant("two"), user("three"), assistant("four")),
+      })
+
+      const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
+
+      expect(summaryCalls).toBe(1)
+      expect(summaryPrompt).toEqual(expect.arrayContaining([expect.objectContaining({ content: expect.anything() })]))
+      expect(recalled.map(itemText)).toEqual([
+        "<working-memory-summary>\nsummary\n</working-memory-summary>",
+        "User: three",
+        "Assistant: four",
+      ])
+    }),
   )
 })

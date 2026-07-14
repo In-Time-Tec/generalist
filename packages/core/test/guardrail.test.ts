@@ -1,8 +1,10 @@
 import { expect, layer } from "@effect/vitest"
+import { Json } from "./json"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Guardrail, ModelMiddleware, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
+import { ItLayer } from "./it-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -40,87 +42,84 @@ const toolCallPart = (id: string, name: string, params: unknown) =>
   Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
 layer(unusedToolHandlerLayer)("Guardrail", (it) => {
-  it.effect("validateInput allows Option.none and receives context", () => {
+  ItLayer.make(it, "validateInput allows Option.none and receives context", () => {
     let modelCalled = false
     let seenContext: ModelMiddleware.TurnContext | undefined
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "guardrail-allow-agent" })
-
-      const result = yield* Agent.generate(agent, { prompt: "allowed" })
-
-      expect(result.text).toBe("ok")
-      expect(modelCalled).toBe(true)
-      expect(seenContext).toEqual({ agentName: "guardrail-allow-agent", turn: 0 })
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() => {
-            modelCalled = true
-            return Stream.make(textDelta("ok"))
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalled = true
+          return Stream.make(textDelta("ok"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([
+          Guardrail.validateInput((_prompt, context) => {
+            seenContext = context
+            return Effect.succeed(Option.none())
           }),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([
-            Guardrail.validateInput((_prompt, context) => {
-              seenContext = context
-              return Effect.succeed(Option.none())
-            }),
-          ]),
-        ),
+        ]),
       ),
-    )
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "guardrail-allow-agent" })
+
+        const result = yield* Agent.generate(agent, { prompt: "allowed" })
+
+        expect(result.text).toBe("ok")
+        expect(modelCalled).toBe(true)
+        expect(seenContext).toEqual({ agentName: "guardrail-allow-agent", turn: 0 })
+      }),
+    ] as const
   })
 
-  it.effect("validateInput blocks before model invocation with the supplied reason", () => {
+  ItLayer.make(it, "validateInput blocks before model invocation with the supplied reason", () => {
     let modelCalled = false
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "guardrail-block-agent" })
-
-      const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "blocked" }))
-
-      expect(modelCalled).toBe(false)
-      expect(failure._tag).toBe("@batonfx/core/AgentError")
-      if (failure._tag === "@batonfx/core/AgentError") {
-        expect(failure.turn).toBe(0)
-        expect(failure.message).toContain("blocked by policy")
-      }
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() => {
-            modelCalled = true
-            return Stream.make(textDelta("should not run"))
-          }),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([Guardrail.validateInput(() => Effect.succeed(Option.some("blocked by policy")))]),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalled = true
+          return Stream.make(textDelta("should not run"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([Guardrail.validateInput(() => Effect.succeed(Option.some("blocked by policy")))]),
       ),
-    )
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "guardrail-block-agent" })
+
+        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "blocked" }))
+
+        expect(modelCalled).toBe(false)
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        if (failure._tag === "@batonfx/core/AgentError") {
+          expect(failure.turn).toBe(0)
+          expect(failure.message).toContain("blocked by policy")
+        }
+      }),
+    ] as const
   })
 
-  it.effect("redactInput rewrites prompt text sent to the model", () => {
+  ItLayer.make(it, "redactInput rewrites prompt text sent to the model", () => {
     let seenPrompt = ""
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "redact-input-agent" })
-
-      yield* Agent.generate(agent, { prompt: "secret 123-45-6789" })
-
-      expect(seenPrompt).not.toContain("123-45-6789")
-      expect(seenPrompt).toContain("[redacted]")
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer((options) => {
-            seenPrompt = JSON.stringify(options.prompt.content)
-            return Stream.make(textDelta("ok"))
-          }),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([Guardrail.redactInput({ pattern: /\d{3}-\d{2}-\d{4}/g })]),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          seenPrompt = Json.stringify(options.prompt.content)
+          return Stream.make(textDelta("ok"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([Guardrail.redactInput({ pattern: /\d{3}-\d{2}-\d{4}/g })]),
       ),
-    )
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "redact-input-agent" })
+
+        yield* Agent.generate(agent, { prompt: "secret 123-45-6789" })
+
+        expect(seenPrompt).not.toContain("123-45-6789")
+        expect(seenPrompt).toContain("[redacted]")
+      }),
+    ] as const
   })
 
   it.effect("redactInput rewrites text-bearing prompt fields without corrupting tool payloads", () => {
@@ -191,117 +190,116 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
     })
   })
 
-  it.effect("redactOutput rewrites ModelPart deltas and Completed text", () =>
-    Effect.gen(function* () {
-      const agent = Agent.make({ name: "redact-output-agent" })
-
-      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
-
-      const modelPart = events.find((event) => event._tag === "ModelPart")
-      expect(modelPart?._tag === "ModelPart" && modelPart.part.type === "text-delta" && modelPart.part.delta).toBe(
-        "token [redacted]",
-      )
-      const completed = events.at(-1)
-      expect(completed?._tag === "Completed" && completed.text).toBe("token [redacted]")
-    }).pipe(
-      Effect.provide(
+  ItLayer.make(
+    it,
+    "redactOutput rewrites ModelPart deltas and Completed text",
+    () =>
+      [
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("token secret"))),
           unusedExecutor,
           Approvals.autoApprove,
           ModelMiddleware.layer([Guardrail.redactOutput({ pattern: /secret/g })]),
         ),
-      ),
-    ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "redact-output-agent" })
+
+          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
+
+          const modelPart = events.find((event) => event._tag === "ModelPart")
+          expect(modelPart?._tag === "ModelPart" && modelPart.part.type === "text-delta" && modelPart.part.delta).toBe(
+            "token [redacted]",
+          )
+          const completed = events.at(-1)
+          expect(completed?._tag === "Completed" && completed.text).toBe("token [redacted]")
+        }),
+      ] as const,
   )
 
-  it.effect("filterOutput drops non-tool parts and receives context", () => {
+  ItLayer.make(it, "filterOutput drops non-tool parts and receives context", () => {
     const contexts: Array<ModelMiddleware.TurnContext> = []
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "filter-agent" })
-
-      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
-
-      const deltas = events.filter((event) => event._tag === "ModelPart" && event.part.type === "text-delta")
-      expect(deltas).toHaveLength(1)
-      const completed = events.at(-1)
-      expect(completed?._tag === "Completed" && completed.text).toBe("keep")
-      expect(contexts).toEqual([
-        { agentName: "filter-agent", turn: 0 },
-        { agentName: "filter-agent", turn: 0 },
-      ])
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() => Stream.fromIterable([textDelta("keep"), textDelta("drop")])),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([
-            Guardrail.filterOutput((part, context) => {
-              contexts.push(context)
-              return part.type !== "text-delta" || part.delta !== "drop"
-            }),
-          ]),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.fromIterable([textDelta("keep"), textDelta("drop")])),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([
+          Guardrail.filterOutput((part, context) => {
+            contexts.push(context)
+            return part.type !== "text-delta" || part.delta !== "drop"
+          }),
+        ]),
       ),
-    )
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "filter-agent" })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
+
+        const deltas = events.filter((event) => event._tag === "ModelPart" && event.part.type === "text-delta")
+        expect(deltas).toHaveLength(1)
+        const completed = events.at(-1)
+        expect(completed?._tag === "Completed" && completed.text).toBe("keep")
+        expect(contexts).toEqual([
+          { agentName: "filter-agent", turn: 0 },
+          { agentName: "filter-agent", turn: 0 },
+        ])
+      }),
+    ] as const
   })
 
-  it.effect("filterOutput never drops tool-call parts", () => {
+  ItLayer.make(it, "filterOutput never drops tool-call parts", () => {
     let calls = 0
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "filter-tool-agent", toolkit: Toolkit.make(echoTool) })
-
-      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool" }))
-
-      expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
-      const completed = events.at(-1)
-      expect(completed?._tag === "Completed" && completed.text).toBe("")
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() => {
-            calls += 1
-            return calls === 1
-              ? Stream.make(toolCallPart("tool-call-filter", "echo", { text: "from model" }))
-              : Stream.make(textDelta("hidden"))
-          }),
-          echoExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([Guardrail.filterOutput(() => false)]),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("tool-call-filter", "echo", { text: "from model" }))
+            : Stream.make(textDelta("hidden"))
+        }),
+        echoExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([Guardrail.filterOutput(() => false)]),
       ),
-    )
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "filter-tool-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool" }))
+
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
+        const completed = events.at(-1)
+        expect(completed?._tag === "Completed" && completed.text).toBe("")
+      }),
+    ] as const
   })
 
-  it.effect("guardrails compose in middleware order", () => {
+  ItLayer.make(it, "guardrails compose in middleware order", () => {
     let modelCalled = false
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "ordered-guardrails-agent" })
-
-      const result = yield* Agent.generate(agent, { prompt: "secret" })
-
-      expect(result.text).toBe("ok")
-      expect(modelCalled).toBe(true)
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() => {
-            modelCalled = true
-            return Stream.make(textDelta("ok"))
-          }),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([
-            Guardrail.redactInput({ pattern: /secret/g, replacement: "safe" }),
-            Guardrail.validateInput((prompt) =>
-              Effect.succeed(
-                JSON.stringify(prompt.content).includes("secret") ? Option.some("secret left") : Option.none(),
-              ),
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalled = true
+          return Stream.make(textDelta("ok"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([
+          Guardrail.redactInput({ pattern: /secret/g, replacement: "safe" }),
+          Guardrail.validateInput((prompt) =>
+            Effect.succeed(
+              Json.stringify(prompt.content).includes("secret") ? Option.some("secret left") : Option.none(),
             ),
-          ]),
-        ),
+          ),
+        ]),
       ),
-    )
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "ordered-guardrails-agent" })
+
+        const result = yield* Agent.generate(agent, { prompt: "secret" })
+
+        expect(result.text).toBe("ok")
+        expect(modelCalled).toBe(true)
+      }),
+    ] as const
   })
 })

@@ -38,7 +38,9 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ToolExecutor extends Context.Service<ToolExecutor, Interface>()("@batonfx/core/ToolExecutor") {}
+export class ToolExecutor extends Context.Service<ToolExecutor, Interface>()(
+  "@batonfx/core/tool-executor/ToolExecutor",
+) {}
 
 /** @experimental */
 export type ToolkitInput<Tools extends Record<string, Tool.Any>> = Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
@@ -76,14 +78,15 @@ export type PlacementResponse =
   | { readonly _tag: "Suspend"; readonly token: string }
 
 /** @experimental */
-export interface PlacementRouteOptions<Tools extends Record<string, Tool.Any>> {
+export interface PlacementRouteOptions<Tools extends Record<string, Tool.Any>, E = AgentError> {
   readonly toolkit: Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
   readonly tools?: ReadonlyArray<string> | undefined
-  readonly execute: (request: PlacementRequest) => Effect.Effect<PlacementResponse, unknown, ToolContext>
+  readonly execute: (request: PlacementRequest) => Effect.Effect<PlacementResponse, E, ToolContext>
 }
 
 /** @experimental */
-export interface RemoteRouteOptions<Tools extends Record<string, Tool.Any>> extends PlacementRouteOptions<Tools> {
+export interface RemoteRouteOptions<Tools extends Record<string, Tool.Any>, E = AgentError>
+  extends PlacementRouteOptions<Tools, E> {
   readonly schedule?: Schedule.Schedule<unknown, unknown> | undefined
 }
 
@@ -149,13 +152,13 @@ const placementOutcome = (
 const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
   request: Request,
-): Effect.Effect<Outcome> => {
+): Effect.Effect<Outcome, never, Tool.HandlerServices<Tools[keyof Tools]>> => {
   if (toolkit.tools[request.call.name] === undefined) {
     return Effect.succeed(failureOutcome(`Tool ${request.call.name} is not registered`))
   }
-  return toolkit.handle(request.call.name as never, request.call.params as never).pipe(
+  return toolkit.handle(request.call.name as keyof Tools, request.call.params as never).pipe(
     Effect.flatMap((results) =>
-      (results as Stream.Stream<Tool.HandlerResult<Tool.Any>, unknown>).pipe(
+      results.pipe(
         Stream.filter((item) => item.preliminary === false),
         Stream.run(Sink.last()),
       ),
@@ -176,10 +179,10 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
     Effect.catchCause((cause) => {
       if (Cause.hasInterrupts(cause)) return Effect.interrupt
       const error = Cause.squash(cause)
-      if (error instanceof AgentSuspended) {
+      if (Schema.is(AgentSuspended)(error)) {
         return Effect.succeed<Outcome>({ _tag: "Suspend", token: error.token })
       }
-      return Effect.succeed(failureOutcome(failureMessage(cause)))
+      return cause.pipe(failureMessage, failureOutcome, Effect.succeed)
     }),
   )
 }
@@ -188,15 +191,56 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
 export function executeToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
   request: Request,
-): Effect.Effect<Outcome>
+): Effect.Effect<Outcome, never, Tool.HandlerServices<Tools[keyof Tools]>>
 export function executeToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.Toolkit<Tools>,
   request: Request,
-): Effect.Effect<Outcome, never, Tool.HandlersFor<Tools>>
-export function executeToolkit<Tools extends Record<string, Tool.Any>>(
-  toolkit: ToolkitInput<Tools>,
+): Effect.Effect<Outcome, never, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>>
+export function executeToolkit(
   request: Request,
-): Effect.Effect<Outcome, never, Tool.HandlersFor<Tools>> {
+): (<Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.WithHandler<Tools>,
+) => Effect.Effect<Outcome, never, Tool.HandlerServices<Tools[keyof Tools]>>) &
+  (<Tools extends Record<string, Tool.Any>>(
+    toolkit: Toolkit.Toolkit<Tools>,
+  ) => Effect.Effect<Outcome, never, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>>)
+export function executeToolkit<Tools extends Record<string, Tool.Any>>(
+  toolkitOrRequest: ToolkitInput<Tools> | Request,
+  request?: Request,
+): unknown {
+  if (request === undefined) {
+    const pipeableRequest = toolkitOrRequest as Request
+    function pipeable<CurrentTools extends Record<string, Tool.Any>>(
+      toolkit: Toolkit.WithHandler<CurrentTools>,
+    ): Effect.Effect<Outcome, never, Tool.HandlerServices<CurrentTools[keyof CurrentTools]>>
+    function pipeable<CurrentTools extends Record<string, Tool.Any>>(
+      toolkit: Toolkit.Toolkit<CurrentTools>,
+    ): Effect.Effect<
+      Outcome,
+      never,
+      Tool.HandlersFor<CurrentTools> | Tool.HandlerServices<CurrentTools[keyof CurrentTools]>
+    >
+    function pipeable<CurrentTools extends Record<string, Tool.Any>>(
+      toolkit: ToolkitInput<CurrentTools>,
+    ): Effect.Effect<
+      Outcome,
+      never,
+      Tool.HandlersFor<CurrentTools> | Tool.HandlerServices<CurrentTools[keyof CurrentTools]>
+    >
+    function pipeable<CurrentTools extends Record<string, Tool.Any>>(
+      toolkit: ToolkitInput<CurrentTools>,
+    ): Effect.Effect<
+      Outcome,
+      never,
+      Tool.HandlersFor<CurrentTools> | Tool.HandlerServices<CurrentTools[keyof CurrentTools]>
+    > {
+      return "handle" in toolkit
+        ? executeWithToolkit(toolkit, pipeableRequest)
+        : executeToolkit(toolkit, pipeableRequest)
+    }
+    return pipeable
+  }
+  const toolkit = toolkitOrRequest as ToolkitInput<Tools>
   return ("handle" in toolkit ? Effect.succeed(toolkit) : toolkit).pipe(
     Effect.flatMap((handled) => executeWithToolkit(handled, request)),
   )
@@ -234,9 +278,9 @@ export const route = (options: RouteOptions): Route => {
   }
 }
 
-const placementRoute = <Tools extends Record<string, Tool.Any>>(
+const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
   placement: Placement,
-  options: PlacementRouteOptions<Tools> | RemoteRouteOptions<Tools>,
+  options: PlacementRouteOptions<Tools, E> | RemoteRouteOptions<Tools, E>,
 ): Route => {
   const routedTools = options.tools ?? Object.keys(options.toolkit.tools)
   return route({
@@ -260,20 +304,24 @@ const placementRoute = <Tools extends Record<string, Tool.Any>>(
 }
 
 /** @experimental Route tool calls to a user/browser/desktop client. */
-export const client = <Tools extends Record<string, Tool.Any>>(options: PlacementRouteOptions<Tools>): Route =>
-  placementRoute("client", options)
+export const client = <Tools extends Record<string, Tool.Any>, E = AgentError>(
+  options: PlacementRouteOptions<Tools, E>,
+): Route => placementRoute("client", options)
 
 /** @experimental Route tool calls to a remote tool worker or service. */
-export const remote = <Tools extends Record<string, Tool.Any>>(options: RemoteRouteOptions<Tools>): Route =>
-  placementRoute("remote", options)
+export const remote = <Tools extends Record<string, Tool.Any>, E = AgentError>(
+  options: RemoteRouteOptions<Tools, E>,
+): Route => placementRoute("remote", options)
 
 /** @experimental Route tool calls to an MCP placement adapter. */
-export const mcp = <Tools extends Record<string, Tool.Any>>(options: PlacementRouteOptions<Tools>): Route =>
-  placementRoute("mcp", options)
+export const mcp = <Tools extends Record<string, Tool.Any>, E = AgentError>(
+  options: PlacementRouteOptions<Tools, E>,
+): Route => placementRoute("mcp", options)
 
 /** @experimental Route tool calls to a workspace or sandbox runtime. */
-export const sandbox = <Tools extends Record<string, Tool.Any>>(options: PlacementRouteOptions<Tools>): Route =>
-  placementRoute("sandbox", options)
+export const sandbox = <Tools extends Record<string, Tool.Any>, E = AgentError>(
+  options: PlacementRouteOptions<Tools, E>,
+): Route => placementRoute("sandbox", options)
 
 /** @experimental */
 export function routeToolkit<Tools extends Record<string, Tool.Any>>(toolkit: Toolkit.WithHandler<Tools>): Route

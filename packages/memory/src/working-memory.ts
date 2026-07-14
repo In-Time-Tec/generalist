@@ -40,7 +40,7 @@ const defaultSummaryPrompt = "Summarize the conversation memory while preserving
 
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
 
-const memoryError = (error: unknown): Memory.MemoryError => new Memory.MemoryError({ message: errorMessage(error) })
+const memoryError = (error: unknown): Memory.MemoryError => Memory.MemoryError.make({ message: errorMessage(error) })
 
 const keyId = (key: Memory.Key): string => JSON.stringify([key.agent, key.subject])
 
@@ -113,16 +113,23 @@ const summarizeOverflow = (
   summary: string | undefined,
   overflow: ReadonlyArray<StoredItem>,
 ): Effect.Effect<string | undefined, Memory.MemoryError> =>
-  Effect.gen(function* () {
-    const model = yield* LanguageModel.LanguageModel
-    const response = yield* model.generateText({
-      prompt: renderSummaryPrompt(options.prompt ?? defaultSummaryPrompt, summary, overflow),
-      toolkit: Toolkit.empty,
-      toolChoice: "none",
-    })
-    const text = response.text.trim()
-    return text.length === 0 ? summary : text
-  }).pipe(Effect.provide(options.model), Effect.mapError(memoryError))
+  Effect.scoped(
+    Layer.build(options.model).pipe(
+      Effect.flatMap((context) =>
+        Effect.gen(function* () {
+          const model = yield* LanguageModel.LanguageModel
+          const response = yield* model.generateText({
+            prompt: renderSummaryPrompt(options.prompt ?? defaultSummaryPrompt, summary, overflow),
+            toolkit: Toolkit.empty,
+            toolChoice: "none",
+          })
+          const text = response.text.trim()
+          return text.length === 0 ? summary : text
+        }).pipe(Effect.provide(context)),
+      ),
+      Effect.mapError(memoryError),
+    ),
+  )
 
 const recallItems = (state: KeyState): ReadonlyArray<Memory.Item> => [
   ...(state.summary === undefined

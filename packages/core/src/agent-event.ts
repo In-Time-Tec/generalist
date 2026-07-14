@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Function, Schema } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
 /** @experimental Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, unknown>>
@@ -103,20 +103,26 @@ const addUsageField = (left: number | undefined, right: number | undefined): num
   left === undefined && right === undefined ? undefined : (left ?? 0) + (right ?? 0)
 
 /** @experimental Fieldwise sum of upstream model usage values. */
-export const addUsage = (left: Response.Usage, right: Response.Usage): Response.Usage =>
-  new Response.Usage({
-    inputTokens: {
-      uncached: addUsageField(left.inputTokens.uncached, right.inputTokens.uncached),
-      total: addUsageField(left.inputTokens.total, right.inputTokens.total),
-      cacheRead: addUsageField(left.inputTokens.cacheRead, right.inputTokens.cacheRead),
-      cacheWrite: addUsageField(left.inputTokens.cacheWrite, right.inputTokens.cacheWrite),
-    },
-    outputTokens: {
-      total: addUsageField(left.outputTokens.total, right.outputTokens.total),
-      text: addUsageField(left.outputTokens.text, right.outputTokens.text),
-      reasoning: addUsageField(left.outputTokens.reasoning, right.outputTokens.reasoning),
-    },
-  })
+export const addUsage: {
+  (right: Response.Usage): (left: Response.Usage) => Response.Usage
+  (left: Response.Usage, right: Response.Usage): Response.Usage
+} = Function.dual(
+  2,
+  (left: Response.Usage, right: Response.Usage): Response.Usage =>
+    Response.Usage.make({
+      inputTokens: {
+        uncached: addUsageField(left.inputTokens.uncached, right.inputTokens.uncached),
+        total: addUsageField(left.inputTokens.total, right.inputTokens.total),
+        cacheRead: addUsageField(left.inputTokens.cacheRead, right.inputTokens.cacheRead),
+        cacheWrite: addUsageField(left.inputTokens.cacheWrite, right.inputTokens.cacheWrite),
+      },
+      outputTokens: {
+        total: addUsageField(left.outputTokens.total, right.outputTokens.total),
+        text: addUsageField(left.outputTokens.text, right.outputTokens.text),
+        reasoning: addUsageField(left.outputTokens.reasoning, right.outputTokens.reasoning),
+      },
+    }),
+)
 
 /** @experimental Closed union of Baton loop events. */
 export type Event =
@@ -134,13 +140,13 @@ export type Event =
 /** @experimental The loop failed. `turn` is the 0-based turn that failed. */
 export class AgentError extends Schema.TaggedErrorClass<AgentError>()("@batonfx/core/AgentError", {
   message: Schema.String,
-  turn: Schema.Number,
+  turn: Schema.Finite,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
 /** @experimental The turn policy declined another turn while tool results were still pending. */
 export class TurnLimitExceeded extends Schema.TaggedErrorClass<TurnLimitExceeded>()("@batonfx/core/TurnLimitExceeded", {
-  turn: Schema.Number,
+  turn: Schema.Finite,
   pending: Schema.Array(
     Schema.Struct({
       tool_call_id: Schema.String,
@@ -153,7 +159,7 @@ export class TurnLimitExceeded extends Schema.TaggedErrorClass<TurnLimitExceeded
 export class MiddlewareViolation extends Schema.TaggedErrorClass<MiddlewareViolation>()(
   "@batonfx/core/MiddlewareViolation",
   {
-    turn: Schema.Number,
+    turn: Schema.Finite,
     detail: Schema.String,
   },
 ) {}

@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Function, Layer, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 /** @experimental Parsed SKILL.md frontmatter. */
 export interface Frontmatter {
@@ -42,11 +42,17 @@ export interface Interface {
 export type Source<R = never> = Effect.Effect<Interface, SkillSourceError, R>
 
 /** @experimental */
-export class SkillSource extends Context.Service<SkillSource, Interface>()("@batonfx/core/SkillSource") {}
+export class SkillSource extends Context.Service<SkillSource, Interface>()("@batonfx/core/skill-source/SkillSource") {}
 
 /** @experimental Build a startup listing line from skill frontmatter. */
-export const makeListing = (frontmatter: Frontmatter, descriptionCap: number = DESCRIPTION_CAP): string =>
-  `- ${frontmatter.name}: ${frontmatter.description.slice(0, Math.max(0, descriptionCap))}`
+export const makeListing: {
+  (descriptionCap?: number): (frontmatter: Frontmatter) => string
+  (frontmatter: Frontmatter, descriptionCap?: number): string
+} = Function.dual(
+  (args) => typeof args[0] !== "number",
+  (frontmatter: Frontmatter, descriptionCap: number = DESCRIPTION_CAP): string =>
+    `- ${frontmatter.name}: ${frontmatter.description.slice(0, Math.max(0, descriptionCap))}`,
+)
 
 /** @experimental A source built from in-memory skills. */
 export const fromSkills = (skills: ReadonlyArray<Skill>): Layer.Layer<SkillSource> => {
@@ -104,25 +110,27 @@ const usageRank = (skill: Skill, recentlyUsed: ReadonlyArray<string>): number =>
 }
 
 /** @experimental Select startup listings within a token budget. */
-export const selectListings = (
-  skills: ReadonlyArray<Skill>,
-  budgetTokens: number,
-  recentlyUsed: ReadonlyArray<string>,
-): ReadonlyArray<Skill> => {
-  if (budgetTokens <= 0) return []
-  const selected = skills.filter(
-    (skill) => skill.frontmatter.disableModelInvocation !== true && estimatedTokens(skill.listing) <= budgetTokens,
-  )
-  let total = selected.reduce((sum, skill) => sum + estimatedTokens(skill.listing), 0)
-  while (total > budgetTokens && selected.length > 0) {
-    let dropIndex = 0
-    for (let index = 1; index < selected.length; index += 1) {
-      if (usageRank(selected[index] as Skill, recentlyUsed) < usageRank(selected[dropIndex] as Skill, recentlyUsed)) {
-        dropIndex = index
+export const selectListings: {
+  (budgetTokens: number, recentlyUsed: ReadonlyArray<string>): (skills: ReadonlyArray<Skill>) => ReadonlyArray<Skill>
+  (skills: ReadonlyArray<Skill>, budgetTokens: number, recentlyUsed: ReadonlyArray<string>): ReadonlyArray<Skill>
+} = Function.dual(
+  3,
+  (skills: ReadonlyArray<Skill>, budgetTokens: number, recentlyUsed: ReadonlyArray<string>): ReadonlyArray<Skill> => {
+    if (budgetTokens <= 0) return []
+    const selected = skills.filter(
+      (skill) => skill.frontmatter.disableModelInvocation !== true && estimatedTokens(skill.listing) <= budgetTokens,
+    )
+    let total = selected.reduce((sum, skill) => sum + estimatedTokens(skill.listing), 0)
+    while (total > budgetTokens && selected.length > 0) {
+      let dropIndex = 0
+      for (let index = 1; index < selected.length; index += 1) {
+        if (usageRank(selected[index] as Skill, recentlyUsed) < usageRank(selected[dropIndex] as Skill, recentlyUsed)) {
+          dropIndex = index
+        }
       }
+      const [dropped] = selected.splice(dropIndex, 1)
+      total -= dropped === undefined ? 0 : estimatedTokens(dropped.listing)
     }
-    const [dropped] = selected.splice(dropIndex, 1)
-    total -= dropped === undefined ? 0 : estimatedTokens(dropped.listing)
-  }
-  return selected
-}
+    return selected
+  },
+)

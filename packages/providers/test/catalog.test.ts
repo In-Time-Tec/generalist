@@ -1,58 +1,61 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it, layer as testLayer } from "@effect/vitest"
 import { Effect } from "effect"
 import { ModelCatalog, layer } from "@batonfx/providers/catalog"
 import { Catalog } from "../src/index"
 
 describe("Catalog", () => {
-  it.effect("requires a known bundled model", () =>
-    Effect.gen(function* () {
-      const metadata = yield* Catalog.require({ provider: "openai", model: "gpt-4o-mini" })
+  testLayer(Catalog.layer())((test) => {
+    test.effect("requires a known bundled model", () =>
+      Effect.gen(function* () {
+        const metadata = yield* Catalog.require({ provider: "openai", model: "gpt-4o-mini" })
 
-      expect(metadata.provider).toBe("openai")
-      expect(metadata.model).toBe("gpt-4o-mini")
-      expect(metadata.contextWindow).toBeGreaterThan(0)
-      expect(metadata.maxOutput).toBeGreaterThan(0)
-    }).pipe(Effect.provide(Catalog.layer())),
-  )
+        expect(metadata.provider).toBe("openai")
+        expect(metadata.model).toBe("gpt-4o-mini")
+        expect(metadata.contextWindow).toBeGreaterThan(0)
+        expect(metadata.maxOutput).toBeGreaterThan(0)
+      }),
+    )
 
-  it.effect("fails typed when required metadata is missing", () =>
-    Effect.gen(function* () {
-      const failure = yield* Effect.flip(Catalog.require({ provider: "missing", model: "none" }))
+    test.effect("fails typed when required metadata is missing", () =>
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Catalog.require({ provider: "missing", model: "none" }))
 
-      expect(failure._tag).toBe("@batonfx/providers/ModelMetadataNotFound")
-      if (failure._tag === "@batonfx/providers/ModelMetadataNotFound") {
-        expect(failure.provider).toBe("missing")
-        expect(failure.model).toBe("none")
-      }
-    }).pipe(Effect.provide(Catalog.layer())),
-  )
+        expect(failure._tag).toBe("@batonfx/providers/ModelMetadataNotFound")
+        if (failure._tag === "@batonfx/providers/ModelMetadataNotFound") {
+          expect(failure.provider).toBe("missing")
+          expect(failure.model).toBe("none")
+        }
+      }),
+    )
 
-  it.effect("lets overrides shadow bundled metadata by provider and model", () => {
-    const override: Catalog.ModelMetadata = {
-      provider: "openai",
-      model: "gpt-4o-mini",
-      contextWindow: 42,
-      maxOutput: 7,
-      pricing: { inputPerMTok: 1 },
-      modalities: ["text"],
-    }
+    test.effect("returns undefined from lookup when metadata is missing", () =>
+      Effect.gen(function* () {
+        const metadata = yield* Catalog.lookup({ provider: "missing", model: "none" })
 
-    return Effect.gen(function* () {
-      const metadata = yield* Catalog.require({ provider: "openai", model: "gpt-4o-mini" })
-      const all = yield* Catalog.all()
-
-      expect(metadata).toEqual(override)
-      expect(all.find((entry) => entry.provider === "openai" && entry.model === "gpt-4o-mini")).toEqual(override)
-    }).pipe(Effect.provide(Catalog.layer([override])))
+        expect(metadata).toBeUndefined()
+      }),
+    )
   })
 
-  it.effect("returns undefined from lookup when metadata is missing", () =>
-    Effect.gen(function* () {
-      const metadata = yield* Catalog.lookup({ provider: "missing", model: "none" })
+  const override: Catalog.ModelMetadata = {
+    provider: "openai",
+    model: "gpt-4o-mini",
+    contextWindow: 42,
+    maxOutput: 7,
+    pricing: { inputPerMTok: 1 },
+    modalities: ["text"],
+  }
+  testLayer(Catalog.layer([override]))((test) => {
+    test.effect("lets overrides shadow bundled metadata by provider and model", () =>
+      Effect.gen(function* () {
+        const metadata = yield* Catalog.require({ provider: "openai", model: "gpt-4o-mini" })
+        const all = yield* Catalog.all()
 
-      expect(metadata).toBeUndefined()
-    }).pipe(Effect.provide(Catalog.layer())),
-  )
+        expect(metadata).toEqual(override)
+        expect(all.find((entry) => entry.provider === "openai" && entry.model === "gpt-4o-mini")).toEqual(override)
+      }),
+    )
+  })
 
   it("exports the catalog namespace and subpath", () => {
     expect(typeof Catalog.layer).toBe("function")

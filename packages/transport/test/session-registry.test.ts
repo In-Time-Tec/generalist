@@ -7,6 +7,11 @@ import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
 import { SessionRegistry, Wire } from "../src/index"
 
+const provideTestLayer =
+  <R, E, RIn>(layer: Layer.Layer<R, E, RIn>) =>
+  <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
+    Layer.build(layer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
+
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
@@ -59,7 +64,7 @@ describe("SessionRegistry.layerMemory", () => {
       expect(info.chatId).toBe("c-open")
       expect(info.lastSeq).toBe(-1)
       expect(info.status._tag).toBe("Idle")
-    }).pipe(Effect.provide(baseLayers(Agent.make({ name: "transport-agent" }), () => assistantText("reply", "ok")))),
+    }).pipe(provideTestLayer(baseLayers(Agent.make({ name: "transport-agent" }), () => assistantText("reply", "ok")))),
   )
 
   it.effect("send publishes monotonic event frames and ended", () =>
@@ -74,7 +79,7 @@ describe("SessionRegistry.layerMemory", () => {
       expect(frames.some((frame) => frame._tag === "SessionStatus" && frame.status._tag === "Running")).toBe(true)
       expect(frames.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
       expect(frames.at(-1)?._tag).toBe("Ended")
-    }).pipe(Effect.provide(baseLayers(Agent.make({ name: "transport-agent" }), () => assistantText("reply", "ok")))),
+    }).pipe(provideTestLayer(baseLayers(Agent.make({ name: "transport-agent" }), () => assistantText("reply", "ok")))),
   )
 
   it.effect("fast completed runs keep idle status and idleSince", () =>
@@ -88,7 +93,7 @@ describe("SessionRegistry.layerMemory", () => {
 
       expect(info.status._tag).toBe("Idle")
       expect(Option.isSome(info.idleSince)).toBe(true)
-    }).pipe(Effect.provide(baseLayers(Agent.make({ name: "fast-agent" }), () => assistantText("reply", "ok")))),
+    }).pipe(provideTestLayer(baseLayers(Agent.make({ name: "fast-agent" }), () => assistantText("reply", "ok")))),
   )
 
   it.effect("idle eviction terminates active attachments and removes the session", () =>
@@ -106,7 +111,7 @@ describe("SessionRegistry.layerMemory", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       expect(missing._tag).toBe("@batonfx/transport/SessionError")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SessionRegistry.layerMemory({ agent: Agent.make({ name: "evict-agent" }), idleTimeout: "10 millis" }).pipe(
           Layer.provide(dependencies(() => assistantText("reply", "ok"))),
         ),
@@ -131,7 +136,7 @@ describe("SessionRegistry.layerMemory", () => {
         const frames = yield* collectThroughEnded("s-busy")
         expect(frames.at(-1)?._tag).toBe("Ended")
       }).pipe(
-        Effect.provide(
+        provideTestLayer(
           baseLayers(Agent.make({ name: "busy-agent" }), () =>
             Stream.unwrap(Deferred.await(release).pipe(Effect.as(assistantText("reply", "released")))),
           ),
@@ -169,7 +174,10 @@ describe("SessionRegistry.layerMemory", () => {
         yield* TestClock.adjust("1 hour")
         yield* Fiber.join(ended)
 
-        const prompts = (yield* fixture.prompts).map((prompt) => JSON.stringify(prompt))
+        const recordedPrompts = yield* fixture.prompts
+        const prompts = yield* Effect.forEach(recordedPrompts, (prompt) =>
+          Schema.encodeUnknownEffect(Schema.UnknownFromJsonString)(prompt),
+        )
         expect(prompts).toHaveLength(3)
         expect(prompts[0]).toContain("first")
         expect(prompts[1]).toContain("second")
@@ -177,7 +185,7 @@ describe("SessionRegistry.layerMemory", () => {
         const drained = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-queued"))
         expect(drained.pendingMessages).toBe(0)
       }).pipe(
-        Effect.provide(
+        provideTestLayer(
           SessionRegistry.layerMemory({
             agent: Agent.make({ name: "queued-agent" }),
             onConcurrentMessage: "enqueue",
@@ -221,7 +229,7 @@ describe("SessionRegistry.layerMemory", () => {
       yield* Fiber.join(secondEnded)
       expect(modelCalls).toBe(2)
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SessionRegistry.layerMemory({
           agent: Agent.make({ name: "capped-agent" }),
           maxConcurrentRuns: 1,
@@ -266,7 +274,7 @@ describe("SessionRegistry.layerMemory", () => {
       yield* Deferred.succeed(release, undefined)
       yield* collectThroughEnded("s-queue-full")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SessionRegistry.layerMemory({
           agent: Agent.make({ name: "queue-full-agent" }),
           onConcurrentMessage: "enqueue",
@@ -293,7 +301,7 @@ describe("SessionRegistry.layerMemory", () => {
       const replay = yield* collectThroughEnded("s-replay", cursor)
       expect(replay.length).toBeGreaterThan(0)
       expect(replay.every((frame) => frame.seq > cursor)).toBe(true)
-    }).pipe(Effect.provide(baseLayers(Agent.make({ name: "replay-agent" }), () => assistantText("reply", "ok")))),
+    }).pipe(provideTestLayer(baseLayers(Agent.make({ name: "replay-agent" }), () => assistantText("reply", "ok")))),
   )
 
   it.effect("lagging subscribers fail without blocking other subscribers", () =>
@@ -328,7 +336,7 @@ describe("SessionRegistry.layerMemory", () => {
           expect(slowError.lastDeliveredSeq).toBe(1)
         }
       }).pipe(
-        Effect.provide(
+        provideTestLayer(
           SessionRegistry.layerMemory({ agent: Agent.make({ name: "lag-agent" }), subscriberQueueCapacity: 1 }).pipe(
             Layer.provide(dependencies(() => assistantText("reply", "ok"))),
           ),
@@ -353,11 +361,13 @@ describe("SessionRegistry.layerMemory", () => {
         registry.attach("s-snapshot", 0).pipe(Stream.take(1), Stream.runCollect),
       )
       expect(snapshot[0]?._tag).toBe("Snapshot")
-      expect(snapshot[0]?._tag === "Snapshot" && JSON.stringify(snapshot[0].transcript.content)).toContain(
-        "snapshot prompt",
-      )
+      const snapshotContent =
+        snapshot[0]?._tag === "Snapshot"
+          ? yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(snapshot[0].transcript.content)
+          : false
+      expect(snapshotContent).toContain("snapshot prompt")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SessionRegistry.layerMemory({
           agent: Agent.make({ name: "snapshot-agent" }),
           ringBufferCapacity: 2,
@@ -391,7 +401,7 @@ describe("SessionRegistry.layerMemory", () => {
       const second = yield* Fiber.join(secondFiber)
       expect(second.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         baseLayers(Agent.make({ name: "interrupt-agent" }), () => {
           modelCalls += 1
           if (modelCalls === 1) {
@@ -434,7 +444,7 @@ describe("SessionRegistry.layerMemory", () => {
       expect(recorded.filter((frame) => frame._tag === "Failed")).toHaveLength(1)
       expect(recorded.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SessionRegistry.layerMemory({
           agent: Agent.make({ name: "interrupt-queue-agent" }),
           onConcurrentMessage: "enqueue",
@@ -458,7 +468,7 @@ describe("SessionRegistry.layerMemory", () => {
       const pendingCapacity = yield* SessionRegistry.SessionRegistry.use((registry) =>
         registry.open({ sessionId: "invalid-pending-capacity" }),
       ).pipe(
-        Effect.provide(
+        provideTestLayer(
           SessionRegistry.layerMemory({
             agent: Agent.make({ name: "invalid-pending-capacity-agent" }),
             pendingMessageCapacity: 1.5,
@@ -469,7 +479,7 @@ describe("SessionRegistry.layerMemory", () => {
       const concurrency = yield* SessionRegistry.SessionRegistry.use((registry) =>
         registry.open({ sessionId: "invalid-concurrency" }),
       ).pipe(
-        Effect.provide(
+        provideTestLayer(
           SessionRegistry.layerMemory({
             agent: Agent.make({ name: "invalid-concurrency-agent" }),
             maxConcurrentRuns: 0,
@@ -510,7 +520,9 @@ describe("SessionRegistry.layerMemory", () => {
 
       const info = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-stop-race"))
       expect(info.status._tag).toBe("Failed")
-    }).pipe(Effect.provide(baseLayers(Agent.make({ name: "stop-race-agent" }), () => Stream.fromEffect(Effect.never))))
+    }).pipe(
+      provideTestLayer(baseLayers(Agent.make({ name: "stop-race-agent" }), () => Stream.fromEffect(Effect.never))),
+    )
   })
 
   it.effect("stale predecessor registration cannot clear a successor interruption", () => {
@@ -546,7 +558,7 @@ describe("SessionRegistry.layerMemory", () => {
       expect(info.pendingMessages).toBe(0)
       expect(info.status._tag).toBe("Failed")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SessionRegistry.layerMemory({
           agent: Agent.make({ name: "successor-stop-agent" }),
           onConcurrentMessage: "enqueue",
@@ -598,7 +610,7 @@ describe("SessionRegistry.layerMemory", () => {
       expect(second.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
       expect(second.at(-1)?._tag).toBe("Ended")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SessionRegistry.layerMemory({ agent }).pipe(
           Layer.provide(
             Layer.mergeAll(
@@ -669,7 +681,7 @@ describe("SessionRegistry.layerMemory", () => {
       expect(completed.pendingMessages).toBe(0)
       expect(completed.status._tag).toBe("Idle")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SessionRegistry.layerMemory({
           agent,
           onConcurrentMessage: "enqueue",
@@ -728,7 +740,7 @@ describe("SessionRegistry.layerMemory", () => {
       expect(secondSuspended?._tag === "Suspended" && secondSuspended.suspension.token).toBe("second-token")
       expect(approvalChecks).toBe(2)
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SessionRegistry.layerMemory({ agent }).pipe(
           Layer.provide(
             Layer.mergeAll(

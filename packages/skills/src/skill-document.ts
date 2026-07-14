@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import { SkillSource } from "@batonfx/core"
 
 export interface ParsedDocument {
@@ -20,7 +20,7 @@ interface ParsedHeader {
 }
 
 const sourceError = (source: string, message: string, cause?: unknown): SkillSource.SkillSourceError =>
-  new SkillSource.SkillSourceError({ source, message, ...(cause === undefined ? {} : { cause }) })
+  SkillSource.SkillSourceError.make({ source, message, ...(cause === undefined ? {} : { cause }) })
 
 const normalizeKey = (key: string): string => key.replace(/[-_]/g, "").toLowerCase()
 
@@ -108,46 +108,57 @@ const parseHeader = (source: string, block: string): Effect.Effect<ParsedHeader,
     return parsed
   }).pipe(Effect.catchCause((cause) => Effect.fail(sourceError(source, "Invalid SKILL.md frontmatter", cause))))
 
-export const splitDocument = (
-  source: string,
-  content: string,
-): Effect.Effect<readonly [string, string], SkillSource.SkillSourceError> =>
+export const splitDocument: {
+  (content: string): (source: string) => Effect.Effect<readonly [string, string], SkillSource.SkillSourceError>
+  (source: string, content: string): Effect.Effect<readonly [string, string], SkillSource.SkillSourceError>
+} = Function.dual(2, (source: string, content: string) =>
   Effect.gen(function* () {
     const normalized = content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n")
     const lines = normalized.split("\n")
     if (lines[0] !== "---") {
-      return yield* Effect.fail(sourceError(source, "Invalid SKILL.md document: missing opening frontmatter fence"))
+      return yield* sourceError(source, "Invalid SKILL.md document: missing opening frontmatter fence")
     }
     const close = lines.findIndex((line, index) => index > 0 && line === "---")
     if (close === -1) {
-      return yield* Effect.fail(sourceError(source, "Invalid SKILL.md document: missing closing frontmatter fence"))
+      return yield* sourceError(source, "Invalid SKILL.md document: missing closing frontmatter fence")
     }
     return [lines.slice(1, close).join("\n"), lines.slice(close + 1).join("\n")] as const
-  })
+  }),
+)
 
-export const validateName = (source: string, name: string): Effect.Effect<string, SkillSource.SkillSourceError> =>
+export const validateName: {
+  (name: string): (source: string) => Effect.Effect<string, SkillSource.SkillSourceError>
+  (source: string, name: string): Effect.Effect<string, SkillSource.SkillSourceError>
+} = Function.dual(2, (source: string, name: string) =>
   /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(name) && !name.includes("--")
     ? Effect.succeed(name)
     : Effect.fail(
         sourceError(source, "SKILL.md name must be 1-64 lowercase alphanumeric or single-hyphen-separated characters"),
-      )
+      ),
+)
 
-export const parseFrontmatter = (
-  source: string,
-  block: string,
-  directoryName: string,
-): Effect.Effect<SkillSource.Frontmatter, SkillSource.SkillSourceError> =>
+export const parseFrontmatter: {
+  (
+    block: string,
+    directoryName: string,
+  ): (source: string) => Effect.Effect<SkillSource.Frontmatter, SkillSource.SkillSourceError>
+  (
+    source: string,
+    block: string,
+    directoryName: string,
+  ): Effect.Effect<SkillSource.Frontmatter, SkillSource.SkillSourceError>
+} = Function.dual(3, (source: string, block: string, directoryName: string) =>
   Effect.gen(function* () {
     const parsed = yield* parseHeader(source, block)
     if (parsed.name === undefined) {
-      return yield* Effect.fail(sourceError(source, "SKILL.md frontmatter requires name"))
+      return yield* sourceError(source, "SKILL.md frontmatter requires name")
     }
     yield* validateName(source, parsed.name)
     if (parsed.name !== directoryName) {
-      return yield* Effect.fail(sourceError(source, `SKILL.md name must match directory ${directoryName}`))
+      return yield* sourceError(source, `SKILL.md name must match directory ${directoryName}`)
     }
     if (parsed.description === undefined || parsed.description.length === 0 || parsed.description.length > 1_024) {
-      return yield* Effect.fail(sourceError(source, "SKILL.md description must contain 1-1024 characters"))
+      return yield* sourceError(source, "SKILL.md description must contain 1-1024 characters")
     }
     return {
       name: parsed.name,
@@ -161,14 +172,18 @@ export const parseFrontmatter = (
       ...(parsed.model === undefined ? {} : { model: parsed.model }),
       ...(parsed.paths === undefined ? {} : { paths: parsed.paths }),
     }
-  })
+  }),
+)
 
-export const parseDocument = (
-  source: string,
-  content: string,
-  directoryName: string,
-): Effect.Effect<ParsedDocument, SkillSource.SkillSourceError> =>
+export const parseDocument: {
+  (
+    content: string,
+    directoryName: string,
+  ): (source: string) => Effect.Effect<ParsedDocument, SkillSource.SkillSourceError>
+  (source: string, content: string, directoryName: string): Effect.Effect<ParsedDocument, SkillSource.SkillSourceError>
+} = Function.dual(3, (source: string, content: string, directoryName: string) =>
   Effect.gen(function* () {
     const [header, body] = yield* splitDocument(source, content)
     return { frontmatter: yield* parseFrontmatter(source, header, directoryName), body }
-  })
+  }),
+)

@@ -1,7 +1,7 @@
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
-import { type Duration, Effect, type Scope } from "effect"
+import { Deferred, type Duration, Effect, type Scope, Schema } from "effect"
 import { McpToolSource } from "../src/index"
 
 export const addInputSchema = {
@@ -20,18 +20,10 @@ export const statsOutputSchema = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null
 
-const resolvable = (): { readonly promise: Promise<void>; readonly resolve: () => void } => {
-  let resolve!: () => void
-  const promise = new Promise<void>((r) => {
-    resolve = r
-  })
-  return { promise, resolve }
-}
-
 export interface Fixture {
   readonly source: McpToolSource.Interface
   readonly closes: { count: number }
-  readonly hang: { readonly started: Promise<void>; readonly aborted: Promise<void> }
+  readonly hang: { readonly started: Deferred.Deferred<void>; readonly aborted: Deferred.Deferred<void> }
 }
 
 export const makeFixtureWith = (options?: {
@@ -40,8 +32,10 @@ export const makeFixtureWith = (options?: {
   Effect.gen(function* () {
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
 
-    const hangStarted = resolvable()
-    const hangAborted = resolvable()
+    const hangStarted = yield* Deferred.make<void>()
+    const hangAborted = yield* Deferred.make<void>()
+    const hangResponse = yield* Deferred.make<never>()
+    const runtime = yield* Effect.context<never>()
 
     const server = new Server({ name: "calc", version: "1.0.0" }, { capabilities: { tools: {} } })
     server.setRequestHandler(ListToolsRequestSchema, () => ({
@@ -67,14 +61,16 @@ export const makeFixtureWith = (options?: {
       }
       if (request.params.name === "stats") {
         return {
-          content: [{ type: "text" as const, text: JSON.stringify({ sum: 42 }) }],
+          content: [{ type: "text" as const, text: Schema.encodeSync(Schema.UnknownFromJsonString)({ sum: 42 }) }],
           structuredContent: { sum: 42 },
         }
       }
       if (request.params.name === "hang") {
-        hangStarted.resolve()
-        extra.signal.addEventListener("abort", () => hangAborted.resolve())
-        return new Promise<never>(() => {})
+        Effect.runForkWith(runtime)(Deferred.succeed(hangStarted, undefined))
+        extra.signal.addEventListener("abort", () =>
+          Effect.runForkWith(runtime)(Deferred.succeed(hangAborted, undefined)),
+        )
+        return Effect.runPromiseWith(runtime)(Deferred.await(hangResponse), { signal: extra.signal })
       }
       return { content: [{ type: "text" as const, text: "boom failed" }], isError: true }
     })
@@ -82,13 +78,15 @@ export const makeFixtureWith = (options?: {
 
     const closes = { count: 0 }
     const originalClose = clientTransport.close.bind(clientTransport)
-    clientTransport.close = async () => {
-      closes.count += 1
-      await originalClose()
-    }
+    clientTransport.close = () =>
+      Effect.runPromiseWith(runtime)(
+        Effect.sync(() => {
+          closes.count += 1
+        }).pipe(Effect.andThen(Effect.promise(originalClose))),
+      )
 
     const source = yield* McpToolSource.fromTransport("calc", clientTransport, options)
-    return { source, closes, hang: { started: hangStarted.promise, aborted: hangAborted.promise } }
+    return { source, closes, hang: { started: hangStarted, aborted: hangAborted } }
   })
 
 export const makeFixture: Effect.Effect<Fixture, McpToolSource.McpConnectionError, Scope.Scope> = makeFixtureWith()

@@ -6,13 +6,13 @@ import { ModelResilience } from "../src/index"
 const transientError = AiError.make({
   module: "TestLanguageModel",
   method: "streamText",
-  reason: new AiError.RateLimitError({}),
+  reason: AiError.RateLimitError.make({}),
 })
 
 const terminalError = AiError.make({
   module: "TestLanguageModel",
   method: "streamText",
-  reason: new AiError.UnknownError({ description: "terminal model failure" }),
+  reason: AiError.UnknownError.make({ description: "terminal model failure" }),
 })
 
 const textPart = (text: string) => Response.makePart("text", { text })

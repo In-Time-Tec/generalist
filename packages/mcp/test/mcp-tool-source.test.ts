@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Fiber, Option } from "effect"
+import { Deferred, Effect, Fiber, Option } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { McpToolSource } from "../src/index"
 import { addInputSchema, makeFixture, makeFixtureWith, statsOutputSchema } from "./fixture"
@@ -91,11 +91,11 @@ describe("McpToolSource", () => {
       Effect.gen(function* () {
         const fixture = yield* makeFixture
         const fiber = yield* fixture.source.callTool("hang", {}).pipe(Effect.forkChild)
-        yield* Effect.promise(() => fixture.hang.started)
+        yield* Deferred.await(fixture.hang.started)
 
         yield* Fiber.interrupt(fiber)
 
-        const aborted = yield* Effect.promise(() => fixture.hang.aborted).pipe(Effect.timeoutOption("500 millis"))
+        const aborted = yield* Deferred.await(fixture.hang.aborted).pipe(Effect.timeoutOption("500 millis"))
         expect(Option.isSome(aborted)).toBe(true)
       }),
     ),

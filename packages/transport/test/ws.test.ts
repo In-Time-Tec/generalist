@@ -5,6 +5,11 @@ import { Socket } from "effect/unstable/socket"
 import { Toolkit } from "effect/unstable/ai"
 import { SessionRegistry, Wire, Ws } from "../src/index"
 
+const provideTestLayer =
+  <R, E, RIn>(layer: Layer.Layer<R, E, RIn>) =>
+  <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
+    Layer.build(layer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
+
 const toolkit = Toolkit.empty
 
 const endedFrame: Wire.LooseServerFrameType = { _tag: "Ended", seq: 1 }
@@ -54,7 +59,7 @@ const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest =>
   }) as unknown as HttpServerRequest.HttpServerRequest
 
 const clientFrameText = (frame: Wire.ClientFrameType): string =>
-  JSON.stringify(Schema.encodeUnknownSync(Wire.ClientFrame)(frame))
+  Schema.encodeUnknownSync(Schema.fromJsonString(Wire.ClientFrame))(frame)
 
 const decodeServerFrame = (text: string): Wire.LooseServerFrameType =>
   Schema.decodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(text)
@@ -65,19 +70,19 @@ const registryLayer = (
   Layer.succeed(
     SessionRegistry.SessionRegistry,
     SessionRegistry.SessionRegistry.of({
-      open: () => Effect.fail(new SessionRegistry.SessionError({ message: "unused" })),
+      open: () => Effect.fail(SessionRegistry.SessionError.make({ message: "unused" })),
       send: implementation.send ?? (() => Effect.void),
       resolveApproval: implementation.resolveApproval ?? (() => Effect.void),
       attach: implementation.attach ?? (() => Stream.never),
       interrupt: implementation.interrupt ?? (() => Effect.void),
-      info: () => Effect.fail(new SessionRegistry.SessionError({ message: "unused" })),
+      info: () => Effect.fail(SessionRegistry.SessionError.make({ message: "unused" })),
     }),
   )
 
 const runHandler = (fake: FakeSocket, layer: Layer.Layer<SessionRegistry.SessionRegistry>) =>
   Ws.handle(toolkit).pipe(
     Effect.provideService(HttpServerRequest.HttpServerRequest, request(fake.socket)),
-    Effect.provide(layer),
+    provideTestLayer(layer),
     Effect.scoped,
     Effect.forkChild,
   )
@@ -164,7 +169,7 @@ describe("Ws", () => {
       const fiber = yield* runHandler(
         fake,
         registryLayer({
-          attach: () => Stream.fail(new SessionRegistry.SubscriberLagged({ sessionId: "s", lastDeliveredSeq: 0 })),
+          attach: () => Stream.fail(SessionRegistry.SubscriberLagged.make({ sessionId: "s", lastDeliveredSeq: 0 })),
         }),
       )
 
@@ -200,7 +205,7 @@ describe("Ws", () => {
       const fiber = yield* runHandler(
         fake,
         registryLayer({
-          send: (sessionId) => Effect.fail(new SessionRegistry.SessionQueueFull({ sessionId, capacity: 1 })),
+          send: (sessionId) => Effect.fail(SessionRegistry.SessionQueueFull.make({ sessionId, capacity: 1 })),
         }),
       )
 

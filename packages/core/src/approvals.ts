@@ -27,7 +27,7 @@ export interface Interface {
 
 /** @experimental Enforcement point for `Ai.Tool.needsApproval`, which
  * `effect/unstable/ai` declares but never enforces. */
-export class Approvals extends Context.Service<Approvals, Interface>()("@batonfx/core/Approvals") {}
+export class Approvals extends Context.Service<Approvals, Interface>()("@batonfx/core/approvals") {}
 
 /** @experimental Default: every check returns Approved. */
 export const autoApprove: Layer.Layer<Approvals> = Layer.succeed(

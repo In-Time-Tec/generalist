@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Option, Ref, Schema } from "effect"
+import { dual } from "effect/Function"
 
 /** @experimental What a matched permission rule grants. */
 export type Level = "allow" | "deny" | "ask"
@@ -87,7 +88,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Permissions extends Context.Service<Permissions, Interface>()("@batonfx/core/Permissions") {}
+export class Permissions extends Context.Service<Permissions, Interface>()("@batonfx/core/permissions") {}
 
 /** @experimental Optional remembered-rule store. */
 export interface RuleStoreInterface {
@@ -95,7 +96,9 @@ export interface RuleStoreInterface {
 }
 
 /** @experimental */
-export class RuleStore extends Context.Service<RuleStore, RuleStoreInterface>()("@batonfx/core/PermissionRuleStore") {}
+export class RuleStore extends Context.Service<RuleStore, RuleStoreInterface>()(
+  "@batonfx/core/permissions/RuleStore",
+) {}
 
 const escapeRegExp = (value: string): string => value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&")
 
@@ -165,8 +168,12 @@ const matchesProjection = (pattern: string, tool: string, projection: Projection
 }
 
 /** @experimental Match a permission pattern against a tool call. */
-export const matches = (pattern: string, tool: string, params: unknown): boolean =>
-  matchesProjection(pattern, tool, project(params), false)
+export const matches: {
+  (tool: string, params: unknown): (pattern: string) => boolean
+  (pattern: string, tool: string, params: unknown): boolean
+} = dual(3, (pattern: string, tool: string, params: unknown): boolean =>
+  matchesProjection(pattern, tool, project(params), false),
+)
 
 const matchingRule = (ruleset: Ruleset, tool: string, params: unknown): Rule | undefined => {
   const projection = project(params)
@@ -178,8 +185,14 @@ const matchingRule = (ruleset: Ruleset, tool: string, params: unknown): Rule | u
 }
 
 /** @experimental Evaluate a ruleset with last-match semantics. */
-export const evaluate = (ruleset: Ruleset, tool: string, params: unknown): Level =>
-  matchingRule(ruleset, tool, params)?.level ?? ruleset.fallback ?? "ask"
+export const evaluate: {
+  (tool: string, params: unknown): (ruleset: Ruleset) => Level
+  (ruleset: Ruleset, tool: string, params: unknown): Level
+} = dual(
+  3,
+  (ruleset: Ruleset, tool: string, params: unknown): Level =>
+    matchingRule(ruleset, tool, params)?.level ?? ruleset.fallback ?? "ask",
+)
 
 const tokenFor = (request: EvaluationRequest): string =>
   `permission:${request.toolCallId ?? `${request.agentName}:${request.turn}:${request.tool}`}`

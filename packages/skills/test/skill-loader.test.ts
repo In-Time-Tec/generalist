@@ -58,6 +58,11 @@ const loaderTestLayer = (
   reads?: ReadCounts,
 ) => SkillLoader.layer(options).pipe(Layer.provide(Layer.mergeAll(testFsLayer(files, directories, reads), Path.layer)))
 
+const provideTestLayer =
+  <R, E, RIn>(layer: Layer.Layer<R, E, RIn>) =>
+  <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
+    Layer.build(layer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
+
 describe("SkillLoader", () => {
   it.effect("parses frontmatter and leaves body lazy", () => {
     const reads: ReadCounts = { full: {}, streamed: {} }
@@ -107,7 +112,7 @@ Use the checklist.
 
       expect(body).toContain("# Review body")
       expect(reads.full[path]).toBe(1)
-    }).pipe(Effect.provide(loaderTestLayer({ cwd: "/repo", roots: [".agents/skills"] }, files, directories, reads)))
+    }).pipe(provideTestLayer(loaderTestLayer({ cwd: "/repo", roots: [".agents/skills"] }, files, directories, reads)))
   })
 
   it.effect("uses standard names for nested skills and lets later roots win collisions", () => {
@@ -141,7 +146,7 @@ body second`,
       expect(all.map((skill) => skill.frontmatter.name)).toEqual(["dup", "lint"])
       expect(nested?.frontmatter.description).toBe("Lint frontend")
       expect(duplicate?.frontmatter.description).toBe("Second duplicate")
-    }).pipe(Effect.provide(loaderTestLayer({ cwd: "/repo", roots: ["a", "b"] }, files, directories)))
+    }).pipe(provideTestLayer(loaderTestLayer({ cwd: "/repo", roots: ["a", "b"] }, files, directories)))
   })
 
   it.effect("fails typed for invalid frontmatter and keeps user-only skills addressable", () => {
@@ -161,14 +166,14 @@ body`,
     return Effect.gen(function* () {
       const failure = yield* Effect.flip(
         SkillSource.SkillSource.pipe(
-          Effect.provide(loaderTestLayer({ cwd: "/repo", roots: ["skills"] }, files, directories)),
+          provideTestLayer(loaderTestLayer({ cwd: "/repo", roots: ["skills"] }, files, directories)),
         ),
       )
 
       expect(failure._tag).toBe("@batonfx/core/SkillSourceError")
 
       const goodSource = yield* SkillSource.SkillSource.pipe(
-        Effect.provide(
+        provideTestLayer(
           loaderTestLayer(
             { cwd: "/repo", roots: ["skills"] },
             {
@@ -232,7 +237,7 @@ body`,
         const relative = testCase.file.slice("/repo/skills/".length)
         const failure = yield* Effect.flip(
           SkillSource.SkillSource.pipe(
-            Effect.provide(
+            provideTestLayer(
               loaderTestLayer(
                 { cwd: "/repo", roots: ["skills"] },
                 { [testCase.file]: testCase.content },

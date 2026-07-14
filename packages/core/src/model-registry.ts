@@ -1,4 +1,4 @@
-import { Chunk, Context, Effect, Layer, Option, Ref, Schema, Semaphore } from "effect"
+import { Chunk, Context, Effect, Function, Layer, Option, Ref, Schema, Semaphore } from "effect"
 import { LanguageModel, Model } from "effect/unstable/ai"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
@@ -50,7 +50,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Service extends Context.Service<Service, Interface>()("@batonfx/core/ModelRegistry") {}
+export class Service extends Context.Service<Service, Interface>()("@batonfx/core/model-registry/Service") {}
 
 /** @experimental */
 export type ModelEnvironment = LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName
@@ -99,66 +99,95 @@ export const registrationFromLayer = <R>(input: {
   )
 
 /** @experimental */
-export const layer = (initialRegistrations: ReadonlyArray<Registration> = [], options?: GovernanceOptions) =>
-  Layer.effect(
-    Service,
-    Effect.gen(function* () {
-      const registry = yield* Ref.make<Registry>(initialRegistrations.reduce(upsertRegistration, Chunk.empty()))
+export const layer: {
+  (): Layer.Layer<Service>
+  (options?: GovernanceOptions): (initialRegistrations?: ReadonlyArray<Registration>) => Layer.Layer<Service>
+  (initialRegistrations?: ReadonlyArray<Registration>, options?: GovernanceOptions): Layer.Layer<Service>
+} = Function.dual(
+  (args) => args.length === 0 || args.length > 1 || Array.isArray(args[0]),
+  (initialRegistrations: ReadonlyArray<Registration> = [], options?: GovernanceOptions) =>
+    Layer.effect(
+      Service,
+      Effect.gen(function* () {
+        const registry = yield* Ref.make<Registry>(initialRegistrations.reduce(upsertRegistration, Chunk.empty()))
 
-      const semaphore =
-        options?.maxConcurrentModelCalls === undefined
-          ? undefined
-          : yield* Semaphore.make(options.maxConcurrentModelCalls)
+        const semaphore =
+          options?.maxConcurrentModelCalls === undefined
+            ? undefined
+            : yield* Semaphore.make(options.maxConcurrentModelCalls)
 
-      const register = Effect.fn("ModelRegistry.register")(function* (input: RegisterInput) {
-        yield* Ref.update(registry, (items) => upsertRegistration(items, input.registration))
-      })
+        const register = Effect.fn("ModelRegistry.register")(function* (input: RegisterInput) {
+          yield* Ref.update(registry, (items) => upsertRegistration(items, input.registration))
+        })
 
-      const registrations = Ref.get(registry).pipe(Effect.map(Chunk.toReadonlyArray))
+        const registrations = Ref.get(registry).pipe(Effect.map(Chunk.toReadonlyArray))
 
-      const provide = Effect.fn("ModelRegistry.provide")(function* <A, E, R>(
-        selection: ModelSelection,
-        effect: Effect.Effect<A, E, R>,
-      ) {
-        const items = yield* Ref.get(registry)
-        const registration = findRegistration(items, selection)
-        if (registration === undefined) {
-          return yield* Effect.fail(
-            new LanguageModelNotRegistered({
+        const provide = Effect.fn("ModelRegistry.provide")(function* <A, E, R>(
+          selection: ModelSelection,
+          effect: Effect.Effect<A, E, R>,
+        ) {
+          const items = yield* Ref.get(registry)
+          const registration = findRegistration(items, selection)
+          if (registration === undefined) {
+            return yield* LanguageModelNotRegistered.make({
               provider: selection.provider,
               model: selection.model,
               ...(selection.registrationKey === undefined ? {} : { registration_key: selection.registrationKey }),
-            }),
+            })
+          }
+          const provided = Effect.scoped(
+            Layer.build(registration.layer).pipe(Effect.flatMap((context) => effect.pipe(Effect.provide(context)))),
           )
-        }
-        const provided = effect.pipe(Effect.provide(registration.layer))
-        return yield* semaphore === undefined ? provided : semaphore.withPermits(1)(provided)
-      })
+          return yield* semaphore === undefined ? provided : semaphore.withPermits(1)(provided)
+        })
 
-      return Service.of({
-        register,
-        registrations,
-        provide,
-      })
-    }),
-  )
-
-/** @experimental */
-export const layerFromRegistrationEffects = <E, R>(
-  registrations: ReadonlyArray<Effect.Effect<Registration, E, R>>,
-  options?: GovernanceOptions,
-) => Layer.unwrap(Effect.all(registrations).pipe(Effect.map((items) => layer(items, options))))
+        return Service.of({
+          register,
+          registrations,
+          provide,
+        })
+      }),
+    ),
+)
 
 /** @experimental */
-export const combine = <E = never, R = never>(
-  registries: ReadonlyArray<Layer.Layer<Service, E, R>>,
-  options?: GovernanceOptions,
-): Layer.Layer<Service, E, R> =>
-  Layer.unwrap(
-    Effect.forEach(registries, (registry) =>
-      Layer.build(registry).pipe(Effect.flatMap((context) => Context.get(context, Service).registrations)),
-    ).pipe(Effect.map((groups) => layer(groups.flat(), options))),
-  )
+export const layerFromRegistrationEffects: {
+  <E, R>(
+    options?: GovernanceOptions,
+  ): (
+    registrations: ReadonlyArray<Effect.Effect<Registration, E, R>>,
+  ) => Layer.Layer<Service, E, Exclude<R, import("effect/Scope").Scope>>
+  <E, R>(
+    registrations: ReadonlyArray<Effect.Effect<Registration, E, R>>,
+    options?: GovernanceOptions,
+  ): Layer.Layer<Service, E, Exclude<R, import("effect/Scope").Scope>>
+} = Function.dual(
+  (args) => args.length !== 1 || Array.isArray(args[0]),
+  <E, R>(registrations: ReadonlyArray<Effect.Effect<Registration, E, R>>, options?: GovernanceOptions) =>
+    Layer.unwrap(Effect.all(registrations).pipe(Effect.map((items) => layer(items, options)))),
+)
+
+/** @experimental */
+export const combine: {
+  <E = never, R = never>(
+    options?: GovernanceOptions,
+  ): (registries: ReadonlyArray<Layer.Layer<Service, E, R>>) => Layer.Layer<Service, E, R>
+  <E = never, R = never>(
+    registries: ReadonlyArray<Layer.Layer<Service, E, R>>,
+    options?: GovernanceOptions,
+  ): Layer.Layer<Service, E, R>
+} = Function.dual(
+  (args) => args.length !== 1 || Array.isArray(args[0]),
+  <E = never, R = never>(
+    registries: ReadonlyArray<Layer.Layer<Service, E, R>>,
+    options?: GovernanceOptions,
+  ): Layer.Layer<Service, E, R> =>
+    Layer.unwrap(
+      Effect.forEach(registries, (registry) =>
+        Layer.build(registry).pipe(Effect.flatMap((context) => Context.get(context, Service).registrations)),
+      ).pipe(Effect.map((groups) => layer(groups.flat(), options))),
+    ),
+)
 
 /** @experimental */
 export const memoryLayer = layer
@@ -179,8 +208,19 @@ export const registrations = Effect.fn("ModelRegistry.registrations.call")(funct
 })
 
 /** @experimental */
-export const provide = <A, E, R>(selection: ModelSelection, effect: Effect.Effect<A, E, R>) =>
+export const provide: {
+  <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): (
+    selection: ModelSelection,
+  ) => Effect.Effect<A, E | LanguageModelNotRegistered, Service | Exclude<R, ModelEnvironment>>
+  <A, E, R>(
+    selection: ModelSelection,
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | LanguageModelNotRegistered, Service | Exclude<R, ModelEnvironment>>
+} = Function.dual(2, <A, E, R>(selection: ModelSelection, effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
     const service = yield* Service
     return yield* service.provide(selection, effect)
-  })
+  }),
+)

@@ -10,11 +10,11 @@ export interface Options extends Limits {
 }
 
 const invalidUrl = (cause: unknown) =>
-  new SkillSource.SkillSourceError({ source: "http-skill-catalog", message: "Invalid manifest URL", cause })
+  SkillSource.SkillSourceError.make({ source: "http-skill-catalog", message: "Invalid manifest URL", cause })
 
 /** @experimental Build a generic HTTP catalog source. */
-export const make = (options: Options): SkillSource.Source<HttpClient.HttpClient | Crypto.Crypto> => {
-  return Effect.gen(function* () {
+export const make = (options: Options): SkillSource.Source<HttpClient.HttpClient | Crypto.Crypto> =>
+  Effect.gen(function* () {
     const parsed = yield* Effect.fromResult(Url.fromString(options.manifestUrl)).pipe(Effect.mapError(invalidUrl))
     const source = options.source ?? `${parsed.origin}${parsed.pathname}`
     return yield* makeHostedCatalog({
@@ -23,7 +23,6 @@ export const make = (options: Options): SkillSource.Source<HttpClient.HttpClient
       resolveSkillUrl: (skillPath) => resolveRelative(source, options.manifestUrl, skillPath),
     })
   })
-}
 
 /** @experimental Build a generic HTTP catalog layer. */
 export const layer = (options: Options) => SkillSource.layer([make(options)])

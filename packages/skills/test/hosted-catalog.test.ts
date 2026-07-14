@@ -1,11 +1,17 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Crypto, Effect, Encoding, Layer } from "effect"
+import { Crypto, Effect, Encoding, Layer, Schema } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { SkillSource } from "@batonfx/core"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "../src/index"
 
 const digestBytes = new Uint8Array(32).fill(1)
 const digest = Encoding.encodeHex(digestBytes)
+const stringify = Schema.encodeSync(Schema.UnknownFromJsonString)
+
+const provideTestLayer =
+  <R, E, RIn>(layer: Layer.Layer<R, E, RIn>) =>
+  <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
+    Layer.build(layer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
 
 const cryptoLayer = (bytes: Uint8Array = digestBytes) =>
   Layer.succeed(
@@ -50,7 +56,7 @@ Review carefully.
 `
 
 const manifest = (skillPath: string = "remote/SKILL.md", sha256: string = digest) =>
-  JSON.stringify({
+  stringify({
     version: 1,
     skills: [
       {
@@ -80,7 +86,7 @@ describe("hosted skill catalogs", () => {
       expect(body).toContain("# Remote body")
       expect(requests.map((request) => request.url)).toEqual([manifestUrl, bodyUrl])
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(
           cryptoLayer(),
           httpLayer({ [manifestUrl]: { body: manifest() }, [bodyUrl]: { body: document } }, requests),
@@ -98,7 +104,7 @@ describe("hosted skill catalogs", () => {
       expect(failure._tag).toBe("@batonfx/core/SkillSourceError")
       expect(failure.source).toBe("unsafe-catalog")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(cryptoLayer(), httpLayer({ [manifestUrl]: { body: manifest("../escape/SKILL.md") } }, requests)),
       ),
     )
@@ -118,7 +124,7 @@ describe("hosted skill catalogs", () => {
       expect(second._tag).toBe("Failure")
       expect(requests.filter((request) => request.url === bodyUrl)).toHaveLength(2)
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(
           cryptoLayer(new Uint8Array(32).fill(2)),
           httpLayer({ [manifestUrl]: { body: manifest() }, [bodyUrl]: { body: document } }, requests),
@@ -140,7 +146,7 @@ describe("hosted skill catalogs", () => {
       expect(failure._tag).toBe("@batonfx/core/SkillSourceError")
       expect(failure.message).toContain("Frontmatter mismatch")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(
           cryptoLayer(),
           httpLayer({ [manifestUrl]: { body: manifest() }, [bodyUrl]: { body: drifted } }, requests),
@@ -153,9 +159,16 @@ describe("hosted skill catalogs", () => {
     const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
     const duplicateUrl = "https://skills.example/duplicate.json"
     const limitedUrl = "https://skills.example/limited.json"
-    const duplicate = JSON.stringify({
+    const entry = {
+      name: "remote",
+      description: "Remote review skill",
+      allowedTools: ["read", "grep"],
+      skillPath: "remote/SKILL.md",
+      sha256: digest,
+    }
+    const duplicate = stringify({
       version: 1,
-      skills: [...JSON.parse(manifest()).skills, ...JSON.parse(manifest()).skills],
+      skills: [entry, entry],
     })
     return Effect.gen(function* () {
       const duplicateFailure = yield* Effect.flip(HttpCatalog.make({ manifestUrl: duplicateUrl }))
@@ -164,7 +177,7 @@ describe("hosted skill catalogs", () => {
       expect(duplicateFailure.message).toContain("Duplicate hosted skill name")
       expect(limitedFailure.message).toContain("exceeds 1 bytes")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(
           cryptoLayer(),
           httpLayer({ [duplicateUrl]: { body: duplicate }, [limitedUrl]: { body: manifest() } }, requests),
@@ -183,7 +196,7 @@ describe("hosted skill catalogs", () => {
       expect(failure.source).not.toContain("secret")
       expect(failure.source).not.toContain("password")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(cryptoLayer(), httpLayer({ [manifestUrl]: { body: "forbidden", status: 403 } }, requests)),
       ),
     )
@@ -214,7 +227,7 @@ describe("hosted skill catalogs", () => {
           items.every((request) => request.accept === "application/vnd.github.raw+json"),
       )
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(
           cryptoLayer(),
           httpLayer(
@@ -237,7 +250,7 @@ describe("hosted skill catalogs", () => {
         GitHubCatalog.make({ owner: "acme", repo: "agent-skills", ref: "main", root: "skills" }),
       )
       expect(failure._tag).toBe("@batonfx/core/SkillSourceError")
-    }).pipe(Effect.provide(Layer.mergeAll(cryptoLayer(), httpLayer({}, [])))),
+    }).pipe(provideTestLayer(Layer.mergeAll(cryptoLayer(), httpLayer({}, [])))),
   )
 
   it.effect("bounds raw streamed bytes before buffering and rejects invalid UTF-8", () => {
@@ -263,7 +276,7 @@ describe("hosted skill catalogs", () => {
       expect(pulls).toBeLessThan(3)
       expect(invalid.message).toContain("UTF-8")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(
           cryptoLayer(),
           httpLayer(
@@ -284,7 +297,7 @@ describe("hosted skill catalogs", () => {
     const bodyUrl = "https://skills.example/catalog/constructor/SKILL.md"
     const raw = new TextEncoder().encode(`---\nname: constructor\ndescription: Safe own-property lookup\n---\nbody`)
     let hashed: Uint8Array | undefined
-    const manifestBody = JSON.stringify({
+    const manifestBody = stringify({
       version: 1,
       skills: [
         {
@@ -313,7 +326,7 @@ describe("hosted skill catalogs", () => {
       expect([...hashed!]).toEqual([...raw])
       expect(skill!.tools).toEqual([])
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(
           recordingCrypto,
           httpLayer({ [manifestUrl]: { body: manifestBody }, [bodyUrl]: { body: raw } }, requests),
@@ -343,7 +356,7 @@ describe("hosted skill catalogs", () => {
       ])
       expect(failures).toHaveLength(6)
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(
           cryptoLayer(),
           httpLayer(
@@ -363,7 +376,7 @@ describe("hosted skill catalogs", () => {
     const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
     const httpUrl = "https://skills.example/catalog.json"
     const s3Url = "https://company-skills.s3.us-west-2.amazonaws.com/skills.json"
-    const secondManifest = JSON.stringify({
+    const secondManifest = stringify({
       version: 1,
       skills: [
         {
@@ -382,13 +395,13 @@ describe("hosted skill catalogs", () => {
       expect(all).toHaveLength(1)
       expect(remote?.frontmatter.description).toBe("Later source wins")
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         SkillSource.layer([
           HttpCatalog.make({ manifestUrl: httpUrl }),
           S3Catalog.make({ bucket: "company-skills", region: "us-west-2" }),
         ]),
       ),
-      Effect.provide(
+      provideTestLayer(
         Layer.mergeAll(
           cryptoLayer(),
           httpLayer({ [httpUrl]: { body: manifest() }, [s3Url]: { body: secondManifest } }, requests),

@@ -29,25 +29,25 @@ export interface AgentClientInterface {
 
 /** @experimental */
 export class AgentClient extends Context.Service<AgentClient, AgentClientInterface>()(
-  "@batonfx/transport/AgentClient",
+  "@batonfx/transport/client/AgentClient",
 ) {}
 
 const ServerFrameJson = Schema.fromJsonString(LooseServerFrame)
 const ClientFrameJson = Schema.fromJsonString(ClientFrame)
 
-const transportError = (message: string): TransportError => new TransportError({ message })
+const transportError = (message: string): TransportError => TransportError.make({ message })
 
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 
 const decodeServerText = (text: string): Effect.Effect<LooseServerFrameType, TransportError> =>
   Schema.decodeUnknownEffect(ServerFrameJson)(text).pipe(
-    Effect.mapError((error) => transportError(errorMessage(error))),
+    Effect.mapError((error) => error.pipe(errorMessage, transportError)),
   )
 
 const encodeClientText = (frame: ClientFrameType): Effect.Effect<string, TransportError> =>
-  Effect.sync(() => Schema.encodeUnknownSync(ClientFrameJson)(frame)).pipe(
-    Effect.catchCause(() => Effect.fail(transportError("failed to encode client frame"))),
+  Schema.encodeUnknownEffect(ClientFrameJson)(frame).pipe(
+    Effect.mapError(() => transportError("failed to encode client frame")),
   )
 
 const urlWithAfterSeq = (url: string, afterSeq: number | undefined): string => {
@@ -72,7 +72,7 @@ export const sseFrames = (options: {
     Stream.decodeText,
     Stream.pipeThroughChannel(Sse.decodeDataSchema(LooseServerFrame)),
     Stream.map((event) => event.data),
-    Stream.mapError((error) => transportError(errorMessage(error))),
+    Stream.mapError((error) => error.pipe(errorMessage, transportError)),
   )
 
 const attachFrame = (sessionId: string, afterSeq: Option.Option<number>): ClientFrameType =>
@@ -103,7 +103,7 @@ export const layerWebSocket: Layer.Layer<AgentClient, never, Socket.WebSocketCon
           const writeClient = (frame: ClientFrameType): Effect.Effect<void, TransportError> =>
             Effect.gen(function* () {
               const writer = yield* Ref.get(writerRef)
-              if (Option.isNone(writer)) return yield* Effect.fail(transportError("WebSocket is not open"))
+              if (Option.isNone(writer)) return yield* transportError("WebSocket is not open")
               const text = yield* encodeClientText(frame)
               yield* writer.value(text).pipe(Effect.mapError((error) => transportError(error.message)))
             })
@@ -151,7 +151,7 @@ export const layerWebSocket: Layer.Layer<AgentClient, never, Socket.WebSocketCon
                 onFailure: (cause) => {
                   if (Cause.hasInterrupts(cause)) return Effect.interrupt
                   const error = Cause.findErrorOption(cause)
-                  if (Option.isSome(error) && error.value instanceof TransportError) return Effect.void
+                  if (Option.isSome(error) && Schema.is(TransportError)(error.value)) return Effect.void
                   return Effect.sleep(reconnectDelay(attempt)).pipe(Effect.andThen(runSocket(false, attempt + 1)))
                 },
               }),

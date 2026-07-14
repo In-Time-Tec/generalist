@@ -1,4 +1,4 @@
-import { Duration, Effect, Layer, Option, Stream, SubscriptionRef } from "effect"
+import { Duration, Effect, Function, Layer, Option, Schema, Stream, SubscriptionRef } from "effect"
 import { AiError, LanguageModel, ModelRegistry, Prompt, Response, Tool } from "@batonfx/core"
 
 /** @experimental */
@@ -106,7 +106,7 @@ interface Claimed {
 }
 
 const emptyUsage = (): Response.Usage =>
-  new Response.Usage({
+  Response.Usage.make({
     inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
     outputTokens: { total: undefined, text: undefined, reasoning: undefined },
   })
@@ -115,7 +115,7 @@ const invalidRequest = (method: Operation, description: string): AiError.AiError
   AiError.make({
     module: "@batonfx/test/TestModel",
     method,
-    reason: new AiError.InvalidRequestError({ description }),
+    reason: AiError.InvalidRequestError.make({ description }),
   })
 
 const normalizeStep = (step: Step): TurnStep | ObjectStep | FailureStep =>
@@ -222,25 +222,21 @@ const executeGenerate = (
     const claimed = yield* claim(state, script, "generateText", options)
     const step = claimed.step
     if (step === undefined) {
-      return yield* Effect.fail(invalidRequest(claimed.request.operation, "TestModel script exhausted"))
+      return yield* invalidRequest(claimed.request.operation, "TestModel script exhausted")
     }
     yield* applyDelay(step)
-    if (step._tag === "Failure") return yield* Effect.fail(step.error)
+    if (step._tag === "Failure") return yield* step.error
     if (step._tag === "Object") {
       if (options.responseFormat.type !== "json") {
-        return yield* Effect.fail(invalidRequest(claimed.request.operation, "Object step requires generateObject"))
+        return yield* invalidRequest(claimed.request.operation, "Object step requires generateObject")
       }
-      const encoded = yield* Effect.try({
-        try: () => JSON.stringify(step.value),
-        catch: () => invalidRequest(claimed.request.operation, "Object step is not JSON serializable"),
-      })
-      if (encoded === undefined) {
-        return yield* Effect.fail(invalidRequest(claimed.request.operation, "Object step is not JSON serializable"))
-      }
+      const encoded = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(step.value).pipe(
+        Effect.mapError(() => invalidRequest(claimed.request.operation, "Object step is not JSON serializable")),
+      )
       return [{ type: "text", text: encoded }, finish(step.finishReason ?? "stop", step.usage ?? emptyUsage())]
     }
     if (options.responseFormat.type === "json") {
-      return yield* Effect.fail(invalidRequest(claimed.request.operation, "generateObject requires an Object step"))
+      return yield* invalidRequest(claimed.request.operation, "generateObject requires an Object step")
     }
     return compileGenerate(step, claimed.request.index)
   })
@@ -254,12 +250,12 @@ const executeStream = (
     const claimed = yield* claim(state, script, "streamText", options)
     const step = claimed.step
     if (step === undefined) {
-      return yield* Effect.fail(invalidRequest(claimed.request.operation, "TestModel script exhausted"))
+      return yield* invalidRequest(claimed.request.operation, "TestModel script exhausted")
     }
     yield* applyDelay(step)
-    if (step._tag === "Failure") return yield* Effect.fail(step.error)
+    if (step._tag === "Failure") return yield* step.error
     if (step._tag === "Object") {
-      return yield* Effect.fail(invalidRequest(claimed.request.operation, "Object step requires generateObject"))
+      return yield* invalidRequest(claimed.request.operation, "Object step requires generateObject")
     }
     return compileStream(step, claimed.request.index)
   })
@@ -271,90 +267,130 @@ export const text = (value: string): TextPart => ({ _tag: "Text", text: value })
 export const reasoning = (value: string): ReasoningPart => ({ _tag: "Reasoning", text: value })
 
 /** @experimental */
-export const toolCall = (name: string, params: unknown, options: ToolCallOptions = {}): ToolCallPart => ({
-  _tag: "ToolCall",
-  name,
-  params,
-  ...(options.id === undefined ? {} : { id: options.id }),
-  providerExecuted: options.providerExecuted ?? false,
-})
+export const toolCall: {
+  (params: unknown, options?: ToolCallOptions): (name: string) => ToolCallPart
+  (name: string, params: unknown, options?: ToolCallOptions): ToolCallPart
+} = Function.dual(
+  (args) => typeof args[0] === "string",
+  (name: string, params: unknown, options: ToolCallOptions = {}) => ({
+    _tag: "ToolCall",
+    name,
+    params,
+    ...(options.id === undefined ? {} : { id: options.id }),
+    providerExecuted: options.providerExecuted ?? false,
+  }),
+)
 
 /** @experimental */
-export const turn = (parts: ReadonlyArray<Part>, options: StepOptions = {}): TurnStep => ({
-  _tag: "Turn",
-  parts,
-  ...options,
-})
+export const turn: {
+  (options?: StepOptions): (parts: ReadonlyArray<Part>) => TurnStep
+  (parts: ReadonlyArray<Part>, options?: StepOptions): TurnStep
+} = Function.dual(
+  (args) => Array.isArray(args[0]),
+  (parts: ReadonlyArray<Part>, options: StepOptions = {}) => ({
+    _tag: "Turn",
+    parts,
+    ...options,
+  }),
+)
 
 /** @experimental */
-export const object = (value: unknown, options: StepOptions = {}): ObjectStep => ({
-  _tag: "Object",
-  value,
-  ...options,
-})
+export const object: {
+  (): (value: unknown) => ObjectStep
+  (value: unknown, options?: StepOptions): ObjectStep
+} = Function.dual(
+  (args) => args.length > 0,
+  (value: unknown, options: StepOptions = {}) => ({
+    _tag: "Object",
+    value,
+    ...options,
+  }),
+)
 
 /** @experimental */
-export const failure = (error: AiError.AiError, options: { readonly delay?: Duration.Input } = {}): FailureStep => ({
-  _tag: "Failure",
-  error,
-  ...options,
-})
+export const failure: {
+  (): (error: AiError.AiError) => FailureStep
+  (error: AiError.AiError, options?: { readonly delay?: Duration.Input }): FailureStep
+} = Function.dual(
+  (args) => args.length > 0,
+  (error: AiError.AiError, options: { readonly delay?: Duration.Input } = {}) => ({
+    _tag: "Failure",
+    error,
+    ...options,
+  }),
+)
 
 /** @experimental */
-export const make = (script: ReadonlyArray<Step>, options: MakeOptions = {}): Effect.Effect<Fixture> =>
-  Effect.gen(function* () {
-    const state = yield* SubscriptionRef.make<State>({ cursor: 0, requests: [] })
-    const service = yield* LanguageModel.make({
-      generateText: (providerOptions) => executeGenerate(state, script, providerOptions),
-      streamText: (providerOptions) =>
-        Stream.unwrap(
-          executeStream(state, script, providerOptions).pipe(Effect.map((parts) => Stream.fromIterable(parts))),
+export const make: {
+  (options?: MakeOptions): (script: ReadonlyArray<Step>) => Effect.Effect<Fixture>
+  (script: ReadonlyArray<Step>, options?: MakeOptions): Effect.Effect<Fixture>
+} = Function.dual(
+  (args) => Array.isArray(args[0]),
+  (script: ReadonlyArray<Step>, options: MakeOptions = {}) =>
+    Effect.gen(function* () {
+      const state = yield* SubscriptionRef.make<State>({ cursor: 0, requests: [] })
+      const service = yield* LanguageModel.make({
+        generateText: (providerOptions) => executeGenerate(state, script, providerOptions),
+        streamText: (providerOptions) =>
+          Stream.unwrap(
+            executeStream(state, script, providerOptions).pipe(Effect.map((parts) => Stream.fromIterable(parts))),
+          ),
+      })
+      const modelLayer = Layer.succeed(LanguageModel.LanguageModel, service)
+      const selection: ModelRegistry.ModelSelection = {
+        provider: options.provider ?? "test",
+        model: options.model ?? "scripted",
+        ...(options.registrationKey === undefined ? {} : { registrationKey: options.registrationKey }),
+      }
+      const registration = yield* ModelRegistry.registrationFromLayer({
+        ...selection,
+        layer: modelLayer,
+        ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
+      })
+      const requests = SubscriptionRef.get(state).pipe(Effect.map((current) => current.requests))
+      return {
+        layer: modelLayer,
+        selection,
+        registration,
+        registryLayer: ModelRegistry.memoryLayer([registration]),
+        requests,
+        prompts: requests.pipe(Effect.map((items) => items.map((request) => request.prompt))),
+        remaining: SubscriptionRef.get(state).pipe(
+          Effect.map((current) => Math.max(0, script.length - current.cursor)),
         ),
-    })
-    const modelLayer = Layer.succeed(LanguageModel.LanguageModel, service)
-    const selection: ModelRegistry.ModelSelection = {
-      provider: options.provider ?? "test",
-      model: options.model ?? "scripted",
-      ...(options.registrationKey === undefined ? {} : { registrationKey: options.registrationKey }),
-    }
-    const registration = yield* ModelRegistry.registrationFromLayer({
-      ...selection,
-      layer: modelLayer,
-      ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
-    })
-    const requests = SubscriptionRef.get(state).pipe(Effect.map((current) => current.requests))
-    return {
-      layer: modelLayer,
-      selection,
-      registration,
-      registryLayer: ModelRegistry.memoryLayer([registration]),
-      requests,
-      prompts: requests.pipe(Effect.map((items) => items.map((request) => request.prompt))),
-      remaining: SubscriptionRef.get(state).pipe(Effect.map((current) => Math.max(0, script.length - current.cursor))),
-      awaitRequests: (count) => {
-        if (!Number.isSafeInteger(count) || count < 0) return Effect.die("count must be a non-negative safe integer")
-        return SubscriptionRef.changes(state).pipe(
-          Stream.filter((current) => current.requests.length >= count),
-          Stream.runHead,
-          Effect.map(Option.match({ onNone: () => [], onSome: (current) => current.requests })),
-        )
-      },
-    }
-  })
+        awaitRequests: (count: number) => {
+          if (!Number.isSafeInteger(count) || count < 0) return Effect.die("count must be a non-negative safe integer")
+          return SubscriptionRef.changes(state).pipe(
+            Stream.filter((current) => current.requests.length >= count),
+            Stream.runHead,
+            Effect.map(Option.match({ onNone: () => [], onSome: (current) => current.requests })),
+          )
+        },
+      }
+    }),
+)
 
 /** @experimental */
-export const layer = (
-  script: ReadonlyArray<Step>,
-  options: MakeOptions = {},
-): Layer.Layer<LanguageModel.LanguageModel> =>
-  Layer.unwrap(make(script, options).pipe(Effect.map((fixture) => fixture.layer)))
+export const layer: {
+  (options?: MakeOptions): (script: ReadonlyArray<Step>) => Layer.Layer<LanguageModel.LanguageModel>
+  (script: ReadonlyArray<Step>, options?: MakeOptions): Layer.Layer<LanguageModel.LanguageModel>
+} = Function.dual(
+  (args) => Array.isArray(args[0]),
+  (script: ReadonlyArray<Step>, options: MakeOptions = {}) =>
+    Layer.unwrap(make(script, options).pipe(Effect.map((fixture) => fixture.layer))),
+)
 
 /** @experimental */
-export const registryLayer = (
-  fixtures: ReadonlyArray<Fixture>,
-  governance?: ModelRegistry.GovernanceOptions,
-): Layer.Layer<ModelRegistry.Service> =>
-  ModelRegistry.memoryLayer(
-    fixtures.map((fixture) => fixture.registration),
-    governance,
-  )
+export const registryLayer: {
+  (
+    governance?: ModelRegistry.GovernanceOptions,
+  ): (fixtures: ReadonlyArray<Fixture>) => Layer.Layer<ModelRegistry.Service>
+  (fixtures: ReadonlyArray<Fixture>, governance?: ModelRegistry.GovernanceOptions): Layer.Layer<ModelRegistry.Service>
+} = Function.dual(
+  (args) => Array.isArray(args[0]),
+  (fixtures: ReadonlyArray<Fixture>, governance?: ModelRegistry.GovernanceOptions) =>
+    ModelRegistry.memoryLayer(
+      fixtures.map((fixture) => fixture.registration),
+      governance,
+    ),
+)

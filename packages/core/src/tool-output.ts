@@ -1,4 +1,4 @@
-import { Context, Effect, HashMap, Layer, Option, Ref, Schema } from "effect"
+import { Context, Effect, Function, HashMap, Layer, Option, Ref, Schema } from "effect"
 import { type Success } from "./tool-executor.js"
 /** @experimental A bounded tool result: inline content plus optional spilled overflow references. */
 export interface ToolOutput {
@@ -13,7 +13,7 @@ export interface StoreInterface {
 
 /** @experimental */
 export class ToolOutputStore extends Context.Service<ToolOutputStore, StoreInterface>()(
-  "@batonfx/core/ToolOutputStore",
+  "@batonfx/core/tool-output/ToolOutputStore",
 ) {}
 
 /** @experimental */
@@ -58,10 +58,16 @@ const serialized = (value: unknown): string => {
 const preview = (value: string, maxBytes: number): string => decoder.decode(encoder.encode(value).slice(0, maxBytes))
 
 /** @experimental */
-export const bound = (
-  result: Success,
-  options: { readonly toolCallId: string; readonly maxBytes: number },
-): Effect.Effect<Success, ToolOutputError> =>
+export const bound: {
+  (options: {
+    readonly toolCallId: string
+    readonly maxBytes: number
+  }): (result: Success) => Effect.Effect<Success, ToolOutputError>
+  (
+    result: Success,
+    options: { readonly toolCallId: string; readonly maxBytes: number },
+  ): Effect.Effect<Success, ToolOutputError>
+} = Function.dual(2, (result: Success, options: { readonly toolCallId: string; readonly maxBytes: number }) =>
   Effect.gen(function* () {
     const encoded = serialized(result.encodedResult)
     const bytes = encoder.encode(encoded).byteLength
@@ -86,4 +92,5 @@ export const bound = (
       outputPaths: [path.value],
     }
     return { _tag: "Success", result: output, encodedResult: output }
-  })
+  }),
+)

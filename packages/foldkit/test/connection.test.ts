@@ -1,26 +1,26 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { Chat, Connection } from "../src/index"
 
 describe("Connection", () => {
-  it.effect("testLayer provides AgentConnection frames and send", () =>
-    Effect.gen(function* () {
-      const incoming = Connection.ConnectionOpened()
-      const frames = yield* Connection.AgentConnection.use((connection) =>
-        connection.frames({ sessionId: "s", afterSeq: 1 }).pipe(Stream.runCollect),
-      )
-      yield* Connection.AgentConnection.use((connection) => connection.send({ _tag: "Cancel", sessionId: "s" }))
+  layer(
+    Connection.testLayer({
+      frames: () => Stream.fromIterable([Connection.ConnectionOpened()]),
+      send: () => Effect.void,
+    }),
+  )((methods) => {
+    methods.effect("testLayer provides AgentConnection frames and send", () =>
+      Effect.gen(function* () {
+        const incoming = Connection.ConnectionOpened()
+        const frames = yield* Connection.AgentConnection.use((connection) =>
+          connection.frames({ sessionId: "s", afterSeq: 1 }).pipe(Stream.runCollect),
+        )
+        yield* Connection.AgentConnection.use((connection) => connection.send({ _tag: "Cancel", sessionId: "s" }))
 
-      expect(frames).toEqual([incoming])
-    }).pipe(
-      Effect.provide(
-        Connection.testLayer({
-          frames: () => Stream.fromIterable([Connection.ConnectionOpened()]),
-          send: () => Effect.void,
-        }),
-      ),
-    ),
-  )
+        expect(frames).toEqual([incoming])
+      }),
+    )
+  })
 
   it("keeps the chat subscription alive across afterSeq-only changes", () => {
     const subscription = Chat.subscriptions.agentFrames

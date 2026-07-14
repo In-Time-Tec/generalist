@@ -47,7 +47,7 @@ export interface Interface {
 
 /** @experimental */
 export class AgentConnection extends Context.Service<AgentConnection, Interface>()(
-  "@batonfx/foldkit/AgentConnection",
+  "@batonfx/foldkit/connection/AgentConnection",
 ) {}
 
 interface ActiveConnection {
@@ -56,7 +56,7 @@ interface ActiveConnection {
 }
 
 const reasonFrom = (error: unknown): string => {
-  if (error instanceof SendFailed) return error.reason
+  if (Schema.is(SendFailed)(error)) return error.reason
   if (error instanceof Error) return error.message
   return String(error)
 }
@@ -120,11 +120,11 @@ export const layerWebSocket = (options: {
           Ref.get(active).pipe(
             Effect.flatMap(
               Option.match({
-                onNone: () => Effect.fail(new SendFailed({ reason: "No active agent connection" })),
+                onNone: () => Effect.fail(SendFailed.make({ reason: "No active agent connection" })),
                 onSome: ({ connection }) =>
                   connection
                     .send(frame)
-                    .pipe(Effect.mapError((error) => new SendFailed({ reason: reasonFrom(error) }))),
+                    .pipe(Effect.mapError((error) => SendFailed.make({ reason: reasonFrom(error) }))),
               }),
             ),
           ),

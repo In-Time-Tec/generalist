@@ -5,7 +5,7 @@ import type {
   OAuthClientMetadata,
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js"
-import { Context, Effect, Layer, Option, Redacted, Ref, Schema } from "effect"
+import { Context, Effect, Layer, Option, Random, Redacted, Ref, Schema } from "effect"
 
 /** @experimental */
 export class OAuthPendingError extends Schema.TaggedErrorClass<OAuthPendingError>()("OAuthPendingError", {
@@ -37,7 +37,7 @@ export interface TokenStoreInterface {
 }
 
 /** @experimental */
-export class TokenStore extends Context.Service<TokenStore, TokenStoreInterface>()("@batonfx/mcp/OAuthTokenStore") {}
+export class TokenStore extends Context.Service<TokenStore, TokenStoreInterface>()("@batonfx/mcp/oauth/TokenStore") {}
 
 /** @experimental */
 export const tokenStoreTestLayer = (implementation: TokenStoreInterface): Layer.Layer<TokenStore> =>
@@ -89,17 +89,15 @@ export interface Authorization {
 /** @experimental */
 export interface Interface {
   readonly provider: OAuthClientProvider
-  readonly authorize: () => Effect.Effect<Authorization, OAuthProviderError>
+  readonly authorize: Effect.Effect<Authorization, OAuthProviderError>
   readonly callback: (url: string) => Effect.Effect<void, OAuthDeniedError | OAuthExpiredError | OAuthProviderError>
   readonly clear: Effect.Effect<void, OAuthProviderError>
 }
 
 /** @experimental */
-export class OAuth extends Context.Service<OAuth, Interface>()("@batonfx/mcp/OAuth") {}
+export class OAuth extends Context.Service<OAuth, Interface>()("@batonfx/mcp/oauth") {}
 
 const message = (error: unknown): string => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
-const randomState = (): string => crypto.randomUUID()
-
 /** @experimental */
 export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, TokenStore> =>
   Layer.effect(
@@ -109,6 +107,8 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
       const verifier = yield* Ref.make(Option.none<string>())
       const pending = yield* Ref.make(Option.none<Authorization>())
       const state = yield* Ref.make(Option.none<string>())
+      const context = yield* Effect.context<never>()
+      const runPromise = Effect.runPromiseWith(context)
       const loadTokens = store
         .load(configuration.serverUrl)
         .pipe(
@@ -121,26 +121,23 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
       const provider: OAuthClientProvider = {
         redirectUrl: configuration.redirectUrl,
         clientMetadata: configuration.clientMetadata,
-        state: () => Effect.runPromise(Ref.get(state).pipe(Effect.map(Option.getOrThrow))),
+        state: () => runPromise(Ref.get(state).pipe(Effect.map(Option.getOrThrow))),
         clientInformation: () => configuration.clientInformation,
-        tokens: () => Effect.runPromise(loadTokens),
-        saveTokens: (tokens) =>
-          Effect.runPromise(store.save(configuration.serverUrl, Redacted.make(JSON.stringify(tokens)))),
+        tokens: () => runPromise(loadTokens),
+        saveTokens: (tokens) => runPromise(store.save(configuration.serverUrl, Redacted.make(JSON.stringify(tokens)))),
         redirectToAuthorization: (url) =>
-          Effect.runPromise(
+          runPromise(
             Ref.set(pending, Option.some({ url: url.toString(), state: url.searchParams.get("state") ?? "" })),
           ),
-        saveCodeVerifier: (value) => Effect.runPromise(Ref.set(verifier, Option.some(value))),
-        codeVerifier: () => Effect.runPromise(Ref.get(verifier).pipe(Effect.map(Option.getOrThrow))),
+        saveCodeVerifier: (value) => runPromise(Ref.set(verifier, Option.some(value))),
+        codeVerifier: () => runPromise(Ref.get(verifier).pipe(Effect.map(Option.getOrThrow))),
         invalidateCredentials: (scope) =>
-          Effect.runPromise(
-            scope === "tokens" || scope === "all" ? store.remove(configuration.serverUrl) : Effect.void,
-          ),
+          runPromise(scope === "tokens" || scope === "all" ? store.remove(configuration.serverUrl) : Effect.void),
       }
       const providerFailure = (operation: string, cause: unknown) =>
-        new OAuthProviderError({ server: configuration.serverUrl, operation, message: message(cause) })
-      const authorize = Effect.fn("OAuth.authorize")(function* () {
-        const generated = randomState()
+        OAuthProviderError.make({ server: configuration.serverUrl, operation, message: message(cause) })
+      const authorize = Effect.gen(function* () {
+        const generated = `${yield* Random.nextInt}-${yield* Random.nextInt}`
         yield* Ref.set(state, Option.some(generated))
         yield* Ref.set(pending, Option.none())
         yield* Effect.tryPromise({
@@ -162,13 +159,13 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
           catch: (cause) => providerFailure("callback", cause),
         })
         const denial = url.searchParams.get("error")
-        if (denial !== null) return yield* new OAuthDeniedError({ reason: denial })
+        if (denial !== null) return yield* OAuthDeniedError.make({ reason: denial })
         const expected = yield* Ref.get(state)
         if (Option.isNone(expected) || url.searchParams.get("state") !== expected.value) {
-          return yield* new OAuthExpiredError({ server: configuration.serverUrl })
+          return yield* OAuthExpiredError.make({ server: configuration.serverUrl })
         }
         const code = url.searchParams.get("code")
-        if (code === null) return yield* new OAuthDeniedError({ reason: "authorization code missing" })
+        if (code === null) return yield* OAuthDeniedError.make({ reason: "authorization code missing" })
         yield* Effect.tryPromise({
           try: () =>
             auth(provider, {

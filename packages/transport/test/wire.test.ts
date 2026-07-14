@@ -13,7 +13,7 @@ const echoTool = Tool.make("echo", {
 
 const toolkit = Toolkit.make(echoTool)
 
-const usage = new Response.Usage({
+const usage = Response.Usage.make({
   inputTokens: { uncached: undefined, total: 1, cacheRead: undefined, cacheWrite: undefined },
   outputTokens: { total: 2, text: 2, reasoning: undefined },
 })
@@ -81,9 +81,9 @@ describe("Wire", () => {
     Effect.gen(function* () {
       const schema = Wire.ServerFrame(toolkit)
       const failures: ReadonlyArray<Wire.RunFailure> = [
-        new AgentEvent.AgentError({ message: "boom", turn: 0 }),
-        new AgentEvent.TurnLimitExceeded({ turn: 3, pending: [{ tool_call_id: "call-1", tool_name: "echo" }] }),
-        new AgentEvent.MiddlewareViolation({ turn: 1, detail: "dropped tool-call" }),
+        AgentEvent.AgentError.make({ message: "boom", turn: 0 }),
+        AgentEvent.TurnLimitExceeded.make({ turn: 3, pending: [{ tool_call_id: "call-1", tool_name: "echo" }] }),
+        AgentEvent.MiddlewareViolation.make({ turn: 1, detail: "dropped tool-call" }),
       ]
 
       for (const error of failures) {
@@ -91,7 +91,7 @@ describe("Wire", () => {
         expect(decoded._tag).toBe("Failed")
       }
 
-      const suspension = new AgentEvent.AgentSuspended({
+      const suspension = AgentEvent.AgentSuspended.make({
         token: "approval-1",
         reason: "approval",
         tool_call_id: "call-1",

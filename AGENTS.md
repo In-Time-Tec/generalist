@@ -61,9 +61,8 @@ bun install
 bun run format        # prettier --write .
 bun run format:check
 bun run lint          # oxlint + ast-grep
-bun run effect:check  # strict Effect v4 language-service diagnostics
 bun run check         # all required repository gates except coverage
-bun run typecheck     # turbo tsc --noEmit
+bun run typecheck     # strict Effect diagnostics + turbo tsc --noEmit
 bun run test          # turbo vitest
 bun run test:coverage
 bun run build         # turbo package and app builds

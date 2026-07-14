@@ -38,7 +38,9 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ModelCatalog extends Context.Service<ModelCatalog, Interface>()("@batonfx/providers/ModelCatalog") {}
+export class ModelCatalog extends Context.Service<ModelCatalog, Interface>()(
+  "@batonfx/providers/catalog/ModelCatalog",
+) {}
 
 /** @experimental Hand-maintained static metadata snapshot. */
 export const bundled: ReadonlyArray<ModelMetadata> = [
@@ -134,7 +136,7 @@ const make = (entries: ReadonlyArray<ModelMetadata>): Interface => {
     lookup(selection).pipe(
       Effect.flatMap((metadata) =>
         metadata === undefined
-          ? Effect.fail(new ModelMetadataNotFound({ provider: selection.provider, model: selection.model }))
+          ? Effect.fail(ModelMetadataNotFound.make({ provider: selection.provider, model: selection.model }))
           : Effect.succeed(metadata),
       ),
     )

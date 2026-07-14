@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { SkillSource } from "../src/index"
+import { ItLayer } from "./it-layer"
 
 const skill = (
   name: string,
@@ -19,29 +20,38 @@ const skill = (
 const listingTokens = (listing: string) => Math.ceil(listing.length / 4)
 
 describe("SkillSource", () => {
-  it.effect("fromSkills returns copied skills and resolves duplicate names with later wins", () => {
+  ItLayer.make(it, "fromSkills returns copied skills and resolves duplicate names with later wins", () => {
     const first = skill("review", "first")
     const second = skill("review", "second")
-    return Effect.gen(function* () {
-      const source = yield* SkillSource.SkillSource
+    return [
+      SkillSource.fromSkills([first, second]),
+      Effect.gen(function* () {
+        const source = yield* SkillSource.SkillSource
 
-      const all = yield* source.all
-      const found = yield* source.get("review")
-      const missing = yield* source.get("missing")
+        const all = yield* source.all
+        const found = yield* source.get("review")
+        const missing = yield* source.get("missing")
 
-      expect(all).toEqual([first, second])
-      expect(found).toBe(second)
-      expect(missing).toBeUndefined()
-    }).pipe(Effect.provide(SkillSource.fromSkills([first, second])))
+        expect(all).toEqual([first, second])
+        expect(found).toBe(second)
+        expect(missing).toBeUndefined()
+      }),
+    ] as const
   })
 
-  it.effect("empty provides no skills", () =>
-    Effect.gen(function* () {
-      const source = yield* SkillSource.SkillSource
+  ItLayer.make(
+    it,
+    "empty provides no skills",
+    () =>
+      [
+        SkillSource.empty,
+        Effect.gen(function* () {
+          const source = yield* SkillSource.SkillSource
 
-      expect(yield* source.all).toEqual([])
-      expect(yield* source.get("missing")).toBeUndefined()
-    }).pipe(Effect.provide(SkillSource.empty)),
+          expect(yield* source.all).toEqual([])
+          expect(yield* source.get("missing")).toBeUndefined()
+        }),
+      ] as const,
   )
 
   it("builds capped listings", () => {
@@ -70,20 +80,22 @@ describe("SkillSource", () => {
     expect(SkillSource.selectListings([first, second, third], 0, ["first", "second", "third"])).toEqual([])
   })
 
-  it.effect("testLayer provides an exact implementation", () =>
-    Effect.gen(function* () {
-      const source = yield* SkillSource.SkillSource
-
-      expect(yield* source.all).toEqual([])
-      expect(yield* source.get("x")).toBeUndefined()
-    }).pipe(
-      Effect.provide(
+  ItLayer.make(
+    it,
+    "testLayer provides an exact implementation",
+    () =>
+      [
         SkillSource.testLayer({
           all: Effect.succeed([]),
-          get: () => Effect.succeed(undefined),
+          get: () => Effect.void.pipe(Effect.map(() => undefined as SkillSource.Skill | undefined)),
         }),
-      ),
-    ),
+        Effect.gen(function* () {
+          const source = yield* SkillSource.SkillSource
+
+          expect(yield* source.all).toEqual([])
+          expect(yield* source.get("x")).toBeUndefined()
+        }),
+      ] as const,
   )
 
   it.effect("merge deduplicates names with later sources winning consistently", () => {
@@ -111,18 +123,14 @@ describe("SkillSource", () => {
 
   it.effect("layer evaluates composable sources and fails fast", () => {
     const first = skill("first", "first")
-    const failure = new SkillSource.SkillSourceError({ source: "second", message: "unavailable" })
-    const failed = SkillSource.SkillSource.pipe(
-      Effect.provide(
+    const failure = SkillSource.SkillSourceError.make({ source: "second", message: "unavailable" })
+    return Effect.gen(function* () {
+      const exit = yield* Layer.build(
         SkillSource.layer([
           Effect.succeed({ all: Effect.succeed([first]), get: () => Effect.succeed(first) }),
           Effect.fail(failure),
         ]),
-      ),
-      Effect.exit,
-    )
-    return Effect.gen(function* () {
-      const exit = yield* failed
+      ).pipe(Effect.exit)
       expect(exit._tag).toBe("Failure")
     })
   })

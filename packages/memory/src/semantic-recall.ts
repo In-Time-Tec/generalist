@@ -11,7 +11,7 @@ export interface Options {
 
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
 
-const memoryError = (error: unknown): Memory.MemoryError => new Memory.MemoryError({ message: errorMessage(error) })
+const memoryError = (error: unknown): Memory.MemoryError => Memory.MemoryError.make({ message: errorMessage(error) })
 
 const textPart = (text: string) => Prompt.makePart("text", { text })
 

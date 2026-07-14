@@ -103,7 +103,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class SessionStore extends Context.Service<SessionStore, Interface>()("@batonfx/core/SessionStore") {}
+export class SessionStore extends Context.Service<SessionStore, Interface>()("@batonfx/core/session/SessionStore") {}
 
 interface State {
   readonly entries: HashMap.HashMap<EntryId, Entry>
@@ -135,7 +135,7 @@ const success = <A>(value: A): Result<A> => ({ _tag: "Success", value })
 
 const failure = (message: string): Result<never> => ({
   _tag: "Failure",
-  error: new SessionStoreError({ message }),
+  error: SessionStoreError.make({ message }),
 })
 
 const effectFromResult = <A>(result: Result<A>): Effect.Effect<A, SessionStoreError> =>

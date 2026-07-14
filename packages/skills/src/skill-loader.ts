@@ -15,7 +15,7 @@ const DEFAULT_ROOTS = [".agents/skills", ".claude/skills", ".pi/skills"] as cons
 const decoder = new TextDecoder()
 
 const sourceError = (source: string, message: string, cause?: unknown): SkillSource.SkillSourceError =>
-  new SkillSource.SkillSourceError({ source, message, ...(cause === undefined ? {} : { cause }) })
+  SkillSource.SkillSourceError.make({ source, message, ...(cause === undefined ? {} : { cause }) })
 
 const mapPlatformError = (source: string, error: PlatformError.PlatformError): SkillSource.SkillSourceError =>
   sourceError(source, error.message, error)

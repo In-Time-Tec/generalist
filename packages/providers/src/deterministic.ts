@@ -47,11 +47,16 @@ export const withOpenAiOrDeterministic = (options: WithOpenAiOrDeterministicOpti
         provider: options.fallbackProvider ?? "deterministic",
         model: options.fallbackModel,
       })
-      const openAiRegistration = yield* openAi(options).pipe(
-        Effect.provide(OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
-        Effect.provide(FetchHttpClient.layer),
-        Effect.asSome,
-        Effect.catchTag("ConfigError", () => Effect.succeedNone),
+      const providerLayer = OpenAiClient.layerConfig({
+        ...options.clientConfig,
+        apiKey: options.apiKey,
+      }).pipe(Layer.provide(FetchHttpClient.layer))
+      const openAiRegistration = yield* Effect.scoped(
+        Layer.build(providerLayer).pipe(
+          Effect.flatMap((context) => openAi(options).pipe(Effect.provide(context))),
+          Effect.asSome,
+          Effect.catchTag("ConfigError", () => Effect.succeedNone),
+        ),
       )
       return ModelRegistry.layer([
         deterministic,

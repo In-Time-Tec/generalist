@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
-import type { Interface, JsonValue } from "./mcp-tool-source.js"
+import type { Interface, JsonValue, McpAiTool } from "./mcp-tool-source.js"
 
 /**
  * Discovered MCP tools as a Baton toolkit. Pair with {@link toolkitLayer}
@@ -8,15 +8,15 @@ import type { Interface, JsonValue } from "./mcp-tool-source.js"
  *
  * @experimental
  */
-export const toolkit = (source: Interface): Effect.Effect<Toolkit.Toolkit<Record<string, Tool.Any>>> =>
-  source.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools) as Toolkit.Toolkit<Record<string, Tool.Any>>))
+export const toolkit = (source: Interface): Effect.Effect<Toolkit.Toolkit<Record<string, McpAiTool>>> =>
+  source.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools) as Toolkit.Toolkit<Record<string, McpAiTool>>))
 
 /**
  * Effect AI handler layer that proxies MCP tool calls to the MCP server.
  *
  * @experimental
  */
-export const toolkitLayer = (source: Interface): Layer.Layer<Tool.Handler<any>> =>
+export const toolkitLayer = (source: Interface): Layer.Layer<Tool.Handler<string>> =>
   Layer.unwrap(
     Effect.gen(function* () {
       const mcpToolkit = yield* toolkit(source)
@@ -24,7 +24,7 @@ export const toolkitLayer = (source: Interface): Layer.Layer<Tool.Handler<any>> 
       const handlers = Object.fromEntries(
         tools.map((tool) => [
           tool.name,
-          (params: unknown) =>
+          (params: unknown): Effect.Effect<JsonValue, string> =>
             source
               .callTool(tool.rawName, params as JsonValue)
               .pipe(Effect.catchTag("McpToolCallError", (error) => Effect.fail(error.message))),

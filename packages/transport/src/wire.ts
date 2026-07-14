@@ -15,7 +15,7 @@ export type RunFailure = typeof RunFailure.Type
 /** @experimental Session lifecycle status carried over the wire. */
 export const SessionStatus = Schema.Union([
   Schema.Struct({ _tag: Schema.tag("Idle") }),
-  Schema.Struct({ _tag: Schema.tag("Running"), turn: Schema.Number }),
+  Schema.Struct({ _tag: Schema.tag("Running"), turn: Schema.Finite }),
   Schema.Struct({ _tag: Schema.tag("Suspended"), suspension: AgentEvent.AgentSuspended }),
   Schema.Struct({ _tag: Schema.tag("Failed"), error: RunFailure }),
 ])
@@ -34,7 +34,7 @@ export type ClientApproval = typeof ClientApproval.Type
 
 /** @experimental Client to server control frame. */
 export const ClientFrame = Schema.Union([
-  Schema.Struct({ _tag: Schema.tag("Attach"), sessionId: Schema.String, afterSeq: Schema.optionalKey(Schema.Number) }),
+  Schema.Struct({ _tag: Schema.tag("Attach"), sessionId: Schema.String, afterSeq: Schema.optionalKey(Schema.Finite) }),
   Schema.Struct({ _tag: Schema.tag("SendMessage"), sessionId: Schema.String, prompt: Schema.String }),
   Schema.Struct({
     _tag: Schema.tag("ResolveApproval"),
@@ -91,17 +91,17 @@ const EventSchemaWith = (
   toolResult: Schema.Top,
 ) =>
   Schema.Union([
-    Schema.Struct({ _tag: Schema.tag("TurnStarted"), turn: Schema.Number, metadata: OptionalMetadata }),
-    Schema.Struct({ _tag: Schema.tag("ModelPart"), turn: Schema.Number, part: streamPart, metadata: OptionalMetadata }),
+    Schema.Struct({ _tag: Schema.tag("TurnStarted"), turn: Schema.Finite, metadata: OptionalMetadata }),
+    Schema.Struct({ _tag: Schema.tag("ModelPart"), turn: Schema.Finite, part: streamPart, metadata: OptionalMetadata }),
     Schema.Struct({
       _tag: Schema.tag("ToolExecutionStarted"),
-      turn: Schema.Number,
+      turn: Schema.Finite,
       call: toolCall,
       metadata: OptionalMetadata,
     }),
     Schema.Struct({
       _tag: Schema.tag("ToolProgress"),
-      turn: Schema.Number,
+      turn: Schema.Finite,
       toolCallId: Schema.String,
       message: Schema.optionalKey(Schema.String),
       data: Schema.optionalKey(Metadata),
@@ -109,27 +109,27 @@ const EventSchemaWith = (
     }),
     Schema.Struct({
       _tag: Schema.tag("ToolExecutionCompleted"),
-      turn: Schema.Number,
+      turn: Schema.Finite,
       call: toolCall,
       result: toolResult,
       metadata: OptionalMetadata,
     }),
     Schema.Struct({
       _tag: Schema.tag("ApprovalRequested"),
-      turn: Schema.Number,
+      turn: Schema.Finite,
       call: toolCall,
       metadata: OptionalMetadata,
     }),
     Schema.Struct({
       _tag: Schema.tag("SteeringDrained"),
-      turn: Schema.Number,
+      turn: Schema.Finite,
       queue: Schema.Literals(["steering", "followUp"]),
-      count: Schema.Number,
+      count: Schema.Finite,
       metadata: OptionalMetadata,
     }),
     Schema.Struct({
       _tag: Schema.tag("TurnCompleted"),
-      turn: Schema.Number,
+      turn: Schema.Finite,
       transcript: Schema.optionalKey(Prompt.Prompt),
       usage: Schema.optionalKey(Response.Usage),
       finishReason: Schema.optionalKey(Response.FinishReason),
@@ -137,14 +137,14 @@ const EventSchemaWith = (
     }),
     Schema.Struct({
       _tag: Schema.tag("StructuredOutput"),
-      turn: Schema.Number,
+      turn: Schema.Finite,
       value: Schema.Unknown,
       content: Schema.Array(responsePart),
       metadata: OptionalMetadata,
     }),
     Schema.Struct({
       _tag: Schema.tag("Completed"),
-      turns: Schema.Number,
+      turns: Schema.Finite,
       text: Schema.String,
       transcript: Schema.optionalKey(Prompt.Prompt),
       usage: Schema.optionalKey(Response.Usage),
@@ -193,12 +193,12 @@ export type ServerFrameType =
 
 const ServerFrameWith = (event: Schema.Top) =>
   Schema.Union([
-    Schema.Struct({ _tag: Schema.tag("Event"), seq: Schema.Number, event }),
-    Schema.Struct({ _tag: Schema.tag("Failed"), seq: Schema.Number, error: RunFailure }),
-    Schema.Struct({ _tag: Schema.tag("Suspended"), seq: Schema.Number, suspension: AgentEvent.AgentSuspended }),
-    Schema.Struct({ _tag: Schema.tag("Ended"), seq: Schema.Number }),
-    Schema.Struct({ _tag: Schema.tag("Snapshot"), seq: Schema.Number, transcript: Prompt.Prompt }),
-    Schema.Struct({ _tag: Schema.tag("SessionStatus"), seq: Schema.Number, status: SessionStatus }),
+    Schema.Struct({ _tag: Schema.tag("Event"), seq: Schema.Finite, event }),
+    Schema.Struct({ _tag: Schema.tag("Failed"), seq: Schema.Finite, error: RunFailure }),
+    Schema.Struct({ _tag: Schema.tag("Suspended"), seq: Schema.Finite, suspension: AgentEvent.AgentSuspended }),
+    Schema.Struct({ _tag: Schema.tag("Ended"), seq: Schema.Finite }),
+    Schema.Struct({ _tag: Schema.tag("Snapshot"), seq: Schema.Finite, transcript: Prompt.Prompt }),
+    Schema.Struct({ _tag: Schema.tag("SessionStatus"), seq: Schema.Finite, status: SessionStatus }),
   ]) as unknown as Schema.Codec<ServerFrameType, unknown, never, never>
 
 /** @experimental Server frame codec using the supplied toolkit. */

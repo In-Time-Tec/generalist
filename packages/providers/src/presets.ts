@@ -1,6 +1,6 @@
 import { OpenAiClient } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "@batonfx/core"
-import { Config, Effect, Redacted } from "effect"
+import { Config, Effect, Layer, Redacted } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
 import { openAiCompatible, type OpenAiCompatibleInput } from "./openai-compat.js"
 
@@ -16,21 +16,24 @@ export interface AzureOpenAiInput extends PresetInput {
 }
 
 const preset = (provider: string, baseUrl: string, input: PresetInput) =>
-  openAiCompatible({
-    provider,
-    model: input.model,
-    ...(input.config === undefined ? {} : { config: input.config }),
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  }).pipe(
-    Effect.provide(
+  Effect.scoped(
+    Layer.build(
       OpenAiClient.layerConfig({
         ...input.clientConfig,
         ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
         apiUrl: Config.succeed(baseUrl),
-      }),
+      }).pipe(Layer.provide(FetchHttpClient.layer)),
+    ).pipe(
+      Effect.flatMap((context) =>
+        openAiCompatible({
+          provider,
+          model: input.model,
+          ...(input.config === undefined ? {} : { config: input.config }),
+          ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
+          ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+        }).pipe(Effect.provide(context)),
+      ),
     ),
-    Effect.provide(FetchHttpClient.layer),
   )
 
 const presetLayer = (registration: Effect.Effect<ModelRegistry.Registration, Config.ConfigError>) =>

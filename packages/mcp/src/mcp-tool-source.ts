@@ -2,11 +2,23 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
-import { Context, Duration, Effect, Layer, Ref, Schema, Scope } from "effect"
+import { Context, Duration, Effect, Function, Layer, Ref, Schema, Scope } from "effect"
+import type { JsonSchema } from "effect/JsonSchema"
 import { Tool } from "effect/unstable/ai"
 import type { Interface as OAuthInterface } from "./oauth.js"
 /** @experimental */
-export type JsonValue = typeof Schema.Json.Type
+export type JsonValue = Schema.Json
+
+/** @experimental */
+export type McpAiTool = Tool.Dynamic<
+  string,
+  {
+    readonly parameters: JsonSchema
+    readonly success: typeof Schema.Unknown
+    readonly failure: typeof Schema.String
+    readonly failureMode: "return"
+  }
+>
 
 /** @experimental */
 export type McpTransport =
@@ -55,11 +67,13 @@ export interface Interface {
   readonly server: string
   readonly tools: Effect.Effect<ReadonlyArray<DiscoveredTool>>
   readonly callTool: (rawName: string, input: JsonValue) => Effect.Effect<JsonValue, McpToolCallError>
-  readonly aiTools: Effect.Effect<ReadonlyArray<Tool.Any>>
+  readonly aiTools: Effect.Effect<ReadonlyArray<McpAiTool>>
 }
 
 /** @experimental */
-export class McpToolSource extends Context.Service<McpToolSource, Interface>()("@batonfx/mcp/McpToolSource") {}
+export class McpToolSource extends Context.Service<McpToolSource, Interface>()(
+  "@batonfx/mcp/mcp-tool-source/McpToolSource",
+) {}
 
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -94,76 +108,81 @@ const discoveredTool = (
 const callArguments = (input: JsonValue): Record<string, unknown> | undefined =>
   typeof input === "object" && input !== null && !Array.isArray(input) ? (input as Record<string, unknown>) : undefined
 
-const aiToolFromDiscovered = (tool: DiscoveredTool): Tool.Any =>
+const aiToolFromDiscovered = (tool: DiscoveredTool): McpAiTool =>
   Tool.dynamic(tool.name, {
     description: tool.description,
-    parameters: tool.inputSchema as never,
+    parameters: tool.inputSchema as JsonSchema,
     success: Schema.Unknown,
     failure: Schema.String,
     failureMode: "return",
   })
 
 /** @experimental */
-export const fromTransport = (
-  name: string,
-  transport: Transport,
-  options?: CallOptions,
-): Effect.Effect<Interface, McpConnectionError, Scope.Scope> =>
-  Effect.gen(function* () {
-    const client = yield* Effect.acquireRelease(
-      Effect.tryPromise({
-        try: async () => {
+export const fromTransport: {
+  (
+    transport: Transport,
+    options?: CallOptions,
+  ): (name: string) => Effect.Effect<Interface, McpConnectionError, Scope.Scope>
+  (name: string, transport: Transport, options?: CallOptions): Effect.Effect<Interface, McpConnectionError, Scope.Scope>
+} = Function.dual(
+  (args) => typeof args[0] === "string",
+  (name: string, transport: Transport, options?: CallOptions) =>
+    Effect.gen(function* () {
+      const client = yield* Effect.acquireRelease(
+        Effect.gen(function* () {
           const created = new Client({ name: `@batonfx/mcp:${name}`, version: "0.0.0" })
-          await created.connect(transport)
+          yield* Effect.tryPromise({
+            try: () => created.connect(transport),
+            catch: (error) => McpConnectionError.make({ server: name, message: errorMessage(error) }),
+          })
           return created
-        },
-        catch: (error) => new McpConnectionError({ server: name, message: errorMessage(error) }),
-      }),
-      (connected) => Effect.promise(() => connected.close()).pipe(Effect.ignore),
-    )
-
-    const listed = yield* Effect.tryPromise({
-      try: () => client.listTools(),
-      catch: (error) => new McpConnectionError({ server: name, message: errorMessage(error) }),
-    })
-    const discovered = yield* Ref.make<ReadonlyArray<DiscoveredTool>>(
-      listed.tools.map((tool) => discoveredTool(name, tool)),
-    )
-
-    const callTimeoutMillis = options?.callTimeout === undefined ? undefined : Duration.toMillis(options.callTimeout)
-
-    const callTool = (rawName: string, input: JsonValue): Effect.Effect<JsonValue, McpToolCallError> =>
-      Effect.tryPromise({
-        try: (signal) =>
-          client.callTool({ name: rawName, arguments: callArguments(input) }, undefined, {
-            signal,
-            ...(callTimeoutMillis === undefined ? {} : { timeout: callTimeoutMillis }),
-          }),
-        catch: (error) => new McpToolCallError({ server: name, tool: rawName, message: errorMessage(error) }),
-      }).pipe(
-        Effect.flatMap((result) => {
-          if (result.isError === true) {
-            const message = joinedText(result.content)
-            return Effect.fail(
-              new McpToolCallError({
-                server: name,
-                tool: rawName,
-                message: message === "" ? "Tool call failed" : message,
-              }),
-            )
-          }
-          if (result.structuredContent !== undefined) return Effect.succeed(jsonValue(result.structuredContent))
-          return Effect.succeed<JsonValue>(joinedText(result.content))
         }),
+        (connected) => Effect.promise(() => connected.close()).pipe(Effect.ignore),
       )
 
-    return McpToolSource.of({
-      server: name,
-      tools: Ref.get(discovered),
-      callTool,
-      aiTools: Ref.get(discovered).pipe(Effect.map((tools) => tools.map(aiToolFromDiscovered))),
-    })
-  })
+      const listed = yield* Effect.tryPromise({
+        try: () => client.listTools(),
+        catch: (error) => McpConnectionError.make({ server: name, message: errorMessage(error) }),
+      })
+      const discovered = yield* Ref.make<ReadonlyArray<DiscoveredTool>>(
+        listed.tools.map((tool) => discoveredTool(name, tool)),
+      )
+
+      const callTimeoutMillis = options?.callTimeout === undefined ? undefined : Duration.toMillis(options.callTimeout)
+
+      const callTool = (rawName: string, input: JsonValue): Effect.Effect<JsonValue, McpToolCallError> =>
+        Effect.tryPromise({
+          try: (signal) =>
+            client.callTool({ name: rawName, arguments: callArguments(input) }, undefined, {
+              signal,
+              ...(callTimeoutMillis === undefined ? {} : { timeout: callTimeoutMillis }),
+            }),
+          catch: (error) => McpToolCallError.make({ server: name, tool: rawName, message: errorMessage(error) }),
+        }).pipe(
+          Effect.flatMap((result) => {
+            if (result.isError === true) {
+              const message = joinedText(result.content)
+              return Effect.fail(
+                McpToolCallError.make({
+                  server: name,
+                  tool: rawName,
+                  message: message === "" ? "Tool call failed" : message,
+                }),
+              )
+            }
+            if (result.structuredContent !== undefined) return Effect.succeed(jsonValue(result.structuredContent))
+            return Effect.succeed<JsonValue>(joinedText(result.content))
+          }),
+        )
+
+      return McpToolSource.of({
+        server: name,
+        tools: Ref.get(discovered),
+        callTool,
+        aiTools: Ref.get(discovered).pipe(Effect.map((tools) => tools.map(aiToolFromDiscovered))),
+      })
+    }),
+)
 
 const buildTransport = (server: string, transport: McpTransport): Effect.Effect<Transport, McpConnectionError> =>
   Effect.try({
@@ -178,7 +197,7 @@ const buildTransport = (server: string, transport: McpTransport): Effect.Effect<
             ...(transport.headers === undefined ? {} : { requestInit: { headers: transport.headers } }),
             ...(transport.oauth === undefined ? {} : { authProvider: transport.oauth.provider }),
           }) as Transport),
-    catch: (error) => new McpConnectionError({ server, message: errorMessage(error) }),
+    catch: (error) => McpConnectionError.make({ server, message: errorMessage(error) }),
   })
 
 const makeInterface = (options: {
@@ -204,11 +223,28 @@ export const layer = (options: {
 }): Layer.Layer<McpToolSource, McpConnectionError> => Layer.effect(McpToolSource, makeInterface(options))
 
 /** @experimental */
-export const layerTagged = <Identifier>(
-  tag: Context.Key<Identifier, Interface>,
-  options: {
+export const layerTagged: {
+  (options: {
     readonly name: string
     readonly transport: McpTransport
     readonly callTimeout?: Duration.Input
-  },
-): Layer.Layer<Identifier, McpConnectionError> => Layer.effect(tag, makeInterface(options))
+  }): <Identifier>(tag: Context.Key<Identifier, Interface>) => Layer.Layer<Identifier, McpConnectionError>
+  <Identifier>(
+    tag: Context.Key<Identifier, Interface>,
+    options: {
+      readonly name: string
+      readonly transport: McpTransport
+      readonly callTimeout?: Duration.Input
+    },
+  ): Layer.Layer<Identifier, McpConnectionError>
+} = Function.dual(
+  2,
+  <Identifier>(
+    tag: Context.Key<Identifier, Interface>,
+    options: {
+      readonly name: string
+      readonly transport: McpTransport
+      readonly callTimeout?: Duration.Input
+    },
+  ) => Layer.effect(tag, makeInterface(options)),
+)

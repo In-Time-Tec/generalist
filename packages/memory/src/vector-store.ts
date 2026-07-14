@@ -47,7 +47,9 @@ export interface Interface {
 }
 
 /** @experimental */
-export class VectorStore extends Context.Service<VectorStore, Interface>()("@batonfx/memory/VectorStore") {}
+export class VectorStore extends Context.Service<VectorStore, Interface>()(
+  "@batonfx/memory/vector-store/VectorStore",
+) {}
 
 const storageKey = (key: Memory.Key, id: string): string => JSON.stringify([key.agent, key.subject, id])
 
@@ -58,7 +60,7 @@ const validateVector = (label: string, vector: ReadonlyArray<number>): Effect.Ef
   const invalid = vector.find((value) => !Number.isFinite(value))
   return invalid === undefined
     ? Effect.void
-    : Effect.fail(new VectorStoreError({ message: `${label} contains a non-finite value` }))
+    : Effect.fail(VectorStoreError.make({ message: `${label} contains a non-finite value` }))
 }
 
 const cosine = (left: ReadonlyArray<number>, right: ReadonlyArray<number>): number => {
@@ -101,11 +103,9 @@ const make = Ref.make(HashMap.empty<string, Embedded>()).pipe(
           for (const [, document] of current) {
             if (!sameKey(document.key, input.key)) continue
             if (document.embedding.length !== input.embedding.length) {
-              return yield* Effect.fail(
-                new VectorStoreError({
-                  message: `document ${document.id} embedding dimension ${document.embedding.length} does not match query dimension ${input.embedding.length}`,
-                }),
-              )
+              return yield* VectorStoreError.make({
+                message: `document ${document.id} embedding dimension ${document.embedding.length} does not match query dimension ${input.embedding.length}`,
+              })
             }
             const score = cosine(document.embedding, input.embedding)
             if (input.minScore !== undefined && score < input.minScore) continue

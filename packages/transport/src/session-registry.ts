@@ -33,7 +33,7 @@ export class SessionQueueFull extends Schema.TaggedErrorClass<SessionQueueFull>(
   "@batonfx/transport/SessionQueueFull",
   {
     sessionId: Schema.String,
-    capacity: Schema.Number,
+    capacity: Schema.Finite,
   },
 ) {}
 
@@ -42,7 +42,7 @@ export class SubscriberLagged extends Schema.TaggedErrorClass<SubscriberLagged>(
   "@batonfx/transport/SubscriberLagged",
   {
     sessionId: Schema.String,
-    lastDeliveredSeq: Schema.Number,
+    lastDeliveredSeq: Schema.Finite,
   },
 ) {}
 
@@ -94,7 +94,7 @@ export interface Interface {
 
 /** @experimental */
 export class SessionRegistry extends Context.Service<SessionRegistry, Interface>()(
-  "@batonfx/transport/SessionRegistry",
+  "@batonfx/transport/session-registry/SessionRegistry",
 ) {}
 
 type SubscriberQueue = Queue.Queue<LooseServerFrameType, SessionError | SubscriberLagged>
@@ -145,7 +145,7 @@ type FrameWithoutSeq = LooseServerFrameType extends infer Frame
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 
-const sessionError = (message: string): SessionError => new SessionError({ message })
+const sessionError = (message: string): SessionError => SessionError.make({ message })
 
 const infoFrom = (session: SessionState): SessionInfo => ({
   sessionId: session.sessionId,
@@ -184,11 +184,11 @@ const stripEventTranscript = (event: AgentEvent.Event, strip: boolean): EventTyp
 
 const runFailureFromCause = (cause: Cause.Cause<Agent.RunError | SessionError>, turn: number): RunFailure => {
   const error = Cause.squash(cause)
-  if (error instanceof AgentEvent.AgentError) return error
-  if (error instanceof AgentEvent.TurnLimitExceeded) return error
-  if (error instanceof AgentEvent.MiddlewareViolation) return error
+  if (Schema.is(AgentEvent.AgentError)(error)) return error
+  if (Schema.is(AgentEvent.TurnLimitExceeded)(error)) return error
+  if (Schema.is(AgentEvent.MiddlewareViolation)(error)) return error
   const message = Cause.hasInterrupts(cause) ? "Session interrupted" : errorMessage(error)
-  return new AgentEvent.AgentError({ message, turn, cause: error })
+  return AgentEvent.AgentError.make({ message, turn, cause: error })
 }
 
 const toApprovalDecision = (decision: ClientApproval): Approvals.Decision => {
@@ -245,7 +245,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
         })
 
       const failSubscriber = (sessionId: string, subscriberId: number, queue: SubscriberQueue, lastSeq: number) =>
-        Queue.fail(queue, new SubscriberLagged({ sessionId, lastDeliveredSeq: lastSeq })).pipe(
+        Queue.fail(queue, SubscriberLagged.make({ sessionId, lastDeliveredSeq: lastSeq })).pipe(
           Effect.andThen(removeSubscriber(sessionId, subscriberId)),
         )
 
@@ -342,7 +342,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
         )
 
       const finalizeInterrupted = (sessionId: string, runId: number): Effect.Effect<void> => {
-        const error = new AgentEvent.AgentError({ message: "Session interrupted", turn: 0 })
+        const error = AgentEvent.AgentError.make({ message: "Session interrupted", turn: 0 })
         return finalizeRun(sessionId, runId, { _tag: "Failed", error }, { _tag: "Failed", error }).pipe(Effect.ignore)
       }
 
@@ -415,7 +415,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
             Effect.matchCauseEffect({
               onFailure: (cause) => {
                 const error = Cause.squash(cause)
-                if (error instanceof AgentEvent.AgentSuspended) {
+                if (Schema.is(AgentEvent.AgentSuspended)(error)) {
                   return finalizeRun(
                     session.sessionId,
                     session.runId,
@@ -433,7 +433,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
               },
               onSuccess: () => finalizeRun(session.sessionId, session.runId, { _tag: "Idle" }),
             }),
-            Effect.catchCause(() => Effect.void),
+            Effect.ignoreCause,
           )
           const runContext = Option.match(overrideApprovals, {
             onNone: () => context,
@@ -469,7 +469,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
               case "Missing":
                 return Effect.fail(sessionError(`Session ${sessionId} is not open`))
               case "Busy":
-                return Effect.fail(new SessionBusy({ sessionId }))
+                return Effect.fail(SessionBusy.make({ sessionId }))
               case "Reserved":
                 return Effect.succeed(reservation.session)
             }
@@ -512,9 +512,9 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
               case "Missing":
                 return Effect.fail(sessionError(`Session ${sessionId} is not open`))
               case "Busy":
-                return Effect.fail(new SessionBusy({ sessionId }))
+                return Effect.fail(SessionBusy.make({ sessionId }))
               case "Full":
-                return Effect.fail(new SessionQueueFull({ sessionId, capacity: pendingMessageCapacity }))
+                return Effect.fail(SessionQueueFull.make({ sessionId, capacity: pendingMessageCapacity }))
               case "Enqueued":
               case "Reserved":
                 return Effect.succeed(submission)
@@ -625,7 +625,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
         persistence.getOrCreate(chatId).pipe(
           Effect.flatMap((chat) => Ref.get(chat.history)),
           Effect.map((transcript) => ({ _tag: "Snapshot", seq, transcript }) as LooseServerFrameType),
-          Effect.mapError((error) => sessionError(errorMessage(error))),
+          Effect.mapError((error) => error.pipe(errorMessage, sessionError)),
         )
 
       const sweep = Clock.currentTimeMillis.pipe(
@@ -692,7 +692,9 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
             const sessionId = openOptions.sessionId ?? `session-${yield* Random.nextIntBetween(100000, 1000000)}`
             const chatId = openOptions.chatId ?? sessionId
             const now = yield* Clock.currentTimeMillis
-            yield* persistence.getOrCreate(chatId).pipe(Effect.mapError((error) => sessionError(errorMessage(error))))
+            yield* persistence
+              .getOrCreate(chatId)
+              .pipe(Effect.mapError((error) => error.pipe(errorMessage, sessionError)))
             const info = yield* Ref.modify(state, (current) => {
               const existing = current.sessions.get(sessionId)
               if (existing !== undefined) return [infoFrom(existing), current]
@@ -725,13 +727,12 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
         resolveApproval: (sessionId, token, decision) =>
           Effect.gen(function* () {
             const session = yield* lookup(sessionId)
-            if (session.status._tag !== "Suspended")
-              return yield* Effect.fail(sessionError(`Session ${sessionId} is not suspended`))
+            if (session.status._tag !== "Suspended") return yield* sessionError(`Session ${sessionId} is not suspended`)
             const suspension = session.status.suspension
             if (suspension.reason !== "approval")
-              return yield* Effect.fail(sessionError(`Session ${sessionId} is not waiting on approval`))
+              return yield* sessionError(`Session ${sessionId} is not waiting on approval`)
             if (suspension.token !== token)
-              return yield* Effect.fail(sessionError(`Approval token ${token} does not match session ${sessionId}`))
+              return yield* sessionError(`Approval token ${token} does not match session ${sessionId}`)
             yield* beginRun(
               sessionId,
               "",

@@ -77,7 +77,7 @@ export const validateInput = (
         Option.match({
           onNone: () => Effect.succeed(prompt),
           onSome: (reason) =>
-            Effect.fail(new AgentError({ message: `Input guardrail blocked: ${reason}`, turn: context.turn })),
+            Effect.fail(AgentError.make({ message: `Input guardrail blocked: ${reason}`, turn: context.turn })),
         }),
       ),
     ),

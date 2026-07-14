@@ -6,10 +6,15 @@ import { Socket } from "effect/unstable/socket"
 import { Response } from "effect/unstable/ai"
 import { Client, Wire } from "../src/index"
 
+const provideTestLayer =
+  <R, E, RIn>(layer: Layer.Layer<R, E, RIn>) =>
+  <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
+    Layer.build(layer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
+
 const endedFrame = (seq: number): Wire.LooseServerFrameType => ({ _tag: "Ended", seq })
 
 const eventText = (frame: Wire.LooseServerFrameType): string =>
-  `id: ${frame.seq}\nevent: ${frame._tag}\ndata: ${JSON.stringify(Schema.encodeUnknownSync(Wire.LooseServerFrame)(frame))}\n\n`
+  `id: ${frame.seq}\nevent: ${frame._tag}\ndata: ${Schema.encodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(frame)}\n\n`
 
 const httpClientLayer = (body: string): Layer.Layer<HttpClient.HttpClient> => {
   const baseRequest = HttpClientRequest.get("http://test/events")
@@ -84,7 +89,7 @@ const decodeClientFrame = (text: string): Wire.ClientFrameType =>
   Schema.decodeUnknownSync(Schema.fromJsonString(Wire.ClientFrame))(text)
 
 const encodeServerFrame = (frame: Wire.LooseServerFrameType): string =>
-  JSON.stringify(Schema.encodeUnknownSync(Wire.LooseServerFrame)(frame))
+  Schema.encodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(frame)
 
 describe("Client", () => {
   it.effect("sseFrames decodes text/event-stream with loose server frames", () =>
@@ -97,7 +102,7 @@ describe("Client", () => {
         expect(frames[0].event._tag).toBe("ModelPart")
       }
     }).pipe(
-      Effect.provide(
+      provideTestLayer(
         httpClientLayer(
           eventText({
             _tag: "Event",
@@ -132,7 +137,7 @@ describe("Client", () => {
         expect(socket?.sent.length).toBe(1)
         expect(typeof socket?.sent[0] === "string" && decodeClientFrame(socket.sent[0])._tag).toBe("Attach")
       }),
-    ).pipe(Effect.provide(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
+    ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
   })
 
   it.effect("WebSocket client reconnects with the last seen seq", () => {
@@ -163,7 +168,7 @@ describe("Client", () => {
           afterSeq: 7,
         })
       }),
-    ).pipe(Effect.provide(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
+    ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
   })
 
   it.effect("WebSocket client backs off repeated reconnect attempts", () => {
@@ -193,7 +198,7 @@ describe("Client", () => {
 
         expect(sockets[2]).toBeDefined()
       }),
-    ).pipe(Effect.provide(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
+    ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
   })
 
   it.effect("WebSocket client fails the frame stream on malformed server frames", () => {
@@ -218,7 +223,7 @@ describe("Client", () => {
         expect(failure._tag).toBe("@batonfx/transport/TransportError")
         expect(sockets.length).toBe(1)
       }),
-    ).pipe(Effect.provide(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
+    ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
   })
 
   it.effect("WebSocket client fails the frame stream on binary server frames", () => {
@@ -243,7 +248,7 @@ describe("Client", () => {
         expect(failure._tag).toBe("@batonfx/transport/TransportError")
         expect(sockets.length).toBe(1)
       }),
-    ).pipe(Effect.provide(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
+    ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
   })
 
   it.effect("send fails while disconnected", () => {
@@ -257,6 +262,6 @@ describe("Client", () => {
 
         expect(failure._tag).toBe("@batonfx/transport/TransportError")
       }),
-    ).pipe(Effect.provide(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
+    ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
   })
 })

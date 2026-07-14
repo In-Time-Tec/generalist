@@ -16,4 +16,4 @@ export const docsIndexLayer: Layer.Layer<DocsIndex> = Layer.succeed(
   }),
 )
 
-export const docsToolLayer = toolkitLayer.pipe(Layer.provide(docsIndexLayer))
+export const docsToolLayer = toolkitLayer.pipe(Layer.provideMerge(docsIndexLayer))

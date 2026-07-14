@@ -26,21 +26,21 @@ export const make = (options: Options): SkillSource.Source<HttpClient.HttpClient
   const source = options.source ?? `github:${options.owner}/${options.repo}@${options.ref}`
   if (!/^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$/.test(options.ref)) {
     return Effect.fail(
-      new SkillSource.SkillSourceError({ source, message: "GitHub skill catalog ref must be a commit id" }),
+      SkillSource.SkillSourceError.make({ source, message: "GitHub skill catalog ref must be a commit id" }),
     )
   }
   if (
     !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(options.owner) ||
     !/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?$/.test(options.repo)
   ) {
-    return Effect.fail(new SkillSource.SkillSourceError({ source, message: "Invalid GitHub owner or repository" }))
+    return Effect.fail(SkillSource.SkillSourceError.make({ source, message: "Invalid GitHub owner or repository" }))
   }
   return Effect.gen(function* () {
     if ((options.root?.length ?? 0) > 0) yield* validateSkillPath(source, options.root ?? "")
     yield* validateSkillPath(source, options.manifestName ?? "skills.json")
     const apiBase = yield* Effect.fromResult(Url.fromString(options.apiBaseUrl ?? "https://api.github.com")).pipe(
-      Effect.mapError(
-        (cause) => new SkillSource.SkillSourceError({ source, message: "Invalid GitHub API base URL", cause }),
+      Effect.mapError((cause) =>
+        SkillSource.SkillSourceError.make({ source, message: "Invalid GitHub API base URL", cause }),
       ),
     )
     if (
@@ -50,7 +50,7 @@ export const make = (options: Options): SkillSource.Source<HttpClient.HttpClient
       apiBase.search.length > 0 ||
       apiBase.hash.length > 0
     ) {
-      return yield* Effect.fail(new SkillSource.SkillSourceError({ source, message: "Invalid GitHub API base URL" }))
+      return yield* SkillSource.SkillSourceError.make({ source, message: "Invalid GitHub API base URL" })
     }
     const base = apiBase.toString().replace(/\/$/, "")
     const root = encodedPath(options.root ?? "")

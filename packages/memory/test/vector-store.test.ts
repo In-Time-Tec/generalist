@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { Memory } from "@batonfx/core"
 import { VectorStore } from "../src/index"
@@ -19,10 +19,13 @@ const document = (
   embedding,
 })
 
-describe("VectorStore", () => {
+layer(VectorStore.memoryLayer)("VectorStore", (it) => {
   it.effect("ranks matching-key documents by cosine score", () =>
     Effect.gen(function* () {
       const store = yield* VectorStore.VectorStore
+      yield* store.delete({ key })
+      yield* store.delete({ key: otherSubject })
+      yield* store.delete({ key: otherAgent })
 
       yield* store.upsert([
         document("near", key, "near", [1, 0]),
@@ -34,12 +37,15 @@ describe("VectorStore", () => {
 
       expect(matches.map((match) => match.document.text)).toEqual(["near", "also-near"])
       expect(matches[0]?.score).toBeGreaterThan(matches[1]?.score ?? 0)
-    }).pipe(Effect.provide(VectorStore.memoryLayer)),
+    }),
   )
 
   it.effect("enforces exact agent and subject key isolation", () =>
     Effect.gen(function* () {
       const store = yield* VectorStore.VectorStore
+      yield* store.delete({ key })
+      yield* store.delete({ key: otherSubject })
+      yield* store.delete({ key: otherAgent })
 
       yield* store.upsert([
         document("same-id", key, "visible", [1, 0]),
@@ -50,12 +56,13 @@ describe("VectorStore", () => {
       const matches = yield* store.query({ key, embedding: [1, 0], limit: 10 })
 
       expect(matches.map((match) => match.document.text)).toEqual(["visible"])
-    }).pipe(Effect.provide(VectorStore.memoryLayer)),
+    }),
   )
 
   it.effect("applies limit and minScore", () =>
     Effect.gen(function* () {
       const store = yield* VectorStore.VectorStore
+      yield* store.delete({ key })
 
       yield* store.upsert([document("near", key, "near", [1, 0]), document("also-near", key, "also-near", [0.8, 0.2])])
 
@@ -64,12 +71,13 @@ describe("VectorStore", () => {
 
       expect(limited.map((match) => match.document.text)).toEqual(["near"])
       expect(thresholded.map((match) => match.document.text)).toEqual(["near"])
-    }).pipe(Effect.provide(VectorStore.memoryLayer)),
+    }),
   )
 
   it.effect("fails loudly on matching-key dimension mismatch", () =>
     Effect.gen(function* () {
       const store = yield* VectorStore.VectorStore
+      yield* store.delete({ key })
 
       yield* store.upsert([document("bad", key, "bad", [1, 0, 0])])
 
@@ -77,12 +85,14 @@ describe("VectorStore", () => {
 
       expect(failure._tag).toBe("@batonfx/memory/VectorStoreError")
       expect(failure.message).toContain("dimension")
-    }).pipe(Effect.provide(VectorStore.memoryLayer)),
+    }),
   )
 
   it.effect("deletes documents for the exact memory key", () =>
     Effect.gen(function* () {
       const store = yield* VectorStore.VectorStore
+      yield* store.delete({ key })
+      yield* store.delete({ key: otherSubject })
 
       yield* store.upsert([
         document("same-id", key, "visible", [1, 0]),
@@ -96,12 +106,14 @@ describe("VectorStore", () => {
 
       expect(deletedMatches).toEqual([])
       expect(remainingMatches.map((match) => match.document.text)).toEqual(["other subject"])
-    }).pipe(Effect.provide(VectorStore.memoryLayer)),
+    }),
   )
 
   it.effect("deletes one document id within the exact memory key", () =>
     Effect.gen(function* () {
       const store = yield* VectorStore.VectorStore
+      yield* store.delete({ key })
+      yield* store.delete({ key: otherSubject })
 
       yield* store.upsert([
         document("first", key, "first", [1, 0]),
@@ -116,6 +128,6 @@ describe("VectorStore", () => {
 
       expect(deletedKeyMatches.map((match) => match.document.text)).toEqual(["second"])
       expect(otherSubjectMatches.map((match) => match.document.text)).toEqual(["other subject"])
-    }).pipe(Effect.provide(VectorStore.memoryLayer)),
+    }),
   )
 })

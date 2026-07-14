@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { AiError, EmbeddingModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
@@ -37,10 +37,12 @@ const memoryLayer = SemanticRecall.layer({ limit: 5 }).pipe(
   Layer.provideMerge(embeddingLayer),
 )
 
-describe("SemanticRecall", () => {
+layer(memoryLayer)("SemanticRecall", (it) => {
   it.effect("remembers a terminal user and assistant exchange for later recall", () =>
     Effect.gen(function* () {
       const memory = yield* Memory.Memory
+      yield* memory.forget({ key })
+      yield* memory.forget({ key: otherKey })
 
       yield* memory.remember({
         key,
@@ -54,12 +56,13 @@ describe("SemanticRecall", () => {
       expect(recalled).toHaveLength(1)
       expect(itemText(recalled[0]!)).toContain("User: What color is the sky?")
       expect(itemText(recalled[0]!)).toContain("Assistant: blue")
-    }).pipe(Effect.provide(memoryLayer)),
+    }),
   )
 
   it.effect("does not upsert nonterminal turns", () =>
     Effect.gen(function* () {
       const memory = yield* Memory.Memory
+      yield* memory.forget({ key })
 
       yield* memory.remember({
         key,
@@ -71,12 +74,14 @@ describe("SemanticRecall", () => {
       const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
 
       expect(recalled).toEqual([])
-    }).pipe(Effect.provide(memoryLayer)),
+    }),
   )
 
   it.effect("isolates recall by memory key", () =>
     Effect.gen(function* () {
       const memory = yield* Memory.Memory
+      yield* memory.forget({ key })
+      yield* memory.forget({ key: otherKey })
 
       yield* memory.remember({
         key,
@@ -88,12 +93,14 @@ describe("SemanticRecall", () => {
       const recalled = yield* memory.recall({ key: otherKey, turn: 0, prompt: prompt(user("color")) })
 
       expect(recalled).toEqual([])
-    }).pipe(Effect.provide(memoryLayer)),
+    }),
   )
 
   it.effect("forgets one semantic memory id within the exact memory key", () =>
     Effect.gen(function* () {
       const memory = yield* Memory.Memory
+      yield* memory.forget({ key })
+      yield* memory.forget({ key: otherKey })
 
       yield* memory.remember({
         key,
@@ -114,41 +121,43 @@ describe("SemanticRecall", () => {
         transcript: prompt(user("What color is the door?"), assistant("blue")),
       })
 
-      yield* memory.forget({ key, id: "semantic-1" })
+      const beforeForget = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
+      const first = beforeForget[0]
+      if (first === undefined) return
+      yield* memory.forget({ key, id: first.id })
 
       const retained = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
       const otherRetained = yield* memory.recall({ key: otherKey, turn: 0, prompt: prompt(user("color")) })
 
       expect(retained.map(itemText)).toEqual(["User: What color is the ocean?\nAssistant: blue"])
       expect(otherRetained.map(itemText)).toEqual(["User: What color is the door?\nAssistant: blue"])
-    }).pipe(Effect.provide(memoryLayer)),
+    }),
   )
+})
 
-  it.effect("maps embedding failures to MemoryError", () => {
-    const embeddingError = AiError.make({
-      module: "SemanticRecallTest",
-      method: "embedMany",
-      reason: new AiError.UnknownError({ description: "embedding failed" }),
-    })
-    const failingEmbedding = Layer.effect(
-      EmbeddingModel.EmbeddingModel,
-      EmbeddingModel.make({ embedMany: () => Effect.fail(embeddingError) }),
-    )
+const embeddingError = AiError.make({
+  module: "SemanticRecallTest",
+  method: "embedMany",
+  reason: AiError.UnknownError.make({ description: "embedding failed" }),
+})
+const failingEmbedding = Layer.effect(
+  EmbeddingModel.EmbeddingModel,
+  EmbeddingModel.make({ embedMany: () => Effect.fail(embeddingError) }),
+)
 
-    return Effect.gen(function* () {
+layer(
+  SemanticRecall.layer({ limit: 5 }).pipe(
+    Layer.provideMerge(VectorStore.memoryLayer),
+    Layer.provideMerge(failingEmbedding),
+  ),
+)((it) => {
+  it.effect("maps embedding failures to MemoryError", () =>
+    Effect.gen(function* () {
       const memory = yield* Memory.Memory
-
       const failure = yield* Effect.flip(memory.recall({ key, turn: 0, prompt: prompt(user("color")) }))
 
       expect(failure._tag).toBe("@batonfx/core/MemoryError")
       expect(failure.message).toContain("embedding failed")
-    }).pipe(
-      Effect.provide(
-        SemanticRecall.layer({ limit: 5 }).pipe(
-          Layer.provideMerge(VectorStore.memoryLayer),
-          Layer.provideMerge(failingEmbedding),
-        ),
-      ),
-    )
-  })
+    }),
+  )
 })

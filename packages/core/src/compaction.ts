@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Option, Schema } from "effect"
+import { Context, Effect, Function, Layer, Option, Schema } from "effect"
 import { LanguageModel, Prompt, Tokenizer, Toolkit } from "effect/unstable/ai"
 import { type Entry, type EntryId, buildContext } from "./session.js"
 import { type Success } from "./tool-executor.js"
@@ -119,7 +119,7 @@ export class CompactionError extends Schema.TaggedErrorClass<CompactionError>()(
 }) {}
 
 /** @experimental */
-export class Compaction extends Context.Service<Compaction, Interface>()("@batonfx/core/Compaction") {}
+export class Compaction extends Context.Service<Compaction, Interface>()("@batonfx/core/compaction") {}
 
 /** @experimental Options for the default compaction implementation. */
 export interface DefaultOptions {
@@ -204,7 +204,7 @@ const compactToolPart = (
     if (part.isFailure) return [part, false] as const
     const success: Success = { _tag: "Success", result: part.result, encodedResult: part.result }
     const bounded = yield* bound(success, { toolCallId: part.id, maxBytes }).pipe(
-      Effect.mapError((error) => new CompactionError({ message: error.message, cause: error })),
+      Effect.mapError((error) => CompactionError.make({ message: error.message, cause: error })),
     )
     if (bounded === success) return [part, false] as const
     return [
@@ -313,33 +313,43 @@ export const defaultStrategy = (options: DefaultOptions = {}): Strategy => ({
       const model = yield* LanguageModel.LanguageModel
       return yield* model.generateText({ prompt, toolkit: Toolkit.empty, toolChoice: "none" }).pipe(
         Effect.map((response) => response.text),
-        Effect.mapError((error) => new CompactionError({ message: String(error), cause: error })),
+        Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
       )
     })
-    return options.summaryModel === undefined ? effect : effect.pipe(Effect.provide(options.summaryModel))
+    return options.summaryModel === undefined
+      ? effect
+      : Effect.scoped(
+          Layer.build(options.summaryModel).pipe(Effect.flatMap((context) => effect.pipe(Effect.provide(context)))),
+        )
   },
 })
 
 /** @experimental Compile ordered strategy parts onto a complete strategy. */
-export const strategy = (parts: ReadonlyArray<StrategyPart>, base: Strategy = defaultStrategy()): Strategy =>
-  parts.reduce<Strategy>(
-    (current, part) => ({
-      shouldCompact: part.shouldCompact ?? current.shouldCompact,
-      cut: part.cut ?? current.cut,
-      summarize: part.summarize ?? current.summarize,
-      ...(part.toolOutputMaxBytes !== undefined
-        ? { toolOutputMaxBytes: part.toolOutputMaxBytes }
-        : current.toolOutputMaxBytes === undefined
-          ? {}
-          : { toolOutputMaxBytes: current.toolOutputMaxBytes }),
-      ...(part.keepRecentTokens !== undefined
-        ? { keepRecentTokens: part.keepRecentTokens }
-        : current.keepRecentTokens === undefined
-          ? {}
-          : { keepRecentTokens: current.keepRecentTokens }),
-    }),
-    base,
-  )
+export const strategy: {
+  (base?: Strategy): (parts: ReadonlyArray<StrategyPart>) => Strategy
+  (parts: ReadonlyArray<StrategyPart>, base?: Strategy): Strategy
+} = Function.dual(
+  (args) => args.length !== 1 || Array.isArray(args[0]),
+  (parts: ReadonlyArray<StrategyPart>, base: Strategy = defaultStrategy()): Strategy =>
+    parts.reduce<Strategy>(
+      (current, part) => ({
+        shouldCompact: part.shouldCompact ?? current.shouldCompact,
+        cut: part.cut ?? current.cut,
+        summarize: part.summarize ?? current.summarize,
+        ...(part.toolOutputMaxBytes !== undefined
+          ? { toolOutputMaxBytes: part.toolOutputMaxBytes }
+          : current.toolOutputMaxBytes === undefined
+            ? {}
+            : { toolOutputMaxBytes: current.toolOutputMaxBytes }),
+        ...(part.keepRecentTokens !== undefined
+          ? { keepRecentTokens: part.keepRecentTokens }
+          : current.keepRecentTokens === undefined
+            ? {}
+            : { keepRecentTokens: current.keepRecentTokens }),
+      }),
+      base,
+    ),
+)
 
 /** @experimental Configure lossless successful-tool-result bounding. */
 export const toolOutputBound = (options: ToolOutputBoundOptions): StrategyPart => ({
@@ -371,68 +381,84 @@ export const structuredSummary = (options: StructuredSummaryOptions = {}): Strat
         })
         .pipe(
           Effect.map((response) => renderAgentSummary(response.value)),
-          Effect.mapError((error) => new CompactionError({ message: String(error), cause: error })),
+          Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
         )
     })
-    return options.summaryModel === undefined ? effect : effect.pipe(Effect.provide(options.summaryModel))
+    return options.summaryModel === undefined
+      ? effect
+      : Effect.scoped(
+          Layer.build(options.summaryModel).pipe(Effect.flatMap((context) => effect.pipe(Effect.provide(context)))),
+        )
   },
 })
 
 /** @experimental Build a compaction service from a strategy. */
-export const make = (compactionStrategy: Strategy, options: DefaultOptions = {}): Interface => ({
-  maybeCompact: (input) =>
-    Effect.gen(function* () {
-      const usage = normalizeUsage(input.usage, options)
-      const shouldCompact = input.overflow || compactionStrategy.shouldCompact(usage)
-      if (!shouldCompact) return Option.none<Result>()
+export const make: {
+  (options?: DefaultOptions): (compactionStrategy: Strategy) => Interface
+  (compactionStrategy: Strategy, options?: DefaultOptions): Interface
+} = Function.dual(
+  (args) => args.length !== 1 || "shouldCompact" in args[0],
+  (compactionStrategy: Strategy, options: DefaultOptions = {}): Interface => ({
+    maybeCompact: (input) =>
+      Effect.gen(function* () {
+        const usage = normalizeUsage(input.usage, options)
+        const shouldCompact = input.overflow || compactionStrategy.shouldCompact(usage)
+        if (!shouldCompact) return Option.none<Result>()
 
-      let history = input.history
-      let prompt = input.prompt
-      let changed = false
-      const toolOutputMaxBytes = input.toolOutputMaxBytes ?? compactionStrategy.toolOutputMaxBytes
+        let history = input.history
+        let prompt = input.prompt
+        let changed = false
+        const toolOutputMaxBytes = input.toolOutputMaxBytes ?? compactionStrategy.toolOutputMaxBytes
 
-      if (toolOutputMaxBytes !== undefined) {
-        const [compactedHistoryPrompt, historyChanged] = yield* microcompactPrompt(history, toolOutputMaxBytes)
-        const [compactedPrompt, promptChanged] = yield* microcompactPrompt(prompt, toolOutputMaxBytes)
-        history = compactedHistoryPrompt
-        prompt = compactedPrompt
-        changed = historyChanged || promptChanged
-        if (changed && fits(history, prompt, usage)) return Option.some(makeMicrocompact(history, prompt))
-      }
+        if (toolOutputMaxBytes !== undefined) {
+          const [compactedHistoryPrompt, historyChanged] = yield* microcompactPrompt(history, toolOutputMaxBytes)
+          const [compactedPrompt, promptChanged] = yield* microcompactPrompt(prompt, toolOutputMaxBytes)
+          history = compactedHistoryPrompt
+          prompt = compactedPrompt
+          changed = historyChanged || promptChanged
+          if (changed && fits(history, prompt, usage)) return Option.some(makeMicrocompact(history, prompt))
+        }
 
-      const plan = compactionStrategy.cut(
-        input.path ?? [],
-        compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? DEFAULT_KEEP_RECENT_TOKENS,
-      )
-      if (Option.isNone(plan)) return changed ? Option.some(makeMicrocompact(history, prompt)) : Option.none<Result>()
+        const plan = compactionStrategy.cut(
+          input.path ?? [],
+          compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? DEFAULT_KEEP_RECENT_TOKENS,
+        )
+        if (Option.isNone(plan)) return changed ? Option.some(makeMicrocompact(history, prompt)) : Option.none<Result>()
 
-      const summary = yield* compactionStrategy.summarize(plan.value, {
-        ...input,
-        history,
-        prompt,
-        usage,
-        ...(toolOutputMaxBytes === undefined ? {} : { toolOutputMaxBytes }),
-      })
-      const recent = buildContext(plan.value.recent)
-      const [compactedRecent] =
-        toolOutputMaxBytes === undefined
-          ? ([recent, false] as const)
-          : yield* microcompactPrompt(recent, toolOutputMaxBytes)
-      return Option.some<Result>({
-        _tag: "Summarize",
-        history: compactedHistory(summary, plan.value.head, compactedRecent),
-        prompt,
-        summary,
-        firstKeptEntryId: plan.value.firstKeptEntryId,
-      })
-    }),
-})
+        const summary = yield* compactionStrategy.summarize(plan.value, {
+          ...input,
+          history,
+          prompt,
+          usage,
+          ...(toolOutputMaxBytes === undefined ? {} : { toolOutputMaxBytes }),
+        })
+        const recent = buildContext(plan.value.recent)
+        const [compactedRecent] =
+          toolOutputMaxBytes === undefined
+            ? ([recent, false] as const)
+            : yield* microcompactPrompt(recent, toolOutputMaxBytes)
+        return Option.some<Result>({
+          _tag: "Summarize",
+          history: compactedHistory(summary, plan.value.head, compactedRecent),
+          prompt,
+          summary,
+          firstKeptEntryId: plan.value.firstKeptEntryId,
+        })
+      }),
+  }),
+)
 
 /** @experimental Layer wiring the default or provided strategy. */
-export const layer = (
-  options: LayerOptions = {},
-  providedStrategy: Strategy = options.strategy ?? defaultStrategy(options),
-): Layer.Layer<Compaction> => Layer.succeed(Compaction, Compaction.of(make(providedStrategy, options)))
+export const layer: {
+  (providedStrategy?: Strategy): (options?: LayerOptions) => Layer.Layer<Compaction>
+  (options?: LayerOptions, providedStrategy?: Strategy): Layer.Layer<Compaction>
+} = Function.dual(
+  (args) => args.length !== 1 || !("shouldCompact" in args[0]),
+  (
+    options: LayerOptions = {},
+    providedStrategy: Strategy = options.strategy ?? defaultStrategy(options),
+  ): Layer.Layer<Compaction> => Layer.succeed(Compaction, Compaction.of(make(providedStrategy, options))),
+)
 
 /** @experimental Truncate-only compaction over `Tokenizer`. */
 export const truncate = (maxTokens: number): Interface => ({
@@ -449,7 +475,7 @@ export const truncate = (maxTokens: number): Interface => ({
       if (Option.isNone(tokenizer)) return Option.none<Result>()
       const prompt = yield* tokenizer.value
         .truncate(Prompt.concat(input.history, input.prompt), maxTokens)
-        .pipe(Effect.mapError((error) => new CompactionError({ message: String(error), cause: error })))
+        .pipe(Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })))
       return Option.some<Result>(makeMicrocompact(Prompt.empty, prompt))
     }),
 })

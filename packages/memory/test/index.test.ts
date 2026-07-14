@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { EmbeddingModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
@@ -28,7 +28,12 @@ const embeddingLayer = Layer.effect(
   }),
 )
 
-describe("@batonfx/memory", () => {
+layer(
+  combinedLayer({ working: { maxMessages: 1 }, semantic: { limit: 5 } }).pipe(
+    Layer.provideMerge(VectorStore.memoryLayer),
+    Layer.provideMerge(embeddingLayer),
+  ),
+)("@batonfx/memory", (it) => {
   it.effect("combinedLayer recalls working memory before semantic matches", () =>
     Effect.gen(function* () {
       const memory = yield* Memory.Memory
@@ -43,13 +48,6 @@ describe("@batonfx/memory", () => {
       const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("color")) })
 
       expect(recalled.map(itemText)).toEqual(["Assistant: blue", "User: What color is the sky?\nAssistant: blue"])
-    }).pipe(
-      Effect.provide(
-        combinedLayer({ working: { maxMessages: 1 }, semantic: { limit: 5 } }).pipe(
-          Layer.provideMerge(VectorStore.memoryLayer),
-          Layer.provideMerge(embeddingLayer),
-        ),
-      ),
-    ),
+    }),
   )
 })

@@ -31,17 +31,17 @@ export interface MakeOptions {
 export interface Interface {
   readonly steer: (message: Message) => Effect.Effect<void, SteeringQueueFull>
   readonly followUp: (message: Message) => Effect.Effect<void, SteeringQueueFull>
-  readonly takeSteering: () => Effect.Effect<ReadonlyArray<Message>>
-  readonly takeFollowUp: () => Effect.Effect<ReadonlyArray<Message>>
+  readonly takeSteering: Effect.Effect<ReadonlyArray<Message>>
+  readonly takeFollowUp: Effect.Effect<ReadonlyArray<Message>>
 }
 
 /** @experimental */
-export class Steering extends Context.Service<Steering, Interface>()("@batonfx/core/Steering") {}
+export class Steering extends Context.Service<Steering, Interface>()("@batonfx/core/steering") {}
 
 /** @experimental Bounded steering queue rejected a message. */
 export class SteeringQueueFull extends Schema.TaggedErrorClass<SteeringQueueFull>()("@batonfx/core/SteeringQueueFull", {
   queue: Schema.Literals(["steering", "followUp"]),
-  capacity: Schema.Number,
+  capacity: Schema.Finite,
 }) {}
 
 interface ResolvedQueuePolicy {
@@ -84,7 +84,7 @@ const offer = (runtime: RuntimeQueue, message: Message): Effect.Effect<void, Ste
   Queue.offer(runtime.queue, message).pipe(
     Effect.flatMap((offered) => {
       if (offered || runtime.policy.capacity === undefined || runtime.policy.onFull !== "fail") return Effect.void
-      return Effect.fail(new SteeringQueueFull({ queue: runtime.name, capacity: runtime.policy.capacity }))
+      return SteeringQueueFull.make({ queue: runtime.name, capacity: runtime.policy.capacity })
     }),
   )
 
@@ -108,8 +108,8 @@ export const layer = (options: MakeOptions = {}): Layer.Layer<Steering> =>
       return Steering.of({
         steer: (message) => offer(steeringQueue, message),
         followUp: (message) => offer(followUpQueue, message),
-        takeSteering: () => drain(steeringQueue.queue, steeringQueue.policy.mode),
-        takeFollowUp: () => drain(followUpQueue.queue, followUpQueue.policy.mode),
+        takeSteering: drain(steeringQueue.queue, steeringQueue.policy.mode),
+        takeFollowUp: drain(followUpQueue.queue, followUpQueue.policy.mode),
       })
     }),
   )

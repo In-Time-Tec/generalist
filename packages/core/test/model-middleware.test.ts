@@ -1,8 +1,10 @@
 import { expect, layer } from "@effect/vitest"
+import { Json } from "./json"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
+import { ItLayer } from "./it-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -68,176 +70,181 @@ const dropToolCalls: ModelMiddleware.Middleware = {
 }
 
 const failingPrompt: ModelMiddleware.Middleware = {
-  transformPrompt: () => Effect.fail(new AgentEvent.AgentError({ message: "prompt middleware boom", turn: 0 })),
+  transformPrompt: () => Effect.fail(AgentEvent.AgentError.make({ message: "prompt middleware boom", turn: 0 })),
 }
 
 layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
-  it.effect("identity default: empty chain behaves like the pre-middleware loop", () =>
-    Effect.gen(function* () {
-      const agent = Agent.make({ name: "identity-agent" })
-
-      const result = yield* Agent.generate(agent, { prompt: "hello" })
-
-      expect(result.text).toBe("plain output")
-    }).pipe(
-      Effect.provide(
+  ItLayer.make(
+    it,
+    "identity default: empty chain behaves like the pre-middleware loop",
+    () =>
+      [
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("plain output"))),
           unusedExecutor,
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
         ),
-      ),
-    ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "identity-agent" })
+
+          const result = yield* Agent.generate(agent, { prompt: "hello" })
+
+          expect(result.text).toBe("plain output")
+        }),
+      ] as const,
   )
 
-  it.effect("prompt transform: marker reaches the model with the correct turn per turn", () => {
+  ItLayer.make(it, "prompt transform: marker reaches the model with the correct turn per turn", () => {
     const prompts: Array<string> = []
     let calls = 0
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "prompt-agent", toolkit: Toolkit.make(echoTool) })
-
-      yield* Agent.generate(agent, { prompt: "use the echo tool" })
-
-      // Two turns ran: turn 0 (tool-call) and turn 1 (final text).
-      expect(prompts).toHaveLength(2)
-      expect(prompts[0]).toContain("scan turn:0")
-      expect(prompts[1]).toContain("scan turn:1")
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer((options) => {
-            calls += 1
-            prompts.push(JSON.stringify(options.prompt.content))
-            return calls === 1
-              ? Stream.make(toolCallPart("tool-call-1", "echo", { text: "from model" }))
-              : Stream.make(textDelta("done"))
-          }),
-          echoExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([appendMarker("scan")]),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          calls += 1
+          prompts.push(Json.stringify(options.prompt.content))
+          return calls === 1
+            ? Stream.make(toolCallPart("tool-call-1", "echo", { text: "from model" }))
+            : Stream.make(textDelta("done"))
+        }),
+        echoExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([appendMarker("scan")]),
       ),
-    )
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "prompt-agent", toolkit: Toolkit.make(echoTool) })
+
+        yield* Agent.generate(agent, { prompt: "use the echo tool" })
+
+        // Two turns ran: turn 0 (tool-call) and turn 1 (final text).
+        expect(prompts).toHaveLength(2)
+        expect(prompts[0]).toContain("scan turn:0")
+        expect(prompts[1]).toContain("scan turn:1")
+      }),
+    ] as const
   })
 
-  it.effect("part transform: uppercasing deltas flows to Completed.text and ModelPart events", () =>
-    Effect.gen(function* () {
-      const agent = Agent.make({ name: "uppercase-agent" })
-
-      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
-
-      const completed = events.at(-1)
-      expect(completed?._tag === "Completed" && completed.text).toBe("HELLO WORLD")
-      const modelPart = events.find((event) => event._tag === "ModelPart")
-      expect(modelPart?._tag === "ModelPart" && modelPart.part.type === "text-delta" && modelPart.part.delta).toBe(
-        "HELLO WORLD",
-      )
-    }).pipe(
-      Effect.provide(
+  ItLayer.make(
+    it,
+    "part transform: uppercasing deltas flows to Completed.text and ModelPart events",
+    () =>
+      [
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("hello world"))),
           unusedExecutor,
           Approvals.autoApprove,
           ModelMiddleware.layer([uppercaseDeltas]),
         ),
-      ),
-    ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "uppercase-agent" })
+
+          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
+
+          const completed = events.at(-1)
+          expect(completed?._tag === "Completed" && completed.text).toBe("HELLO WORLD")
+          const modelPart = events.find((event) => event._tag === "ModelPart")
+          expect(modelPart?._tag === "ModelPart" && modelPart.part.type === "text-delta" && modelPart.part.delta).toBe(
+            "HELLO WORLD",
+          )
+        }),
+      ] as const,
   )
 
-  it.effect("part drop: dropped text-deltas yield empty text and no delta events", () =>
-    Effect.gen(function* () {
-      const agent = Agent.make({ name: "drop-agent" })
-
-      const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
-
-      const completed = events.at(-1)
-      expect(completed?._tag === "Completed" && completed.text).toBe("")
-      const hasDelta = events.some((event) => event._tag === "ModelPart" && event.part.type === "text-delta")
-      expect(hasDelta).toBe(false)
-    }).pipe(
-      Effect.provide(
+  ItLayer.make(
+    it,
+    "part drop: dropped text-deltas yield empty text and no delta events",
+    () =>
+      [
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("hidden"))),
           unusedExecutor,
           Approvals.autoApprove,
           ModelMiddleware.layer([dropDeltas]),
         ),
-      ),
-    ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "drop-agent" })
+
+          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
+
+          const completed = events.at(-1)
+          expect(completed?._tag === "Completed" && completed.text).toBe("")
+          const hasDelta = events.some((event) => event._tag === "ModelPart" && event.part.type === "text-delta")
+          expect(hasDelta).toBe(false)
+        }),
+      ] as const,
   )
 
-  it.effect("ordering: two prompt middlewares apply in array order", () => {
+  ItLayer.make(it, "ordering: two prompt middlewares apply in array order", () => {
     let seen = ""
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "ordering-agent" })
-
-      yield* Agent.generate(agent, { prompt: "hello" })
-
-      const aIndex = seen.indexOf("first")
-      const bIndex = seen.indexOf("second")
-      expect(aIndex).toBeGreaterThanOrEqual(0)
-      expect(bIndex).toBeGreaterThan(aIndex)
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer((options) => {
-            seen = JSON.stringify(options.prompt.content)
-            return Stream.make(textDelta("ok"))
-          }),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([appendMarker("first"), appendMarker("second")]),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          seen = Json.stringify(options.prompt.content)
+          return Stream.make(textDelta("ok"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([appendMarker("first"), appendMarker("second")]),
       ),
-    )
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "ordering-agent" })
+
+        yield* Agent.generate(agent, { prompt: "hello" })
+
+        const aIndex = seen.indexOf("first")
+        const bIndex = seen.indexOf("second")
+        expect(aIndex).toBeGreaterThanOrEqual(0)
+        expect(bIndex).toBeGreaterThan(aIndex)
+      }),
+    ] as const
   })
 
-  it.effect("tool-call drop guard: dropping a tool-call part fails the run", () =>
-    Effect.gen(function* () {
-      const agent = Agent.make({ name: "guard-agent", toolkit: Toolkit.make(echoTool) })
-
-      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" })))
-
-      expect(failure._tag).toBe("@batonfx/core/MiddlewareViolation")
-      if (failure._tag === "@batonfx/core/MiddlewareViolation") {
-        expect(failure.turn).toBe(0)
-        expect(failure.detail).toContain("tool-call")
-      }
-    }).pipe(
-      Effect.provide(
+  ItLayer.make(
+    it,
+    "tool-call drop guard: dropping a tool-call part fails the run",
+    () =>
+      [
         Layer.mergeAll(
           modelLayer(() => Stream.make(toolCallPart("tool-call-guard", "echo", { text: "hi" }))),
           unusedExecutor,
           Approvals.autoApprove,
           ModelMiddleware.layer([dropToolCalls]),
         ),
-      ),
-    ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "guard-agent", toolkit: Toolkit.make(echoTool) })
+
+          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" })))
+
+          expect(failure._tag).toBe("@batonfx/core/MiddlewareViolation")
+          if (failure._tag === "@batonfx/core/MiddlewareViolation") {
+            expect(failure.turn).toBe(0)
+            expect(failure.detail).toContain("tool-call")
+          }
+        }),
+      ] as const,
   )
 
-  it.effect("middleware failure: transformPrompt failure fails the run before the model is called", () => {
+  ItLayer.make(it, "middleware failure: transformPrompt failure fails the run before the model is called", () => {
     let modelCalled = false
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "failing-agent" })
-
-      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "hello" })))
-
-      expect(modelCalled).toBe(false)
-      expect(failure._tag).toBe("@batonfx/core/AgentError")
-      expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe("prompt middleware boom")
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          modelLayer(() => {
-            modelCalled = true
-            return Stream.make(textDelta("should not run"))
-          }),
-          unusedExecutor,
-          Approvals.autoApprove,
-          ModelMiddleware.layer([failingPrompt]),
-        ),
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalled = true
+          return Stream.make(textDelta("should not run"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([failingPrompt]),
       ),
-    )
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "failing-agent" })
+
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "hello" })))
+
+        expect(modelCalled).toBe(false)
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe("prompt middleware boom")
+      }),
+    ] as const
   })
 })

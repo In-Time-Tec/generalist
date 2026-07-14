@@ -8,7 +8,7 @@ import { ClientFrame, ServerFrame } from "./wire.js"
 import type { ClientFrameType, LooseServerFrameType } from "./wire.js"
 const ClientFrameJson = Schema.fromJsonString(ClientFrame)
 
-const transportError = (message: string): TransportError => new TransportError({ message })
+const transportError = (message: string): TransportError => TransportError.make({ message })
 
 const encodeServerFrame =
   <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
@@ -56,8 +56,10 @@ export const handle = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string
         Effect.andThen(
           registry.attach(sessionId, afterSeq).pipe(
             Stream.runForEach(writeFrame),
-            Effect.catchTag("@batonfx/transport/SubscriberLagged", () => close(4000, "lagged")),
-            Effect.catchTag("@batonfx/transport/SessionError", (error) => close(1011, error.message)),
+            Effect.catchTags({
+              "@batonfx/transport/SubscriberLagged": () => close(4000, "lagged"),
+              "@batonfx/transport/SessionError": (error) => close(1011, error.message),
+            }),
             Effect.catchCause((cause) =>
               Cause.hasInterrupts(cause) ? Effect.interrupt : close(1011, "attachment failed"),
             ),
@@ -83,10 +85,12 @@ export const handle = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string
     const handleText = (text: string) =>
       decodeClientFrame(text).pipe(
         Effect.flatMap(dispatch),
-        Effect.catchTag("@batonfx/transport/TransportError", () => close(1003, "malformed client frame")),
-        Effect.catchTag("@batonfx/transport/SessionBusy", () => close(1011, "session busy")),
-        Effect.catchTag("@batonfx/transport/SessionQueueFull", () => close(1013, "session queue full")),
-        Effect.catchTag("@batonfx/transport/SessionError", (error) => close(1011, error.message)),
+        Effect.catchTags({
+          "@batonfx/transport/TransportError": () => close(1003, "malformed client frame"),
+          "@batonfx/transport/SessionBusy": () => close(1011, "session busy"),
+          "@batonfx/transport/SessionQueueFull": () => close(1013, "session queue full"),
+          "@batonfx/transport/SessionError": (error) => close(1011, error.message),
+        }),
       )
 
     const handleRaw = (data: string | Uint8Array) =>

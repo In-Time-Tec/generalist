@@ -2,7 +2,7 @@ import { Agent, TurnPolicy } from "@batonfx/core"
 import { toolkit } from "./tools"
 
 /** @experimental The deep-research agent: plan briefly, search as needed, then synthesize a cited answer. */
-export const agent = Agent.make({
+export const agent: Agent.Agent<typeof toolkit.tools, false> = Agent.make({
   name: "deep-research-agent",
   instructions: "Plan briefly, call web_search as needed, then synthesize a cited answer with source URLs.",
   toolkit,

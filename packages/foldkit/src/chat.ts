@@ -1,4 +1,5 @@
 import { Cause, Equivalence, Effect, Option, Schema, Stream } from "effect"
+import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 import { define, type Command } from "foldkit/command"
 import { m } from "foldkit/message"
@@ -27,7 +28,7 @@ const ToolEntryFields = {
   outcome: Schema.suspend((): Schema.Schema<ToolOutcome> => ToolOutcome),
   progress: Schema.Array(Schema.String),
 }
-const RunningFields = { turn: Schema.Number }
+const RunningFields = { turn: Schema.Finite }
 const AwaitingApprovalFields = {
   token: Schema.String,
   toolName: Schema.String,
@@ -36,7 +37,7 @@ const AwaitingApprovalFields = {
 const ClickedDenyFields = { reason: Schema.NullOr(Schema.String) }
 const ReceivedAgentFields = { incoming: Incoming }
 const ModelStreaming = Schema.Struct({
-  turn: Schema.Number,
+  turn: Schema.Finite,
   text: Schema.String,
   reasoning: Schema.String,
 })
@@ -107,7 +108,7 @@ export interface Model {
 export const Model: Schema.Schema<Model> = Schema.Struct({
   sessionId: Schema.NullOr(Schema.String),
   connection: ModelConnection,
-  lastSeq: Schema.Number,
+  lastSeq: Schema.Finite,
   run: RunState,
   entries: Schema.Array(ChatEntry),
   streaming: Schema.NullOr(ModelStreaming),
@@ -345,7 +346,7 @@ export const initialModel = (sessionId: string | null = null): Model => ({
 type FailedAgentCommandMessage = typeof FailedAgentCommand.Type
 
 const commandFailed = (error: unknown): FailedAgentCommandMessage =>
-  FailedAgentCommand({ reason: error instanceof SendFailed ? error.reason : String(error) })
+  FailedAgentCommand({ reason: Schema.is(SendFailed)(error) ? error.reason : String(error) })
 
 const catchCommandFailure = <A>(effect: Effect.Effect<A, SendFailed, AgentConnection>) =>
   effect.pipe(Effect.catchCause((cause) => Effect.succeed(commandFailed(Cause.squash(cause)))))
@@ -757,10 +758,10 @@ const isServerFrame = (incoming: Incoming): incoming is Wire.LooseServerFrameTyp
   incoming._tag === "SessionStatus"
 
 /** @experimental */
-export const update = (
-  model: Model,
-  message: Message,
-): readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<OutMessage>] => {
+export const update: {
+  (message: Message): (model: Model) => readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<OutMessage>]
+  (model: Model, message: Message): readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<OutMessage>]
+} = dual(2, (model: Model, message: Message) => {
   switch (message._tag) {
     case "ReceivedAgent":
       if (isServerFrame(message.incoming)) {
@@ -849,12 +850,12 @@ export const update = (
     case "CancelledRun":
       return [model, [], Option.none()]
   }
-}
+})
 
 /** @experimental */
 export const subscriptions = make<Model, Message, AgentConnection>()((entry) => ({
   agentFrames: entry(
-    { sessionId: Schema.NullOr(Schema.String), afterSeq: Schema.Number },
+    { sessionId: Schema.NullOr(Schema.String), afterSeq: Schema.Finite },
     {
       modelToDependencies: (model) => ({ sessionId: model.sessionId, afterSeq: model.lastSeq }),
       keepAliveEquivalence: Equivalence.make((left, right) => left.sessionId === right.sessionId),
