@@ -1,9 +1,10 @@
-import { Effect, HashMap, Layer, Ref } from "effect"
+import { Context, Effect, HashMap, Layer, Ref, Scope, Semaphore } from "effect"
 import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
 
 /** @experimental */
 export interface SummarizeOptions {
+  /** @deprecated Provide `SummaryModel` through Effect composition instead. */
   readonly model: Layer.Layer<LanguageModel.LanguageModel>
   readonly prompt?: string
 }
@@ -13,6 +14,26 @@ export interface Options {
   readonly maxMessages?: number
   readonly summarize?: SummarizeOptions
 }
+
+/** @experimental */
+export interface ComposedOptions {
+  readonly maxMessages?: number
+  readonly summarize: {
+    readonly model?: never
+    readonly prompt?: string
+  }
+}
+
+/** @experimental */
+export class SummaryModel extends Context.Service<SummaryModel, LanguageModel.Service>()(
+  "@batonfx/memory/working-memory/SummaryModel",
+) {}
+
+/** @experimental */
+export const summaryModelLayer: Layer.Layer<SummaryModel, never, LanguageModel.LanguageModel> = Layer.effect(
+  SummaryModel,
+  LanguageModel.LanguageModel,
+)
 
 type StoredRole = "user" | "assistant"
 
@@ -109,27 +130,37 @@ const renderSummaryPrompt = (
   ].join("\n\n")
 
 const summarizeOverflow = (
-  options: SummarizeOptions,
+  model: LanguageModel.Service,
+  prompt: string | undefined,
   summary: string | undefined,
   overflow: ReadonlyArray<StoredItem>,
 ): Effect.Effect<string | undefined, Memory.MemoryError> =>
-  Effect.scoped(
-    Layer.build(options.model).pipe(
-      Effect.flatMap((context) =>
-        Effect.gen(function* () {
-          const model = yield* LanguageModel.LanguageModel
-          const response = yield* model.generateText({
-            prompt: renderSummaryPrompt(options.prompt ?? defaultSummaryPrompt, summary, overflow),
-            toolkit: Toolkit.empty,
-            toolChoice: "none",
-          })
-          const text = response.text.trim()
-          return text.length === 0 ? summary : text
-        }).pipe(Effect.provide(context)),
-      ),
+  model
+    .generateText({
+      prompt: renderSummaryPrompt(prompt ?? defaultSummaryPrompt, summary, overflow),
+      toolkit: Toolkit.empty,
+      toolChoice: "none",
+    })
+    .pipe(
+      Effect.map((response) => {
+        const text = response.text.trim()
+        return text.length === 0 ? summary : text
+      }),
       Effect.mapError(memoryError),
-    ),
-  )
+    )
+
+const resolveSummaryModel = (
+  options: Options | ComposedOptions,
+): Effect.Effect<LanguageModel.Service | void, never, SummaryModel | Scope.Scope> =>
+  options.summarize === undefined
+    ? Effect.void
+    : "model" in options.summarize
+      ? Layer.build(options.summarize.model).pipe(
+          Effect.map((context) => Context.get(context, LanguageModel.LanguageModel)),
+        )
+      : SummaryModel
+
+type WithoutSummaryOptions = Options & { readonly summarize?: undefined }
 
 const recallItems = (state: KeyState): ReadonlyArray<Memory.Item> => [
   ...(state.summary === undefined
@@ -144,20 +175,34 @@ const recallItems = (state: KeyState): ReadonlyArray<Memory.Item> => [
 ]
 
 /** @experimental */
-export const make = (options: Options = {}): Effect.Effect<Memory.Interface> =>
-  Ref.make(HashMap.empty<string, KeyState>()).pipe(
-    Effect.map((states): Memory.Interface => {
-      const maxMessages = Math.max(0, Math.floor(options.maxMessages ?? 20))
-      return {
-        recall: (input) =>
-          Ref.get(states).pipe(
-            Effect.map((current) => HashMap.get(current, keyId(input.key))),
-            Effect.map((state) => (state._tag === "Some" ? recallItems(state.value) : [])),
-          ),
-        remember: (input) => {
-          const incoming = normalize(input.transcript)
-          if (incoming.length === 0) return Effect.void
-          return Effect.gen(function* () {
+export function make(options: ComposedOptions): Effect.Effect<Memory.Interface, never, SummaryModel>
+/** @experimental */
+export function make(options?: WithoutSummaryOptions): Effect.Effect<Memory.Interface>
+/** @experimental */
+export function make(options: Options): Effect.Effect<Memory.Interface, never, Scope.Scope>
+/** @experimental */
+export function make(
+  options: Options | ComposedOptions,
+): Effect.Effect<Memory.Interface, never, SummaryModel | Scope.Scope>
+export function make(
+  options: Options | ComposedOptions = {},
+): Effect.Effect<Memory.Interface, never, SummaryModel | Scope.Scope> {
+  return Effect.gen(function* () {
+    const summaryModel = yield* resolveSummaryModel(options)
+    const states = yield* Ref.make(HashMap.empty<string, KeyState>())
+    const semaphore = yield* Semaphore.make(1)
+    const maxMessages = Math.max(0, Math.floor(options.maxMessages ?? 20))
+    return {
+      recall: (input) =>
+        Ref.get(states).pipe(
+          Effect.map((current) => HashMap.get(current, keyId(input.key))),
+          Effect.map((state) => (state._tag === "Some" ? recallItems(state.value) : [])),
+        ),
+      remember: (input) => {
+        const incoming = normalize(input.transcript)
+        if (incoming.length === 0) return Effect.void
+        return semaphore.withPermits(1)(
+          Effect.gen(function* () {
             const current = yield* Ref.get(states)
             const id = keyId(input.key)
             const existing = HashMap.get(current, id).pipe((option) =>
@@ -176,40 +221,50 @@ export const make = (options: Options = {}): Effect.Effect<Memory.Interface> =>
             const summary =
               trimmed.overflow.length === 0
                 ? existing.summary
-                : options.summarize === undefined
+                : summaryModel === undefined
                   ? existing.summary
-                  : yield* summarizeOverflow(options.summarize, existing.summary, trimmed.overflow)
+                  : yield* summarizeOverflow(
+                      summaryModel,
+                      options.summarize?.prompt,
+                      existing.summary,
+                      trimmed.overflow,
+                    )
             const nextState: KeyState = {
               recent: trimmed.recent,
               counter,
               ...(summary === undefined ? {} : { summary }),
             }
             yield* Ref.update(states, HashMap.set(id, nextState))
-          })
-        },
-        forget: (input) =>
-          Ref.update(states, (current) => {
-            const id = keyId(input.key)
-            if (input.id === undefined) return HashMap.remove(current, id)
-            const existing = HashMap.get(current, id)
-            if (existing._tag === "None") return current
-            const summary = input.id === "working-summary" ? undefined : existing.value.summary
-            const recent = existing.value.recent.filter((item) => item.id !== input.id)
-            if (summary === undefined && recent.length === 0) return HashMap.remove(current, id)
-            const nextState: KeyState = {
-              recent,
-              counter: existing.value.counter,
-              ...(summary === undefined ? {} : { summary }),
-            }
-            return HashMap.set(current, id, nextState)
           }),
-      }
-    }),
-  )
+        )
+      },
+      forget: (input) =>
+        Ref.update(states, (current) => {
+          const id = keyId(input.key)
+          if (input.id === undefined) return HashMap.remove(current, id)
+          const existing = HashMap.get(current, id)
+          if (existing._tag === "None") return current
+          const summary = input.id === "working-summary" ? undefined : existing.value.summary
+          const recent = existing.value.recent.filter((item) => item.id !== input.id)
+          if (summary === undefined && recent.length === 0) return HashMap.remove(current, id)
+          const nextState: KeyState = {
+            recent,
+            counter: existing.value.counter,
+            ...(summary === undefined ? {} : { summary }),
+          }
+          return HashMap.set(current, id, nextState)
+        }),
+    }
+  })
+}
 
 /** @experimental */
 export const makeWorkingMemory = make
 
 /** @experimental */
-export const layer = (options: Options = {}): Layer.Layer<Memory.Memory> =>
-  Layer.effect(Memory.Memory, make(options).pipe(Effect.map(Memory.Memory.of)))
+export function layer(options: ComposedOptions): Layer.Layer<Memory.Memory, never, SummaryModel>
+/** @experimental */
+export function layer(options?: Options): Layer.Layer<Memory.Memory>
+export function layer(options: Options | ComposedOptions = {}): Layer.Layer<Memory.Memory, never, SummaryModel> {
+  return Layer.effect(Memory.Memory, make(options).pipe(Effect.map(Memory.Memory.of)))
+}

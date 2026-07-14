@@ -2,6 +2,22 @@
 
 Non-durable memory implementations for Baton agents.
 
+## Working-memory summaries
+
+Provide a dedicated summary model through Effect layer composition:
+
+```ts
+import { Layer } from "effect"
+import { WorkingMemory } from "@batonfx/memory"
+
+const memoryLayer = WorkingMemory.layer({
+  maxMessages: 20,
+  summarize: {},
+}).pipe(Layer.provide(WorkingMemory.summaryModelLayer.pipe(Layer.provide(modelLayer))))
+```
+
+The summary model is acquired once in `memoryLayer`'s owning scope and reused across overflows. The former `summarize: { model: modelLayer }` option remains supported but is deprecated; migrate by composing the model through `summaryModelLayer` as shown above.
+
 See the [Baton documentation](https://github.com/In-Time-Tec/batonfx#readme) for installation, examples, and API guidance.
 
 ## Imports and migration
