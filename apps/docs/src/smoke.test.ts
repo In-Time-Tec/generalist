@@ -6,6 +6,7 @@ import { ChangedUrl, ClickedLink } from "./app/message"
 import { allPages, legacyRedirects, pageByPath, searchDocs } from "./content/registry"
 import { readSidebarGroups, writeSidebarGroups } from "./layout/sidebarStorage"
 import { Model, init, subscriptions, update, view } from "./main"
+import { multiAgent } from "./pages/guides/multi-agent"
 
 const makeStorage = (): Storage => {
   const entries = new Map<string, string>()
@@ -215,6 +216,30 @@ test("search finds pages by body text with title matches first", () => {
 
   const bodyResults = searchDocs("TurnPolicy")
   expect(bodyResults.length).toBeGreaterThan(0)
+})
+
+test("multi-agent guide preserves the two-channel child-run contract", () => {
+  for (const marker of [
+    "Channel 1: Effect Context",
+    "Channel 2: run options / orchestration",
+    "LanguageModel.LanguageModel",
+    "ToolExecutor",
+    "Approvals",
+    "ModelMiddleware",
+    "sessionId",
+    "persistence.chatId",
+    "runId",
+    "Queue position",
+    "Scheduling and run permits",
+    '"local"',
+    "fresh chat",
+    "Effect.provide",
+    "ToolExecutor.fromToolkit",
+    "Approvals.autoApprove",
+    "ModelMiddleware.identityLayer",
+  ]) {
+    expect(multiAgent.markdown, marker).toContain(marker)
+  }
 })
 
 test("command palette opens from shortcut and shows grouped results", async () => {
