@@ -285,9 +285,6 @@ const withSystem = (instructions: string, prompt: Prompt.Prompt): Prompt.Prompt 
 const skillListingsInstructions = (listings: string): string =>
   `Available skills:\n${listings}\n\nCall ${activateSkillToolName} with a listed skill name to load its full body before using it.`
 
-const isUserMessagePart = (part: Prompt.Part): part is Prompt.UserMessagePart =>
-  part.type === "text" || part.type === "file"
-
 const approvalRequired = (
   tool: Tool.Any | undefined,
   call: AnyToolCall,
@@ -550,37 +547,22 @@ const streamInternal = <
       const isSkillActivationCall = (call: AnyToolCall): boolean =>
         call.name === activateSkillToolName && skillRuntime !== undefined && hasActivatableSkills
 
-      const insertRecalledItems = (
-        turn: number,
-        prompt: Prompt.Prompt,
-        items: ReadonlyArray<Item>,
-      ): Effect.Effect<Prompt.Prompt, AgentError> =>
-        Effect.gen(function* () {
-          const parts = items.flatMap((item) => item.parts)
-          if (parts.length === 0) return prompt
-          const userParts: Array<Prompt.UserMessagePart> = []
-          for (const part of parts) {
-            if (!isUserMessagePart(part)) {
-              return yield* AgentError.make({
-                message: `Memory recalled unsupported prompt part type: ${part.type}`,
-                turn,
-              })
-            }
-            userParts.push(part)
-          }
-          const memoryMessage = Prompt.makeMessage("user", { content: userParts })
-          const [first, ...rest] = prompt.content
-          return first?.role === "system"
-            ? Prompt.fromMessages([first, memoryMessage, ...rest])
-            : Prompt.fromMessages([memoryMessage, ...prompt.content])
-        })
+      const insertRecalledItems = (prompt: Prompt.Prompt, items: ReadonlyArray<Item>): Prompt.Prompt => {
+        const content = items.flatMap((item) => item.content)
+        if (content.length === 0) return prompt
+        const memoryMessage = Prompt.makeMessage("user", { content })
+        const [first, ...rest] = prompt.content
+        return first?.role === "system"
+          ? Prompt.fromMessages([first, memoryMessage, ...rest])
+          : Prompt.fromMessages([memoryMessage, ...prompt.content])
+      }
 
       const recallInitialPrompt = (prompt: Prompt.Prompt): Effect.Effect<Prompt.Prompt, AgentError> =>
         memoryRuntime === undefined
           ? Effect.succeed(prompt)
           : memoryRuntime.service.recall({ key: memoryRuntime.key, turn: 0, prompt }).pipe(
               Effect.mapError((error) => memoryError(0, error)),
-              Effect.flatMap((items) => insertRecalledItems(0, prompt, items)),
+              Effect.map((items) => insertRecalledItems(prompt, items)),
             )
 
       const rememberTurn = (

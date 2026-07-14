@@ -346,7 +346,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           recall: (input) =>
             Effect.sync(() => {
               recalled = input.key.agent === key.agent && input.key.subject === key.subject
-              return [{ id: "memory-default-item", parts: [Prompt.makePart("text", { text: "stored fact" })] }]
+              return [{ id: "memory-default-item", content: [Prompt.makePart("text", { text: "stored fact" })] }]
             }),
           remember: (input) =>
             Effect.sync(() => {
