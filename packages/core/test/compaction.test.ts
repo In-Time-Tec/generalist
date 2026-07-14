@@ -20,6 +20,19 @@ const toolResult = (id: string, result: unknown): Prompt.Message =>
     content: [Prompt.makePart("tool-result", { id, name: "echo", isFailure: false, result })],
   })
 
+const successfulToolResultValue = (prompt: Prompt.Prompt): unknown => {
+  for (const message of prompt.content) {
+    if (typeof message.content === "string") continue
+    for (const part of message.content) {
+      if (part.type === "tool-result" && !part.isFailure) return part.result
+    }
+  }
+  return undefined
+}
+
+const outputPaths = (value: unknown): unknown =>
+  typeof value === "object" && value !== null && "outputPaths" in value ? value.outputPaths : undefined
+
 const entry = (id: string, message: Prompt.Message): Session.MessageEntry => ({
   _tag: "Message",
   id,
@@ -397,7 +410,12 @@ describe("Compaction", () => {
   })
 
   ItLayer.make(it, "keeps retained tool results bounded after semantic summarization", () => {
-    const large = "retained-tool-output".repeat(50)
+    let stores = 0
+    const paths = ["mem:retained-tool", "s3:retained-tool"]
+    const envelope: ToolOutput.ToolOutput = {
+      inline: { truncated: true, bytes: 1_000, maxBytes: 12, preview: '"retained-t' },
+      outputPaths: paths,
+    }
     const composed = Compaction.strategy([
       Compaction.toolOutputBound({ maxBytes: 12 }),
       Compaction.keepRecent({ tokens: 1 }),
@@ -405,11 +423,16 @@ describe("Compaction", () => {
     const service = Compaction.make(composed, { contextWindow: 1, reserveTokens: 0 })
     return [
       Layer.mergeAll(
-        ToolOutput.testLayer({ put: () => Effect.succeed(Option.some("mem:retained-tool")) }),
+        ToolOutput.testLayer({
+          put: () => {
+            stores += 1
+            return Effect.succeed(Option.some("mem:retained-tool"))
+          },
+        }),
         modelLayer(() => Effect.succeed([{ type: "text", text: "checkpoint summary" }])),
       ),
       Effect.gen(function* () {
-        const compacted = yield* service.maybeCompact({
+        const request: Compaction.Request = {
           agentName: "retained-tool-bound-agent",
           sessionId: "session",
           turn: 2,
@@ -418,17 +441,37 @@ describe("Compaction", () => {
           path: [
             entry("0", user("old goal")),
             entry("1", assistantToolCall("call-retained")),
-            entry("2", toolResult("call-retained", large)),
+            entry("2", toolResult("call-retained", envelope)),
           ],
           usage: { contextTokens: 100, contextWindow: 1, reserveTokens: 0 },
           overflow: false,
-        })
+        }
+        const compacted = yield* service.maybeCompact(request)
 
         expect(Option.isSome(compacted)).toBe(true)
-        if (Option.isSome(compacted) && compacted.value._tag === "Summarize") {
-          const history = Json.stringify(compacted.value.history.content)
-          expect(history).toContain("mem:retained-tool")
-          expect(history).not.toContain(large)
+        expect(stores).toBe(0)
+        if (Option.isNone(compacted)) return
+        expect(compacted.value._tag).toBe("Summarize")
+        if (compacted.value._tag !== "Summarize") return
+
+        const retained = successfulToolResultValue(compacted.value.history)
+        expect(outputPaths(retained)).toEqual(paths)
+
+        const compactedAgain = yield* service.maybeCompact({
+          ...request,
+          history: compacted.value.history,
+          path: [
+            entry("0", user("checkpointed goal")),
+            entry("1", assistantToolCall("call-retained")),
+            entry("2", toolResult("call-retained", retained)),
+          ],
+        })
+
+        expect(Option.isSome(compactedAgain)).toBe(true)
+        expect(stores).toBe(0)
+        if (Option.isSome(compactedAgain)) {
+          expect(compactedAgain.value._tag).toBe("Summarize")
+          expect(outputPaths(successfulToolResultValue(compactedAgain.value.history))).toEqual(paths)
         }
       }),
     ] as const
