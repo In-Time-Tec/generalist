@@ -19,7 +19,7 @@
     "test": "bun turbo test",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "typecheck": "effect-tsgo diagnostics --project ./tsconfig.json --format pretty --strict && bun turbo typecheck",
+    "typecheck": "bun turbo typecheck && effect-tsgo diagnostics --project ./tsconfig.json --format pretty --strict",
     "typecheck:examples": "bun run check:examples && bash -lc 'set -euo pipefail; for dir in examples/*; do (cd \"$dir\" && bun run typecheck); done'",
     "vendor:check": "./scripts/vendor-check.sh",
     "vendor:setup": "git config core.hooksPath .githooks && git config submodule.recurse true && bun run vendor:update",
