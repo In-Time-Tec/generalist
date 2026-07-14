@@ -2,7 +2,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Deferred, type Duration, Effect, type Scope, Schema } from "effect"
-import { McpToolSource } from "../src/index"
+import { McpToolSource, OAuth } from "../src/index"
 
 export const addInputSchema = {
   type: "object" as const,
@@ -28,7 +28,7 @@ export interface Fixture {
 
 export const makeFixtureWith = (options?: {
   readonly callTimeout?: Duration.Input
-}): Effect.Effect<Fixture, McpToolSource.McpConnectionError, Scope.Scope> =>
+}): Effect.Effect<Fixture, McpToolSource.McpConnectionError | OAuth.OAuthProviderError, Scope.Scope> =>
   Effect.gen(function* () {
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
 
@@ -89,4 +89,8 @@ export const makeFixtureWith = (options?: {
     return { source, closes, hang: { started: hangStarted, aborted: hangAborted } }
   })
 
-export const makeFixture: Effect.Effect<Fixture, McpToolSource.McpConnectionError, Scope.Scope> = makeFixtureWith()
+export const makeFixture: Effect.Effect<
+  Fixture,
+  McpToolSource.McpConnectionError | OAuth.OAuthProviderError,
+  Scope.Scope
+> = makeFixtureWith()

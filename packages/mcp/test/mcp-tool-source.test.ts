@@ -1,10 +1,25 @@
 import { describe, expect, it } from "@effect/vitest"
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { Deferred, Effect, Fiber, Option } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { McpToolSource } from "../src/index"
 import { addInputSchema, makeFixture, makeFixtureWith, statsOutputSchema } from "./fixture"
 
 describe("McpToolSource", () => {
+  it.effect("preserves connection details for non-OAuth transports", () =>
+    Effect.gen(function* () {
+      const transport: Transport = {
+        start: () => Promise.reject(new Error("custom transport unavailable")),
+        send: () => Promise.resolve(),
+        close: () => Promise.resolve(),
+      }
+      const error = yield* McpToolSource.fromTransport("custom", transport).pipe(Effect.flip, Effect.scoped)
+
+      expect(error).toBeInstanceOf(McpToolSource.McpConnectionError)
+      expect(error.message).toContain("custom transport unavailable")
+    }),
+  )
+
   it.effect("discovers namespaced tools with schema passthrough", () =>
     Effect.scoped(
       Effect.gen(function* () {
