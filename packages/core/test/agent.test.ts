@@ -3361,6 +3361,63 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "preserves a model stream defect after emitted events", () => {
+    const cause = Cause.die(new Error("model defect"))
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(cause)))),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const events: Array<AgentEvent.Event> = []
+        const agent = Agent.make({ name: "defective-model-agent" })
+
+        const exit = yield* Agent.stream(agent, { prompt: "relay input" }).pipe(
+          Stream.runForEach((event) => Effect.sync(() => events.push(event))),
+          Effect.exit,
+        )
+
+        expect(events.some((event) => event._tag === "ModelPart")).toBe(true)
+        expect(exit).toEqual(Exit.failCause(cause))
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "preserves a compound stream Cause after emitted events", () => {
+    const failure = AgentEvent.AgentError.make({ message: "model stream failure", turn: 0 })
+    const cause = Cause.combine(Cause.fail(failure), Cause.die(new Error("model defect")))
+    let parts = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.fromIterable([textDelta("partial"), textDelta("terminal")])),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([
+          {
+            transformPart: (part) => {
+              parts += 1
+              return parts === 1 ? Effect.succeed(Option.some(part)) : Effect.failCause(cause)
+            },
+          },
+        ]),
+      ),
+      Effect.gen(function* () {
+        const events: Array<AgentEvent.Event> = []
+        const agent = Agent.make({ name: "compound-model-agent" })
+
+        const exit = yield* Agent.stream(agent, { prompt: "relay input" }).pipe(
+          Stream.runForEach((event) => Effect.sync(() => events.push(event))),
+          Effect.exit,
+        )
+
+        expect(events.some((event) => event._tag === "ModelPart")).toBe(true)
+        expect(exit).toEqual(Exit.failCause(cause))
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "does not retry model failures when ModelResilience is absent", () => {
     let calls = 0
     return [

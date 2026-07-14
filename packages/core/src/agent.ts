@@ -342,6 +342,8 @@ export type RunError =
   | MiddlewareViolation
   | ProgressOverflowError
   | ToolNameCollision
+  | AiError.AiError
+  | LanguageModelNotRegistered
 
 type ModelRunServices<HasModel extends boolean> = [HasModel] extends [true] ? Service : LanguageModel.LanguageModel
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
@@ -1482,9 +1484,12 @@ const streamInternal = <
               }
               return Stream.failCause(cause)
             }),
-            Stream.mapError((error) =>
-              AiError.isAiError(error) ? AgentError.make({ message: errorMessage(error), turn, cause: error }) : error,
-            ),
+            Stream.catchCause((cause) => {
+              const failure = singleFailure(cause)
+              return Option.isSome(failure) && AiError.isAiError(failure.value)
+                ? Stream.fail(AgentError.make({ message: errorMessage(failure.value), turn, cause: failure.value }))
+                : Stream.failCause(cause)
+            }),
           )
         }
         const parts = Stream.unwrap(
@@ -1548,8 +1553,19 @@ const streamInternal = <
               .pipe(
                 withModelResilience,
                 withAgentModel,
-                Effect.mapError((error) =>
-                  AgentError.make({ message: errorMessage(error), turn: structuredTurn, cause: error }),
+                Effect.catchCause(
+                  (cause): Effect.Effect<never, AgentError | AiError.AiError | LanguageModelNotRegistered> => {
+                    const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+                    return reason !== undefined && Cause.isFailReason(reason)
+                      ? Effect.fail(
+                          AgentError.make({
+                            message: errorMessage(reason.error),
+                            turn: structuredTurn,
+                            cause: reason.error,
+                          }),
+                        )
+                      : Effect.failCause(cause)
+                  },
                 ),
               )
             yield* captureStructuredUsage(response.content)
@@ -1776,9 +1792,8 @@ const streamInternal = <
       const runStream = options.resume === undefined ? runTurn(0, initialPrompt) : resumeStream(options.resume)
       return runStream.pipe(
         Stream.catchCause((cause) => {
-          if (Cause.hasInterrupts(cause)) return Stream.failCause(cause)
-          const error = Cause.squash(cause)
-          if (Schema.is(AgentSuspended)(error)) {
+          const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+          if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(AgentSuspended)(reason.error)) {
             return Stream.unwrap(
               Effect.gen(function* () {
                 const transcript = yield* Ref.get(chat.history)
