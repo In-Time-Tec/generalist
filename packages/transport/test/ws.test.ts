@@ -26,7 +26,13 @@ interface FakeSocket {
   readonly outbound: Queue.Queue<string | Uint8Array | Socket.CloseEvent>
 }
 
-const makeFakeSocket = (): Effect.Effect<FakeSocket> =>
+interface FakeSocketOptions {
+  readonly concurrentHandlers?: boolean
+  readonly beforeHandle?: (message: string | Uint8Array) => Effect.Effect<void>
+  readonly afterHandle?: (message: string | Uint8Array) => Effect.Effect<void>
+}
+
+const makeFakeSocket = (fakeOptions: FakeSocketOptions = {}): Effect.Effect<FakeSocket> =>
   Effect.gen(function* () {
     const inbound = yield* Queue.unbounded<string | Uint8Array | Socket.CloseEvent>()
     const outbound = yield* Queue.unbounded<string | Uint8Array | Socket.CloseEvent>()
@@ -40,8 +46,18 @@ const makeFakeSocket = (): Effect.Effect<FakeSocket> =>
             if (Socket.isCloseEvent(message)) {
               open = false
             } else {
-              const result = handler(message)
-              if (Effect.isEffect(result)) yield* result
+              const before = fakeOptions.beforeHandle === undefined ? Effect.void : fakeOptions.beforeHandle(message)
+              const handleEffect = Effect.suspend(() => {
+                const result = handler(message)
+                return Effect.isEffect(result) ? result : Effect.void
+              })
+              const afterHandle = fakeOptions.afterHandle
+              const handle = before.pipe(
+                Effect.andThen(handleEffect),
+                afterHandle === undefined ? (effect) => effect : Effect.tap(() => afterHandle(message)),
+              )
+              if (fakeOptions.concurrentHandlers === true) yield* handle.pipe(Effect.forkChild)
+              else yield* handle
             }
           }
         }),
@@ -61,8 +77,19 @@ const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest =>
 const clientFrameText = (frame: Wire.ClientFrameType): string =>
   Schema.encodeUnknownSync(Schema.fromJsonString(Wire.ClientFrame))(frame)
 
+const decodeClientFrameText = (text: string): Wire.ClientFrameType =>
+  Schema.decodeUnknownSync(Schema.fromJsonString(Wire.ClientFrame))(text)
+
 const decodeServerFrame = (text: string): Wire.LooseServerFrameType =>
   Schema.decodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(text)
+
+const commandFrames = (
+  sessionId: string,
+): ReadonlyArray<Exclude<Wire.ClientFrameType, { readonly _tag: "Attach" }>> => [
+  { _tag: "SendMessage", sessionId, prompt: "hello" },
+  { _tag: "ResolveApproval", sessionId, token: "t", decision: { _tag: "Approved" } },
+  { _tag: "Cancel", sessionId },
+]
 
 const registryLayer = (
   implementation: Partial<SessionRegistry.Interface>,
@@ -109,7 +136,7 @@ describe("Ws", () => {
     }),
   )
 
-  it.effect("dispatches client command frames to SessionRegistry", () =>
+  it.effect("dispatches every command only after attaching to the same session", () =>
     Effect.gen(function* () {
       const fake = yield* makeFakeSocket()
       const calls = yield* Ref.make<Array<string>>([])
@@ -123,6 +150,7 @@ describe("Ws", () => {
         }),
       )
 
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "s" }))
       yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "SendMessage", sessionId: "s", prompt: "hello" }))
       yield* Queue.offer(
         fake.inbound,
@@ -137,29 +165,224 @@ describe("Ws", () => {
     }),
   )
 
-  it.effect("new Attach interrupts and replaces the previous attachment", () =>
+  it.effect("rejects every command before attach without dispatching", () =>
+    Effect.gen(function* () {
+      for (const frame of commandFrames("s")) {
+        const fake = yield* makeFakeSocket()
+        const calls = yield* Ref.make<Array<string>>([])
+        const fiber = yield* runHandler(
+          fake,
+          registryLayer({
+            send: (sessionId) => Ref.update(calls, (items) => [...items, `send:${sessionId}`]),
+            resolveApproval: (sessionId) => Ref.update(calls, (items) => [...items, `approval:${sessionId}`]),
+            interrupt: (sessionId) => Ref.update(calls, (items) => [...items, `cancel:${sessionId}`]),
+          }),
+        )
+
+        yield* Queue.offer(fake.inbound, clientFrameText(frame))
+        const output = yield* Queue.take(fake.outbound)
+        yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+        yield* Fiber.join(fiber)
+
+        expect(Socket.isCloseEvent(output)).toBe(true)
+        expect(Socket.isCloseEvent(output) && output.code).toBe(1008)
+        expect(Socket.isCloseEvent(output) && output.reason).toBe("not attached")
+        expect(yield* Ref.get(calls)).toEqual([])
+      }
+    }),
+  )
+
+  it.effect("rejects every cross-session command without dispatching", () =>
+    Effect.gen(function* () {
+      for (const frame of commandFrames("other")) {
+        const fake = yield* makeFakeSocket()
+        const calls = yield* Ref.make<Array<string>>([])
+        const fiber = yield* runHandler(
+          fake,
+          registryLayer({
+            send: (sessionId) => Ref.update(calls, (items) => [...items, `send:${sessionId}`]),
+            resolveApproval: (sessionId) => Ref.update(calls, (items) => [...items, `approval:${sessionId}`]),
+            interrupt: (sessionId) => Ref.update(calls, (items) => [...items, `cancel:${sessionId}`]),
+          }),
+        )
+
+        yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "attached" }))
+        yield* Queue.offer(fake.inbound, clientFrameText(frame))
+        const output = yield* Queue.take(fake.outbound)
+        yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+        yield* Fiber.join(fiber)
+
+        expect(Socket.isCloseEvent(output)).toBe(true)
+        expect(Socket.isCloseEvent(output) && output.code).toBe(1008)
+        expect(Socket.isCloseEvent(output) && output.reason).toBe("session mismatch")
+        expect(yield* Ref.get(calls)).toEqual([])
+      }
+    }),
+  )
+
+  it.effect("rejects a command that wins an Attach race before attachment", () =>
+    Effect.gen(function* () {
+      const releaseAttach = yield* Deferred.make<void>()
+      const attachHandled = yield* Deferred.make<void>()
+      const attachStarts = yield* Ref.make(0)
+      const fake = yield* makeFakeSocket({
+        concurrentHandlers: true,
+        beforeHandle: (message) =>
+          typeof message === "string" && decodeClientFrameText(message)._tag === "Attach"
+            ? Deferred.await(releaseAttach)
+            : Effect.void,
+        afterHandle: (message) =>
+          typeof message === "string" && decodeClientFrameText(message)._tag === "Attach"
+            ? Deferred.succeed(attachHandled, undefined).pipe(Effect.asVoid)
+            : Effect.void,
+      })
+      const calls = yield* Ref.make<Array<string>>([])
+      const fiber = yield* runHandler(
+        fake,
+        registryLayer({
+          send: (sessionId) => Ref.update(calls, (items) => [...items, sessionId]),
+          attach: () =>
+            Stream.fromEffect(Ref.update(attachStarts, (count) => count + 1)).pipe(
+              Stream.drain,
+              Stream.concat(Stream.never),
+            ),
+        }),
+      )
+
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "attached" }))
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "SendMessage", sessionId: "attached", prompt: "hello" }))
+      const output = yield* Queue.take(fake.outbound)
+      yield* Deferred.succeed(releaseAttach, undefined)
+      yield* Deferred.await(attachHandled)
+      yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(fiber)
+
+      expect(Socket.isCloseEvent(output)).toBe(true)
+      expect(Socket.isCloseEvent(output) && output.code).toBe(1008)
+      expect(Socket.isCloseEvent(output) && output.reason).toBe("not attached")
+      expect(yield* Ref.get(calls)).toEqual([])
+      expect(yield* Ref.get(attachStarts)).toBe(0)
+    }),
+  )
+
+  it.effect("dispatches a matching command that loses an Attach race", () =>
+    Effect.gen(function* () {
+      const releaseCommand = yield* Deferred.make<void>()
+      const attachHandled = yield* Deferred.make<void>()
+      const dispatched = yield* Deferred.make<string>()
+      const fake = yield* makeFakeSocket({
+        concurrentHandlers: true,
+        beforeHandle: (message) =>
+          typeof message === "string" && decodeClientFrameText(message)._tag === "SendMessage"
+            ? Deferred.await(releaseCommand)
+            : Effect.void,
+        afterHandle: (message) =>
+          typeof message === "string" && decodeClientFrameText(message)._tag === "Attach"
+            ? Deferred.succeed(attachHandled, undefined).pipe(Effect.asVoid)
+            : Effect.void,
+      })
+      const fiber = yield* runHandler(
+        fake,
+        registryLayer({
+          send: (sessionId) => Deferred.succeed(dispatched, sessionId).pipe(Effect.asVoid),
+        }),
+      )
+
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "attached" }))
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "SendMessage", sessionId: "attached", prompt: "hello" }))
+      yield* Deferred.await(attachHandled)
+      yield* Deferred.succeed(releaseCommand, undefined)
+
+      expect(yield* Deferred.await(dispatched)).toBe("attached")
+
+      yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(fiber)
+    }),
+  )
+
+  it.effect("makes policy close terminal before queued handlers dispatch", () =>
+    Effect.gen(function* () {
+      const fake = yield* makeFakeSocket()
+      const calls = yield* Ref.make<Array<string>>([])
+      const fiber = yield* runHandler(
+        fake,
+        registryLayer({
+          send: (sessionId) => Ref.update(calls, (items) => [...items, sessionId]),
+        }),
+      )
+
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "attached" }))
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "SendMessage", sessionId: "other", prompt: "bad" }))
+      const output = yield* Queue.take(fake.outbound)
+      yield* Queue.offer(
+        fake.inbound,
+        clientFrameText({ _tag: "SendMessage", sessionId: "attached", prompt: "after-close" }),
+      )
+      yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(fiber)
+
+      expect(Socket.isCloseEvent(output) && output.code).toBe(1008)
+      expect(yield* Ref.get(calls)).toEqual([])
+    }),
+  )
+
+  it.effect("treats repeated same-session Attach as idempotent", () =>
+    Effect.gen(function* () {
+      const fake = yield* makeFakeSocket()
+      const attached = yield* Ref.make<Array<string>>([])
+      const started = yield* Deferred.make<void>()
+      const interrupted = yield* Deferred.make<void>()
+      const fiber = yield* runHandler(
+        fake,
+        registryLayer({
+          attach: (sessionId) =>
+            Stream.fromEffect(
+              Ref.update(attached, (items) => [...items, sessionId]).pipe(
+                Effect.andThen(Deferred.succeed(started, undefined)),
+              ),
+            ).pipe(
+              Stream.drain,
+              Stream.concat(Stream.never),
+              Stream.ensuring(Deferred.succeed(interrupted, undefined).pipe(Effect.asVoid)),
+            ),
+        }),
+      )
+
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "same" }))
+      yield* Deferred.await(started)
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "same", afterSeq: 10 }))
+      yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(fiber)
+
+      expect(yield* Ref.get(attached)).toEqual(["same"])
+      expect(yield* Deferred.isDone(interrupted)).toBe(true)
+    }),
+  )
+
+  it.effect("rejects Attach for a different session and keeps the original attachment", () =>
     Effect.gen(function* () {
       const fake = yield* makeFakeSocket()
       const firstInterrupted = yield* Deferred.make<void>()
       const fiber = yield* runHandler(
         fake,
         registryLayer({
-          attach: (sessionId) =>
-            sessionId === "first"
-              ? Stream.never.pipe(Stream.ensuring(Deferred.succeed(firstInterrupted, undefined).pipe(Effect.asVoid)))
-              : Stream.fromIterable([endedFrame]),
+          attach: () =>
+            Stream.never.pipe(Stream.ensuring(Deferred.succeed(firstInterrupted, undefined).pipe(Effect.asVoid))),
         }),
       )
 
       yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "first" }))
-      yield* Effect.yieldNow
       yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "second" }))
-      yield* Deferred.await(firstInterrupted)
       const output = yield* Queue.take(fake.outbound)
+
+      expect(Socket.isCloseEvent(output)).toBe(true)
+      expect(Socket.isCloseEvent(output) && output.code).toBe(1008)
+      expect(Socket.isCloseEvent(output) && output.reason).toBe("session mismatch")
+      expect(yield* Deferred.isDone(firstInterrupted)).toBe(false)
+
       yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
       yield* Fiber.join(fiber)
-
-      expect(typeof output === "string" && decodeServerFrame(output)._tag).toBe("Ended")
+      expect(yield* Deferred.isDone(firstInterrupted)).toBe(true)
     }),
   )
 
@@ -209,6 +432,7 @@ describe("Ws", () => {
         }),
       )
 
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "s" }))
       yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "SendMessage", sessionId: "s", prompt: "hello" }))
       const output = yield* Queue.take(fake.outbound)
       yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
