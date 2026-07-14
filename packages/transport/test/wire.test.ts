@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentEvent, TurnPolicy } from "@batonfx/core"
+import { AgentEvent, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import { Wire } from "../src/index"
 
 const echoTool = Tool.make("echo", {
@@ -12,6 +12,15 @@ const echoTool = Tool.make("echo", {
 })
 
 const toolkit = Toolkit.make(echoTool)
+
+const overlappingTool = Tool.make("overlapping", {
+  parameters: Schema.Struct({}),
+  success: Schema.FiniteFromString,
+  failure: Schema.Finite,
+  failureMode: "return",
+})
+
+const overlappingToolkit = Toolkit.make(overlappingTool)
 
 const usage = Response.Usage.make({
   inputTokens: { uncached: undefined, total: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -138,6 +147,40 @@ describe("Wire", () => {
     }),
   )
 
+  it.effect("strict failed tool results use the declared failure encoding when decoded schemas overlap", () =>
+    Effect.gen(function* () {
+      const schema = Wire.ServerFrame(overlappingToolkit)
+      const call = Response.makePart("tool-call", {
+        id: "overlap-1",
+        name: "overlapping",
+        params: {},
+        providerExecuted: false,
+      })
+      const result = Response.toolResultPart({
+        id: "overlap-1",
+        name: "overlapping",
+        isFailure: true,
+        result: 409,
+        encodedResult: 409,
+        providerExecuted: false,
+        preliminary: false,
+      })
+      const frame: Wire.ServerFrameType = {
+        _tag: "Event",
+        seq: 0,
+        event: { _tag: "ToolExecutionCompleted", turn: 0, call, result },
+      }
+
+      const encoded = yield* Schema.encodeUnknownEffect(schema)(frame)
+      const decoded = yield* Schema.decodeUnknownEffect(schema)(encoded)
+
+      expect(encoded).toMatchObject({ event: { result: { isFailure: true, result: 409 } } })
+      expect(decoded).toMatchObject({
+        event: { result: { isFailure: true, result: 409, encodedResult: 409 } },
+      })
+    }),
+  )
+
   it.effect("encodes non-suspension run failures and suspension terminals separately", () =>
     Effect.gen(function* () {
       const schema = Wire.ServerFrame(toolkit)
@@ -155,6 +198,7 @@ describe("Wire", () => {
           pending: [{ tool_call_id: "call-1", tool_name: "echo" }],
         }),
         AgentEvent.MiddlewareViolation.make({ turn: 1, detail: "dropped tool-call" }),
+        ToolExecutor.FrameworkFailure.make({ stage: "placement", tool: "echo", message: "worker unavailable" }),
       ]
 
       for (const error of failures) {
@@ -162,6 +206,14 @@ describe("Wire", () => {
         const encoded = yield* Schema.encodeUnknownEffect(jsonSchema)({ _tag: "Failed", seq: 10, error })
         const decoded = yield* Schema.decodeUnknownEffect(jsonSchema)(encoded)
         expect(decoded._tag).toBe("Failed")
+
+        const statusEncoded = yield* Schema.encodeUnknownEffect(schema)({
+          _tag: "SessionStatus",
+          seq: 11,
+          status: { _tag: "Failed", error },
+        })
+        const statusDecoded = yield* Schema.decodeUnknownEffect(schema)(statusEncoded)
+        expect(statusDecoded).toMatchObject({ _tag: "SessionStatus", status: { _tag: "Failed" } })
       }
 
       const suspension = AgentEvent.AgentSuspended.make({

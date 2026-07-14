@@ -5,7 +5,7 @@ export interface Approved {
   readonly _tag: "Approved"
 }
 
-/** @experimental Denied: the model receives a failed tool result with `reason`. */
+/** @experimental Denied: the run fails with an authorization FrameworkFailure. */
 export interface Denied {
   readonly _tag: "Denied"
   readonly reason?: string

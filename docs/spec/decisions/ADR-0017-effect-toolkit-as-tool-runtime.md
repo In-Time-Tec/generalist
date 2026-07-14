@@ -16,7 +16,7 @@ Baton treats Effect AI `Tool` and `Toolkit` values as the public tool runtime. A
 
 `Agent.make` accepts the name first: `Agent.make("assistant", { instructions, toolkit, policy })`. The object form remains accepted only as a migration convenience; documentation uses the name-first form.
 
-`Agent.stream` and derived helpers require only `Ai.LanguageModel.LanguageModel` for a no-tool run. `ModelMiddleware` defaults to the empty chain when absent. `Approvals` is resolved only when a tool declares `needsApproval`; if the service is absent for an approval-gated call, Baton fails closed by feeding a failed tool result back to the model. `ToolExecutor` is an optional override seam. When it is absent, Baton executes framework tool calls through the active Effect toolkit handlers in the current Effect context.
+`Agent.stream` and derived helpers require only `Ai.LanguageModel.LanguageModel` for a no-tool run. `ModelMiddleware` defaults to the empty chain when absent. `Approvals` is resolved only when a tool declares `needsApproval`; if the service is absent for an approval-gated call, Baton fails closed with an authorization `FrameworkFailure`. `ToolExecutor` is an optional override seam. When it is absent, Baton executes framework tool calls through the active Effect toolkit handlers in the current Effect context.
 
 The advanced `ToolExecutor` seam stays for durable hosts, remote tool runners, MCP adapters, and suspension. It overrides local toolkit handler execution when provided, and it remains the only way for a host to return `Suspend` from a tool call.
 

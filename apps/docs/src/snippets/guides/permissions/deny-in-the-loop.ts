@@ -15,32 +15,19 @@ const permissionsLayer = Permissions.fromRuleset({
   fallback: "allow",
 })
 
-let calls = 0
-
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
     generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: (options) => {
-      calls += 1
-      if (calls === 1) {
-        return Stream.make(
-          Response.makePart("tool-call", {
-            id: "drop-1",
-            name: "drop_table",
-            params: { table: "users" },
-            providerExecuted: false,
-          }),
-        )
-      }
-      const sawDenial = JSON.stringify(options.prompt.content).includes("Schema changes require a migration")
-      return Stream.make(
-        Response.makePart("text-delta", {
-          id: "assistant",
-          delta: sawDenial ? "I cannot drop tables; write a migration instead." : "Dropped the table.",
+    streamText: () =>
+      Stream.make(
+        Response.makePart("tool-call", {
+          id: "drop-1",
+          name: "drop_table",
+          params: { table: "users" },
+          providerExecuted: false,
         }),
-      )
-    },
+      ),
   }),
 )
 
@@ -48,6 +35,9 @@ const program = Effect.gen(function* () {
   const result = yield* Agent.generate(agent, { prompt: "Drop the users table." })
   yield* Console.log(result.text)
 }).pipe(
+  Effect.catchTag("@batonfx/core/FrameworkFailure", (failure) =>
+    Console.log(`${failure.tool} ${failure.stage}: ${failure.message}`),
+  ),
   Effect.provide(
     Layer.mergeAll(
       modelLayer,

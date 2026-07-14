@@ -63,7 +63,7 @@ Run `bun examples/package-composition-guides/src/core.ts`. The program remains l
 
 ## Errors, requirements, and resources
 
-The merged layer discharges `Chat.Persistence` and `LanguageModel`, so the program has `R = never` and succeeds with `void`. Its schema-backed error channel is `Agent.RunError`: `AgentError | AgentSuspended | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | ProgressOverflowError`. Missing persistence, persistence failures, and model failures map to `AgentError`; `history` and `persistence` are mutually exclusive. The memory backing store is owned by its layer. The sequential example has no timers, detached fibers, buffers, or concurrent work.
+The merged layer discharges `Chat.Persistence` and `LanguageModel`, so the program has `R = never` and succeeds with `void`. Its error channel is `Agent.RunError`: `AgentError | AgentSuspended | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | ProgressOverflowError | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure`. Sole persistence and model failures map to `AgentError`; compound model causes retain their typed branches, and tool framework faults remain `FrameworkFailure`. `history` and `persistence` are mutually exclusive. The memory backing store is owned by its layer. The sequential example has no timers, detached fibers, buffers, or concurrent work.
 
 ## More
 
@@ -118,6 +118,21 @@ const executorLayer = ToolExecutor.router([
 ```
 
 Remote routes execute once by default. Set `retrySafe: false` explicitly for non-idempotent work. Enable retries only when the remote endpoint deduplicates the supplied stable `operationKey`; `maxRetries` bounds even an otherwise unbounded schedule. A legacy `schedule` without `retrySafe: true` is ignored. Client, MCP, sandbox, and custom routes remain one-shot and require no migration.
+
+`ToolExecutor.execute` returns `Success | DomainFailure | Suspend`. A declared domain failure retains both `failure`, the decoded value, and `encodedFailure`, the value encoded by the tool's failure schema. Decode, encode, handler-boundary, missing-handler, route, placement, and authorization failures fail the Effect with schema-backed `FrameworkFailure` instead of becoming tool output.
+
+This is an exhaustive-match migration from the former message-only `Failure` outcome:
+
+```ts
+executor.execute(request).pipe(
+  Effect.tap((outcome) =>
+    outcome._tag === "DomainFailure" ? recordDomainFailure(outcome.failure, outcome.encodedFailure) : Effect.void,
+  ),
+  Effect.catchTag("@batonfx/core/FrameworkFailure", recordFrameworkFailure),
+)
+```
+
+Placement adapters likewise return `DomainFailure { failure }` instead of `Failure { message }`. Baton validates and encodes the supplied value against the selected tool's declared failure schema.
 
 ### Turn policy migration
 

@@ -554,6 +554,8 @@ const failureMessage = (failure: Wire.RunFailure): string => {
       return failure.detail
     case "@batonfx/core/TurnLimitExceeded":
       return `Turn limit exceeded at turn ${failure.turn}`
+    case "@batonfx/core/FrameworkFailure":
+      return `${failure.tool} ${failure.stage}: ${failure.message}`
   }
 }
 

@@ -63,11 +63,11 @@ const child = Agent.generate(childAgent, { prompt })
 
 The surrounding application provides the handler's required services once through `Effect.provide(...)`; the nested effect evaluates in that Context. Supplying `{ prompt }` does not inspect the parent's `RunOptions`. A caller that invokes `Agent.generate` directly can explicitly choose a child `sessionId` or `persistence`, but `AgentTool.asTool` intentionally exposes no hidden identity-forwarding behavior.
 
-At the tool boundary, child `AgentError`, `TurnPolicyError`, `TurnPolicyStopped`, `TurnLimitExceeded`, `MiddlewareViolation`, `ToolNameCollision`, and defects thrown by prompt/result mappers become a failed tool result with a string message. Child policy requirements remain in the returned tool handler's Effect requirements, and collision messages retain the conflicting name and ordered origin evidence.
-The handled tool retains the child Agent's complete requirement parameter. Transfer tools do the same. Fan-out unions every child operation requirement, including run-specific memory, and supervisor construction retains every specialist requirement through its transfer-tool handlers.
+At the tool boundary, child `Agent.RunError` values and defects thrown by prompt/result mappers become a declared `Schema.String` domain failure. The executor encodes that string through the child tool's failure schema before emitting a failed tool-result part. Child policy requirements remain in the returned tool handler's Effect requirements, and collision messages retain the conflicting name and ordered origin evidence.
 
-At the tool boundary, child `AgentError`, `TurnLimitExceeded`, `MiddlewareViolation`, and defects thrown by prompt/result mappers become a failed tool result with a string message.
-Child `AgentSuspended` is also collapsed into a failed tool result. The parent agent receives the failure as ordinary tool context and can decide whether to continue, retry, ask the user, or transfer elsewhere. Durable cross-process HITL remains a host concern.
+Child `AgentSuspended` is also collapsed into the same declared string domain failure. The parent agent receives the schema-valid failure as ordinary tool context and can decide whether to continue, retry, ask the user, or transfer elsewhere. Durable cross-process HITL remains a host concern.
+
+The handled tool retains the child Agent's complete requirement parameter. Transfer tools do the same. Fan-out unions every child operation requirement, including run-specific memory, and supervisor construction retains every specialist requirement through its transfer-tool handlers.
 
 The runnable child-as-tool example in the public multi-agent guide provisions the model, toolkit handlers, executor, approvals, and middleware as ambient layers while omitting child run options. Current behavior is anchored by `packages/core/src/agent-tool.ts`, `packages/core/src/agent.ts`, and `packages/transport/src/session-registry.ts`; `packages/core/test/agent-tool.test.ts` covers the child tool boundary and `packages/core/test/handoff.test.ts` covers bounded isolated fan-out.
 

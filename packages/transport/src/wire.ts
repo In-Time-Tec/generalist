@@ -1,6 +1,6 @@
 import { Effect, Schema, SchemaTransformation } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentEvent, TurnPolicy } from "@batonfx/core"
+import { AgentEvent, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import { WireEncodeError } from "./errors.js"
 
 /** @experimental Canonical transport frame sequence and replay cursor schema. */
@@ -26,6 +26,7 @@ export const RunFailure = Schema.Union([
   AgentEvent.TurnPolicyStopped,
   AgentEvent.TurnLimitExceeded,
   AgentEvent.MiddlewareViolation,
+  ToolExecutor.FrameworkFailure,
 ])
 
 /** @experimental */
@@ -98,10 +99,21 @@ const toolSchemas = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, T
 const toolCallSchema = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>): Schema.Top =>
   unionOrNever(toolSchemas(toolkit).map((tool) => Response.ToolCallPart(tool.name, tool.parametersSchema)))
 
-const toolResultSchema = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>): Schema.Top =>
-  unionOrNever(
-    toolSchemas(toolkit).map((tool) => Response.ToolResultPart(tool.name, tool.successSchema, tool.failureSchema)),
+const toolResultBranch = (tool: Tool.Any, isFailure: boolean): Schema.Top =>
+  Response.ToolResultPart(
+    tool.name,
+    isFailure ? Schema.Never : tool.successSchema,
+    isFailure ? tool.failureSchema : Schema.Never,
+  ).pipe(
+    Schema.check(
+      Schema.makeFilter(
+        (part) => part.isFailure === isFailure || `Expected ${isFailure ? "failure" : "success"} tool result`,
+      ),
+    ),
   )
+
+const toolResultSchema = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>): Schema.Top =>
+  unionOrNever(toolSchemas(toolkit).flatMap((tool) => [toolResultBranch(tool, false), toolResultBranch(tool, true)]))
 
 const EventSchemaWith = (
   streamPart: Schema.Top,

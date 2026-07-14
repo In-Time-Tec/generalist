@@ -2,7 +2,7 @@ import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
 import { Deferred, Effect, Exit, Fiber, Layer, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentEvent,
@@ -65,15 +65,15 @@ const gatedTool = Tool.make("gated", {
 layer(unusedToolHandlerLayer)("AgentTool", (it) => {
   expect(agentToolRequirementProof).toBe(true)
 
-  ItLayer.make(it, "ToolExecutor.fromToolkit maps returned handler failures to failed outcomes", () => {
+  ItLayer.make(it, "ToolExecutor.fromToolkit preserves decoded and encoded declared failures", () => {
     const failingTool = Tool.make("failing", {
       parameters: Schema.Struct({}),
       success: Schema.String,
-      failure: Schema.String,
+      failure: Schema.Struct({ code: Schema.FiniteFromString, detail: Schema.String }),
       failureMode: "return",
     })
     const toolkit = Toolkit.make(failingTool)
-    const handlers = toolkit.toLayer({ failing: () => Effect.fail("child failed") })
+    const handlers = toolkit.toLayer({ failing: () => Effect.fail({ code: 409, detail: "child failed" }) })
     return [
       Layer.mergeAll(
         handlers,
@@ -83,7 +83,131 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Effect.gen(function* () {
         const outcome = yield* ToolExecutor.ToolExecutor.use((executor) => executor.execute(request("failing", {})))
 
-        expect(outcome).toEqual({ _tag: "Failure", message: "child failed" })
+        expect(outcome).toEqual({
+          _tag: "DomainFailure",
+          failure: { code: 409, detail: "child failed" },
+          encodedFailure: { code: "409", detail: "child failed" },
+        })
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor.fromToolkit uses the failure encoding when decoded schemas overlap", () => {
+    const overlappingTool = Tool.make("overlapping_failure", {
+      parameters: Schema.Struct({}),
+      success: Schema.FiniteFromString,
+      failure: Schema.Finite,
+      failureMode: "return",
+    })
+    const toolkit = Toolkit.make(overlappingTool)
+    const handlers = toolkit.toLayer({ overlapping_failure: () => Effect.fail(409) })
+    return [
+      Layer.mergeAll(
+        handlers,
+        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolContext.layerDefault,
+      ),
+      Effect.gen(function* () {
+        const outcome = yield* ToolExecutor.ToolExecutor.use((executor) =>
+          executor.execute(request("overlapping_failure", {})),
+        )
+
+        expect(outcome).toEqual({ _tag: "DomainFailure", failure: 409, encodedFailure: 409 })
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor.fromToolkit preserves error-mode declared failures", () => {
+    const failingTool = Tool.make("failing_error_mode", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+      failure: Schema.Struct({ code: Schema.FiniteFromString }),
+    })
+    const toolkit = Toolkit.make(failingTool)
+    const handlers = toolkit.toLayer({ failing_error_mode: () => Effect.fail({ code: 503 }) })
+    return [
+      Layer.mergeAll(
+        handlers,
+        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolContext.layerDefault,
+      ),
+      Effect.gen(function* () {
+        const outcome = yield* ToolExecutor.ToolExecutor.use((executor) =>
+          executor.execute(request("failing_error_mode", {})),
+        )
+
+        expect(outcome).toEqual({
+          _tag: "DomainFailure",
+          failure: { code: 503 },
+          encodedFailure: { code: "503" },
+        })
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor reports decode-input and missing-handler framework stages", () => {
+    const lookupTool = Tool.make("lookup_stages", {
+      parameters: Schema.Struct({ id: Schema.String }),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(lookupTool)
+    let handled = false
+    const handlers = toolkit.toLayer({
+      lookup_stages: () => {
+        handled = true
+        return Effect.succeed("found")
+      },
+    })
+    return [
+      Layer.mergeAll(
+        handlers,
+        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolContext.layerDefault,
+      ),
+      Effect.gen(function* () {
+        const executor = yield* ToolExecutor.ToolExecutor
+        const decode = yield* Effect.flip(executor.execute(request("lookup_stages", { id: 1 })))
+        const missing = yield* Effect.flip(executor.execute(request("missing_handler", {})))
+
+        expect(decode).toMatchObject({ stage: "decode-input", tool: "lookup_stages" })
+        expect(missing).toMatchObject({ stage: "missing-handler", tool: "missing_handler" })
+        expect(handled).toBe(false)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor reports invalid handler results as framework failures", () => {
+    const failingTool = Tool.make("undeclared_failure", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+      failure: Schema.Struct({ code: Schema.Finite }),
+    })
+    const toolkit = Toolkit.make(failingTool)
+    const handlers = toolkit.toLayer({
+      undeclared_failure: () =>
+        Effect.fail(
+          AiError.make({
+            module: "test",
+            method: "undeclared_failure",
+            reason: AiError.InvalidToolResultError.make({
+              toolName: "undeclared_failure",
+              description: "unexpected handler failure",
+            }),
+          }),
+        ),
+    })
+    return [
+      Layer.mergeAll(
+        handlers,
+        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolContext.layerDefault,
+      ),
+      Effect.gen(function* () {
+        const failure = yield* ToolExecutor.ToolExecutor.use((executor) =>
+          executor.execute(request("undeclared_failure", {})),
+        ).pipe(Effect.flip)
+
+        expect(failure).toMatchObject({ stage: "handler", tool: "undeclared_failure" })
       }),
     ] as const
   })
@@ -107,6 +231,29 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         ).pipe(Effect.exit)
 
         expect(Exit.hasInterrupts(exit)).toBe(true)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor.fromToolkit preserves handler defects", () => {
+    const defectiveTool = Tool.make("defective", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(defectiveTool)
+    const handlers = toolkit.toLayer({ defective: () => Effect.die("handler defect") })
+    return [
+      Layer.mergeAll(
+        handlers,
+        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolContext.layerDefault,
+      ),
+      Effect.gen(function* () {
+        const exit = yield* ToolExecutor.ToolExecutor.use((executor) =>
+          executor.execute(request("defective", {})),
+        ).pipe(Effect.exit)
+
+        expect(Exit.hasDies(exit)).toBe(true)
       }),
     ] as const
   })
@@ -138,7 +285,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         const executor = yield* ToolExecutor.ToolExecutor
         const lookup = yield* executor.execute(request("lookup", { id: "local" }))
         const remote = yield* executor.execute(request("remote", {}))
-        const missing = yield* executor.execute(request("missing", {}))
+        const missing = yield* Effect.flip(executor.execute(request("missing", {})))
 
         expect(lookup).toEqual({
           _tag: "Success",
@@ -150,7 +297,11 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           result: { source: "remote" },
           encodedResult: { source: "remote" },
         })
-        expect(missing).toEqual({ _tag: "Failure", message: "Tool missing is not registered" })
+        expect(missing).toMatchObject({
+          _tag: "@batonfx/core/FrameworkFailure",
+          stage: "route",
+          tool: "missing",
+        })
       }),
     ] as const
   })
@@ -180,15 +331,132 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const success = yield* executor.execute(request("select_file", {}))
-        const invalid = yield* executor.execute(request("select_file", { invalid: true }))
+        const invalid = yield* Effect.flip(executor.execute(request("select_file", { invalid: true })))
 
         expect(success).toEqual({
           _tag: "Success",
           result: { name: "notes.txt", contents: "hello" },
           encodedResult: { name: "notes.txt", contents: "hello" },
         })
-        expect(invalid._tag).toBe("Failure")
-        expect(invalid._tag === "Failure" && invalid.message).toContain("invalid client result")
+        expect(invalid).toMatchObject({
+          _tag: "@batonfx/core/FrameworkFailure",
+          stage: "encode-success",
+          tool: "select_file",
+        })
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor validates placement domain failures against the failure schema", () => {
+    const deploy = Tool.make("deploy", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+      failure: Schema.Struct({ code: Schema.FiniteFromString }),
+    })
+    return [
+      Layer.mergeAll(
+        ToolExecutor.router([
+          ToolExecutor.client({
+            toolkit: Toolkit.make(deploy),
+            execute: () => Effect.succeed({ _tag: "DomainFailure", failure: { code: "invalid" } }),
+          }),
+        ]),
+        ToolContext.layerDefault,
+      ),
+      Effect.gen(function* () {
+        const failure = yield* ToolExecutor.ToolExecutor.use((executor) =>
+          executor.execute(request("deploy", {})),
+        ).pipe(Effect.flip)
+
+        expect(failure).toMatchObject({ stage: "encode-domain-failure", tool: "deploy" })
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor rejects invalid placement input before calling the adapter", () => {
+    const deploy = Tool.make("deploy_input", {
+      parameters: Schema.Struct({ id: Schema.String }),
+      success: Schema.String,
+    })
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        ToolExecutor.router([
+          ToolExecutor.client({
+            toolkit: Toolkit.make(deploy),
+            execute: () => {
+              calls += 1
+              return Effect.succeed({ _tag: "Success", result: "deployed" })
+            },
+          }),
+        ]),
+        ToolContext.layerDefault,
+      ),
+      Effect.gen(function* () {
+        const failure = yield* ToolExecutor.ToolExecutor.use((executor) =>
+          executor.execute(request("deploy_input", { id: 1 })),
+        ).pipe(Effect.flip)
+
+        expect(failure).toMatchObject({ stage: "decode-input", tool: "deploy_input" })
+        expect(calls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor.remote retries infrastructure failures without retrying tool failures", () => {
+    const runCi = Tool.make("run_ci", {
+      parameters: Schema.Struct({}),
+      success: Schema.Struct({ status: Schema.String }),
+      failure: Schema.Struct({ message: Schema.String }),
+    })
+    const toolkit = Toolkit.make(runCi)
+    let attempts = 0
+
+    return [
+      Layer.mergeAll(
+        ToolExecutor.router([
+          ToolExecutor.remote({
+            toolkit,
+            retrySafe: true,
+            operationKey: ({ call }) => call.id,
+            maxRetries: 1,
+            schedule: Schedule.recurs(1),
+            execute: ({ call }): Effect.Effect<ToolExecutor.PlacementResponse, string> =>
+              Effect.gen(function* () {
+                attempts += 1
+                if ("toolFailure" in (call.params as Record<string, unknown>)) {
+                  return { _tag: "DomainFailure", failure: { message: "ci failed" } }
+                }
+                if ("infrastructureFailure" in (call.params as Record<string, unknown>)) {
+                  return yield* Effect.fail<string>("worker unavailable")
+                }
+                if (attempts === 1) {
+                  return yield* Effect.fail<string>("network unavailable")
+                }
+                return { _tag: "Success", result: { status: "green" } }
+              }),
+          }),
+        ]),
+        ToolContext.layerDefault,
+      ),
+      Effect.gen(function* () {
+        const executor = yield* ToolExecutor.ToolExecutor
+        const recovered = yield* executor.execute(request("run_ci", {}))
+        const failed = yield* executor.execute(request("run_ci", { toolFailure: true }))
+        const infrastructure = yield* Effect.flip(executor.execute(request("run_ci", { infrastructureFailure: true })))
+
+        expect(attempts).toBe(5)
+        expect(recovered).toEqual({
+          _tag: "Success",
+          result: { status: "green" },
+          encodedResult: { status: "green" },
+        })
+        expect(failed).toEqual({
+          _tag: "DomainFailure",
+          failure: { message: "ci failed" },
+          encodedFailure: { message: "ci failed" },
+        })
+        expect(infrastructure).toMatchObject({ stage: "placement", tool: "run_ci" })
       }),
     ] as const
   })
@@ -217,11 +485,10 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       ),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
-        const failed = yield* executor.execute(request("run_ci", {}))
+        const failed = yield* Effect.flip(executor.execute(request("run_ci", {})))
 
         expect(attempts).toBe(1)
-        expect(failed._tag).toBe("Failure")
-        expect(failed._tag === "Failure" && failed.message).toContain("network unavailable")
+        expect(failed).toMatchObject({ stage: "placement", tool: "run_ci" })
       }),
     ] as const
   })
@@ -393,10 +660,10 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     return [
       ToolContext.layerDefault,
       Effect.gen(function* () {
-        const outcome = yield* noRetries.execute(request("lookup", {}))
+        const outcome = yield* Effect.flip(noRetries.execute(request("lookup", {})))
         const error = yield* invalidBound.execute(request("lookup", {})).pipe(Effect.flip)
 
-        expect(outcome._tag).toBe("Failure")
+        expect(outcome).toMatchObject({ stage: "placement", tool: "lookup" })
         expect(keyEvaluations).toBe(1)
         expect(attempts).toBe(1)
         expect(Schema.is(ToolExecutor.RemoteRetryError)(error)).toBe(true)
@@ -409,6 +676,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const lookup = Tool.make("lookup", {
       parameters: Schema.Struct({ mode: Schema.String }),
       success: Schema.String,
+      failure: Schema.Struct({ message: Schema.String }),
     })
     const toolkit = Toolkit.make(lookup)
     const attempts: Record<string, number> = {}
@@ -421,7 +689,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       execute: ({ call }): Effect.Effect<ToolExecutor.PlacementResponse, string | AgentEvent.AgentError> => {
         const mode = (call.params as { readonly mode: string }).mode
         attempts[mode] = (attempts[mode] ?? 0) + 1
-        if (mode === "domain") return Effect.succeed({ _tag: "Failure", message: "not found" })
+        if (mode === "domain") return Effect.succeed({ _tag: "DomainFailure", failure: { message: "not found" } })
         if (mode === "success") return Effect.succeed({ _tag: "Success", result: "found" })
         if (mode === "defect") return Effect.die("broken adapter")
         if (mode === "interrupt") return Effect.interrupt
@@ -437,15 +705,19 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         const success = yield* remote.execute(request("lookup", { mode: "success" }))
         const defect = yield* remote.execute(request("lookup", { mode: "defect" })).pipe(Effect.exit)
         const interruption = yield* remote.execute(request("lookup", { mode: "interrupt" })).pipe(Effect.exit)
-        const framework = yield* remote.execute(request("lookup", { mode: "framework" }))
-        const exhausted = yield* remote.execute(request("lookup", { mode: "infrastructure" }))
+        const framework = yield* Effect.flip(remote.execute(request("lookup", { mode: "framework" })))
+        const exhausted = yield* Effect.flip(remote.execute(request("lookup", { mode: "infrastructure" })))
 
-        expect(domain).toEqual({ _tag: "Failure", message: "not found" })
+        expect(domain).toEqual({
+          _tag: "DomainFailure",
+          failure: { message: "not found" },
+          encodedFailure: { message: "not found" },
+        })
         expect(success).toEqual({ _tag: "Success", result: "found", encodedResult: "found" })
-        expect(Exit.isSuccess(defect)).toBe(true)
+        expect(Exit.hasDies(defect)).toBe(true)
         expect(Exit.hasInterrupts(interruption)).toBe(true)
-        expect(framework._tag).toBe("Failure")
-        expect(exhausted._tag).toBe("Failure")
+        expect(framework).toMatchObject({ stage: "placement", tool: "lookup" })
+        expect(exhausted).toMatchObject({ stage: "placement", tool: "lookup" })
         expect(attempts).toEqual({ domain: 1, success: 1, defect: 1, interrupt: 1, framework: 1, infrastructure: 3 })
       }),
     ] as const
@@ -486,6 +758,82 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           result: { source: "sandbox" },
           encodedResult: { source: "sandbox" },
         })
+      }),
+    ] as const
+  })
+
+  ItLayer.make(
+    it,
+    "keeps concurrent executor outcomes associated with their calls",
+    () =>
+      [
+        Layer.mergeAll(
+          ToolExecutor.testLayer({
+            execute: (input) =>
+              Effect.succeed(
+                input.call.name === "first"
+                  ? { _tag: "Success", result: input.call.id, encodedResult: input.call.id }
+                  : { _tag: "DomainFailure", failure: input.call.id, encodedFailure: input.call.id },
+              ),
+          }),
+          ToolContext.layerDefault,
+        ),
+        Effect.gen(function* () {
+          const executor = yield* ToolExecutor.ToolExecutor
+          const outcomes = yield* Effect.all(
+            [executor.execute(request("first", {})), executor.execute(request("second", {}))],
+            { concurrency: 2 },
+          )
+
+          expect(outcomes).toEqual([
+            { _tag: "Success", result: "call-first", encodedResult: "call-first" },
+            { _tag: "DomainFailure", failure: "call-second", encodedFailure: "call-second" },
+          ])
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(it, "Agent emits decoded domain failures and re-feeds only their encoded value", () => {
+    const failingTool = Tool.make("agent_failure", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+      failure: Schema.Struct({ code: Schema.FiniteFromString, detail: Schema.String }),
+      failureMode: "return",
+    })
+    const toolkit = Toolkit.make(failingTool)
+    const handlers = toolkit.toLayer({
+      agent_failure: () => Effect.fail({ code: 422, detail: "invalid request" }),
+    })
+    let calls = 0
+    let followUp = ""
+    return [
+      Layer.mergeAll(
+        handlers,
+        modelLayer((options) => {
+          calls += 1
+          if (calls === 1) return Stream.make(toolCallPart("call-agent-failure", "agent_failure", {}))
+          followUp = Json.stringify(options.prompt.content)
+          return Stream.make(textDelta("handled failure"))
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "domain-failure-agent", toolkit }), { prompt: "fail" }),
+        )
+        const completed = events.find((event) => event._tag === "ToolExecutionCompleted")
+
+        expect(completed?._tag === "ToolExecutionCompleted" && completed.result.result).toEqual({
+          code: 422,
+          detail: "invalid request",
+        })
+        expect(completed?._tag === "ToolExecutionCompleted" && completed.result.encodedResult).toEqual({
+          code: "422",
+          detail: "invalid request",
+        })
+        expect(followUp).toContain('"code":"422"')
+        expect(followUp).not.toContain('"error"')
       }),
     ] as const
   })

@@ -116,6 +116,40 @@ describe("Chat", () => {
     expect(recovered.entries).toEqual([Chat.UserEntry({ text: "authoritative history" })])
   })
 
+  it("surfaces framework failures from terminal frames and session status", () => {
+    const failure = {
+      _tag: "@batonfx/core/FrameworkFailure" as const,
+      stage: "placement" as const,
+      tool: "lookup",
+      message: "worker unavailable",
+    }
+    const failedFrame = Schema.decodeUnknownSync(Wire.LooseServerFrame)({
+      _tag: "Failed",
+      seq: 0,
+      error: failure,
+    })
+    const [failedModel, , failedOut] = updateWith(Chat.initialModel("s-chat"), failedFrame)
+
+    expect(failedModel.run).toEqual({ _tag: "Failed", message: "lookup placement: worker unavailable" })
+    expect(Option.getOrUndefined(failedOut)).toEqual({
+      _tag: "RunFailed",
+      message: "lookup placement: worker unavailable",
+    })
+
+    const statusFrame = Schema.decodeUnknownSync(Wire.LooseServerFrame)({
+      _tag: "SessionStatus",
+      seq: 1,
+      status: { _tag: "Failed", error: failure },
+    })
+    const [statusModel, , statusOut] = updateWith(Chat.initialModel("s-chat"), statusFrame)
+
+    expect(statusModel.run).toEqual({ _tag: "Failed", message: "lookup placement: worker unavailable" })
+    expect(Option.getOrUndefined(statusOut)).toEqual({
+      _tag: "RunFailed",
+      message: "lookup placement: worker unavailable",
+    })
+  })
+
   it("surfaces approval suspension and emits approval commands", () => {
     let model = Chat.initialModel("s-chat")
     let out: Option.Option<Chat.OutMessage> = Option.none()

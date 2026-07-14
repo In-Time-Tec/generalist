@@ -28,11 +28,11 @@ Argument matching is shape-independent: the params value is recursively projecte
 ## Decision model
 
 - `Allow` continues to the existing `needsApproval` / `Approvals` path.
-- `Deny` creates a failed tool-result part and does not emit `ToolExecutionStarted`.
+- `Deny` fails with `FrameworkFailure { stage: "authorization" }` and does not emit `ToolExecutionStarted`.
 - `Ask` emits `ApprovalRequested` and calls `Permissions.await(pending)`.
 - `await` returning `Option.none()` suspends the run with `AgentSuspended { reason: "approval" }`.
 - `await` returning `Approved` executes the current call.
-- `await` returning `Denied` creates a failed tool-result part.
+- `await` returning `Denied` fails with `FrameworkFailure { stage: "authorization" }`.
 - `await` returning `Always` executes the current call and, when `RuleStore` is present, remembers an allow rule for that tool.
 
 Provider-executed tool calls are not gated by `Permissions` because Baton does not dispatch them.
