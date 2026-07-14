@@ -4,7 +4,7 @@ import { Presets } from "@batonfx/providers"
 
 const agent = Agent.make({ name: "gemini-agent" })
 
-const providerLayer = Presets.withGoogleAiStudio({
+const providerLayer = Presets.withGoogleAiStudioFetch({
   model: "gemini-2.0-flash",
   apiKey: Config.redacted("GOOGLE_AI_STUDIO_API_KEY"),
 })

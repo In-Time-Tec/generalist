@@ -45,5 +45,8 @@ const clientLayerConfig = (options: WithOpenAiCompatibleOptions) =>
 export const withOpenAiCompatible = (options: WithOpenAiCompatibleOptions) =>
   ModelRegistry.layerFromRegistrationEffects([openAiCompatible(options)]).pipe(
     Layer.provide(clientLayerConfig(options)),
-    Layer.provide(FetchHttpClient.layer),
   )
+
+/** @experimental */
+export const withOpenAiCompatibleFetch = (options: WithOpenAiCompatibleOptions) =>
+  withOpenAiCompatible(options).pipe(Layer.provide(FetchHttpClient.layer))

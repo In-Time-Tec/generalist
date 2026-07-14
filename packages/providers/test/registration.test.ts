@@ -1,13 +1,14 @@
 import { describe, expect, it, layer as testLayer } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Redacted, Schema } from "effect"
-import { EmbeddingModel, Tool, Toolkit } from "effect/unstable/ai"
+import { Tool, Toolkit } from "effect/unstable/ai"
+import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
-import { anthropic, withAnthropic } from "@batonfx/providers/anthropic"
-import { withOpenAiOrDeterministic } from "@batonfx/providers/deterministic"
-import { openAi, withOpenAi } from "@batonfx/providers/openai"
-import { openAiCompatible, withOpenAiCompatible } from "@batonfx/providers/openai-compat"
-import { openRouter, withOpenRouter } from "@batonfx/providers/openrouter"
-import { Deterministic, Embedding, Presets } from "../src/index"
+import { anthropic, withAnthropic, withAnthropicFetch } from "@batonfx/providers/anthropic"
+import { withOpenAiOrDeterministic, withOpenAiOrDeterministicFetch } from "@batonfx/providers/deterministic"
+import { openAi, withOpenAi, withOpenAiFetch } from "@batonfx/providers/openai"
+import { openAiCompatible, withOpenAiCompatible, withOpenAiCompatibleFetch } from "@batonfx/providers/openai-compat"
+import { openRouter, withOpenRouter, withOpenRouterFetch } from "@batonfx/providers/openrouter"
+import { Deterministic, Embedding, Presets } from "../src/index.js"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
 const unexpectedTool = Tool.make("unexpected", { parameters: Schema.Unknown, success: Schema.Unknown })
@@ -15,22 +16,62 @@ const unexpectedToolkit = Toolkit.make(unexpectedTool)
 const unexpectedToolLayer = unexpectedToolkit.toLayer({
   unexpected: () => Effect.die("unexpected tool call"),
 })
+const hostHttpClient = HttpClient.make(() => Effect.die("unexpected HTTP request"))
+
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+type Assert<T extends true> = T
+type EveryLayerServices<Layers extends ReadonlyArray<Layer.Any>, Services> = Layers extends readonly [
+  infer Head extends Layer.Any,
+  ...infer Tail extends ReadonlyArray<Layer.Any>,
+]
+  ? Equal<Layer.Services<Head>, Services> extends true
+    ? EveryLayerServices<Tail, Services>
+    : false
+  : true
+type EveryLayerError<Layers extends ReadonlyArray<Layer.Any>, Error> = Layers extends readonly [
+  infer Head extends Layer.Any,
+  ...infer Tail extends ReadonlyArray<Layer.Any>,
+]
+  ? Equal<Layer.Error<Head>, Error> extends true
+    ? EveryLayerError<Tail, Error>
+    : false
+  : true
+type EveryEffectServices<Effects extends ReadonlyArray<unknown>, Services> = Effects extends readonly [
+  infer Head,
+  ...infer Tail,
+]
+  ? Equal<Effect.Services<Head>, Services> extends true
+    ? EveryEffectServices<Tail, Services>
+    : false
+  : true
+type EveryEffectError<Effects extends ReadonlyArray<unknown>, Error> = Effects extends readonly [
+  infer Head,
+  ...infer Tail,
+]
+  ? Equal<Effect.Error<Head>, Error> extends true
+    ? EveryEffectError<Tail, Error>
+    : false
+  : true
+
+const tuple = <const Values extends ReadonlyArray<unknown>>(...values: Values): Values => values
 
 describe("providers", () => {
-  testLayer(ModelRegistry.layerFromRegistrationEffects([Presets.groq({ model: "llama-test", apiKey })]))((test) => {
-    test.effect("creates an OpenAI-compatible preset registration for ModelRegistry", () =>
-      Effect.gen(function* () {
-        const registration = yield* Presets.groq({ model: "llama-test", apiKey })
+  testLayer(ModelRegistry.layerFromRegistrationEffects([Presets.groqFetch({ model: "llama-test", apiKey })]))(
+    (test) => {
+      test.effect("creates an OpenAI-compatible preset registration for ModelRegistry", () =>
+        Effect.gen(function* () {
+          const registration = yield* Presets.groqFetch({ model: "llama-test", apiKey })
 
-        expect(registration.provider).toBe("groq")
-        expect(registration.model).toBe("llama-test")
+          expect(registration.provider).toBe("groq")
+          expect(registration.model).toBe("llama-test")
 
-        const registered = yield* ModelRegistry.registrations()
+          const registered = yield* ModelRegistry.registrations()
 
-        expect(registered.map((item) => [item.provider, item.model])).toEqual([["groq", "llama-test"]])
-      }),
-    )
-  })
+          expect(registered.map((item) => [item.provider, item.model])).toEqual([["groq", "llama-test"]])
+        }),
+      )
+    },
+  )
 
   testLayer(
     Layer.mergeAll(
@@ -57,7 +98,7 @@ describe("providers", () => {
 
   testLayer(
     Layer.mergeAll(
-      Deterministic.withOpenAiOrDeterministic({
+      Deterministic.withOpenAiOrDeterministicFetch({
         model: "gpt-test",
         fallbackModel: "fallback",
         apiKey: Config.fail(new ConfigProvider.SourceError({ message: "missing test key" })),
@@ -120,8 +161,8 @@ describe("providers", () => {
 
   testLayer(
     ModelRegistry.combine([
-      withAnthropic({ model: "claude-test", apiKey }),
-      withOpenRouter({ model: "openrouter-test", apiKey }),
+      withAnthropicFetch({ model: "claude-test", apiKey }),
+      withOpenRouterFetch({ model: "openrouter-test", apiKey }),
     ]),
   )((test) => {
     test.effect("combines anthropic and openrouter registry layers without dropping registrations", () =>
@@ -137,16 +178,184 @@ describe("providers", () => {
   })
 
   it("builds embedding layers without live calls", () => {
-    const openAiLayer: Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError> = Embedding.withOpenAiEmbedding({
-      model: "text-embedding-3-small",
+    const baseLayers = tuple(
+      Embedding.withOpenAiEmbedding({ model: "text-embedding-3-small", apiKey }),
+      Embedding.withOpenAiCompatibleEmbedding({
+        model: "embed-test",
+        baseUrl: "http://localhost:11434/v1",
+        apiKey,
+      }),
+    )
+    const fetchLayers = tuple(
+      Embedding.withOpenAiEmbeddingFetch({ model: "text-embedding-3-small", apiKey }),
+      Embedding.withOpenAiCompatibleEmbeddingFetch({
+        model: "embed-test",
+        baseUrl: "http://localhost:11434/v1",
+        apiKey,
+      }),
+    )
+    const baseRequirements: Assert<EveryLayerServices<typeof baseLayers, HttpClient.HttpClient>> = true
+    const fetchRequirements: Assert<EveryLayerServices<typeof fetchLayers, never>> = true
+    const baseErrors: Assert<EveryLayerError<typeof baseLayers, Config.ConfigError>> = true
+    const fetchErrors: Assert<EveryLayerError<typeof fetchLayers, Config.ConfigError>> = true
+
+    expect([baseRequirements, fetchRequirements, baseErrors, fetchErrors]).toEqual([true, true, true, true])
+  })
+
+  it("preserves HttpClient in base layer requirements and discharges it only in Fetch conveniences", () => {
+    const baseLayers = tuple(
+      withOpenAi({ model: "gpt-test", apiKey }),
+      withAnthropic({ model: "claude-test", apiKey }),
+      withOpenRouter({ model: "openrouter-test", apiKey }),
+      withOpenAiCompatible({ model: "compatible-test", apiKey }),
+      Presets.withGroq({ model: "model", apiKey }),
+      Presets.withMistral({ model: "model", apiKey }),
+      Presets.withXai({ model: "model", apiKey }),
+      Presets.withDeepseek({ model: "model", apiKey }),
+      Presets.withGoogleAiStudio({ model: "model", apiKey }),
+      Presets.withAzureOpenAi({ model: "model", resource: "resource", apiKey }),
+      Presets.withOllama({ model: "model", apiKey }),
+    )
+    const fetchLayers = tuple(
+      withOpenAiFetch({ model: "gpt-test", apiKey }),
+      withAnthropicFetch({ model: "claude-test", apiKey }),
+      withOpenRouterFetch({ model: "openrouter-test", apiKey }),
+      withOpenAiCompatibleFetch({ model: "compatible-test", apiKey }),
+      Presets.withGroqFetch({ model: "model", apiKey }),
+      Presets.withMistralFetch({ model: "model", apiKey }),
+      Presets.withXaiFetch({ model: "model", apiKey }),
+      Presets.withDeepseekFetch({ model: "model", apiKey }),
+      Presets.withGoogleAiStudioFetch({ model: "model", apiKey }),
+      Presets.withAzureOpenAiFetch({ model: "model", resource: "resource", apiKey }),
+      Presets.withOllamaFetch({ model: "model", apiKey }),
+    )
+    const deterministicLayer = withOpenAiOrDeterministic({ model: "gpt-test", fallbackModel: "fallback", apiKey })
+    const deterministicFetchLayer = withOpenAiOrDeterministicFetch({
+      model: "gpt-test",
+      fallbackModel: "fallback",
       apiKey,
     })
-    const compatibleLayer: Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError> =
-      Embedding.withOpenAiCompatibleEmbedding({ model: "embed-test", baseUrl: "http://localhost:11434/v1", apiKey })
+    const baseRequirements: Assert<EveryLayerServices<typeof baseLayers, HttpClient.HttpClient>> = true
+    const fetchRequirements: Assert<EveryLayerServices<typeof fetchLayers, never>> = true
+    const errors: Assert<EveryLayerError<typeof baseLayers, Config.ConfigError>> = true
+    const fetchErrors: Assert<EveryLayerError<typeof fetchLayers, Config.ConfigError>> = true
+    const deterministicRequirements: Assert<Equal<Layer.Services<typeof deterministicLayer>, HttpClient.HttpClient>> =
+      true
+    const deterministicFetchRequirements: Assert<Equal<Layer.Services<typeof deterministicFetchLayer>, never>> = true
+    const deterministicErrors: Assert<Equal<Layer.Error<typeof deterministicLayer>, never>> = true
+    const deterministicFetchErrors: Assert<Equal<Layer.Error<typeof deterministicFetchLayer>, never>> = true
+    const basePresets = tuple(
+      Presets.groq({ model: "model", apiKey }),
+      Presets.mistral({ model: "model", apiKey }),
+      Presets.xai({ model: "model", apiKey }),
+      Presets.deepseek({ model: "model", apiKey }),
+      Presets.googleAiStudio({ model: "model", apiKey }),
+      Presets.azureOpenAi({ model: "model", resource: "resource", apiKey }),
+      Presets.ollama({ model: "model", apiKey }),
+    )
+    const fetchPresets = tuple(
+      Presets.groqFetch({ model: "model", apiKey }),
+      Presets.mistralFetch({ model: "model", apiKey }),
+      Presets.xaiFetch({ model: "model", apiKey }),
+      Presets.deepseekFetch({ model: "model", apiKey }),
+      Presets.googleAiStudioFetch({ model: "model", apiKey }),
+      Presets.azureOpenAiFetch({ model: "model", resource: "resource", apiKey }),
+      Presets.ollamaFetch({ model: "model", apiKey }),
+    )
+    const basePresetRequirements: Assert<EveryEffectServices<typeof basePresets, HttpClient.HttpClient>> = true
+    const fetchPresetRequirements: Assert<EveryEffectServices<typeof fetchPresets, never>> = true
+    const presetErrors: Assert<EveryEffectError<typeof basePresets, Config.ConfigError>> = true
+    const fetchPresetErrors: Assert<EveryEffectError<typeof fetchPresets, Config.ConfigError>> = true
 
-    expect(openAiLayer).toBeDefined()
-    expect(compatibleLayer).toBeDefined()
+    expect([
+      baseRequirements,
+      fetchRequirements,
+      errors,
+      fetchErrors,
+      deterministicRequirements,
+      deterministicFetchRequirements,
+      deterministicErrors,
+      deterministicFetchErrors,
+      basePresetRequirements,
+      fetchPresetRequirements,
+      presetErrors,
+      fetchPresetErrors,
+    ]).toEqual([true, true, true, true, true, true, true, true, true, true, true, true])
   })
+
+  it.effect("builds base provider and preset constructors concurrently with the host HttpClient", () => {
+    const providerLayers = [
+      withOpenAi({ model: "gpt-test", apiKey }),
+      withAnthropic({ model: "claude-test", apiKey }),
+      withOpenRouter({ model: "openrouter-test", apiKey }),
+      withOpenAiCompatible({ model: "compatible-test", apiKey }),
+      Presets.withGroq({ model: "model", apiKey }),
+      Presets.withMistral({ model: "model", apiKey }),
+      Presets.withXai({ model: "model", apiKey }),
+      Presets.withDeepseek({ model: "model", apiKey }),
+      Presets.withGoogleAiStudio({ model: "model", apiKey }),
+      Presets.withAzureOpenAi({ model: "model", resource: "resource", apiKey }),
+      Presets.withOllama({ model: "model", apiKey }),
+    ]
+    const embeddingLayers = [
+      Embedding.withOpenAiEmbedding({ model: "text-embedding-3-small", apiKey }),
+      Embedding.withOpenAiCompatibleEmbedding({
+        model: "embed-test",
+        baseUrl: "http://localhost:11434/v1",
+        apiKey,
+      }),
+    ]
+
+    return Effect.all(
+      [
+        Effect.all(
+          providerLayers.map((layer) => Effect.scoped(Layer.build(layer)).pipe(Effect.asVoid)),
+          { concurrency: 4 },
+        ),
+        Effect.all(
+          embeddingLayers.map((layer) => Effect.scoped(Layer.build(layer)).pipe(Effect.asVoid)),
+          { concurrency: 2 },
+        ),
+      ],
+      { concurrency: 2 },
+    ).pipe(Effect.provideService(HttpClient.HttpClient, hostHttpClient))
+  })
+
+  it.effect("builds the base deterministic fallback with the host HttpClient", () =>
+    Effect.gen(function* () {
+      const registered = yield* Effect.scoped(
+        Layer.build(
+          withOpenAiOrDeterministic({
+            model: "gpt-test",
+            fallbackModel: "fallback",
+            apiKey,
+          }),
+        ).pipe(Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context)))),
+      )
+
+      expect(registered.map((item) => [item.provider, item.model])).toEqual([
+        ["deterministic", "fallback"],
+        ["openai", "gpt-test"],
+      ])
+    }).pipe(Effect.provideService(HttpClient.HttpClient, hostHttpClient)),
+  )
+
+  it.effect("keeps provider configuration failures typed when a host HttpClient is supplied", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        Effect.scoped(
+          Layer.build(
+            withOpenAi({
+              model: "gpt-test",
+              apiKey: Config.fail(new ConfigProvider.SourceError({ message: "missing test key" })),
+            }),
+          ),
+        ),
+      )
+
+      expect(failure._tag).toBe("ConfigError")
+    }).pipe(Effect.provideService(HttpClient.HttpClient, hostHttpClient)),
+  )
 
   it("exposes provider helper functions and subpath modules", () => {
     expect(typeof openAi).toBe("function")
@@ -154,9 +363,15 @@ describe("providers", () => {
     expect(typeof openRouter).toBe("function")
     expect(typeof openAiCompatible).toBe("function")
     expect(typeof withOpenAi).toBe("function")
+    expect(typeof withOpenAiFetch).toBe("function")
     expect(typeof withOpenAiCompatible).toBe("function")
+    expect(typeof withOpenAiCompatibleFetch).toBe("function")
     expect(typeof withOpenAiOrDeterministic).toBe("function")
+    expect(typeof withOpenAiOrDeterministicFetch).toBe("function")
     expect(typeof Presets.withAzureOpenAi).toBe("function")
+    expect(typeof Presets.withAzureOpenAiFetch).toBe("function")
     expect(typeof Presets.withOllama).toBe("function")
+    expect(typeof Presets.withOllamaFetch).toBe("function")
+    expect(FetchHttpClient.layer).toBeDefined()
   })
 })

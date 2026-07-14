@@ -16,7 +16,10 @@ const program = ModelRegistry.provide(
   Effect.flatMap((result) => Console.log(result.text)),
   Effect.provide(
     Layer.mergeAll(
-      OpenRouter.withOpenRouter({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
+      OpenRouter.withOpenRouterFetch({
+        model: "openai/gpt-4o-mini",
+        apiKey: Config.redacted("OPENROUTER_API_KEY"),
+      }),
       ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
       Approvals.autoApprove,
       ModelMiddleware.identityLayer,

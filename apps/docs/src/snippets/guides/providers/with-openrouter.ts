@@ -7,7 +7,7 @@ const agent = Agent.make({
   instructions: "Answer in one sentence.",
 })
 
-const providerLayer = OpenRouter.withOpenRouter({
+const providerLayer = OpenRouter.withOpenRouterFetch({
   model: "openai/gpt-4o-mini",
   apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })

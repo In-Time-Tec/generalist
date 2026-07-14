@@ -36,5 +36,8 @@ export interface WithOpenRouterOptions extends OpenRouterInput {
 export const withOpenRouter = (options: WithOpenRouterOptions) =>
   ModelRegistry.layerFromRegistrationEffects([openRouter(options)]).pipe(
     Layer.provide(OpenRouterClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
-    Layer.provide(FetchHttpClient.layer),
   )
+
+/** @experimental */
+export const withOpenRouterFetch = (options: WithOpenRouterOptions) =>
+  withOpenRouter(options).pipe(Layer.provide(FetchHttpClient.layer))

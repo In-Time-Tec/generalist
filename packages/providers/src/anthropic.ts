@@ -36,5 +36,8 @@ export interface WithAnthropicOptions extends AnthropicInput {
 export const withAnthropic = (options: WithAnthropicOptions) =>
   ModelRegistry.layerFromRegistrationEffects([anthropic(options)]).pipe(
     Layer.provide(AnthropicClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
-    Layer.provide(FetchHttpClient.layer),
   )
+
+/** @experimental */
+export const withAnthropicFetch = (options: WithAnthropicOptions) =>
+  withAnthropic(options).pipe(Layer.provide(FetchHttpClient.layer))
