@@ -3,7 +3,7 @@ import { Memory } from "@batonfx/core"
 import { SemanticRecall, VectorStore, WorkingMemory } from "@batonfx/memory"
 import { Embedding } from "@batonfx/providers"
 
-const embeddingLayer = Embedding.withOpenAiEmbedding({
+const embeddingLayer = Embedding.withOpenAiEmbeddingFetch({
   model: "text-embedding-3-small",
   apiKey: Config.redacted("OPENAI_API_KEY"),
 })

@@ -5,7 +5,7 @@ import {
 } from "@effect/ai-openai-compat"
 import { Config, Layer, Redacted } from "effect"
 import { EmbeddingModel } from "effect/unstable/ai"
-import { FetchHttpClient } from "effect/unstable/http"
+import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 
 /** @experimental */
 export interface OpenAiEmbeddingInput {
@@ -18,14 +18,15 @@ export interface OpenAiEmbeddingInput {
 /** @experimental */
 export const withOpenAiEmbedding = (
   options: OpenAiEmbeddingInput,
-): Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError> =>
+): Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError, HttpClient.HttpClient> =>
   OpenAiEmbeddingModel.layer({
     model: options.model,
     ...(options.config === undefined ? {} : { config: options.config }),
-  }).pipe(
-    Layer.provide(OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
-    Layer.provide(FetchHttpClient.layer),
-  )
+  }).pipe(Layer.provide(OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })))
+
+/** @experimental */
+export const withOpenAiEmbeddingFetch = (options: OpenAiEmbeddingInput) =>
+  withOpenAiEmbedding(options).pipe(Layer.provide(FetchHttpClient.layer))
 
 /** @experimental */
 export interface OpenAiCompatibleEmbeddingInput {
@@ -42,7 +43,7 @@ export interface OpenAiCompatibleEmbeddingInput {
 /** @experimental */
 export const withOpenAiCompatibleEmbedding = (
   options: OpenAiCompatibleEmbeddingInput,
-): Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError> =>
+): Layer.Layer<EmbeddingModel.EmbeddingModel, Config.ConfigError, HttpClient.HttpClient> =>
   OpenAiCompatibleEmbeddingModel.layer({
     model: options.model,
     ...(options.config === undefined ? {} : { config: options.config }),
@@ -54,5 +55,8 @@ export const withOpenAiCompatibleEmbedding = (
         apiUrl: Config.succeed(options.baseUrl),
       }),
     ),
-    Layer.provide(FetchHttpClient.layer),
   )
+
+/** @experimental */
+export const withOpenAiCompatibleEmbeddingFetch = (options: OpenAiCompatibleEmbeddingInput) =>
+  withOpenAiCompatibleEmbedding(options).pipe(Layer.provide(FetchHttpClient.layer))

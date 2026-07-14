@@ -4,7 +4,7 @@ import { Deterministic } from "@batonfx/providers"
 
 const agent = Agent.make({ name: "release-notes" })
 
-const modelLayer = Deterministic.withOpenAiOrDeterministic({
+const modelLayer = Deterministic.withOpenAiOrDeterministicFetch({
   model: "gpt-4o-mini",
   fallbackModel: "gpt-4o-mini",
   apiKey: Config.redacted("OPENAI_API_KEY"),

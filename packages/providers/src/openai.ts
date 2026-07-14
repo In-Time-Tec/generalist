@@ -41,5 +41,8 @@ export interface WithOpenAiOptions extends OpenAiInput {
 export const withOpenAi = (options: WithOpenAiOptions) =>
   ModelRegistry.layerFromRegistrationEffects([openAi(options)]).pipe(
     Layer.provide(OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
-    Layer.provide(FetchHttpClient.layer),
   )
+
+/** @experimental */
+export const withOpenAiFetch = (options: WithOpenAiOptions) =>
+  withOpenAi(options).pipe(Layer.provide(FetchHttpClient.layer))

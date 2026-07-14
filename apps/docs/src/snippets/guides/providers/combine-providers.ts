@@ -5,8 +5,8 @@ import { Anthropic, OpenRouter } from "@batonfx/providers"
 const agent = Agent.make({ name: "router" })
 
 const registryLayer = ModelRegistry.combine([
-  Anthropic.withAnthropic({ model: "claude-sonnet-4-5", apiKey: Config.redacted("ANTHROPIC_API_KEY") }),
-  OpenRouter.withOpenRouter({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
+  Anthropic.withAnthropicFetch({ model: "claude-sonnet-4-5", apiKey: Config.redacted("ANTHROPIC_API_KEY") }),
+  OpenRouter.withOpenRouterFetch({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
 ])
 
 const runWith = (selection: ModelRegistry.ModelSelection) =>

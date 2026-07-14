@@ -31,15 +31,17 @@ Each helper accepts the model name, optional language-model config, optional reg
 
 ## All-in-one layers
 
-`withOpenAi`, `withAnthropic`, `withOpenRouter`, and `withOpenAiCompatible` return `Layer<ModelRegistry.Service, Config.ConfigError>`. They compose the corresponding registration effect with the upstream client `layerConfig` and `FetchHttpClient.layer`.
+`withOpenAi`, `withAnthropic`, `withOpenRouter`, and `withOpenAiCompatible` return `Layer<ModelRegistry.Service, Config.ConfigError, HttpClient.HttpClient>`. They compose the corresponding registration effect with the upstream client `layerConfig` while preserving the upstream Effect Platform `HttpClient` requirement so hosts can supply tracing, test, proxy, or platform clients. The matching `withOpenAiFetch`, `withAnthropicFetch`, `withOpenRouterFetch`, and `withOpenAiCompatibleFetch` conveniences explicitly provide `FetchHttpClient.layer` and return layers with no remaining requirement.
 
 Every `with*` layer provides the single `ModelRegistry.Service` tag with its own fresh registry, so `Layer.mergeAll(withAnthropic(...), withOpenRouter(...))` keeps only one provider's registrations. Multi-provider hosts combine registry layers with `ModelRegistry.combine([withAnthropic(...), withOpenRouter(...)], options?)`, which builds each layer, collects its registrations, and installs one registry containing all of them. Upsert semantics are preserved: on identical `(provider, model, registrationKey)` identity, later layers win.
 
 The raw upstream `*Client.layerConfig` functions are re-exported for callers that want to assemble provider layers manually.
 
+Existing applications that relied on the former implicit fetch transport migrate from an unnamed constructor to its matching `*Fetch` name. For example, replace `withOpenAi(options)` with `withOpenAiFetch(options)` to preserve the previous runtime behavior. Use the unchanged base name only when the host provides `HttpClient.HttpClient`.
+
 ## Deterministic model
 
-`Deterministic.deterministicModel(input)` registers a local `Ai.LanguageModel` that emits `deterministic response`. `withDeterministic` installs it as a `ModelRegistry` layer. `withOpenAiOrDeterministic` always registers the deterministic fallback and registers OpenAI only when its config resolves.
+`Deterministic.deterministicModel(input)` registers a local `Ai.LanguageModel` that emits `deterministic response`. `withDeterministic` installs it as a `ModelRegistry` layer. `withOpenAiOrDeterministic` always registers the deterministic fallback and registers OpenAI only when its config resolves while preserving the `HttpClient` requirement; `withOpenAiOrDeterministicFetch` explicitly selects the fetch client.
 
 The deterministic helper is for tests and local development only. It is not a replay, fixture, or durable execution mechanism.
 
@@ -57,11 +59,11 @@ Presets are thin wrappers over `openAiCompatible` with a provider name and base 
 | `azureOpenAi`    | `azure`    | `https://{resource}.openai.azure.com/openai/v1`            |
 | `ollama`         | `ollama`   | `http://localhost:11434/v1`                                |
 
-Each preset has a matching `with*` layer form. Presets remain wrappers; they do not introduce provider-specific behavior beyond the provider name and base URL.
+Each preset registration effect and matching `with*` layer form preserves `HttpClient.HttpClient` in its requirements. Every preset also has matching `*Fetch` and `with*Fetch` conveniences that explicitly provide `FetchHttpClient.layer`. Presets remain wrappers; they do not introduce provider-specific behavior beyond the provider name and base URL.
 
 ## Embeddings
 
-Embeddings are not registered in `ModelRegistry`, which is language-model-only. `Embedding.withOpenAiEmbedding` and `Embedding.withOpenAiCompatibleEmbedding` return layers for `Ai.EmbeddingModel.EmbeddingModel` and compose the matching upstream embedding model with the matching upstream client and `FetchHttpClient.layer`.
+Embeddings are not registered in `ModelRegistry`, which is language-model-only. `Embedding.withOpenAiEmbedding` and `Embedding.withOpenAiCompatibleEmbedding` return layers for `Ai.EmbeddingModel.EmbeddingModel` and preserve `HttpClient.HttpClient` in their requirements. `Embedding.withOpenAiEmbeddingFetch` and `Embedding.withOpenAiCompatibleEmbeddingFetch` explicitly provide `FetchHttpClient.layer`.
 
 Memory packages consume the Effect AI embedding tag rather than importing provider packages.
 

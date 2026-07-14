@@ -51,7 +51,7 @@ export const memory = definePage({
       " and an ",
       code("Ai.EmbeddingModel"),
       "; ",
-      code("Embedding.withOpenAiEmbedding"),
+      code("Embedding.withOpenAiEmbeddingFetch"),
       " from ",
       code("@batonfx/providers"),
       " supplies the latter:",

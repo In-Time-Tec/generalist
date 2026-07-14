@@ -112,7 +112,7 @@ export const quickstart = definePage({
       " registers a model in the ModelRegistry; ",
       code("ModelRegistry.provide(selection, effect)"),
       " supplies the actual LanguageModel per run. Swapping to a real model is the same shape with ",
-      code("withOpenRouter"),
+      code("withOpenRouterFetch"),
       " (see ",
       link("/docs/guides/providers", "How to register real model providers"),
       "). The registry layer is never a LanguageModel layer by itself.",
