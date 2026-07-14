@@ -10,7 +10,7 @@ const program = Effect.scoped(
     const client = yield* Client.AgentClient
     const connection = yield* client.connect({ url: "ws://localhost:4000/ws", sessionId })
     yield* connection.status.pipe(
-      Stream.takeUntil((status) => status._tag === "Open"),
+      Stream.takeUntil((status) => status._tag === "Connected"),
       Stream.runDrain,
     )
     yield* connection.send({ _tag: "ResolveApproval", sessionId, token, decision: { _tag: "Approved" } })

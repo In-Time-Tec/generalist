@@ -3,6 +3,7 @@ import { Schema } from "effect"
 /** @experimental Transport framing, encoding, or connection operation failed. */
 export class TransportError extends Schema.TaggedErrorClass<TransportError>()("@batonfx/transport/TransportError", {
   message: Schema.String,
+  kind: Schema.optional(Schema.Literals(["socket", "protocol", "encoding", "not-open"])),
 }) {}
 
 /** @experimental A WebSocket command was received before the socket attached to a session. */
@@ -13,3 +14,11 @@ export class SessionMismatch extends Schema.TaggedErrorClass<SessionMismatch>()(
   attachedSessionId: Schema.String,
   requestedSessionId: Schema.String,
 }) {}
+
+/** @experimental Reconnection stopped after the configured schedule was exhausted. */
+export class ReconnectExhausted extends Schema.TaggedErrorClass<ReconnectExhausted>()(
+  "@batonfx/transport/ReconnectExhausted",
+  {
+    lastError: TransportError,
+  },
+) {}
