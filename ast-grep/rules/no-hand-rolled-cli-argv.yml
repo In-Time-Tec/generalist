@@ -12,6 +12,7 @@ files:
   - "**/*.ts"
   - "**/*.tsx"
 ignores:
+  - "repos/effect/**"
   - "**/dist/**"
   - "**/coverage/**"
   - "node_modules/**"

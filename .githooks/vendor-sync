@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+
+git -C "$root" submodule sync
+git -C "$root" submodule update --init --remote --depth 1

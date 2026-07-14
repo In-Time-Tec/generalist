@@ -28,10 +28,11 @@ const httpLayer = (
       const target = url.toString()
       requests.push({ url: target, accept: request.headers.accept })
       const response = responses[target]
+      const body = response?.body instanceof Uint8Array ? new Uint8Array(response.body) : response?.body
       return Effect.succeed(
         HttpClientResponse.fromWeb(
           request,
-          new Response(response?.body ?? "missing", {
+          new Response(body ?? "missing", {
             status: response?.status ?? (response === undefined ? 404 : 200),
           }),
         ),

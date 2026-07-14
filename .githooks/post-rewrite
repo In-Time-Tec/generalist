@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+if [ "${1:-}" = "rebase" ]; then
+  exec "$(dirname "$0")/vendor-sync"
+fi

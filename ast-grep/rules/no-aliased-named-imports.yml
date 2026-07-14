@@ -12,6 +12,7 @@ files:
   - "**/*.ts.txt"
   - "apps/docs/src/snippets/**/*.txt"
 ignores:
+  - "repos/effect/**"
   - "**/dist/**"
   - "**/coverage/**"
   - "node_modules/**"

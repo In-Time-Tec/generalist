@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -39,32 +41,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Check formatting
-        run: bun run format:check
-
-      - name: Lint
-        run: bun run lint
-
-      - name: Typecheck
-        run: bun run typecheck
-
-      - name: Check docs
-        run: bun run check:docs
-
-      - name: Typecheck examples
-        run: bun run typecheck:examples
-
-      - name: Check release
-        run: bun run check:release
-
-      - name: Test
-        run: bun run test
+      - name: Check
+        run: bun run check
 
       - name: Coverage
         run: bun run test:coverage
-
-      - name: Build
-        run: bun run build
-
-      - name: Verify packed packages
-        run: bun run package:smoke

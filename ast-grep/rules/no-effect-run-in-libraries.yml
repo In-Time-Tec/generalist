@@ -1,0 +1,17 @@
+id: no-effect-run-in-libraries
+language: TypeScript
+severity: error
+message: Library modules must return and compose Effect values; run Effect only at an explicit process or framework boundary.
+rule:
+  pattern: Effect.$RUN($$$ARGS)
+constraints:
+  RUN:
+    regex: "^run"
+files:
+  - "packages/*/src/**/*.ts"
+  - "packages/*/src/**/*.tsx"
+ignores:
+  - "packages/mcp/src/oauth.ts"
+  - "**/dist/**"
+  - "**/generated/**"
+  - "repos/effect/**"

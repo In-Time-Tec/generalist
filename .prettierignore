@@ -3,6 +3,7 @@
 coverage
 dist
 node_modules
+repos
 
 # Local agent/tooling state directories.
 .claude
