@@ -1,13 +1,18 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Option, Schema } from "effect"
+import { Cause, Effect, Exit, Layer, Option, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
-import { Wire } from "@batonfx/transport"
+import { Errors, Wire } from "@batonfx/transport"
 import { Chat, Connection } from "../src/index"
 
 const eventFrame = (seq: number, event: Wire.EventType): Wire.LooseServerFrameType => ({ _tag: "Event", seq, event })
 
 const updateWith = (model: Chat.Model, incoming: Connection.Incoming) =>
   Chat.update(model, Chat.ReceivedAgent({ incoming }))
+
+const provideTestLayer =
+  <R, E, RIn>(testLayer: Layer.Layer<R, E, RIn>) =>
+  <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
+    Layer.build(testLayer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
 
 describe("Chat", () => {
   it("folds a full run into display entries and a completion out-message", () => {
@@ -139,5 +144,102 @@ describe("Chat", () => {
     expect(next.entries).toEqual([Chat.UserEntry({ text: "hello" })])
     expect(commands).toHaveLength(1)
     expect(commands[0]).toMatchObject({ name: "SendUserMessage", args: { sessionId: "s-chat", text: "hello" } })
+  })
+
+  it.effect("preserves a typed command failure as a structured message", () => {
+    const error = Connection.SendFailed.make({ reason: "command rejected" })
+    const command: Chat.ChatCommand = Chat.CancelRun({ sessionId: "s-chat" })
+
+    return Effect.gen(function* () {
+      const message = yield* command.effect
+
+      expect(message).toEqual(Chat.FailedAgentCommand({ operation: "cancel", error, reason: "command rejected" }))
+      expect(Schema.is(Chat.Message)(message)).toBe(true)
+    }).pipe(
+      provideTestLayer(
+        Connection.testLayer({
+          frames: () => Stream.empty,
+          send: () => Effect.fail(error),
+        }),
+      ),
+    )
+  })
+
+  it.effect("retains transport command error tags and fields", () => {
+    const error = Errors.TransportError.make({ message: "socket closed" })
+    return Effect.gen(function* () {
+      const message = yield* Chat.SendUserMessage({ sessionId: "s-chat", text: "hello" }).effect
+
+      expect(message).toEqual(Chat.FailedAgentCommand({ operation: "send", error, reason: "socket closed" }))
+    }).pipe(
+      provideTestLayer(
+        Connection.testLayer({
+          frames: () => Stream.empty,
+          send: () => Effect.fail(error),
+        }),
+      ),
+    )
+  })
+
+  it.effect("labels approval command failures", () => {
+    const error = Connection.SendFailed.make({ reason: "approval rejected" })
+    return Effect.gen(function* () {
+      const message = yield* Chat.ResolveApproval({
+        sessionId: "s-chat",
+        token: "approval-token",
+        approved: false,
+        reason: null,
+      }).effect
+
+      expect(message).toEqual(
+        Chat.FailedAgentCommand({ operation: "resolveApproval", error, reason: "approval rejected" }),
+      )
+    }).pipe(
+      provideTestLayer(
+        Connection.testLayer({
+          frames: () => Stream.empty,
+          send: () => Effect.fail(error),
+        }),
+      ),
+    )
+  })
+
+  it.effect("keeps command defects and interruption out of UI messages", () => {
+    const commandExit = (send: Connection.Interface["send"]) =>
+      Chat.CancelRun({ sessionId: "s-chat" }).effect.pipe(
+        provideTestLayer(
+          Connection.testLayer({
+            frames: () => Stream.empty,
+            send,
+          }),
+        ),
+        Effect.exit,
+      )
+
+    return Effect.gen(function* () {
+      const defectExit = yield* commandExit(() => Effect.die("command defect"))
+      const interruptExit = yield* commandExit(() => Effect.interrupt)
+
+      expect(Exit.isFailure(defectExit) && Cause.hasDies(defectExit.cause)).toBe(true)
+      expect(Exit.isFailure(interruptExit) && Cause.hasInterrupts(interruptExit.cause)).toBe(true)
+    })
+  })
+
+  it.effect("preserves unexpected reasons in a composite command cause", () => {
+    const error = Connection.SendFailed.make({ reason: "command rejected" })
+    const cause = Cause.combine(Cause.fail(error), Cause.die("command defect"))
+    return Effect.gen(function* () {
+      const exit = yield* Effect.exit(Chat.CancelRun({ sessionId: "s-chat" }).effect)
+
+      expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true)
+      expect(Exit.isFailure(exit) && Cause.hasFails(exit.cause)).toBe(false)
+    }).pipe(
+      provideTestLayer(
+        Connection.testLayer({
+          frames: () => Stream.empty,
+          send: () => Effect.failCause(cause),
+        }),
+      ),
+    )
   })
 })

@@ -1,4 +1,4 @@
-import { Cause, Equivalence, Effect, Option, Schema, Stream } from "effect"
+import { Cause, Equivalence, Effect, Option, Result, Schema, Stream } from "effect"
 import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 import { define, type Command } from "foldkit/command"
@@ -6,12 +6,11 @@ import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
 import { make } from "foldkit/subscription"
 import { Wire } from "@batonfx/transport"
-import { AgentConnection, Incoming, SendFailed } from "./connection.js"
+import { AgentCommandError, AgentConnection, CommandOperation, Incoming, SendFailed } from "./connection.js"
 const CompletedFields = { isFailure: Schema.Boolean, result: Schema.Unknown }
 const UserEntryFields = { text: Schema.String }
 const AssistantEntryFields = { text: Schema.String, reasoning: Schema.NullOr(Schema.String) }
 const RunCompletedFields = { text: Schema.String }
-const StringReasonFields = { reason: Schema.String }
 const OpenedSessionFields = { sessionId: Schema.String }
 
 /** @experimental */
@@ -158,10 +157,18 @@ export const ResolvedApproval: CallableTaggedStruct<"ResolvedApproval", {}> = m(
 export const CancelledRun: CallableTaggedStruct<"CancelledRun", {}> = m("CancelledRun")
 
 /** @experimental */
-export const FailedAgentCommand: CallableTaggedStruct<"FailedAgentCommand", typeof StringReasonFields> = m(
+export const FailedAgentCommand: CallableTaggedStruct<
   "FailedAgentCommand",
-  StringReasonFields,
-)
+  {
+    operation: typeof CommandOperation
+    error: typeof AgentCommandError
+    reason: typeof Schema.String
+  }
+> = m("FailedAgentCommand", {
+  operation: CommandOperation,
+  error: AgentCommandError,
+  reason: Schema.String,
+})
 
 /** @experimental */
 export type Message =
@@ -330,7 +337,7 @@ export const ConversationItem: Schema.Schema<ConversationItem> = Schema.Union([
 ])
 
 /** @experimental */
-export type ChatCommand = Command<Message, any, AgentConnection>
+export type ChatCommand = Command<Message, AgentCommandError, AgentConnection>
 
 /** @experimental */
 export const initialModel = (sessionId: string | null = null): Model => ({
@@ -345,11 +352,37 @@ export const initialModel = (sessionId: string | null = null): Model => ({
 
 type FailedAgentCommandMessage = typeof FailedAgentCommand.Type
 
-const commandFailed = (error: unknown): FailedAgentCommandMessage =>
-  FailedAgentCommand({ reason: Schema.is(SendFailed)(error) ? error.reason : String(error) })
+const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<never>> => {
+  const reasons: Array<Cause.Reason<never>> = []
+  for (const reason of cause.reasons) {
+    if (Cause.isDieReason(reason) || Cause.isInterruptReason(reason)) reasons.push(reason)
+  }
+  return reasons.length === 0 ? Option.none() : Option.some(Cause.fromReasons(reasons))
+}
 
-const catchCommandFailure = <A>(effect: Effect.Effect<A, SendFailed, AgentConnection>) =>
-  effect.pipe(Effect.catchCause((cause) => Effect.succeed(commandFailed(Cause.squash(cause)))))
+const commandFailed = (operation: CommandOperation, error: AgentCommandError): FailedAgentCommandMessage =>
+  FailedAgentCommand({
+    operation,
+    error,
+    reason: Schema.is(SendFailed)(error) ? error.reason : error.message,
+  })
+
+const catchCommandFailure = <A>(
+  operation: CommandOperation,
+  effect: Effect.Effect<A, AgentCommandError, AgentConnection>,
+) =>
+  effect.pipe(
+    Effect.catchCause((cause) =>
+      Option.match(unexpectedCause(cause), {
+        onNone: () =>
+          Result.match(Cause.findError(cause), {
+            onFailure: Effect.failCause,
+            onSuccess: (error) => Effect.succeed(commandFailed(operation, error)),
+          }),
+        onSome: Effect.failCause,
+      }),
+    ),
+  )
 
 /** @experimental */
 export const SendUserMessage = define(
@@ -360,6 +393,7 @@ export const SendUserMessage = define(
 )(({ sessionId, text }) =>
   AgentConnection.use((connection) =>
     catchCommandFailure(
+      "send",
       connection.send({ _tag: "SendMessage", sessionId, prompt: text }).pipe(Effect.as(SentUserMessage())),
     ),
   ),
@@ -384,6 +418,7 @@ export const ResolveApproval = define(
       : { _tag: "Denied", reason }
   return AgentConnection.use((connection) =>
     catchCommandFailure(
+      "resolveApproval",
       connection.send({ _tag: "ResolveApproval", sessionId, token, decision }).pipe(Effect.as(ResolvedApproval())),
     ),
   )
@@ -397,7 +432,7 @@ export const CancelRun = define(
   FailedAgentCommand,
 )(({ sessionId }) =>
   AgentConnection.use((connection) =>
-    catchCommandFailure(connection.send({ _tag: "Cancel", sessionId }).pipe(Effect.as(CancelledRun()))),
+    catchCommandFailure("cancel", connection.send({ _tag: "Cancel", sessionId }).pipe(Effect.as(CancelledRun()))),
   ),
 )
 

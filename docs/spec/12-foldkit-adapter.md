@@ -30,7 +30,7 @@ Compatibility routing uses a bounded map of active session acquisitions. A newer
 
 Callers of `frames` and `send` require no migration, and `testLayer({ frames, send })` continues to adapt legacy test implementations. Custom providers typed as `AgentConnection.Interface` or constructed directly with `AgentConnection.of` must add the scoped `session` acquisition; they may use `testLayer` as a temporary compatibility adapter.
 
-Transport failures are folded into `Incoming` values such as `ConnectionFailed`; they are not replay `Failed` frames. Command failures become `SendFailed` and are converted by commands into FoldKit messages.
+Expected `TransportError` failures from the frame stream are folded into structured `ConnectionFailed` incoming facts that retain the `connect` operation and original error. They are not replay `Failed` frames. Defects and interruption remain in the stream cause. Command sends fail with the `AgentCommandError` union of transport `TransportError` and adapter `SendFailed`; built-in commands recover only those expected errors into structured `FailedAgentCommand` messages that retain the operation and original error. Defects and interruption retain their Effect semantics.
 
 The first layer is WebSocket-backed. SSE is downstream-only in the transport spec; this package does not define a command POST convention.
 
@@ -71,7 +71,9 @@ Frame handling:
 | `Snapshot`                                    | replace display entries from the prompt transcript projection                        |
 | `Ended`                                       | no-op logical run terminator                                                         |
 
-User messages update draft state and emit commands. Commands convert every send failure into `FailedAgentCommand`; no command fails silently.
+User messages update draft state and emit commands. Commands convert every expected `AgentCommandError` into `FailedAgentCommand`; no expected command failure is silent. The default chat update renders structured connection and command facts from their typed error message while preserving their discriminator and fields for custom updates and diagnostics.
+
+`ChatCommand` now exposes `AgentCommandError` instead of `any`. `ConnectionFailed.reason` and `FailedAgentCommand.reason` remain available as the default display text, while their new `operation` and `error` fields provide structured handling. Consumers that construct either message directly must supply those fields; consumers that only read `reason` remain source-compatible.
 
 Tool entries retain the difference between a tool call observed in model output and execution actually starting. Foldcn tool status helpers map that to `input-streaming` before `ToolExecutionStarted`, `input-available` while execution is running, and `output-available` / `output-error` after completion.
 
