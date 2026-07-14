@@ -1,5 +1,5 @@
 import { describe, expect, it, layer } from "@effect/vitest"
-import { Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
+import { Cause, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { Socket } from "effect/unstable/socket"
 import { Wire } from "@batonfx/transport"
 import { Chat, Connection } from "../src/index"
@@ -48,6 +48,10 @@ class FakeWebSocket extends EventTarget implements WebSocket {
   open(): void {
     this.readyState = this.OPEN
     this.dispatchEvent(new Event("open"))
+  }
+
+  message(data: unknown): void {
+    this.dispatchEvent(new MessageEvent("message", { data }))
   }
 
   send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void {
@@ -240,6 +244,106 @@ describe("Connection", () => {
       expect(socket.closeCalls).toBe(1)
     }).pipe(
       provideTestLayer(Connection.layerWebSocket({ url: "ws://test" }).pipe(Layer.provide(webSocketLayer(sockets)))),
+    )
+  })
+
+  it.effect("preserves a typed frame failure as a structured connection fact", () => {
+    const sockets: Array<FakeWebSocket> = []
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const connection = yield* Connection.AgentConnection
+        const session = yield* connection.session({ sessionId: "typed-frame-failure" })
+        const failure = yield* Effect.forkScoped(
+          session.frames.pipe(
+            Stream.filter((incoming) => incoming._tag === "ConnectionFailed"),
+            Stream.runHead,
+          ),
+        )
+        const socket = yield* openSocket(sockets, 0)
+        socket.message("not a server frame")
+        const incoming = Option.getOrThrow(yield* Fiber.join(failure))
+
+        expect(incoming).toMatchObject({
+          _tag: "ConnectionFailed",
+          operation: "connect",
+          error: {
+            _tag: "@batonfx/transport/TransportError",
+            message: expect.any(String),
+          },
+          reason: expect.any(String),
+        })
+        expect(Schema.is(Connection.Incoming)(incoming)).toBe(true)
+      }).pipe(
+        provideTestLayer(Connection.layerWebSocket({ url: "ws://test" }).pipe(Layer.provide(webSocketLayer(sockets)))),
+      ),
+    )
+  })
+
+  it.effect("keeps frame stream defects and interruption out of connection facts", () => {
+    const defect = Effect.scoped(
+      Connection.AgentConnection.use((connection) =>
+        connection.session({ sessionId: "defect" }).pipe(
+          Effect.flatMap((session) => Stream.runDrain(session.frames)),
+          Effect.exit,
+        ),
+      ),
+    ).pipe(
+      provideTestLayer(
+        Connection.testLayer({
+          frames: () => Stream.die("frame defect"),
+          send: () => Effect.void,
+        }),
+      ),
+    )
+    const interruption = Effect.scoped(
+      Connection.AgentConnection.use((connection) =>
+        connection.session({ sessionId: "interruption" }).pipe(
+          Effect.flatMap((session) => Stream.runDrain(session.frames)),
+          Effect.exit,
+        ),
+      ),
+    ).pipe(
+      provideTestLayer(
+        Connection.testLayer({
+          frames: () => Stream.fromEffect(Effect.interrupt),
+          send: () => Effect.void,
+        }),
+      ),
+    )
+
+    return Effect.gen(function* () {
+      const defectExit = yield* defect
+      const interruptExit = yield* interruption
+
+      expect(Exit.isFailure(defectExit) && Cause.hasDies(defectExit.cause)).toBe(true)
+      expect(Exit.isFailure(interruptExit) && Cause.hasInterrupts(interruptExit.cause)).toBe(true)
+    })
+  })
+
+  it.effect("preserves a standard WebSocket command failure and stream interruption", () => {
+    const sockets: Array<FakeWebSocket> = []
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const connection = yield* Connection.AgentConnection
+        const session = yield* connection.session({ sessionId: "standard-boundary" })
+        const frames = yield* Effect.forkScoped(Stream.runDrain(session.frames))
+        const message = yield* Chat.CancelRun({ sessionId: "standard-boundary" }).effect
+        yield* Fiber.interrupt(frames)
+        const interrupted = yield* Fiber.await(frames)
+
+        expect(message).toMatchObject({
+          _tag: "FailedAgentCommand",
+          operation: "cancel",
+          error: {
+            _tag: "@batonfx/transport/TransportError",
+            message: "WebSocket is not open",
+          },
+          reason: "WebSocket is not open",
+        })
+        expect(Exit.isFailure(interrupted) && Cause.hasInterrupts(interrupted.cause)).toBe(true)
+      }).pipe(
+        provideTestLayer(Connection.layerWebSocket({ url: "ws://test" }).pipe(Layer.provide(webSocketLayer(sockets)))),
+      ),
     )
   })
 })

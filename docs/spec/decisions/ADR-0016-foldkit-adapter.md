@@ -10,7 +10,7 @@ FoldKit applications need a small adapter that turns Baton transport streams and
 
 ## Decision
 
-Add `@batonfx/foldkit` as a package that peer-depends on FoldKit and Effect, depends on `@batonfx/transport`, and exports `Connection` and `Chat` namespaces. The adapter uses a static FoldKit runtime `resources` layer for an `AgentConnection` factory, scoped per-session `SessionConnection` values, a WebSocket-backed connection layer, FoldKit command definitions that convert failures into messages, and a pure replay-idempotent chat update.
+Add `@batonfx/foldkit` as a package that peer-depends on FoldKit and Effect, depends on `@batonfx/transport`, and exports `Connection` and `Chat` namespaces. The adapter uses a static FoldKit runtime `resources` layer for an `AgentConnection` factory, scoped per-session `SessionConnection` values, a WebSocket-backed connection layer, FoldKit command definitions that convert expected typed failures into structured messages, and a pure replay-idempotent chat update. Connection and command facts retain the operation and original tagged error. Defects and interruption are not converted into UI data and retain their Effect cause semantics.
 
 Each `SessionConnection` owns one transport connection under its caller's scope, so subscription frames and commands share one session identity and lifetime. The static service keeps migration-compatible `frames` and `send` methods: stream acquisition owns its connection scope, while command routing uses an active-session map keyed by session id. Map removal is generation-checked so an old finalizer cannot remove a newer same-session acquisition. Missing or mismatched session ownership fails through `SendFailed`; no command falls back to another session.
 
@@ -25,6 +25,7 @@ The adapter does not define styled views, EventSource wrappers, generic SSE comm
 - FoldKit apps can embed a Baton chat submodel without adopting Relay.
 - Overlapping subscriptions route commands only through their matching scoped session connection.
 - Existing `frames` and `send` callers remain source-compatible while integrations can migrate to direct `session` acquisition.
+- Public command error channels expose the concrete transport-or-adapter failure union instead of `any`; custom command consumers may need to tighten their annotations.
 - Relay can still compose at a higher layer by providing durable transport/session behavior.
 - SSE command routing remains host-owned until the transport spec defines a command POST contract.
 

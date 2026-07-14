@@ -2,7 +2,7 @@ import { Cause, Context, Effect, Layer, Option, Ref, Result, Schema, Scope, Stre
 import { Socket } from "effect/unstable/socket"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import { Client, Wire } from "@batonfx/transport"
+import { Client, Errors, Wire } from "@batonfx/transport"
 
 /** @experimental */
 export const ConnectionOpened: CallableTaggedStruct<"ConnectionOpened", {}> = m("ConnectionOpened")
@@ -11,10 +11,18 @@ export const ConnectionOpened: CallableTaggedStruct<"ConnectionOpened", {}> = m(
 export const ConnectionLost: CallableTaggedStruct<"ConnectionLost", {}> = m("ConnectionLost")
 
 /** @experimental */
-export const ConnectionFailed: CallableTaggedStruct<"ConnectionFailed", { reason: typeof Schema.String }> = m(
+export const ConnectionFailed: CallableTaggedStruct<
   "ConnectionFailed",
-  { reason: Schema.String },
-)
+  {
+    operation: Schema.Literal<"connect">
+    error: typeof Errors.TransportError
+    reason: typeof Schema.String
+  }
+> = m("ConnectionFailed", {
+  operation: Schema.Literal("connect"),
+  error: Errors.TransportError,
+  reason: Schema.String,
+})
 
 /** @experimental */
 export type Incoming =
@@ -37,10 +45,24 @@ export class SendFailed extends Schema.TaggedErrorClass<SendFailed>()("@batonfx/
 }) {}
 
 /** @experimental */
+export const AgentCommandError = Schema.Union([Errors.TransportError, SendFailed])
+
+/** @experimental */
+export type AgentCommandError = typeof AgentCommandError.Type
+
+/** @experimental */
+export const CommandOperation = Schema.Literals(["send", "cancel", "resolveApproval"])
+
+/** @experimental */
+export type CommandOperation = typeof CommandOperation.Type
+
+/** @experimental */
 export interface SessionConnection {
   readonly sessionId: string
   readonly frames: Stream.Stream<Incoming, never>
-  readonly send: (frame: Exclude<Wire.ClientFrameType, { readonly _tag: "Attach" }>) => Effect.Effect<void, SendFailed>
+  readonly send: (
+    frame: Exclude<Wire.ClientFrameType, { readonly _tag: "Attach" }>,
+  ) => Effect.Effect<void, AgentCommandError>
 }
 
 /** @experimental */
@@ -53,7 +75,7 @@ export interface Interface {
     readonly sessionId: string
     readonly afterSeq?: number
   }) => Stream.Stream<Incoming, never>
-  readonly send: (frame: Wire.ClientFrameType) => Effect.Effect<void, SendFailed>
+  readonly send: (frame: Wire.ClientFrameType) => Effect.Effect<void, AgentCommandError>
 }
 
 /** @experimental */
@@ -68,10 +90,17 @@ interface ActiveConnection {
 
 type LegacyInterface = Omit<Interface, "session">
 
-const reasonFrom = (error: unknown): string => {
-  if (Schema.is(SendFailed)(error)) return error.reason
-  if (error instanceof Error) return error.message
-  return String(error)
+const sendThrough = (
+  connection: Client.Connection,
+  frame: Wire.ClientFrameType,
+): Effect.Effect<void, AgentCommandError> => connection.send(frame)
+
+const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<never>> => {
+  const reasons: Array<Cause.Reason<never>> = []
+  for (const reason of cause.reasons) {
+    if (Cause.isDieReason(reason) || Cause.isInterruptReason(reason)) reasons.push(reason)
+  }
+  return reasons.length === 0 ? Option.none() : Option.some(Cause.fromReasons(reasons))
 }
 
 const statusIncoming = (status: Client.ConnectionStatus): Option.Option<Incoming> => {
@@ -125,9 +154,6 @@ export const layerWebSocket = (options: {
           return updated
         })
 
-      const sendThrough = (connection: Client.Connection, frame: Wire.ClientFrameType) =>
-        connection.send(frame).pipe(Effect.mapError((error) => SendFailed.make({ reason: reasonFrom(error) })))
-
       const session = ({ sessionId }: { readonly sessionId: string; readonly afterSeq?: number }) =>
         Effect.gen(function* () {
           const connection = yield* client.connect({ url: options.url, sessionId })
@@ -150,7 +176,17 @@ export const layerWebSocket = (options: {
           )
           const frames = connection.frames.pipe(
             Stream.map((frame): Incoming => frame),
-            Stream.catchCause((cause) => Stream.succeed(ConnectionFailed({ reason: reasonFrom(Cause.squash(cause)) }))),
+            Stream.catchCause((cause) =>
+              Option.match(unexpectedCause(cause), {
+                onNone: () =>
+                  Result.match(Cause.findError(cause), {
+                    onFailure: Stream.failCause,
+                    onSuccess: (error) =>
+                      Stream.succeed(ConnectionFailed({ operation: "connect", error, reason: error.message })),
+                  }),
+                onSome: Stream.failCause,
+              }),
+            ),
           )
           return {
             sessionId,
