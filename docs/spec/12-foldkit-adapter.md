@@ -18,12 +18,17 @@ Baton does not own styled views, FoldCN components, durable execution addressabi
 
 ## AgentConnection resource
 
-`AgentConnection` is a long-lived Effect service supplied to FoldKit through static runtime `resources`. The FoldKit `managedResources` API is for model-driven acquire/re-acquire lifecycles and is not used for the shared agent socket in this milestone.
+`AgentConnection` is a long-lived Effect service supplied to FoldKit through static runtime `resources`. It is a connection factory and compatibility router, not the owner of one global socket. `session({ sessionId, afterSeq? })` acquires a `SessionConnection` in the caller's `Scope`; that value owns one transport connection whose frame subscription and command writes share the same lifetime. Closing the scope interrupts and releases only that acquisition exactly once.
 
 The resource exposes:
 
-- `frames({ sessionId, afterSeq? })`, a never-failing stream of decoded server frames and connection facts;
-- `send(frame)`, a command-side write of an existing `Wire.ClientFrameType`.
+- `session({ sessionId, afterSeq? })`, a scoped acquisition returning the selected `sessionId`, a never-failing stream of decoded server frames and connection facts, and a command-side `send(frame)` that rejects a frame for any other session;
+- `frames({ sessionId, afterSeq? })`, a source-compatible adapter that acquires a session for the stream lifetime;
+- `send(frame)`, a source-compatible command route that selects only the active acquisition keyed by the frame's `sessionId` and fails typed when none exists.
+
+Compatibility routing uses a bounded map of active session acquisitions. A newer acquisition for the same session replaces the map entry, and every finalizer removes its entry only when its generation still matches. Overlapping sessions therefore cannot overwrite each other's command route, and finalizing an older same-session acquisition cannot remove its successor. New integrations should acquire `SessionConnection` directly; the compatibility methods remain for existing FoldKit commands whose execution environment contains only the static resource layer.
+
+Callers of `frames` and `send` require no migration, and `testLayer({ frames, send })` continues to adapt legacy test implementations. Custom providers typed as `AgentConnection.Interface` or constructed directly with `AgentConnection.of` must add the scoped `session` acquisition; they may use `testLayer` as a temporary compatibility adapter.
 
 Transport failures are folded into `Incoming` values such as `ConnectionFailed`; they are not replay `Failed` frames. Command failures become `SendFailed` and are converted by commands into FoldKit messages.
 
@@ -31,7 +36,7 @@ The first layer is WebSocket-backed. SSE is downstream-only in the transport spe
 
 ## Subscription contract
 
-The chat subscription depends on `sessionId` and `afterSeq`, but it keeps the stream alive when only `afterSeq` changes. `sessionId` changes restart the stream; cursor changes are read by the running stream where FoldKit supplies `readDependencies`.
+The chat subscription depends on `sessionId` and `afterSeq`, but it keeps the scoped session connection alive when only `afterSeq` changes. `sessionId` changes release the old acquisition and acquire the new session; cursor changes are read by the running stream where FoldKit supplies `readDependencies`.
 
 Current WebSocket transport reconnects with the last sequence it has seen internally. Its initial `connect` call has no `afterSeq` option, so the FoldKit adapter accepts `afterSeq` for subscription shape and idempotence but does not invent a new transport cursor contract.
 
