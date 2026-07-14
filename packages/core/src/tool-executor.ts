@@ -32,9 +32,15 @@ export interface Suspend {
 /** @experimental */
 export type Outcome = Success | Failure | Suspend
 
+/** @experimental A retry-safe remote route supplied an invalid or unstable operation key or retry bound. */
+export class RemoteRetryError extends Schema.TaggedErrorClass<RemoteRetryError>()("@batonfx/core/RemoteRetryError", {
+  reason: Schema.Literals(["invalid-max-retries", "missing-operation-key", "changed-operation-key"]),
+  message: Schema.String,
+}) {}
+
 /** @experimental */
 export interface Interface {
-  readonly execute: (request: Request) => Effect.Effect<Outcome, AgentError, ToolContext>
+  readonly execute: (request: Request) => Effect.Effect<Outcome, AgentError | RemoteRetryError, ToolContext>
 }
 
 /** @experimental */
@@ -71,6 +77,11 @@ export interface PlacementRequest extends Request {
   readonly tool: Tool.Any
 }
 
+/** @experimental A retry-safe remote placement request carrying its endpoint deduplication key. */
+export interface RemotePlacementRequest extends PlacementRequest {
+  readonly operationKey: string
+}
+
 /** @experimental */
 export type PlacementResponse =
   | { readonly _tag: "Success"; readonly result: unknown }
@@ -85,10 +96,27 @@ export interface PlacementRouteOptions<Tools extends Record<string, Tool.Any>, E
 }
 
 /** @experimental */
-export interface RemoteRouteOptions<Tools extends Record<string, Tool.Any>, E = AgentError>
+export interface RemoteRouteUnsafeOptions<Tools extends Record<string, Tool.Any>, E = AgentError>
   extends PlacementRouteOptions<Tools, E> {
+  readonly retrySafe?: false | undefined
   readonly schedule?: Schedule.Schedule<unknown, unknown> | undefined
 }
+
+/** @experimental Retry-safe remote route whose endpoint deduplicates the stable operation key. */
+export interface RemoteRouteRetrySafeOptions<Tools extends Record<string, Tool.Any>, E> {
+  readonly toolkit: Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
+  readonly tools?: ReadonlyArray<string> | undefined
+  readonly retrySafe: true
+  readonly operationKey: (request: PlacementRequest) => string
+  readonly maxRetries: number
+  readonly schedule: Schedule.Schedule<unknown, E>
+  readonly execute: (request: RemotePlacementRequest) => Effect.Effect<PlacementResponse, E, ToolContext>
+}
+
+/** @experimental */
+export type RemoteRouteOptions<Tools extends Record<string, Tool.Any>, E = AgentError> =
+  | RemoteRouteUnsafeOptions<Tools, E>
+  | RemoteRouteRetrySafeOptions<Tools, E>
 
 const failureMessage = (cause: Cause.Cause<unknown>): string => {
   const error = Cause.squash(cause)
@@ -280,7 +308,7 @@ export const route = (options: RouteOptions): Route => {
 
 const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
   placement: Placement,
-  options: PlacementRouteOptions<Tools, E> | RemoteRouteOptions<Tools, E>,
+  options: PlacementRouteOptions<Tools, E>,
 ): Route => {
   const routedTools = options.tools ?? Object.keys(options.toolkit.tools)
   return route({
@@ -288,20 +316,81 @@ const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
     execute: (request) => {
       const tool = options.toolkit.tools[request.call.name]
       if (tool === undefined) return Effect.succeed(failureOutcome(`Tool ${request.call.name} is not registered`))
-      const effect = options.execute({ ...request, placement, tool })
-      const scheduled =
-        "schedule" in options && options.schedule !== undefined ? Effect.retry(effect, options.schedule) : effect
-      return scheduled.pipe(
+      const placementRequest: PlacementRequest = { ...request, placement, tool }
+      return options.execute(placementRequest).pipe(
         Effect.flatMap((response) => placementOutcome(placement, tool, response)),
-        Effect.catchCause((cause) =>
-          Cause.hasInterrupts(cause)
-            ? Effect.interrupt
-            : Effect.succeed(failureOutcome(`${placement} tool infrastructure failed: ${failureMessage(cause)}`)),
-        ),
+        Effect.catchCause((cause) => {
+          if (Cause.hasInterrupts(cause)) return Effect.interrupt
+          const error = Cause.squash(cause)
+          return Schema.is(RemoteRetryError)(error)
+            ? Effect.fail(error)
+            : Effect.succeed(failureOutcome(`${placement} tool infrastructure failed: ${failureMessage(cause)}`))
+        }),
       )
     },
   })
 }
+
+const remoteRetryError = (reason: RemoteRetryError["reason"], message: string): RemoteRetryError =>
+  RemoteRetryError.make({ reason, message })
+
+const validateOperationKey = (operationKey: unknown): Effect.Effect<string, RemoteRetryError> =>
+  typeof operationKey !== "string" || operationKey.trim().length === 0
+    ? Effect.fail(remoteRetryError("missing-operation-key", "Remote retry operation key must be non-empty"))
+    : Effect.succeed(operationKey)
+
+const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
+  options: RemoteRouteRetrySafeOptions<Tools, E>,
+  request: PlacementRequest,
+): Effect.Effect<PlacementResponse, E | RemoteRetryError, ToolContext> =>
+  Effect.suspend(() => {
+    if (!Number.isFinite(options.maxRetries) || !Number.isInteger(options.maxRetries) || options.maxRetries < 0) {
+      return Effect.fail(
+        remoteRetryError("invalid-max-retries", "Remote retry maxRetries must be a non-negative finite integer"),
+      )
+    }
+    const operationKey = typeof options.operationKey === "function" ? options.operationKey(request) : undefined
+    return validateOperationKey(operationKey).pipe(
+      Effect.flatMap((stableKey) => {
+        let attempt = 0
+        const executeAttempt: Effect.Effect<PlacementResponse | RemoteRetryError, E, ToolContext> = Effect.suspend(
+          () => {
+            const currentKey = attempt === 0 ? stableKey : options.operationKey(request)
+            attempt += 1
+            return validateOperationKey(currentKey).pipe(
+              Effect.match({
+                onFailure: (error): string | RemoteRetryError => error,
+                onSuccess: (validatedKey): string | RemoteRetryError => validatedKey,
+              }),
+              Effect.flatMap(
+                (validatedKey): Effect.Effect<PlacementResponse | RemoteRetryError, E, ToolContext> =>
+                  typeof validatedKey !== "string"
+                    ? Effect.succeed(validatedKey)
+                    : validatedKey === stableKey
+                      ? options.execute({ ...request, operationKey: stableKey })
+                      : Effect.succeed(
+                          remoteRetryError(
+                            "changed-operation-key",
+                            "Remote retry operation key changed between attempts",
+                          ),
+                        ),
+              ),
+            )
+          },
+        )
+        return Effect.retry(executeAttempt, {
+          schedule: options.schedule,
+          times: options.maxRetries,
+          while: (error: E) => !Schema.is(AgentError)(error) && !Schema.is(RemoteRetryError)(error),
+        }).pipe(
+          Effect.flatMap(
+            (result): Effect.Effect<PlacementResponse, RemoteRetryError> =>
+              Schema.is(RemoteRetryError)(result) ? Effect.fail(result) : Effect.succeed(result),
+          ),
+        )
+      }),
+    )
+  })
 
 /** @experimental Route tool calls to a user/browser/desktop client. */
 export const client = <Tools extends Record<string, Tool.Any>, E = AgentError>(
@@ -311,7 +400,14 @@ export const client = <Tools extends Record<string, Tool.Any>, E = AgentError>(
 /** @experimental Route tool calls to a remote tool worker or service. */
 export const remote = <Tools extends Record<string, Tool.Any>, E = AgentError>(
   options: RemoteRouteOptions<Tools, E>,
-): Route => placementRoute("remote", options)
+): Route =>
+  options.retrySafe === true
+    ? placementRoute("remote", {
+        toolkit: options.toolkit,
+        ...(options.tools === undefined ? {} : { tools: options.tools }),
+        execute: (request) => retryRemote(options, request),
+      })
+    : placementRoute("remote", options)
 
 /** @experimental Route tool calls to an MCP placement adapter. */
 export const mcp = <Tools extends Record<string, Tool.Any>, E = AgentError>(

@@ -1,8 +1,9 @@
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
-import { Effect, Exit, Layer, Schedule, Schema, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Schedule, Schema, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, AgentTool, Approvals, ModelMiddleware, ToolContext, ToolExecutor } from "../src/index"
+import { Agent, AgentEvent, AgentTool, Approvals, ModelMiddleware, ToolContext, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 
@@ -167,7 +168,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "ToolExecutor.remote retries infrastructure failures without retrying tool failures", () => {
+  ItLayer.make(it, "ToolExecutor.remote ignores legacy schedules unless retry safety is explicit", () => {
     const runCi = Tool.make("run_ci", {
       parameters: Schema.Struct({}),
       success: Schema.Struct({ status: Schema.String }),
@@ -181,16 +182,51 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           ToolExecutor.remote({
             toolkit,
             schedule: Schedule.recurs(1),
-            execute: ({ call }): Effect.Effect<ToolExecutor.PlacementResponse, string> =>
+            execute: (): Effect.Effect<ToolExecutor.PlacementResponse, string> => {
+              attempts += 1
+              return Effect.fail("network unavailable")
+            },
+          }),
+        ]),
+        ToolContext.layerDefault,
+      ),
+      Effect.gen(function* () {
+        const executor = yield* ToolExecutor.ToolExecutor
+        const failed = yield* executor.execute(request("run_ci", {}))
+
+        expect(attempts).toBe(1)
+        expect(failed._tag).toBe("Failure")
+        expect(failed._tag === "Failure" && failed.message).toContain("network unavailable")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor.remote deduplicates commit-then-response-loss retries by one operation key", () => {
+    const charge = Tool.make("charge", {
+      parameters: Schema.Struct({ amount: Schema.Finite }),
+      success: Schema.Struct({ receipt: Schema.String }),
+    })
+    const toolkit = Toolkit.make(charge)
+    const commits = new Set<string>()
+    const observedKeys: Array<string> = []
+    let attempts = 0
+
+    return [
+      Layer.mergeAll(
+        ToolExecutor.router([
+          ToolExecutor.remote({
+            toolkit,
+            retrySafe: true,
+            operationKey: ({ call, sessionId }) => `${sessionId}:${call.id}`,
+            maxRetries: 2,
+            schedule: Schedule.forever,
+            execute: ({ operationKey }): Effect.Effect<ToolExecutor.PlacementResponse, string> =>
               Effect.gen(function* () {
                 attempts += 1
-                if ("toolFailure" in (call.params as Record<string, unknown>)) {
-                  return { _tag: "Failure", message: "ci failed" }
-                }
-                if (attempts === 1) {
-                  return yield* Effect.fail<string>("network unavailable")
-                }
-                return { _tag: "Success", result: { status: "green" } }
+                observedKeys.push(operationKey)
+                commits.add(operationKey)
+                if (attempts === 1) return yield* Effect.fail("response lost")
+                return { _tag: "Success", result: { receipt: "receipt-1" } }
               }),
           }),
         ]),
@@ -198,16 +234,194 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       ),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
-        const recovered = yield* executor.execute(request("run_ci", {}))
-        const failed = yield* executor.execute(request("run_ci", { toolFailure: true }))
+        const outcome = yield* executor.execute(request("charge", { amount: 10 }))
 
-        expect(attempts).toBe(3)
-        expect(recovered).toEqual({
+        expect(outcome).toEqual({
           _tag: "Success",
-          result: { status: "green" },
-          encodedResult: { status: "green" },
+          result: { receipt: "receipt-1" },
+          encodedResult: { receipt: "receipt-1" },
         })
-        expect(failed).toEqual({ _tag: "Failure", message: "ci failed" })
+        expect(attempts).toBe(2)
+        expect(observedKeys).toEqual(["session-1:call-charge", "session-1:call-charge"])
+        expect(commits.size).toBe(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(
+    it,
+    "ToolExecutor.remote rejects empty and changing operation keys before another remote attempt",
+    () => {
+      const lookup = Tool.make("lookup", {
+        parameters: Schema.Struct({}),
+        success: Schema.String,
+      })
+      const toolkit = Toolkit.make(lookup)
+      let changingKey = 0
+      let emptyAttempts = 0
+      let changingAttempts = 0
+      const empty = ToolExecutor.remote({
+        toolkit,
+        retrySafe: true,
+        operationKey: () => " ",
+        maxRetries: 1,
+        schedule: Schedule.recurs(1),
+        execute: () => {
+          emptyAttempts += 1
+          return Effect.fail("unavailable")
+        },
+      })
+      const changing = ToolExecutor.remote({
+        toolkit,
+        retrySafe: true,
+        operationKey: () => `lookup-${changingKey++}`,
+        maxRetries: 1,
+        schedule: Schedule.recurs(1),
+        execute: () => {
+          changingAttempts += 1
+          return Effect.fail("unavailable")
+        },
+      })
+
+      return [
+        ToolContext.layerDefault,
+        Effect.gen(function* () {
+          const emptyError = yield* Effect.flip(empty.execute(request("lookup", {})))
+          const changingError = yield* Effect.flip(changing.execute(request("lookup", {})))
+
+          expect(Schema.is(ToolExecutor.RemoteRetryError)(emptyError)).toBe(true)
+          expect(Schema.is(ToolExecutor.RemoteRetryError)(changingError)).toBe(true)
+          expect(emptyAttempts).toBe(0)
+          expect(changingAttempts).toBe(1)
+        }),
+      ] as const
+    },
+  )
+
+  ItLayer.make(it, "ToolExecutor.remote validates a retry key immediately before the next attempt", () => {
+    const lookup = Tool.make("lookup", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(lookup)
+    let operationKey = "lookup-1"
+    let attempts = 0
+
+    return [
+      ToolContext.layerDefault,
+      Effect.gen(function* () {
+        const firstAttempt = yield* Deferred.make<void>()
+        const remote = ToolExecutor.remote({
+          toolkit,
+          retrySafe: true,
+          operationKey: () => operationKey,
+          maxRetries: 1,
+          schedule: Schedule.spaced("1 hour"),
+          execute: () => {
+            attempts += 1
+            return Deferred.succeed(firstAttempt, undefined).pipe(Effect.andThen(Effect.fail("response lost")))
+          },
+        })
+        const fiber = yield* remote.execute(request("lookup", {})).pipe(Effect.forkChild)
+        yield* Deferred.await(firstAttempt)
+        operationKey = "lookup-2"
+        yield* TestClock.adjust("1 hour")
+        const error = yield* Fiber.join(fiber).pipe(Effect.flip)
+
+        expect(Schema.is(ToolExecutor.RemoteRetryError)(error)).toBe(true)
+        expect(attempts).toBe(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor.remote accepts zero retries and rejects invalid retry bounds", () => {
+    const lookup = Tool.make("lookup", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(lookup)
+    let keyEvaluations = 0
+    let attempts = 0
+    const noRetries = ToolExecutor.remote({
+      toolkit,
+      retrySafe: true,
+      operationKey: () => `lookup-${keyEvaluations++}`,
+      maxRetries: 0,
+      schedule: Schedule.forever,
+      execute: () => {
+        attempts += 1
+        return Effect.fail("unavailable")
+      },
+    })
+    const invalidBound = ToolExecutor.remote({
+      toolkit,
+      retrySafe: true,
+      operationKey: () => "lookup-1",
+      maxRetries: Number.POSITIVE_INFINITY,
+      schedule: Schedule.forever,
+      execute: () => {
+        attempts += 1
+        return Effect.fail("unavailable")
+      },
+    })
+
+    return [
+      ToolContext.layerDefault,
+      Effect.gen(function* () {
+        const outcome = yield* noRetries.execute(request("lookup", {}))
+        const error = yield* invalidBound.execute(request("lookup", {})).pipe(Effect.flip)
+
+        expect(outcome._tag).toBe("Failure")
+        expect(keyEvaluations).toBe(1)
+        expect(attempts).toBe(1)
+        expect(Schema.is(ToolExecutor.RemoteRetryError)(error)).toBe(true)
+        expect(Schema.is(ToolExecutor.RemoteRetryError)(error) && error.reason).toBe("invalid-max-retries")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ToolExecutor.remote bounds retries and excludes outcomes, defects, and interruption", () => {
+    const lookup = Tool.make("lookup", {
+      parameters: Schema.Struct({ mode: Schema.String }),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(lookup)
+    const attempts: Record<string, number> = {}
+    const remote = ToolExecutor.remote({
+      toolkit,
+      retrySafe: true,
+      operationKey: ({ call }) => call.id,
+      maxRetries: 2,
+      schedule: Schedule.forever,
+      execute: ({ call }): Effect.Effect<ToolExecutor.PlacementResponse, string | AgentEvent.AgentError> => {
+        const mode = (call.params as { readonly mode: string }).mode
+        attempts[mode] = (attempts[mode] ?? 0) + 1
+        if (mode === "domain") return Effect.succeed({ _tag: "Failure", message: "not found" })
+        if (mode === "success") return Effect.succeed({ _tag: "Success", result: "found" })
+        if (mode === "defect") return Effect.die("broken adapter")
+        if (mode === "interrupt") return Effect.interrupt
+        if (mode === "framework") return Effect.fail(AgentEvent.AgentError.make({ message: "invalid route", turn: 0 }))
+        return Effect.fail("unavailable")
+      },
+    })
+
+    return [
+      ToolContext.layerDefault,
+      Effect.gen(function* () {
+        const domain = yield* remote.execute(request("lookup", { mode: "domain" }))
+        const success = yield* remote.execute(request("lookup", { mode: "success" }))
+        const defect = yield* remote.execute(request("lookup", { mode: "defect" })).pipe(Effect.exit)
+        const interruption = yield* remote.execute(request("lookup", { mode: "interrupt" })).pipe(Effect.exit)
+        const framework = yield* remote.execute(request("lookup", { mode: "framework" }))
+        const exhausted = yield* remote.execute(request("lookup", { mode: "infrastructure" }))
+
+        expect(domain).toEqual({ _tag: "Failure", message: "not found" })
+        expect(success).toEqual({ _tag: "Success", result: "found", encodedResult: "found" })
+        expect(Exit.isSuccess(defect)).toBe(true)
+        expect(Exit.hasInterrupts(interruption)).toBe(true)
+        expect(framework._tag).toBe("Failure")
+        expect(exhausted._tag).toBe("Failure")
+        expect(attempts).toEqual({ domain: 1, success: 1, defect: 1, interrupt: 1, framework: 1, infrastructure: 3 })
       }),
     ] as const
   })
