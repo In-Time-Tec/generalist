@@ -25,7 +25,7 @@ Consumers canonically import `Client`, `Errors`, `SessionRegistry`, `Sse`, `Wire
 Terminal outcomes are data frames, not connection failures:
 
 - `Suspended { suspension }` carries `AgentSuspended` for approval or tool-wait suspension;
-- `Failed { error }` carries `AgentError`, `TurnLimitExceeded`, or `MiddlewareViolation`;
+- `Failed { error }` carries `AgentError`, `TurnPolicyError`, `TurnPolicyStopped`, `TurnLimitExceeded`, or `MiddlewareViolation`;
 - `Ended` marks the end of one logical run.
 
 Every logical run emits exactly one `Ended` frame after `Event(Completed)`, `Suspended`, or `Failed`. `Ended` does not close the session or require an attachment stream to end; clients may remain attached for the next `send`.
@@ -41,6 +41,8 @@ When `stripTranscripts` is true, `TurnCompleted` and `Completed` event frames om
 `open` creates or returns a session. `sessionId` defaults to a generated id; `chatId` defaults to `sessionId`. The registry stores live run state and replay frames only. Chat history belongs to `Ai.Chat.Persistence`.
 
 `send` starts an `Agent.stream` run with `{ prompt, sessionId, persistence: { chatId } }` and returns after the run fiber starts. By default, a session in `Running` or `Suspended` status rejects another `send` with `SessionBusy`, preserving the original contract.
+
+`layerMemory` retains the configured Agent's policy requirements in its Layer input. Policy failures and explicit stops are published unchanged through `Failed`; the registry does not collapse them into `AgentError`.
 
 `layerMemory` may opt into `onConcurrentMessage: "enqueue"`. In enqueue mode, `send` returns after the prompt is accepted into the process-local queue; it does not wait for that prompt to start or finish. Prompts execute FIFO and never overlap within one session. `pendingMessageCapacity` is a non-negative safe integer, defaults to 128, bounds accepted queued prompts, and overflows with `SessionQueueFull`. `SessionInfo.pendingMessages` exposes the current queue depth without adding a wire lifecycle status.
 

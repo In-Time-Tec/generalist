@@ -23,8 +23,12 @@ export interface TransferOptions<
 }
 
 /** @experimental One child run in a bounded fan-out. */
-export interface FanOutChild<Tools extends Record<string, Tool.Any>, HasModel extends boolean = boolean> {
-  readonly agent: Agent<Tools, HasModel>
+export interface FanOutChild<
+  Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean = boolean,
+  PolicyServices = never,
+> {
+  readonly agent: Agent<Tools, HasModel, PolicyServices>
   readonly prompt: Prompt.RawInput
   readonly options?: Omit<RunOptions, "prompt">
 }
@@ -35,7 +39,12 @@ export interface FanOutOptions {
 }
 
 /** @experimental Built supervisor agent and handled toolkit for its transfer tools. */
-export interface Supervisor<Tools extends Record<string, Tool.Any>, HasModel extends boolean> {
+export interface Supervisor<
+  Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean,
+  SpecialistPolicyServices = never,
+  SupervisorPolicyServices = never,
+> {
   readonly agent: Agent<
     Record<
       string,
@@ -47,25 +56,31 @@ export interface Supervisor<Tools extends Record<string, Tool.Any>, HasModel ext
           readonly failure: typeof Schema.String
           readonly failureMode: "return"
         },
-        RunServices<Tools, HasModel>
+        RunServices<Tools, HasModel, SpecialistPolicyServices>
       >
     >,
-    false
+    false,
+    SupervisorPolicyServices
   >
   readonly toolkit: AgentToolToolkit<
     string,
     DefaultTransferParameters,
     typeof Schema.String,
-    RunServices<Tools, HasModel>
+    RunServices<Tools, HasModel, SpecialistPolicyServices>
   >
 }
 
 /** @experimental Options for building a transfer-tool supervisor. */
-export interface SupervisorOptions<Tools extends Record<string, Tool.Any>, HasModel extends boolean> {
+export interface SupervisorOptions<
+  Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean,
+  SpecialistPolicyServices = never,
+  SupervisorPolicyServices = never,
+> {
   readonly name: string
   readonly instructions?: string
-  readonly specialists: ReadonlyArray<Agent<Tools, HasModel>>
-  readonly policy?: TurnPolicy
+  readonly specialists: ReadonlyArray<Agent<Tools, HasModel, SpecialistPolicyServices>>
+  readonly policy?: TurnPolicy<SupervisorPolicyServices>
 }
 
 const transferName = (agentName: string): string => `transfer_to_${agentName}`
@@ -117,18 +132,19 @@ const toolkitFromHandled = <Tools extends Record<string, Tool.Any>>(
 export const transferTool: {
   <Parameters extends Schema.Top = DefaultTransferParameters, Success extends Schema.Top = typeof Schema.String>(
     options?: TransferOptions<Parameters, Success>,
-  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    target: Agent<Tools, HasModel>,
-  ) => AgentToolToolkit<string, Parameters, Success, RunServices<Tools, HasModel>>
+  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
+    target: Agent<Tools, HasModel, PolicyServices>,
+  ) => AgentToolToolkit<string, Parameters, Success, RunServices<Tools, HasModel, PolicyServices>>
   <
     Tools extends Record<string, Tool.Any>,
     HasModel extends boolean,
     Parameters extends Schema.Top = DefaultTransferParameters,
     Success extends Schema.Top = typeof Schema.String,
+    PolicyServices = never,
   >(
-    target: Agent<Tools, HasModel>,
+    target: Agent<Tools, HasModel, PolicyServices>,
     options?: TransferOptions<Parameters, Success>,
-  ): AgentToolToolkit<string, Parameters, Success, RunServices<Tools, HasModel>>
+  ): AgentToolToolkit<string, Parameters, Success, RunServices<Tools, HasModel, PolicyServices>>
 } = Function.dual(
   (args) => args.length !== 1 || "name" in args[0],
   <
@@ -136,10 +152,11 @@ export const transferTool: {
     HasModel extends boolean,
     Parameters extends Schema.Top = DefaultTransferParameters,
     Success extends Schema.Top = typeof Schema.String,
+    PolicyServices = never,
   >(
-    target: Agent<Tools, HasModel>,
+    target: Agent<Tools, HasModel, PolicyServices>,
     options: TransferOptions<Parameters, Success> = {},
-  ): AgentToolToolkit<string, Parameters, Success, RunServices<Tools, HasModel>> =>
+  ): AgentToolToolkit<string, Parameters, Success, RunServices<Tools, HasModel, PolicyServices>> =>
     asTool(target, {
       name: options.nameOverride ?? transferName(target.name),
       description: options.description ?? `Transfer to ${target.name}`,
@@ -152,21 +169,21 @@ export const transferTool: {
 
 /** @experimental Run isolated child agents concurrently and preserve input order. */
 export const fanOut: {
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
+  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
     options?: FanOutOptions,
   ): (
-    children: ReadonlyArray<FanOutChild<Tools, HasModel>>,
-  ) => Effect.Effect<ReadonlyArray<Result>, RunError, RunServices<Tools, HasModel>>
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    children: ReadonlyArray<FanOutChild<Tools, HasModel>>,
+    children: ReadonlyArray<FanOutChild<Tools, HasModel, PolicyServices>>,
+  ) => Effect.Effect<ReadonlyArray<Result>, RunError, RunServices<Tools, HasModel, PolicyServices>>
+  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
+    children: ReadonlyArray<FanOutChild<Tools, HasModel, PolicyServices>>,
     options?: FanOutOptions,
-  ): Effect.Effect<ReadonlyArray<Result>, RunError, RunServices<Tools, HasModel>>
+  ): Effect.Effect<ReadonlyArray<Result>, RunError, RunServices<Tools, HasModel, PolicyServices>>
 } = Function.dual(
   (args) => args.length !== 1 || Array.isArray(args[0]),
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    children: ReadonlyArray<FanOutChild<Tools, HasModel>>,
+  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices>(
+    children: ReadonlyArray<FanOutChild<Tools, HasModel, PolicyServices>>,
     options: FanOutOptions = {},
-  ): Effect.Effect<ReadonlyArray<Result>, RunError, RunServices<Tools, HasModel>> =>
+  ): Effect.Effect<ReadonlyArray<Result>, RunError, RunServices<Tools, HasModel, PolicyServices>> =>
     positiveConcurrency(options.concurrency).pipe(
       Effect.flatMap((concurrency) =>
         Effect.forEach(children, (child) => generate(child.agent, { ...child.options, prompt: child.prompt }), {
@@ -177,9 +194,14 @@ export const fanOut: {
 )
 
 /** @experimental Build a supervisor agent plus handled transfer-tool toolkit. */
-export const supervisor = <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-  options: SupervisorOptions<Tools, HasModel>,
-): Supervisor<Tools, HasModel> => {
+export const supervisor = <
+  Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean,
+  SpecialistPolicyServices = never,
+  SupervisorPolicyServices = never,
+>(
+  options: SupervisorOptions<Tools, HasModel, SpecialistPolicyServices, SupervisorPolicyServices>,
+): Supervisor<Tools, HasModel, SpecialistPolicyServices, SupervisorPolicyServices> => {
   const transferTools = options.specialists.map((specialist) => transferTool(specialist))
   const toolkit = mergeHandled(transferTools)
   return {

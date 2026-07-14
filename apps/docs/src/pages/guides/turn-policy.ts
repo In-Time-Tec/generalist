@@ -34,9 +34,11 @@ export const turnPolicy = definePage({
     codeBlock({ label: "compose-policies.ts", source: composePolicies }),
     h2("observe-the-stop", "2. Observe what happens at the limit"),
     p(
-      "When the policy stops while tool results are still pending, the run fails with ",
+      "When a configured recurrence cap stops while tool results are still pending, the run fails with ",
       code("TurnLimitExceeded"),
-      " carrying the pending calls, because the loop refuses to silently drop work:",
+      ". Other successful stops fail with ",
+      code("TurnPolicyStopped"),
+      " carrying the exact reason. Both carry the pending calls because the loop refuses to silently drop work:",
     ),
     codeBlock({ label: "turn-limit.ts", source: turnLimit, expectedOutput: turnLimitExpected }),
     h2("override-per-turn", "3. Override instructions, model, or tools per turn"),
@@ -59,7 +61,7 @@ export const turnPolicy = definePage({
     ),
     h2("recipe-token-budget", "Recipe: a token-budget policy"),
     p(
-      "Policies receive the full history each decision, so a budget policy stays a plain value: estimate the context size and stop when it exceeds your budget. If the estimate should come from provider metadata, read that metadata before constructing the agent so the loop's service set stays unchanged:",
+      "Policies receive the full history each decision and may require Effect services. The policy's requirements remain visible in the Agent run type, and expected evaluation failures use TurnPolicyError. This pure budget recipe estimates the context size and stops with an explicit BudgetExhausted reason:",
     ),
     codeBlock({ label: "token-budget.ts", source: tokenBudget }),
     callout(

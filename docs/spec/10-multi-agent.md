@@ -23,7 +23,7 @@ Baton does not own durable child state, address books, cross-process routing, sh
 
 The handler runs `Agent.generate` for the child in the current Effect context. It does not provide or override `Ai.LanguageModel.LanguageModel`, `ToolExecutor`, `Approvals`, or `ModelMiddleware`; callers decide what services child runs inherit.
 
-At the tool boundary, child `AgentError`, `TurnLimitExceeded`, `MiddlewareViolation`, and defects thrown by prompt/result mappers become a failed tool result with a string message.
+At the tool boundary, child `AgentError`, `TurnPolicyError`, `TurnPolicyStopped`, `TurnLimitExceeded`, `MiddlewareViolation`, and defects thrown by prompt/result mappers become a failed tool result with a string message. Child policy requirements remain in the returned tool handler's Effect requirements.
 
 Child `AgentSuspended` is also collapsed into a failed tool result. The parent agent receives the failure as ordinary tool context and can decide whether to continue, retry, ask the user, or transfer elsewhere. Durable cross-process HITL remains a host concern.
 
@@ -38,6 +38,8 @@ Child `AgentSuspended` is also collapsed into a failed tool result. The parent a
 `Handoff.fanOut(children, options?)` runs isolated `Agent.generate` calls with `Effect.forEach` and bounded concurrency. Results preserve input order. Default concurrency is 4.
 
 `fanOut` is not a tool boundary, so child `RunError` values propagate to the caller. Invalid concurrency fails with `AgentError`.
+
+Policy requirements from transfer targets, specialists, supervisors, and fan-out children remain visible in the composed toolkit, Agent, or fan-out Effect requirements.
 
 ## Related docs
 

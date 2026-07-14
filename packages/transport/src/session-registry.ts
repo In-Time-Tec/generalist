@@ -16,7 +16,7 @@ import {
   Stream,
 } from "effect"
 import { Chat, Prompt, Tool } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals } from "@batonfx/core"
+import { Agent, AgentEvent, Approvals, TurnPolicy } from "@batonfx/core"
 import { type FrameJournal, type FrameWithoutSeq, makeFrameJournal } from "./frame-journal.js"
 import {
   coordination,
@@ -42,8 +42,12 @@ export interface SessionInfo {
 }
 
 /** @experimental */
-export interface MemoryOptions<Tools extends Record<string, Tool.Any>, HasModel extends boolean = boolean> {
-  readonly agent: Agent.Agent<Tools, HasModel>
+export interface MemoryOptions<
+  Tools extends Record<string, Tool.Any>,
+  HasModel extends boolean = boolean,
+  PolicyServices = never,
+> {
+  readonly agent: Agent.Agent<Tools, HasModel, PolicyServices>
   readonly ringBufferCapacity?: number
   readonly subscriberQueueCapacity?: number
   readonly idleTimeout?: Duration.Input
@@ -140,6 +144,8 @@ const stripEventTranscript = (event: AgentEvent.Event, strip: boolean): EventTyp
 const runFailureFromCause = (cause: Cause.Cause<Agent.RunError | SessionError>, turn: number): RunFailure => {
   const error = Cause.squash(cause)
   if (Schema.is(AgentEvent.AgentError)(error)) return error
+  if (Schema.is(TurnPolicy.TurnPolicyError)(error)) return error
+  if (Schema.is(AgentEvent.TurnPolicyStopped)(error)) return error
   if (Schema.is(AgentEvent.TurnLimitExceeded)(error)) return error
   if (Schema.is(AgentEvent.MiddlewareViolation)(error)) return error
   const message = Cause.hasInterrupts(cause) ? "Session interrupted" : errorMessage(error)
@@ -152,14 +158,14 @@ const toApprovalDecision = (decision: ClientApproval): Approvals.Decision => {
 }
 
 /** @experimental */
-export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-  options: MemoryOptions<Tools, HasModel>,
-): Layer.Layer<SessionRegistry, never, Agent.RunServices<Tools, HasModel> | Chat.Persistence> =>
+export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
+  options: MemoryOptions<Tools, HasModel, PolicyServices>,
+): Layer.Layer<SessionRegistry, never, Agent.RunServices<Tools, HasModel, PolicyServices> | Chat.Persistence> =>
   Layer.effect(
     SessionRegistry,
     Effect.gen(function* () {
       const scope = yield* Effect.scope
-      const context = yield* Effect.context<Agent.RunServices<Tools, HasModel> | Chat.Persistence>()
+      const context = yield* Effect.context<Agent.RunServices<Tools, HasModel, PolicyServices> | Chat.Persistence>()
       const approvals = yield* Effect.serviceOption(Approvals.Approvals)
       const persistence = yield* Chat.Persistence
       const state = yield* Ref.make<RegistryState>({ sessions: new Map() })

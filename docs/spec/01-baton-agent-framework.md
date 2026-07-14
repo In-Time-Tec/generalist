@@ -11,10 +11,10 @@ Compatibility: this spec is tested against `effect` and `@effect/vitest` `4.0.0-
 `Agent.make(name, options)` and the object form build a plain agent definition value with these defaults:
 
 ```ts
-type AgentOptions = {
+type AgentOptions<R = never> = {
   readonly instructions?: string
   readonly toolkit?: Toolkit.Toolkit<any>
-  readonly policy?: TurnPolicy.TurnPolicy
+  readonly policy?: TurnPolicy.TurnPolicy<R>
   readonly model?: ModelRegistry.ModelSelection
   readonly memory?: Memory.Key
   readonly metadata?: Readonly<Record<string, unknown>>
@@ -113,7 +113,7 @@ Module conventions: consumers import module namespaces from `@batonfx/core`; ser
 - If a `Steering` service is present, Baton drains follow-up input at this same would-complete boundary before `Completed` or terminal structured output. Non-empty follow-up emits `SteeringDrained { turn, queue: "followUp", count }` after `TurnCompleted` and starts another normal streamed turn. If follow-up is empty, completion proceeds unchanged. If a terminal structured-output run has queued follow-up input, the structured turn is delayed until follow-ups are exhausted.
 - If a `Compaction` service is present, Baton may shrink projected context immediately before a streamed model turn. Proactive compaction requires finite usage/window data; reactive compaction handles a pre-emission context-overflow failure by compacting and retrying the same turn once. If `Compaction` is absent, Baton does not touch `SessionStore` for compaction and current behavior is unchanged.
 - In structured mode (`Agent.streamObject` / `Agent.generateObject`), Baton first runs the normal tool loop unchanged. When the loop would otherwise complete, Baton runs one additional terminal structured turn on the same live `Ai.Chat` using `chat.generateObject({ prompt: objectPrompt, schema, objectName, toolChoice: "none" })`. This call runs in its own `Baton.Agent.turn` span at the terminal turn index, as a sibling of the preceding model-turn span under `Baton.Agent.run`. The terminal turn emits `StructuredOutput { turn, value, content }` immediately before `Completed`. `value` is `unknown` in the event union because the union is closed and non-generic; `Agent.generateObject` returns it typed as the caller's schema type. `content` is the raw structured response parts, including any `finish` part. `Completed.text` remains the accumulated normal streamed text; `Completed.transcript` and `Completed.usage` include the structured exchange. No `TurnStarted`, `ModelPart`, or `TurnCompleted` event is emitted for the non-streaming structured turn; it is represented by `StructuredOutput`.
-- If `pendingToolResults` is non-empty, the loop calls `policy.decide(info)`. `Continue` selects `overrides` for the next model call: model layer and active tools affect that call, while instructions are prepended once as a system message to its prompt and then retained by `Ai.Chat` in transcript history. If `Steering` is present, Baton drains steering input after the policy continues, emits `SteeringDrained { turn, queue: "steering", count }`, and prepends the drained prompts before the tool-result prompt with `Ai.Prompt.concat`. `Stop` fails the stream with `TurnLimitExceeded { turn, pending }` — pending results are never silently dropped, and steering does not bypass the policy cap.
+- If `pendingToolResults` is non-empty, the loop evaluates `policy.decide(info)` exactly once. `Continue` selects `overrides` for the next model call: model layer and active tools affect that call, while instructions are prepended once as a system message to its prompt and then retained by `Ai.Chat` in transcript history. If `Steering` is present, Baton drains steering input after the policy continues, emits `SteeringDrained { turn, queue: "steering", count }`, and prepends the drained prompts before the tool-result prompt with `Ai.Prompt.concat`. `Stop { reason: TurnLimit }` fails with `TurnLimitExceeded { turn, limit, pending }`; every other `Stop` fails with `TurnPolicyStopped { turn, reason, pending }`. Pending results remain attached as the complete stop checkpoint and are never silently dropped. A failed policy Effect propagates its exact `TurnPolicyError`, and steering does not bypass a stop.
 - The default policy is `TurnPolicy.recurs(8)` (an eight-follow-up-turn cap).
 - Built-in policy snapshots describe constructor data only. Hosts must reject an absent or unsupported snapshot instead of silently substituting different policy behavior.
 
@@ -125,12 +125,14 @@ Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run
 
 ## Run errors
 
-`Agent.RunError` is the error channel of `Agent.stream` and `Agent.generate`: `AgentError | AgentSuspended | TurnLimitExceeded | MiddlewareViolation | ProgressOverflowError`. `AgentError` keeps the stable tag `@batonfx/core/AgentError`; `AgentSuspended` keeps the stable tag `@batonfx/core/AgentSuspended`. Consumers match typed tags and structured fields rather than diagnostic strings.
+`Agent.RunError` is the error channel of `Agent.stream` and `Agent.generate`: `AgentError | AgentSuspended | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | ProgressOverflowError`. `AgentError` keeps the stable tag `@batonfx/core/AgentError`; `AgentSuspended` keeps the stable tag `@batonfx/core/AgentSuspended`. Consumers match typed tags and structured fields rather than diagnostic strings.
 
 - **`AgentError`** carries `{ message, turn, cause? }` for general loop failures and wrapped external failures. `cause` is an optional `Schema.Defect()` value preserving the live underlying error for host classification.
 - Structured-output generation or schema-decoding failures map to `AgentError` at the terminal structured turn index.
 - **`AgentSuspended`** carries `{ token, reason, tool_call_id, tool_name, tool_params }` when the run must be resumed out-of-band.
-- **`TurnLimitExceeded`** carries `{ turn, pending }` when the policy stops while tool results are pending. `pending` is an array of `{ tool_call_id, tool_name }`.
+- **`TurnPolicyError`** carries `{ message, cause? }` when policy evaluation fails. `cause` preserves the specific live cause for host classification.
+- **`TurnPolicyStopped`** carries `{ turn, reason, pending }` for successful policy stops other than a configured turn limit. `reason` is the schema-backed `StopReason`; `pending` is the complete array of `{ tool_call_id, tool_name }` waiting at that boundary.
+- **`TurnLimitExceeded`** carries `{ turn, limit, pending }` only when `StopReason.TurnLimit` reports actual configured turn-limit exhaustion.
 - **`MiddlewareViolation`** carries `{ turn, detail }` for host middleware contract bugs such as dropping a `tool-call` part.
 - **`ProgressOverflowError`** carries `{ turn, toolCallId, capacity }` when an explicitly selected `Fail` progress policy cannot retain another update.
 
@@ -150,7 +152,7 @@ Baton wraps the whole run stream in an OpenTelemetry span named `Baton.Agent.run
 - **`SkillSource`** — optional agentskills.io skill source. `all` supplies startup listings; `get(name)` supplies one lazy skill body. `Agent.stream` resolves `SkillSource` optionally so its requirement set does not grow. When present, Baton appends selected listings to the system baseline and handles `activate_skill` tool calls through the same `SkillSource.Interface` that durable hosts such as Relay provide over pinned skill snapshots.
 - **`ModelResilience`** — optional model-call retry seam. `classify(error) => "transient" | "terminal"` sees the live provider failure before Baton wraps or stringifies it; `retrySchedule` controls retries. `defaultClassify` treats retryable `Ai.AiError` values as transient and everything else as terminal. `none` disables retry, `make`/`layer` build policies, `testLayer` swaps exact behavior in tests, and `apply(model, policy)` wraps `streamText`, `generateText`, and `generateObject`. `Agent.stream` resolves this service optionally so its requirement set does not grow.
 - **`Approvals`** — optional enforcement point for `Ai.Tool.needsApproval`, which `effect/unstable/ai` declares but never enforces for Baton's disabled tool-resolution loop. `check(request) => Effect<Decision>` where `Decision` is `Approved | Denied | Pending`. `needsApproval: true` gates the call; `false` or `undefined` does not. A `NeedsApprovalFunction` is evaluated with the actual call params and `{ toolCallId, messages }`; a thrown exception, failure, or defect fails closed by treating the call as gated. Tools without an approval requirement never touch the service. If a gated call needs approval and `Approvals` is absent, Baton emits the approval request and feeds a failed tool result back to the model. `Denied` re-feeds a failed tool result; `Pending` suspends the run.
-- **`TurnPolicy`** — a plain value carried by the agent (like `Schedule` values), not a service. `decide(info) => Effect<Decision>` with per-turn `overrides` on `Continue`.
+- **`TurnPolicy<R>`** — a plain value carried by the agent (like `Schedule` values), not a service. `decide(info) => Effect<Decision, TurnPolicyError, R>` with per-turn `overrides` on `Continue`. `R` is part of `Agent<..., R>` and every run function's requirements. `Decision.Stop` carries one schema-backed `StopReason`: `TurnLimit { limit }`, `GoalSatisfied`, `BudgetExhausted { budget }`, or `Policy { detail }`. Built-ins remain requirement-free. `fromLegacy` is a deprecated migration adapter that maps a reasonless legacy stop to `Policy { detail: "Legacy policy stopped" }`.
 
 ## Model middleware
 
@@ -239,6 +241,7 @@ Baton is designed to be composed behind a durable runtime's own agent-loop inter
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
 - `docs/spec/decisions/ADR-0027-memory-item-user-content.md`
 - `docs/spec/decisions/ADR-0028-scoped-mcp-baton-tools.md`
+- `docs/spec/decisions/ADR-0030-effectful-turn-policy-stop-reasons.md`
 - `docs/spec/02-session-event-log.md`
 - `docs/spec/03-instructions-and-context-epoch.md`
 - `docs/spec/04-permissions-policy.md`

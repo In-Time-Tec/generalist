@@ -174,7 +174,9 @@ export const coreAgentReference = definePage({
     h2("run-error", "RunError"),
     p(
       "The error channel of every run function is the union ",
-      code("AgentError | AgentSuspended | TurnLimitExceeded | MiddlewareViolation"),
+      code(
+        "AgentError | AgentSuspended | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation",
+      ),
       ". Field shapes are tabulated in ",
       link("/docs/reference/core-events", "AgentEvent and errors"),
       ".",
