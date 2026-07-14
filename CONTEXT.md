@@ -25,7 +25,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - **ModelCatalog**: the optional provider-package service for static model metadata such as context windows, output limits, pricing, and modalities. It lives in `@batonfx/providers`; core never depends on it.
 - **MCP OAuth**: the `@batonfx/mcp` authorization lifecycle for authenticated remote servers. Baton owns discovery, PKCE, callback exchange, refresh integration, and typed failures; hosts own browser/callback UI and redacted token persistence.
 - **ModelResilience**: the optional model-call retry seam. It classifies live model-call failures as `transient` or `terminal` and supplies the retry schedule applied inside a single model call; streamed turns retry only before any part has been emitted.
-- **ModelMiddleware**: the interceptor seam for everything going into (`transformPrompt`) or out of (`transformPart`) the model — PII scrubbing, prompt-injection screening, output filtering, logging. Ships a `identityLayer` default and no built-in filters.
+- **ModelMiddleware**: the interceptor seam for everything going into (`transformPrompt`) or out of (`transformPart`) the model — PII scrubbing, prompt-injection screening, output filtering, logging. Ships a `layerIdentity` default and no built-in filters.
 - **Guardrail**: ergonomic `ModelMiddleware.Middleware` combinators for input validation, prompt/output regex redaction, and output filtering. Guardrails are not a separate subsystem; they compose through `ModelMiddleware.layer([...])`.
 - **Instructions**: the ordered context-source registry. `openEpoch` renders baseline sources once into the run's system-message baseline and keeps dynamic sources for later `renderUpdate` calls; filesystem, skills, and memory sources are contributed by later packages/seams.
 - **Memory**: the optional recall/remember/forget seam. `RunOptions.memory.key` is host-chosen; recall inserts one user message after the system message and before the run prompt; remember runs after completed turns; forget is a host-requested lifecycle cleanup operation for a whole key or one remembered item id. Non-durable working-memory and semantic-recall implementations live in `@batonfx/memory`; durable memory remains host-owned.
@@ -41,6 +41,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Baton depends on `effect` only. It never imports from any durable runtime's schema, event log, or database. In this repo the rule is enforced by the `no-relayfx-imports` ast-grep rule.
 - Payload vocabulary is `Ai.Prompt`/`Ai.Response`. Baton adds loop framing only — no second wire format.
 - Every exported symbol is `@experimental` while `effect/unstable/ai` is itself unstable.
+- Public APIs use package-root module namespaces and noun-after-`layer` service Layer variants; established subpaths and superseded Layer names follow ADR-0024 compatibility policy.
 - Errors that cross a service boundary are `Schema.TaggedErrorClass`.
 - No `Date.now()` or raw platform time/concurrency/randomness — use Effect primitives.
 - Pending tool results are never silently dropped: a `Stop` policy with pending results fails the run.

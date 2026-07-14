@@ -291,7 +291,7 @@ const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Mes
 export const buildContext = (path: ReadonlyArray<Entry>): Prompt.Prompt => Prompt.fromMessages(projectedMessages(path))
 
 /** @experimental Ref-backed non-durable session store. */
-export const memoryLayer: Layer.Layer<SessionStore> = Layer.effect(
+export const layerMemory: Layer.Layer<SessionStore> = Layer.effect(
   SessionStore,
   Ref.make(initialState).pipe(
     Effect.map((state) =>
@@ -313,6 +313,12 @@ export const memoryLayer: Layer.Layer<SessionStore> = Layer.effect(
     ),
   ),
 )
+
+/**
+ * @experimental
+ * @deprecated Use {@link layerMemory}. This alias will not be removed before 1.0.0 and only in a separately planned major release.
+ */
+export const memoryLayer: typeof layerMemory = layerMemory
 
 /** @experimental */
 export const testLayer = (implementation: Interface): Layer.Layer<SessionStore> =>

@@ -14,6 +14,8 @@ Baton owns:
 
 Baton does not own durable storage, cross-process sessions, multiplexing, EventSource wrappers, POST command routes, command acknowledgement envelopes, or browser UI state. Relay implements the same `SessionRegistry` interface over its durable event log.
 
+Consumers canonically import `Client`, `Errors`, `SessionRegistry`, `Sse`, `Wire`, and `Ws` from `@batonfx/transport`. The established transport subpaths remain compatibility imports exposing the same module surfaces under ADR-0024.
+
 ## Wire contract
 
 `seq` numbers server frames, not agent events. It is 0-based and monotonic per session. Replay cursors compare against frame `seq`; transports such as SSE use the same value as their resume cursor.
@@ -106,3 +108,4 @@ The SSE client helper decodes `text/event-stream` response bodies into loose ser
 - `docs/spec/decisions/ADR-0014-transport-wire-and-session-registry.md`
 - `docs/spec/decisions/ADR-0015-transport-sse-websocket-client.md`
 - `docs/spec/decisions/ADR-0018-in-process-session-run-queue.md`
+- `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`

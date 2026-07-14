@@ -189,8 +189,14 @@ export const combine: {
     ),
 )
 
-/** @experimental */
-export const memoryLayer = layer
+/** @experimental In-memory model registry. */
+export const layerMemory: typeof layer = layer
+
+/**
+ * @experimental
+ * @deprecated Use {@link layerMemory}. This alias will not be removed before 1.0.0 and only in a separately planned major release.
+ */
+export const memoryLayer: typeof layerMemory = layerMemory
 
 /** @experimental */
 export const testLayer = (implementation: Interface) => Layer.succeed(Service, Service.of(implementation))

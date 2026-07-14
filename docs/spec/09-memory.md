@@ -47,7 +47,7 @@ Forget is store-agnostic. Omitting `id` deletes all non-durable working state fo
 
 ## Service helpers
 
-`Memory.merge(first, second)` recalls from both memories with `first` items first, remembers to both, and forgets from both. `noopLayer` provides a memory that recalls nothing, records nothing, and forgets successfully. `testLayer(implementation)` provides exact recall/remember/forget behavior for tests.
+`Memory.merge(first, second)` recalls from both memories with `first` items first, remembers to both, and forgets from both. `layerNoop` provides a memory that recalls nothing, records nothing, and forgets successfully. The deprecated `noopLayer` compatibility alias remains available under ADR-0024. `testLayer(implementation)` provides exact recall/remember/forget behavior for tests.
 
 ## `@batonfx/memory`
 
@@ -57,7 +57,7 @@ The package exports `VectorStore`, `SemanticRecall`, `WorkingMemory`, and `combi
 
 ## VectorStore
 
-`VectorStore` stores `Document { id, key, text, metadata? }` values with embeddings and queries by cosine similarity. The in-process `memoryLayer` stores documents in a `Ref<HashMap>` and is non-durable.
+`VectorStore` stores `Document { id, key, text, metadata? }` values with embeddings and queries by cosine similarity. The in-process `layerMemory` stores documents in a `Ref<HashMap>` and is non-durable. The deprecated `memoryLayer` compatibility alias remains available under ADR-0024.
 
 Key isolation is part of the contract: query candidates must match both `key.agent` and `key.subject` exactly before scoring. Upsert replaces only the same `(agent, subject, id)` tuple. Delete without `id` removes the exact key; delete with `id` removes the exact `(agent, subject, id)` tuple. A matching-key embedding dimension mismatch fails with `VectorStoreError` instead of being silently ignored.
 
@@ -87,3 +87,4 @@ Forget without `id` drops the exact key's in-process working-memory state. Forge
 
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0001-baton-standalone-agent-framework.md`
+- `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`
