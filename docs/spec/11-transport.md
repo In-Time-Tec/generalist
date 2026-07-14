@@ -1,6 +1,6 @@
 # 11 — Transport wire and in-process session registry
 
-Baton transport is the non-durable, same-process layer that turns `Agent.stream` into replayable wire frames for chat transports. It owns schemas, an in-memory `SessionRegistry`, and thin SSE/WebSocket/client adapters over the registry seam. It does not own durable event logs, Relay integration, multiplexing, or AI SDK data-stream adapters.
+Baton transport is the non-durable, same-process layer that turns `Agent.stream` into replayable wire frames for chat transports. It owns schemas, an in-memory `SessionRegistry`, and thin SSE/WebSocket/client adapters over the registry seam. A transport session is an ephemeral execution and frame-delivery owner; it is distinct from core `SessionStore`, the agent event-log and compaction seam. Transport does not own durable event logs, Relay integration, multiplexing, or AI SDK data-stream adapters.
 
 ## Scope
 
@@ -16,9 +16,11 @@ Baton does not own durable storage, cross-process sessions, multiplexing, EventS
 
 Consumers canonically import `Client`, `Errors`, `SessionRegistry`, `Sse`, `Wire`, and `Ws` from `@batonfx/transport`. The established transport subpaths remain compatibility imports exposing the same module surfaces under ADR-0024.
 
+`SessionRegistry` remains the public transport facade. Its in-memory implementation privately separates deterministic run, queue, approval, interruption, and close coordination from the per-session frame journal that owns sequence allocation, bounded replay, subscriber delivery, and snapshot replay plans. These collaborators are implementation details rather than additional `Context` services. Core `SessionStore` neither supplies nor consumes this transport state.
+
 ## Wire contract
 
-`seq` numbers server frames, not agent events. It is 0-based and monotonic per session. Replay cursors compare against frame `seq`; transports such as SSE use the same value as their resume cursor.
+`seq` numbers server frames, not agent events. It is 0-based and monotonic per session. Replay cursors compare against frame `seq`; transports such as SSE use the same value as their resume cursor. Sequence allocation, ring insertion, and live subscriber delivery are serialized per transport session so ring replay and live delivery observe the same order; publication in one session does not serialize publication in another.
 
 Terminal outcomes are data frames, not connection failures:
 
