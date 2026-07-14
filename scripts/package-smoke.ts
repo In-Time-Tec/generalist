@@ -122,10 +122,11 @@ const program = Effect.gen(function* () {
 import { Agent, Chat, Memory, ModelMiddleware, ModelRegistry, Session, ToolOutput } from "@batonfx/core"
 import { VectorStore } from "@batonfx/memory"
 import { OAuth, McpToolSource } from "@batonfx/mcp"
+import { route as mcpRoute, type BatonTools, type Options as McpRouteOptions } from "@batonfx/mcp/baton"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "@batonfx/skills"
 import { TestModel } from "@batonfx/test"
 import { SessionRegistry } from "@batonfx/transport"
-import { Crypto, Effect, Layer, Option, Redacted } from "effect"
+import { Crypto, Effect, Layer, Option, Redacted, Scope } from "effect"
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
     ? (<Value>() => Value extends Right ? 1 : 2) extends <Value>() => Value extends Left ? 1 : 2
@@ -214,6 +215,16 @@ const proof = Effect.gen(function* () {
   return transport
 }).pipe(Effect.provide(oauthLayer))
 void proof
+const routeOptions: McpRouteOptions = {
+  name: "package-smoke",
+  transport: { kind: "http", url: "https://mcp.example/rpc" },
+}
+const routed: Effect.Effect<
+  BatonTools,
+  McpToolSource.McpConnectionError | OAuth.OAuthPendingError | OAuth.OAuthProviderError,
+  Scope.Scope
+> = mcpRoute(routeOptions)
+void routed
 `,
   )
   yield* fileSystem.writeFileString(

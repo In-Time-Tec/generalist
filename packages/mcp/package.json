@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
+    "@batonfx/test": "workspace:*",
     "@types/bun": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
