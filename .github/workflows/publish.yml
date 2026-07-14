@@ -54,6 +54,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Make Effect TypeScript binary executable
+        run: find node_modules/.bun -path '*/@effect/tsgo-linux-*/lib/tsc' -exec chmod +x {} +
+
       - name: Check release workflow
         run: bun run check
 
