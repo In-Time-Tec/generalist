@@ -22,7 +22,7 @@ export interface Interface {
 /** @experimental */
 export class Instructions extends Context.Service<Instructions, Interface>()("@batonfx/core/instructions") {}
 
-/** @experimental Frozen baseline plus dynamic sources for later update rendering. */
+/** @experimental Frozen baseline plus compatibility-only dynamic sources. */
 export interface ContextEpoch {
   readonly baseline: string
   readonly dynamic: ReadonlyArray<ContextSource>
@@ -65,7 +65,10 @@ export const openEpoch: {
     }),
 )
 
-/** @experimental Render dynamic sources for an incremental context update. */
+/**
+ * @experimental Render dynamic sources for callers that own transcript insertion.
+ * @deprecated Use `openEpoch` for Agent-integrated baseline instructions. Baton does not inject dynamic updates. Hosts needing changing context must own transcript insertion and persistence. This export will not be removed before 1.0.0 and only in a separately planned major release.
+ */
 export const renderUpdate: {
   (context: RenderContext): (epoch: ContextEpoch) => Effect.Effect<Option.Option<string>, AgentError>
   (epoch: ContextEpoch, context: RenderContext): Effect.Effect<Option.Option<string>, AgentError>

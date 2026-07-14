@@ -16,7 +16,7 @@ export const coreContextReference = definePage({
       code("ContextSource"),
       " values: ",
       code('{ id, cache: "baseline" | "dynamic", render }'),
-      ". Baseline sources render once into the system message when an epoch opens; dynamic sources render incremental updates each turn.",
+      ". Baseline sources render once into the system message when an epoch opens. The Agent does not render or inject dynamic sources.",
     ),
     table(
       ["Export", "Notes"],
@@ -26,7 +26,10 @@ export const coreContextReference = definePage({
           [code("openEpoch(instructions, context)")],
           ["Renders baseline sources and freezes dynamic sources into a ", code("ContextEpoch")],
         ],
-        [[code("renderUpdate(epoch, context)")], "Renders dynamic sources for an incremental context update"],
+        [
+          [code("renderUpdate(epoch, context)")],
+          "Deprecated compatibility utility; callers own transcript insertion and persistence",
+        ],
         [
           [code("layer(sources)"), " / ", code("testLayer(implementation)")],
           "Explicit ordered registry; layer from an interface",
