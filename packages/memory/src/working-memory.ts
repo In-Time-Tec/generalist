@@ -168,10 +168,10 @@ const recallItems = (state: KeyState): ReadonlyArray<Memory.Item> => [
     : [
         {
           id: "working-summary",
-          parts: [textPart(`<working-memory-summary>\n${state.summary}\n</working-memory-summary>`)],
+          content: [textPart(`<working-memory-summary>\n${state.summary}\n</working-memory-summary>`)],
         },
       ]),
-  ...state.recent.map((item) => ({ id: item.id, parts: [textPart(formatItem(item))] })),
+  ...state.recent.map((item) => ({ id: item.id, content: [textPart(formatItem(item))] })),
 ]
 
 /** @experimental */

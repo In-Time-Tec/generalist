@@ -31,6 +31,27 @@ Existing names remain exact aliases during the deprecation window. They will not
 
 `layerIdentity` means a transformation that preserves input. `layerNoop` means service operations deliberately take no meaningful action.
 
+## Memory item content
+
+`Memory.Item.content` accepts only Effect AI user-message parts: text and files. Protocol transcript parts such as reasoning, tool calls/results, and approval parts cannot be recalled as memory items.
+
+```ts
+import { Array } from "effect"
+import { Memory, Prompt } from "@batonfx/core"
+
+const item: Memory.Item = {
+  id: "fact-1",
+  content: [Prompt.makePart("text", { text: "prefers dark mode" })],
+}
+
+const migrated: Memory.Item = {
+  id: legacy.id,
+  content: Array.getSomes(legacy.parts.map(Memory.itemFromPromptPart)),
+}
+```
+
+This is a breaking correction from the former `parts: ReadonlyArray<Prompt.Part>` field. Rename `parts` to `content`; when legacy storage contains broad prompt parts, use `Memory.itemFromPromptPart` to filter them explicitly or reject the legacy item if any conversion returns `Option.none`. Baton never converts protocol parts to lossy text.
+
 ## Tool execution placement
 
 Baton uses Effect AI `Tool` and `Toolkit` values directly. For ordinary in-process tools, provide the handler layer from `toolkit.toLayer(...)` and no `ToolExecutor` is required. `ToolExecutor` is the optional override seam for durable waits and external placement. Its route helpers keep placement explicit while reusing the same toolkit definitions:

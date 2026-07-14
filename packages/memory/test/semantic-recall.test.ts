@@ -13,7 +13,7 @@ const assistant = (text: string) => Prompt.makeMessage("assistant", { content: [
 const prompt = (...messages: ReadonlyArray<Prompt.Message>) => Prompt.fromMessages(messages)
 
 const itemText = (item: Memory.Item): string =>
-  item.parts
+  item.content
     .filter((part): part is Prompt.TextPart => part.type === "text")
     .map((part) => part.text)
     .join("")

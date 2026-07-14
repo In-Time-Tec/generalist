@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Layer, Option, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 /** @experimental */
@@ -11,11 +11,19 @@ export interface Key {
 }
 
 /** @experimental */
+export type ItemPart = Prompt.UserMessagePart
+
+/** @experimental */
 export interface Item {
   readonly id: string
-  readonly parts: ReadonlyArray<Prompt.Part>
+  readonly content: ReadonlyArray<ItemPart>
   readonly metadata?: Metadata
 }
+
+/** @experimental */
+export const itemFromPromptPart = Option.liftPredicate(
+  (part: Prompt.Part): part is ItemPart => part.type === "text" || part.type === "file",
+)
 
 /** @experimental */
 export interface RecallInput {

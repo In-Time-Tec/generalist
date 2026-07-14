@@ -53,7 +53,7 @@ const finalExchangeText = (prompt: Prompt.Prompt): string | undefined => {
 
 const itemFromMatch = (match: Match): Memory.Item => ({
   id: match.document.id,
-  parts: [textPart(match.document.text)],
+  content: [textPart(match.document.text)],
   metadata: { ...match.document.metadata, score: match.score },
 })
 

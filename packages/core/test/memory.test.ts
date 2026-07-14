@@ -1,6 +1,7 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { expectTypeOf } from "vitest"
 import { Agent, Approvals, Memory, ModelMiddleware, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
@@ -48,6 +49,46 @@ const messageText = (message: Prompt.Message): string => {
 const unusedExecutor = ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool execution") })
 
 layer(unusedToolHandlerLayer)("Memory", (it) => {
+  it("accepts only user-message parts as recalled item content", () => {
+    expectTypeOf<Memory.ItemPart>().toEqualTypeOf<Prompt.UserMessagePart>()
+    expectTypeOf<Prompt.ReasoningPart>().not.toExtend<Memory.ItemPart>()
+    expectTypeOf<Prompt.ToolCallPart>().not.toExtend<Memory.ItemPart>()
+    expectTypeOf<Prompt.ToolResultPart>().not.toExtend<Memory.ItemPart>()
+    expectTypeOf<Prompt.ToolApprovalResponsePart>().not.toExtend<Memory.ItemPart>()
+    expectTypeOf<Prompt.ToolApprovalRequestPart>().not.toExtend<Memory.ItemPart>()
+    expectTypeOf<Memory.Item["content"]>().toEqualTypeOf<ReadonlyArray<Memory.ItemPart>>()
+  })
+
+  it("converts legacy prompt parts without reinterpreting protocol parts", () => {
+    const text = textPart("remembered context")
+    const file = Prompt.makePart("file", {
+      mediaType: "text/plain",
+      fileName: "memory.txt",
+      data: new Uint8Array([1, 2, 3]),
+    })
+    const protocolParts: ReadonlyArray<Prompt.Part> = [
+      Prompt.makePart("reasoning", { text: "private reasoning" }),
+      Prompt.makePart("tool-call", {
+        id: "call-1",
+        name: "lookup",
+        params: {},
+        providerExecuted: false,
+      }),
+      Prompt.makePart("tool-result", {
+        id: "call-1",
+        name: "lookup",
+        isFailure: false,
+        result: "result",
+      }),
+      Prompt.makePart("tool-approval-response", { approvalId: "approval-1", approved: true }),
+      Prompt.makePart("tool-approval-request", { approvalId: "approval-1", toolCallId: "call-1" }),
+    ]
+
+    expect(Memory.itemFromPromptPart(text)).toEqual(Option.some(text))
+    expect(Memory.itemFromPromptPart(file)).toEqual(Option.some(file))
+    expect(protocolParts.map(Memory.itemFromPromptPart)).toEqual(protocolParts.map(() => Option.none()))
+  })
+
   ItLayer.make(it, "fails fast when memory options are set without a Memory service", () => {
     let modelCalls = 0
     const agent = Agent.make({ name: "memory-agent" })
@@ -76,9 +117,14 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "inserts recalled items after system and before the run prompt before middleware", () => {
+  ItLayer.make(it, "inserts text and file content from multiple recalled items in source order", () => {
     let modelPrompt: Prompt.Prompt | undefined
     let middlewarePrompt: Prompt.Prompt | undefined
+    const file = Prompt.makePart("file", {
+      mediaType: "text/plain",
+      fileName: "memory.txt",
+      data: new Uint8Array([1, 2, 3]),
+    })
     const agent = Agent.make({ name: "memory-agent", instructions: "system instructions" })
     return [
       Layer.mergeAll(
@@ -97,7 +143,12 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         ]),
         Memory.testLayer({
-          recall: () => Effect.succeed([{ id: "item-1", parts: [textPart("remembered context")] }]),
+          recall: () =>
+            Effect.succeed([
+              { id: "item-empty", content: [] },
+              { id: "item-text", content: [textPart("remembered context")] },
+              { id: "item-file", content: [file] },
+            ]),
           remember: () => Effect.void,
           forget: () => Effect.void,
         }),
@@ -112,6 +163,36 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           "live prompt",
         ])
         expect(middlewarePrompt?.content.map(messageText)).toEqual(["remembered context", "live prompt"])
+        const recalledMessage = modelPrompt?.content[1]
+        expect(recalledMessage?.role).toBe("user")
+        expect(recalledMessage?.content).toEqual([textPart("remembered context"), file])
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "does not insert a recalled message when every item is empty", () => {
+    let modelPrompt: Prompt.Prompt | undefined
+    const agent = Agent.make({ name: "memory-agent" })
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          modelPrompt = options.prompt
+          return Stream.make(textDelta("done"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "item-empty", content: [] }]),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
+
+        expect(result.text).toBe("done")
+        expect(modelPrompt?.content.map(messageText)).toEqual(["live prompt"])
       }),
     ] as const
   })

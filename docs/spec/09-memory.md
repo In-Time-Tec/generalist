@@ -23,7 +23,21 @@ Baton core does not own vector stores, embedding models, summarization, extracti
 
 When `Agent.make({ memory })` or `RunOptions.memory` is set and the `Memory` service is present, Baton calls `recall({ key, turn: 0, prompt })` once for non-resume runs. `prompt` is the run's initial prompt before recalled memory is inserted. A run-specific `RunOptions.memory.key` overrides the agent default.
 
-Recalled items are flattened in source order into one user message. That message is inserted after an initial system message when one exists and before the run prompt. Recall happens before model middleware, so guardrails and other prompt middleware see the enriched prompt.
+`Memory.Item.content` is `ReadonlyArray<Memory.ItemPart>`, where `ItemPart` is exactly Effect AI's `Prompt.UserMessagePart` (`Prompt.TextPart | Prompt.FilePart`). Recalled items are flattened in item and content order into one user message. That message is inserted after an initial system message when one exists and before the run prompt. If every recalled item has empty content, no message is inserted. Recall happens before model middleware, so guardrails and other prompt middleware see the enriched prompt. Because the item type admits only user-message content, a well-typed item never fails later during prompt insertion because of its part kind.
+
+Reasoning, tool calls, tool results, and tool approval request/response parts are protocol transcript content and cannot enter recall through `Memory.Item`. `Memory.itemFromPromptPart(part)` is the explicit legacy conversion boundary: it returns `Option.some` for text and file parts and `Option.none` for every protocol-only part. A migrating implementation may filter broad legacy arrays with this function or reject the whole stored item when any result is `None`; it must not silently stringify or reinterpret rejected parts.
+
+```ts
+import { Array, Option } from "effect"
+import { Memory } from "@batonfx/core"
+
+const content = Array.getSomes(legacyParts.map(Memory.itemFromPromptPart))
+const item: Memory.Item = { id, content }
+
+const rejectedPart = legacyParts.find((part) => Option.isNone(Memory.itemFromPromptPart(part)))
+```
+
+This is a breaking experimental interface correction: consumers rename `parts` to `content` and narrow broad stored arrays through the explicit conversion boundary. Built-in memory implementations emit text-only content and require only that mechanical field rename.
 
 Resume runs skip recall because turn 0 already happened before suspension.
 
@@ -106,3 +120,4 @@ Forget without `id` drops the exact key's in-process working-memory state. Forge
 - `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
 - `docs/spec/decisions/ADR-0026-working-memory-summary-model.md`
+- `docs/spec/decisions/ADR-0027-memory-item-user-content.md`
