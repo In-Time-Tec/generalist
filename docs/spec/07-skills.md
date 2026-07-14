@@ -91,11 +91,15 @@ Hosted manifests never deserialize executable tools. A trusted host may attach i
 
 HTTP failures, invalid status, malformed JSON/frontmatter, invalid UTF-8, limit violations, unsafe paths, digest mismatches, and metadata mismatches map to `SkillSourceError`. Diagnostic `source` values come from caller-safe catalog identifiers and never include URL userinfo, query strings, fragments, or authorization values.
 
+The hosted manifest schema, URL resolvers, request headers, and shared constructor are package internals owned by the supported adapters. `@batonfx/skills` does not expose a generic hosted-catalog namespace or transport extension point. A new transport contract requires a separately accepted use case and security contract rather than exposing the built-in engine's implementation options.
+
 ## Hosted providers
 
-- `HttpCatalog.make({ manifestUrl, source?, ...limits })` loads a manifest over the ambient Effect `HttpClient`. Skill paths resolve relative to the manifest URL and must remain same-origin and beneath the manifest directory.
+- `HttpCatalog.make({ manifestUrl, ...limits })` loads a manifest over the ambient Effect `HttpClient`. Skill paths resolve relative to the manifest URL and must remain same-origin and beneath the manifest directory. Diagnostics use the parsed URL origin and path, excluding credentials, query, and fragment.
 - `S3Catalog.make({ bucket, region, prefix?, manifestName?, ...limits })` is a virtual-hosted HTTPS preset over the same manifest protocol. Because AWS wildcard TLS does not cover dotted bucket names, this preset accepts only DNS-compatible non-dotted bucket names. It does not call `ListObjectsV2` or sign requests. Public access, presigning, credentials, retries, and SigV4 come from the caller-provided `HttpClient`.
 - `GitHubCatalog.make({ owner, repo, ref, root?, manifestName?, apiBaseUrl?, ...limits })` reads the manifest and bodies through the GitHub Contents API with the raw media type. Owner and repository components are validated before URL construction; `apiBaseUrl` must be an absolute HTTPS URL without credentials, query, or fragment. `ref` must be an immutable 40- or 64-character hexadecimal commit id. It does not enumerate trees or accept a mutable branch/tag. Authentication, retries, and rate-limit policy come from the caller-provided `HttpClient`.
+
+S3 diagnostics identify the bucket and prefix; GitHub diagnostics identify the repository and immutable ref. Provider options do not accept an alternate diagnostic `source`. Hosted request failures preserve the typed `SkillSourceError` boundary but omit the underlying HTTP error cause because it owns the request URL and decorated headers and is therefore not safe to encode or log.
 
 Each module also exposes `layer(options)` as a one-source convenience. None adds built-in refresh or retry behavior; rebuild the layer to refresh a manifest and decorate `HttpClient` for transport policy.
 

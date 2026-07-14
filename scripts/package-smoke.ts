@@ -122,6 +122,7 @@ const program = Effect.gen(function* () {
 import { Agent, Chat, Memory, ModelMiddleware, ModelRegistry, Session, ToolOutput } from "@batonfx/core"
 import { VectorStore } from "@batonfx/memory"
 import { OAuth, McpToolSource } from "@batonfx/mcp"
+import { GitHubCatalog, HttpCatalog, S3Catalog } from "@batonfx/skills"
 import { TestModel } from "@batonfx/test"
 import { SessionRegistry } from "@batonfx/transport"
 import { Crypto, Effect, Layer, Option, Redacted } from "effect"
@@ -133,6 +134,11 @@ type Equal<Left, Right> =
     : false
 type Assert<Value extends true> = Value
 type LayerShape<Value extends Layer.Any> = readonly [Layer.Success<Value>, Layer.Error<Value>, Layer.Services<Value>]
+type SkillsRoot = typeof import("@batonfx/skills")
+type HostedCatalogInternal = Assert<Equal<"HostedCatalog" extends keyof SkillsRoot ? true : false, false>>
+type HttpSourceInternal = Assert<Equal<"source" extends keyof HttpCatalog.Options ? true : false, false>>
+type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? true : false, false>>
+type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Options ? true : false, false>>
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
 type MemoryCompatibility = Assert<Equal<typeof Memory.layerNoop, typeof Memory.noopLayer>>
 type MiddlewareCanonical = Assert<
@@ -216,6 +222,8 @@ void proof
 for (const specifier of specifiers) await import(specifier)
 const { Memory, ModelMiddleware, ModelRegistry, Session } = await import("@batonfx/core")
 const { VectorStore } = await import("@batonfx/memory")
+const skills = await import("@batonfx/skills")
+if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
 const aliases = [
   [Memory.layerNoop, Memory.noopLayer, "Memory.noopLayer"],
   [ModelMiddleware.layerIdentity, ModelMiddleware.identityLayer, "ModelMiddleware.identityLayer"],

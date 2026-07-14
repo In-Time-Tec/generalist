@@ -1,10 +1,9 @@
-import { Crypto, Effect, Encoding, Function, Layer, Schema, Stream } from "effect"
+import { Crypto, Effect, Encoding, Function, Schema, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse, Url } from "effect/unstable/http"
 import { SkillSource } from "@batonfx/core"
 import { parseDocument, validateName } from "./skill-document.js"
 
-/** @experimental Baton hosted skill manifest entry. */
-export const ManifestSkill = Schema.Struct({
+const ManifestSkill = Schema.Struct({
   name: Schema.String,
   description: Schema.String,
   skillPath: Schema.String,
@@ -19,17 +18,12 @@ export const ManifestSkill = Schema.Struct({
   paths: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 
-/** @experimental */
-export type ManifestSkill = typeof ManifestSkill.Type
+type ManifestSkill = typeof ManifestSkill.Type
 
-/** @experimental Baton hosted skill manifest. */
-export const Manifest = Schema.Struct({
+const Manifest = Schema.Struct({
   version: Schema.Literal(1),
   skills: Schema.Array(ManifestSkill),
 })
-
-/** @experimental */
-export type Manifest = typeof Manifest.Type
 
 /** @experimental Shared hosted-catalog limits and trusted tools. */
 export interface Limits {
@@ -40,8 +34,8 @@ export interface Limits {
   readonly toolsBySkill?: Readonly<Record<string, ReadonlyArray<SkillSource.Skill["tools"][number]>>>
 }
 
-/** @experimental Internal hosted-catalog construction options. */
-export interface MakeOptions extends Limits {
+interface MakeOptions {
+  readonly limits: Limits
   readonly source: string
   readonly manifestUrl: string
   readonly resolveSkillUrl: (skillPath: string) => Effect.Effect<string, SkillSource.SkillSourceError>
@@ -79,10 +73,10 @@ const fetchBytes = (
 ): Effect.Effect<Uint8Array, SkillSource.SkillSourceError> =>
   client.execute(request(url, headers)).pipe(
     Effect.flatMap(HttpClientResponse.filterStatusOk),
-    Effect.mapError((error) => sourceError(source, "Hosted skill request failed", error)),
+    Effect.mapError(() => sourceError(source, "Hosted skill request failed")),
     Effect.flatMap((response) =>
       response.stream.pipe(
-        Stream.mapError((error) => sourceError(source, "Hosted skill request failed", error)),
+        Stream.mapError(() => sourceError(source, "Hosted skill request failed")),
         Stream.runFoldEffect(
           () => ({ size: 0, chunks: [] as Array<Uint8Array> }),
           (state, chunk) => {
@@ -143,7 +137,7 @@ export const validateSkillPath: {
     !skillPath.includes("#") &&
     segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
     ? Effect.succeed(skillPath)
-    : Effect.fail(sourceError(source, `Unsafe hosted skill path: ${skillPath}`))
+    : Effect.fail(sourceError(source, "Unsafe hosted skill path"))
 })
 
 /** @experimental Resolve a same-origin path beneath a manifest directory. */
@@ -154,16 +148,16 @@ export const resolveRelative: {
   Effect.gen(function* () {
     yield* validateSkillPath(source, skillPath)
     const manifest = yield* Effect.fromResult(Url.fromString(manifestUrl)).pipe(
-      Effect.mapError((error) => sourceError(source, "Invalid manifest URL", error)),
+      Effect.mapError(() => sourceError(source, "Invalid manifest URL")),
     )
     const directory = yield* Effect.fromResult(Url.fromString(".", manifest)).pipe(
-      Effect.mapError((error) => sourceError(source, "Invalid manifest directory URL", error)),
+      Effect.mapError(() => sourceError(source, "Invalid manifest directory URL")),
     )
     const resolved = yield* Effect.fromResult(Url.fromString(skillPath, directory)).pipe(
-      Effect.mapError((error) => sourceError(source, "Invalid hosted skill URL", error)),
+      Effect.mapError(() => sourceError(source, "Invalid hosted skill URL")),
     )
     if (resolved.origin !== manifest.origin || !resolved.pathname.startsWith(directory.pathname)) {
-      return yield* sourceError(source, `Hosted skill path escapes manifest directory: ${skillPath}`)
+      return yield* sourceError(source, "Hosted skill path escapes manifest directory")
     }
     return resolved.toString()
   }),
@@ -177,15 +171,20 @@ export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpCl
     const manifestMaxBytes = yield* safeInteger(
       options.source,
       "manifestMaxBytes",
-      options.manifestMaxBytes ?? 1024 * 1024,
+      options.limits.manifestMaxBytes ?? 1024 * 1024,
       1,
     )
-    const bodyMaxBytes = yield* safeInteger(options.source, "bodyMaxBytes", options.bodyMaxBytes ?? 1024 * 1024, 1)
-    const maxSkills = yield* safeInteger(options.source, "maxSkills", options.maxSkills ?? 1_000, 1)
+    const bodyMaxBytes = yield* safeInteger(
+      options.source,
+      "bodyMaxBytes",
+      options.limits.bodyMaxBytes ?? 1024 * 1024,
+      1,
+    )
+    const maxSkills = yield* safeInteger(options.source, "maxSkills", options.limits.maxSkills ?? 1_000, 1)
     const descriptionCap = yield* safeInteger(
       options.source,
       "descriptionCap",
-      options.descriptionCap ?? SkillSource.DESCRIPTION_CAP,
+      options.limits.descriptionCap ?? SkillSource.DESCRIPTION_CAP,
       0,
     )
     const manifestBytes = yield* fetchBytes(
@@ -242,8 +241,8 @@ export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpCl
         ),
       )
       const tools =
-        options.toolsBySkill !== undefined && Object.hasOwn(options.toolsBySkill, entry.name)
-          ? (options.toolsBySkill[entry.name] ?? [])
+        options.limits.toolsBySkill !== undefined && Object.hasOwn(options.limits.toolsBySkill, entry.name)
+          ? (options.limits.toolsBySkill[entry.name] ?? [])
           : []
       byName.set(entry.name, {
         frontmatter: metadata,
@@ -258,9 +257,3 @@ export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpCl
       get: (name) => Effect.succeed(byName.get(name)),
     }
   })
-
-/** @experimental One-source hosted catalog layer. */
-export const layer = (
-  options: MakeOptions,
-): Layer.Layer<SkillSource.SkillSource, SkillSource.SkillSourceError, HttpClient.HttpClient | Crypto.Crypto> =>
-  Layer.effect(SkillSource.SkillSource, make(options).pipe(Effect.map(SkillSource.SkillSource.of)))
