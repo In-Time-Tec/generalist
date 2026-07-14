@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. Amended: WebSocket command authority is bound immutably by the first attachment.
 
 ## Context
 
@@ -14,11 +14,14 @@ Add `@batonfx/transport` subpaths for SSE, WebSocket, and client adapters. They 
 
 Transport errors are not replay frames. Malformed WebSocket client frames and command dispatch failures close the socket rather than manufacturing non-monotonic `Failed` frames.
 
+The first successful WebSocket `Attach(S)` establishes immutable authority for session `S` for that socket. A repeated `Attach(S)` is idempotent; `Attach(T)` fails when `T` differs. Every command is authorized server-side against the socket state before registry dispatch. `NotAttached` and `SessionMismatch` are schema-backed tagged protocol failures and close the socket with code `1008`, without changing client or server frame schemas. Initiating a protocol close atomically transitions the socket to a terminal state so concurrently queued handlers cannot attach or begin registry dispatch during the close handshake.
+
 ## Consequences
 
 - Relay can reuse these handlers by providing a durable `SessionRegistry`.
 - Clients have a simple reconnect contract based on frame sequence.
 - Browser clients can display unknown tool data through loose decoding.
+- Caller-controlled command session ids cannot escape the socket's attached session authority.
 - Command acknowledgements, multiplexing, EventSource wrappers, and offline command queues remain future protocol work.
 
 ## Related docs

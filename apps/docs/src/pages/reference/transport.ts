@@ -37,7 +37,7 @@ export const transportReference = definePage({
         [[code("./sse")], ["SSE response helper ", code("respond")]],
         [[code("./ws")], ["WebSocket handler ", code("handle")]],
         [[code("./client")], [code("AgentClient"), ", ", code("layerWebSocket"), ", ", code("sseFrames")]],
-        [[code("./errors")], [code("TransportError")]],
+        [[code("./errors")], [code("TransportError"), ", ", code("NotAttached"), ", ", code("SessionMismatch")]],
       ],
     ),
     h2("client-frames", "Wire.ClientFrame"),
@@ -238,7 +238,7 @@ export const transportReference = definePage({
       code("ClientFrame"),
       " JSON text frames, dispatches to the registry, and writes encoded ",
       code("ServerFrame"),
-      "s. Close codes: 4000 when a subscriber lags, 1003 for malformed or binary frames, 1011 for session errors and busy sessions, and 1013 when an enqueue-mode session queue is full.",
+      "s. The first Attach binds immutable session authority; same-session reattach is idempotent, while commands before attach or for another session close with code 1008. Other close codes: 4000 when a subscriber lags, 1003 for malformed or binary frames, 1011 for session errors and busy sessions, and 1013 when an enqueue-mode session queue is full.",
     ),
     h2("client", "Client"),
     table(
