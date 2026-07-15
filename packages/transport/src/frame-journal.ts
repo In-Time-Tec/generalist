@@ -97,7 +97,7 @@ export const makeFrameJournal = (options: Options): Effect.Effect<FrameJournal> 
           Effect.gen(function* () {
             const current = yield* Ref.get(state)
             if (current.closed) return yield* sessionError(options.sessionId)
-            const frame = { ...input, seq: current.lastSeq + 1 } as LooseServerFrameType
+            const frame: LooseServerFrameType = { ...input, seq: current.lastSeq + 1 }
             if (options.onAllocated !== undefined) yield* options.onAllocated(frame)
             const subscribers = new Map(current.subscribers)
             for (const [subscriberId, queue] of current.subscribers) {

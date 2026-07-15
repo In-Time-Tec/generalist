@@ -610,7 +610,7 @@ const applyStatus = (model: Model, status: Wire.SessionStatus): readonly [Model,
   }
 }
 
-const applyEvent = (model: Model, event: Wire.EventType): readonly [Model, Option.Option<OutMessage>] => {
+const applyEvent = (model: Model, event: Wire.LooseEventType): readonly [Model, Option.Option<OutMessage>] => {
   switch (event._tag) {
     case "TurnStarted":
       return [

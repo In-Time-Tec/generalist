@@ -57,6 +57,32 @@ await Effect.runPromise(program)
 
 Run `bun examples/package-composition-guides/src/transport.ts`.
 
+## Fixed and runtime-dynamic wire capabilities
+
+Fixed-tool endpoints keep exact startup-toolkit validation. Passing a toolkit directly remains shorthand for the explicit fixed capability:
+
+```ts
+const fixed = { capability: "fixed", toolkit } as const
+
+Wire.codec(fixed)
+Sse.streamSuccess(fixed)
+Sse.respond(fixed)({ sessionId, request })
+Ws.handle(fixed)
+```
+
+Agents that expose `activate_skill` or discover tools after startup must select the runtime-dynamic capability for the complete server endpoint:
+
+```ts
+const dynamic = { capability: "runtime-dynamic" } as const
+
+Wire.codec(dynamic)
+Sse.streamSuccess(dynamic)
+Sse.respond(dynamic)({ sessionId, request })
+Ws.handle(dynamic)
+```
+
+The dynamic path validates frame tags, sequences, common event fields, call ids/names, progress fields, and result flags, but tool parameters and results are `unknown`. Browser SSE and WebSocket clients decode this honest loose frame type. This does not authorize tools or weaken core collision and framework-failure handling.
+
 ## Errors, requirements, and resources
 
 The layers supply `SessionRegistry`, `LanguageModel`, and chat persistence, leaving `R = never`; success is `void`, while `open` retains schema-backed `SessionError`. Registry `send` can also fail with `SessionBusy` or `SessionQueueFull`, `attach` can fail with `SubscriberLagged`, and client transport operations use `TransportError`. The in-memory registry owns session fibers and journals for its layer lifetime. This composition enables FIFO enqueueing, bounds pending messages at capacity **16**, and bounds concurrent runs at **4**; subscriber and replay buffers are also bounded by registry policy.

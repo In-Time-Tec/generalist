@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Option, Queue } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { makeFrameJournal } from "../src/frame-journal.js"
+import type { FrameWithoutSeq } from "../src/frame-journal.js"
 import type { SessionError, SubscriberLagged } from "../src/session-registry-errors.js"
 import type { LooseServerFrameType } from "../src/wire.js"
 
@@ -103,6 +104,78 @@ describe("frame journal", () => {
       expect(Option.isSome(stale.snapshot)).toBe(true)
       if (Option.isSome(stale.snapshot)) expect(stale.snapshot.value.throughSeq).toBe(2)
       expect(yield* journal.lastSeq).toBe(2)
+    }),
+  )
+
+  it.effect("buffers and replays runtime-dynamic activation and tool events", () =>
+    Effect.gen(function* () {
+      const inputs: ReadonlyArray<FrameWithoutSeq> = [
+        {
+          _tag: "Event",
+          event: {
+            _tag: "ToolExecutionStarted",
+            turn: 0,
+            call: { type: "tool-call", id: "activate-1", name: "activate_skill", params: { name: "review" } },
+          },
+        },
+        {
+          _tag: "Event",
+          event: {
+            _tag: "ToolExecutionCompleted",
+            turn: 0,
+            call: { type: "tool-call", id: "activate-1", name: "activate_skill", params: { name: "review" } },
+            result: {
+              type: "tool-result",
+              id: "activate-1",
+              name: "activate_skill",
+              result: { activated: "review" },
+              isFailure: false,
+            },
+          },
+        },
+        {
+          _tag: "Event",
+          event: {
+            _tag: "ToolExecutionStarted",
+            turn: 1,
+            call: { type: "tool-call", id: "review-1", name: "review_tool", params: { path: "src" } },
+          },
+        },
+        {
+          _tag: "Event",
+          event: { _tag: "ToolProgress", turn: 1, toolCallId: "review-1", message: "reviewing" },
+        },
+        {
+          _tag: "Event",
+          event: {
+            _tag: "ToolExecutionCompleted",
+            turn: 1,
+            call: { type: "tool-call", id: "review-1", name: "review_tool", params: { path: "src" } },
+            result: {
+              type: "tool-result",
+              id: "review-1",
+              name: "review_tool",
+              result: { issues: 0 },
+              isFailure: false,
+            },
+          },
+        },
+      ]
+      const journal = yield* makeFrameJournal({ sessionId: "dynamic", capacity: 8, initialTranscript: Prompt.empty })
+      yield* journal.publish(status(0))
+      for (const input of inputs) yield* journal.publish(input)
+
+      const queue = yield* makeQueue(8)
+      const replay = yield* journal.subscribe(queue, 0)
+
+      expect(replay.replay.map((frame) => frame.seq)).toEqual([1, 2, 3, 4, 5])
+      expect(replay.replay).toMatchObject([
+        { event: { _tag: "ToolExecutionStarted", call: { name: "activate_skill" } } },
+        { event: { _tag: "ToolExecutionCompleted", result: { name: "activate_skill" } } },
+        { event: { _tag: "ToolExecutionStarted", call: { name: "review_tool" } } },
+        { event: { _tag: "ToolProgress", toolCallId: "review-1" } },
+        { event: { _tag: "ToolExecutionCompleted", result: { name: "review_tool" } } },
+      ])
     }),
   )
 

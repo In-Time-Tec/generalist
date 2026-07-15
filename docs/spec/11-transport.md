@@ -7,7 +7,7 @@ Baton transport is the non-durable, same-process layer that turns `Agent.stream`
 Baton owns:
 
 - toolkit-parameterized codecs for loop events and server/client frames;
-- a loose browser codec that accepts unknown tool names as display data;
+- a loose runtime-dynamic codec that accepts unknown tool names and payloads while retaining common event and frame validation;
 - `SessionRegistry`, an interface for opening sessions, sending prompts, attaching to replay/live frames, resolving approval suspensions, interrupting runs, and inspecting status;
 - `layerMemory`, a best-effort in-process registry implementation;
 - SSE, WebSocket, and isomorphic client adapters that depend only on `SessionRegistry`.
@@ -34,7 +34,14 @@ Every logical run emits exactly one `Ended` frame after `Event(Completed)`, `Sus
 
 `EventSchema(toolkit)` mirrors every current `AgentEvent.Event` tag: `TurnStarted`, `ModelPart`, `ToolExecutionStarted`, `ToolProgress`, `ToolExecutionCompleted`, `ApprovalRequested`, `SteeringDrained`, `TurnCompleted`, `StructuredOutput`, and `Completed`. `ModelPart.part` and `StructuredOutput.content` use Effect AI response-part schemas for the supplied toolkit. Tool-call and tool-result fields are strict for that toolkit.
 
-`LooseEventSchema` and `LooseServerFrame` are for browser display and replay. They accept unknown tool-call and tool-result names with unknown params/results. They are not a server-side execution contract.
+Transport endpoints select one server-frame capability when they are constructed:
+
+- `fixed` closes over a startup toolkit and validates exact tool names and parameter, success, and declared-failure schemas. Passing a toolkit directly to the established constructors remains shorthand for this capability.
+- `runtime-dynamic` uses `LooseEventSchema` and `LooseServerFrame`. It accepts `activate_skill`, activated skill tools, and other runtime-discovered names with unknown params/results while still validating event tags, turns, call ids and names, progress fields, result flags, frame tags, sequences, failures, suspensions, statuses, snapshots, and transcripts.
+
+`LooseEventType` and `LooseServerFrameType` are the decoded types of their schemas rather than aliases of the strict compatibility types. `SessionRegistry`, replay journals, SSE/WS dynamic endpoints, and browser clients carry those loose values without changing validation policy mid-pipeline. Loose frames are display and delivery data, never tool execution authorization. Tool-name collision validation and framework failures retain the core contracts: collisions prevent advertisement/execution, and framework failures remain terminal `Failed` frames rather than tool results.
+
+`Wire.codec(toolkit)` remains the fixed-tool shorthand. `Wire.codec({ capability: "fixed", toolkit })` makes that policy explicit, while `Wire.codec({ capability: "runtime-dynamic" })` selects the loose server-frame codec. The same capability input is accepted by `Sse.respond`, `Sse.streamSuccess`, and `Ws.handle`; an SSE route uses the same selection for its response schema and responder. Existing fixed-tool consumers remain source-compatible. A consumer serving skill activation or runtime-discovered tools migrates from `Sse.respond(toolkit)` / `Ws.handle(toolkit)` to the runtime-dynamic capability rather than weakening its startup toolkit.
 
 Declared `DomainFailure` outcomes remain `ToolExecutionCompleted` events whose failed result carries the decoded domain value and schema-encoded payload. `FrameworkFailure` is never a tool result or completed-tool event; it terminates the run through the existing `Failed` frame and `SessionStatus.Failed` schema.
 
@@ -88,13 +95,13 @@ The SSE/WS handlers added later depend on `SessionRegistry`, not `layerMemory`, 
 
 SSE is downstream-only. Hosts expose ordinary command routes for `SendMessage`, `ResolveApproval`, and `Cancel`; those routes call `SessionRegistry` methods directly.
 
-`Sse.respond(toolkit)` reads the resume cursor from `Last-Event-ID`; if absent, it falls back to `?after_seq=`. Invalid cursors are ignored. The cursor is passed to `SessionRegistry.attach(sessionId, afterSeq)`.
+`Sse.respond(capability)` reads the resume cursor from `Last-Event-ID`; if absent, it falls back to `?after_seq=`. Invalid cursors are ignored. The cursor is passed to `SessionRegistry.attach(sessionId, afterSeq)`. A direct toolkit remains fixed-capability shorthand. `Sse.streamSuccess(capability)` advertises the same selected strict or loose server-frame schema.
 
 Each SSE event has:
 
 - `id` equal to the server frame `seq`;
 - `event` equal to the server frame `_tag`;
-- `data` equal to JSON for `Wire.ServerFrame(toolkit)`.
+- `data` equal to JSON for the selected fixed `Wire.ServerFrame(toolkit)` or runtime-dynamic `Wire.LooseServerFrame`.
 
 When an SSE event carries an `id`, clients validate it with the shared sequence schema and require it to equal the decoded payload `seq`. The sole exception is `id: -1` on a `Snapshot` whose `seq` is the pre-history replay-boundary sentinel `-1`; `-1` is never an allocated frame sequence or request cursor. A missing ID remains decodable, but an invalid or mismatched ID is a transport error.
 
@@ -102,7 +109,7 @@ Responses use `text/event-stream`, `cache-control: no-cache`, `connection: keep-
 
 ## WebSocket contract
 
-WebSocket transport is text-JSON only. Clients send existing `Wire.ClientFrame` values, and servers send existing `Wire.ServerFrame` values.
+WebSocket transport is text-JSON only. Clients send existing `Wire.ClientFrame` values, and servers send frames validated by the fixed or runtime-dynamic capability selected by `Ws.handle`. The selection is immutable for the handler.
 
 One socket has immutable authority for at most one session. It begins `Unattached`; the first successful `Attach(sessionId)` starts a scoped subscription fiber and atomically establishes `Attached(sessionId, fiber)`. Repeating `Attach` for that same session is idempotent and does not restart replay or replace the subscription. Attaching the socket to a different session fails with `SessionMismatch`.
 
@@ -130,3 +137,4 @@ The SSE client helper decodes `text/event-stream` response bodies into loose ser
 - `docs/spec/decisions/ADR-0018-in-process-session-run-queue.md`
 - `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`
 - `docs/spec/decisions/ADR-0033-truthful-agent-requirements.md`
+- `docs/spec/decisions/ADR-0038-runtime-dynamic-transport-capability.md`

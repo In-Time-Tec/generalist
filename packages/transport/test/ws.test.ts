@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Queue, Ref, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Queue, Ref, Schema, Stream } from "effect"
 import { Headers, HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Prompt, Toolkit } from "effect/unstable/ai"
@@ -19,6 +19,64 @@ const eventFrame: Wire.LooseServerFrameType = {
   seq: 0,
   event: { _tag: "TurnStarted", turn: 0 },
 }
+
+const dynamicFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
+  {
+    _tag: "Event",
+    seq: 0,
+    event: {
+      _tag: "ToolExecutionStarted",
+      turn: 0,
+      call: { type: "tool-call", id: "activate-1", name: "activate_skill", params: { name: "review" } },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 1,
+    event: {
+      _tag: "ToolExecutionCompleted",
+      turn: 0,
+      call: { type: "tool-call", id: "activate-1", name: "activate_skill", params: { name: "review" } },
+      result: {
+        type: "tool-result",
+        id: "activate-1",
+        name: "activate_skill",
+        result: { activated: "review" },
+        isFailure: false,
+      },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 2,
+    event: {
+      _tag: "ToolExecutionStarted",
+      turn: 1,
+      call: { type: "tool-call", id: "review-1", name: "review_tool", params: { path: "src" } },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 3,
+    event: { _tag: "ToolProgress", turn: 1, toolCallId: "review-1", message: "reviewing", data: { pct: 50 } },
+  },
+  {
+    _tag: "Event",
+    seq: 4,
+    event: {
+      _tag: "ToolExecutionCompleted",
+      turn: 1,
+      call: { type: "tool-call", id: "review-1", name: "review_tool", params: { path: "src" } },
+      result: {
+        type: "tool-result",
+        id: "review-1",
+        name: "review_tool",
+        result: { issues: 0 },
+        isFailure: false,
+      },
+    },
+  },
+]
 
 interface FakeSocket {
   readonly socket: Socket.Socket
@@ -114,6 +172,14 @@ const runHandler = (fake: FakeSocket, layer: Layer.Layer<SessionRegistry.Session
     Effect.forkChild,
   )
 
+const runDynamicHandler = (fake: FakeSocket, layer: Layer.Layer<SessionRegistry.SessionRegistry>) =>
+  Ws.handle({ capability: "runtime-dynamic" }).pipe(
+    Effect.provideService(HttpServerRequest.HttpServerRequest, request(fake.socket)),
+    provideTestLayer(layer),
+    Effect.scoped,
+    Effect.forkChild,
+  )
+
 describe("Ws", () => {
   const invalidSequences = [-1, 1.5, Number.POSITIVE_INFINITY, Number.NaN, Number.MAX_SAFE_INTEGER + 1]
 
@@ -156,6 +222,44 @@ describe("Ws", () => {
     }),
   )
 
+  it.effect("runtime-dynamic WebSocket streams and replays activated tool events", () =>
+    Effect.gen(function* () {
+      const cursors = yield* Ref.make<Array<number | undefined>>([])
+      const attach = (_sessionId: string, afterSeq?: number) =>
+        Ref.update(cursors, (values) => [...values, afterSeq]).pipe(
+          Effect.map(() => dynamicFrames.filter((frame) => frame.seq > (afterSeq ?? -1))),
+          Stream.fromEffect,
+          Stream.flatMap(Stream.fromIterable),
+        )
+
+      const first = yield* makeFakeSocket()
+      const firstFiber = yield* runDynamicHandler(first, registryLayer({ attach }))
+      yield* Queue.offer(first.inbound, clientFrameText({ _tag: "Attach", sessionId: "s-dynamic" }))
+      const firstFrames: Array<Wire.LooseServerFrameType> = []
+      for (let index = 0; index < dynamicFrames.length; index++) {
+        const output = yield* Queue.take(first.outbound)
+        if (typeof output === "string") firstFrames.push(decodeServerFrame(output))
+      }
+      yield* Queue.offer(first.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(firstFiber)
+
+      const replay = yield* makeFakeSocket()
+      const replayFiber = yield* runDynamicHandler(replay, registryLayer({ attach }))
+      yield* Queue.offer(replay.inbound, clientFrameText({ _tag: "Attach", sessionId: "s-dynamic", afterSeq: 1 }))
+      const replayFrames: Array<Wire.LooseServerFrameType> = []
+      for (let index = 2; index < dynamicFrames.length; index++) {
+        const output = yield* Queue.take(replay.outbound)
+        if (typeof output === "string") replayFrames.push(decodeServerFrame(output))
+      }
+      yield* Queue.offer(replay.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(replayFiber)
+
+      expect(firstFrames).toEqual(dynamicFrames)
+      expect(replayFrames).toEqual(dynamicFrames.slice(2))
+      expect(yield* Ref.get(cursors)).toEqual([undefined, 1])
+    }),
+  )
+
   it.effect("Attach streams a pre-history snapshot sentinel", () =>
     Effect.gen(function* () {
       const fake = yield* makeFakeSocket()
@@ -190,6 +294,37 @@ describe("Ws", () => {
       expect(Socket.isCloseEvent(output)).toBe(true)
       expect(Socket.isCloseEvent(output) && output.code).toBe(1011)
       expect(Socket.isCloseEvent(output) && output.reason).toBe("wire encoding failed")
+    }),
+  )
+
+  it.effect("runtime-dynamic encoding failures close the socket without replay failures", () =>
+    Effect.gen(function* () {
+      const fake = yield* makeFakeSocket()
+      const fiber = yield* runDynamicHandler(
+        fake,
+        registryLayer({
+          attach: () =>
+            Stream.succeed({
+              _tag: "Event",
+              seq: 0,
+              event: {
+                _tag: "ToolExecutionStarted",
+                turn: 0,
+                call: { type: "tool-call", id: "runtime-1", name: "runtime", params: 1n },
+              },
+            }),
+        }),
+      )
+
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "s-invalid-dynamic" }))
+      const output = yield* Queue.take(fake.outbound)
+      expect(Socket.isCloseEvent(output)).toBe(true)
+      expect(Socket.isCloseEvent(output) && output.code).toBe(1011)
+      expect(Socket.isCloseEvent(output) && output.reason).toBe("wire encoding failed")
+      expect(Option.isNone(yield* Queue.poll(fake.outbound))).toBe(true)
+
+      yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(fiber)
     }),
   )
 
