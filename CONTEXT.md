@@ -46,6 +46,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Public APIs use package-root module namespaces and noun-after-`layer` service Layer variants; established subpaths and superseded Layer names follow ADR-0024 compatibility policy.
 - Errors that cross a service boundary are `Schema.TaggedErrorClass`.
 - Every post-middleware tool-call ID is unique within its model response. Duplicate transformed IDs fail typed before the duplicate can initiate authorization, execution, or persistence.
+- Resume is bound to the sole unresolved authoritative suspension checkpoint. Baton persists the suspension token and authorization snapshot on the transformed call, rejects a missing, stale, duplicate, or mismatched suspension with `ResumeMismatch`, and performs no resumed side effect before that comparison succeeds.
 - No `Date.now()` or raw platform time/concurrency/randomness — use Effect primitives.
 - Pending tool results are never silently dropped: a `Stop` policy with pending results fails the run.
 - Completed framework tool results enter Chat exactly once in call order before Session synchronization, Memory retention, policy evaluation, persistence, and `TurnCompleted`; follow-up turns consume that checkpoint without appending the results again.
