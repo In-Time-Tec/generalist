@@ -5,13 +5,10 @@ import { HttpApiSchema } from "effect/unstable/httpapi"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { TransportError } from "./errors.js"
 import { SessionError, SessionRegistry } from "./session-registry.js"
-import { ServerFrame } from "./wire.js"
+import { codec, SequenceFromString, ServerFrame } from "./wire.js"
 import type { LooseServerFrameType } from "./wire.js"
-const cursorFromString = (value: string): Option.Option<number> => {
-  if (!/^\d+$/.test(value)) return Option.none()
-  const parsed = Number(value)
-  return Number.isSafeInteger(parsed) ? Option.some(parsed) : Option.none()
-}
+
+const cursorFromString = Schema.decodeUnknownOption(SequenceFromString)
 
 const queryAfterSeq = (url: string): Option.Option<number> => {
   try {
@@ -34,17 +31,17 @@ export const streamSuccess = <T extends Toolkit.Any | Toolkit.WithHandler<Record
 const afterSeqFromRequest = (request: HttpServerRequest.HttpServerRequest): Option.Option<number> =>
   lastEventId(request.headers).pipe(Option.orElse(() => queryAfterSeq(request.url)))
 
-const encodeFrame =
-  <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
-  (frame: LooseServerFrameType): string => {
-    const encoded = Schema.encodeUnknownSync(ServerFrame(toolkit))(frame)
-    return Sse.encoder.write({
-      _tag: "Event",
-      id: String(frame.seq),
-      event: frame._tag,
-      data: JSON.stringify(encoded),
-    })
-  }
+const encodeFrame = (wireCodec: ReturnType<typeof codec>) => (frame: LooseServerFrameType) =>
+  wireCodec.encodeServer(frame).pipe(
+    Effect.map((data) =>
+      Sse.encoder.write({
+        _tag: "Event",
+        id: String(frame.seq),
+        event: frame._tag,
+        data,
+      }),
+    ),
+  )
 
 /** @experimental */
 export const respond =
@@ -56,7 +53,7 @@ export const respond =
   }): Effect.Effect<HttpServerResponse.HttpServerResponse, SessionError, SessionRegistry> =>
     SessionRegistry.use((registry) => {
       const cursor = Option.getOrUndefined(afterSeqFromRequest(options.request))
-      const frames = registry.attach(options.sessionId, cursor).pipe(Stream.map(encodeFrame(toolkit)))
+      const frames = registry.attach(options.sessionId, cursor).pipe(Stream.mapEffect(encodeFrame(codec(toolkit))))
       const heartbeats = Stream.tick(options.keepAlive ?? "15 seconds").pipe(Stream.map(() => ": keep-alive\n\n"))
       return Effect.succeed(
         HttpServerResponse.stream(frames.pipe(Stream.merge(heartbeats, { haltStrategy: "left" }), Stream.encodeText), {

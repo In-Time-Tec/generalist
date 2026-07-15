@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Queue, Ref, Schema, Stream } from "effect"
 import { Headers, HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import { Toolkit } from "effect/unstable/ai"
+import { Prompt, Toolkit } from "effect/unstable/ai"
 import { SessionRegistry, Wire, Ws } from "../src/index"
 
 const provideTestLayer =
@@ -115,6 +115,26 @@ const runHandler = (fake: FakeSocket, layer: Layer.Layer<SessionRegistry.Session
   )
 
 describe("Ws", () => {
+  const invalidSequences = [-1, 1.5, Number.POSITIVE_INFINITY, Number.NaN, Number.MAX_SAFE_INTEGER + 1]
+
+  it.effect("rejects Attach frames with invalid sequences", () =>
+    Effect.gen(function* () {
+      for (const afterSeq of invalidSequences) {
+        const fake = yield* makeFakeSocket()
+        const fiber = yield* runHandler(fake, registryLayer({}))
+        const text = `{"_tag":"Attach","sessionId":"s-ws","afterSeq":${String(afterSeq)}}`
+
+        yield* Queue.offer(fake.inbound, text)
+        const output = yield* Queue.take(fake.outbound)
+        yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+        yield* Fiber.join(fiber)
+
+        expect(Socket.isCloseEvent(output)).toBe(true)
+        expect(Socket.isCloseEvent(output) && output.code).toBe(1003)
+      }
+    }),
+  )
+
   it.effect("Attach streams server frames as JSON text", () =>
     Effect.gen(function* () {
       const fake = yield* makeFakeSocket()
@@ -133,6 +153,43 @@ describe("Ws", () => {
       expect(typeof second).toBe("string")
       expect(typeof first === "string" && decodeServerFrame(first)._tag).toBe("Event")
       expect(typeof second === "string" && decodeServerFrame(second)._tag).toBe("Ended")
+    }),
+  )
+
+  it.effect("Attach streams a pre-history snapshot sentinel", () =>
+    Effect.gen(function* () {
+      const fake = yield* makeFakeSocket()
+      const fiber = yield* runHandler(
+        fake,
+        registryLayer({ attach: () => Stream.succeed({ _tag: "Snapshot", seq: -1, transcript: Prompt.empty }) }),
+      )
+
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "s-snapshot" }))
+      const output = yield* Queue.take(fake.outbound)
+      yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(fiber)
+
+      expect(typeof output === "string" && decodeServerFrame(output)).toEqual({
+        _tag: "Snapshot",
+        seq: -1,
+        transcript: Prompt.empty,
+      })
+    }),
+  )
+
+  it.effect("server frame encoding failures close the socket without defects", () =>
+    Effect.gen(function* () {
+      const fake = yield* makeFakeSocket()
+      const fiber = yield* runHandler(fake, registryLayer({ attach: () => Stream.succeed({ _tag: "Ended", seq: -1 }) }))
+
+      yield* Queue.offer(fake.inbound, clientFrameText({ _tag: "Attach", sessionId: "s-invalid-frame" }))
+      const output = yield* Queue.take(fake.outbound)
+      yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+      yield* Fiber.join(fiber)
+
+      expect(Socket.isCloseEvent(output)).toBe(true)
+      expect(Socket.isCloseEvent(output) && output.code).toBe(1011)
+      expect(Socket.isCloseEvent(output) && output.reason).toBe("wire encoding failed")
     }),
   )
 

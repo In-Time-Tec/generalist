@@ -10,7 +10,9 @@ The transport wire format and `SessionRegistry` seam provide replayable session 
 
 ## Decision
 
-Add `@batonfx/transport` subpaths for SSE, WebSocket, and client adapters. They depend only on the existing wire schemas and `SessionRegistry`. SSE uses the pinned Effect SSE encoder and maps `Last-Event-ID` to `attach(afterSeq)`. WebSocket uses existing `Wire.ClientFrame` and `Wire.ServerFrame` values with one attached session per socket. The default client decodes `Wire.LooseServerFrame` and reattaches after reconnect with the last seen sequence.
+Add `@batonfx/transport` subpaths for SSE, WebSocket, and client adapters. They depend only on the existing wire schemas and `SessionRegistry`. One shared sequence schema restricts allocated frame sequences, WebSocket `afterSeq`, and SSE request cursors to non-negative safe integers. A `Snapshot` alone may carry `-1` as the pre-history replay-boundary sentinel; the sentinel is never accepted as a request cursor or another frame's sequence. SSE uses the pinned Effect SSE encoder, maps `Last-Event-ID` to `attach(afterSeq)`, and requires an event ID to match its payload sequence when present. WebSocket uses existing `Wire.ClientFrame` and `Wire.ServerFrame` values with one attached session per socket. The default client decodes `Wire.LooseServerFrame` and reattaches after reconnect with the last seen non-negative sequence, omitting `afterSeq` after a sentinel snapshot.
+
+Wire JSON encoding is exposed as a toolkit-parameterized, lazy Effect codec. Schema encoding failures map to the schema-backed `WireEncodeError` transport error instead of escaping synchronously or becoming defects. SSE and WebSocket handlers consume this codec and handle encoding failure in their typed stream/socket paths.
 
 Transport errors are not replay frames. Malformed WebSocket client frames and command dispatch failures close the socket rather than manufacturing non-monotonic `Failed` frames.
 
@@ -26,6 +28,8 @@ Client frame and status delivery use explicit positive-capacity Effect queues. F
 - Caller-controlled command session ids cannot escape the socket's attached session authority.
 - Existing two-field `connect` calls remain source-compatible, but reconnect changes from infinite to finite by default and status tags become `Connecting`, `Connected`, `Disconnected`, and `Retrying`.
 - Hosts that intentionally need a different finite retry or buffering policy configure it at connection acquisition.
+- Invalid, fractional, negative, non-finite, and unsafe sequence values are rejected consistently at transport boundaries.
+- Valid existing frame JSON remains wire-compatible; only invalid sequence values are newly rejected.
 - Command acknowledgements, multiplexing, EventSource wrappers, and offline command queues remain future protocol work.
 
 ## Related docs

@@ -3,8 +3,8 @@ import { Effect, Fiber, Layer, Option, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Sse } from "effect/unstable/encoding"
 import { Headers, HttpBody, HttpServerRequest } from "effect/unstable/http"
-import { Toolkit } from "effect/unstable/ai"
-import { SessionRegistry, Wire } from "../src/index"
+import { Prompt, Toolkit } from "effect/unstable/ai"
+import { Errors, SessionRegistry, Wire } from "../src/index"
 import { lastEventId, respond, streamSuccess } from "../src/sse"
 
 const provideTestLayer =
@@ -59,11 +59,48 @@ const parseSse = (text: string): ReadonlyArray<Sse.Event> => {
 }
 
 describe("Sse", () => {
-  it("parses Last-Event-ID as a non-negative integer", () => {
-    expect(Option.getOrUndefined(lastEventId(Headers.fromInput({ "Last-Event-ID": "12" })))).toBe(12)
-    expect(Option.isNone(lastEventId(Headers.fromInput({ "Last-Event-ID": "1.5" })))).toBe(true)
-    expect(Option.isNone(lastEventId(Headers.fromInput({ "Last-Event-ID": "-1" })))).toBe(true)
+  const invalidCursors = [
+    "",
+    " ",
+    "+1",
+    "1e2",
+    "0x10",
+    "-1",
+    "1.5",
+    "Infinity",
+    "NaN",
+    String(Number.MAX_SAFE_INTEGER + 1),
+  ]
+
+  it("parses Last-Event-ID as a non-negative safe integer", () => {
+    for (const cursor of [0, Number.MAX_SAFE_INTEGER]) {
+      expect(Option.getOrUndefined(lastEventId(Headers.fromInput({ "Last-Event-ID": String(cursor) })))).toBe(cursor)
+    }
+    for (const cursor of invalidCursors) {
+      expect(Option.isNone(lastEventId(Headers.fromInput({ "Last-Event-ID": cursor })))).toBe(true)
+    }
   })
+
+  it.effect("ignores invalid after_seq cursors", () =>
+    Effect.gen(function* () {
+      for (const cursor of invalidCursors) {
+        let received: number | undefined = 42
+        yield* respond(toolkit)({
+          sessionId: "s-invalid-query",
+          request: request(`http://test/sessions/s-invalid-query/events?after_seq=${cursor}`),
+        }).pipe(
+          provideTestLayer(
+            registryLayer((_sessionId, afterSeq) => {
+              received = afterSeq
+              return Stream.fromIterable([endedFrame])
+            }),
+          ),
+        )
+
+        expect(received).toBeUndefined()
+      }
+    }),
+  )
 
   it.effect("respond encodes registry frames as SSE events with seq ids", () =>
     Effect.gen(function* () {
@@ -83,6 +120,38 @@ describe("Sse", () => {
         events.map((event) => Schema.decodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(event.data)._tag),
       ).toEqual(["Event", "Ended"])
     }).pipe(provideTestLayer(registryLayer(() => Stream.fromIterable([eventFrame, endedFrame])))),
+  )
+
+  it.effect("respond encodes a pre-history snapshot with its sentinel event id", () =>
+    Effect.gen(function* () {
+      const response = yield* respond(toolkit)({
+        sessionId: "s-snapshot",
+        request: request("http://test/sessions/s-snapshot/events"),
+      })
+      const chunks = yield* streamBodyText(response.body)
+      const events = parseSse(chunks.join(""))
+      const frame = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Wire.LooseServerFrame))(events[0]?.data)
+
+      expect(events.map((event) => event.id)).toEqual(["-1"])
+      expect(frame._tag).toBe("Snapshot")
+    }).pipe(
+      provideTestLayer(registryLayer(() => Stream.succeed({ _tag: "Snapshot", seq: -1, transcript: Prompt.empty }))),
+    ),
+  )
+
+  it.effect("keeps server frame encoding failures in the typed SSE stream", () =>
+    Effect.gen(function* () {
+      const response = yield* respond(toolkit)({
+        sessionId: "s-invalid-frame",
+        request: request("http://test/sessions/s-invalid-frame/events"),
+      })
+      expect(response.body._tag).toBe("Stream")
+      const error = yield* response.body._tag === "Stream"
+        ? response.body.stream.pipe(Stream.runDrain, Effect.flip)
+        : Effect.die("expected stream body")
+
+      expect(Schema.is(Errors.WireEncodeError)(error)).toBe(true)
+    }).pipe(provideTestLayer(registryLayer(() => Stream.succeed({ _tag: "Ended", seq: -1 })))),
   )
 
   it.effect("passes Last-Event-ID to SessionRegistry.attach before query fallback", () =>

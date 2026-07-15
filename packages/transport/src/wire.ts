@@ -1,6 +1,23 @@
-import { Schema } from "effect"
+import { Effect, Schema, SchemaTransformation } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentEvent, TurnPolicy } from "@batonfx/core"
+import { WireEncodeError } from "./errors.js"
+
+/** @experimental Canonical transport frame sequence and replay cursor schema. */
+export const Sequence = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(0),
+  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
+)
+
+/** @experimental */
+export type Sequence = typeof Sequence.Type
+
+/** @experimental String representation of the canonical transport sequence. */
+export const SequenceFromString = Schema.String.check(Schema.isPattern(/^\d+$/)).pipe(
+  Schema.decodeTo(Sequence, SchemaTransformation.numberFromString),
+)
+
+const SnapshotSequence = Schema.Union([Schema.Literals([-1]), Sequence])
 
 /** @experimental A run failure that is not an approval/tool-wait suspension. */
 export const RunFailure = Schema.Union([
@@ -36,7 +53,7 @@ export type ClientApproval = typeof ClientApproval.Type
 
 /** @experimental Client to server control frame. */
 export const ClientFrame = Schema.Union([
-  Schema.Struct({ _tag: Schema.tag("Attach"), sessionId: Schema.String, afterSeq: Schema.optionalKey(Schema.Finite) }),
+  Schema.Struct({ _tag: Schema.tag("Attach"), sessionId: Schema.String, afterSeq: Schema.optionalKey(Sequence) }),
   Schema.Struct({ _tag: Schema.tag("SendMessage"), sessionId: Schema.String, prompt: Schema.String }),
   Schema.Struct({
     _tag: Schema.tag("ResolveApproval"),
@@ -195,12 +212,12 @@ export type ServerFrameType =
 
 const ServerFrameWith = (event: Schema.Top) =>
   Schema.Union([
-    Schema.Struct({ _tag: Schema.tag("Event"), seq: Schema.Finite, event }),
-    Schema.Struct({ _tag: Schema.tag("Failed"), seq: Schema.Finite, error: RunFailure }),
-    Schema.Struct({ _tag: Schema.tag("Suspended"), seq: Schema.Finite, suspension: AgentEvent.AgentSuspended }),
-    Schema.Struct({ _tag: Schema.tag("Ended"), seq: Schema.Finite }),
-    Schema.Struct({ _tag: Schema.tag("Snapshot"), seq: Schema.Finite, transcript: Prompt.Prompt }),
-    Schema.Struct({ _tag: Schema.tag("SessionStatus"), seq: Schema.Finite, status: SessionStatus }),
+    Schema.Struct({ _tag: Schema.tag("Event"), seq: Sequence, event }),
+    Schema.Struct({ _tag: Schema.tag("Failed"), seq: Sequence, error: RunFailure }),
+    Schema.Struct({ _tag: Schema.tag("Suspended"), seq: Sequence, suspension: AgentEvent.AgentSuspended }),
+    Schema.Struct({ _tag: Schema.tag("Ended"), seq: Sequence }),
+    Schema.Struct({ _tag: Schema.tag("Snapshot"), seq: SnapshotSequence, transcript: Prompt.Prompt }),
+    Schema.Struct({ _tag: Schema.tag("SessionStatus"), seq: Sequence, status: SessionStatus }),
   ]) as unknown as Schema.Codec<ServerFrameType, unknown, never, never>
 
 /** @experimental Server frame codec using the supplied toolkit. */
@@ -212,3 +229,21 @@ export const LooseServerFrame = ServerFrameWith(LooseEventSchema)
 
 /** @experimental */
 export type LooseServerFrameType = ServerFrameType
+
+/** @experimental Lazy JSON encoders for transport client and server frames. */
+export interface WireCodec {
+  readonly encodeServer: (frame: ServerFrameType) => Effect.Effect<string, WireEncodeError>
+  readonly encodeClient: (frame: ClientFrameType) => Effect.Effect<string, WireEncodeError>
+}
+
+const encodeError = (error: Schema.SchemaError): WireEncodeError => WireEncodeError.make({ message: String(error) })
+
+/** @experimental Builds the JSON wire codec for a toolkit. */
+export const codec = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(
+  toolkit: T,
+): WireCodec => ({
+  encodeServer: (frame) =>
+    Schema.encodeEffect(Schema.fromJsonString(ServerFrame(toolkit)))(frame).pipe(Effect.mapError(encodeError)),
+  encodeClient: (frame) =>
+    Schema.encodeEffect(Schema.fromJsonString(ClientFrame))(frame).pipe(Effect.mapError(encodeError)),
+})

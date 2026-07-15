@@ -16,8 +16,9 @@ import {
 import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
+import { Toolkit } from "effect/unstable/ai"
 import { ReconnectExhausted, TransportError } from "./errors.js"
-import { ClientFrame, LooseServerFrame } from "./wire.js"
+import { codec, LooseServerFrame, Sequence, SequenceFromString } from "./wire.js"
 import type { ClientFrameType, LooseServerFrameType } from "./wire.js"
 /** @experimental */
 export type ConnectionStatus =
@@ -67,7 +68,7 @@ export class AgentClient extends Context.Service<AgentClient, AgentClientInterfa
 ) {}
 
 const ServerFrameJson = Schema.fromJsonString(LooseServerFrame)
-const ClientFrameJson = Schema.fromJsonString(ClientFrame)
+const wireCodec = codec(Toolkit.empty)
 
 const transportError = (message: string, kind?: TransportError["kind"]): TransportError =>
   TransportError.make(kind === undefined ? { message } : { message, kind })
@@ -81,9 +82,7 @@ const decodeServerText = (text: string): Effect.Effect<LooseServerFrameType, Tra
   )
 
 const encodeClientText = (frame: ClientFrameType): Effect.Effect<string, TransportError> =>
-  Schema.encodeUnknownEffect(ClientFrameJson)(frame).pipe(
-    Effect.mapError(() => transportError("failed to encode client frame", "encoding")),
-  )
+  wireCodec.encodeClient(frame).pipe(Effect.mapError((error) => transportError(error.message, "encoding")))
 
 const urlWithAfterSeq = (url: string, afterSeq: number | undefined): string => {
   if (afterSeq === undefined) return url
@@ -103,11 +102,40 @@ export const sseFrames = (options: {
   readonly url: string
   readonly afterSeq?: number
 }): Stream.Stream<LooseServerFrameType, TransportError, HttpClient.HttpClient> =>
-  HttpClientResponse.stream(HttpClient.get(urlWithAfterSeq(options.url, options.afterSeq))).pipe(
-    Stream.decodeText,
-    Stream.pipeThroughChannel(Sse.decodeDataSchema(LooseServerFrame)),
-    Stream.map((event) => event.data),
-    Stream.mapError((error) => error.pipe(errorMessage, transportError)),
+  Stream.unwrap(
+    (options.afterSeq === undefined
+      ? Effect.succeed(options.url)
+      : Schema.decodeUnknownEffect(Sequence)(options.afterSeq).pipe(
+          Effect.map((afterSeq) => urlWithAfterSeq(options.url, afterSeq)),
+        )
+    ).pipe(
+      Effect.map((url) =>
+        HttpClientResponse.stream(HttpClient.get(url)).pipe(
+          Stream.decodeText,
+          Stream.pipeThroughChannel(Sse.decodeDataSchema(LooseServerFrame)),
+          Stream.mapEffect((event) => {
+            if (event.id === undefined) return Effect.succeed(event.data)
+            if (event.data._tag === "Snapshot" && event.data.seq === -1) {
+              return event.id === "-1"
+                ? Effect.succeed(event.data)
+                : Effect.fail(transportError("SSE event ID does not match payload sequence", "protocol"))
+            }
+            return Schema.decodeUnknownEffect(SequenceFromString)(event.id).pipe(
+              Effect.flatMap((id) =>
+                id === event.data.seq
+                  ? Effect.succeed(event.data)
+                  : Effect.fail(transportError("SSE event ID does not match payload sequence", "protocol")),
+              ),
+            )
+          }),
+        ),
+      ),
+      Effect.mapError((error) => error.pipe(errorMessage, (message) => transportError(message, "protocol"))),
+    ),
+  ).pipe(
+    Stream.mapError((error) =>
+      Schema.is(TransportError)(error) ? error : transportError(errorMessage(error), "protocol"),
+    ),
   )
 
 const attachFrame = (sessionId: string, afterSeq: Option.Option<number>): ClientFrameType =>
@@ -252,7 +280,14 @@ export const layerWebSocket: Layer.Layer<AgentClient, never, Socket.WebSocketCon
                         Effect.flatMap((frame) =>
                           Queue.offer(framesQueue, frame).pipe(
                             Effect.flatMap((accepted) =>
-                              accepted ? Ref.set(lastSeq, Option.some(frame.seq)) : Effect.void,
+                              accepted
+                                ? Ref.set(
+                                    lastSeq,
+                                    frame._tag === "Snapshot" && frame.seq === -1
+                                      ? Option.none()
+                                      : Option.some(frame.seq),
+                                  )
+                                : Effect.void,
                             ),
                           ),
                         ),
