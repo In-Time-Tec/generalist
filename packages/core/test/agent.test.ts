@@ -384,6 +384,85 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ] as const,
   )
 
+  ItLayer.make(it, "governs selected streaming and structured model operations through their exits", () => {
+    let acquired = 0
+    let released = 0
+    const selection = { provider: "test", model: "scoped-structured" }
+    const structuredEntered = Deferred.makeUnsafe<void>()
+    const structuredGate = Deferred.makeUnsafe<void>()
+    const selectedModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      Effect.acquireRelease(
+        Effect.gen(function* () {
+          acquired += 1
+          const lifetime = { finalized: false }
+          const assertLive = Effect.gen(function* () {
+            if (lifetime.finalized) return yield* Effect.die("selected model used after layer release")
+          })
+          const model = yield* LanguageModel.make({
+            streamText: () => Stream.fromEffect(assertLive).pipe(Stream.map(() => textDelta("normal answer"))),
+            generateText: () =>
+              assertLive.pipe(
+                Effect.andThen(Deferred.succeed(structuredEntered, undefined)),
+                Effect.andThen(Deferred.await(structuredGate)),
+                Effect.as([{ type: "text" as const, text: '{"ok":true}' }]),
+              ),
+          })
+          return { lifetime, model }
+        }),
+        ({ lifetime }) =>
+          Effect.sync(() => {
+            lifetime.finalized = true
+            released += 1
+          }),
+      ).pipe(Effect.map(({ model }) => model)),
+    )
+
+    return [
+      Layer.unwrap(
+        ModelRegistry.registrationFromLayer({ ...selection, layer: selectedModel }).pipe(
+          Effect.map((registration) =>
+            Layer.mergeAll(
+              ModelRegistry.memoryLayer([registration], { maxConcurrentModelCalls: 1 }),
+              unusedExecutor,
+              Approvals.autoApprove,
+              ModelMiddleware.identityLayer,
+            ),
+          ),
+        ),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make("scoped-structured-agent", { model: selection })
+        const agentFiber = yield* Effect.forkChild(
+          Agent.generateObject(agent, { prompt: "make object", schema: objectSchema }),
+        )
+        yield* Deferred.await(structuredEntered)
+
+        let competitorEntered = false
+        const competitor = yield* Effect.forkChild(
+          ModelRegistry.operate(
+            selection,
+            Effect.sync(() => {
+              competitorEntered = true
+            }),
+          ),
+        )
+        yield* Effect.forEach(Array.from({ length: 20 }), () => Effect.yieldNow)
+        expect(competitorEntered).toBe(false)
+
+        yield* Deferred.succeed(structuredGate, undefined)
+        const result = yield* Fiber.join(agentFiber)
+        yield* Fiber.join(competitor)
+
+        expect(result.text).toBe("normal answer")
+        expect(result.value).toEqual({ ok: true })
+        expect(competitorEntered).toBe(true)
+        expect(acquired).toBe(3)
+        expect(released).toBe(3)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "uses the agent memory default when run options omit memory", () => {
     const key = { agent: "memory-default-agent", subject: "subject-1" }
     let recalled = false

@@ -40,7 +40,7 @@ import {
 import { Instructions, openEpoch } from "./instructions.js"
 import { type Item, type Key, Memory, type MemoryError } from "./memory.js"
 import { type Middleware, ModelMiddleware, type TurnContext } from "./model-middleware.js"
-import { type ModelEnvironment, type ModelSelection, Service } from "./model-registry.js"
+import { type LanguageModelNotRegistered, type ModelSelection, Service } from "./model-registry.js"
 import { ModelResilience, apply } from "./model-resilience.js"
 import { type Answer, type Pending, type PermissionError, Permissions, RuleStore } from "./permissions.js"
 import { type Entry, SessionStore, type SessionStoreError } from "./session.js"
@@ -495,7 +495,7 @@ const streamInternal = <
       const persistenceOptions = options.persistence
       const memoryOptions = options.memory ?? (agent.memory === undefined ? undefined : { key: agent.memory })
       const agentModel = agent.model
-      const agentModelContext =
+      const agentModelRegistry =
         agentModel === undefined
           ? undefined
           : yield* Option.match(modelRegistryService, {
@@ -506,14 +506,7 @@ const streamInternal = <
                     turn: 0,
                   }),
                 ),
-              onSome: (registry) =>
-                registry
-                  .provide(agentModel, Effect.context<ModelEnvironment>())
-                  .pipe(
-                    Effect.mapError((error) =>
-                      AgentError.make({ message: errorMessage(error), turn: 0, cause: error }),
-                    ),
-                  ),
+              onSome: Effect.succeed,
             })
       const memoryRuntime: { readonly key: Key; readonly service: typeof Memory.Service } | undefined =
         memoryOptions === undefined
@@ -1115,15 +1108,29 @@ const streamInternal = <
             ),
         })
 
-      const withAgentModel = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-        agentModelContext === undefined ? effect : effect.pipe(Effect.provide(agentModelContext))
+      const withAgentModel = <A, E, R>(
+        effect: Effect.Effect<A, E, R>,
+      ): Effect.Effect<A, E | LanguageModelNotRegistered, R> =>
+        agentModelRegistry === undefined || agentModel === undefined
+          ? effect
+          : agentModelRegistry.operate(agentModel, effect)
 
       function provideAgentModel<A, E, R>(
         stream: Stream.Stream<A, E, R>,
-      ): Stream.Stream<A, E, Exclude<R, LanguageModel.LanguageModel> | ModelRunServices<HasModel>>
+      ): Stream.Stream<A, E | AgentError, Exclude<R, LanguageModel.LanguageModel> | ModelRunServices<HasModel>>
       function provideAgentModel<A, E, R>(stream: Stream.Stream<A, E, R>): Stream.Stream<A, E, R | Service>
-      function provideAgentModel<A, E, R>(stream: Stream.Stream<A, E, R>): Stream.Stream<A, E, R | Service> {
-        return agentModelContext === undefined ? stream : stream.pipe(Stream.provideContext(agentModelContext))
+      function provideAgentModel<A, E, R>(
+        stream: Stream.Stream<A, E, R>,
+      ): Stream.Stream<A, E | AgentError, R | Service> {
+        return agentModelRegistry === undefined || agentModel === undefined
+          ? stream
+          : agentModelRegistry
+              .stream(agentModel, stream)
+              .pipe(
+                Stream.catchTag("LanguageModelNotRegistered", (error) =>
+                  Stream.fail(AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error })),
+                ),
+              )
       }
 
       const partEvents = (

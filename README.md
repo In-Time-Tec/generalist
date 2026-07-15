@@ -16,7 +16,7 @@ const searchTool = Tool.make("search_docs", {
 const toolkit = Toolkit.make(searchTool)
 const agent = Agent.make("assistant", { instructions: "Be concise.", toolkit })
 
-const program = ModelRegistry.provide(
+const program = ModelRegistry.operate(
   { provider: "deterministic", model: "local" },
   Agent.generate(agent, { prompt: "Explain Baton in one sentence." }),
 ).pipe(
