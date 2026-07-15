@@ -74,14 +74,19 @@ const webSocketLayer = (sockets: Array<FakeWebSocket>): Layer.Layer<Socket.WebSo
 const decodeClientFrame = (value: unknown): Wire.ClientFrameType =>
   Schema.decodeUnknownSync(Schema.fromJsonString(Wire.ClientFrame))(value)
 
-const openSocket = (sockets: Array<FakeWebSocket>, index: number) =>
-  Effect.gen(function* () {
-    yield* Effect.yieldNow
+const openSocket = (sockets: Array<FakeWebSocket>, index: number): Effect.Effect<FakeWebSocket> =>
+  Effect.suspend(function loop(): Effect.Effect<FakeWebSocket> {
     const socket = sockets[index]
-    if (socket === undefined) return yield* Effect.die(`Missing socket ${index}`)
-    socket.open()
-    yield* Effect.yieldNow
-    return socket
+    if (socket === undefined) return Effect.yieldNow.pipe(Effect.andThen(Effect.suspend(loop)))
+    return Effect.sync(() => socket.open()).pipe(
+      Effect.andThen(
+        Effect.suspend(function attached(): Effect.Effect<FakeWebSocket> {
+          return socket.sent.length === 0
+            ? Effect.yieldNow.pipe(Effect.andThen(Effect.suspend(attached)))
+            : Effect.succeed(socket)
+        }),
+      ),
+    )
   })
 
 describe("Connection", () => {

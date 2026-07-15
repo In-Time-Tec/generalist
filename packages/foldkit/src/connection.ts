@@ -105,10 +105,10 @@ const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<ne
 
 const statusIncoming = (status: Client.ConnectionStatus): Option.Option<Incoming> => {
   switch (status._tag) {
-    case "Open":
+    case "Connected":
       return Option.some(ConnectionOpened())
-    case "Reconnecting":
-    case "Closed":
+    case "Disconnected":
+    case "Retrying":
       return Option.some(ConnectionLost())
     case "Connecting":
       return Option.none()
