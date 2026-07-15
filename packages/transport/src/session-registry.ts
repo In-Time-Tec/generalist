@@ -140,6 +140,7 @@ const stripEventTranscript = (event: AgentEvent.Event, strip: boolean): EventTyp
 const runFailureFromCause = (cause: Cause.Cause<Agent.RunError | SessionError>, turn: number): RunFailure => {
   const error = Cause.squash(cause)
   if (Schema.is(AgentEvent.AgentError)(error)) return error
+  if (Schema.is(AgentEvent.ResumeMismatch)(error)) return error
   if (Schema.is(TurnPolicy.TurnPolicyError)(error)) return error
   if (Schema.is(AgentEvent.TurnPolicyStopped)(error)) return error
   if (Schema.is(AgentEvent.TurnLimitExceeded)(error)) return error
@@ -271,7 +272,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
         resume: Agent.Resume | undefined,
         decision: ClientApproval | undefined,
       ): Effect.Effect<Option.Option<Approvals.Interface>> => {
-        if (resume === undefined || decision === undefined || resume.authorizationStage !== "approval") {
+        if (resume === undefined || decision === undefined || resume.suspension.authorization_stage !== "approval") {
           return Effect.succeed(approvals)
         }
         const fallbackApprovals = Option.getOrElse(approvals, () =>
@@ -288,7 +289,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
             Option.some(
               Approvals.Approvals.of({
                 check: (request) => {
-                  if (request.call.id !== resume.call.id) return fallbackApprovals.check(request)
+                  if (request.call.id !== resume.suspension.tool_call_id) return fallbackApprovals.check(request)
                   return Ref.modify(consumed, (used) => [!used, true]).pipe(
                     Effect.flatMap((useOverride) =>
                       useOverride ? Effect.succeed(toApprovalDecision(decision)) : fallbackApprovals.check(request),
@@ -305,12 +306,12 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
         resume: Agent.Resume | undefined,
         decision: ClientApproval | undefined,
       ): Effect.Effect<Option.Option<Permissions.Interface>> => {
-        if (resume === undefined || decision === undefined || resume.authorizationStage !== "permission") {
+        if (resume === undefined || decision === undefined || resume.suspension.authorization_stage !== "permission") {
           return Effect.succeed(permissions)
         }
         const fallbackPermissions = Option.getOrElse(permissions, () =>
           Permissions.Permissions.of({
-            evaluate: () => Effect.succeed({ _tag: "Ask", token: `permission:${resume.call.id}` }),
+            evaluate: () => Effect.succeed({ _tag: "Ask", token: `permission:${resume.suspension.tool_call_id}` }),
             await: () => Effect.succeedNone,
           }),
         )
@@ -320,7 +321,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
               Permissions.Permissions.of({
                 evaluate: fallbackPermissions.evaluate,
                 await: (pending) => {
-                  if (pending.toolCallId !== resume.call.id) return fallbackPermissions.await(pending)
+                  if (pending.toolCallId !== resume.suspension.tool_call_id) return fallbackPermissions.await(pending)
                   return Ref.modify(consumed, (used) => [!used, true]).pipe(
                     Effect.flatMap((useOverride) => {
                       if (!useOverride) return fallbackPermissions.await(pending)
@@ -664,24 +665,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
               return yield* sessionError(`Session ${sessionId} is not waiting on approval`)
             if (suspension.token !== token)
               return yield* sessionError(`Approval token ${token} does not match session ${sessionId}`)
-            yield* beginRun(
-              sessionId,
-              "",
-              {
-                token: suspension.token,
-                call: {
-                  id: suspension.tool_call_id,
-                  name: suspension.tool_name,
-                  params: suspension.tool_params,
-                },
-                ...(suspension.active_tools === undefined ? {} : { activeTools: suspension.active_tools }),
-                ...(suspension.activated_skills === undefined ? {} : { activatedSkills: suspension.activated_skills }),
-                ...(suspension.authorization_stage === undefined
-                  ? {}
-                  : { authorizationStage: suspension.authorization_stage }),
-              },
-              decision,
-            )
+            yield* beginRun(sessionId, "", { suspension }, decision)
           }),
         attach: (sessionId, afterSeq) =>
           Stream.unwrap(

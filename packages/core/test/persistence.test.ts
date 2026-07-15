@@ -3,7 +3,7 @@ import { Json } from "./json"
 import { Effect, Layer, Ref, Schema, Stream } from "effect"
 import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Approvals, ModelMiddleware, ToolExecutor } from "../src/index"
+import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 
@@ -192,11 +192,56 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
       ] as const,
   )
 
+  ItLayer.make(it, "does not create a persisted chat when its resume checkpoint is missing", () => {
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("must not run"))
+        }),
+        unusedExecutor,
+        Approvals.testLayer({ check: () => Effect.die("authorization must not run") }),
+        ModelMiddleware.identityLayer,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "missing-persisted-checkpoint-agent", toolkit: Toolkit.make(echoTool) })
+        const suspension = AgentEvent.AgentSuspended.make({
+          token: "missing-token",
+          reason: "approval",
+          tool_call_id: "missing-call",
+          tool_name: "echo",
+          tool_params: { text: "missing" },
+          active_tools: ["echo"],
+          activated_skills: [],
+        })
+
+        const mismatch = yield* Agent.persisted(agent, {
+          prompt: "ignored",
+          persistence: { chatId: "missing-resume-chat" },
+          resume: { suspension },
+        }).pipe(Stream.runDrain, Effect.flip)
+
+        expect(mismatch).toMatchObject({
+          _tag: "@batonfx/core/ResumeMismatch",
+          reason: "checkpoint-not-found",
+          received: suspension,
+        })
+        expect(modelCalls).toBe(0)
+        const persistence = yield* Chat.Persistence
+        const missing = yield* persistence.get("missing-resume-chat").pipe(Effect.flip)
+        expect(missing._tag).toBe("ChatNotFoundError")
+      }),
+    ] as const
+  })
+
   ItLayer.make(
     it,
     "suspend/save: a suspended run persists the pending tool call and resumes from stored context",
     () => {
       let calls = 0
+      let suspendedExecutions = 0
       let resumeSawStoredContext = false
       return [
         Layer.mergeAll(
@@ -212,24 +257,27 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
             // see the earlier user message from stored context.
             const content = Json.stringify(options.prompt.content)
             resumeSawStoredContext =
-              content.includes("please wait") && content.includes("ordinary complete") && content.includes("resumed")
+              content.includes("please wait") && content.includes("ordinary complete") && content.includes("echoed")
             return Stream.make(textDelta("done after resume"))
           }),
           ToolExecutor.testLayer({
-            execute: (request) =>
-              request.call.id === "tool-call-ordinary"
-                ? Effect.succeed({
+            execute: (request) => {
+              if (request.call.id === "tool-call-ordinary") {
+                return Effect.succeed({
+                  _tag: "Success",
+                  result: { text: "ordinary complete" },
+                  encodedResult: { text: "ordinary complete" },
+                })
+              }
+              suspendedExecutions += 1
+              return suspendedExecutions === 1
+                ? Effect.succeed({ _tag: "Suspend", token: "wait-token" })
+                : Effect.succeed({
                     _tag: "Success",
-                    result: { text: "ordinary complete" },
-                    encodedResult: { text: "ordinary complete" },
+                    result: { echoed: request.call.params },
+                    encodedResult: { echoed: request.call.params },
                   })
-                : request.call.id === "tool-call-suspend" && Json.stringify(request.call.params).includes("hold")
-                  ? Effect.succeed({ _tag: "Suspend", token: "wait-token" })
-                  : Effect.succeed({
-                      _tag: "Success",
-                      result: { echoed: request.call.params },
-                      encodedResult: { echoed: request.call.params },
-                    }),
+            },
           }),
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
@@ -247,22 +295,50 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           )
 
           expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
+          if (failure._tag !== "@batonfx/core/AgentSuspended") return expect.unreachable()
           const suspendedTranscript = yield* historyText("s1")
           // The assistant turn carrying the pending tool call survived to the store.
           expect(suspendedTranscript).toContain("tool-call-suspend")
           expect(suspendedTranscript).toContain("tool-call-ordinary")
           expect(suspendedTranscript).toContain("ordinary complete")
 
+          const mismatch = yield* Agent.persisted(agent, {
+            prompt: "ignored",
+            persistence: { chatId: "s1" },
+            resume: {
+              suspension: AgentEvent.AgentSuspended.make({ ...failure, token: "stale-token" }),
+            },
+          }).pipe(Stream.runDrain, Effect.flip)
+
+          expect(mismatch._tag).toBe("@batonfx/core/ResumeMismatch")
+          expect(yield* historyText("s1")).toBe(suspendedTranscript)
+          expect(suspendedExecutions).toBe(1)
+
           const events = yield* Stream.runCollect(
             Agent.persisted(agent, {
               prompt: "ignored",
               persistence: { chatId: "s1" },
-              resume: { call: { id: "tool-call-suspend", name: "echo", params: { text: "resumed" } } },
+              resume: { suspension: failure },
             }),
           )
 
           expect(events.at(-1)?._tag).toBe("Completed")
           expect(resumeSawStoredContext).toBe(true)
+          const completedTranscript = yield* historyText("s1")
+          const duplicate = yield* Agent.persisted(agent, {
+            prompt: "ignored",
+            persistence: { chatId: "s1" },
+            resume: { suspension: failure },
+          }).pipe(Stream.runDrain, Effect.flip)
+
+          expect(duplicate).toMatchObject({
+            _tag: "@batonfx/core/ResumeMismatch",
+            reason: "checkpoint-not-found",
+            received: failure,
+          })
+          expect(yield* historyText("s1")).toBe(completedTranscript)
+          expect(suspendedExecutions).toBe(2)
+          expect(calls).toBe(2)
         }),
       ] as const
     },

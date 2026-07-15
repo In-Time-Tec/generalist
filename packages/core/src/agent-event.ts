@@ -222,7 +222,7 @@ export class ToolNameCollision extends Schema.TaggedErrorClass<ToolNameCollision
 /**
  * @experimental The run suspended: a tool outcome was `Suspend` or an approval
  * decision was `Pending`. The run did NOT finish; the host resolves `token`
- * out-of-band and re-enters via `RunOptions.resume` with the pending call.
+ * out-of-band and re-enters via `RunOptions.resume` with this exact suspension.
  * Field shape deliberately mirrors a tool call so durable hosts can persist it.
  */
 export class AgentSuspended extends Schema.TaggedErrorClass<AgentSuspended>()("@batonfx/core/AgentSuspended", {
@@ -234,4 +234,11 @@ export class AgentSuspended extends Schema.TaggedErrorClass<AgentSuspended>()("@
   tool_params: Schema.Unknown,
   active_tools: Schema.optional(Schema.Array(Schema.String)),
   activated_skills: Schema.optional(Schema.Array(Schema.String)),
+}) {}
+
+/** @experimental A resume identity did not match the current authoritative suspension checkpoint. */
+export class ResumeMismatch extends Schema.TaggedErrorClass<ResumeMismatch>()("@batonfx/core/ResumeMismatch", {
+  reason: Schema.Literals(["checkpoint-not-found", "identity-mismatch"]),
+  expected: Schema.optional(AgentSuspended),
+  received: AgentSuspended,
 }) {}

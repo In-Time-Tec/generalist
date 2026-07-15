@@ -16,7 +16,7 @@ After framework tool execution completes for a turn, Baton appends the ordered p
 
 Pending state remains available to policy evaluation as decision input. On `Continue`, Baton clears that state and starts the next model turn with only steering or instruction-override input; the model reads tool results from Chat history rather than receiving a second tool-result prompt. A policy stop leaves the checkpoint intact.
 
-Suspension keeps its trailing checkpoint for completed siblings because normal after-turn processing is not reached when a later call suspends. Resume execution uses the normal checkpoint boundary for the resumed result and follows the same no-reappend rule.
+Suspension keeps its trailing checkpoint for completed siblings because normal after-turn processing is not reached when a later call suspends. ADR-0039 extends that same serialized transition with suspension metadata on the sole unresolved call. Resume execution uses the normal checkpoint boundary for the resumed result and follows the same no-reappend rule.
 
 No public service or payload type is added. The checkpoint uses Effect AI `Prompt.fromResponseParts`, `Ref`, and Baton's scoped semaphore; persistence failures retain the existing typed `AgentError` mapping, semaphore ownership is released on every exit, and interruption does not manufacture a successful tool result.
 
@@ -41,3 +41,4 @@ No public service or payload type is added. The checkpoint uses Effect AI `Promp
 - `docs/spec/09-memory.md`
 - `docs/spec/decisions/ADR-0002-tool-context-output-spill.md`
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
+- `docs/spec/decisions/ADR-0039-authoritative-suspension-resume.md`

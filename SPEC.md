@@ -64,7 +64,7 @@ SPEC.md
    ├─ ADR-0035-unified-tool-authorization.md
    ├─ ADR-0036-framework-tool-result-checkpoint.md
    ├─ ADR-0037-unique-transformed-tool-call-ids.md
-   └─ ADR-0038-runtime-dynamic-transport-capability.md
+   ├─ ADR-0038-runtime-dynamic-transport-capability.md
    └─ ADR-0039-authoritative-suspension-resume.md
 ```
 

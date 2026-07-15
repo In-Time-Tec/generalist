@@ -27,7 +27,7 @@ Wire encoding is lazy and effectful. The toolkit-parameterized wire codec encode
 Terminal outcomes are data frames, not connection failures:
 
 - `Suspended { suspension }` carries `AgentSuspended` for approval or tool-wait suspension;
-- `Failed { error }` carries `AgentError`, `TurnPolicyError`, `TurnPolicyStopped`, `TurnLimitExceeded`, `MiddlewareViolation`, or tool-boundary `FrameworkFailure`;
+- `Failed { error }` carries `AgentError`, `ResumeMismatch`, `TurnPolicyError`, `TurnPolicyStopped`, `TurnLimitExceeded`, `MiddlewareViolation`, or tool-boundary `FrameworkFailure`;
 - `Ended` marks the end of one logical run.
 
 Every logical run emits exactly one `Ended` frame after `Event(Completed)`, `Suspended`, or `Failed`. `Ended` does not close the session or require an attachment stream to end; clients may remain attached for the next `send`.
@@ -67,7 +67,7 @@ The replay origin is `afterSeq`, or `-1` when the cursor is omitted. The origin 
 
 The journal lock protects only in-memory sequence, transcript, ring, and subscriber state. Persistence reads complete before journal construction, and transcript values supplied by loop events or the session-owned chat `Ref` are already materialized, so no persistence integration runs while a journal transition is held open. Persistence failures from `open` and journal capture failures remain `SessionError` values.
 
-`resolveApproval` resumes only a suspended approval with a matching token. `Approved` re-enters with a one-shot approvals override that approves the suspended call. `Denied` re-enters with a one-shot denial and produces the same authorization `FrameworkFailure` as core approval denial. Tool-wait suspension is surfaced as `Suspended` but not resolved by this client frame.
+`resolveApproval` resumes only a suspended approval with a matching token. `Approved` re-enters with a one-shot approvals override that approves the suspended call. `Denied` re-enters with a one-shot denial and produces the same authorization `FrameworkFailure` as core approval denial. If the persisted checkpoint is missing or no longer matches the captured suspension, the terminal `Failed` frame preserves core's typed `ResumeMismatch`. Tool-wait suspension is surfaced as `Suspended` but not resolved by this client frame.
 
 `interrupt` cancels by session status, not by fiber presence. When the run fiber is already recorded, it interrupts that fiber. When the cancel lands after `send`/`resolveApproval` reserved the run but before the fiber is recorded, it marks the reservation interrupt-requested; `send`/`resolveApproval` consume the mark when recording the fiber and cancel the run immediately, so a `Cancel` racing a `SendMessage` is never dropped. A cancelled run publishes a `Failed` frame carrying `AgentError` with message `Session interrupted`, a `Failed` session status, and `Ended`, leaving the session free for the next `send`. It is idempotent when no run is active or reserved.
 

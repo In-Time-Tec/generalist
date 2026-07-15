@@ -6,6 +6,7 @@ import {
   AgentSuspended,
   DuplicateToolCallId,
   MiddlewareViolation,
+  ResumeMismatch,
   ToolNameCollision,
   TurnLimitExceeded,
   TurnPolicyStopped,
@@ -55,6 +56,9 @@ const errorMessage = (error: unknown): string => {
   }
   if (Schema.is(AgentError)(error)) {
     return `failed on turn ${error.turn}: ${error.message}`
+  }
+  if (Schema.is(ResumeMismatch)(error)) {
+    return `resume mismatch: ${error.reason}`
   }
   if (Schema.is(TurnLimitExceeded)(error)) {
     return `turn limit exceeded at turn ${error.turn}`
