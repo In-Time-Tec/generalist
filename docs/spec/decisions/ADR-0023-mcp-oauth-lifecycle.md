@@ -8,6 +8,8 @@ Accepted
 
 Baton exposes an Effect service for MCP OAuth and adapts it to the public `OAuthClientProvider` extension point of the MCP SDK. Token persistence is an injected host-owned service whose values are `Redacted`. Baton does not own browser UI, callback HTTP servers, or durable secret storage.
 
+Baton owns a schema-validated, versioned token document inside the redacted store value. Version 1 is `{ version: 1, tokens }`, where the token fields match the SDK OAuth token contract. A valid legacy bare token object is migrated by rewriting it before it is returned. Invalid JSON, token fields, versions, and migration writes fail through a sanitized provider error; incompatible credentials require explicit host or lifecycle removal rather than an implicit cache reset.
+
 One Effect `SynchronizedRef` owns the active callback state, PKCE verifier, and pending authorization as a single flow value. Callback state is single-use for every terminal callback attempt: Baton atomically validates and takes the matching flow before malformed-callback or denial handling and before code exchange. The exchange receives only the taken verifier, while concurrent callbacks and the shared provider observe an idle flow. Provider errors expose stable operation context instead of forwarding opaque SDK or persistence messages that could contain credentials.
 
 The OAuth service exposes SDK-captured pending authorization as Effect state. Authenticated HTTP transport connection preserves that state as `OAuthPendingError`, allowing a host to launch its browser flow without importing or interpreting SDK errors.
@@ -18,4 +20,4 @@ The provider retains SDK discovery state across the browser round-trip. A single
 
 ## Consequences
 
-External consumers can compose authenticated remote MCP transports without SDK deep imports. SDK protocol behavior remains upstream-owned while Baton provides typed lifecycle and storage boundaries. Reconnection and refresh reuse persisted credentials without placing them in transport configuration headers, logs, errors, or callback URLs.
+External consumers can compose authenticated remote MCP transports without SDK deep imports. SDK protocol behavior remains upstream-owned while Baton provides typed lifecycle and storage boundaries. Reconnection and refresh reuse persisted credentials without placing them in transport configuration headers, logs, errors, or callback URLs. Existing valid bare token documents migrate on first read without changing `TokenStore` or SDK callback signatures; invalid or future documents fail closed and can be removed through the existing authorization lifecycle.

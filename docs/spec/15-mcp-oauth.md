@@ -20,7 +20,8 @@
 - Optional pre-registered client information is kept in session state. When omitted, the provider stores SDK dynamic registration results and honors client, token, verifier, and all-credential invalidation scopes.
 - OAuth resource and authorization-server discovery state is retained across callback exchange and honors discovery/all invalidation. Transport connection, explicit authorization, callback exchange, and clearing are serialized per OAuth service so one active lifecycle cannot replace another's state, verifier, discovery data, or pending URL.
 - Provider-boundary persistence failures are retained for the serialized transport attempt and take precedence over a later SDK redirect when the SDK treats a refresh failure as recoverable.
-- `OAuth.TokenStore` receives only `Redacted<string>` token documents. Production hosts provide secure persistence; the package provides memory and deterministic test layers.
+- `OAuth.TokenStore` receives only `Redacted<string>` token documents. Baton encodes them as a schema-validated `{ version: 1, tokens }` JSON envelope and validates JSON syntax, the exact supported version, and OAuth token fields before returning credentials to the SDK. Production hosts provide secure persistence; the package provides memory and deterministic test layers.
+- A valid legacy bare OAuth token object is loaded once and immediately rewritten as the version 1 envelope. Malformed JSON, unsupported envelopes, invalid token fields, and failed legacy rewrites fail as sanitized `OAuthProviderError` values rather than defects; Baton does not silently reset or expose the rejected document.
 - Remote HTTP transports accept the public `OAuth.Interface` and pass its provider to the public MCP SDK transport API. Reconnect loads tokens from the store and never adds tokens to errors, URLs, or Baton's public values.
 
 ## Errors
