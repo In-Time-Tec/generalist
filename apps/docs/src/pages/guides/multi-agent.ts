@@ -4,7 +4,22 @@ import fanOut from "../../snippets/guides/multi-agent/fan-out.ts?raw"
 import fanOutExpected from "../../snippets/guides/multi-agent/fan-out.expected.txt?raw"
 import supervisor from "../../snippets/guides/multi-agent/supervisor.ts?raw"
 import supervisorExpected from "../../snippets/guides/multi-agent/supervisor.expected.txt?raw"
-import { bullets, callout, code, codeBlock, definePage, h2, link, p } from "../../prose"
+import { bullets, callout, code, codeBlock, definePage, h2, link, p, table } from "../../prose"
+
+const childChannels = `Parent Agent.generate
+│
+├── Channel 1: Effect Context (inherited by nested child effect)
+│   ├── LanguageModel.LanguageModel
+│   ├── ToolExecutor / Approvals
+│   └── ModelMiddleware and other required services
+│
+└── AgentTool handler ──▶ Child Agent.generate({ prompt })
+    │
+    └── Channel 2: run options / orchestration (not implicitly inherited)
+        ├── sessionId defaults independently
+        ├── persistence/chatId absent unless explicitly supplied
+        └── transport runId, queue, and scheduling remain transport-owned`
+
 export const multiAgent = definePage({
   path: "/docs/guides/multi-agent",
   title: "How to coordinate multiple agents",
@@ -21,6 +36,55 @@ export const multiAgent = definePage({
       " seam rather than adding a new runtime. Durable, addressable, cross-process child executions belong to a host runtime; see ",
       link("/docs/learn/baton-and-relay", "Baton and Relay"),
       ".",
+    ),
+    h2("two-channels", "Context services and run identity are separate channels"),
+    p(
+      "A nested child effect evaluates in the current Effect Context, so its service requirements remain ambient. That does not copy values out of the parent's ",
+      code("RunOptions"),
+      ": child run identity and persistence are arguments to the child call, while transport identity and scheduling remain owned by the transport that launched the parent.",
+    ),
+    codeBlock({ label: "Parent and child channels", language: "text", source: childChannels }),
+    table(
+      ["Value or service", "Owner", "What the child receives"],
+      [
+        [
+          [code("LanguageModel.LanguageModel")],
+          "Effect Context",
+          [
+            "An unpinned child uses the ambient service; a child with ",
+            code("agent.model"),
+            " resolves it through the ambient ModelRegistry",
+          ],
+        ],
+        [[code("ToolExecutor")], "Effect Context", "The ambient optional executor"],
+        [[code("Approvals")], "Effect Context", "The ambient optional approval service"],
+        [[code("ModelMiddleware")], "Effect Context", "The ambient optional middleware service"],
+        [
+          [code("sessionId")],
+          ["Child ", code("RunOptions")],
+          ["Not inherited; omission follows the child default ", code('"local"'), ", not the parent's identity"],
+        ],
+        [
+          [code("persistence.chatId")],
+          ["Child ", code("RunOptions")],
+          "Not inherited; omission uses a fresh chat rather than the parent's transcript or persistence record",
+        ],
+        [
+          [code("runId")],
+          "Transport",
+          "Not inherited; a core child invocation does not join the parent's transport run",
+        ],
+        [
+          "Queue position",
+          "Transport",
+          "Not inherited; the child tool effect does not enter the parent's transport queue",
+        ],
+        [
+          "Scheduling and run permits",
+          "Transport",
+          "No separate schedule or permit; the scoped child runs while the parent continues to hold its permit",
+        ],
+      ],
     ),
     h2("fan-out-child-runs", "1. Fan out child runs"),
     p(
@@ -42,8 +106,8 @@ export const multiAgent = definePage({
     codeBlock({ label: "supervisor.ts", source: supervisor, expectedOutput: supervisorExpected }),
     callout(
       "info",
-      "Children inherit the parent's services",
-      "Child runs execute in the current Effect context: the same model, executor, approvals, and middleware the parent run sees. To give a child a different model, provide a different layer around its handler.",
+      "Services are ambient; run options are not",
+      "Child runs execute in the current Effect Context: an unpinned child sees the ambient model, and the executor, approvals, and middleware remain visible unless overridden. A model-selected child resolves through the ambient ModelRegistry. No parent sessionId, persistence chat ID, transport runId, queue position, or separate scheduling policy is copied into the child call.",
     ),
     h2("expose-an-agent-as-a-tool", "3. Expose an agent as a tool"),
     p(
@@ -54,17 +118,26 @@ export const multiAgent = definePage({
       code("result.text"),
       " as the output. Override any of them.",
     ),
+    p(
+      "Inside the handler the child invocation is ",
+      code("Agent.generate(summarizer, { prompt })"),
+      ". The runnable example supplies the model, toolkit handler, executor, approvals, and middleware with the surrounding ",
+      code("Effect.provide"),
+      ". Because the child call omits ",
+      code("sessionId"),
+      " and ",
+      code("persistence"),
+      ", its session ID defaults independently and it uses a fresh chat. It does not share the parent's transcript or enter its transport queue.",
+    ),
     codeBlock({ label: "agent-as-tool.ts", source: agentAsTool, expectedOutput: agentAsToolExpected }),
     bullets(
       [
         "At the tool boundary, child run failures become failed tool results with a string message, so the parent's model can recover.",
       ],
       [
-        "Child suspension is not collapsed: a child's ",
+        "Child suspension is collapsed into a failed tool result: a child's ",
         code("AgentSuspended"),
-        " propagates through the executor's ",
-        code("Suspend"),
-        " outcome, and the parent run suspends with the child's token (",
+        " does not suspend the parent or create a second suspension protocol (",
         link("/docs/learn/suspension", "Suspension as a typed error"),
         ").",
       ],

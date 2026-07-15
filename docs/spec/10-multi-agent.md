@@ -21,11 +21,53 @@ Baton does not own durable child state, address books, cross-process routing, sh
 
 `AgentTool.asTool(agent, options?)` returns a handled toolkit containing one tool. The tool defaults to `agent.name`, `Schema.Struct({ prompt: Schema.String })` parameters, `params.prompt` as the child prompt, `Schema.String` success, and `result.text` as the output.
 
-The handler runs `Agent.generate` for the child in the current Effect context. It does not provide or override `Ai.LanguageModel.LanguageModel`, `ToolExecutor`, `Approvals`, or `ModelMiddleware`; callers decide what services child runs inherit.
+The handler runs `Agent.generate(agent, { prompt })` for the child in the current Effect context. `AgentTool` itself does not provide or override `Ai.LanguageModel.LanguageModel`, `ToolExecutor`, `Approvals`, or `ModelMiddleware`; callers decide what services child runs inherit. It also does not copy values from the parent's `RunOptions` into the child call.
+
+## Two-channel child runs
+
+An in-process child invocation has two independent channels. The Effect Context channel is ambient and follows normal nested Effect evaluation. The Run/orchestration channel consists of ordinary arguments to the child call plus state owned by an outer transport; it is not copied merely because Context services remain visible.
+
+```text
+Parent Agent.generate
+│
+├── Channel 1: Effect Context (inherited by nested child effect)
+│   ├── LanguageModel.LanguageModel
+│   ├── ToolExecutor / Approvals
+│   └── ModelMiddleware and other required services
+│
+└── AgentTool handler ──▶ Child Agent.generate({ prompt })
+    │
+    └── Channel 2: run options / orchestration (not implicitly inherited)
+        ├── sessionId defaults independently
+        ├── persistence/chatId absent unless explicitly supplied
+        └── transport runId, queue, and scheduling remain transport-owned
+```
+
+| Value or service                   | Channel                            | Child behavior                                                                                                                                                 |
+| ---------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LanguageModel.LanguageModel`      | Effect Context                     | An unpinned child uses the ambient service. A child with `agent.model` resolves its selection through the ambient `ModelRegistry`; `AgentTool` copies neither. |
+| `ToolExecutor`                     | Effect Context                     | The child sees the ambient optional executor; no executor value is copied from parent options.                                                                 |
+| `Approvals`                        | Effect Context                     | The child sees the ambient optional approval service.                                                                                                          |
+| `ModelMiddleware`                  | Effect Context                     | The child sees the ambient optional middleware service.                                                                                                        |
+| `sessionId`                        | Child `RunOptions`                 | Not inherited. When omitted by `AgentTool`, it defaults to `"local"` for the child run, independently of the parent's identity.                                |
+| persistence / chat ID              | Child `RunOptions.persistence`     | Not inherited. When omitted by `AgentTool`, the child uses a fresh chat and does not join the parent's transcript or persistence record.                       |
+| transport `runId`                  | Transport-owned orchestration      | Not inherited. Core child invocation does not create or join a transport run.                                                                                  |
+| transport queue                    | Transport-owned orchestration      | Not inherited. The child runs inside the current tool effect rather than entering the parent's `SessionRegistry` queue.                                        |
+| transport scheduling / run permits | Transport-owned scoped concurrency | The child gets no separate schedule or permit. It is scoped inside the parent run, so the parent keeps its permit until the nested work completes.             |
+
+The child-as-tool handler is equivalent to this child call for identity purposes:
+
+```ts
+const child = Agent.generate(childAgent, { prompt })
+```
+
+The surrounding application provides the handler's required services once through `Effect.provide(...)`; the nested effect evaluates in that Context. Supplying `{ prompt }` does not inspect the parent's `RunOptions`. A caller that invokes `Agent.generate` directly can explicitly choose a child `sessionId` or `persistence`, but `AgentTool.asTool` intentionally exposes no hidden identity-forwarding behavior.
 
 At the tool boundary, child `AgentError`, `TurnPolicyError`, `TurnPolicyStopped`, `TurnLimitExceeded`, `MiddlewareViolation`, `ToolNameCollision`, and defects thrown by prompt/result mappers become a failed tool result with a string message. Child policy requirements remain in the returned tool handler's Effect requirements, and collision messages retain the conflicting name and ordered origin evidence.
 
 Child `AgentSuspended` is also collapsed into a failed tool result. The parent agent receives the failure as ordinary tool context and can decide whether to continue, retry, ask the user, or transfer elsewhere. Durable cross-process HITL remains a host concern.
+
+The runnable child-as-tool example in the public multi-agent guide provisions the model, toolkit handlers, executor, approvals, and middleware as ambient layers while omitting child run options. Current behavior is anchored by `packages/core/src/agent-tool.ts`, `packages/core/src/agent.ts`, and `packages/transport/src/session-registry.ts`; `packages/core/test/agent-tool.test.ts` covers the child tool boundary and `packages/core/test/handoff.test.ts` covers bounded isolated fan-out.
 
 ## Handoff
 
