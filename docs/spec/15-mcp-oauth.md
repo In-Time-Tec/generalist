@@ -1,6 +1,14 @@
-# 15 — MCP OAuth
+# 15 — MCP
 
-`@batonfx/mcp` owns the OAuth protocol lifecycle used by remote MCP transports. Hosts own user interaction and secure token persistence.
+`@batonfx/mcp` owns remote MCP tool discovery, tool-call adaptation, and the OAuth protocol lifecycle used by remote MCP transports. Hosts own user interaction and secure token persistence.
+
+## Remote tool payloads
+
+- Discovery decodes every server-controlled input and output schema as `Schema.Json` before exposing a tool.
+- Invalid discovery JSON fails as `McpConnectionError` with server context.
+- Structured tool-call content decodes as `Schema.Json` before Baton returns it.
+- Invalid structured content fails as `McpToolCallError` with server and tool context.
+- Decoding remains inside the declared Effect error channel. It does not defect, change the accepted JSON vocabulary, or alter MCP SDK transport validation.
 
 ## Contract
 
@@ -25,4 +33,4 @@ Baton owns discovery, PKCE, state validation, code exchange, refresh integration
 
 ## Decision
 
-The stable ownership decision is recorded by `ADR-0023-mcp-oauth-lifecycle.md`.
+The stable ownership decisions are recorded by `ADR-0023-mcp-oauth-lifecycle.md` and `ADR-0029-mcp-remote-payload-decoding.md`.

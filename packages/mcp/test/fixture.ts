@@ -34,98 +34,114 @@ export interface TransportFixture {
   readonly hang: { readonly started: Deferred.Deferred<void>; readonly aborted: Deferred.Deferred<void> }
 }
 
-export const makeTransportFixture: Effect.Effect<TransportFixture> = Effect.gen(function* () {
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+export const makeTransportFixture = (options?: {
+  readonly malformedDiscoverySchema?: "input" | "output"
+  readonly malformedStructuredContent?: boolean
+  readonly closes?: { count: number }
+}): Effect.Effect<TransportFixture> =>
+  Effect.gen(function* () {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
 
-  const hangStarted = yield* Deferred.make<void>()
-  const hangAborted = yield* Deferred.make<void>()
-  const hangResponse = yield* Deferred.make<never>()
-  const concurrentGate = yield* Deferred.make<void>()
-  const concurrent = { active: 0, max: 0 }
-  const runtime = yield* Effect.context<never>()
+    const hangStarted = yield* Deferred.make<void>()
+    const hangAborted = yield* Deferred.make<void>()
+    const hangResponse = yield* Deferred.make<never>()
+    const concurrentGate = yield* Deferred.make<void>()
+    const concurrent = { active: 0, max: 0 }
+    const runtime = yield* Effect.context<never>()
 
-  const server = new Server({ name: "calc", version: "1.0.0" }, { capabilities: { tools: {} } })
-  server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: [
-      { name: "add", description: "Add two numbers", inputSchema: addInputSchema },
-      { name: "barrier_add", description: "Add concurrently", inputSchema: addInputSchema },
-      {
-        name: "stats",
-        description: "Structured stats",
-        inputSchema: statsInputSchema,
-        outputSchema: statsOutputSchema,
-      },
-      { name: "boom", description: "Always fails", inputSchema: { type: "object" as const, properties: {} } },
-      { name: "hang", description: "Never responds", inputSchema: { type: "object" as const, properties: {} } },
-    ],
-  }))
-  server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
-    if (request.params.name === "add" || request.params.name === "barrier_add") {
-      const args = request.params.arguments
-      if (!isRecord(args) || typeof args.a !== "number" || typeof args.b !== "number") {
-        return { content: [{ type: "text" as const, text: "invalid arguments" }], isError: true }
-      }
-      if (request.params.name === "barrier_add") {
-        concurrent.active += 1
-        concurrent.max = Math.max(concurrent.max, concurrent.active)
-        if (concurrent.active === 2) Effect.runForkWith(runtime)(Deferred.succeed(concurrentGate, undefined))
-        return Effect.runPromiseWith(runtime)(
-          Deferred.await(concurrentGate).pipe(
-            Effect.ensuring(
-              Effect.sync(() => {
-                concurrent.active -= 1
-              }),
+    const server = new Server({ name: "calc", version: "1.0.0" }, { capabilities: { tools: {} } })
+    server.setRequestHandler(ListToolsRequestSchema, () => ({
+      tools: [
+        { name: "add", description: "Add two numbers", inputSchema: addInputSchema },
+        { name: "barrier_add", description: "Add concurrently", inputSchema: addInputSchema },
+        {
+          name: "stats",
+          description: "Structured stats",
+          inputSchema:
+            options?.malformedDiscoverySchema === "input"
+              ? { ...statsInputSchema, default: undefined }
+              : statsInputSchema,
+          outputSchema:
+            options?.malformedDiscoverySchema === "output"
+              ? { ...statsOutputSchema, default: undefined }
+              : statsOutputSchema,
+        },
+        { name: "boom", description: "Always fails", inputSchema: { type: "object" as const, properties: {} } },
+        { name: "hang", description: "Never responds", inputSchema: { type: "object" as const, properties: {} } },
+      ],
+    }))
+    server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
+      if (request.params.name === "add" || request.params.name === "barrier_add") {
+        const args = request.params.arguments
+        if (!isRecord(args) || typeof args.a !== "number" || typeof args.b !== "number") {
+          return { content: [{ type: "text" as const, text: "invalid arguments" }], isError: true }
+        }
+        if (request.params.name === "barrier_add") {
+          concurrent.active += 1
+          concurrent.max = Math.max(concurrent.max, concurrent.active)
+          if (concurrent.active === 2) Effect.runForkWith(runtime)(Deferred.succeed(concurrentGate, undefined))
+          return Effect.runPromiseWith(runtime)(
+            Deferred.await(concurrentGate).pipe(
+              Effect.ensuring(
+                Effect.sync(() => {
+                  concurrent.active -= 1
+                }),
+              ),
+              Effect.as({ content: [{ type: "text" as const, text: String(args.a + args.b) }] }),
             ),
-            Effect.as({ content: [{ type: "text" as const, text: String(args.a + args.b) }] }),
-          ),
-          { signal: extra.signal },
+            { signal: extra.signal },
+          )
+        }
+        return { content: [{ type: "text" as const, text: String(args.a + args.b) }] }
+      }
+      if (request.params.name === "stats") {
+        const structuredContent =
+          options?.malformedStructuredContent === true ? { sum: 42, invalid: undefined } : { sum: 42 }
+        return {
+          content: [{ type: "text" as const, text: Schema.encodeSync(Schema.UnknownFromJsonString)({ sum: 42 }) }],
+          structuredContent,
+        }
+      }
+      if (request.params.name === "hang") {
+        Effect.runForkWith(runtime)(Deferred.succeed(hangStarted, undefined))
+        extra.signal.addEventListener("abort", () =>
+          Effect.runForkWith(runtime)(Deferred.succeed(hangAborted, undefined)),
         )
+        return Effect.runPromiseWith(runtime)(Deferred.await(hangResponse), { signal: extra.signal })
       }
-      return { content: [{ type: "text" as const, text: String(args.a + args.b) }] }
-    }
-    if (request.params.name === "stats") {
-      return {
-        content: [{ type: "text" as const, text: Schema.encodeSync(Schema.UnknownFromJsonString)({ sum: 42 }) }],
-        structuredContent: { sum: 42 },
-      }
-    }
-    if (request.params.name === "hang") {
-      Effect.runForkWith(runtime)(Deferred.succeed(hangStarted, undefined))
-      extra.signal.addEventListener("abort", () =>
-        Effect.runForkWith(runtime)(Deferred.succeed(hangAborted, undefined)),
+      return { content: [{ type: "text" as const, text: "boom failed" }], isError: true }
+    })
+    yield* Effect.promise(() => server.connect(serverTransport))
+
+    const closes = options?.closes ?? { count: 0 }
+    const originalClose = clientTransport.close.bind(clientTransport)
+    clientTransport.close = () =>
+      Effect.runPromiseWith(runtime)(
+        Effect.sync(() => {
+          closes.count += 1
+        }).pipe(Effect.andThen(Effect.promise(originalClose))),
       )
-      return Effect.runPromiseWith(runtime)(Deferred.await(hangResponse), { signal: extra.signal })
-    }
-    return { content: [{ type: "text" as const, text: "boom failed" }], isError: true }
-  })
-  yield* Effect.promise(() => server.connect(serverTransport))
 
-  const closes = { count: 0 }
-  const originalClose = clientTransport.close.bind(clientTransport)
-  clientTransport.close = () =>
-    Effect.runPromiseWith(runtime)(
-      Effect.sync(() => {
-        closes.count += 1
-      }).pipe(Effect.andThen(Effect.promise(originalClose))),
-    )
-
-  return {
-    transport: clientTransport,
-    closes,
-    concurrent: {
-      get max() {
-        return concurrent.max
+    return {
+      transport: clientTransport,
+      closes,
+      concurrent: {
+        get max() {
+          return concurrent.max
+        },
       },
-    },
-    hang: { started: hangStarted, aborted: hangAborted },
-  }
-})
+      hang: { started: hangStarted, aborted: hangAborted },
+    }
+  })
 
 export const makeFixtureWith = (options?: {
   readonly callTimeout?: Duration.Input
+  readonly malformedDiscoverySchema?: "input" | "output"
+  readonly malformedStructuredContent?: boolean
+  readonly closes?: { count: number }
 }): Effect.Effect<Fixture, McpToolSource.McpConnectionError | OAuth.OAuthProviderError, Scope.Scope> =>
   Effect.gen(function* () {
-    const fixture = yield* makeTransportFixture
+    const fixture = yield* makeTransportFixture(options)
     const source = yield* McpToolSource.fromTransport("calc", fixture.transport, options)
     return { source, closes: fixture.closes, hang: fixture.hang }
   })
