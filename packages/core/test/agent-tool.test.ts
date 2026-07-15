@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
-import { Deferred, Effect, Exit, Fiber, Layer, Schedule, Schema, Stream } from "effect"
+import { Context, Deferred, Effect, Exit, Fiber, Layer, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import {
@@ -61,6 +61,10 @@ const gatedTool = Tool.make("gated", {
   success: Schema.String,
   needsApproval: true,
 })
+
+class AuthorizationDependency extends Context.Service<AuthorizationDependency, string>()(
+  "@batonfx/core/test/agent-tool.test/AuthorizationDependency",
+) {}
 
 layer(unusedToolHandlerLayer)("AgentTool", (it) => {
   expect(agentToolRequirementProof).toBe(true)
@@ -867,6 +871,55 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.result).toBe("child answer")
         const completed = events.at(-1)
         expect(completed?._tag === "Completed" && completed.text).toBe("parent saw child answer")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "preserves child authorization requirements", () => {
+    let calls = 0
+    let authorized = false
+    const toolkit = Toolkit.make(gatedTool)
+    const child = Agent.make({
+      name: "authorized-child",
+      toolkit,
+      authorization: {
+        authorize: () =>
+          AuthorizationDependency.pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                authorized = true
+              }),
+            ),
+            Effect.as({ _tag: "Execute" as const }),
+          ),
+      },
+    })
+    const childTool = AgentTool.asTool(child, { name: "ask_authorized_child" })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("authorized-call", "gated", { text: "run" }))
+            : Stream.make(textDelta("authorized child answer"))
+        }),
+        ToolExecutor.router([ToolExecutor.routeToolkit(childTool), ToolExecutor.routeToolkit(toolkit)]).pipe(
+          Layer.provide(toolkit.toLayer({ gated: ({ text }) => Effect.succeed(text) })),
+        ),
+        ToolContext.layerDefault,
+        Layer.succeed(AuthorizationDependency, "available"),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const executor = yield* ToolExecutor.ToolExecutor
+        const outcome = yield* executor.execute(request("ask_authorized_child", { prompt: "child task" }))
+
+        expect(authorized).toBe(true)
+        expect(outcome).toEqual({
+          _tag: "Success",
+          result: "authorized child answer",
+          encodedResult: "authorized child answer",
+        })
       }),
     ] as const
   })

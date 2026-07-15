@@ -169,4 +169,40 @@ describe("Permissions", () => {
         }),
       ] as const,
   )
+
+  ItLayer.make(it, "ruleStoreMemory reads complete concurrent updates", () => {
+    const rules = Array.from({ length: 32 }, (_, index) => ({
+      pattern: `tool-${index}`,
+      level: "allow" as const,
+    }))
+    return [
+      Permissions.ruleStoreMemory(),
+      Effect.gen(function* () {
+        const store = yield* Permissions.RuleStore
+
+        yield* Effect.all(
+          rules.map((rule) => store.remember(rule)),
+          { concurrency: 8 },
+        )
+        const remembered = store.rules === undefined ? [] : yield* store.rules
+
+        expect(remembered).toHaveLength(rules.length)
+        expect(new Set(remembered.map((rule) => rule.pattern)).size).toBe(rules.length)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "ruleStoreMemory replaces an identical pattern with its latest decision", () => [
+    Permissions.ruleStoreMemory(),
+    Effect.gen(function* () {
+      const store = yield* Permissions.RuleStore
+
+      yield* store.remember({ pattern: "bash", level: "allow" })
+      yield* store.remember({ pattern: "bash", level: "deny", reason: "revoked" })
+      yield* store.remember({ pattern: "bash", level: "ask" })
+      const remembered = store.rules === undefined ? [] : yield* store.rules
+
+      expect(remembered).toEqual([{ pattern: "bash", level: "ask" }])
+    }),
+  ])
 })

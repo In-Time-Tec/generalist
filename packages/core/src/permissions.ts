@@ -93,6 +93,7 @@ export class Permissions extends Context.Service<Permissions, Interface>()("@bat
 /** @experimental Optional remembered-rule store. */
 export interface RuleStoreInterface {
   readonly remember: (rule: Rule) => Effect.Effect<void, PermissionError>
+  readonly rules?: Effect.Effect<ReadonlyArray<Rule>, PermissionError>
 }
 
 /** @experimental */
@@ -184,6 +185,16 @@ const matchingRule = (ruleset: Ruleset, tool: string, params: unknown): Rule | u
   return matched
 }
 
+/** @experimental Find the last matching rule without applying a fallback. */
+export const matchRule: {
+  (tool: string, params: unknown): (ruleset: Ruleset) => Option.Option<Rule>
+  (ruleset: Ruleset, tool: string, params: unknown): Option.Option<Rule>
+} = dual(
+  3,
+  (ruleset: Ruleset, tool: string, params: unknown): Option.Option<Rule> =>
+    Option.fromNullishOr(matchingRule(ruleset, tool, params)),
+)
+
 /** @experimental Evaluate a ruleset with last-match semantics. */
 export const evaluate: {
   (tool: string, params: unknown): (ruleset: Ruleset) => Level
@@ -252,7 +263,9 @@ export const ruleStoreMemory = (initialRules: ReadonlyArray<Rule> = []): Layer.L
     Ref.make<ReadonlyArray<Rule>>(initialRules).pipe(
       Effect.map((rules) =>
         RuleStore.of({
-          remember: (rule) => Ref.update(rules, (current) => [...current, rule]),
+          remember: (rule) =>
+            Ref.update(rules, (current) => [...current.filter((existing) => existing.pattern !== rule.pattern), rule]),
+          rules: Ref.get(rules),
         }),
       ),
     ),

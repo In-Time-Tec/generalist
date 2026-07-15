@@ -1,6 +1,6 @@
 # 04 — Permissions Policy
 
-Baton's `Permissions` module is the optional policy seam for framework-executed local tool calls. It evaluates declarative allow/deny/ask rules before `ToolExecutor` and before a tool's own `needsApproval` / `Approvals` gate.
+Baton's `Permissions` module is the compatibility policy seam for framework-executed local tool calls. `ToolAuthorization` combines its answer with remembered rules, the current turn's active-tool set, and a tool's own `needsApproval` / `Approvals` gate before `ToolExecutor` can run.
 
 ## Scope
 
@@ -8,7 +8,7 @@ Baton owns:
 
 - the `Level`, `Rule`, `Ruleset`, `Decision`, `Answer`, and `Pending` model;
 - pure `matches(pattern, tool, params)` and `evaluate(ruleset, tool, params)` helpers;
-- in-process `Permissions` and optional `RuleStore` service boundaries;
+- in-process `Permissions` and optional readable `RuleStore` service boundaries;
 - static, allow-all, interactive, and test layers;
 - Agent integration for local tool calls before execution and before tool-declared approval checks.
 
@@ -31,9 +31,9 @@ Argument matching is shape-independent: the params value is recursively projecte
 - `Deny` fails with `FrameworkFailure { stage: "authorization" }` and does not emit `ToolExecutionStarted`.
 - `Ask` emits `ApprovalRequested` and calls `Permissions.await(pending)`.
 - `await` returning `Option.none()` suspends the run with `AgentSuspended { reason: "approval" }`.
-- `await` returning `Approved` executes the current call.
+- `await` returning `Approved` allows the current call to proceed to `needsApproval`; it does not execute or approve the tool by itself.
 - `await` returning `Denied` fails with `FrameworkFailure { stage: "authorization" }`.
-- `await` returning `Always` executes the current call and, when `RuleStore` is present, remembers an allow rule for that tool.
+- `await` returning `Always` remembers an allow rule for that tool when `RuleStore` is present, then allows the current call to proceed to `needsApproval`; it does not override a static or dynamic approval requirement.
 
 Provider-executed tool calls are not gated by `Permissions` because Baton does not dispatch them.
 
@@ -43,13 +43,22 @@ Core's interactive layer is non-durable. A host can implement `onAsk(pending)` b
 
 ## Agent integration
 
-`Agent.stream` resolves `Permissions` optionally so its static requirement set does not grow. If the service is absent, the existing behavior is unchanged: ungated tools execute and `needsApproval` tools use `Approvals`.
+`Agent.stream` resolves `Permissions`, `RuleStore`, and `Approvals` optionally and adapts them into one `ToolAuthorization.ToolAuthorizer` unless the agent supplies an explicit `authorization`. Existing services therefore remain source-compatible while every call reaches one final decision.
+
+`ToolAuthorizer<R>` preserves custom Effect requirements in the Agent and all run APIs. A layer-provided `ToolAuthorizerService` is dependency-closed (`R = never`); dependency-bearing authorizers use the explicit Agent field so requirements remain visible to callers.
 
 For a framework-executed local tool call, Baton runs:
 
-1. optional `Permissions.evaluate` / `Permissions.await`;
-2. existing `Ai.Tool.needsApproval` / `Approvals.check`;
-3. `ToolExecutor.execute`.
+1. reject a tool absent from the exact active toolkit for the turn;
+2. read matching remembered rules and evaluate optional `Permissions` policy;
+3. resolve permission conflicts with `deny > allow > ask`; a remembered allow suppresses a repeated permission ask, but never suppresses `needsApproval`;
+4. emit `ApprovalRequested` before a permission wait, then evaluate `Ai.Tool.needsApproval` fail-closed and emit the event before consulting `Approvals` when required;
+5. return exactly one final `Execute`, `Deny`, or `Suspend` authorization;
+6. call `ToolExecutor.execute` only for `Execute`.
+
+Remembered rules use the same glob matching and last-match semantics as ordinary rules. A later remembered rule with the same pattern replaces the earlier value, which is the in-process invalidation mechanism. A `RuleStore` implementation that omits the additive `rules` read operation remains writable for compatibility but cannot suppress future asks. Memory-layer reads and writes are atomic through Effect `Ref`, so concurrent calls observe complete rule snapshots rather than partial updates. The memory layer's scope bounds the lifetime of remembered rules.
+
+An explicit current or remembered deny always wins. Any allow wins over ask. If neither source answers, ask wins. A matched remembered ask without a `Permissions` answer source suspends fail-closed. Active-tool exclusion has higher precedence than all policy and approval answers, including explicit custom authorizers. A required static or dynamic approval is evaluated after permission resolution and cannot be bypassed by `Approved` or `Always`.
 
 ## Related docs
 

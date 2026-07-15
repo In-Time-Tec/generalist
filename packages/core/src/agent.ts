@@ -3,6 +3,7 @@ import {
   Channel,
   type Duration,
   Effect,
+  Equal,
   Exit,
   Fiber,
   Layer,
@@ -46,10 +47,16 @@ import { type Item, type Key, Memory, type MemoryError } from "./memory.js"
 import { type Middleware, ModelMiddleware, type TurnContext } from "./model-middleware.js"
 import { type LanguageModelNotRegistered, type ModelSelection, Service } from "./model-registry.js"
 import { ModelResilience, apply } from "./model-resilience.js"
-import { type Answer, type Pending, type PermissionError, Permissions, RuleStore } from "./permissions.js"
+import { Permissions, RuleStore } from "./permissions.js"
 import { type Entry, SessionStore, type SessionStoreError } from "./session.js"
 import { SkillSource, type SkillSourceError, selectListings } from "./skill-source.js"
 import { type Message, Steering } from "./steering.js"
+import {
+  type AuthorizationError,
+  ToolAuthorizerService,
+  type ToolAuthorizer,
+  make as makeToolAuthorizer,
+} from "./tool-authorization.js"
 import { ToolContext } from "./tool-context.js"
 import {
   type DomainFailure,
@@ -89,6 +96,7 @@ export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = Language
   readonly policy: TurnPolicy<R>
   readonly model?: ModelSelection
   readonly memory?: Key
+  readonly authorization?: ToolAuthorizer<R>
   readonly metadata?: Readonly<Record<string, unknown>>
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
 }
@@ -108,32 +116,46 @@ export interface WithModelDefault {
 }
 
 /** @experimental */
-export interface MakeOptions<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never> {
+export interface MakeOptions<
+  Tools extends Record<string, Tool.Any> = {},
+  PolicyServices = never,
+  AuthorizationServices = never,
+> {
   readonly instructions?: string
   readonly toolkit?: Toolkit.Toolkit<Tools>
   readonly tools?: never
   readonly policy?: TurnPolicy<PolicyServices>
   readonly model?: ModelSelection
   readonly memory?: Key
+  readonly authorization?: ToolAuthorizer<AuthorizationServices>
   readonly metadata?: Readonly<Record<string, unknown>>
 }
 
 /** @experimental Agent options with ordered static declarations instead of a pre-built toolkit. */
-export interface MakeToolsOptions<StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>
-  extends Omit<MakeOptions<{}, PolicyServices>, "toolkit" | "tools"> {
+export interface MakeToolsOptions<
+  StaticTools extends ReadonlyArray<Tool.Any>,
+  PolicyServices = never,
+  AuthorizationServices = never,
+> extends Omit<MakeOptions<{}, PolicyServices, AuthorizationServices>, "toolkit" | "tools"> {
   readonly tools: StaticTools
   readonly toolkit?: never
 }
 
 /** @experimental */
-export interface MakeObjectOptions<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>
-  extends MakeOptions<Tools, PolicyServices> {
+export interface MakeObjectOptions<
+  Tools extends Record<string, Tool.Any> = {},
+  PolicyServices = never,
+  AuthorizationServices = never,
+> extends MakeOptions<Tools, PolicyServices, AuthorizationServices> {
   readonly name: string
 }
 
 /** @experimental */
-export interface MakeToolsObjectOptions<StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>
-  extends MakeToolsOptions<StaticTools, PolicyServices> {
+export interface MakeToolsObjectOptions<
+  StaticTools extends ReadonlyArray<Tool.Any>,
+  PolicyServices = never,
+  AuthorizationServices = never,
+> extends MakeToolsOptions<StaticTools, PolicyServices, AuthorizationServices> {
   readonly name: string
 }
 
@@ -145,56 +167,64 @@ type ModelRequirement<O> = [Exclude<OptionValue<O, "model">, undefined>] extends
     : Service
 type MemoryRequirement<O> = [Exclude<OptionValue<O, "memory">, undefined>] extends [never] ? never : Memory
 type PolicyRequirement<O> = O extends { readonly policy: TurnPolicy<infer R> } ? R : never
+type AuthorizationRequirement<O> = O extends { readonly authorization: ToolAuthorizer<infer R> } ? R : never
 type OptionRequirements<Tools extends Record<string, Tool.Any>, O> =
   | StaticToolServices<Tools>
   | ModelRequirement<O>
   | MemoryRequirement<O>
   | PolicyRequirement<O>
+  | AuthorizationRequirement<O>
 
 /** @experimental Defaults: empty toolkit, `defaultPolicy`. */
 export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
-  const O extends MakeToolsOptions<StaticTools, any> = MakeToolsOptions<StaticTools>,
+  const O extends MakeToolsOptions<StaticTools, any, any> = MakeToolsOptions<StaticTools>,
 >(
   name: string,
-  options: MakeToolsOptions<StaticTools, any> & O,
+  options: MakeToolsOptions<StaticTools, any, any> & O,
 ): Agent<Toolkit.ToolsByName<StaticTools>, OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>>
 export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
-  const O extends MakeToolsObjectOptions<StaticTools, any> = MakeToolsObjectOptions<StaticTools>,
+  const O extends MakeToolsObjectOptions<StaticTools, any, any> = MakeToolsObjectOptions<StaticTools>,
 >(
-  options: MakeToolsObjectOptions<StaticTools, any> & O,
+  options: MakeToolsObjectOptions<StaticTools, any, any> & O,
 ): Agent<Toolkit.ToolsByName<StaticTools>, OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>>
 export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
-  const O extends MakeToolsOptions<StaticTools, any> = MakeToolsOptions<StaticTools>,
+  const O extends MakeToolsOptions<StaticTools, any, any> = MakeToolsOptions<StaticTools>,
 >(
-  options: MakeToolsOptions<StaticTools, any> & O & { readonly name?: never },
+  options: MakeToolsOptions<StaticTools, any, any> & O & { readonly name?: never },
 ): (name: string) => Agent<Toolkit.ToolsByName<StaticTools>, OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>>
 export function make<
   Tools extends Record<string, Tool.Any> = {},
-  const O extends MakeOptions<Tools, any> = MakeOptions<Tools>,
->(name: string, options: MakeOptions<Tools, any> & O): Agent<Tools, OptionRequirements<Tools, O>>
+  const O extends MakeOptions<Tools, any, any> = MakeOptions<Tools>,
+>(name: string, options: MakeOptions<Tools, any, any> & O): Agent<Tools, OptionRequirements<Tools, O>>
 export function make(name: string): Agent<{}, LanguageModel.LanguageModel>
 export function make<
   Tools extends Record<string, Tool.Any> = {},
-  const O extends MakeObjectOptions<Tools, any> = MakeObjectOptions<Tools>,
->(options: MakeObjectOptions<Tools, any> & O): Agent<Tools, OptionRequirements<Tools, O>>
+  const O extends MakeObjectOptions<Tools, any, any> = MakeObjectOptions<Tools>,
+>(options: MakeObjectOptions<Tools, any, any> & O): Agent<Tools, OptionRequirements<Tools, O>>
 export function make<
   Tools extends Record<string, Tool.Any> = {},
-  const O extends MakeOptions<Tools, any> = MakeOptions<Tools>,
+  const O extends MakeOptions<Tools, any, any> = MakeOptions<Tools>,
 >(
-  options: MakeOptions<Tools, any> & O & { readonly name?: never },
+  options: MakeOptions<Tools, any, any> & O & { readonly name?: never },
 ): (name: string) => Agent<Tools, OptionRequirements<Tools, O>>
 export function make(): (name: string) => Agent<{}, LanguageModel.LanguageModel>
-export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
+export function make<
+  Tools extends Record<string, Tool.Any> = {},
+  PolicyServices = never,
+  AuthorizationServices = never,
+>(
   nameOrOptions?:
     | string
-    | MakeObjectOptions<Tools, PolicyServices>
-    | MakeOptions<Tools, PolicyServices>
-    | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices>
-    | MakeToolsObjectOptions<ReadonlyArray<Tool.Any>, PolicyServices>,
-  options: MakeOptions<Tools, PolicyServices> | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices> = {},
+    | MakeObjectOptions<Tools, PolicyServices, AuthorizationServices>
+    | MakeOptions<Tools, PolicyServices, AuthorizationServices>
+    | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices>
+    | MakeToolsObjectOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices>,
+  options:
+    | MakeOptions<Tools, PolicyServices, AuthorizationServices>
+    | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices> = {},
 ): unknown {
   if (nameOrOptions === undefined || (typeof nameOrOptions !== "string" && !("name" in nameOrOptions))) {
     const curriedOptions = nameOrOptions ?? {}
@@ -208,6 +238,7 @@ export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices
           ...(curriedOptions.policy === undefined ? {} : { policy: curriedOptions.policy }),
           ...(curriedOptions.model === undefined ? {} : { model: curriedOptions.model }),
           ...(curriedOptions.memory === undefined ? {} : { memory: curriedOptions.memory }),
+          ...(curriedOptions.authorization === undefined ? {} : { authorization: curriedOptions.authorization }),
           ...(curriedOptions.metadata === undefined ? {} : { metadata: curriedOptions.metadata }),
         })
     }
@@ -219,6 +250,7 @@ export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices
         ...(curriedOptions.policy === undefined ? {} : { policy: curriedOptions.policy }),
         ...(curriedOptions.model === undefined ? {} : { model: curriedOptions.model }),
         ...(curriedOptions.memory === undefined ? {} : { memory: curriedOptions.memory }),
+        ...(curriedOptions.authorization === undefined ? {} : { authorization: curriedOptions.authorization }),
         ...(curriedOptions.metadata === undefined ? {} : { metadata: curriedOptions.metadata }),
       })
   }
@@ -252,6 +284,7 @@ export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices
     policy: resolved.policy ?? defaultPolicy,
     ...(resolved.model === undefined ? {} : { model: resolved.model }),
     ...(resolved.memory === undefined ? {} : { memory: resolved.memory }),
+    ...(resolved.authorization === undefined ? {} : { authorization: resolved.authorization }),
     ...(resolved.metadata === undefined ? {} : { metadata: resolved.metadata }),
     toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map((tool) => ({
       tool,
@@ -262,11 +295,15 @@ export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices
 
 /** @experimental Re-entry after `AgentSuspended`: execute this call first. */
 export interface Resume {
+  readonly token?: string
   readonly call: {
     readonly id: string
     readonly name: string
     readonly params: unknown
   }
+  readonly activeTools?: ReadonlyArray<string>
+  readonly activatedSkills?: ReadonlyArray<string>
+  readonly authorizationStage?: "permission" | "approval"
 }
 
 /** @experimental Bounded buffering behavior for tool progress events. */
@@ -401,6 +438,25 @@ const lockForChat = (chat: Chat.Service): Semaphore.Semaphore => {
   return created
 }
 
+const unresolvedToolCall = (
+  messages: ReadonlyArray<Prompt.Message>,
+): { readonly call: Prompt.ToolCallPart; readonly messages: ReadonlyArray<Prompt.Message> } | undefined => {
+  const calls: Array<{ readonly call: Prompt.ToolCallPart; readonly messageIndex: number }> = []
+  const results = new Set<string>()
+  for (const [messageIndex, message] of messages.entries()) {
+    if (typeof message.content === "string") continue
+    for (const part of message.content) {
+      if (part.type === "tool-call" && !part.providerExecuted) calls.push({ call: part, messageIndex })
+      if (part.type === "tool-result") results.add(part.id)
+    }
+  }
+  const unresolved = calls.filter(({ call }) => !results.has(call.id))
+  const pending = unresolved[0]
+  return unresolved.length === 1 && pending !== undefined
+    ? { call: pending.call, messages: messages.slice(0, pending.messageIndex) }
+    : undefined
+}
+
 const skillListingBudgetTokens = 2_048
 
 const activateSkillToolName = "activate_skill"
@@ -479,20 +535,6 @@ const withSystem = (instructions: string, prompt: Prompt.Prompt): Prompt.Prompt 
 const skillListingsInstructions = (listings: string): string =>
   `Available skills:\n${listings}\n\nCall ${activateSkillToolName} with a listed skill name to load its full body before using it.`
 
-const approvalRequired = (
-  tool: Tool.Any | undefined,
-  call: AnyToolCall,
-  messages: ReadonlyArray<Prompt.Message>,
-): Effect.Effect<boolean> => {
-  const needsApproval = tool?.needsApproval
-  if (needsApproval === undefined) return Effect.succeed(false)
-  if (typeof needsApproval === "boolean") return Effect.succeed(needsApproval)
-  return Effect.suspend(() => {
-    const result = needsApproval(call.params as never, { toolCallId: call.id, messages })
-    return Effect.isEffect(result) ? result : Effect.succeed(result)
-  }).pipe(Effect.catchCause((cause) => (Cause.hasInterrupts(cause) ? Effect.interrupt : Effect.succeed(true))))
-}
-
 /** Fold the prompt through every `transformPrompt` hook in array order. */
 const applyPromptChain = (
   chain: ReadonlyArray<Middleware>,
@@ -544,7 +586,8 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         tool,
         dispatch: "Static",
       }))
-      yield* assemble(staticCandidates)
+      const staticRegistry = yield* assemble(staticCandidates)
+      const staticToolkit = staticRegistry.toolkit as unknown as Toolkit.Toolkit<Tools>
       if (
         agent.toolDeclarations !== undefined &&
         (agent.toolDeclarations.length !== Object.keys(agent.toolkit.tools).length ||
@@ -650,11 +693,22 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       const resilienceService = yield* Effect.serviceOption(ModelResilience)
       const modelRegistryService = yield* Effect.serviceOption(Service)
       const permissionsService = yield* Effect.serviceOption(Permissions)
+      const ruleStoreService = yield* Effect.serviceOption(RuleStore)
+      const authorizationService = yield* Effect.serviceOption(ToolAuthorizerService)
       const steeringService = yield* Effect.serviceOption(Steering)
       const compactionService = yield* Effect.serviceOption(Compaction)
       const memoryService = yield* Effect.serviceOption(Memory)
       const sessionService = yield* Effect.serviceOption(SessionStore)
       const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
+      const authorizer =
+        agent.authorization ??
+        Option.getOrElse(authorizationService, () =>
+          makeToolAuthorizer({
+            ...(Option.isNone(permissionsService) ? {} : { permissions: permissionsService.value }),
+            ...(Option.isNone(approvals) ? {} : { approvals: approvals.value }),
+            ...(Option.isNone(ruleStoreService) ? {} : { ruleStore: ruleStoreService.value }),
+          }),
+        )
       const persistenceOptions = options.persistence
       const memoryOptions = options.memory ?? (agent.memory === undefined ? undefined : { key: agent.memory })
       const agentModel = agent.model
@@ -998,7 +1052,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       > => {
         const registered = get(registry, request.call.name)
         if (registered?.dispatch === "Static") {
-          return executeToolkit(agent.toolkit, request)
+          return executeToolkit(staticToolkit, request)
         }
         return registered === undefined
           ? Effect.fail(
@@ -1116,21 +1170,6 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           ),
         )
 
-      const permissionError = (call: AnyToolCall, error: PermissionError): FrameworkFailure =>
-        FrameworkFailure.make({ stage: "authorization", tool: call.name, message: error.message })
-
-      const permissionDeniedEvents = (
-        call: AnyToolCall,
-        reason: string | undefined,
-      ): Stream.Stream<Event, FrameworkFailure> =>
-        Stream.fail(
-          FrameworkFailure.make({
-            stage: "authorization",
-            tool: call.name,
-            message: reason ?? "Permission denied",
-          }),
-        )
-
       const activateSkillOutcome = (
         turn: number,
         call: AnyToolCall,
@@ -1193,149 +1232,85 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           ),
         )
 
-      const rememberAlways = (call: AnyToolCall): Effect.Effect<void, FrameworkFailure> =>
-        Effect.serviceOption(RuleStore).pipe(
-          Effect.flatMap(
-            Option.match({
-              onNone: () => Effect.void,
-              onSome: (store) =>
-                store
-                  .remember({ pattern: call.name, level: "allow" })
-                  .pipe(Effect.mapError((error) => permissionError(call, error))),
-            }),
-          ),
-        )
-
-      const approvalEvents = (
-        turn: number,
-        call: AnyToolCall,
-        messages: ReadonlyArray<Prompt.Message>,
-        request: Request,
-        tool: Tool.Any | undefined,
-        registry: Registry,
-      ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> =>
-        Stream.unwrap(
-          approvalRequired(tool, call, messages).pipe(
-            Effect.map((isRequired): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
-              if (!isRequired) return executeApproved(turn, call, request, registry)
-              if (Option.isNone(approvals)) {
-                return Stream.concat(
-                  Stream.fromIterable<Event>([{ _tag: "ApprovalRequested", turn, call }]),
-                  permissionDeniedEvents(call, "Approvals service is required for approval-gated tools"),
-                )
-              }
-              return Stream.concat(
-                Stream.fromIterable<Event>([{ _tag: "ApprovalRequested", turn, call }]),
-                Stream.unwrap(
-                  approvals.value.check(request).pipe(
-                    Effect.map((decision): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
-                      switch (decision._tag) {
-                        case "Approved":
-                          return executeApproved(turn, call, request, registry)
-                        case "Denied":
-                          return permissionDeniedEvents(call, decision.reason ?? "Tool call denied")
-                        case "Pending":
-                          return failSuspended(call, decision.token, "approval")
-                      }
-                    }),
-                  ),
-                ),
-              )
-            }),
-          ),
-        )
-
-      const permissionAnsweredEvents = (
-        turn: number,
-        call: AnyToolCall,
-        request: Request,
-        answer: Answer,
-        registry: Registry,
-      ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
-        switch (answer._tag) {
-          case "Approved":
-            return executeApproved(turn, call, request, registry)
-          case "Denied":
-            return permissionDeniedEvents(call, answer.reason)
-          case "Always":
-            return Stream.unwrap(rememberAlways(call).pipe(Effect.as(executeApproved(turn, call, request, registry))))
-        }
-      }
-
-      const permissionAskEvents = (
-        turn: number,
-        call: AnyToolCall,
-        request: Request,
-        token: string,
-        registry: Registry,
-      ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
-        const pending: Pending = {
-          token,
-          tool: call.name,
-          params: call.params,
-          agentName: agent.name,
-          turn,
-          toolCallId: call.id,
-        }
-        if (Option.isNone(permissionsService)) return failSuspended(call, token, "approval")
-        return Stream.concat(
-          Stream.fromIterable<Event>([{ _tag: "ApprovalRequested", turn, call }]),
-          Stream.unwrap(
-            permissionsService.value.await(pending).pipe(
-              Effect.mapError((error) => permissionError(call, error)),
-              Effect.map(
-                Option.match({
-                  onNone: () => failSuspended(call, token, "approval"),
-                  onSome: (answer) => permissionAnsweredEvents(turn, call, request, answer, registry),
-                }),
-              ),
-            ),
-          ),
-        )
-      }
+      const authorizationError = (turn: number, error: AuthorizationError): AgentError =>
+        AgentError.make({ message: error.message, turn, cause: error })
 
       const toolCallEvents = (
         turn: number,
         call: AnyToolCall,
         messages: ReadonlyArray<Prompt.Message>,
         registry: Registry,
-      ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
+        authorizationStage?: "permission" | "approval",
+        authorizationToken?: string,
+      ): Stream.Stream<Event, RunError, StaticToolServices<Tools> | R> => {
         const request: Request = { call, turn, agentName: agent.name, sessionId }
-        const registered = get(registry, call.name)
-        if (registered === undefined) {
+        const candidate = get(registry, call.name)
+        if (candidate === undefined)
           return Stream.fail(
             FrameworkFailure.make({
-              stage: "missing-handler",
+              stage: "authorization",
               tool: call.name,
-              message: `Tool ${call.name} is not registered`,
+              message: `Tool ${call.name} is not active for turn ${turn}`,
             }),
           )
-        }
-        const tool = registered.tool
-        if (Option.isNone(permissionsService)) return approvalEvents(turn, call, messages, request, tool, registry)
+        const activeTools = registry.entries.map((entry) => entry.tool.name)
         return Stream.unwrap(
-          permissionsService.value
-            .evaluate({
-              tool: call.name,
-              params: call.params,
-              agentName: agent.name,
-              turn,
-              toolCallId: call.id,
-              sessionId,
-            })
-            .pipe(
-              Effect.mapError((error) => permissionError(call, error)),
-              Effect.map((decision): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
-                switch (decision._tag) {
-                  case "Allow":
-                    return approvalEvents(turn, call, messages, request, tool, registry)
-                  case "Deny":
-                    return permissionDeniedEvents(call, decision.reason)
-                  case "Ask":
-                    return permissionAskEvents(turn, call, request, decision.token, registry)
-                }
-              }),
-            ),
+          Effect.gen(function* () {
+            const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
+            const approvalEvents = yield* Queue.bounded<Event, Cause.Done>(1)
+            const fiber = yield* authorizer
+              .authorize({
+                call,
+                tool: candidate.tool,
+                active: true,
+                activeTools,
+                activatedSkills,
+                ...(authorizationStage === undefined ? {} : { authorizationStage }),
+                ...(authorizationToken === undefined ? {} : { authorizationToken }),
+                messages,
+                execution: request,
+                onApprovalRequired: Queue.offer(approvalEvents, { _tag: "ApprovalRequested", turn, call }).pipe(
+                  Effect.asVoid,
+                ),
+              })
+              .pipe(
+                Effect.mapError((error) => authorizationError(turn, error)),
+                Effect.ensuring(Queue.end(approvalEvents).pipe(Effect.asVoid)),
+                Effect.forkScoped({ startImmediately: true }),
+              )
+            return Stream.concat(
+              Stream.fromQueue(approvalEvents),
+              Stream.fromEffect(Fiber.join(fiber)).pipe(
+                Stream.flatMap((decision) => {
+                  switch (decision._tag) {
+                    case "Execute":
+                      return executeApproved(turn, call, request, registry)
+                    case "Deny":
+                      return Stream.fail(
+                        FrameworkFailure.make({
+                          stage: "authorization",
+                          tool: call.name,
+                          message: decision.error.message,
+                        }),
+                      )
+                    case "Suspend":
+                      return Stream.fail(
+                        AgentSuspended.make({
+                          token: decision.suspension.token,
+                          reason: "approval",
+                          authorization_stage: decision.suspension.authorization_stage ?? "approval",
+                          tool_call_id: call.id,
+                          tool_name: call.name,
+                          tool_params: call.params,
+                          active_tools: activeTools,
+                          activated_skills: activatedSkills,
+                        }),
+                      )
+                  }
+                }),
+              ),
+            )
+          }),
         )
       }
 
@@ -1411,7 +1386,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         part: Response.StreamPart<Record<string, Tool.Any>>,
         messages: ReadonlyArray<Prompt.Message>,
         registry: Registry,
-      ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
+      ): Stream.Stream<Event, RunError, StaticToolServices<Tools> | R> => {
         if (part.type === "error") {
           if (isToolNameCollision(part.error)) return Stream.fail(part.error)
           return Stream.fail(AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }))
@@ -1805,7 +1780,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               readonly overrides?: TurnOverrides
             }
           | undefined
-        const call = Response.makePart("tool-call", {
+        const suppliedCall = Response.makePart("tool-call", {
           id: resume.call.id,
           name: resume.call.name,
           params: resume.call.params,
@@ -1815,7 +1790,37 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           Stream.concat(
             Stream.unwrap(
               Effect.all({ history: Ref.get(chat.history), tools: Ref.get(toolState) }).pipe(
-                Effect.map(({ history, tools }) => toolCallEvents(0, call, history.content, tools.registry)),
+                Effect.map(({ history, tools }) => {
+                  const checkpoint =
+                    resume.authorizationStage === undefined
+                      ? { call: suppliedCall, messages: history.content }
+                      : unresolvedToolCall(history.content)
+                  if (
+                    checkpoint === undefined ||
+                    checkpoint.call.id !== suppliedCall.id ||
+                    checkpoint.call.name !== suppliedCall.name ||
+                    !Equal.equals(checkpoint.call.params, suppliedCall.params)
+                  ) {
+                    return Stream.fail(
+                      AgentError.make({
+                        message: "Resume call does not match the unresolved checkpoint call",
+                        turn: 0,
+                      }),
+                    )
+                  }
+                  const registry =
+                    resume.authorizationStage === undefined && resume.activeTools === undefined
+                      ? tools.registry
+                      : select(tools.registry, resume.activeTools ?? [])
+                  return toolCallEvents(
+                    0,
+                    checkpoint.call as AnyToolCall,
+                    checkpoint.messages,
+                    registry,
+                    resume.authorizationStage,
+                    resume.token,
+                  )
+                }),
               ),
             ),
           ),
@@ -1891,6 +1896,11 @@ export const provideModel: {
   ): Agent<Tools, Exclude<R, LanguageModel.LanguageModel> | RM> => ({
     ...agent,
     policy: agent.policy as TurnPolicy<Exclude<R, LanguageModel.LanguageModel> | RM>,
+    ...(agent.authorization === undefined
+      ? {}
+      : {
+          authorization: agent.authorization as ToolAuthorizer<Exclude<R, LanguageModel.LanguageModel> | RM>,
+        }),
     [AgentTypeId]: {
       tools: (value: Tools) => value,
       requirements: (value: Exclude<R, LanguageModel.LanguageModel> | RM) => value,
