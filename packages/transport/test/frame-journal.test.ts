@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Queue } from "effect"
+import { Deferred, Effect, Fiber, Option, Queue } from "effect"
+import { Prompt } from "effect/unstable/ai"
 import { makeFrameJournal } from "../src/frame-journal.js"
 import type { SessionError, SubscriberLagged } from "../src/session-registry-errors.js"
 import type { LooseServerFrameType } from "../src/wire.js"
@@ -9,9 +10,84 @@ const status = (turn: number) => ({ _tag: "SessionStatus" as const, status: { _t
 const makeQueue = (capacity: number) => Queue.dropping<LooseServerFrameType, SessionError | SubscriberLagged>(capacity)
 
 describe("frame journal", () => {
+  it.effect("snapshots the complete transcript for cursorless replay after truncation", () =>
+    Effect.gen(function* () {
+      const transcript = Prompt.make("complete history")
+      const journal = yield* makeFrameJournal({ sessionId: "cursorless", capacity: 1, initialTranscript: transcript })
+      yield* journal.publish(status(0))
+      yield* journal.publish(status(1))
+
+      const queue = yield* makeQueue(8)
+      const capture = yield* journal.subscribe(queue)
+
+      expect(Option.isSome(capture.snapshot)).toBe(true)
+      if (Option.isSome(capture.snapshot)) {
+        expect(capture.snapshot.value.throughSeq).toBe(1)
+        expect(capture.snapshot.value.transcript).toBe(transcript)
+      }
+      expect(capture.replay).toEqual([])
+    }),
+  )
+
+  it.effect("captures transcript publication and its frame boundary atomically", () =>
+    Effect.gen(function* () {
+      const initialTranscript = Prompt.make("initial")
+      const newerTranscript = Prompt.make("newer")
+      const secondAllocated = yield* Deferred.make<void>()
+      const releaseSecond = yield* Deferred.make<void>()
+      const journal = yield* makeFrameJournal({
+        sessionId: "point-in-time",
+        capacity: 1,
+        initialTranscript,
+        onAllocated: (frame) =>
+          frame.seq === 1
+            ? Deferred.succeed(secondAllocated, undefined).pipe(Effect.andThen(Deferred.await(releaseSecond)))
+            : Effect.void,
+      })
+      yield* journal.publish(status(0))
+      const publisher = yield* journal.publish(status(1), newerTranscript).pipe(Effect.forkChild)
+      yield* Deferred.await(secondAllocated)
+
+      const queue = yield* makeQueue(8)
+      const subscriber = yield* journal.subscribe(queue, -2).pipe(Effect.forkChild)
+      yield* Effect.yieldNow
+      yield* Deferred.succeed(releaseSecond, undefined)
+      yield* Fiber.join(publisher)
+      const capture = yield* Fiber.join(subscriber)
+
+      expect(Option.isSome(capture.snapshot)).toBe(true)
+      if (Option.isSome(capture.snapshot)) {
+        expect(capture.snapshot.value.throughSeq).toBe(1)
+        expect(capture.snapshot.value.transcript).toBe(newerTranscript)
+      }
+      expect(capture.replay).toEqual([])
+    }),
+  )
+
+  it.effect("delivers only strictly newer frames after a concurrent snapshot boundary", () =>
+    Effect.gen(function* () {
+      const journal = yield* makeFrameJournal({
+        sessionId: "boundary",
+        capacity: 1,
+        initialTranscript: Prompt.make("history"),
+      })
+      yield* journal.publish(status(0))
+      yield* journal.publish(status(1))
+      const queue = yield* makeQueue(8)
+      const capture = yield* journal.subscribe(queue, -2)
+      yield* journal.publish(status(2))
+      const live = yield* Queue.take(queue)
+
+      expect(Option.isSome(capture.snapshot)).toBe(true)
+      if (Option.isSome(capture.snapshot)) expect(capture.snapshot.value.throughSeq).toBe(1)
+      expect(capture.replay).toEqual([])
+      expect(live.seq).toBe(2)
+    }),
+  )
+
   it.effect("owns monotonic sequence, bounded replay, and stale snapshot plans", () =>
     Effect.gen(function* () {
-      const journal = yield* makeFrameJournal({ sessionId: "journal", capacity: 2 })
+      const journal = yield* makeFrameJournal({ sessionId: "journal", capacity: 2, initialTranscript: Prompt.empty })
       yield* journal.publish(status(0))
       yield* journal.publish(status(1))
       yield* journal.publish(status(2))
@@ -22,17 +98,17 @@ describe("frame journal", () => {
       const stale = yield* journal.subscribe(staleQueue, -1)
 
       expect(replay.replay.map((frame) => frame.seq)).toEqual([1, 2])
-      expect(replay.stale).toBe(false)
+      expect(Option.isNone(replay.snapshot)).toBe(true)
       expect(stale.replay).toEqual([])
-      expect(stale.stale).toBe(true)
-      expect(stale.snapshotSeq).toBe(2)
+      expect(Option.isSome(stale.snapshot)).toBe(true)
+      if (Option.isSome(stale.snapshot)) expect(stale.snapshot.value.throughSeq).toBe(2)
       expect(yield* journal.lastSeq).toBe(2)
     }),
   )
 
   it.effect("fails and removes a lagging subscriber without blocking publication", () =>
     Effect.gen(function* () {
-      const journal = yield* makeFrameJournal({ sessionId: "lagged", capacity: 8 })
+      const journal = yield* makeFrameJournal({ sessionId: "lagged", capacity: 8, initialTranscript: Prompt.empty })
       const queue = yield* makeQueue(1)
       yield* journal.subscribe(queue)
 
@@ -55,6 +131,7 @@ describe("frame journal", () => {
       const journal = yield* makeFrameJournal({
         sessionId: "ordered",
         capacity: 8,
+        initialTranscript: Prompt.empty,
         onAllocated: (frame) =>
           frame.seq === 0
             ? Deferred.succeed(firstAllocated, undefined).pipe(Effect.andThen(Deferred.await(releaseFirst)))
@@ -86,6 +163,7 @@ describe("frame journal", () => {
       const journal = yield* makeFrameJournal({
         sessionId: "interrupted",
         capacity: 8,
+        initialTranscript: Prompt.empty,
         onDelivered: (frame) =>
           frame.seq === 0
             ? Deferred.succeed(delivered, undefined).pipe(Effect.andThen(Deferred.await(release)))
@@ -117,9 +195,10 @@ describe("frame journal", () => {
       const journalA = yield* makeFrameJournal({
         sessionId: "a",
         capacity: 8,
+        initialTranscript: Prompt.empty,
         onAllocated: () => Deferred.succeed(blocked, undefined).pipe(Effect.andThen(Deferred.await(release))),
       })
-      const journalB = yield* makeFrameJournal({ sessionId: "b", capacity: 8 })
+      const journalB = yield* makeFrameJournal({ sessionId: "b", capacity: 8, initialTranscript: Prompt.empty })
 
       const publishA = yield* journalA.publish(status(0)).pipe(Effect.forkChild)
       yield* Deferred.await(blocked)

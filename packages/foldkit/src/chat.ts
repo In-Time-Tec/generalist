@@ -677,6 +677,9 @@ const projectPrompt = (prompt: Prompt.Prompt): ReadonlyArray<ChatEntry> => {
 }
 
 const applyFrame = (model: Model, frame: Wire.LooseServerFrameType): readonly [Model, Option.Option<OutMessage>] => {
+  if (frame._tag === "Snapshot") {
+    return [{ ...model, lastSeq: frame.seq, entries: projectPrompt(frame.transcript), streaming: null }, Option.none()]
+  }
   if (frame.seq <= model.lastSeq) return [model, Option.none()]
   const withSeq = { ...model, lastSeq: frame.seq }
   switch (frame._tag) {
@@ -690,8 +693,6 @@ const applyFrame = (model: Model, frame: Wire.LooseServerFrameType): readonly [M
     }
     case "Ended":
       return [withSeq, Option.none()]
-    case "Snapshot":
-      return [{ ...withSeq, entries: projectPrompt(frame.transcript), streaming: null }, Option.none()]
     case "SessionStatus":
       return applyStatus(withSeq, frame.status)
   }
