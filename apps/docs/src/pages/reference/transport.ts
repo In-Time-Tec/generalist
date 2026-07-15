@@ -78,7 +78,9 @@ export const transportReference = definePage({
             "The run failed terminally; ",
             code("RunFailure"),
             " is ",
-            code("AgentError | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation"),
+            code(
+              "AgentError | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | FrameworkFailure",
+            ),
           ],
         ],
         [

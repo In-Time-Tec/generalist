@@ -16,7 +16,7 @@ import {
   Stream,
 } from "effect"
 import { Chat, Prompt, Tool } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, TurnPolicy } from "@batonfx/core"
+import { Agent, AgentEvent, Approvals, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import { type FrameJournal, type FrameWithoutSeq, makeFrameJournal } from "./frame-journal.js"
 import {
   coordination,
@@ -144,6 +144,7 @@ const runFailureFromCause = (cause: Cause.Cause<Agent.RunError | SessionError>, 
   if (Schema.is(AgentEvent.TurnPolicyStopped)(error)) return error
   if (Schema.is(AgentEvent.TurnLimitExceeded)(error)) return error
   if (Schema.is(AgentEvent.MiddlewareViolation)(error)) return error
+  if (Schema.is(ToolExecutor.FrameworkFailure)(error)) return error
   const message = Cause.hasInterrupts(cause) ? "Session interrupted" : errorMessage(error)
   return AgentEvent.AgentError.make({ message, turn, cause: error })
 }

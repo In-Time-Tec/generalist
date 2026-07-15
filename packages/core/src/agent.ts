@@ -52,6 +52,8 @@ import { SkillSource, type SkillSourceError, selectListings } from "./skill-sour
 import { type Message, Steering } from "./steering.js"
 import { ToolContext } from "./tool-context.js"
 import {
+  type DomainFailure,
+  FrameworkFailure,
   type Outcome,
   type Request,
   RemoteRetryError,
@@ -379,6 +381,7 @@ export type RunError =
   | ToolNameCollision
   | AiError.AiError
   | LanguageModelNotRegistered
+  | FrameworkFailure
 
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<Tools>
@@ -410,10 +413,17 @@ const activateSkillSuccess = Schema.Struct({
   allowedTools: Schema.Array(Schema.String),
 })
 
+const activateSkillFailure = Schema.Struct({
+  reason: Schema.Literals(["not-found", "not-model-invocable"]),
+  message: Schema.String,
+})
+
 const activateSkillTool = Tool.make(activateSkillToolName, {
   description: "Load the full body for one listed Baton skill by name before applying that skill.",
   parameters: activateSkillParameters,
   success: activateSkillSuccess,
+  failure: activateSkillFailure,
+  failureMode: "return",
 })
 
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
@@ -443,13 +453,13 @@ const successResult = (call: AnyToolCall, outcome: Success): PendingToolResult =
     preliminary: false,
   })
 
-const failedResult = (call: AnyToolCall, message: string): PendingToolResult =>
+const domainFailureResult = (call: AnyToolCall, outcome: DomainFailure): PendingToolResult =>
   Response.toolResultPart({
     id: call.id,
     name: call.name,
     isFailure: true,
-    result: { error: message },
-    encodedResult: { error: message },
+    result: outcome.failure,
+    encodedResult: outcome.encodedFailure,
     providerExecuted: false,
     preliminary: false,
   })
@@ -966,8 +976,8 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }])
               }),
             )
-          case "Failure": {
-            const result = failedResult(call, outcome.message)
+          case "DomainFailure": {
+            const result = domainFailureResult(call, outcome)
             state.pending.push(result)
             return Effect.succeed(
               Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }]),
@@ -981,17 +991,30 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       const defaultExecute = (
         request: Request,
         registry: Registry,
-      ): Effect.Effect<Outcome, never, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>> => {
+      ): Effect.Effect<
+        Outcome,
+        FrameworkFailure,
+        Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>
+      > => {
         const registered = get(registry, request.call.name)
         if (registered?.dispatch === "Static") {
           return executeToolkit(agent.toolkit, request)
         }
         return registered === undefined
-          ? Effect.succeed({ _tag: "Failure", message: `Tool ${request.call.name} is not registered` })
-          : Effect.succeed({
-              _tag: "Failure",
-              message: `Activated skill tool ${request.call.name} requires ToolExecutor`,
-            })
+          ? Effect.fail(
+              FrameworkFailure.make({
+                stage: "missing-handler",
+                tool: request.call.name,
+                message: `Tool ${request.call.name} is not registered`,
+              }),
+            )
+          : Effect.fail(
+              FrameworkFailure.make({
+                stage: "missing-handler",
+                tool: request.call.name,
+                message: `Activated skill tool ${request.call.name} requires ToolExecutor`,
+              }),
+            )
       }
 
       const makeProgressQueue = (): Effect.Effect<Queue.Queue<ToolProgress, Cause.Done | ProgressOverflowError>> => {
@@ -1057,7 +1080,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               })
               const execution: Effect.Effect<
                 Outcome,
-                AgentError | ToolNameCollision,
+                AgentError | ToolNameCollision | FrameworkFailure,
                 ToolContext | Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>
               > = isSkillActivationCall(call, registry)
                 ? activateSkillOutcome(turn, call)
@@ -1093,34 +1116,52 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           ),
         )
 
-      const permissionError = (turn: number, error: PermissionError): AgentError =>
-        AgentError.make({ message: error.message, turn, cause: error })
+      const permissionError = (call: AnyToolCall, error: PermissionError): FrameworkFailure =>
+        FrameworkFailure.make({ stage: "authorization", tool: call.name, message: error.message })
 
       const permissionDeniedEvents = (
-        turn: number,
         call: AnyToolCall,
         reason: string | undefined,
-      ): Stream.Stream<Event> => {
-        const result = failedResult(call, reason ?? "Permission denied")
-        state.pending.push(result)
-        return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
-      }
+      ): Stream.Stream<Event, FrameworkFailure> =>
+        Stream.fail(
+          FrameworkFailure.make({
+            stage: "authorization",
+            tool: call.name,
+            message: reason ?? "Permission denied",
+          }),
+        )
 
       const activateSkillOutcome = (
         turn: number,
         call: AnyToolCall,
-      ): Effect.Effect<Outcome, AgentError | ToolNameCollision> =>
+      ): Effect.Effect<Outcome, AgentError | ToolNameCollision | FrameworkFailure> =>
         Effect.gen(function* () {
-          if (skillRuntime === undefined)
-            return { _tag: "Failure", message: "SkillSource is not available" } satisfies Outcome
+          if (skillRuntime === undefined) {
+            return yield* FrameworkFailure.make({
+              stage: "missing-handler",
+              tool: call.name,
+              message: "SkillSource is not available",
+            })
+          }
           const params = Schema.decodeUnknownOption(activateSkillParameters)(call.params)
-          if (Option.isNone(params))
-            return { _tag: "Failure", message: "Skill activation requires a name" } satisfies Outcome
+          if (Option.isNone(params)) {
+            return yield* FrameworkFailure.make({
+              stage: "decode-input",
+              tool: call.name,
+              message: "Skill activation requires a name",
+            })
+          }
           const skill = yield* skillRuntime.source.get(params.value.name)
-          if (skill === undefined)
-            return { _tag: "Failure", message: `Skill not found: ${params.value.name}` } satisfies Outcome
+          if (skill === undefined) {
+            const failure = { reason: "not-found" as const, message: `Skill not found: ${params.value.name}` }
+            return { _tag: "DomainFailure", failure, encodedFailure: failure } satisfies DomainFailure
+          }
           if (skill.frontmatter.disableModelInvocation === true) {
-            return { _tag: "Failure", message: `Skill is not model-invocable: ${params.value.name}` } satisfies Outcome
+            const failure = {
+              reason: "not-model-invocable" as const,
+              message: `Skill is not model-invocable: ${params.value.name}`,
+            }
+            return { _tag: "DomainFailure", failure, encodedFailure: failure } satisfies DomainFailure
           }
           const current = yield* Ref.get(toolState)
           let body = current.activatedSkillBodies.get(skill.frontmatter.name)
@@ -1146,9 +1187,13 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             allowedTools: [...(skill.frontmatter.allowedTools ?? [])],
           }
           return { _tag: "Success", result: output, encodedResult: output } satisfies Success
-        }).pipe(Effect.mapError((error) => (isToolNameCollision(error) ? error : skillError(turn, error))))
+        }).pipe(
+          Effect.mapError((error) =>
+            isToolNameCollision(error) || Schema.is(FrameworkFailure)(error) ? error : skillError(turn, error),
+          ),
+        )
 
-      const rememberAlways = (turn: number, call: AnyToolCall): Effect.Effect<void, AgentError> =>
+      const rememberAlways = (call: AnyToolCall): Effect.Effect<void, FrameworkFailure> =>
         Effect.serviceOption(RuleStore).pipe(
           Effect.flatMap(
             Option.match({
@@ -1156,7 +1201,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               onSome: (store) =>
                 store
                   .remember({ pattern: call.name, level: "allow" })
-                  .pipe(Effect.mapError((error) => permissionError(turn, error))),
+                  .pipe(Effect.mapError((error) => permissionError(call, error))),
             }),
           ),
         )
@@ -1174,12 +1219,10 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             Effect.map((isRequired): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
               if (!isRequired) return executeApproved(turn, call, request, registry)
               if (Option.isNone(approvals)) {
-                const result = failedResult(call, "Approvals service is required for approval-gated tools")
-                state.pending.push(result)
-                return Stream.fromIterable<Event>([
-                  { _tag: "ApprovalRequested", turn, call },
-                  { _tag: "ToolExecutionCompleted", turn, call, result },
-                ])
+                return Stream.concat(
+                  Stream.fromIterable<Event>([{ _tag: "ApprovalRequested", turn, call }]),
+                  permissionDeniedEvents(call, "Approvals service is required for approval-gated tools"),
+                )
               }
               return Stream.concat(
                 Stream.fromIterable<Event>([{ _tag: "ApprovalRequested", turn, call }]),
@@ -1189,11 +1232,8 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                       switch (decision._tag) {
                         case "Approved":
                           return executeApproved(turn, call, request, registry)
-                        case "Denied": {
-                          const result = failedResult(call, decision.reason ?? "Tool call denied")
-                          state.pending.push(result)
-                          return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
-                        }
+                        case "Denied":
+                          return permissionDeniedEvents(call, decision.reason ?? "Tool call denied")
                         case "Pending":
                           return failSuspended(call, decision.token, "approval")
                       }
@@ -1216,11 +1256,9 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           case "Approved":
             return executeApproved(turn, call, request, registry)
           case "Denied":
-            return permissionDeniedEvents(turn, call, answer.reason)
+            return permissionDeniedEvents(call, answer.reason)
           case "Always":
-            return Stream.unwrap(
-              rememberAlways(turn, call).pipe(Effect.as(executeApproved(turn, call, request, registry))),
-            )
+            return Stream.unwrap(rememberAlways(call).pipe(Effect.as(executeApproved(turn, call, request, registry))))
         }
       }
 
@@ -1244,7 +1282,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           Stream.fromIterable<Event>([{ _tag: "ApprovalRequested", turn, call }]),
           Stream.unwrap(
             permissionsService.value.await(pending).pipe(
-              Effect.mapError((error) => permissionError(turn, error)),
+              Effect.mapError((error) => permissionError(call, error)),
               Effect.map(
                 Option.match({
                   onNone: () => failSuspended(call, token, "approval"),
@@ -1265,9 +1303,13 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         const request: Request = { call, turn, agentName: agent.name, sessionId }
         const registered = get(registry, call.name)
         if (registered === undefined) {
-          const result = failedResult(call, `Tool ${call.name} is not registered`)
-          state.pending.push(result)
-          return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
+          return Stream.fail(
+            FrameworkFailure.make({
+              stage: "missing-handler",
+              tool: call.name,
+              message: `Tool ${call.name} is not registered`,
+            }),
+          )
         }
         const tool = registered.tool
         if (Option.isNone(permissionsService)) return approvalEvents(turn, call, messages, request, tool, registry)
@@ -1282,13 +1324,13 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               sessionId,
             })
             .pipe(
-              Effect.mapError((error) => permissionError(turn, error)),
+              Effect.mapError((error) => permissionError(call, error)),
               Effect.map((decision): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
                 switch (decision._tag) {
                   case "Allow":
                     return approvalEvents(turn, call, messages, request, tool, registry)
                   case "Deny":
-                    return permissionDeniedEvents(turn, call, decision.reason)
+                    return permissionDeniedEvents(call, decision.reason)
                   case "Ask":
                     return permissionAskEvents(turn, call, request, decision.token, registry)
                 }

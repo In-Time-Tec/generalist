@@ -100,8 +100,12 @@ describe("baton adapter", () => {
         if (completed?._tag === "ToolExecutionCompleted") {
           expect(completed.result.isFailure).toBe(true)
           expect(completed.result.result).toEqual({
-            error: '{"_tag":"McpToolCallError","server":"calc","tool":"boom","message":"boom failed"}',
+            _tag: "McpToolCallError",
+            server: "calc",
+            tool: "boom",
+            message: "boom failed",
           })
+          expect(completed.result.encodedResult).toEqual(completed.result.result)
         }
         const final = events.at(-1)
         expect(final?._tag === "Completed" && final.text).toBe("recovered from the tool failure")

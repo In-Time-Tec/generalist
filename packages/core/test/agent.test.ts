@@ -898,17 +898,18 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make("missing-approvals-agent", { toolkit: Toolkit.make(gatedTool) })
+        const events: Array<AgentEvent.Event> = []
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use gated" }))
-        const completion = events.find((event) => event._tag === "ToolExecutionCompleted")
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "use gated" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
 
+        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
-        if (completion?._tag === "ToolExecutionCompleted") {
-          expect(completion.result.isFailure).toBe(true)
-          expect(Json.stringify(completion.result.encodedResult)).toContain("Approvals service is required")
-        }
-        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
       }),
     ] as const
   })
@@ -1795,7 +1796,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             Effect.gen(function* () {
               const context = yield* ToolContext.ToolContext
               yield* context.emit({ toolCallId: "tool-call-progress-failure", message: "before failure" })
-              return { _tag: "Failure", message: "tool failed" }
+              return { _tag: "DomainFailure", failure: "tool failed", encodedFailure: "tool failed" }
             }),
         }),
         Approvals.autoApprove,
@@ -1955,28 +1956,25 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "gated-session-agent", toolkit: Toolkit.make(gatedTool) })
 
-        const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "needs approval", sessionId: "session-approval" }),
+        const failure = yield* Effect.flip(
+          Stream.runDrain(Agent.stream(agent, { prompt: "needs approval", sessionId: "session-approval" })),
         )
 
         expect(approvalSessionId).toBe("session-approval")
-        expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
-        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
       }),
     ] as const
   })
 
   ItLayer.make(it, "denies through Permissions before approvals or executor", () => {
     let calls = 0
-    let secondPrompt = ""
     return [
       Layer.mergeAll(
-        modelLayer((options) => {
+        modelLayer(() => {
           calls += 1
           if (calls === 1) {
             return Stream.make(toolCallPart("tool-call-permission-deny", "gated", { text: "blocked" }))
           }
-          secondPrompt = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("saw denied permission"))
         }),
         ToolExecutor.testLayer({ execute: () => Effect.die("permission-denied call must not execute") }),
@@ -1986,32 +1984,32 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "permission-deny-agent", toolkit: Toolkit.make(gatedTool) })
+        const events: Array<AgentEvent.Event> = []
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "needs permission" }))
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "needs permission" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
 
+        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(false)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
-        const denied = events.find((event) => event._tag === "ToolExecutionCompleted")
-        if (denied?._tag === "ToolExecutionCompleted") {
-          expect(denied.result.isFailure).toBe(true)
-          expect(Json.stringify(denied.result.encodedResult)).toContain("Permission denied")
-        }
-        expect(secondPrompt).toContain("Permission denied")
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
+        expect(calls).toBe(1)
       }),
     ] as const
   })
 
   ItLayer.make(it, "allows through Permissions while preserving tool-declared approvals", () => {
     let calls = 0
-    let secondPrompt = ""
     return [
       Layer.mergeAll(
-        modelLayer((options) => {
+        modelLayer(() => {
           calls += 1
           if (calls === 1) {
             return Stream.make(toolCallPart("tool-call-permission-allow", "gated", { text: "still gated" }))
           }
-          secondPrompt = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("saw approval denial"))
         }),
         ToolExecutor.testLayer({ execute: () => Effect.die("approval-denied call must not execute") }),
@@ -2021,12 +2019,19 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "permission-allow-agent", toolkit: Toolkit.make(gatedTool) })
+        const events: Array<AgentEvent.Event> = []
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "needs approval" }))
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "needs approval" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
 
+        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
-        expect(secondPrompt).toContain("Tool call denied")
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
+        expect(calls).toBe(1)
       }),
     ] as const
   })
@@ -2964,7 +2969,6 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
                     })
                     yield* Deferred.succeed(started, undefined)
                     return yield* Effect.never
-                    return { _tag: "Failure", message: "unreachable" }
                   }),
               }),
               Approvals.autoApprove,
@@ -4344,13 +4348,19 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "dynamic-gated-agent", toolkit: Toolkit.make(dynamicTool) })
+        const events: Array<AgentEvent.Event> = []
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "large amount" }))
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "large amount" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
 
         expect(approvals).toBe(1)
+        expect(failure).toMatchObject({ stage: "authorization", tool: "dynamic-gated" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
-        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
       }),
     ] as const
   })
@@ -4402,12 +4412,18 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(throwingTool, failingTool),
         })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "needs approval fail closed" }))
+        const events: Array<AgentEvent.Event> = []
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "needs approval fail closed" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
 
-        expect(approvals).toBe(2)
-        expect(events.filter((event) => event._tag === "ApprovalRequested")).toHaveLength(2)
+        expect(approvals).toBe(1)
+        expect(failure).toMatchObject({ stage: "authorization", tool: "throwing-approval" })
+        expect(events.filter((event) => event._tag === "ApprovalRequested")).toHaveLength(1)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
-        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
       }),
     ] as const
   })
@@ -4441,17 +4457,15 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "re-feeds a failed tool result when approvals deny", () => {
+  ItLayer.make(it, "fails with authorization evidence when approvals deny", () => {
     let calls = 0
-    let secondCallSawDenial = false
     return [
       Layer.mergeAll(
-        modelLayer((options) => {
+        modelLayer(() => {
           calls += 1
           if (calls === 1) {
             return Stream.make(toolCallPart("tool-call-denied", "gated", { text: "please" }))
           }
-          secondCallSawDenial = Json.stringify(options.prompt.content).includes("Tool call denied")
           return Stream.make(textDelta("saw denial"))
         }),
         unusedExecutor,
@@ -4464,12 +4478,18 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           toolkit: Toolkit.make(gatedTool),
         })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the gated tool" }))
+        const events: Array<AgentEvent.Event> = []
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "use the gated tool" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
 
-        expect(secondCallSawDenial).toBe(true)
+        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
-        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
+        expect(calls).toBe(1)
       }),
     ] as const
   })
