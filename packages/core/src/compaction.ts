@@ -203,10 +203,8 @@ const compactToolPart = (
   Effect.gen(function* () {
     if (part.isFailure) return [part, false] as const
     const success: Success = { _tag: "Success", result: part.result, encodedResult: part.result }
-    const bounded = yield* bound(success, { toolCallId: part.id, maxBytes }).pipe(
-      Effect.mapError((error) => CompactionError.make({ message: error.message, cause: error })),
-    )
-    if (bounded === success) return [part, false] as const
+    const bounded = yield* bound(success, { toolCallId: part.id, maxBytes })
+    if (bounded.encodedResult === success.encodedResult) return [part, false] as const
     return [
       Prompt.makePart("tool-result", {
         id: part.id,

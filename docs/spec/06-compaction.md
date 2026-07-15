@@ -8,7 +8,7 @@ Baton owns:
 
 - the `Compaction` service boundary;
 - a pure `Strategy` shape for trigger, cut-point selection, and summarization;
-- composable strategy parts for lossless tool-output bounding, structured summarization, and recent-tail retention;
+- composable strategy parts for tool-output bounding, structured summarization, and recent-tail retention;
 - a two-stage default strategy that tries tool-output microcompaction before summary checkpointing;
 - a truncate-only implementation over `Ai.Tokenizer`;
 - optional `Agent.stream` integration that preserves current behavior when `Compaction` is absent.
@@ -44,7 +44,7 @@ The three required methods remain the complete host-decoration boundary. In part
 
 The public parts are:
 
-- `toolOutputBound({ maxBytes })`, which supplies the lossless successful-tool-result bound used before semantic summarization. An explicit `Request.toolOutputMaxBytes` wins over the strategy part. Bounding still depends on `ToolOutputStore`: when the store does not accept a spill, Baton preserves the original result rather than truncating it. Failed tool results are unchanged.
+- `toolOutputBound({ maxBytes })`, which supplies the successful-tool-result bound used before semantic summarization. An explicit `Request.toolOutputMaxBytes` wins over the strategy part. A successful `ToolOutputStore` spill preserves the full value out of context; an absent, declining, or typed-failing store produces a deterministic bounded inline fallback. Existing Baton output envelopes are idempotent: compaction preserves their exact ordered path list and never stores them again. Failed tool results are unchanged.
 - `structuredSummary({ objectName?, summaryModel?, summaryPrompt? })`, which replaces only `summarize`. It calls `LanguageModel.generateObject` directly with the exported `AgentSummary` schema, no toolkit, and `toolChoice: "none"`. Baton deterministically renders the decoded value into the existing string checkpoint contract.
 - `keepRecent({ tokens })`, which supplies the non-negative safe-integer token target for the verbatim suffix. Baton deliberately does not infer turns from message roles because session entries do not carry a canonical turn identifier.
 
@@ -68,7 +68,7 @@ Cut points snap to turn boundaries. A kept suffix never starts with a tool-resul
 
 ## Default two-stage strategy
 
-The default strategy first microcompacts successful tool-result payloads in the projected prompt. When `RunOptions.toolOutputMaxBytes` and `ToolOutputStore` are available, oversized successful results are replaced with the existing `ToolOutput { inline, outputPaths }` envelope. Failed tool results are never spilled.
+The default strategy first microcompacts successful tool-result payloads in the projected prompt. When `RunOptions.toolOutputMaxBytes` is available, oversized successful results are replaced with the existing `ToolOutput { inline, outputPaths }` envelope. A store may preserve overflow out of context, but storage is only an optimization: absence, decline, or typed failure uses an inline fallback, while interruption propagates. Repeated microcompaction and semantic compaction recognize an existing envelope, preserve its exact paths and ordering, and do not spill it again. Failed tool results are never spilled.
 
 If the microcompacted context fits under `contextWindow - reserveTokens`, Baton uses that projected context and does not call the summary model.
 

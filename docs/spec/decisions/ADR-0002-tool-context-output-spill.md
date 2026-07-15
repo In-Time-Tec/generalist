@@ -18,6 +18,10 @@ Progress updates cross a per-tool bounded Effect `Queue`. `RunOptions.toolProgre
 
 Add `ToolOutputStore` and `ToolOutput.bound` as the output-spill seam. `ToolOutput.bound` resolves `ToolOutputStore` optionally with `Effect.serviceOption`, so `Agent.stream` does not gain a hard service requirement. A store write returns `Option<string>`: `Some(path)` means the overflow was stored and Baton should replace inline output with a bounded `ToolOutput` envelope, while `None` means the store declines spill. This resolves the no-op-store case without sentinel paths or hard-coded implementation checks.
 
+Output storage is an optional optimization after a tool has succeeded. `ToolOutput.bound` therefore returns `BoundedSuccess` without a typed failure channel: an absent store, `None`, or failure-only `ToolOutputError` cause produces the same deterministic bounded inline envelope with an empty path list. Causes containing interruption or defects propagate those unrecoverable reasons. The store boundary retains its typed `ToolOutputError` contract for direct and mandatory uses.
+
+Bounding is idempotent. A Baton `ToolOutput` envelope is recognized by its complete bounded-inline metadata before storage, and rebounding returns its exact ordered `outputPaths` without calling `put`. A tighter bound truncates the existing preview again without respilling. This also makes repeated microcompaction and semantic compaction stable.
+
 When spill happens, Baton stores `{ result, encodedResult }` and replaces both `result` and `encodedResult` with:
 
 ```json
@@ -38,8 +42,10 @@ The envelope stays in the `Ai.Response` vocabulary. Baton adds loop framing only
 
 - Tool handlers and durable executors can read cancellation/progress/session data through normal Effect service lookup.
 - Hosts can fold `ToolProgress` into their own event logs without affecting the model transcript.
-- Standalone Baton keeps progress ordering and event payloads by default while replacing unbounded retention with bounded backpressure; `sessionId` defaults to `"local"`, progress is emitted only when a tool calls `emit`, and absent/no-op output stores do not alter results.
+- Standalone Baton keeps progress ordering and event payloads by default while replacing unbounded retention with bounded backpressure; `sessionId` defaults to `"local"`, progress is emitted only when a tool calls `emit`, and bounding leaves under-limit output unchanged.
 - Loss or overflow requires an explicit non-default policy. Completed success and tool-failure outcomes expose loss through terminal metadata, and overflow under `Fail` uses a typed stream error; suspension, execution-channel failure, and downstream cancellation do not emit loss metadata.
+- A successful tool result cannot become a failed turn because optional output storage failed; absent, declined, and typed-failed storage use bounded inline fallback.
+- Repeated bounding preserves existing output paths and performs no additional storage write.
 - Relay can back `ToolOutputStore` with a durable blob store without Baton depending on Relay.
 
 ## Rejected alternatives

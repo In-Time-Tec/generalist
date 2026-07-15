@@ -707,17 +707,12 @@ const streamInternal = <
             }),
         })
 
-      const boundedSuccessResult = (
-        turn: number,
-        call: AnyToolCall,
-        outcome: Success,
-      ): Effect.Effect<PendingToolResult, AgentError> =>
-        (options.toolOutputMaxBytes === undefined
-          ? Effect.succeed(outcome)
+      const boundedSuccessResult = (call: AnyToolCall, outcome: Success): Effect.Effect<PendingToolResult> =>
+        options.toolOutputMaxBytes === undefined
+          ? Effect.succeed(successResult(call, outcome))
           : bound(outcome, { toolCallId: call.id, maxBytes: options.toolOutputMaxBytes }).pipe(
-              Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
+              Effect.map((bounded) => successResult(call, bounded)),
             )
-        ).pipe(Effect.map((bounded) => successResult(call, bounded)))
 
       const outcomeEvents = (
         turn: number,
@@ -731,7 +726,7 @@ const streamInternal = <
             return (
               isSkillActivationCall(call)
                 ? Effect.succeed(successResult(call, outcome))
-                : boundedSuccessResult(turn, call, outcome)
+                : boundedSuccessResult(call, outcome)
             ).pipe(
               Effect.map((result) => {
                 state.pending.push(result)
