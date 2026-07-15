@@ -79,6 +79,34 @@ describe("ModelResilience", () => {
     })
   })
 
+  it.effect("preserves and does not classify a mixed generateText Cause", () => {
+    const cause = Cause.combine(Cause.fail(transientError), Cause.die(new Error("model defect")))
+    let calls = 0
+    let classifications = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        generateText: () => {
+          calls += 1
+          return Effect.failCause(cause)
+        },
+      }),
+      ModelResilience.make({
+        retrySchedule: Schedule.recurs(3),
+        classify: () => {
+          classifications += 1
+          return "transient"
+        },
+      }),
+    )
+    return Effect.gen(function* () {
+      const exit = yield* Effect.exit(wrapped.generateText({ prompt: "compound text" }))
+
+      expect(calls).toBe(1)
+      expect(classifications).toBe(0)
+      expect(exit).toEqual(Exit.failCause(cause))
+    })
+  })
+
   it.effect("does not retry terminal generateText failures", () => {
     let calls = 0
     const wrapped = ModelResilience.apply(
@@ -119,6 +147,36 @@ describe("ModelResilience", () => {
 
       expect(calls).toBe(2)
       expect(response.value).toEqual({ ok: true })
+    })
+  })
+
+  it.effect("preserves and does not classify a mixed generateObject Cause", () => {
+    const cause = Cause.combine(Cause.fail(transientError), Cause.die(new Error("model defect")))
+    let calls = 0
+    let classifications = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        generateObject: (() => {
+          calls += 1
+          return Effect.failCause(cause)
+        }) as unknown as LanguageModel.Service["generateObject"],
+      }),
+      ModelResilience.make({
+        retrySchedule: Schedule.recurs(3),
+        classify: () => {
+          classifications += 1
+          return "transient"
+        },
+      }),
+    )
+    return Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        wrapped.generateObject({ prompt: "compound object", schema: Schema.Struct({ ok: Schema.Boolean }) }),
+      )
+
+      expect(calls).toBe(1)
+      expect(classifications).toBe(0)
+      expect(exit).toEqual(Exit.failCause(cause))
     })
   })
 
@@ -210,11 +268,12 @@ describe("ModelResilience", () => {
 
   it.effect("propagates mid-stream interrupts instead of squashing them into an error part", () => {
     let calls = 0
+    const cause = Cause.interrupt()
     const wrapped = ModelResilience.apply(
       languageModel({
         streamText: () => {
           calls += 1
-          return Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(Cause.interrupt())))
+          return Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(cause)))
         },
       }),
       ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
@@ -223,8 +282,89 @@ describe("ModelResilience", () => {
       const exit = yield* Effect.exit(Stream.runCollect(wrapped.streamText({ prompt: "interrupted stream" })))
 
       expect(calls).toBe(1)
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause)).toBe(true)
+      expect(exit).toEqual(Exit.failCause(cause))
+    })
+  })
+
+  it.effect("preserves a mid-stream defect after an emitted part", () => {
+    const defect = new Error("model defect")
+    const cause = Cause.die(defect)
+    const emitted: Array<string> = []
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(cause))),
+      }),
+      ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+    )
+    return Effect.gen(function* () {
+      const exit = yield* wrapped.streamText({ prompt: "defective stream" }).pipe(
+        Stream.runForEach((part) => Effect.sync(() => emitted.push(part.type))),
+        Effect.exit,
+      )
+
+      expect(emitted).toEqual(["text-delta"])
+      expect(exit).toEqual(Exit.failCause(cause))
+    })
+  })
+
+  it.effect("preserves a mixed mid-stream Cause after an emitted part", () => {
+    const cause = Cause.combine(Cause.fail(transientError), Cause.die(new Error("model defect")))
+    const emitted: Array<string> = []
+    let calls = 0
+    let classifications = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(cause)))
+        },
+      }),
+      ModelResilience.make({
+        retrySchedule: Schedule.recurs(3),
+        classify: () => {
+          classifications += 1
+          return "transient"
+        },
+      }),
+    )
+    return Effect.gen(function* () {
+      const exit = yield* wrapped.streamText({ prompt: "compound stream" }).pipe(
+        Stream.runForEach((part) => Effect.sync(() => emitted.push(part.type))),
+        Effect.exit,
+      )
+
+      expect(emitted).toEqual(["text-delta"])
+      expect(calls).toBe(1)
+      expect(classifications).toBe(0)
+      expect(exit).toEqual(Exit.failCause(cause))
+    })
+  })
+
+  it.effect("preserves and does not classify a mixed Cause before emission", () => {
+    const cause = Cause.combine(Cause.fail(transientError), Cause.die(new Error("model defect")))
+    let calls = 0
+    let classifications = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return Stream.failCause(cause)
+        },
+      }),
+      ModelResilience.make({
+        retrySchedule: Schedule.recurs(3),
+        classify: () => {
+          classifications += 1
+          return "transient"
+        },
+      }),
+    )
+    return Effect.gen(function* () {
+      const exit = yield* Effect.exit(Stream.runCollect(wrapped.streamText({ prompt: "compound stream" })))
+
+      expect(calls).toBe(1)
+      expect(classifications).toBe(0)
+      expect(exit).toEqual(Exit.failCause(cause))
     })
   })
 
