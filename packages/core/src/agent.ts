@@ -626,8 +626,9 @@ const skillListingsInstructions = (listings: string): string =>
 const recalledMessages = (prompt: Prompt.Prompt): ReadonlyArray<Prompt.Message> =>
   prompt.content.filter(isMessageFromRecall).map(recalledMessageIdentity)
 
-const encodeMessage = Schema.encodeEffect(Prompt.Message)
-const decodeMessage = Schema.decodeEffect(Prompt.Message)
+const messageJsonStringCodec = Schema.fromJsonString(Schema.toCodecJson(Prompt.Message))
+const encodeMessage = Schema.encodeEffect(messageJsonStringCodec)
+const decodeMessage = Schema.decodeEffect(messageJsonStringCodec)
 
 const detachMessage = (message: Prompt.Message) =>
   encodeMessage(message).pipe(
@@ -646,6 +647,21 @@ const detachEntry = (entry: Entry) =>
   entry._tag === "Message" || entry._tag === "Steering"
     ? detachMessage(entry.message).pipe(Effect.map((message): Entry => ({ ...entry, message })))
     : Effect.succeed(entry)
+
+const sessionTranscriptCursor = (path: ReadonlyArray<Entry>, transcript: Prompt.Prompt): Option.Option<number> => {
+  const projected = buildContext(path).content
+  if (projected.length === 0) return Option.some(0)
+  const matches: Array<number> = []
+  for (let start = 0; start <= transcript.content.length - projected.length; start += 1) {
+    if (
+      transcript.content.slice(0, start).every((message) => message.role === "system") &&
+      projected.every((message, index) => Equal.equals(message, transcript.content[start + index]))
+    ) {
+      matches.push(start + projected.length)
+    }
+  }
+  return matches.length === 1 ? Option.some(matches[0] as number) : Option.none()
+}
 
 const preservesRecalledMessages = (
   allowed: ReadonlyArray<Prompt.Message>,
@@ -1162,12 +1178,13 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               if (!sessionInitialized) {
                 sessionInitialized = true
                 if (existingPath.length > 0) {
-                  sessionSyncedMessages = buildContext(existingPath).content.length
-                  if (sessionSyncedMessages > transcript.content.length) {
+                  const cursor = sessionTranscriptCursor(existingPath, transcript)
+                  if (Option.isNone(cursor)) {
                     return yield* SessionStoreError.make({
-                      message: "Session context contains more messages than the Chat transcript",
+                      message: "Session context does not align with the Chat transcript",
                     })
                   }
+                  sessionSyncedMessages = cursor.value
                 }
               }
               for (const message of transcript.content.slice(sessionSyncedMessages)) {

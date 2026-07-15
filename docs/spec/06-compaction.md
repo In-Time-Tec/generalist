@@ -90,7 +90,9 @@ The summary template has fixed sections: Goal, Constraints, Progress, Key Decisi
 
 When both `Compaction` and `SessionStore` are provided, the loop mirrors chat transcript messages into the session log and appends a `Compaction` entry after summary checkpointing. The full pre-compaction conversation remains in the session path; only the prompt projected into the live `Ai.Chat` shrinks.
 
-Compaction implementations receive schema-detached message data in request history, prompt, and Session-path views. In-place message mutation cannot modify authoritative Chat or Session state; an accepted result becomes authoritative only after recalled-message lineage validation. Non-message Session entry fields remain readonly borrowed input.
+Compaction implementations receive canonically JSON-detached message data in request history, prompt, and Session-path views. In-place mutation of message containers, opaque JSON tool payloads, file bytes, or URLs cannot modify authoritative Chat or Session state; an accepted result becomes authoritative only after recalled-message lineage validation. Non-message Session entry fields remain readonly borrowed input.
+
+When a run attaches to a non-empty Session, Agent structurally aligns the Session's model projection as one unique contiguous range in the supplied Chat transcript, permits only system messages in the unmatched hoisted prefix, and appends only the unmatched Chat suffix. It never treats projected-message count as a synchronization cursor because summary compaction may preserve system messages outside the Session projection. An ambiguous or unaligned Session projection fails through the typed Agent/Session error boundary rather than duplicating or skipping transcript entries.
 
 Memory retention uses the full Session path in this mode. Its dedicated projection excludes structurally marked recalled messages and synthetic compaction checkpoints while preserving authored/model/tool transcript entries across the cut. A summary influenced by recalled context therefore cannot become recursively remembered.
 

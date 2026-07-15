@@ -732,6 +732,16 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
 
   ItLayer.make(it, "isolates the current prompt when Session-backed compaction mutates and declines", () => {
     let modelPrompt: Prompt.Prompt | undefined
+    const bytes = Prompt.makePart("file", {
+      mediaType: "application/octet-stream",
+      fileName: "bytes.bin",
+      data: new Uint8Array([1, 2, 3]),
+    })
+    const url = Prompt.makePart("file", {
+      mediaType: "text/plain",
+      fileName: "reference.txt",
+      data: new URL("https://example.com/original"),
+    })
     const agent = Agent.make({ name: "memory-agent" })
     return [
       Layer.mergeAll(
@@ -752,13 +762,20 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                   ? recalled.content.find((part) => part.type === "text")
                   : undefined
                 if (text !== undefined) Object.assign(text, { text: "mutated recalled context" })
+                if (Array.isArray(recalled.content)) {
+                  for (const part of recalled.content) {
+                    if (part.type !== "file") continue
+                    if (part.data instanceof Uint8Array) part.data[0] = 9
+                    if (part.data instanceof URL) part.data.pathname = "/mutated"
+                  }
+                }
               }
               return Option.none()
             }),
         }),
         Session.layerMemory,
         Memory.testLayer({
-          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context"), bytes, url] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
         }),
@@ -772,6 +789,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         })
         expect(modelPrompt?.content.map(messageText)).toContain("recalled context")
         expect(modelPrompt?.content.map(messageText)).not.toContain("mutated recalled context")
+        const files = modelPrompt?.content.flatMap((message) =>
+          Array.isArray(message.content) ? message.content.filter((part) => part.type === "file") : [],
+        )
+        expect(files?.[0]?.data).toEqual(new Uint8Array([1, 2, 3]))
+        expect(files?.[1]?.data).toEqual(new URL("https://example.com/original"))
       }),
     ] as const
   })
@@ -784,11 +806,16 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         modelLayer(() => {
           modelCalls += 1
           return modelCalls === 1
-            ? Stream.make(toolCallPart("call-history", "lookup", {}))
+            ? Stream.make(toolCallPart("call-history", "lookup", { nested: { value: "original params" } }))
             : Stream.make(textDelta("done"))
         }),
         ToolExecutor.testLayer({
-          execute: () => Effect.succeed({ _tag: "Success", result: "tool value", encodedResult: "tool value" }),
+          execute: () =>
+            Effect.succeed({
+              _tag: "Success",
+              result: { nested: { value: "original result" } },
+              encodedResult: { nested: { value: "original result" } },
+            }),
         }),
         Approvals.autoApprove,
         ModelMiddleware.identityLayer,
@@ -804,6 +831,17 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                   ? authored.content.find((part) => part.type === "text")
                   : undefined
               if (text !== undefined) Object.assign(text, { text: "corrupted authored context" })
+              for (const message of request.history.content) {
+                if (!Array.isArray(message.content)) continue
+                for (const part of message.content) {
+                  if (part.type === "tool-call") {
+                    ;(part.params as { nested: { value: string } }).nested.value = "mutated params"
+                  }
+                  if (part.type === "tool-result") {
+                    ;(part.result as { nested: { value: string } }).nested.value = "mutated result"
+                  }
+                }
+              }
               return Option.some({
                 _tag: "Microcompact" as const,
                 history: Prompt.fromMessages([]),
@@ -829,6 +867,204 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         expect(memoryTranscript.content.map(messageText)).toContain("live prompt")
         expect(memoryTranscript.content.map(messageText)).not.toContain("corrupted authored context")
         expect(memoryTranscript.content.map(messageText)).not.toContain("recalled context")
+        const parts = memoryTranscript.content.flatMap((message) =>
+          Array.isArray(message.content) ? message.content : [],
+        )
+        const call = parts.find((part) => part.type === "tool-call" && part.id === "call-history")
+        const toolResult = parts.find((part) => part.type === "tool-result" && part.id === "call-history")
+        expect(call?.type === "tool-call" ? call.params : undefined).toEqual({ nested: { value: "original params" } })
+        expect(toolResult?.type === "tool-result" ? toolResult.result : undefined).toEqual({
+          nested: { value: "original result" },
+        })
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "isolates opaque tool payloads when Session-backed compaction mutates and declines", () => {
+    let modelCalls = 0
+    let terminalPrompt: Prompt.Prompt | undefined
+    const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
+    return [
+      Layer.mergeAll(
+        modelLayer((request) => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.make(toolCallPart("call-opaque", "lookup", { nested: { value: "original params" } }))
+          }
+          terminalPrompt = request.prompt
+          return Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () =>
+            Effect.succeed({
+              _tag: "Success",
+              result: { nested: { value: "original result" } },
+              encodedResult: { nested: { value: "original result" } },
+            }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Compaction.testLayer({
+          maybeCompact: (request) =>
+            Effect.sync(() => {
+              if (request.turn === 0) return Option.none()
+              for (const message of request.history.content) {
+                if (!Array.isArray(message.content)) continue
+                for (const part of message.content) {
+                  if (part.type === "tool-call") {
+                    ;(part.params as { nested: { value: string } }).nested.value = "mutated params"
+                  }
+                  if (part.type === "tool-result") {
+                    ;(part.result as { nested: { value: string } }).nested.value = "mutated result"
+                  }
+                }
+              }
+              return Option.none()
+            }),
+        }),
+        Session.layerMemory,
+        Memory.testLayer({
+          recall: () => Effect.succeed([]),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const result = yield* Agent.generate(agent, { prompt: "use opaque values", memory: { key } })
+        const session = yield* Session.SessionStore
+        const retained = Session.buildMemoryContext(yield* session.path())
+        const prompts = [terminalPrompt, retained].filter((prompt): prompt is Prompt.Prompt => prompt !== undefined)
+
+        expect(result.text).toBe("done")
+        expect(prompts).toHaveLength(2)
+        for (const prompt of prompts) {
+          const parts = prompt.content.flatMap((message) => (Array.isArray(message.content) ? message.content : []))
+          const call = parts.find((part) => part.type === "tool-call" && part.id === "call-opaque")
+          const toolResult = parts.find((part) => part.type === "tool-result" && part.id === "call-opaque")
+          expect(call?.type === "tool-call" ? call.params : undefined).toEqual({ nested: { value: "original params" } })
+          expect(toolResult?.type === "tool-result" ? toolResult.result : undefined).toEqual({
+            nested: { value: "original result" },
+          })
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "aligns an existing compacted Session before appending a subsequent run", () => {
+    let modelCalls = 0
+    const remembers: Array<Memory.RememberInput> = []
+    const agent = Agent.make({
+      name: "memory-agent",
+      instructions: "system instructions",
+      toolkit: Toolkit.make(lookupTool),
+    })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("call-existing-session", "lookup", {}))
+            : Stream.make(textDelta(modelCalls === 2 ? "first done" : "second done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => Effect.succeed({ _tag: "Success", result: "tool value", encodedResult: "tool value" }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Compaction.testLayer({
+          maybeCompact: (request) => {
+            if (request.turn === 0) return Effect.succeedNone
+            const firstKept = request.path?.at(-1)
+            const system = request.history.content.find((message) => message.role === "system")
+            if (firstKept === undefined || system === undefined) return Effect.succeedNone
+            return Effect.succeed(
+              Option.some({
+                _tag: "Summarize",
+                history: Prompt.fromMessages([
+                  system,
+                  Prompt.makeMessage("user", {
+                    content: [textPart("<conversation-checkpoint>\nsummary\n</conversation-checkpoint>")],
+                  }),
+                ]),
+                prompt: request.prompt,
+                summary: "summary",
+                firstKeptEntryId: firstKept.id,
+              }),
+            )
+          },
+        }),
+        Session.layerMemory,
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const first = yield* Agent.generate(agent, { prompt: "first authored", memory: { key } })
+        const session = yield* Session.SessionStore
+        const firstPath = yield* session.path()
+        const compaction = firstPath.find((entry) => entry._tag === "Compaction")
+        if (compaction === undefined) return yield* Effect.die("missing compaction entry")
+        yield* session.setLeaf(compaction.id)
+        const projected = Session.buildContext(yield* session.path())
+        const resumedHistory = Prompt.fromMessages([
+          Prompt.makeMessage("system", { content: "system instructions" }),
+          ...projected.content,
+          Prompt.makeMessage("assistant", { content: [textPart("first done")] }),
+        ])
+
+        expect(first.text).toBe("first done")
+        expect(projected.content).toHaveLength(2)
+
+        const second = yield* Agent.generate(agent, {
+          prompt: "second authored",
+          history: resumedHistory,
+          memory: { key },
+        })
+        const retained = Session.buildMemoryContext(yield* session.path())
+        const retainedText = retained.content.map(messageText)
+
+        expect(second.text).toBe("second done")
+        expect(retainedText.filter((text) => text === "first done")).toHaveLength(1)
+        expect(retainedText.filter((text) => text === "second authored")).toHaveLength(1)
+        expect(retainedText).not.toContain("recalled context")
+        expect(remembers.at(-1)?.transcript.content.map(messageText)).toEqual(retainedText)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "appends a repeated authored suffix instead of ambiguously skipping it", () => {
+    const agent = Agent.make({ name: "memory-agent" })
+    const repeated = Prompt.makeMessage("user", { content: [textPart("same authored content")] })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(textDelta("done"))),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Compaction.layer({}),
+        Session.layerMemory,
+        Memory.testLayer({
+          recall: () => Effect.succeed([]),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const session = yield* Session.SessionStore
+        yield* session.append({ _tag: "Message", message: repeated })
+
+        const result = yield* Agent.generate(agent, {
+          prompt: "new authored content",
+          history: Prompt.fromMessages([repeated, repeated]),
+          memory: { key },
+        })
+        const retainedText = Session.buildMemoryContext(yield* session.path()).content.map(messageText)
+
+        expect(result.text).toBe("done")
+        expect(retainedText.filter((text) => text === "same authored content")).toHaveLength(2)
+        expect(retainedText.filter((text) => text === "new authored content")).toHaveLength(1)
       }),
     ] as const
   })
