@@ -6,6 +6,7 @@ import {
   Equal,
   Exit,
   Fiber,
+  HashMap,
   Layer,
   Option,
   Queue,
@@ -22,6 +23,7 @@ import {
   AgentError,
   AgentSuspended,
   type Completed,
+  DuplicateToolCallId,
   type Event,
   MiddlewareViolation,
   ProgressOverflowError,
@@ -414,6 +416,7 @@ export type RunError =
   | TurnPolicyStopped
   | TurnLimitExceeded
   | MiddlewareViolation
+  | DuplicateToolCallId
   | ProgressOverflowError
   | ToolNameCollision
   | AiError.AiError
@@ -427,6 +430,11 @@ type StaticToolServices<Tools extends Record<string, Tool.Any>> =
 type AnyToolCall = Response.ToolCallPart<string, unknown>
 
 type PendingToolResult = Response.ToolResultPart<string, unknown, unknown>
+
+interface ToolCallIdState {
+  readonly nextIndex: number
+  readonly firstIndexes: HashMap.HashMap<string, number>
+}
 
 const chatLocks = new WeakMap<Chat.Service, Semaphore.Semaphore>()
 
@@ -1428,13 +1436,46 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           ),
         )
 
+      const validateToolCallId = (
+        idState: Ref.Ref<ToolCallIdState>,
+        part: Response.StreamPart<any>,
+      ): Effect.Effect<void, DuplicateToolCallId> => {
+        if (part.type !== "tool-call") return Effect.void
+        return Ref.modify(idState, (current) => {
+          const existingFirstIndex = HashMap.get(current.firstIndexes, part.id)
+          const duplicate = Option.map(existingFirstIndex, (index) =>
+            DuplicateToolCallId.make({ id: part.id, firstIndex: index, duplicateIndex: current.nextIndex }),
+          )
+          return [
+            duplicate,
+            {
+              nextIndex: current.nextIndex + 1,
+              firstIndexes: Option.isSome(existingFirstIndex)
+                ? current.firstIndexes
+                : HashMap.set(current.firstIndexes, part.id, current.nextIndex),
+            },
+          ]
+        }).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () => Effect.void,
+              onSome: Effect.fail,
+            }),
+          ),
+        )
+      }
+
       const modelTurn = (turn: number, prompt: Prompt.RawInput, registry: Registry, overrides?: TurnOverrides) => {
         const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
         const attempt = (
           activePrompt: Prompt.Prompt,
           retryOverflow: boolean,
         ): Stream.Stream<
-          { readonly part: Response.StreamPart<any>; readonly messages: ReadonlyArray<Prompt.Message> },
+          {
+            readonly part: Response.StreamPart<any>
+            readonly messages: ReadonlyArray<Prompt.Message>
+            readonly accept: Effect.Effect<void, DuplicateToolCallId>
+          },
           RunError,
           LanguageModel.LanguageModel
         > => {
@@ -1456,8 +1497,16 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           }
           return Stream.fromChannel(
             Channel.acquireUseRelease(
-              chatLock.take(1).pipe(Effect.andThen(Ref.get(chat.history))),
-              (history) => {
+              Effect.gen(function* () {
+                yield* chatLock.take(1)
+                const history = yield* Ref.get(chat.history)
+                const toolCallIds = yield* Ref.make<ToolCallIdState>({
+                  nextIndex: 0,
+                  firstIndexes: HashMap.empty(),
+                })
+                return { history, toolCallIds }
+              }),
+              ({ history, toolCallIds }) => {
                 const responsePrompt = Prompt.concat(history, activePrompt)
                 const messages = responsePrompt.content
                 const rawParts = LanguageModel.streamText({
@@ -1481,16 +1530,21 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 return rawParts.pipe(
                   Stream.mapEffect((part) => transformPart(turn, part)),
                   Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
-                  Stream.tap((part) =>
-                    Effect.sync(() => {
-                      transformedParts.push(part)
-                    }),
-                  ),
-                  Stream.map((part) => ({ part, messages })),
+                  Stream.map((part) => ({
+                    part,
+                    messages,
+                    accept: validateToolCallId(toolCallIds, part).pipe(
+                      Effect.andThen(
+                        Effect.sync(() => {
+                          transformedParts.push(part)
+                        }),
+                      ),
+                    ),
+                  })),
                   Stream.toChannel,
                 )
               },
-              (history, exit) =>
+              ({ history }, exit) =>
                 (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted)
                   ? Effect.void
                   : Ref.set(
@@ -1524,7 +1578,11 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             Effect.flatMap((transformedPrompt) => preparePrompt(turn, transformedPrompt, false)),
             Effect.map((preparedPrompt) =>
               attempt(preparedPrompt, true).pipe(
-                Stream.flatMap(({ part, messages }) => partEvents(turn, part, messages, activeRegistry)),
+                Stream.flatMap(({ accept, part, messages }) =>
+                  Stream.fromEffect(accept).pipe(
+                    Stream.flatMap(() => partEvents(turn, part, messages, activeRegistry)),
+                  ),
+                ),
               ),
             ),
           ),

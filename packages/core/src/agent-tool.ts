@@ -4,6 +4,7 @@ import { type Agent, type Result, generate } from "./agent.js"
 import {
   AgentError,
   AgentSuspended,
+  DuplicateToolCallId,
   MiddlewareViolation,
   ToolNameCollision,
   TurnLimitExceeded,
@@ -66,6 +67,9 @@ const errorMessage = (error: unknown): string => {
   }
   if (Schema.is(MiddlewareViolation)(error)) {
     return `middleware violation on turn ${error.turn}: ${error.detail}`
+  }
+  if (Schema.is(DuplicateToolCallId)(error)) {
+    return `duplicate tool-call ID '${error.id}' at position ${error.duplicateIndex} (first at ${error.firstIndex})`
   }
   if (Schema.is(ToolNameCollision)(error)) {
     return `tool name collision: ${error.name} (${error.origins

@@ -44,6 +44,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Every exported symbol is `@experimental` while `effect/unstable/ai` is itself unstable.
 - Public APIs use package-root module namespaces and noun-after-`layer` service Layer variants; established subpaths and superseded Layer names follow ADR-0024 compatibility policy.
 - Errors that cross a service boundary are `Schema.TaggedErrorClass`.
+- Every post-middleware tool-call ID is unique within its model response. Duplicate transformed IDs fail typed before the duplicate can initiate authorization, execution, or persistence.
 - No `Date.now()` or raw platform time/concurrency/randomness — use Effect primitives.
 - Pending tool results are never silently dropped: a `Stop` policy with pending results fails the run.
 - Permission policy is optional. Absent `Permissions` preserves existing tool execution and `needsApproval` behavior exactly.

@@ -24,6 +24,13 @@ const echoTool = Tool.make("echo", {
   success: Schema.Unknown,
 })
 
+const gatedEchoTool = Tool.make("gated-echo", {
+  description: "Echo input for duplicate ID tests",
+  parameters: Schema.Struct({ text: Schema.String }),
+  success: Schema.Unknown,
+  needsApproval: true,
+})
+
 const echoExecutor = ToolExecutor.testLayer({
   execute: (request) =>
     Effect.succeed({
@@ -250,6 +257,244 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         expect(serializedSession).toContain("safe-1")
         expect(serializedSession).not.toContain("secret")
         expect(serializedSession).not.toContain("raw-1")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects duplicate transformed tool-call IDs before the duplicate executes", () => {
+    const dispatched: Array<string> = []
+    let approvalChecks = 0
+    let modelCalls = 0
+    const duplicateIdMiddleware: ModelMiddleware.Middleware = {
+      transformPart: (part) =>
+        Effect.succeed(
+          Option.some(
+            part.type === "tool-call"
+              ? Response.makePart("tool-call", {
+                  id: part.id === "provider-3" ? "later" : "shared",
+                  name: part.name,
+                  params: part.params,
+                  providerExecuted: part.providerExecuted,
+                })
+              : part,
+          ),
+        ),
+    }
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(
+                toolCallPart("provider-1", "gated-echo", { text: "first" }),
+                toolCallPart("provider-2", "gated-echo", { text: "second" }),
+                toolCallPart("provider-3", "gated-echo", { text: "third" }),
+              )
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: (request) =>
+            Effect.sync(() => {
+              dispatched.push(request.call.id)
+              return { _tag: "Success", result: "result", encodedResult: "result" } as const
+            }),
+        }),
+        Approvals.testLayer({
+          check: () =>
+            Effect.sync(() => {
+              approvalChecks += 1
+              return { _tag: "Approved" } as const
+            }),
+        }),
+        ModelMiddleware.layer([duplicateIdMiddleware]),
+        Chat.layerPersisted({ storeId: "duplicate-id" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "duplicate-id-agent", toolkit: Toolkit.make(gatedEchoTool) })
+        const events: Array<AgentEvent.Event> = []
+        const outcome = yield* Agent.persisted(agent, {
+          prompt: "call three times",
+          persistence: { chatId: "duplicate-id-chat" },
+        }).pipe(
+          Stream.runForEach((event) =>
+            Effect.sync(() => {
+              events.push(event)
+            }),
+          ),
+          Effect.match({ onFailure: (error) => ({ error }), onSuccess: (value) => ({ value }) }),
+        )
+        const persistence = yield* Chat.Persistence
+        const persisted = yield* persistence.get("duplicate-id-chat")
+        const history = Json.stringify((yield* Ref.get(persisted.history)).content)
+        const modelToolCalls = events.filter((event) => event._tag === "ModelPart" && event.part.type === "tool-call")
+        const approvalRequests = events.filter((event) => event._tag === "ApprovalRequested")
+        const executionStarted = events.filter((event) => event._tag === "ToolExecutionStarted")
+        const executionCompleted = events.filter((event) => event._tag === "ToolExecutionCompleted")
+
+        expect(dispatched).toEqual(["shared"])
+        expect(approvalChecks).toBe(1)
+        expect(modelToolCalls).toHaveLength(1)
+        expect(approvalRequests).toHaveLength(1)
+        expect(executionStarted).toHaveLength(1)
+        expect(executionCompleted).toHaveLength(1)
+        expect(Json.stringify(events)).toContain("first")
+        expect(Json.stringify(events)).not.toContain("second")
+        expect(Json.stringify(events)).not.toContain("third")
+        expect(history).toContain("first")
+        expect(history).not.toContain("second")
+        expect(history).not.toContain("third")
+        expect("error" in outcome && outcome.error._tag).toBe("@batonfx/core/DuplicateToolCallId")
+        if ("error" in outcome && outcome.error._tag === "@batonfx/core/DuplicateToolCallId") {
+          expect(outcome.error.id).toBe("shared")
+          expect(outcome.error.firstIndex).toBe(0)
+          expect(outcome.error.duplicateIndex).toBe(1)
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects non-adjacent and provider-executed duplicate IDs with tool-call positions", () => {
+    const dispatched: Array<string> = []
+    return [
+      Layer.mergeAll(
+        modelLayer(() =>
+          Stream.make(
+            toolCallPart("duplicate", "gated-echo", { text: "first" }),
+            textDelta("between"),
+            toolCallPart("middle", "gated-echo", { text: "middle" }),
+            Response.makePart("tool-call", {
+              id: "duplicate",
+              name: "gated-echo",
+              params: { text: "provider" },
+              providerExecuted: true,
+            }),
+            toolCallPart("later", "gated-echo", { text: "later" }),
+          ),
+        ),
+        ToolExecutor.testLayer({
+          execute: (request) =>
+            Effect.sync(() => {
+              dispatched.push(request.call.id)
+              return { _tag: "Success", result: "result", encodedResult: "result" } as const
+            }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "non-adjacent-agent", toolkit: Toolkit.make(gatedEchoTool) })
+        const events: Array<AgentEvent.Event> = []
+        const failure = yield* Effect.flip(
+          Agent.stream(agent, { prompt: "call tools" }).pipe(
+            Stream.runForEach((event) =>
+              Effect.sync(() => {
+                events.push(event)
+              }),
+            ),
+          ),
+        )
+        const modelToolCalls = events.filter((event) => event._tag === "ModelPart" && event.part.type === "tool-call")
+
+        expect(failure._tag).toBe("@batonfx/core/DuplicateToolCallId")
+        expect(dispatched).toEqual(["duplicate", "middle"])
+        expect(modelToolCalls).toHaveLength(2)
+        expect(Json.stringify(modelToolCalls)).not.toContain('"text":"provider"')
+        expect(Json.stringify(events)).not.toContain("later")
+        if (failure._tag === "@batonfx/core/DuplicateToolCallId") {
+          expect(failure.id).toBe("duplicate")
+          expect(failure.firstIndex).toBe(0)
+          expect(failure.duplicateIndex).toBe(2)
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects duplicate IDs before a second local toolkit handler invocation", () => {
+    const handled: Array<string> = []
+    let modelCalls = 0
+    const toolkit = Toolkit.make(gatedEchoTool)
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(
+                toolCallPart("local-duplicate", "gated-echo", { text: "first" }),
+                toolCallPart("local-duplicate", "gated-echo", { text: "second" }),
+                toolCallPart("local-later", "gated-echo", { text: "later" }),
+              )
+            : Stream.make(textDelta("done"))
+        }),
+        toolkit.toLayer({
+          "gated-echo": (params) =>
+            Effect.sync(() => {
+              handled.push(params.text)
+              return params.text
+            }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "local-duplicate-agent", toolkit })
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "call locally" })))
+
+        expect(failure._tag).toBe("@batonfx/core/DuplicateToolCallId")
+        expect(handled).toEqual(["first"])
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "allows IDs replaced by middleware and reused in later turns and runs", () => {
+    const dispatched: Array<string> = []
+    let modelCalls = 0
+    const uniqueReplacement: ModelMiddleware.Middleware = {
+      transformPart: (part) =>
+        Effect.succeed(
+          Option.some(
+            part.type === "tool-call"
+              ? Response.makePart("tool-call", {
+                  id: `safe-${(part.params as { readonly text: string }).text}`,
+                  name: part.name,
+                  params: part.params,
+                  providerExecuted: part.providerExecuted,
+                })
+              : part,
+          ),
+        ),
+    }
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.make(
+              toolCallPart("raw", "echo", { text: "one" }),
+              toolCallPart("raw", "echo", { text: "two" }),
+            )
+          }
+          if (modelCalls === 2 || modelCalls === 4) {
+            return Stream.make(toolCallPart("raw", "echo", { text: "one" }))
+          }
+          return Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: (request) =>
+            Effect.sync(() => {
+              dispatched.push(request.call.id)
+              return { _tag: "Success", result: "result", encodedResult: "result" } as const
+            }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.layer([uniqueReplacement]),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "id-scope-agent", toolkit: Toolkit.make(echoTool) })
+
+        yield* Agent.generate(agent, { prompt: "first run" })
+        yield* Agent.generate(agent, { prompt: "second run" })
+
+        expect(dispatched).toEqual(["safe-one", "safe-two", "safe-one", "safe-one"])
       }),
     ] as const
   })

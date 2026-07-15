@@ -182,6 +182,16 @@ export class MiddlewareViolation extends Schema.TaggedErrorClass<MiddlewareViola
   },
 ) {}
 
+/** @experimental A transformed model response reused a tool-call identifier. */
+export class DuplicateToolCallId extends Schema.TaggedErrorClass<DuplicateToolCallId>()(
+  "@batonfx/core/DuplicateToolCallId",
+  {
+    id: Schema.String,
+    firstIndex: Schema.Finite,
+    duplicateIndex: Schema.Finite,
+  },
+) {}
+
 /** @experimental An explicitly failing tool progress queue reached capacity. */
 export class ProgressOverflowError extends Schema.TaggedErrorClass<ProgressOverflowError>()(
   "@batonfx/core/ProgressOverflowError",
