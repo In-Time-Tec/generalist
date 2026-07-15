@@ -25,6 +25,8 @@ import {
   type SteeringDrained,
   type StructuredOutput,
   type ToolProgress,
+  ToolNameCollision,
+  type ToolOrigin,
   type TurnCompleted,
   TurnLimitExceeded,
   TurnPolicyStopped,
@@ -56,6 +58,7 @@ import {
   executeToolkit,
 } from "./tool-executor.js"
 import { bound } from "./tool-output.js"
+import { type Candidate, type Registry, assemble, get, select } from "./tool-registry.js"
 import {
   type Decision,
   defaultPolicy,
@@ -79,6 +82,13 @@ export interface Agent<
   readonly model?: HasModel extends true ? ModelSelection : ModelSelection
   readonly memory?: Key
   readonly metadata?: Readonly<Record<string, unknown>>
+  readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
+}
+
+/** @experimental One origin-preserving static or Handoff tool declaration. */
+export interface ToolDeclaration {
+  readonly tool: Tool.Any
+  readonly origin: Extract<ToolOrigin, { readonly _tag: "Static" | "Handoff" }>
 }
 
 /** @experimental */
@@ -90,10 +100,18 @@ export interface WithModelDefault {
 export interface MakeOptions<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never> {
   readonly instructions?: string
   readonly toolkit?: Toolkit.Toolkit<Tools>
+  readonly tools?: never
   readonly policy?: TurnPolicy<PolicyServices>
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly metadata?: Readonly<Record<string, unknown>>
+}
+
+/** @experimental Agent options with ordered static declarations instead of a pre-built toolkit. */
+export interface MakeToolsOptions<StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>
+  extends Omit<MakeOptions<{}, PolicyServices>, "toolkit" | "tools"> {
+  readonly tools: StaticTools
+  readonly toolkit?: never
 }
 
 /** @experimental */
@@ -102,7 +120,33 @@ export interface MakeObjectOptions<Tools extends Record<string, Tool.Any> = {}, 
   readonly name: string
 }
 
+/** @experimental */
+export interface MakeToolsObjectOptions<StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>
+  extends MakeToolsOptions<StaticTools, PolicyServices> {
+  readonly name: string
+}
+
 /** @experimental Defaults: empty toolkit, `defaultPolicy`. */
+export function make<const StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>(
+  name: string,
+  options: MakeToolsOptions<StaticTools, PolicyServices> & WithModelDefault,
+): Agent<Toolkit.ToolsByName<StaticTools>, true, PolicyServices>
+export function make<const StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>(
+  name: string,
+  options: MakeToolsOptions<StaticTools, PolicyServices>,
+): Agent<Toolkit.ToolsByName<StaticTools>, false, PolicyServices>
+export function make<const StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>(
+  options: MakeToolsObjectOptions<StaticTools, PolicyServices> & WithModelDefault,
+): Agent<Toolkit.ToolsByName<StaticTools>, true, PolicyServices>
+export function make<const StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>(
+  options: MakeToolsObjectOptions<StaticTools, PolicyServices>,
+): Agent<Toolkit.ToolsByName<StaticTools>, false, PolicyServices>
+export function make<const StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>(
+  options: MakeToolsOptions<StaticTools, PolicyServices> & WithModelDefault,
+): (name: string) => Agent<Toolkit.ToolsByName<StaticTools>, true, PolicyServices>
+export function make<const StaticTools extends ReadonlyArray<Tool.Any>, PolicyServices = never>(
+  options: MakeToolsOptions<StaticTools, PolicyServices>,
+): (name: string) => Agent<Toolkit.ToolsByName<StaticTools>, false, PolicyServices>
 export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
   name: string,
   options: MakeOptions<Tools, PolicyServices> & WithModelDefault,
@@ -124,21 +168,71 @@ export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices
   options?: MakeOptions<Tools, PolicyServices>,
 ): (name: string) => Agent<Tools, false, PolicyServices>
 export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
-  nameOrOptions?: string | MakeObjectOptions<Tools, PolicyServices> | MakeOptions<Tools, PolicyServices>,
-  options: MakeOptions<Tools, PolicyServices> = {},
-): Agent<Tools, boolean, PolicyServices> | ((name: string) => Agent<Tools, boolean, PolicyServices>) {
+  nameOrOptions?:
+    | string
+    | MakeObjectOptions<Tools, PolicyServices>
+    | MakeOptions<Tools, PolicyServices>
+    | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices>
+    | MakeToolsObjectOptions<ReadonlyArray<Tool.Any>, PolicyServices>,
+  options: MakeOptions<Tools, PolicyServices> | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices> = {},
+): unknown {
   if (nameOrOptions === undefined || (typeof nameOrOptions !== "string" && !("name" in nameOrOptions))) {
-    return (name) => make(name, nameOrOptions ?? {})
+    const curriedOptions = nameOrOptions ?? {}
+    if ("tools" in curriedOptions && Array.isArray(curriedOptions.tools)) {
+      const tools = curriedOptions.tools
+      return (name: string) =>
+        make({
+          name,
+          tools,
+          ...(curriedOptions.instructions === undefined ? {} : { instructions: curriedOptions.instructions }),
+          ...(curriedOptions.policy === undefined ? {} : { policy: curriedOptions.policy }),
+          ...(curriedOptions.model === undefined ? {} : { model: curriedOptions.model }),
+          ...(curriedOptions.memory === undefined ? {} : { memory: curriedOptions.memory }),
+          ...(curriedOptions.metadata === undefined ? {} : { metadata: curriedOptions.metadata }),
+        })
+    }
+    return (name: string) =>
+      make({
+        name,
+        ...(curriedOptions.instructions === undefined ? {} : { instructions: curriedOptions.instructions }),
+        ...(curriedOptions.toolkit === undefined ? {} : { toolkit: curriedOptions.toolkit }),
+        ...(curriedOptions.policy === undefined ? {} : { policy: curriedOptions.policy }),
+        ...(curriedOptions.model === undefined ? {} : { model: curriedOptions.model }),
+        ...(curriedOptions.memory === undefined ? {} : { memory: curriedOptions.memory }),
+        ...(curriedOptions.metadata === undefined ? {} : { metadata: curriedOptions.metadata }),
+      })
   }
   const resolved = typeof nameOrOptions === "string" ? { ...options, name: nameOrOptions } : nameOrOptions
+  const declaredTools: ReadonlyArray<Tool.Any> | undefined =
+    "tools" in resolved && Array.isArray(resolved.tools) ? resolved.tools : undefined
+  const toolkit =
+    declaredTools === undefined
+      ? (resolved.toolkit ?? (Toolkit.empty as unknown as Toolkit.Toolkit<Tools>))
+      : Toolkit.make(...declaredTools)
+  if (declaredTools !== undefined) {
+    for (const tool of declaredTools) {
+      if (!Object.hasOwn(toolkit.tools, tool.name)) {
+        Object.defineProperty(toolkit.tools, tool.name, {
+          configurable: true,
+          enumerable: true,
+          value: tool,
+          writable: true,
+        })
+      }
+    }
+  }
   return {
     name: resolved.name,
     ...(resolved.instructions === undefined ? {} : { instructions: resolved.instructions }),
-    toolkit: resolved.toolkit ?? (Toolkit.empty as unknown as Toolkit.Toolkit<Tools>),
+    toolkit: toolkit as unknown as Toolkit.Toolkit<Tools>,
     policy: resolved.policy ?? defaultPolicy,
     ...(resolved.model === undefined ? {} : { model: resolved.model }),
     ...(resolved.memory === undefined ? {} : { memory: resolved.memory }),
     ...(resolved.metadata === undefined ? {} : { metadata: resolved.metadata }),
+    toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map((tool) => ({
+      tool,
+      origin: { _tag: "Static", agent: resolved.name },
+    })),
   }
 }
 
@@ -247,6 +341,7 @@ export type RunError =
   | TurnLimitExceeded
   | MiddlewareViolation
   | ProgressOverflowError
+  | ToolNameCollision
 
 type ModelRunServices<HasModel extends boolean> = [HasModel] extends [true] ? Service : LanguageModel.LanguageModel
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
@@ -280,17 +375,21 @@ const activateSkillToolName = "activate_skill"
 
 const activateSkillParameters = Schema.Struct({ name: Schema.String })
 
+const activateSkillSuccess = Schema.Struct({
+  name: Schema.String,
+  body: Schema.String,
+  allowedTools: Schema.Array(Schema.String),
+})
+
 const activateSkillTool = Tool.make(activateSkillToolName, {
   description: "Load the full body for one listed Baton skill by name before applying that skill.",
   parameters: activateSkillParameters,
-  success: Schema.Struct({
-    name: Schema.String,
-    body: Schema.String,
-    allowedTools: Schema.Array(Schema.String),
-  }),
+  success: activateSkillSuccess,
 })
 
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
+
+const isToolNameCollision = Schema.is(ToolNameCollision)
 
 const appendInstructionFragment = (base: string | undefined, fragment: string | undefined): string | undefined => {
   if (fragment === undefined || fragment.length === 0) return base
@@ -404,6 +503,28 @@ const streamInternal = <
 > =>
   Stream.unwrap(
     Effect.gen(function* () {
+      const staticCandidates: ReadonlyArray<Candidate> = (
+        agent.toolDeclarations ??
+        Object.values(agent.toolkit.tools).map((tool) => ({
+          tool,
+          origin: { _tag: "Static" as const, agent: agent.name },
+        }))
+      ).map(({ origin, tool }) => ({
+        origin,
+        tool,
+        dispatch: "Static",
+      }))
+      yield* assemble(staticCandidates)
+      if (
+        agent.toolDeclarations !== undefined &&
+        (agent.toolDeclarations.length !== Object.keys(agent.toolkit.tools).length ||
+          agent.toolDeclarations.some((declaration) => agent.toolkit.tools[declaration.tool.name] !== declaration.tool))
+      ) {
+        return yield* AgentError.make({
+          message: "Agent tool declarations and toolkit must contain the same tool instances",
+          turn: 0,
+        })
+      }
       const executor = yield* Effect.serviceOption(ToolExecutor)
       const approvals = yield* Effect.serviceOption(Approvals)
       const chain = yield* Effect.serviceOption(ModelMiddleware).pipe(
@@ -464,6 +585,18 @@ const streamInternal = <
         skillRuntime === undefined ? [] : selectListings(skillRuntime.skills, skillListingBudgetTokens, [])
       const skillListings = selectedSkills.map((skill) => skill.listing).join("\n")
       const hasActivatableSkills = selectedSkills.length > 0
+      const initialRegistry = yield* assemble([
+        ...staticCandidates,
+        ...(hasActivatableSkills
+          ? [
+              {
+                tool: activateSkillTool,
+                origin: { _tag: "Builtin", builtin: "activate_skill" } as const,
+                dispatch: "Builtin" as const,
+              },
+            ]
+          : []),
+      ])
       const instructionsEpoch =
         options.system === undefined && options.history === undefined && Option.isSome(instructionsService)
           ? yield* openEpoch(instructionsService.value, { agentName: agent.name, turn: 0 })
@@ -587,8 +720,61 @@ const streamInternal = <
         usage: undefined as Response.Usage | undefined,
       }
 
-      const activatedSkillBodies = new Map<string, string>()
-      const activatedSkillTools = new Map<string, Tool.Any>()
+      const toolState = yield* Ref.make({
+        registry: initialRegistry,
+        activatedSkillBodies: new Map<string, string>(),
+      })
+
+      const restoreActivatedSkills = (history: Prompt.Prompt): Effect.Effect<void, AgentError | ToolNameCollision> =>
+        Effect.gen(function* () {
+          for (const message of history.content) {
+            if (!Array.isArray(message.content)) continue
+            for (const part of message.content) {
+              if (
+                String(part.type) !== "tool-result" ||
+                String(part.name) !== activateSkillToolName ||
+                part.isFailure === true
+              )
+                continue
+              const activation = Schema.decodeUnknownOption(activateSkillSuccess)(part.result)
+              if (Option.isNone(activation)) continue
+              if (skillRuntime === undefined) {
+                return yield* AgentError.make({
+                  message: "Resuming activated skill tools requires SkillSource in context",
+                  turn: 0,
+                })
+              }
+              const skill = yield* skillRuntime.source.get(activation.value.name)
+              if (skill === undefined) {
+                return yield* AgentError.make({
+                  message: `Skill not found while restoring resume state: ${activation.value.name}`,
+                  turn: 0,
+                })
+              }
+              const current = yield* Ref.get(toolState)
+              if (current.activatedSkillBodies.has(skill.frontmatter.name)) continue
+              const registry = yield* assemble([
+                ...current.registry.entries,
+                ...skill.tools.map(
+                  (tool): Candidate => ({
+                    tool,
+                    origin: { _tag: "Skill", skill: skill.frontmatter.name },
+                    dispatch: "Skill",
+                  }),
+                ),
+              ])
+              const activatedSkillBodies = new Map(current.activatedSkillBodies)
+              activatedSkillBodies.set(skill.frontmatter.name, activation.value.body)
+              yield* Ref.set(toolState, { registry, activatedSkillBodies })
+            }
+          }
+        }).pipe(
+          Effect.mapError((error) =>
+            isToolNameCollision(error) ? error : AgentError.make({ message: error.message, turn: 0, cause: error }),
+          ),
+        )
+
+      if (options.resume !== undefined) yield* Ref.get(chat.history).pipe(Effect.flatMap(restoreActivatedSkills))
 
       let sessionSyncedMessages = 0
       let sessionInitialized = false
@@ -609,8 +795,8 @@ const streamInternal = <
       const skillError = (turn: number, error: SkillSourceError): AgentError =>
         AgentError.make({ message: error.message, turn, cause: error })
 
-      const isSkillActivationCall = (call: AnyToolCall): boolean =>
-        call.name === activateSkillToolName && skillRuntime !== undefined && hasActivatableSkills
+      const isSkillActivationCall = (call: AnyToolCall, registry: Registry): boolean =>
+        get(registry, call.name)?.dispatch === "Builtin" && skillRuntime !== undefined
 
       const insertRecalledItems = (prompt: Prompt.Prompt, items: ReadonlyArray<Item>): Prompt.Prompt => {
         const content = items.flatMap((item) => item.content)
@@ -745,12 +931,13 @@ const streamInternal = <
         call: AnyToolCall,
         outcome: Outcome,
         droppedProgress: number,
+        registry: Registry,
       ): Effect.Effect<Stream.Stream<Event, RunError>, AgentError> => {
         const metadata = droppedProgress === 0 ? {} : { metadata: { toolProgress: { dropped: droppedProgress } } }
         switch (outcome._tag) {
           case "Success":
             return (
-              isSkillActivationCall(call)
+              isSkillActivationCall(call, registry)
                 ? Effect.succeed(successResult(call, outcome))
                 : boundedSuccessResult(call, outcome)
             ).pipe(
@@ -773,12 +960,13 @@ const streamInternal = <
 
       const defaultExecute = (
         request: Request,
+        registry: Registry,
       ): Effect.Effect<Outcome, never, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>> => {
-        if (agent.toolkit.tools[request.call.name] !== undefined) {
+        const registered = get(registry, request.call.name)
+        if (registered?.dispatch === "Static") {
           return executeToolkit(agent.toolkit, request)
         }
-        const activated = activatedSkillTools.get(request.call.name)
-        return activated === undefined
+        return registered === undefined
           ? Effect.succeed({ _tag: "Failure", message: `Tool ${request.call.name} is not registered` })
           : Effect.succeed({
               _tag: "Failure",
@@ -802,6 +990,7 @@ const streamInternal = <
         turn: number,
         call: AnyToolCall,
         request: Request,
+        registry: Registry,
       ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> =>
         Stream.concat(
           Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
@@ -848,12 +1037,12 @@ const streamInternal = <
               })
               const execution: Effect.Effect<
                 Outcome,
-                AgentError,
+                AgentError | ToolNameCollision,
                 ToolContext | Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>
-              > = isSkillActivationCall(call)
+              > = isSkillActivationCall(call, registry)
                 ? activateSkillOutcome(turn, call)
                 : Option.isNone(executor)
-                  ? defaultExecute(request)
+                  ? defaultExecute(request, registry)
                   : executor.value
                       .execute(request)
                       .pipe(
@@ -874,7 +1063,7 @@ const streamInternal = <
                   Stream.flatMap((outcome) =>
                     Stream.unwrap(
                       Ref.get(droppedProgress).pipe(
-                        Effect.flatMap((dropped) => outcomeEvents(turn, call, outcome, dropped)),
+                        Effect.flatMap((dropped) => outcomeEvents(turn, call, outcome, dropped, registry)),
                       ),
                     ),
                   ),
@@ -897,7 +1086,10 @@ const streamInternal = <
         return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
       }
 
-      const activateSkillOutcome = (turn: number, call: AnyToolCall): Effect.Effect<Outcome, AgentError> =>
+      const activateSkillOutcome = (
+        turn: number,
+        call: AnyToolCall,
+      ): Effect.Effect<Outcome, AgentError | ToolNameCollision> =>
         Effect.gen(function* () {
           if (skillRuntime === undefined)
             return { _tag: "Failure", message: "SkillSource is not available" } satisfies Outcome
@@ -910,13 +1102,23 @@ const streamInternal = <
           if (skill.frontmatter.disableModelInvocation === true) {
             return { _tag: "Failure", message: `Skill is not model-invocable: ${params.value.name}` } satisfies Outcome
           }
-          let body = activatedSkillBodies.get(skill.frontmatter.name)
+          const current = yield* Ref.get(toolState)
+          let body = current.activatedSkillBodies.get(skill.frontmatter.name)
           if (body === undefined) {
+            const registry = yield* assemble([
+              ...current.registry.entries,
+              ...skill.tools.map(
+                (tool): Candidate => ({
+                  tool,
+                  origin: { _tag: "Skill", skill: skill.frontmatter.name },
+                  dispatch: "Skill",
+                }),
+              ),
+            ])
             body = yield* skill.body
+            const activatedSkillBodies = new Map(current.activatedSkillBodies)
             activatedSkillBodies.set(skill.frontmatter.name, body)
-            for (const tool of skill.tools) {
-              activatedSkillTools.set(tool.name, tool)
-            }
+            yield* Ref.set(toolState, { registry, activatedSkillBodies })
           }
           const output = {
             name: skill.frontmatter.name,
@@ -924,7 +1126,7 @@ const streamInternal = <
             allowedTools: [...(skill.frontmatter.allowedTools ?? [])],
           }
           return { _tag: "Success", result: output, encodedResult: output } satisfies Success
-        }).pipe(Effect.mapError((error) => skillError(turn, error)))
+        }).pipe(Effect.mapError((error) => (isToolNameCollision(error) ? error : skillError(turn, error))))
 
       const rememberAlways = (turn: number, call: AnyToolCall): Effect.Effect<void, AgentError> =>
         Effect.serviceOption(RuleStore).pipe(
@@ -945,11 +1147,12 @@ const streamInternal = <
         messages: ReadonlyArray<Prompt.Message>,
         request: Request,
         tool: Tool.Any | undefined,
+        registry: Registry,
       ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> =>
         Stream.unwrap(
           approvalRequired(tool, call, messages).pipe(
             Effect.map((isRequired): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
-              if (!isRequired) return executeApproved(turn, call, request)
+              if (!isRequired) return executeApproved(turn, call, request, registry)
               if (Option.isNone(approvals)) {
                 const result = failedResult(call, "Approvals service is required for approval-gated tools")
                 state.pending.push(result)
@@ -965,7 +1168,7 @@ const streamInternal = <
                     Effect.map((decision): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
                       switch (decision._tag) {
                         case "Approved":
-                          return executeApproved(turn, call, request)
+                          return executeApproved(turn, call, request, registry)
                         case "Denied": {
                           const result = failedResult(call, decision.reason ?? "Tool call denied")
                           state.pending.push(result)
@@ -987,14 +1190,17 @@ const streamInternal = <
         call: AnyToolCall,
         request: Request,
         answer: Answer,
+        registry: Registry,
       ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
         switch (answer._tag) {
           case "Approved":
-            return executeApproved(turn, call, request)
+            return executeApproved(turn, call, request, registry)
           case "Denied":
             return permissionDeniedEvents(turn, call, answer.reason)
           case "Always":
-            return Stream.unwrap(rememberAlways(turn, call).pipe(Effect.as(executeApproved(turn, call, request))))
+            return Stream.unwrap(
+              rememberAlways(turn, call).pipe(Effect.as(executeApproved(turn, call, request, registry))),
+            )
         }
       }
 
@@ -1003,6 +1209,7 @@ const streamInternal = <
         call: AnyToolCall,
         request: Request,
         token: string,
+        registry: Registry,
       ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
         const pending: Pending = {
           token,
@@ -1021,7 +1228,7 @@ const streamInternal = <
               Effect.map(
                 Option.match({
                   onNone: () => failSuspended(call, token, "approval"),
-                  onSome: (answer) => permissionAnsweredEvents(turn, call, request, answer),
+                  onSome: (answer) => permissionAnsweredEvents(turn, call, request, answer, registry),
                 }),
               ),
             ),
@@ -1033,10 +1240,17 @@ const streamInternal = <
         turn: number,
         call: AnyToolCall,
         messages: ReadonlyArray<Prompt.Message>,
+        registry: Registry,
       ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
         const request: Request = { call, turn, agentName: agent.name, sessionId }
-        const tool = currentToolkit().tools[call.name] as Tool.Any | undefined
-        if (Option.isNone(permissionsService)) return approvalEvents(turn, call, messages, request, tool)
+        const registered = get(registry, call.name)
+        if (registered === undefined) {
+          const result = failedResult(call, `Tool ${call.name} is not registered`)
+          state.pending.push(result)
+          return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result }])
+        }
+        const tool = registered.tool
+        if (Option.isNone(permissionsService)) return approvalEvents(turn, call, messages, request, tool, registry)
         return Stream.unwrap(
           permissionsService.value
             .evaluate({
@@ -1052,11 +1266,11 @@ const streamInternal = <
               Effect.map((decision): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
                 switch (decision._tag) {
                   case "Allow":
-                    return approvalEvents(turn, call, messages, request, tool)
+                    return approvalEvents(turn, call, messages, request, tool, registry)
                   case "Deny":
                     return permissionDeniedEvents(turn, call, decision.reason)
                   case "Ask":
-                    return permissionAskEvents(turn, call, request, decision.token)
+                    return permissionAskEvents(turn, call, request, decision.token, registry)
                 }
               }),
             ),
@@ -1137,8 +1351,10 @@ const streamInternal = <
         turn: number,
         part: Response.StreamPart<Record<string, Tool.Any>>,
         messages: ReadonlyArray<Prompt.Message>,
+        registry: Registry,
       ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> => {
         if (part.type === "error") {
+          if (isToolNameCollision(part.error)) return Stream.fail(part.error)
           return Stream.fail(AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }))
         }
         const modelPart = Stream.fromIterable<Event>([{ _tag: "ModelPart", turn, part }])
@@ -1146,7 +1362,7 @@ const streamInternal = <
           const call = part as AnyToolCall
           return call.providerExecuted === true
             ? modelPart
-            : Stream.concat(modelPart, toolCallEvents(turn, call, messages))
+            : Stream.concat(modelPart, toolCallEvents(turn, call, messages, registry))
         }
         if (part.type === "text-delta") {
           state.text = `${state.text}${part.delta}`
@@ -1178,24 +1394,13 @@ const streamInternal = <
           ),
         )
 
-      const currentToolkit = (): Toolkit.Toolkit<Record<string, Tool.Any>> =>
-        Toolkit.make(
-          ...Object.values(agent.toolkit.tools),
-          ...(hasActivatableSkills ? [activateSkillTool] : []),
-          ...activatedSkillTools.values(),
-        ) as unknown as Toolkit.Toolkit<Record<string, Tool.Any>>
-
-      const activeToolkit = (activeTools: ReadonlyArray<string>): Toolkit.Toolkit<Record<string, Tool.Any>> =>
-        Toolkit.make(
-          ...Object.values(currentToolkit().tools).filter((tool) => activeTools.includes(tool.name)),
-        ) as unknown as Toolkit.Toolkit<Record<string, Tool.Any>>
-
       const modelTurn = (
         turn: number,
         prompt: Prompt.RawInput,
+        registry: Registry,
         overrides?: TurnOverrides,
       ): Stream.Stream<Event, RunError, RunServices<Tools, HasModel>> => {
-        const toolkit = overrides?.activeTools === undefined ? currentToolkit() : activeToolkit(overrides.activeTools)
+        const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
         const attempt = (
           activePrompt: Prompt.Prompt,
           retryOverflow: boolean,
@@ -1228,7 +1433,7 @@ const streamInternal = <
                 const messages = responsePrompt.content
                 const rawParts = LanguageModel.streamText({
                   prompt: responsePrompt,
-                  toolkit,
+                  toolkit: activeRegistry.toolkit,
                   disableToolCallResolution: true,
                 }).pipe(
                   Stream.tap(() =>
@@ -1287,7 +1492,7 @@ const streamInternal = <
             Effect.flatMap((transformedPrompt) => preparePrompt(turn, transformedPrompt, false)),
             Effect.map((preparedPrompt) =>
               attempt(preparedPrompt, true).pipe(
-                Stream.flatMap(({ part, messages }) => partEvents(turn, part, messages)),
+                Stream.flatMap(({ part, messages }) => partEvents(turn, part, messages, activeRegistry)),
               ),
             ),
           ),
@@ -1492,7 +1697,11 @@ const streamInternal = <
         let structuredTurn: number | undefined
         const currentTurn = Stream.fromIterable<Event>([{ _tag: "TurnStarted", turn }]).pipe(
           Stream.concat(resetTurnState(turn)),
-          Stream.concat(modelTurn(turn, prompt, overrides)),
+          Stream.concat(
+            Stream.unwrap(
+              Ref.get(toolState).pipe(Effect.map(({ registry }) => modelTurn(turn, prompt, registry, overrides))),
+            ),
+          ),
           Stream.concat(
             Stream.unwrap(
               afterTurn(turn).pipe(
@@ -1537,7 +1746,9 @@ const streamInternal = <
         const currentTurn = resetTurnState(0).pipe(
           Stream.concat(
             Stream.unwrap(
-              Ref.get(chat.history).pipe(Effect.map((history) => toolCallEvents(0, call, history.content))),
+              Effect.all({ history: Ref.get(chat.history), tools: Ref.get(toolState) }).pipe(
+                Effect.map(({ history, tools }) => toolCallEvents(0, call, history.content, tools.registry)),
+              ),
             ),
           ),
           Stream.concat(

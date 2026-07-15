@@ -100,15 +100,18 @@ const positiveConcurrency = (value: number | undefined): Effect.Effect<number, A
 const mergeHandled = <Tools extends Record<string, Tool.Any>>(
   toolkits: ReadonlyArray<Toolkit.WithHandler<Tools>>,
 ): Toolkit.WithHandler<Tools> => {
-  const tools: Record<string, Tool.Any> = {}
+  const entries = new Map<string, { readonly tool: Tool.Any; readonly toolkit: Toolkit.WithHandler<Tools> }>()
   for (const toolkit of toolkits) {
-    Object.assign(tools, toolkit.tools)
+    for (const tool of Object.values(toolkit.tools)) {
+      if (!entries.has(tool.name)) entries.set(tool.name, { tool, toolkit })
+    }
   }
+  const tools = Object.fromEntries([...entries].map(([name, entry]) => [name, entry.tool]))
   return {
     tools: tools as Tools,
     handle: (name, params) => {
-      const toolkit = toolkits.find((candidate) => candidate.tools[name] !== undefined)
-      return toolkit === undefined
+      const entry = entries.get(String(name))
+      return entry === undefined
         ? Effect.fail(
             AiError.make({
               module: "Handoff",
@@ -119,7 +122,7 @@ const mergeHandled = <Tools extends Record<string, Tool.Any>>(
               }),
             }),
           )
-        : toolkit.handle(name, params)
+        : entry.toolkit.handle(name, params)
     },
   }
 }
@@ -204,13 +207,22 @@ export const supervisor = <
 ): Supervisor<Tools, HasModel, SpecialistPolicyServices, SupervisorPolicyServices> => {
   const transferTools = options.specialists.map((specialist) => transferTool(specialist))
   const toolkit = mergeHandled(transferTools)
+  const agent = make({
+    name: options.name,
+    ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
+    toolkit: toolkitFromHandled(toolkit),
+    ...(options.policy === undefined ? {} : { policy: options.policy }),
+  })
   return {
-    agent: make({
-      name: options.name,
-      ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
-      toolkit: toolkitFromHandled(toolkit),
-      ...(options.policy === undefined ? {} : { policy: options.policy }),
-    }),
+    agent: {
+      ...agent,
+      toolDeclarations: transferTools.flatMap((transfer, index) =>
+        Object.values(transfer.tools).map((tool) => ({
+          tool,
+          origin: { _tag: "Handoff" as const, specialist: options.specialists[index]!.name },
+        })),
+      ),
+    },
     toolkit,
   }
 }

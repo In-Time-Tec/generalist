@@ -1,7 +1,14 @@
 import { Cause, Effect, Function, Schema } from "effect"
 import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { type Agent, type Result, type RunServices, generate } from "./agent.js"
-import { AgentError, AgentSuspended, MiddlewareViolation, TurnLimitExceeded, TurnPolicyStopped } from "./agent-event.js"
+import {
+  AgentError,
+  AgentSuspended,
+  MiddlewareViolation,
+  ToolNameCollision,
+  TurnLimitExceeded,
+  TurnPolicyStopped,
+} from "./agent-event.js"
 import { TurnPolicyError } from "./turn-policy.js"
 
 const defaultParameters = Schema.Struct({ prompt: Schema.String })
@@ -59,6 +66,19 @@ const errorMessage = (error: unknown): string => {
   }
   if (Schema.is(MiddlewareViolation)(error)) {
     return `middleware violation on turn ${error.turn}: ${error.detail}`
+  }
+  if (Schema.is(ToolNameCollision)(error)) {
+    return `tool name collision: ${error.name} (${error.origins
+      .map((origin) =>
+        origin._tag === "Static"
+          ? `static:${origin.agent}`
+          : origin._tag === "Builtin"
+            ? `builtin:${origin.builtin}`
+            : origin._tag === "Skill"
+              ? `skill:${origin.skill}`
+              : `handoff:${origin.specialist}`,
+      )
+      .join(", ")})`
   }
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 }
