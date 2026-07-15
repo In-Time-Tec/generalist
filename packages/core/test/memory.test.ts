@@ -1,8 +1,8 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Layer, Option, Schema, Stream } from "effect"
-import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Effect, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { expectTypeOf } from "vitest"
-import { Agent, Approvals, Memory, ModelMiddleware, ToolExecutor } from "../src/index"
+import { Agent, Approvals, Compaction, Guardrail, Memory, ModelMiddleware, Session, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 
@@ -89,9 +89,33 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     expect(protocolParts.map(Memory.itemFromPromptPart)).toEqual(protocolParts.map(() => Option.none()))
   })
 
+  it("projects recalled origin structurally while retaining identical authored content", () => {
+    const recalled = Memory.messageFromRecall([textPart("identical")])
+    const authored = Prompt.makeMessage("user", { content: [textPart("identical")] })
+
+    expect(Memory.projectTranscript(Prompt.fromMessages([recalled, authored])).content).toEqual([authored])
+  })
+
+  it.effect("preserves recall origin through Chat export and restore", () =>
+    Effect.gen(function* () {
+      const recalled = Memory.messageFromRecall([textPart("persisted recall")])
+      const authored = Prompt.makeMessage("user", { content: [textPart("persisted authored")] })
+      const chat = yield* Chat.fromPrompt([recalled, authored])
+      const exported = yield* chat.export
+      const restored = yield* Chat.fromExport(exported)
+      const history = yield* Ref.get(restored.history)
+
+      expect(history.content[0]?.options).toEqual({
+        "@batonfx/core/memory": { origin: "memoryRecall" },
+      })
+      expect(Memory.projectTranscript(history).content.map(messageText)).toEqual(["persisted authored"])
+    }),
+  )
+
   ItLayer.make(it, "inserts text and file content from multiple recalled items in source order", () => {
     let modelPrompt: Prompt.Prompt | undefined
     let middlewarePrompt: Prompt.Prompt | undefined
+    let remembered: Memory.RememberInput | undefined
     const file = Prompt.makePart("file", {
       mediaType: "text/plain",
       fileName: "memory.txt",
@@ -121,7 +145,10 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               { id: "item-text", content: [textPart("remembered context")] },
               { id: "item-file", content: [file] },
             ]),
-          remember: () => Effect.void,
+          remember: (input) =>
+            Effect.sync(() => {
+              remembered = input
+            }),
           forget: () => Effect.void,
         }),
       ),
@@ -138,6 +165,10 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         const recalledMessage = modelPrompt?.content[1]
         expect(recalledMessage?.role).toBe("user")
         expect(recalledMessage?.content).toEqual([textPart("remembered context"), file])
+        expect(recalledMessage?.options).toEqual({
+          "@batonfx/core/memory": { origin: "memoryRecall" },
+        })
+        expect(remembered?.transcript.content.map(messageText)).toEqual(["system instructions", "live prompt"])
       }),
     ] as const
   })
@@ -165,6 +196,180 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
 
         expect(result.text).toBe("done")
         expect(modelPrompt?.content.map(messageText)).toEqual(["live prompt"])
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed before the model when middleware drops recall provenance", () => {
+    let modelCalls = 0
+    let remembered = false
+    const agent = Agent.make({ name: "memory-agent" })
+    return [
+      Layer.mergeAll(
+        modelLayer(() =>
+          Stream.sync(() => {
+            modelCalls += 1
+            return textDelta("unexpected")
+          }),
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([
+          {
+            transformPrompt: (prompt) =>
+              Effect.succeed(
+                Prompt.fromMessages(
+                  prompt.content.map((message) =>
+                    message.role === "user" ? Prompt.makeMessage("user", { content: message.content }) : message,
+                  ),
+                ),
+              ),
+          },
+        ]),
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          remember: () =>
+            Effect.sync(() => {
+              remembered = true
+            }),
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+
+        expect(failure._tag).toBe("@batonfx/core/MiddlewareViolation")
+        expect(modelCalls).toBe(0)
+        expect(remembered).toBe(false)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed when middleware moves recall provenance onto authored content", () => {
+    let modelCalls = 0
+    let remembered = false
+    const agent = Agent.make({ name: "memory-agent" })
+    return [
+      Layer.mergeAll(
+        modelLayer(() =>
+          Stream.sync(() => {
+            modelCalls += 1
+            return textDelta("unexpected")
+          }),
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([
+          {
+            transformPrompt: (prompt) => {
+              const recalled = prompt.content.find((message) => messageText(message) === "recalled context")
+              return Effect.succeed(
+                Prompt.fromMessages(
+                  prompt.content.map((message) => {
+                    if (message.role !== "user") return message
+                    if (messageText(message) === "recalled context") {
+                      return Prompt.makeMessage("user", { content: message.content })
+                    }
+                    if (messageText(message) === "live prompt") {
+                      return Prompt.makeMessage("user", { content: message.content, options: recalled?.options })
+                    }
+                    return message
+                  }),
+                ),
+              )
+            },
+          },
+        ]),
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          remember: () =>
+            Effect.sync(() => {
+              remembered = true
+            }),
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+
+        expect(failure._tag).toBe("@batonfx/core/MiddlewareViolation")
+        expect(modelCalls).toBe(0)
+        expect(remembered).toBe(false)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed when middleware moves recall provenance in place", () => {
+    let modelCalls = 0
+    const agent = Agent.make({ name: "memory-agent" })
+    return [
+      Layer.mergeAll(
+        modelLayer(() =>
+          Stream.sync(() => {
+            modelCalls += 1
+            return textDelta("unexpected")
+          }),
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([
+          {
+            transformPrompt: (prompt) =>
+              Effect.sync(() => {
+                const recalled = prompt.content.find((message) => messageText(message) === "recalled context")
+                const authored = prompt.content.find((message) => messageText(message) === "live prompt")
+                const marker = recalled?.options["@batonfx/core/memory"]
+                if (recalled !== undefined && authored !== undefined) {
+                  Reflect.deleteProperty(recalled.options, "@batonfx/core/memory")
+                  Object.assign(authored.options, { "@batonfx/core/memory": marker })
+                }
+                return prompt
+              }),
+          },
+        ]),
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+
+        expect(failure._tag).toBe("@batonfx/core/MiddlewareViolation")
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "allows input guardrails to redact recalled content without losing provenance", () => {
+    let modelPrompt: Prompt.Prompt | undefined
+    let remembered: Memory.RememberInput | undefined
+    const agent = Agent.make({ name: "memory-agent" })
+    return [
+      Layer.mergeAll(
+        modelLayer((params) => {
+          modelPrompt = params.prompt
+          return Stream.make(textDelta("done"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layer([Guardrail.redactInput({ pattern: /secret/g, replacement: "MASK" })]),
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled secret")] }]),
+          remember: (input) =>
+            Effect.sync(() => {
+              remembered = input
+            }),
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const result = yield* Agent.generate(agent, { prompt: "authored secret", memory: { key } })
+
+        expect(result.text).toBe("done")
+        expect(modelPrompt?.content.map(messageText)).toEqual(["recalled MASK", "authored MASK"])
+        expect(remembered?.transcript.content.map(messageText)).toEqual(["authored MASK"])
       }),
     ] as const
   })
@@ -211,6 +416,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
 
   ItLayer.make(it, "does not recall on resume", () => {
     let recalls = 0
+    const remembers: Array<Memory.RememberInput> = []
+    const recalled = Memory.messageFromRecall([textPart("recalled before suspension")])
+    const authored = Prompt.makeMessage("user", { content: [textPart("authored before suspension")] })
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return [
       Layer.mergeAll(
@@ -226,19 +434,25 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               recalls += 1
               return []
             }),
-          remember: () => Effect.void,
+          remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
         }),
       ),
       Effect.gen(function* () {
         const result = yield* Agent.generate(agent, {
           prompt: "ignored on resume",
+          history: Prompt.fromMessages([recalled, authored]),
           memory: { key },
           resume: { call: { id: "call-resume", name: "lookup", params: {} } },
         })
 
         expect(result.text).toBe("done")
         expect(recalls).toBe(0)
+        expect(remembers.length).toBe(2)
+        for (const remembered of remembers) {
+          expect(remembered.transcript.content).not.toContain(recalled)
+          expect(remembered.transcript.content).toContain(authored)
+        }
       }),
     ] as const
   })
@@ -263,6 +477,331 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
 
         expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
         expect(remembers).toEqual([])
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "retains Session provenance and authored transcript across suspension and resume", () => {
+    const remembers: Array<Memory.RememberInput> = []
+    let executions = 0
+    let modelCalls = 0
+    let checkpoint: Prompt.Prompt | undefined
+    const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(waitTool) })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1 ? Stream.make(toolCallPart("call-wait", "wait", {})) : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executions += 1
+            return Effect.succeed(
+              executions === 1
+                ? { _tag: "Suspend" as const, token: "wait-1" }
+                : { _tag: "Success" as const, result: "ok", encodedResult: "ok" },
+            )
+          },
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Compaction.layer({}),
+        Session.layerMemory,
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled before wait")] }]),
+          remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(
+          Agent.stream(agent, { prompt: "authored before wait", memory: { key } }).pipe(
+            Stream.tap((event) =>
+              Effect.sync(() => {
+                if (event._tag === "TurnCompleted") checkpoint = event.transcript
+              }),
+            ),
+            Stream.runDrain,
+          ),
+        )
+
+        expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
+        expect(checkpoint).toBeDefined()
+        expect(remembers).toEqual([])
+        if (checkpoint === undefined) return expect.unreachable()
+
+        const result = yield* Agent.generate(agent, {
+          prompt: "ignored on resume",
+          history: checkpoint,
+          memory: { key },
+          resume: { token: "wait-1", call: { id: "call-wait", name: "wait", params: {} } },
+        })
+
+        expect(result.text).toBe("done")
+        expect(remembers.length).toBe(2)
+        const rememberedText = remembers.map((input) => input.transcript.content.map(messageText))
+        expect(rememberedText[0]).toContain("authored before wait")
+        expect(rememberedText[1]).toContain("authored before wait")
+        expect(rememberedText.flat()).not.toContain("recalled before wait")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "remembers lossless authored and tool context instead of a compaction checkpoint", () => {
+    const remembers: Array<Memory.RememberInput> = []
+    let modelCalls = 0
+    const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("call-compact", "lookup", {}))
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => Effect.succeed({ _tag: "Success", result: "tool value", encodedResult: "tool value" }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Compaction.testLayer({
+          maybeCompact: (request) => {
+            if (request.turn === 0) return Effect.succeedNone
+            const firstKept = request.path?.at(-1)
+            if (firstKept === undefined) return Effect.succeedNone
+            return Effect.succeed(
+              Option.some({
+                _tag: "Summarize",
+                history: Prompt.fromMessages([
+                  Prompt.makeMessage("user", {
+                    content: [
+                      textPart("<conversation-checkpoint>\nrecall-derived summary\n</conversation-checkpoint>"),
+                    ],
+                  }),
+                ]),
+                prompt: request.prompt,
+                summary: "recall-derived summary",
+                firstKeptEntryId: firstKept.id,
+              }),
+            )
+          },
+        }),
+        Session.layerMemory,
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const result = yield* Agent.generate(agent, { prompt: "authored context", memory: { key } })
+
+        expect(result.text).toBe("done")
+        expect(remembers.length).toBe(2)
+        const terminal = remembers[1]
+        expect(terminal?.transcript.content.map(messageText)).toContain("authored context")
+        expect(terminal?.transcript.content.map(messageText)).not.toContain("recalled context")
+        expect(terminal?.transcript.content.map(messageText).join("\n")).not.toContain("conversation-checkpoint")
+        const toolResults = terminal?.transcript.content.flatMap((message) =>
+          Array.isArray(message.content)
+            ? message.content.filter((part) => part.type === "tool-result" && part.id === "call-compact")
+            : [],
+        )
+        expect(toolResults).toHaveLength(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed when Session-backed compaction strips current-prompt recall provenance", () => {
+    let modelCalls = 0
+    let remembered = false
+    const agent = Agent.make({ name: "memory-agent" })
+    return [
+      Layer.mergeAll(
+        modelLayer(() =>
+          Stream.sync(() => {
+            modelCalls += 1
+            return textDelta("unexpected")
+          }),
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Compaction.testLayer({
+          maybeCompact: (request) =>
+            Effect.succeed(
+              Option.some({
+                _tag: "Microcompact",
+                history: request.history,
+                prompt: Prompt.fromMessages(
+                  request.prompt.content.map((message) =>
+                    message.role === "user" ? Prompt.makeMessage("user", { content: message.content }) : message,
+                  ),
+                ),
+              }),
+            ),
+        }),
+        Session.layerMemory,
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          remember: () =>
+            Effect.sync(() => {
+              remembered = true
+            }),
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+
+        expect(failure._tag).toBe("@batonfx/core/MiddlewareViolation")
+        expect(modelCalls).toBe(0)
+        expect(remembered).toBe(false)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed when Session-backed compaction strips current-prompt provenance in place", () => {
+    let modelCalls = 0
+    const agent = Agent.make({ name: "memory-agent" })
+    return [
+      Layer.mergeAll(
+        modelLayer(() =>
+          Stream.sync(() => {
+            modelCalls += 1
+            return textDelta("unexpected")
+          }),
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Compaction.testLayer({
+          maybeCompact: (request) =>
+            Effect.sync(() => {
+              const recalled = request.prompt.content.find((message) => messageText(message) === "recalled context")
+              if (recalled !== undefined) Reflect.deleteProperty(recalled.options, "@batonfx/core/memory")
+              return Option.some({
+                _tag: "Microcompact" as const,
+                history: request.history,
+                prompt: request.prompt,
+              })
+            }),
+        }),
+        Session.layerMemory,
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "live prompt", memory: { key } }))
+
+        expect(failure._tag).toBe("@batonfx/core/MiddlewareViolation")
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "isolates the current prompt when Session-backed compaction mutates and declines", () => {
+    let modelPrompt: Prompt.Prompt | undefined
+    const agent = Agent.make({ name: "memory-agent" })
+    return [
+      Layer.mergeAll(
+        modelLayer((params) => {
+          modelPrompt = params.prompt
+          return Stream.make(textDelta("done"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Compaction.testLayer({
+          maybeCompact: (request) =>
+            Effect.sync(() => {
+              const recalled = request.prompt.content.find((message) => messageText(message) === "recalled context")
+              if (recalled !== undefined) {
+                Reflect.deleteProperty(recalled.options, "@batonfx/core/memory")
+                const text = Array.isArray(recalled.content)
+                  ? recalled.content.find((part) => part.type === "text")
+                  : undefined
+                if (text !== undefined) Object.assign(text, { text: "mutated recalled context" })
+              }
+              return Option.none()
+            }),
+        }),
+        Session.layerMemory,
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
+
+        expect(result.text).toBe("done")
+        expect(modelPrompt?.content[0]?.options).toEqual({
+          "@batonfx/core/memory": { origin: "memoryRecall" },
+        })
+        expect(modelPrompt?.content.map(messageText)).toContain("recalled context")
+        expect(modelPrompt?.content.map(messageText)).not.toContain("mutated recalled context")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "isolates synchronized Session history from in-place compaction mutation", () => {
+    let modelCalls = 0
+    const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("call-history", "lookup", {}))
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => Effect.succeed({ _tag: "Success", result: "tool value", encodedResult: "tool value" }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Compaction.testLayer({
+          maybeCompact: (request) => {
+            if (request.turn === 0) return Effect.succeedNone
+            return Effect.sync(() => {
+              const recalled = request.history.content.find((message) => messageText(message) === "recalled context")
+              if (recalled !== undefined) Reflect.deleteProperty(recalled.options, "@batonfx/core/memory")
+              const authored = request.history.content.find((message) => messageText(message) === "live prompt")
+              const text =
+                authored !== undefined && Array.isArray(authored.content)
+                  ? authored.content.find((part) => part.type === "text")
+                  : undefined
+              if (text !== undefined) Object.assign(text, { text: "corrupted authored context" })
+              return Option.some({
+                _tag: "Microcompact" as const,
+                history: Prompt.fromMessages([]),
+                prompt: request.prompt,
+              })
+            })
+          },
+        }),
+        Session.layerMemory,
+        Memory.testLayer({
+          recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
+          remember: () => Effect.void,
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const result = yield* Agent.generate(agent, { prompt: "live prompt", memory: { key } })
+        const session = yield* Session.SessionStore
+        const memoryTranscript = Session.buildMemoryContext(yield* session.path())
+
+        expect(result.text).toBe("done")
+        expect(modelCalls).toBe(2)
+        expect(memoryTranscript.content.map(messageText)).toContain("live prompt")
+        expect(memoryTranscript.content.map(messageText)).not.toContain("corrupted authored context")
+        expect(memoryTranscript.content.map(messageText)).not.toContain("recalled context")
       }),
     ] as const
   })
@@ -298,6 +837,46 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           expect(failure.cause).toBe(memoryError)
         }
         expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "maps remember MemoryError before completion", () => {
+    const memoryError = Memory.MemoryError.make({ message: "memory write unavailable" })
+    const events: Array<string> = []
+    const agent = Agent.make({ name: "memory-agent" })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(textDelta("done"))),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        Memory.testLayer({
+          recall: () => Effect.succeed([]),
+          remember: () => Effect.fail(memoryError),
+          forget: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(
+          Agent.stream(agent, { prompt: "hello", memory: { key } }).pipe(
+            Stream.tap((event) =>
+              Effect.sync(() => {
+                events.push(event._tag)
+              }),
+            ),
+            Stream.runDrain,
+          ),
+        )
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        if (failure._tag === "@batonfx/core/AgentError") {
+          expect(failure.message).toBe("memory write unavailable")
+          expect(failure.turn).toBe(0)
+          expect(failure.cause).toBe(memoryError)
+        }
+        expect(events).not.toContain("TurnCompleted")
+        expect(events).not.toContain("Completed")
       }),
     ] as const
   })

@@ -9,7 +9,7 @@ export interface TurnContext {
 
 /** @experimental A single middleware. Both hooks are optional; omitted hooks are identity. */
 export interface Middleware {
-  /** Transform the prompt for a turn before it is sent to the model. */
+  /** Transform the prompt for a turn before it is sent to the model. Recalled-memory messages must preserve lineage. */
   readonly transformPrompt?: (prompt: Prompt.Prompt, context: TurnContext) => Effect.Effect<Prompt.Prompt, AgentError>
   /**
    * Transform or drop a model stream part before the loop processes it.

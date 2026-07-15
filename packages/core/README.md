@@ -94,6 +94,8 @@ const migrated: Memory.Item = {
 
 This is a breaking correction from the former `parts: ReadonlyArray<Prompt.Part>` field. Rename `parts` to `content`; when legacy storage contains broad prompt parts, use `Memory.itemFromPromptPart` to filter them explicitly or reject the legacy item if any conversion returns `Option.none`. Baton never converts protocol parts to lossy text.
 
+Recalled items enter Chat as one user message carrying structural `memoryRecall` origin in Effect AI message options. Prompt middleware normally passes that marked message through unchanged; middleware that rebuilds its user content uses `Memory.replaceRecalledMessage` to retain its identity lineage. Compaction passes marked current-prompt messages through unchanged. Before every `Memory.remember`, core applies `Memory.projectTranscript` (or the lossless Session memory projection during compaction) so recalled context cannot be recursively stored. Identical user-authored text remains eligible for retention because projection never compares content. `RememberInput` and custom Memory implementations remain source-compatible; legacy histories without the option are treated as ordinary transcript content.
+
 ### Tool execution placement
 
 Baton uses Effect AI `Tool` and `Toolkit` values directly. For ordinary in-process tools, provide the handler layer from `toolkit.toLayer(...)` and no `ToolExecutor` is required. `ToolExecutor` is the optional override seam for durable waits and external placement. Its route helpers keep placement explicit while reusing the same toolkit definitions:

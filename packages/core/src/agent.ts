@@ -45,12 +45,22 @@ import {
   isContextOverflow,
 } from "./compaction.js"
 import { Instructions, openEpoch } from "./instructions.js"
-import { type Item, type Key, Memory, type MemoryError } from "./memory.js"
+import {
+  type Item,
+  type Key,
+  Memory,
+  type MemoryError,
+  isMessageFromRecall,
+  messageFromRecall,
+  projectTranscript,
+  recalledMessageIdentity,
+  replaceRecalledMessage,
+} from "./memory.js"
 import { type Middleware, ModelMiddleware, type TurnContext } from "./model-middleware.js"
 import { type LanguageModelNotRegistered, type ModelSelection, Service } from "./model-registry.js"
 import { ModelResilience, apply } from "./model-resilience.js"
 import { Permissions, RuleStore } from "./permissions.js"
-import { type Entry, SessionStore, type SessionStoreError } from "./session.js"
+import { type Entry, SessionStore, SessionStoreError, buildContext, buildMemoryContext } from "./session.js"
 import { SkillSource, type SkillSourceError, selectListings } from "./skill-source.js"
 import { type Message, Steering } from "./steering.js"
 import {
@@ -543,17 +553,64 @@ const withSystem = (instructions: string, prompt: Prompt.Prompt): Prompt.Prompt 
 const skillListingsInstructions = (listings: string): string =>
   `Available skills:\n${listings}\n\nCall ${activateSkillToolName} with a listed skill name to load its full body before using it.`
 
+const recalledMessages = (prompt: Prompt.Prompt): ReadonlyArray<Prompt.Message> =>
+  prompt.content.filter(isMessageFromRecall).map(recalledMessageIdentity)
+
+const encodeMessage = Schema.encodeEffect(Prompt.Message)
+const decodeMessage = Schema.decodeEffect(Prompt.Message)
+
+const detachMessage = (message: Prompt.Message) =>
+  encodeMessage(message).pipe(
+    Effect.flatMap(decodeMessage),
+    Effect.map((detached) =>
+      isMessageFromRecall(message) && message.role === "user" && detached.role === "user"
+        ? replaceRecalledMessage(message, detached.content)
+        : detached,
+    ),
+  )
+
+const detachPrompt = (prompt: Prompt.Prompt) =>
+  Effect.forEach(prompt.content, detachMessage).pipe(Effect.map(Prompt.fromMessages))
+
+const detachEntry = (entry: Entry) =>
+  entry._tag === "Message" || entry._tag === "Steering"
+    ? detachMessage(entry.message).pipe(Effect.map((message): Entry => ({ ...entry, message })))
+    : Effect.succeed(entry)
+
+const preservesRecalledMessages = (
+  allowed: ReadonlyArray<Prompt.Message>,
+  required: ReadonlyArray<Prompt.Message>,
+  transformed: Prompt.Prompt,
+): boolean => {
+  const allowedSet = new Set(allowed)
+  const transformedMessages = recalledMessages(transformed)
+  const transformedSet = new Set(transformedMessages)
+  return (
+    transformedSet.size === transformedMessages.length &&
+    transformedMessages.every((message) => allowedSet.has(message)) &&
+    required.every((message) => transformedSet.has(message))
+  )
+}
+
 /** Fold the prompt through every `transformPrompt` hook in array order. */
 const applyPromptChain = (
   chain: ReadonlyArray<Middleware>,
   prompt: Prompt.Prompt,
   context: TurnContext,
-): Effect.Effect<Prompt.Prompt, AgentError> =>
+): Effect.Effect<Prompt.Prompt, AgentError | MiddlewareViolation> =>
   Effect.gen(function* () {
     let current = prompt
     for (const middleware of chain) {
       if (middleware.transformPrompt !== undefined) {
-        current = yield* middleware.transformPrompt(current, context)
+        const recalled = recalledMessages(current)
+        const transformed = yield* middleware.transformPrompt(current, context)
+        if (!preservesRecalledMessages(recalled, recalled, transformed)) {
+          return yield* MiddlewareViolation.make({
+            turn: context.turn,
+            detail: "Prompt middleware must preserve recalled-memory message lineage",
+          })
+        }
+        current = transformed
       }
     }
     return current
@@ -905,7 +962,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       const insertRecalledItems = (prompt: Prompt.Prompt, items: ReadonlyArray<Item>): Prompt.Prompt => {
         const content = items.flatMap((item) => item.content)
         if (content.length === 0) return prompt
-        const memoryMessage = Prompt.makeMessage("user", { content })
+        const memoryMessage = messageFromRecall(content)
         const [first, ...rest] = prompt.content
         return first?.role === "system"
           ? Prompt.fromMessages([first, memoryMessage, ...rest])
@@ -924,11 +981,17 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         turn: number,
         transcript: Prompt.Prompt,
         terminal: boolean,
+        path: ReadonlyArray<Entry>,
       ): Effect.Effect<void, AgentError> =>
         memoryRuntime === undefined
           ? Effect.void
           : memoryRuntime.service
-              .remember({ key: memoryRuntime.key, turn, transcript, terminal })
+              .remember({
+                key: memoryRuntime.key,
+                turn,
+                transcript: Option.isSome(activeSession) ? buildMemoryContext(path) : projectTranscript(transcript),
+                terminal,
+              })
               .pipe(Effect.mapError((error) => memoryError(turn, error)))
 
       const syncSession = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, AgentError> =>
@@ -940,8 +1003,12 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               if (!sessionInitialized) {
                 sessionInitialized = true
                 if (existingPath.length > 0) {
-                  sessionSyncedMessages = transcript.content.length
-                  return existingPath
+                  sessionSyncedMessages = buildContext(existingPath).content.length
+                  if (sessionSyncedMessages > transcript.content.length) {
+                    return yield* SessionStoreError.make({
+                      message: "Session context contains more messages than the Chat transcript",
+                    })
+                  }
                 }
               }
               for (const message of transcript.content.slice(sessionSyncedMessages)) {
@@ -994,7 +1061,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         turn: number,
         prompt: Prompt.Prompt,
         overflow: boolean,
-      ): Effect.Effect<Prompt.Prompt, AgentError, LanguageModel.LanguageModel> =>
+      ): Effect.Effect<Prompt.Prompt, AgentError | MiddlewareViolation, LanguageModel.LanguageModel> =>
         Option.match(compactionService, {
           onNone: () => Effect.succeed(prompt),
           onSome: (compaction) =>
@@ -1002,14 +1069,25 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               const history = yield* Ref.get(chat.history)
               const path = yield* syncSession(turn, history)
               const usage = yield* compactionUsage(turn, history, prompt)
+              const historyRecalled = recalledMessages(history)
+              const promptRecalled = recalledMessages(prompt)
+              const detachedHistory = yield* detachPrompt(history).pipe(
+                Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
+              )
+              const detachedPrompt = yield* detachPrompt(prompt).pipe(
+                Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
+              )
+              const detachedPath = yield* Effect.forEach(path, detachEntry).pipe(
+                Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
+              )
               const compacted = yield* compaction
                 .maybeCompact({
                   agentName: agent.name,
                   sessionId,
                   turn,
-                  history,
-                  prompt,
-                  path,
+                  history: detachedHistory,
+                  prompt: detachedPrompt,
+                  path: detachedPath,
                   usage,
                   overflow,
                   ...(options.toolOutputMaxBytes === undefined
@@ -1018,6 +1096,20 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 })
                 .pipe(Effect.mapError((error) => compactionError(turn, error)))
               if (Option.isNone(compacted)) return prompt
+              const allowed = [...historyRecalled, ...promptRecalled]
+              const required = Option.isSome(activeSession) ? promptRecalled : allowed
+              if (
+                !preservesRecalledMessages(
+                  allowed,
+                  required,
+                  Prompt.concat(compacted.value.history, compacted.value.prompt),
+                )
+              ) {
+                return yield* MiddlewareViolation.make({
+                  turn,
+                  detail: "Compaction must preserve recalled-memory message lineage outside the lossless Session path",
+                })
+              }
               yield* applyCompactionResult(turn, compacted.value)
               return compacted.value.prompt
             }),
@@ -1714,8 +1806,8 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         Effect.gen(function* () {
           const pending = state.pending
           const transcript = yield* checkpointPending(turn, pending)
-          yield* syncSession(turn, transcript)
-          yield* rememberTurn(turn, transcript, pending.length === 0)
+          const path = yield* syncSession(turn, transcript)
+          yield* rememberTurn(turn, transcript, pending.length === 0, path)
           const completed: Event = turnCompletedEvent(turn, transcript)
           if (pending.length === 0) {
             const followUp = yield* takeFollowUp()
@@ -1927,6 +2019,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             return Stream.unwrap(
               Effect.gen(function* () {
                 const checkpoint = yield* checkpointPending(state.turn, state.pending)
+                yield* syncSession(state.turn, checkpoint)
                 return Stream.concat(
                   Stream.fromIterable<Event>([turnCompletedEvent(state.turn, checkpoint)]),
                   Stream.failCause<RunError>(cause),

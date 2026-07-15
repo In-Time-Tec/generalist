@@ -64,7 +64,8 @@ SPEC.md
    ├─ ADR-0035-unified-tool-authorization.md
    ├─ ADR-0036-framework-tool-result-checkpoint.md
    ├─ ADR-0037-unique-transformed-tool-call-ids.md
-   └─ ADR-0038-runtime-dynamic-transport-capability.md
+   ├─ ADR-0038-runtime-dynamic-transport-capability.md
+   └─ ADR-0039-memory-recall-provenance.md
 ```
 
 ## Packages
@@ -139,3 +140,4 @@ SPEC.md
 - ADR-0036 — Framework Tool-result Checkpoint: `docs/spec/decisions/ADR-0036-framework-tool-result-checkpoint.md`
 - ADR-0037 — Unique Transformed Tool-call IDs: `docs/spec/decisions/ADR-0037-unique-transformed-tool-call-ids.md`
 - ADR-0038 — Runtime-dynamic Transport Capability: `docs/spec/decisions/ADR-0038-runtime-dynamic-transport-capability.md`
+- ADR-0039 — Memory Recall Provenance: `docs/spec/decisions/ADR-0039-memory-recall-provenance.md`

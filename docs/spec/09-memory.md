@@ -1,6 +1,6 @@
 # 09 — Memory
 
-Baton memory is an optional core seam for recall before the first model turn, remember after completed turns, and host-requested lifecycle cleanup. Core owns only the timing, prompt insertion, and service operation contract. Concrete non-durable implementations live in `@batonfx/memory`; durable implementations remain host-owned.
+Baton memory is an optional core seam for recall before the first model turn, remember after completed turns, and host-requested lifecycle cleanup. Core owns the timing, structurally provenanced prompt insertion, memory-specific transcript projection, and service operation contract. Concrete non-durable implementations live in `@batonfx/memory`; durable implementations remain host-owned.
 
 ## Scope
 
@@ -8,8 +8,8 @@ Baton owns:
 
 - the `Memory` service interface in `packages/core/src/memory.ts`;
 - the agent default `Agent.make({ memory })` and per-run `RunOptions.memory.key` contracts;
-- recall insertion into the initial prompt;
-- remember calls after completed turns;
+- recall insertion into the initial prompt with structural origin;
+- memory-specific transcript projection and remember calls after completed turns;
 - host-requested forget lifecycle cleanup;
 - loud error mapping into `AgentError`.
 
@@ -23,7 +23,7 @@ Baton core does not own vector stores, embedding models, summarization, extracti
 
 When `Agent.make({ memory })` or `RunOptions.memory` is set and the `Memory` service is present, Baton calls `recall({ key, turn: 0, prompt })` once for non-resume runs. `prompt` is the run's initial prompt before recalled memory is inserted. A run-specific `RunOptions.memory.key` overrides the agent default.
 
-`Memory.Item.content` is `ReadonlyArray<Memory.ItemPart>`, where `ItemPart` is exactly Effect AI's `Prompt.UserMessagePart` (`Prompt.TextPart | Prompt.FilePart`). Recalled items are flattened in item and content order into one user message. That message is inserted after an initial system message when one exists and before the run prompt. If every recalled item has empty content, no message is inserted. Recall happens before model middleware, so guardrails and other prompt middleware see the enriched prompt. Because the item type admits only user-message content, a well-typed item never fails later during prompt insertion because of its part kind.
+`Memory.Item.content` is `ReadonlyArray<Memory.ItemPart>`, where `ItemPart` is exactly Effect AI's `Prompt.UserMessagePart` (`Prompt.TextPart | Prompt.FilePart`). Recalled items are flattened in item and content order into one user message. That message carries the schema-backed Effect AI message option `@batonfx/core/memory: { origin: "memoryRecall" }`, is inserted after an initial system message when one exists, and precedes the run prompt. The option remains structural through Prompt concatenation, Chat persistence, Session message projection, suspension, and resume; Baton never parses message content to recover origin. If every recalled item has empty content, no message is inserted. Recall happens before model middleware, so guardrails and other prompt middleware see the enriched prompt. Because the item type admits only user-message content, a well-typed item never fails later during prompt insertion because of its part kind.
 
 Reasoning, tool calls, tool results, and tool approval request/response parts are protocol transcript content and cannot enter recall through `Memory.Item`. `Memory.itemFromPromptPart(part)` is the explicit legacy conversion boundary: it returns `Option.some` for text and file parts and `Option.none` for every protocol-only part. A migrating implementation may filter broad legacy arrays with this function or reject the whole stored item when any result is `None`; it must not silently stringify or reinterpret rejected parts.
 
@@ -43,7 +43,13 @@ Resume runs skip recall because turn 0 already happened before suspension.
 
 ## Remember
 
-Baton calls `remember({ key, turn, transcript, terminal })` after each completed streamed turn. `transcript` is the full `Ai.Chat` history at that point, including only authoritative post-middleware model responses rather than raw provider parts and including that turn's completed framework tool results exactly once in call order. `terminal` is `true` when the run would otherwise complete with no pending tool results and `false` when tool results will be re-fed to a follow-up turn.
+Baton calls `remember({ key, turn, transcript, terminal })` after each completed streamed turn. `transcript` is a memory-specific projection of the authoritative conversation: it excludes every message with structural `memoryRecall` origin while preserving ordinary system, user, assistant, and tool messages in order, including that turn's completed framework tool results exactly once. `Memory.projectTranscript` defines this pure projection for plain Chat histories. User-authored text identical to recalled text remains because classification never uses equality, prefixes, tags, or any other content heuristic.
+
+When Compaction and SessionStore are active, Agent uses `Session.buildMemoryContext` over the lossless path rather than the compacted Chat projection. It ignores recalled-origin messages and synthetic Session/compaction context while retaining prompt-native pre- and post-compaction transcript entries in path order. This prevents a checkpoint summary derived from recall from entering memory without discarding legitimate authored transcript content. Without an active Session path, Agent projects the current Chat transcript directly. Legacy histories whose messages lack the Baton option are ordinary transcript content.
+
+Prompt middleware must preserve each recall-origin message's identity lineage. Passing the same message object through does so directly; middleware that must rebuild recalled user content uses `Memory.replaceRecalledMessage` to retain the lineage while preserving structural options. Agent snapshots lineage before invoking each middleware step and fails with `MiddlewareViolation` if a marker is removed, fabricated, duplicated, or moved onto another message. Compaction receives schema-detached message data in its history, prompt, and Session-path views so in-place message mutation cannot corrupt Chat or the lossless Session path, including when compaction declines. Its result must preserve recalled-message lineage across combined history and prompt when no lossless Session path exists. With Session, a result may omit recall-origin history already represented in the lossless path, but it must preserve every recall-origin message from the unsynchronized current prompt and may not introduce or move markers.
+
+`terminal` is `true` when the run would otherwise complete with no pending tool results and `false` when tool results will be re-fed to a follow-up turn.
 
 Terminal remember runs after any completed-tool-result checkpoint save, then before the final persisted-chat save and `Completed`. Suspension does not remember at the suspension point; the host re-enters with `RunOptions.resume`, and the resumed run's completed turns remember normally.
 
@@ -123,3 +129,4 @@ Forget without `id` drops the exact key's in-process working-memory state. Forge
 - `docs/spec/decisions/ADR-0027-memory-item-user-content.md`
 - `docs/spec/decisions/ADR-0033-truthful-agent-requirements.md`
 - `docs/spec/decisions/ADR-0036-framework-tool-result-checkpoint.md`
+- `docs/spec/decisions/ADR-0039-memory-recall-provenance.md`

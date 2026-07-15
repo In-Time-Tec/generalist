@@ -1,5 +1,6 @@
 import { Context, Effect, HashMap, Layer, Option, Ref, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import { projectTranscript } from "./memory.js"
 /** @experimental Opaque session entry id. */
 export type EntryId = string
 
@@ -289,6 +290,29 @@ const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Mes
 
 /** @experimental Purely projects a root-to-leaf session path into model context. */
 export const buildContext = (path: ReadonlyArray<Entry>): Prompt.Prompt => Prompt.fromMessages(projectedMessages(path))
+
+/** @experimental Purely projects a lossless path for memory retention. */
+export const buildMemoryContext = (path: ReadonlyArray<Entry>): Prompt.Prompt => {
+  const messages = path.flatMap((entry): ReadonlyArray<Prompt.Message> => {
+    switch (entry._tag) {
+      case "Message":
+        return [entry.message]
+      case "ToolCall":
+        return [Prompt.makeMessage("assistant", { content: [entry.part] })]
+      case "ToolResult":
+        return [Prompt.makeMessage("tool", { content: [entry.part] })]
+      case "Steering":
+        return [entry.message]
+      case "Memory":
+      case "Skill":
+      case "Handoff":
+      case "Compaction":
+      case "BranchSummary":
+        return []
+    }
+  })
+  return projectTranscript(Prompt.fromMessages(messages))
+}
 
 /** @experimental Ref-backed non-durable session store. */
 export const layerMemory: Layer.Layer<SessionStore> = Layer.effect(

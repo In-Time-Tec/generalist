@@ -90,6 +90,10 @@ The summary template has fixed sections: Goal, Constraints, Progress, Key Decisi
 
 When both `Compaction` and `SessionStore` are provided, the loop mirrors chat transcript messages into the session log and appends a `Compaction` entry after summary checkpointing. The full pre-compaction conversation remains in the session path; only the prompt projected into the live `Ai.Chat` shrinks.
 
+Compaction implementations receive schema-detached message data in request history, prompt, and Session-path views. In-place message mutation cannot modify authoritative Chat or Session state; an accepted result becomes authoritative only after recalled-message lineage validation. Non-message Session entry fields remain readonly borrowed input.
+
+Memory retention uses the full Session path in this mode. Its dedicated projection excludes structurally marked recalled messages and synthetic compaction checkpoints while preserving authored/model/tool transcript entries across the cut. A summary influenced by recalled context therefore cannot become recursively remembered.
+
 When no `SessionStore` is provided, Baton can still run an implementation supplied through `Compaction.testLayer`, but the default summary strategy cannot invent a durable history and returns no summary compaction when no safe session path is available.
 
 ## Agent integration
@@ -108,3 +112,4 @@ Terminal structured-output compaction is deferred; the same seam can compact nor
 - `docs/spec/02-session-event-log.md`
 - `docs/spec/decisions/ADR-0009-compaction-strategy-seam.md`
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
+- `docs/spec/decisions/ADR-0039-memory-recall-provenance.md`
