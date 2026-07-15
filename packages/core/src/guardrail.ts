@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { AgentError } from "./agent-event.js"
+import { isMessageFromRecall, replaceRecalledMessage } from "./memory.js"
 import type { Middleware, TurnContext } from "./model-middleware.js"
 
 interface RedactOptions {
@@ -49,10 +50,15 @@ const redactPromptText = (prompt: Prompt.Prompt, options: RedactOptions): Prompt
             options: message.options,
           })
         case "user":
-          return Prompt.makeMessage("user", {
-            content: message.content.map((part) => redactUserPart(part, options)),
-            options: message.options,
-          })
+          return isMessageFromRecall(message)
+            ? replaceRecalledMessage(
+                message,
+                message.content.map((part) => redactUserPart(part, options)),
+              )
+            : Prompt.makeMessage("user", {
+                content: message.content.map((part) => redactUserPart(part, options)),
+                options: message.options,
+              })
         case "assistant":
           return Prompt.makeMessage("assistant", {
             content: message.content.map((part) => redactAssistantPart(part, options)),

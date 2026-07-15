@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Context, Deferred, Effect, Fiber, Layer, Ref, Scope, Stream } from "effect"
-import { AiError, LanguageModel, Prompt } from "effect/unstable/ai"
-import { Memory } from "@batonfx/core"
+import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
+import { Agent, Memory } from "@batonfx/core"
 import { WorkingMemory } from "../src/index"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
@@ -31,7 +31,7 @@ const promptText = (value: Prompt.Prompt): string =>
     .join("")
 
 let summaryCalls = 0
-let summaryPrompt: unknown
+let summaryPrompt: Prompt.Prompt["content"] | undefined
 const summaryModel = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
@@ -46,6 +46,45 @@ const summaryModel = Layer.effect(
 )
 
 layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
+  it.effect("does not recursively remember recalled context while retaining identical authored text", () =>
+    Effect.gen(function* () {
+      const memory = yield* WorkingMemory.make({ maxMessages: 20 })
+      const calls = yield* Ref.make(0)
+      const model = yield* LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Ref.updateAndGet(calls, (count) => count + 1).pipe(
+            Stream.fromEffect,
+            Stream.flatMap((call) =>
+              Stream.fromIterable([
+                Response.makePart("text-start", { id: `text-${call}` }),
+                Response.makePart("text-delta", { id: `text-${call}`, delta: call === 1 ? "first" : "second" }),
+                Response.makePart("text-end", { id: `text-${call}` }),
+              ]),
+            ),
+          ),
+      })
+      const agent = Agent.make({ name: key.agent })
+      const run = (input: string) =>
+        Agent.generate(agent, { prompt: input, memory: { key } }).pipe(
+          Effect.provideService(LanguageModel.LanguageModel, model),
+          Effect.provideService(Memory.Memory, Memory.Memory.of(memory)),
+        )
+
+      yield* run("repeated")
+      yield* run("repeated")
+
+      const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
+
+      expect(recalled.map(itemText)).toEqual([
+        "User: repeated",
+        "Assistant: first",
+        "User: repeated",
+        "Assistant: second",
+      ])
+    }),
+  )
+
   it.effect("keeps a bounded recent tail", () =>
     Effect.gen(function* () {
       const memory = yield* Memory.Memory
@@ -136,6 +175,53 @@ layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
 })
 
 layer(WorkingMemory.layer({ maxMessages: 2, summarize: { model: summaryModel } }))((it) => {
+  it.effect("keeps repeated Agent runs bounded and excludes recalled context from summary overflow", () =>
+    Effect.gen(function* () {
+      summaryCalls = 0
+      summaryPrompt = undefined
+      const memory = yield* Memory.Memory
+      const calls = yield* Ref.make(0)
+      const model = yield* LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Ref.updateAndGet(calls, (count) => count + 1).pipe(
+            Stream.fromEffect,
+            Stream.flatMap((call) =>
+              Stream.fromIterable([
+                Response.makePart("text-start", { id: `bounded-${call}` }),
+                Response.makePart("text-delta", {
+                  id: `bounded-${call}`,
+                  delta: call === 1 ? "first" : "second",
+                }),
+                Response.makePart("text-end", { id: `bounded-${call}` }),
+              ]),
+            ),
+          ),
+      })
+      const agent = Agent.make({ name: key.agent })
+      const run = Agent.generate(agent, { prompt: "repeated", memory: { key } }).pipe(
+        Effect.provideService(LanguageModel.LanguageModel, model),
+      )
+
+      yield* run
+      yield* run
+
+      const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
+      const renderedSummaryPrompt = summaryPrompt === undefined ? "" : promptText(Prompt.fromMessages(summaryPrompt))
+
+      expect(summaryCalls).toBe(1)
+      expect(renderedSummaryPrompt).toContain("User: repeated")
+      expect(renderedSummaryPrompt).toContain("Assistant: first")
+      expect(renderedSummaryPrompt).not.toContain("User: User: repeatedAssistant: first")
+      expect(recalled.map((item) => item.id)).toEqual(["working-summary", "working-3", "working-4"])
+      expect(recalled.map(itemText)).toEqual([
+        "<working-memory-summary>\nsummary\n</working-memory-summary>",
+        "User: repeated",
+        "Assistant: second",
+      ])
+    }),
+  )
+
   it.effect("summarizes overflow once and recalls summary before the recent tail", () =>
     Effect.gen(function* () {
       summaryCalls = 0

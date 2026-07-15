@@ -9,7 +9,7 @@ Baton owns:
 - the closed session entry union: `Message`, `ToolCall`, `ToolResult`, `Memory`, `Skill`, `Steering`, `Handoff`, `Compaction`, and `BranchSummary`;
 - the `SessionStore` service boundary;
 - a `Ref`-backed in-memory layer and a `testLayer`;
-- the pure `buildContext(path)` projector.
+- the pure model `buildContext(path)` and memory `buildMemoryContext(path)` projectors.
 
 Baton does not own durable/addressable storage, JSONL filesystem adapters, Relay adapters, `/tree` UI, or Agent loop integration in this issue. Durable hosts provide their own `SessionStore` implementation at the boundary.
 
@@ -43,6 +43,8 @@ Each entry has an opaque `id`, a `parentId` (`null` for a root entry), and optio
 - With one or more compactions, the last compaction wins. The projector emits one user checkpoint message containing `<conversation-checkpoint>`, then projects entries from `firstKeptEntryId` onward. Older entries remain in the path but are absent from the prompt.
 - If a malformed path's `firstKeptEntryId` is missing, the projector emits the checkpoint and continues after the compaction entry rather than reintroducing compacted history.
 
+`buildMemoryContext(path)` is the lossless memory-retention projection. It walks the whole path, ignores compaction and synthetic context entries, retains prompt-native `Message`, `ToolCall`, `ToolResult`, and `Steering` entries in order, and removes `Message` values carrying Baton's structural `memoryRecall` origin. It never compares content. Agent uses this projector before `Memory.remember` when compaction integration has an active Session path.
+
 ## Agent integration
 
 `SessionStore` is wired into `Agent.stream` only when `Compaction` is also present. In that mode the loop mirrors the authoritative transformed Chat transcript into the session path and appends a `Compaction` entry after summary checkpointing. Completed framework tool results enter Chat exactly once before this synchronization, so the same turn's session path includes them in call order. Raw pre-middleware response parts never enter the session path. Without `Compaction`, `SessionStore` remains a standalone seam and the current agent loop continues to use `Ai.Chat` only.
@@ -53,3 +55,4 @@ Each entry has an opaque `id`, a `parentId` (`null` for a root entry), and optio
 - `docs/spec/decisions/ADR-0005-session-event-log.md`
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
 - `docs/spec/decisions/ADR-0036-framework-tool-result-checkpoint.md`
+- `docs/spec/decisions/ADR-0040-memory-recall-provenance.md`

@@ -1,6 +1,10 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
+
+const provenanceOption = "@batonfx/core/memory"
+const recallLineage = new WeakMap<Prompt.Message, Prompt.Message>()
+
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
 
@@ -24,6 +28,51 @@ export interface Item {
 export const itemFromPromptPart = Option.liftPredicate(
   (part: Prompt.Part): part is ItemPart => part.type === "text" || part.type === "file",
 )
+
+/** @experimental */
+export const isMessageFromRecall = (message: Prompt.Message): boolean => {
+  const provenance = message.options[provenanceOption]
+  return (
+    typeof provenance === "object" &&
+    provenance !== null &&
+    !Array.isArray(provenance) &&
+    "origin" in provenance &&
+    provenance.origin === "memoryRecall"
+  )
+}
+
+/** @experimental */
+export const messageFromRecall = (content: ReadonlyArray<ItemPart>): Prompt.UserMessage => {
+  const message = Prompt.makeMessage("user", {
+    content,
+    options: { [provenanceOption]: { origin: "memoryRecall" } },
+  })
+  recallLineage.set(message, message)
+  return message
+}
+
+/** @experimental */
+export const replaceRecalledMessage: {
+  (content: ReadonlyArray<Prompt.UserMessagePart>): (message: Prompt.UserMessage) => Prompt.UserMessage
+  (message: Prompt.UserMessage, content: ReadonlyArray<Prompt.UserMessagePart>): Prompt.UserMessage
+} = dual(2, (message: Prompt.UserMessage, content: ReadonlyArray<Prompt.UserMessagePart>): Prompt.UserMessage => {
+  const options = isMessageFromRecall(message)
+    ? { ...message.options, [provenanceOption]: { origin: "memoryRecall" } }
+    : { ...message.options }
+  const replacement = Prompt.makeMessage("user", { content, options })
+  if (isMessageFromRecall(message)) recallLineage.set(replacement, recallLineage.get(message) ?? message)
+  return replacement
+})
+
+/** @experimental */
+export const recalledMessageIdentity = (message: Prompt.Message): Prompt.Message =>
+  recallLineage.get(message) ?? message
+
+/** @experimental */
+export const projectTranscript = (transcript: Prompt.Prompt): Prompt.Prompt => {
+  const content = transcript.content.filter((message) => !isMessageFromRecall(message))
+  return content.length === transcript.content.length ? transcript : Prompt.fromMessages(content)
+}
 
 /** @experimental */
 export interface RecallInput {

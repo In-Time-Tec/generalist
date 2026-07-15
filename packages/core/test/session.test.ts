@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Session } from "../src/index"
+import { Memory, Session } from "../src/index"
 import { ItLayer } from "./it-layer"
 
 const user = (text: string): Prompt.Message =>
@@ -103,6 +103,39 @@ describe("Session", () => {
             "<conversation-checkpoint>\nsummary m1-m3\n</conversation-checkpoint>",
             "m4",
             "m5",
+          ])
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
+    "projects lossless memory context across compaction without recalled or synthetic entries",
+    () =>
+      [
+        Session.memoryLayer,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+
+          const first = yield* store.append({ _tag: "Message", message: user("authored before") })
+          yield* store.append({
+            _tag: "Message",
+            message: Memory.messageFromRecall([Prompt.makePart("text", { text: "recalled" })]),
+          })
+          const kept = yield* store.append({ _tag: "Message", message: assistant("model before") })
+          yield* store.append({
+            _tag: "Compaction",
+            summary: "summary containing recalled and authored context",
+            firstKeptEntryId: kept.id,
+          })
+          yield* store.append({ _tag: "Message", message: user("authored after") })
+          const path = yield* store.path()
+
+          expect(first.id).toBe("0")
+          expect(promptTexts(Session.buildMemoryContext(path))).toEqual([
+            "authored before",
+            "model before",
+            "authored after",
           ])
         }),
       ] as const,

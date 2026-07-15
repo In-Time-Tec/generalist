@@ -22,6 +22,11 @@ export const memory = definePage({
       code("{ agent, subject }"),
       " that you choose. Batonfx never derives memory identity from session ids or users.",
     ),
+    p(
+      "Injected recall carries structural provenance in the Chat transcript. Before ",
+      code("Memory.remember"),
+      ", core removes recall-origin entries without comparing text, so recalled context cannot recursively grow working memory while identical user-authored text is retained. Compacted runs project from the lossless Session path rather than remembering a synthetic checkpoint.",
+    ),
     h2("working-memory", "1. Start with working memory"),
     p(
       code("WorkingMemory.layer"),
