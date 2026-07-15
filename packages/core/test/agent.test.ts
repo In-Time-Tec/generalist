@@ -218,6 +218,10 @@ const gatedTool = Tool.make("gated", {
   needsApproval: true,
 })
 
+class AuthorizationDependency extends Context.Service<AuthorizationDependency, string>()(
+  "@batonfx/core/test/agent.test/AuthorizationDependency",
+) {}
+
 const testSkill = (
   name: string,
   description: string,
@@ -832,6 +836,51 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
         expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
         expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "executes the static tool snapshot advertised to the model", () => {
+    let modelCalls = 0
+    let originalCalls = 0
+    const original = Tool.make("snapshot_tool", {
+      parameters: Schema.Struct({}),
+      success: Schema.Literal("original"),
+    })
+    const replacement = Tool.make("snapshot_tool", {
+      parameters: Schema.Struct({}),
+      success: Schema.Literal("replacement"),
+    })
+    const toolkit = Toolkit.make(original)
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            Object.defineProperty(toolkit.tools, "snapshot_tool", {
+              configurable: true,
+              enumerable: true,
+              value: replacement,
+              writable: true,
+            })
+            return Stream.make(toolCallPart("snapshot-call", "snapshot_tool", {}))
+          }
+          return Stream.make(textDelta("done"))
+        }),
+        toolkit.toLayer({
+          snapshot_tool: () =>
+            Effect.sync(() => {
+              originalCalls += 1
+              return "original" as const
+            }),
+        }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make("snapshot-agent", { toolkit })
+
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "run snapshot" }))
+
+        expect(originalCalls).toBe(1)
       }),
     ] as const
   })
@@ -1466,6 +1515,36 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "preserves custom authorizer requirements in the run type", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("required-authorizer", "echo", { text: "run" }))
+            : Stream.make(textDelta("authorized"))
+        }),
+        echoExecutor,
+        ModelMiddleware.identityLayer,
+        Layer.succeed(AuthorizationDependency, "available"),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({
+          name: "required-authorizer-agent",
+          toolkit: Toolkit.make(echoTool),
+          authorization: {
+            authorize: () => Effect.as(AuthorizationDependency, { _tag: "Execute" as const }),
+          },
+        })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "authorize" }))
+
+        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "provides ToolContext to executors and emits ToolProgress events", () => {
     let calls = 0
     let requestSessionId = ""
@@ -1966,6 +2045,40 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "emits ApprovalRequested before a blocking approval check completes", () => {
+    let modelCalls = 0
+    let approval: Deferred.Deferred<Approvals.Decision> | undefined
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("blocking-approval", "gated", { text: "wait" }))
+            : Stream.make(textDelta("after blocking approval"))
+        }),
+        unusedExecutor,
+        Approvals.testLayer({
+          check: () => (approval === undefined ? Effect.die("missing approval Deferred") : Deferred.await(approval)),
+        }),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        approval = yield* Deferred.make<Approvals.Decision>()
+        const requested = yield* Deferred.make<void>()
+        const agent = Agent.make({ name: "blocking-approval-agent", toolkit: Toolkit.make(gatedTool) })
+        const fiber = yield* Stream.runForEach(Agent.stream(agent, { prompt: "wait for approval" }), (event) =>
+          event._tag === "ApprovalRequested" ? Deferred.succeed(requested, undefined).pipe(Effect.asVoid) : Effect.void,
+        ).pipe(Effect.forkChild({ startImmediately: true }))
+
+        yield* Deferred.await(requested)
+        expect(fiber.pollUnsafe()).toBeUndefined()
+        yield* Deferred.succeed(approval, { _tag: "Denied" })
+        const failure = yield* Fiber.join(fiber).pipe(Effect.flip)
+        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "denies through Permissions before approvals or executor", () => {
     let calls = 0
     return [
@@ -2074,7 +2187,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "executes permission Approved answers without consulting Approvals again", () => {
+  ItLayer.make(it, "does not let permission Approved answers bypass needsApproval", () => {
     let calls = 0
     return [
       Layer.mergeAll(
@@ -2084,8 +2197,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             ? Stream.make(toolCallPart("tool-call-permission-approved", "gated", { text: "approved" }))
             : Stream.make(textDelta("after approved permission"))
         }),
-        echoExecutor,
-        Approvals.testLayer({ check: () => Effect.die("permission-approved call must not ask approvals") }),
+        ToolExecutor.testLayer({ execute: () => Effect.die("approval-denied call must not execute") }),
+        Approvals.denyAll,
         Permissions.interactive({
           ruleset: { rules: [], fallback: "ask" },
           onAsk: () => Effect.succeed({ _tag: "Approved" }),
@@ -2094,17 +2207,23 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "permission-approved-agent", toolkit: Toolkit.make(gatedTool) })
+        const events: Array<AgentEvent.Event> = []
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "ask then approve" }))
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "ask then approve" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
 
+        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
-        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
-        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
       }),
     ] as const
   })
 
-  ItLayer.make(it, "remembers Always answers through the optional RuleStore", () => {
+  ItLayer.make(it, "remembers Always without bypassing needsApproval", () => {
     let calls = 0
     const remembered: Array<Permissions.Rule> = []
     return [
@@ -2115,8 +2234,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             ? Stream.make(toolCallPart("tool-call-permission-always", "gated", { text: "always" }))
             : Stream.make(textDelta("after always"))
         }),
-        echoExecutor,
-        Approvals.testLayer({ check: () => Effect.die("permission-always call must not ask approvals") }),
+        ToolExecutor.testLayer({ execute: () => Effect.die("approval-denied call must not execute") }),
+        Approvals.denyAll,
         Permissions.interactive({
           ruleset: { rules: [], fallback: "ask" },
           onAsk: () => Effect.succeed({ _tag: "Always" }),
@@ -2131,12 +2250,184 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "permission-always-agent", toolkit: Toolkit.make(gatedTool) })
+        const events: Array<AgentEvent.Event> = []
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "ask always" }))
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "ask always" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
 
+        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
         expect(remembered).toEqual([{ pattern: "gated", level: "allow" }])
-        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "reads a remembered Always rule before asking again", () => {
+    let modelCalls = 0
+    let asks = 0
+    let executions = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.fromIterable([
+                toolCallPart("tool-call-always-first", "echo", { text: "first" }),
+                toolCallPart("tool-call-always-second", "echo", { text: "second" }),
+              ])
+            : Stream.make(textDelta("after remembered permission"))
+        }),
+        ToolExecutor.testLayer({
+          execute: (request) => {
+            executions += 1
+            return Effect.succeed({
+              _tag: "Success",
+              result: request.call.params,
+              encodedResult: request.call.params,
+            })
+          },
+        }),
+        Permissions.interactive({
+          ruleset: { rules: [], fallback: "ask" },
+          onAsk: () => {
+            asks += 1
+            return Effect.succeed({ _tag: "Always" })
+          },
+        }),
+        Permissions.ruleStoreMemory(),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "remembered-always-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "remember approval" }))
+
+        expect(asks).toBe(1)
+        expect(executions).toBe(2)
         expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "denies a static tool excluded after it was active on the previous turn", () => {
+    let modelCalls = 0
+    let gatedExecutions = 0
+    const policy = TurnPolicy.make(({ turn }) =>
+      Effect.succeed(TurnPolicy.decision.continue(turn === 1 ? { activeTools: ["echo"] } : undefined)),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          if (modelCalls === 1) return Stream.make(toolCallPart("active-seed", "echo", { text: "seed" }))
+          if (modelCalls === 2) return Stream.make(toolCallPart("excluded-static", "echo", { text: "blocked" }))
+          return Stream.make(textDelta("after excluded tool"))
+        }),
+        ToolExecutor.testLayer({
+          execute: (request) => {
+            if (request.call.name === "gated") gatedExecutions += 1
+            return Effect.succeed({
+              _tag: "Success",
+              result: request.call.params,
+              encodedResult: request.call.params,
+            })
+          },
+        }),
+        Approvals.testLayer({ check: () => Effect.die("excluded tool must not request approval") }),
+        ModelMiddleware.layer([
+          {
+            transformPart: (part) =>
+              Effect.succeed(
+                Option.some(
+                  part.type === "tool-call" && part.id === "excluded-static"
+                    ? toolCallPart(part.id, "gated", part.params)
+                    : part,
+                ),
+              ),
+          },
+        ]),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({
+          name: "active-tools-agent",
+          toolkit: Toolkit.make(echoTool, gatedTool),
+          policy,
+        })
+
+        const events: Array<AgentEvent.Event> = []
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "use active tools" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
+
+        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+        expect(gatedExecutions).toBe(0)
+        expect(events.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
+        expect(
+          events.some((event) => event._tag === "ToolExecutionCompleted" && event.call.id === "excluded-static"),
+        ).toBe(false)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "denies an activated skill tool excluded from the current turn", () => {
+    let modelCalls = 0
+    const reviewTool = Tool.make("review_tool", {
+      parameters: Schema.Struct({ target: Schema.String }),
+      success: Schema.Unknown,
+    })
+    const review: SkillSource.Skill = {
+      ...testSkill("review-active", "Review active tool behavior.", "REVIEW BODY"),
+      tools: [reviewTool],
+    }
+    const policy = TurnPolicy.make(() =>
+      Effect.succeed(TurnPolicy.decision.continue({ activeTools: ["activate_skill"] })),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("activate-review", "activate_skill", { name: "review-active" }))
+            : modelCalls === 2
+              ? Stream.make(textDelta("invalid skill call"))
+              : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({ execute: () => Effect.die("excluded skill tool must not execute") }),
+        SkillSource.fromSkills([review]),
+        ModelMiddleware.layer([
+          {
+            transformPart: (part, context) =>
+              Effect.succeed(
+                Option.some(
+                  context.turn === 1 && part.type === "text-delta"
+                    ? toolCallPart("excluded-skill", "review_tool", { target: "src" })
+                    : part,
+                ),
+              ),
+          },
+        ]),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "active-skill-tools-agent", policy })
+
+        const events: Array<AgentEvent.Event> = []
+        const failure = yield* Effect.flip(
+          Stream.runForEach(Agent.stream(agent, { prompt: "review" }), (event) =>
+            Effect.sync(() => events.push(event)),
+          ),
+        )
+
+        expect(failure).toMatchObject({ stage: "authorization", tool: "review_tool" })
+        expect(events.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
+        expect(
+          events.some((event) => event._tag === "ToolExecutionCompleted" && event.call.id === "excluded-skill"),
+        ).toBe(false)
       }),
     ] as const
   })
@@ -4239,6 +4530,279 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         if (completed?._tag === "Completed") {
           expect(completed.text).toBe("after resume")
         }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "resumes an authorization suspension with its active-tool snapshot", () => {
+    let modelCalls = 0
+    let permissionAnswers = 0
+    let executions = 0
+    let checkpoint: Prompt.Prompt | undefined
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("authorization-resume", "gated", { text: "resume" }))
+            : Stream.make(textDelta("after authorization resume"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executions += 1
+            return Effect.succeed({ _tag: "Success", result: "resumed", encodedResult: "resumed" })
+          },
+        }),
+        Permissions.testLayer({
+          evaluate: () => Effect.succeed({ _tag: "Ask", token: "authorization-token" }),
+          await: () => {
+            permissionAnswers += 1
+            return Effect.succeed(permissionAnswers === 1 ? Option.none() : Option.some({ _tag: "Approved" as const }))
+          },
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "authorization-resume-agent", toolkit: Toolkit.make(gatedTool) })
+        const failure = yield* Agent.stream(agent, { prompt: "suspend authorization" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (failure._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return expect.unreachable()
+        }
+
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, {
+            prompt: "ignored",
+            history: checkpoint,
+            resume: {
+              call: {
+                id: failure.tool_call_id,
+                name: failure.tool_name,
+                params: failure.tool_params,
+              },
+              ...(failure.active_tools === undefined ? {} : { activeTools: failure.active_tools }),
+              ...(failure.activated_skills === undefined ? {} : { activatedSkills: failure.activated_skills }),
+              ...(failure.authorization_stage === undefined ? {} : { authorizationStage: failure.authorization_stage }),
+              token: failure.token,
+            },
+          }),
+        )
+
+        expect(failure.active_tools).toEqual(["gated"])
+        expect(executions).toBe(1)
+        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "denies a substituted resume call outside the suspended active-tool snapshot", () => {
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("after substituted resume"))
+        }),
+        ToolExecutor.testLayer({ execute: () => Effect.die("substituted resume call must not execute") }),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({
+          name: "substituted-resume-agent",
+          toolkit: Toolkit.make(echoTool, gatedTool),
+          authorization: { authorize: () => Effect.succeed({ _tag: "Execute" as const }) },
+        })
+
+        const failure = yield* Effect.flip(
+          Stream.runDrain(
+            Agent.stream(agent, {
+              prompt: "ignored",
+              history: [{ role: "user", content: [{ type: "text", text: "suspended" }] }],
+              resume: {
+                call: { id: "substituted", name: "echo", params: { text: "blocked" } },
+                activeTools: ["gated"],
+              },
+            }),
+          ),
+        )
+
+        expect(failure).toMatchObject({ stage: "authorization", tool: "echo" })
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "normalizes custom authorization suspensions to the attempted call snapshot", () => {
+    const forged = AgentEvent.AgentSuspended.make({
+      token: "custom-token",
+      reason: "approval",
+      tool_call_id: "forged-call",
+      tool_name: "echo",
+      tool_params: { text: "forged" },
+      active_tools: ["echo", "gated"],
+      activated_skills: ["forged-skill"],
+    })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(toolCallPart("actual-call", "gated", { text: "actual" }))),
+        ToolExecutor.testLayer({ execute: () => Effect.die("suspended call must not execute") }),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({
+          name: "normalized-suspension-agent",
+          toolkit: Toolkit.make(gatedTool),
+          authorization: { authorize: () => Effect.succeed({ _tag: "Suspend" as const, suspension: forged }) },
+        })
+
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "suspend" })))
+
+        expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
+        if (failure._tag !== "@batonfx/core/AgentSuspended") return expect.unreachable()
+        expect(failure.token).toBe("custom-token")
+        expect(failure.tool_call_id).toBe("actual-call")
+        expect(failure.tool_name).toBe("gated")
+        expect(failure.tool_params).toEqual({ text: "actual" })
+        expect(failure.active_tools).toEqual(["gated"])
+        expect(failure.activated_skills).toEqual([])
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects an authorization resume whose params differ from the checkpoint", () => {
+    let checkpoint: Prompt.Prompt | undefined
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(toolCallPart("bound-call", "gated", { text: "original" }))),
+        ToolExecutor.testLayer({ execute: () => Effect.die("substituted params must not execute") }),
+        Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "bound-resume-agent", toolkit: Toolkit.make(gatedTool) })
+        const failure = yield* Agent.stream(agent, { prompt: "suspend" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (failure._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing authorization checkpoint")
+        }
+
+        const resumeFailure = yield* Effect.flip(
+          Stream.runDrain(
+            Agent.stream(agent, {
+              prompt: "ignored",
+              history: checkpoint,
+              resume: {
+                call: { id: failure.tool_call_id, name: failure.tool_name, params: { text: "substituted" } },
+                ...(failure.active_tools === undefined ? {} : { activeTools: failure.active_tools }),
+                ...(failure.activated_skills === undefined ? {} : { activatedSkills: failure.activated_skills }),
+                authorizationStage: "permission",
+              },
+            }),
+          ),
+        )
+
+        expect(resumeFailure._tag).toBe("@batonfx/core/AgentError")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rehydrates activated skill tools when resuming authorization", () => {
+    let modelCalls = 0
+    let approvalChecks = 0
+    let executions = 0
+    let checkpoint: Prompt.Prompt | undefined
+    const reviewTool = Tool.make("resumable_review", {
+      parameters: Schema.Struct({ target: Schema.String }),
+      success: Schema.Unknown,
+      needsApproval: true,
+    })
+    const review: SkillSource.Skill = {
+      ...testSkill("resumable-review", "Review with resumable approval.", "RESUMABLE REVIEW BODY"),
+      tools: [reviewTool],
+    }
+    const policy = TurnPolicy.make(() =>
+      Effect.succeed(TurnPolicy.decision.continue({ activeTools: ["activate_skill", "resumable_review"] })),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.make(toolCallPart("activate-resumable", "activate_skill", { name: "resumable-review" }))
+          }
+          if (modelCalls === 2) {
+            return Stream.make(toolCallPart("resumable-review-call", "resumable_review", { target: "src" }))
+          }
+          return Stream.make(textDelta("after resumed skill"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executions += 1
+            return Effect.succeed({ _tag: "Success", result: "reviewed", encodedResult: "reviewed" })
+          },
+        }),
+        Approvals.testLayer({
+          check: () => {
+            approvalChecks += 1
+            return Effect.succeed(
+              approvalChecks === 1
+                ? { _tag: "Pending", token: "skill-approval" as const }
+                : { _tag: "Approved" as const },
+            )
+          },
+        }),
+        SkillSource.fromSkills([review]),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "resumable-skill-agent", policy })
+        const failure = yield* Agent.stream(agent, { prompt: "review" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (failure._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) return expect.unreachable()
+
+        yield* Stream.runDrain(
+          Agent.stream(agent, {
+            prompt: "ignored",
+            history: checkpoint,
+            resume: {
+              call: {
+                id: failure.tool_call_id,
+                name: failure.tool_name,
+                params: failure.tool_params,
+              },
+              ...(failure.active_tools === undefined ? {} : { activeTools: failure.active_tools }),
+              ...(failure.activated_skills === undefined ? {} : { activatedSkills: failure.activated_skills }),
+              ...(failure.authorization_stage === undefined ? {} : { authorizationStage: failure.authorization_stage }),
+            },
+          }),
+        )
+
+        expect(failure.activated_skills).toEqual(["resumable-review"])
+        expect(executions).toBe(1)
+        expect(modelCalls).toBe(3)
       }),
     ] as const
   })

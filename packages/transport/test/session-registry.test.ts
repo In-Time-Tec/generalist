@@ -3,7 +3,7 @@ import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scheduler, S
 import { TestClock } from "effect/testing"
 import { AiError, Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Approvals, ModelMiddleware } from "@batonfx/core"
+import { Agent, Approvals, ModelMiddleware, Permissions } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
 import { SessionRegistry, Wire } from "../src/index"
 
@@ -744,6 +744,315 @@ describe("SessionRegistry.layerMemory", () => {
                   }),
               }),
               Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-token" }) }),
+              ModelMiddleware.identityLayer,
+              persistenceLayer,
+            ),
+          ),
+        ),
+      ),
+    )
+  })
+
+  it.effect("resolves permission-originated suspensions with a one-shot permission answer", () => {
+    const permissioned = Tool.make("permissioned", {
+      parameters: Schema.Struct({ text: Schema.String }),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(permissioned)
+    const agent = Agent.make({ name: "permission-resume-agent", toolkit })
+    let calls = 0
+    let handled = false
+    return Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-permission" }))
+      const firstFiber = yield* collectThroughEnded("s-permission").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-permission", "needs permission"))
+      const first = yield* Fiber.join(firstFiber)
+
+      expect(first.some((frame) => frame._tag === "Suspended")).toBe(true)
+
+      const secondFiber = yield* collectThroughEnded("s-permission", first.at(-1)?.seq).pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.resolveApproval("s-permission", "permission:call-permission", { _tag: "Approved" }),
+      )
+      const second = yield* Fiber.join(secondFiber)
+
+      expect(handled).toBe(true)
+      expect(second.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
+    }).pipe(
+      provideTestLayer(
+        SessionRegistry.layerMemory({ agent }).pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              modelLayer(() => {
+                calls += 1
+                return calls === 1
+                  ? Stream.make(toolCallPart("call-permission", "permissioned", { text: "approved" }))
+                  : assistantText("reply", "permission done")
+              }),
+              toolkit.toLayer({
+                permissioned: () =>
+                  Effect.sync(() => {
+                    handled = true
+                    return "approved"
+                  }),
+              }),
+              Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+              ModelMiddleware.identityLayer,
+              persistenceLayer,
+            ),
+          ),
+        ),
+      ),
+    )
+  })
+
+  it.effect("isolates concurrent permission decisions for identical tool call IDs", () => {
+    const permissioned = Tool.make("isolated_permission", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(permissioned)
+    const agent = Agent.make({ name: "isolated-permission-agent", toolkit })
+    let modelCalls = 0
+    let executions = 0
+    return Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        Effect.all([
+          registry.open({ sessionId: "s-isolated-approved" }),
+          registry.open({ sessionId: "s-isolated-denied" }),
+        ]),
+      )
+      const approvedFirst = yield* collectThroughEnded("s-isolated-approved").pipe(Effect.forkChild)
+      const deniedFirst = yield* collectThroughEnded("s-isolated-denied").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        Effect.all([registry.send("s-isolated-approved", "run"), registry.send("s-isolated-denied", "run")]),
+      )
+      const [approvedSuspension, deniedSuspension] = yield* Effect.all([
+        Fiber.join(approvedFirst),
+        Fiber.join(deniedFirst),
+      ])
+
+      const approvedResume = yield* collectThroughEnded("s-isolated-approved", approvedSuspension.at(-1)?.seq).pipe(
+        Effect.forkChild,
+      )
+      const deniedResume = yield* collectThroughEnded("s-isolated-denied", deniedSuspension.at(-1)?.seq).pipe(
+        Effect.forkChild,
+      )
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        Effect.all(
+          [
+            registry.resolveApproval("s-isolated-approved", "permission:shared-call", { _tag: "Approved" }),
+            registry.resolveApproval("s-isolated-denied", "permission:shared-call", {
+              _tag: "Denied",
+              reason: "denied",
+            }),
+          ],
+          { concurrency: 2 },
+        ),
+      )
+      const [approved, denied] = yield* Effect.all([Fiber.join(approvedResume), Fiber.join(deniedResume)])
+
+      expect(executions).toBe(1)
+      expect(approved.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
+      expect(denied.some((frame) => frame._tag === "Failed")).toBe(true)
+    }).pipe(
+      provideTestLayer(
+        SessionRegistry.layerMemory({ agent }).pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              modelLayer(() =>
+                ++modelCalls <= 2
+                  ? Stream.make(toolCallPart("shared-call", "isolated_permission", {}))
+                  : assistantText("reply", "done"),
+              ),
+              toolkit.toLayer({
+                isolated_permission: () =>
+                  Effect.sync(() => {
+                    executions += 1
+                    return "executed"
+                  }),
+              }),
+              Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+              ModelMiddleware.identityLayer,
+              persistenceLayer,
+            ),
+          ),
+        ),
+      ),
+    )
+  })
+
+  it.effect("honors the captured permission answer when live policy changes to allow", () => {
+    const permissioned = Tool.make("permission_drift", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(permissioned)
+    const agent = Agent.make({ name: "permission-drift-agent", toolkit })
+    let evaluations = 0
+    let handled = false
+    return Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-permission-drift" }))
+      const firstFiber = yield* collectThroughEnded("s-permission-drift").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-permission-drift", "run"))
+      const first = yield* Fiber.join(firstFiber)
+
+      const secondFiber = yield* collectThroughEnded("s-permission-drift", first.at(-1)?.seq).pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.resolveApproval("s-permission-drift", "original-token", { _tag: "Denied", reason: "client denied" }),
+      )
+      const second = yield* Fiber.join(secondFiber)
+
+      expect(handled).toBe(false)
+      expect(second.some((frame) => frame._tag === "Event" && frame.event._tag === "ApprovalRequested")).toBe(true)
+      expect(second.some((frame) => frame._tag === "Failed")).toBe(true)
+    }).pipe(
+      provideTestLayer(
+        SessionRegistry.layerMemory({ agent }).pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              modelLayer(() => Stream.make(toolCallPart("call-drift", "permission_drift", {}))),
+              toolkit.toLayer({
+                permission_drift: () =>
+                  Effect.sync(() => {
+                    handled = true
+                    return "executed"
+                  }),
+              }),
+              Permissions.testLayer({
+                evaluate: () =>
+                  Effect.sync(() =>
+                    evaluations++ === 0
+                      ? ({ _tag: "Ask", token: "original-token" } as const)
+                      : ({ _tag: "Allow" } as const),
+                  ),
+                await: () => Effect.succeedNone,
+              }),
+              ModelMiddleware.identityLayer,
+              persistenceLayer,
+            ),
+          ),
+        ),
+      ),
+    )
+  })
+
+  it.effect("continues from permission approval through a separate dynamic approval", () => {
+    let approvalChecks = 0
+    let approvalMessageRoles: ReadonlyArray<string> = []
+    const gated = Tool.make("two_stage", {
+      parameters: Schema.Struct({ text: Schema.String }),
+      success: Schema.String,
+      needsApproval: (_params, context) => {
+        approvalChecks += 1
+        approvalMessageRoles = context.messages.map((message) => message.role)
+        return context.messages.at(-1)?.role === "user"
+      },
+    })
+    const toolkit = Toolkit.make(gated)
+    const agent = Agent.make({ name: "two-stage-approval-agent", toolkit })
+    let calls = 0
+    let handled = false
+    return Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-two-stage" }))
+      const permissionFrames = yield* collectThroughEnded("s-two-stage").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-two-stage", "needs both approvals"))
+      const first = yield* Fiber.join(permissionFrames)
+
+      const approvalFrames = yield* collectThroughEnded("s-two-stage", first.at(-1)?.seq).pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.resolveApproval("s-two-stage", "permission:call-two-stage", { _tag: "Approved" }),
+      )
+      const second = yield* Fiber.join(approvalFrames)
+      const approvalSuspension = second.find((frame) => frame._tag === "Suspended")
+
+      expect(approvalMessageRoles).toEqual(["user"])
+      expect(approvalSuspension?._tag === "Suspended" && approvalSuspension.suspension.token).toBe("dynamic-approval")
+      expect(approvalChecks).toBe(1)
+
+      const completionFrames = yield* collectThroughEnded("s-two-stage", second.at(-1)?.seq).pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.resolveApproval("s-two-stage", "dynamic-approval", { _tag: "Denied", reason: "review denied" }),
+      )
+      const third = yield* Fiber.join(completionFrames)
+
+      expect(approvalChecks).toBe(1)
+      expect(handled).toBe(false)
+      expect(third.some((frame) => frame._tag === "Failed")).toBe(true)
+    }).pipe(
+      provideTestLayer(
+        SessionRegistry.layerMemory({ agent }).pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              modelLayer(() => {
+                calls += 1
+                return calls === 1
+                  ? Stream.make(toolCallPart("call-two-stage", "two_stage", { text: "approved" }))
+                  : assistantText("reply", "two-stage done")
+              }),
+              toolkit.toLayer({
+                two_stage: () =>
+                  Effect.sync(() => {
+                    handled = true
+                    return "approved"
+                  }),
+              }),
+              Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+              Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "dynamic-approval" }) }),
+              ModelMiddleware.identityLayer,
+              persistenceLayer,
+            ),
+          ),
+        ),
+      ),
+    )
+  })
+
+  it.effect("resolves a remembered ask without a Permissions service", () => {
+    const remembered = Tool.make("remembered_ask", {
+      parameters: Schema.Struct({ text: Schema.String }),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(remembered)
+    const agent = Agent.make({ name: "remembered-ask-agent", toolkit })
+    let calls = 0
+    let handled = false
+    return Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-remembered-ask" }))
+      const firstFiber = yield* collectThroughEnded("s-remembered-ask").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-remembered-ask", "needs permission"))
+      const first = yield* Fiber.join(firstFiber)
+
+      const secondFiber = yield* collectThroughEnded("s-remembered-ask", first.at(-1)?.seq).pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.resolveApproval("s-remembered-ask", "permission:call-remembered", { _tag: "Approved" }),
+      )
+      const second = yield* Fiber.join(secondFiber)
+
+      expect(handled).toBe(true)
+      expect(second.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
+    }).pipe(
+      provideTestLayer(
+        SessionRegistry.layerMemory({ agent }).pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              modelLayer(() => {
+                calls += 1
+                return calls === 1
+                  ? Stream.make(toolCallPart("call-remembered", "remembered_ask", { text: "approved" }))
+                  : assistantText("reply", "remembered done")
+              }),
+              toolkit.toLayer({
+                remembered_ask: () =>
+                  Effect.sync(() => {
+                    handled = true
+                    return "approved"
+                  }),
+              }),
+              Permissions.ruleStoreTestLayer({
+                remember: () => Effect.void,
+                rules: Effect.succeed([{ pattern: "remembered_ask", level: "ask" }]),
+              }),
               ModelMiddleware.identityLayer,
               persistenceLayer,
             ),

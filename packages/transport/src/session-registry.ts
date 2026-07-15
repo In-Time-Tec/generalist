@@ -16,7 +16,7 @@ import {
   Stream,
 } from "effect"
 import { Chat, Prompt, Tool } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, ToolExecutor, TurnPolicy } from "@batonfx/core"
+import { Agent, AgentEvent, Approvals, Permissions, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import { type FrameJournal, type FrameWithoutSeq, makeFrameJournal } from "./frame-journal.js"
 import {
   coordination,
@@ -164,6 +164,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
       const scope = yield* Effect.scope
       const context = yield* Effect.context<R | Chat.Persistence>()
       const approvals = yield* Effect.serviceOption(Approvals.Approvals)
+      const permissions = yield* Effect.serviceOption(Permissions.Permissions)
       const persistence = yield* Chat.Persistence
       const state = yield* Ref.make<RegistryState>({ sessions: new Map() })
       const ringBufferCapacity = options.ringBufferCapacity ?? 1024
@@ -270,7 +271,9 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
         resume: Agent.Resume | undefined,
         decision: ClientApproval | undefined,
       ): Effect.Effect<Option.Option<Approvals.Interface>> => {
-        if (resume === undefined || decision === undefined) return Effect.succeed(approvals)
+        if (resume === undefined || decision === undefined || resume.authorizationStage !== "approval") {
+          return Effect.succeed(approvals)
+        }
         const fallbackApprovals = Option.getOrElse(approvals, () =>
           Approvals.Approvals.of({
             check: () =>
@@ -298,6 +301,47 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
         )
       }
 
+      const makePermissions = (
+        resume: Agent.Resume | undefined,
+        decision: ClientApproval | undefined,
+      ): Effect.Effect<Option.Option<Permissions.Interface>> => {
+        if (resume === undefined || decision === undefined || resume.authorizationStage !== "permission") {
+          return Effect.succeed(permissions)
+        }
+        const fallbackPermissions = Option.getOrElse(permissions, () =>
+          Permissions.Permissions.of({
+            evaluate: () => Effect.succeed({ _tag: "Ask", token: `permission:${resume.call.id}` }),
+            await: () => Effect.succeedNone,
+          }),
+        )
+        return Ref.make(false).pipe(
+          Effect.map((consumed) =>
+            Option.some(
+              Permissions.Permissions.of({
+                evaluate: fallbackPermissions.evaluate,
+                await: (pending) => {
+                  if (pending.toolCallId !== resume.call.id) return fallbackPermissions.await(pending)
+                  return Ref.modify(consumed, (used) => [!used, true]).pipe(
+                    Effect.flatMap((useOverride) => {
+                      if (!useOverride) return fallbackPermissions.await(pending)
+                      return Effect.succeed(
+                        Option.some(
+                          decision._tag === "Approved"
+                            ? ({ _tag: "Approved" } as const)
+                            : decision.reason === undefined
+                              ? ({ _tag: "Denied" } as const)
+                              : ({ _tag: "Denied", reason: decision.reason } as const),
+                        ),
+                      )
+                    }),
+                  )
+                },
+              }),
+            ),
+          ),
+        )
+      }
+
       const runStream = (
         session: SessionState,
         prompt: Prompt.RawInput,
@@ -306,6 +350,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
       ): Effect.Effect<void> =>
         Effect.gen(function* () {
           const overrideApprovals = yield* makeApprovals(resume, approvalDecision)
+          const overridePermissions = yield* makePermissions(resume, approvalDecision)
           const runOptions = {
             prompt,
             sessionId: session.sessionId,
@@ -357,9 +402,13 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
             }),
             Effect.ignoreCause,
           )
-          const approvalsContext = Option.match(overrideApprovals, {
+          const approvalContext = Option.match(overrideApprovals, {
             onNone: () => context,
             onSome: (overrideService) => Context.add(context, Approvals.Approvals, overrideService),
+          })
+          const permissionContext = Option.match(overridePermissions, {
+            onNone: () => approvalContext,
+            onSome: (overrideService) => Context.add(approvalContext, Permissions.Permissions, overrideService),
           })
           const runPersistence = Chat.Persistence.of({
             get: (chatId, chatOptions) =>
@@ -371,7 +420,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
                 ? persistence.getOrCreate(chatId, chatOptions).pipe(Effect.tap((chat) => Ref.set(session.chat, chat)))
                 : persistence.getOrCreate(chatId, chatOptions),
           })
-          const runContext = Context.add(approvalsContext, Chat.Persistence, runPersistence)
+          const runContext = Context.add(permissionContext, Chat.Persistence, runPersistence)
           return yield* run.pipe(Effect.provide(runContext))
         })
 
@@ -619,11 +668,17 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
               sessionId,
               "",
               {
+                token: suspension.token,
                 call: {
                   id: suspension.tool_call_id,
                   name: suspension.tool_name,
                   params: suspension.tool_params,
                 },
+                ...(suspension.active_tools === undefined ? {} : { activeTools: suspension.active_tools }),
+                ...(suspension.activated_skills === undefined ? {} : { activatedSkills: suspension.activated_skills }),
+                ...(suspension.authorization_stage === undefined
+                  ? {}
+                  : { authorizationStage: suspension.authorization_stage }),
               },
               decision,
             )
