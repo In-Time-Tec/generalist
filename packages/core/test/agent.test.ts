@@ -1377,13 +1377,15 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         )
 
         expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
-        if (suspendedTranscript === undefined) return yield* Effect.die("missing activated skill checkpoint")
+        if (failure._tag !== "@batonfx/core/AgentSuspended" || suspendedTranscript === undefined) {
+          return yield* Effect.die("missing activated skill checkpoint")
+        }
 
         const resumed = yield* Stream.runCollect(
           Agent.stream(agent, {
             prompt: "ignored",
             history: suspendedTranscript,
-            resume: { call: { id: "resumable-call", name: "resumable_skill_tool", params: {} } },
+            resume: { suspension: failure },
           }),
         )
 
@@ -3890,38 +3892,59 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "performs the terminal structured turn after resume", () => {
     let calls = 0
+    let executions = 0
     let sawResumedToolResult = false
+    let checkpoint: Prompt.Prompt | undefined
     const { spans, tracer } = testTracer()
     return [
       Layer.mergeAll(
         modelLayer(
           (options) => {
             calls += 1
+            if (calls === 1) {
+              return Stream.make(toolCallPart("tool-call-resume-structured", "echo", { text: "resumed" }))
+            }
             sawResumedToolResult = sawResumedToolResult || Json.stringify(options.prompt.content).includes("resumed")
             return Stream.make(textDelta("after resume"))
           },
           () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
         ),
-        echoExecutor,
+        ToolExecutor.testLayer({
+          execute: () => {
+            executions += 1
+            return executions === 1
+              ? Effect.succeed({ _tag: "Suspend", token: "structured-token" })
+              : Effect.succeed({ _tag: "Success", result: "resumed", encodedResult: "resumed" })
+          },
+        }),
         Approvals.autoApprove,
         ModelMiddleware.identityLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "resume-structured-agent", toolkit: Toolkit.make(echoTool) })
+        const suspension = yield* Agent.stream(agent, { prompt: "suspend before structured output" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (suspension._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing structured suspension checkpoint")
+        }
 
         const events = yield* Stream.runCollect(
           Agent.streamObject(agent, {
-            prompt: "ignored original prompt",
-            history: [
-              { role: "system", content: "resume history system" },
-              { role: "user", content: [{ type: "text", text: "earlier user input" }] },
-            ],
-            resume: { call: { id: "tool-call-resume-structured", name: "echo", params: { text: "resumed" } } },
+            prompt: "ignored",
+            history: checkpoint,
+            resume: { suspension },
             schema: objectSchema,
           }),
         ).pipe(Effect.withTracer(tracer))
 
-        expect(calls).toBe(1)
+        expect(calls).toBe(2)
         expect(sawResumedToolResult).toBe(true)
         expect(events.map((event) => event._tag)).toEqual([
           "ToolExecutionStarted",
@@ -4626,7 +4649,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(suspension._tag).toBe("@batonfx/core/AgentSuspended")
         expect(suspendedTranscript).toBeDefined()
-        if (suspendedTranscript === undefined) return yield* Effect.die("missing suspension checkpoint")
+        if (suspension._tag !== "@batonfx/core/AgentSuspended" || suspendedTranscript === undefined) {
+          return yield* Effect.die("missing suspension checkpoint")
+        }
         assertExchange(suspendedTranscript, ["tool-call-ordinary"])
         const checkpoint = Json.stringify(suspendedTranscript?.content)
         expect(checkpoint).toContain("tool-call-ordinary")
@@ -4638,7 +4663,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Agent.stream(agent, {
             prompt: "ignored",
             history: suspendedTranscript,
-            resume: { call: { id: "tool-call-child", name: "echo", params: { text: "child" } } },
+            resume: { suspension },
           }),
         )
 
@@ -4653,56 +4678,49 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "resumes a suspended run by executing the pending call first", () => {
-    let calls = 0
-    let sawOriginalPrompt = false
-    let sawResumedToolResult = false
+  ItLayer.make(it, "rejects a resume token that differs from the authoritative suspension checkpoint", () => {
+    let checkpoint: Prompt.Prompt | undefined
+    let executions = 0
+    const executor = ToolExecutor.testLayer({
+      execute: () => {
+        executions += 1
+        return executions === 1
+          ? Effect.succeed({ _tag: "Suspend" as const, token: "authoritative-token" })
+          : Effect.succeed({ _tag: "Success" as const, result: "executed", encodedResult: "executed" })
+      },
+    })
     return [
       Layer.mergeAll(
-        modelLayer((options) => {
-          calls += 1
-          const content = Json.stringify(options.prompt.content)
-          sawOriginalPrompt = sawOriginalPrompt || content.includes("ignored original prompt")
-          sawResumedToolResult = sawResumedToolResult || content.includes("resumed")
-          return Stream.make(textDelta("after resume"))
-        }),
-        echoExecutor,
+        modelLayer(() => Stream.make(toolCallPart("bound-resume", "echo", { text: "original" }))),
+        executor,
         Approvals.autoApprove,
         ModelMiddleware.identityLayer,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({
-          name: "resume-agent",
-          toolkit: Toolkit.make(echoTool),
-        })
-
-        const events = yield* Stream.runCollect(
-          Agent.stream(agent, {
-            prompt: "ignored original prompt",
-            history: [
-              { role: "system", content: "resume history system" },
-              { role: "user", content: [{ type: "text", text: "earlier user input" }] },
-            ],
-            resume: { call: { id: "tool-call-resume", name: "echo", params: { text: "resumed" } } },
-          }),
+        const agent = Agent.make({ name: "bound-resume-token-agent", toolkit: Toolkit.make(echoTool) })
+        const suspension = yield* Agent.stream(agent, { prompt: "suspend" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
         )
-
-        expect(calls).toBe(1)
-        expect(sawOriginalPrompt).toBe(false)
-        expect(sawResumedToolResult).toBe(true)
-        expect(events.map((event) => event._tag)).toEqual([
-          "ToolExecutionStarted",
-          "ToolExecutionCompleted",
-          "TurnCompleted",
-          "TurnStarted",
-          "ModelPart",
-          "TurnCompleted",
-          "Completed",
-        ])
-        const completed = events.at(-1)
-        if (completed?._tag === "Completed") {
-          expect(completed.text).toBe("after resume")
+        if (suspension._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing suspension checkpoint")
         }
+
+        const mismatch = yield* Agent.stream(agent, {
+          prompt: "ignored",
+          history: checkpoint,
+          resume: {
+            suspension: AgentEvent.AgentSuspended.make({ ...suspension, token: "fabricated-token" }),
+          },
+        }).pipe(Stream.runDrain, Effect.flip)
+
+        expect(String(mismatch._tag)).toBe("@batonfx/core/ResumeMismatch")
+        expect(executions).toBe(1)
       }),
     ] as const
   })
@@ -4755,17 +4773,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Agent.stream(agent, {
             prompt: "ignored",
             history: checkpoint,
-            resume: {
-              call: {
-                id: failure.tool_call_id,
-                name: failure.tool_name,
-                params: failure.tool_params,
-              },
-              ...(failure.active_tools === undefined ? {} : { activeTools: failure.active_tools }),
-              ...(failure.activated_skills === undefined ? {} : { activatedSkills: failure.activated_skills }),
-              ...(failure.authorization_stage === undefined ? {} : { authorizationStage: failure.authorization_stage }),
-              token: failure.token,
-            },
+            resume: { suspension: failure },
           }),
         )
 
@@ -4777,38 +4785,103 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "denies a substituted resume call outside the suspended active-tool snapshot", () => {
+  ItLayer.make(it, "rejects substituted resume call identity before model or tool side effects", () => {
     let modelCalls = 0
+    let executorCalls = 0
+    let checkpoint: Prompt.Prompt | undefined
     return [
       Layer.mergeAll(
         modelLayer(() => {
           modelCalls += 1
-          return Stream.make(textDelta("after substituted resume"))
+          return Stream.make(toolCallPart("authoritative-call", "echo", { text: "original" }))
         }),
-        ToolExecutor.testLayer({ execute: () => Effect.die("substituted resume call must not execute") }),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executorCalls += 1
+            return Effect.succeed({ _tag: "Suspend", token: "authoritative-token" })
+          },
+        }),
+        Approvals.autoApprove,
         ModelMiddleware.identityLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
           name: "substituted-resume-agent",
-          toolkit: Toolkit.make(echoTool, gatedTool),
-          authorization: { authorize: () => Effect.succeed({ _tag: "Execute" as const }) },
+          toolkit: Toolkit.make(echoTool),
         })
-
-        const failure = yield* Effect.flip(
-          Stream.runDrain(
-            Agent.stream(agent, {
-              prompt: "ignored",
-              history: [{ role: "user", content: [{ type: "text", text: "suspended" }] }],
-              resume: {
-                call: { id: "substituted", name: "echo", params: { text: "blocked" } },
-                activeTools: ["gated"],
-              },
+        const suspension = yield* Agent.stream(agent, { prompt: "suspend" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
             }),
           ),
+          Stream.runDrain,
+          Effect.flip,
         )
+        if (suspension._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing suspension checkpoint")
+        }
 
-        expect(failure).toMatchObject({ stage: "authorization", tool: "echo" })
+        const mismatches = [
+          AgentEvent.AgentSuspended.make({ ...suspension, tool_call_id: "substituted-call" }),
+          AgentEvent.AgentSuspended.make({ ...suspension, tool_name: "gated" }),
+          AgentEvent.AgentSuspended.make({ ...suspension, tool_params: { text: "substituted" } }),
+          AgentEvent.AgentSuspended.make({ ...suspension, reason: "approval" }),
+          AgentEvent.AgentSuspended.make({ ...suspension, authorization_stage: "permission" }),
+          AgentEvent.AgentSuspended.make({ ...suspension, active_tools: [] }),
+          AgentEvent.AgentSuspended.make({ ...suspension, activated_skills: ["substituted-skill"] }),
+        ]
+        for (const received of mismatches) {
+          const failure = yield* Agent.stream(agent, {
+            prompt: "ignored",
+            history: checkpoint,
+            resume: { suspension: received },
+          }).pipe(Stream.runDrain, Effect.flip)
+          expect(failure).toMatchObject({
+            _tag: "@batonfx/core/ResumeMismatch",
+            reason: "identity-mismatch",
+            expected: suspension,
+            received,
+          })
+        }
+
+        expect(modelCalls).toBe(1)
+        expect(executorCalls).toBe(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects resume when the current transcript has no suspension checkpoint", () => {
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("must not run"))
+        }),
+        ToolExecutor.testLayer({ execute: () => Effect.die("missing checkpoint must not execute") }),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const received = AgentEvent.AgentSuspended.make({
+          token: "stale-token",
+          reason: "tool-wait",
+          tool_call_id: "stale-call",
+          tool_name: "echo",
+          tool_params: { text: "stale" },
+        })
+        const agent = Agent.make({ name: "missing-resume-agent", toolkit: Toolkit.make(echoTool) })
+        const failure = yield* Agent.stream(agent, {
+          prompt: "ignored",
+          history: [{ role: "user", content: [{ type: "text", text: "completed" }] }],
+          resume: { suspension: received },
+        }).pipe(Stream.runDrain, Effect.flip)
+
+        expect(failure).toMatchObject({
+          _tag: "@batonfx/core/ResumeMismatch",
+          reason: "checkpoint-not-found",
+          received,
+        })
         expect(modelCalls).toBe(0)
       }),
     ] as const
@@ -4881,16 +4954,16 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               prompt: "ignored",
               history: checkpoint,
               resume: {
-                call: { id: failure.tool_call_id, name: failure.tool_name, params: { text: "substituted" } },
-                ...(failure.active_tools === undefined ? {} : { activeTools: failure.active_tools }),
-                ...(failure.activated_skills === undefined ? {} : { activatedSkills: failure.activated_skills }),
-                authorizationStage: "permission",
+                suspension: AgentEvent.AgentSuspended.make({
+                  ...failure,
+                  tool_params: { text: "substituted" },
+                }),
               },
             }),
           ),
         )
 
-        expect(resumeFailure._tag).toBe("@batonfx/core/AgentError")
+        expect(resumeFailure._tag).toBe("@batonfx/core/ResumeMismatch")
       }),
     ] as const
   })
@@ -4960,16 +5033,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           Agent.stream(agent, {
             prompt: "ignored",
             history: checkpoint,
-            resume: {
-              call: {
-                id: failure.tool_call_id,
-                name: failure.tool_name,
-                params: failure.tool_params,
-              },
-              ...(failure.active_tools === undefined ? {} : { activeTools: failure.active_tools }),
-              ...(failure.activated_skills === undefined ? {} : { activatedSkills: failure.activated_skills }),
-              ...(failure.authorization_stage === undefined ? {} : { authorizationStage: failure.authorization_stage }),
-            },
+            resume: { suspension: failure },
           }),
         )
 
@@ -5006,6 +5070,88 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ] as const,
   )
+
+  ItLayer.make(it, "resumes a framework call that reuses a provider-executed call id", () => {
+    let modelCalls = 0
+    let approvalChecks = 0
+    let executions = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.make(providerToolCallPart("reused-call", "gated", { text: "provider" }))
+          }
+          if (modelCalls === 2) {
+            return Stream.make(toolCallPart("reused-call", "gated", { text: "framework" }))
+          }
+          return Stream.make(textDelta("resumed"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executions += 1
+            return Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" })
+          },
+        }),
+        Approvals.testLayer({
+          check: () => {
+            approvalChecks += 1
+            return Effect.succeed(
+              approvalChecks === 1
+                ? { _tag: "Pending", token: "reused-call-token" as const }
+                : { _tag: "Approved" as const },
+            )
+          },
+        }),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "reused-provider-call-agent", toolkit: Toolkit.make(gatedTool) })
+        const first = yield* Stream.runCollect(Agent.stream(agent, { prompt: "provider call" }))
+        const firstTurn = first.find((event) => event._tag === "TurnCompleted")
+        if (firstTurn?._tag !== "TurnCompleted") return expect.unreachable()
+
+        let checkpoint: Prompt.Prompt | undefined
+        const suspended = yield* Agent.stream(agent, { prompt: "framework call", history: firstTurn.transcript }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (suspended._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return expect.unreachable()
+        }
+
+        const resumed = yield* Stream.runCollect(
+          Agent.stream(agent, {
+            prompt: "ignored",
+            history: checkpoint,
+            resume: { suspension: suspended },
+          }),
+        )
+
+        const resumedTurn = resumed.find((event) => event._tag === "TurnCompleted")
+        if (resumedTurn?._tag !== "TurnCompleted") return expect.unreachable()
+        const duplicate = yield* Agent.stream(agent, {
+          prompt: "ignored",
+          history: resumedTurn.transcript,
+          resume: { suspension: suspended },
+        }).pipe(Stream.runDrain, Effect.flip)
+
+        expect(duplicate).toMatchObject({
+          _tag: "@batonfx/core/ResumeMismatch",
+          reason: "checkpoint-not-found",
+          received: suspended,
+        })
+        expect(executions).toBe(1)
+        expect(approvalChecks).toBe(2)
+        expect(modelCalls).toBe(3)
+      }),
+    ] as const
+  })
 
   ItLayer.make(it, "evaluates needsApproval functions and executes when they return false", () => {
     let calls = 0

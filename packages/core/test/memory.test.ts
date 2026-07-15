@@ -211,12 +211,25 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
 
   ItLayer.make(it, "does not recall on resume", () => {
     let recalls = 0
+    let modelCalls = 0
+    let executions = 0
+    let checkpoint: Prompt.Prompt | undefined
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return [
       Layer.mergeAll(
-        modelLayer(() => Stream.make(textDelta("done"))),
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("call-resume", "lookup", {}))
+            : Stream.make(textDelta("done"))
+        }),
         ToolExecutor.testLayer({
-          execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
+          execute: () => {
+            executions += 1
+            return executions === 1
+              ? Effect.succeed({ _tag: "Suspend", token: "memory-resume" })
+              : Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" })
+          },
         }),
         Approvals.autoApprove,
         ModelMiddleware.identityLayer,
@@ -231,10 +244,24 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
       ),
       Effect.gen(function* () {
+        const suspension = yield* Agent.stream(agent, { prompt: "suspend", memory: { key } }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (suspension._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing memory suspension checkpoint")
+        }
+        recalls = 0
         const result = yield* Agent.generate(agent, {
           prompt: "ignored on resume",
+          history: checkpoint,
           memory: { key },
-          resume: { call: { id: "call-resume", name: "lookup", params: {} } },
+          resume: { suspension },
         })
 
         expect(result.text).toBe("done")

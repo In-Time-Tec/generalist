@@ -83,9 +83,7 @@ const program = Effect.gen(function* () {
   const result = yield* Agent.generate(agent, {
     prompt: "",
     history: transcript,
-    resume: {
-      call: { id: suspension.tool_call_id, name: suspension.tool_name, params: suspension.tool_params },
-    },
+    resume: { suspension },
   })
   yield* Console.log(result.text)
 }).pipe(Effect.provide(layers))

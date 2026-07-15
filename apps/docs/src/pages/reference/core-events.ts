@@ -142,6 +142,17 @@ export const coreEventsReference = definePage({
             "; the run did not finish",
           ],
         ],
+        [
+          [code("ResumeMismatch")],
+          [
+            code('reason: "checkpoint-not-found" | "identity-mismatch"'),
+            ", ",
+            code("expected?"),
+            ", ",
+            code("received"),
+          ],
+          "The supplied suspension does not match the current authoritative checkpoint",
+        ],
       ],
     ),
     callout(
@@ -149,7 +160,7 @@ export const coreEventsReference = definePage({
       "AgentSuspended is a contract, not a failure",
       "The host resolves the token out-of-band and re-enters via ",
       code("RunOptions.resume"),
-      " with the pending call. The field shape deliberately mirrors a tool call so durable hosts can persist it as one.",
+      " with the exact suspension. Baton verifies it against the persisted unresolved call before any resumed side effect.",
     ),
     p(
       "For the loop that emits these events, see ",

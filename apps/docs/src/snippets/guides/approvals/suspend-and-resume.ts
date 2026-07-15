@@ -1,5 +1,15 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
-import { Agent, AgentEvent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "@batonfx/core"
+import {
+  Agent,
+  AgentEvent,
+  Approvals,
+  LanguageModel,
+  ModelMiddleware,
+  Prompt,
+  Response,
+  Tool,
+  Toolkit,
+} from "@batonfx/core"
 
 const deployTool = Tool.make("deploy_service", {
   description: "Deploy a service to production",
@@ -51,16 +61,24 @@ const approvedLayers = Layer.mergeAll(modelLayer, toolkitLayer, Approvals.autoAp
 const prompt = "Deploy the api service."
 
 const program = Effect.gen(function* () {
-  const failure = yield* Agent.generate(agent, { prompt }).pipe(Effect.provide(pendingLayers), Effect.flip)
+  let transcript = Prompt.empty
+  const failure = yield* Agent.stream(agent, { prompt }).pipe(
+    Stream.runForEach((event) =>
+      Effect.sync(() => {
+        if (event._tag === "TurnCompleted") transcript = event.transcript
+      }),
+    ),
+    Effect.provide(pendingLayers),
+    Effect.flip,
+  )
   if (!(failure instanceof AgentEvent.AgentSuspended)) {
     return yield* Effect.die("expected the run to suspend")
   }
   yield* Console.log(`suspended reason=${failure.reason} tool=${failure.tool_name} token=${failure.token}`)
   const resumed = yield* Agent.generate(agent, {
     prompt,
-    resume: {
-      call: { id: failure.tool_call_id, name: failure.tool_name, params: failure.tool_params },
-    },
+    history: transcript,
+    resume: { suspension: failure },
   }).pipe(Effect.provide(approvedLayers))
   yield* Console.log(resumed.text)
 })

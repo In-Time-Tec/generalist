@@ -186,6 +186,16 @@ describe("Wire", () => {
       const schema = Wire.ServerFrame(toolkit)
       const failures: ReadonlyArray<Wire.RunFailure> = [
         AgentEvent.AgentError.make({ message: "boom", turn: 0 }),
+        AgentEvent.ResumeMismatch.make({
+          reason: "checkpoint-not-found",
+          received: AgentEvent.AgentSuspended.make({
+            token: "stale",
+            reason: "approval",
+            tool_call_id: "call-1",
+            tool_name: "echo",
+            tool_params: { text: "hello" },
+          }),
+        }),
         TurnPolicy.TurnPolicyError.make({ message: "policy unavailable", cause: { service: "budget" } }),
         AgentEvent.TurnPolicyStopped.make({
           turn: 2,
