@@ -279,6 +279,14 @@ describe("Compaction", () => {
               expect(history).toContain("You are a careful reviewer")
               expect(history).toContain("<conversation-checkpoint>")
               expect(history).toContain("recent tail")
+              const checkpointId = yield* store.reserveEntryId
+              yield* store.appendCheckpoint({
+                id: checkpointId,
+                parentId: yield* store.leaf,
+                projectedHistory: value.history,
+                summary: value.summary,
+              })
+              expect(Json.stringify(Session.buildContext(yield* store.path()).content)).toBe(history)
             }
           }
         }),

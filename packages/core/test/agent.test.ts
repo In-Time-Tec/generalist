@@ -2741,11 +2741,322 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events = yield* Stream.runCollect(
           Agent.stream(agent, { prompt: "old context", system: "You are a careful test agent" }),
         )
+        const session = yield* Session.SessionStore
+        const completed = events.at(-1)
 
         expect(streamCalls).toBe(2)
         expect(secondPrompt).toContain("<conversation-checkpoint>")
         expect(secondPrompt).toContain("You are a careful test agent")
-        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag === "Completed") {
+          expect(Json.stringify(Session.buildContext(yield* session.path()).content)).toBe(
+            Json.stringify(completed.transcript.content),
+          )
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "checkpoints repeated mixed custom projections without duplicate or skipped Session entries", () => {
+    let modelCalls = 0
+    let compactions = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls < 5
+            ? Stream.make(toolCallPart(`mixed-${modelCalls}`, "echo", { text: `turn-${modelCalls}` }))
+            : Stream.make(textDelta("mixed complete"))
+        }),
+        echoExecutor,
+        Session.memoryLayer,
+        Compaction.testLayer({
+          maybeCompact: () =>
+            Effect.sync(() => {
+              compactions += 1
+              const history = Prompt.fromMessages([
+                Prompt.makeMessage("system", { content: "stable system" }),
+                Prompt.makeMessage("user", {
+                  content: [Prompt.makePart("text", { text: `projection-${compactions}` })],
+                }),
+              ])
+              return Option.some(
+                compactions % 2 === 0
+                  ? { _tag: "Microcompact", history, prompt: Prompt.empty }
+                  : {
+                      _tag: "Summarize",
+                      history,
+                      prompt: Prompt.empty,
+                      summary: `summary-${compactions}`,
+                      firstKeptEntryId: "legacy-field-is-not-projection-authority",
+                    },
+              )
+            }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "mixed-checkpoint-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start mixed checkpoints" }))
+        const session = yield* Session.SessionStore
+        const path = yield* session.path()
+        const checkpoints = path.filter((entry) => entry._tag === "Compaction")
+        const completed = events.at(-1)
+
+        expect(modelCalls).toBe(5)
+        expect(compactions).toBe(5)
+        expect(checkpoints).toHaveLength(5)
+        expect(new Set(checkpoints.map((entry) => entry.id)).size).toBe(5)
+        expect(checkpoints.every((entry) => entry._tag === "Compaction" && entry.version === 2)).toBe(true)
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag === "Completed") {
+          expect(Json.stringify(Session.buildContext(path).content)).toBe(Json.stringify(completed.transcript.content))
+          expect(Json.stringify(completed.transcript.content)).toContain("projection-5")
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "checkpoints truncate projections with identical live and rebuilt history", () => {
+    const tokenizer = Layer.succeed(
+      Tokenizer.Tokenizer,
+      Tokenizer.Tokenizer.of({
+        tokenize: (input) => Effect.succeed(Prompt.make(input).content.map((_, index) => index)),
+        truncate: (input, tokens) => Effect.succeed(Prompt.fromMessages(Prompt.make(input).content.slice(-tokens))),
+      }),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(textDelta("truncated"))),
+        Session.memoryLayer,
+        Compaction.testLayer(Compaction.truncate(1)),
+        tokenizer,
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "truncate-checkpoint-agent" }), {
+            prompt: "newest prompt",
+            history: Prompt.fromMessages([
+              Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "old prompt" })] }),
+            ]),
+            compaction: { contextWindow: 1 },
+          }),
+        )
+        const session = yield* Session.SessionStore
+        const path = yield* session.path()
+        const completed = events.at(-1)
+
+        expect(path.some((entry) => entry._tag === "Compaction" && entry.version === 2)).toBe(true)
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag === "Completed") {
+          expect(Json.stringify(Session.buildContext(path).content)).toBe(Json.stringify(completed.transcript.content))
+          expect(Json.stringify(completed.transcript.content)).toContain("newest prompt")
+          expect(Json.stringify(completed.transcript.content)).not.toContain("old prompt")
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects a custom compaction projection with an orphan tool result", () => {
+    const orphan = Prompt.makeMessage("tool", {
+      content: [
+        Prompt.makePart("tool-result", {
+          id: "orphan",
+          name: "echo",
+          isFailure: false,
+          result: "orphaned",
+        }),
+      ],
+    })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.die("invalid projection must fail before the model")),
+        Session.memoryLayer,
+        Compaction.testLayer({
+          maybeCompact: () =>
+            Effect.succeed(
+              Option.some({
+                _tag: "Microcompact",
+                history: Prompt.fromMessages([orphan]),
+                prompt: Prompt.empty,
+              }),
+            ),
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Agent.stream(Agent.make({ name: "orphan-checkpoint-agent" }), {
+          prompt: "invalid",
+        }).pipe(Stream.runDrain, Effect.flip)
+        const session = yield* Session.SessionStore
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(failure.message).toContain("orphan tool result")
+        expect((yield* session.path()).some((entry) => entry._tag === "Compaction")).toBe(false)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects duplicate unresolved tool calls in a custom compaction projection", () => {
+    const duplicateCalls = Prompt.makeMessage("assistant", {
+      content: [
+        Prompt.makePart("tool-call", {
+          id: "duplicate",
+          name: "echo",
+          params: { text: "first" },
+          providerExecuted: false,
+        }),
+        Prompt.makePart("tool-call", {
+          id: "duplicate",
+          name: "echo",
+          params: { text: "second" },
+          providerExecuted: false,
+        }),
+        Prompt.makePart("tool-result", {
+          id: "duplicate",
+          name: "echo",
+          isFailure: false,
+          result: "only one result",
+        }),
+      ],
+    })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.die("invalid projection must fail before the model")),
+        Session.memoryLayer,
+        Compaction.testLayer({
+          maybeCompact: () =>
+            Effect.succeed(
+              Option.some({
+                _tag: "Microcompact",
+                history: Prompt.fromMessages([duplicateCalls]),
+                prompt: Prompt.empty,
+              }),
+            ),
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Agent.stream(Agent.make({ name: "duplicate-tool-checkpoint-agent" }), {
+          prompt: "invalid",
+        }).pipe(Stream.runDrain, Effect.flip)
+        const session = yield* Session.SessionStore
+        const path = yield* session.path()
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(failure.message).toContain("duplicate tool call")
+        expect(path.every((entry) => entry._tag !== "Compaction")).toBe(true)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "checkpoints a provider-executed tool exchange without orphaning its result", () => {
+    const reusedProviderCall = Prompt.makePart("tool-call", {
+      id: "provider-reused",
+      name: "provider-search",
+      params: { query: "reused" },
+      providerExecuted: true,
+    })
+    const providerCall = Prompt.makePart("tool-call", {
+      id: "provider-checkpoint",
+      name: "provider-search",
+      params: { query: "Baton" },
+      providerExecuted: true,
+    })
+    const providerResult = Prompt.makePart("tool-result", {
+      id: "provider-checkpoint",
+      name: "provider-search",
+      isFailure: false,
+      result: { answer: "found" },
+    })
+    const projected = Prompt.fromMessages([
+      Prompt.makeMessage("assistant", { content: [reusedProviderCall] }),
+      Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "next response" })] }),
+      Prompt.makeMessage("assistant", { content: [reusedProviderCall] }),
+      Prompt.makeMessage("assistant", { content: [providerCall] }),
+      Prompt.makeMessage("tool", { content: [providerResult] }),
+    ])
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.empty),
+        Session.memoryLayer,
+        Compaction.testLayer({
+          maybeCompact: () =>
+            Effect.succeed(
+              Option.some({
+                _tag: "Microcompact",
+                history: projected,
+                prompt: Prompt.empty,
+              }),
+            ),
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "provider-checkpoint-agent" }), { prompt: "compact provider exchange" }),
+        )
+        const session = yield* Session.SessionStore
+        const path = yield* session.path()
+        const completed = events.at(-1)
+
+        expect(path.some((entry) => entry._tag === "Compaction" && entry.version === 2)).toBe(true)
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag === "Completed") {
+          expect(Session.buildContext(path).content).toEqual(completed.transcript.content)
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "reconciles structurally equal Session messages with reordered object keys", () => {
+    const toolMessage = (params: Readonly<Record<string, number>>) =>
+      Prompt.makeMessage("assistant", {
+        content: [
+          Prompt.makePart("tool-call", {
+            id: "reordered-session",
+            name: "provider-search",
+            params,
+            providerExecuted: true,
+          }),
+        ],
+      })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.empty),
+        Session.memoryLayer,
+        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const session = yield* Session.SessionStore
+        yield* session.append({ _tag: "Message", message: toolMessage({ first: 1, second: 2 }) })
+
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "structural-session-agent" }), {
+            history: Prompt.fromMessages([toolMessage({ second: 2, first: 1 })]),
+            prompt: "continue",
+          }),
+        )
+        const completed = events.at(-1)
+
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag === "Completed") {
+          expect(Session.buildContext(yield* session.path()).content).toEqual(completed.transcript.content)
+        }
       }),
     ] as const
   })
@@ -2795,6 +3106,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
   ItLayer.make(it, "reactively compacts and retries a pre-emission overflow once", () => {
     let calls = 0
     let overflowRequests = 0
+    let reactiveInput = ""
     let retriedPrompt = ""
     return [
       Layer.mergeAll(
@@ -2807,11 +3119,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Compaction.testLayer({
           maybeCompact: (request) =>
             Effect.sync(() => {
-              if (request.overflow) overflowRequests += 1
+              if (request.overflow) {
+                overflowRequests += 1
+                reactiveInput = Json.stringify(request.prompt.content)
+              }
               return Option.some({
                 _tag: "Microcompact",
                 history: Prompt.empty,
-                prompt: Prompt.make("after overflow"),
+                prompt: Prompt.make(request.overflow ? "after overflow" : "proactive projection"),
               })
             }),
         }),
@@ -2826,6 +3141,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(calls).toBe(2)
         expect(overflowRequests).toBe(1)
+        expect(reactiveInput).toContain("proactive projection")
+        expect(reactiveInput).not.toContain("too large")
         expect(retriedPrompt).toContain("after overflow")
         expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(1)
         expect(events.at(-1)?._tag).toBe("Completed")
@@ -3560,6 +3877,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           () => Stream.make(textDelta("normal answer")),
           () => Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)]),
         ),
+        Session.memoryLayer,
+        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
         Approvals.autoApprove,
         ModelMiddleware.identityLayer,
@@ -3592,6 +3911,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           expect(completed.turns).toBe(2)
           expect(completed.usage).toEqual(structuredUsage)
           expect(Json.stringify(completed.transcript.content)).toContain(Agent.defaultObjectPrompt)
+          const session = yield* Session.SessionStore
+          expect(Session.buildContext(yield* session.path()).content).toEqual(completed.transcript.content)
         }
       }),
     ] as const

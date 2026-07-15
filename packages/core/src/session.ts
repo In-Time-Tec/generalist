@@ -58,12 +58,24 @@ export interface HandoffEntry extends BaseEntry {
   readonly summary: string
 }
 
-/** @experimental A compaction boundary for prompt projection. */
-export interface CompactionEntry extends BaseEntry {
+/** @experimental A legacy summary compaction boundary for prompt projection. */
+export interface LegacyCompactionEntry extends BaseEntry {
   readonly _tag: "Compaction"
+  readonly version?: 1
   readonly summary: string
   readonly firstKeptEntryId: EntryId
 }
+
+/** @experimental An exact point-in-time compaction projection. */
+export interface CheckpointEntry extends BaseEntry {
+  readonly _tag: "Compaction"
+  readonly version: 2
+  readonly projectedHistory: Prompt.Prompt
+  readonly summary?: string
+}
+
+/** @experimental A legacy or exact compaction boundary. */
+export type CompactionEntry = LegacyCompactionEntry | CheckpointEntry
 
 /** @experimental A summary of an abandoned branch. */
 export interface BranchSummaryEntry extends BaseEntry {
@@ -83,21 +95,52 @@ export type Entry =
   | CompactionEntry
   | BranchSummaryEntry
 
+type AppendEntryInput<Item extends Entry> = Item extends CheckpointEntry ? never : Omit<Item, "id" | "parentId">
+
 /** @experimental Session entry input appended by a store implementation. */
-export type AppendInput = Entry extends infer Item
-  ? Item extends Entry
-    ? Omit<Item, "id" | "parentId">
-    : never
-  : never
+export type AppendInput = AppendEntryInput<Entry>
 
 /** @experimental Session store operation failure. */
 export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError>()("@batonfx/core/SessionStoreError", {
   message: Schema.String,
 }) {}
 
+/** @experimental Session append conflict with the active path or checkpoint identity. */
+export class SessionConflict extends Schema.TaggedErrorClass<SessionConflict>()("@batonfx/core/SessionConflict", {
+  reason: Schema.Literals(["stale-leaf", "checkpoint-id-reused", "checkpoint-not-on-active-path"]),
+  message: Schema.String,
+}) {}
+
+/** @experimental Expected active leaf for a normal Session append. */
+export interface AppendOptions {
+  readonly expectedLeafId?: EntryId | null
+}
+
+/** @experimental Stable exact projection prepared for idempotent append. */
+export interface PreparedCheckpoint {
+  readonly id: EntryId
+  readonly parentId: EntryId | null
+  readonly projectedHistory: Prompt.Prompt
+  readonly summary?: string
+}
+
+/** @experimental Authoritative result of an idempotent checkpoint append. */
+export interface CheckpointAppend {
+  readonly _tag: "Appended" | "AlreadyPresent"
+  readonly checkpoint: CheckpointEntry
+  readonly leafId: EntryId
+}
+
 /** @experimental Session event-log service boundary. */
 export interface Interface {
-  readonly append: (entry: AppendInput) => Effect.Effect<Entry, SessionStoreError>
+  readonly reserveEntryId: Effect.Effect<EntryId, SessionStoreError>
+  readonly append: (
+    entry: AppendInput,
+    options?: AppendOptions,
+  ) => Effect.Effect<Entry, SessionStoreError | SessionConflict>
+  readonly appendCheckpoint: (
+    checkpoint: PreparedCheckpoint,
+  ) => Effect.Effect<CheckpointAppend, SessionStoreError | SessionConflict>
   readonly path: (leaf?: EntryId) => Effect.Effect<ReadonlyArray<Entry>, SessionStoreError>
   readonly setLeaf: (id: EntryId | null) => Effect.Effect<void, SessionStoreError>
   readonly leaf: Effect.Effect<EntryId | null>
@@ -141,6 +184,11 @@ const failure = (message: string): Result<never> => ({
 
 const effectFromResult = <A>(result: Result<A>): Effect.Effect<A, SessionStoreError> =>
   result._tag === "Failure" ? Effect.fail(result.error) : Effect.succeed(result.value)
+
+const effectFromAppendResult = (
+  result: Result<Entry> | SessionConflict,
+): Effect.Effect<Entry, SessionStoreError | SessionConflict> =>
+  result._tag === "@batonfx/core/SessionConflict" ? Effect.fail(result) : effectFromResult(result)
 
 const entryFromInput = (input: AppendInput, id: EntryId, parentId: EntryId | null): Entry => {
   const base = {
@@ -198,7 +246,20 @@ const validateCompaction = (state: State, input: AppendInput): Result<void> => {
   return success(undefined)
 }
 
-const appendState = (state: State, input: AppendInput): readonly [Result<Entry>, State] => {
+const appendState = (
+  state: State,
+  input: AppendInput,
+  options?: AppendOptions,
+): readonly [Result<Entry> | SessionConflict, State] => {
+  if (options?.expectedLeafId !== undefined && options.expectedLeafId !== state.leaf) {
+    return [
+      SessionConflict.make({
+        reason: "stale-leaf",
+        message: `Expected Session leaf ${String(options.expectedLeafId)} but found ${String(state.leaf)}`,
+      }),
+      state,
+    ]
+  }
   const valid = validateCompaction(state, input)
   if (valid._tag === "Failure") return [valid, state]
 
@@ -211,6 +272,75 @@ const appendState = (state: State, input: AppendInput): readonly [Result<Entry>,
       order: [...state.order, id],
       leaf: id,
       counter: state.counter + 1,
+    },
+  ]
+}
+
+const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
+
+const checkpointMatches = (entry: CheckpointEntry, prepared: PreparedCheckpoint): boolean =>
+  entry.parentId === prepared.parentId &&
+  entry.summary === prepared.summary &&
+  promptEquivalence(entry.projectedHistory, prepared.projectedHistory)
+
+const appendCheckpointState = (
+  state: State,
+  prepared: PreparedCheckpoint,
+): readonly [CheckpointAppend | SessionConflict, State] => {
+  const existing = HashMap.get(state.entries, prepared.id)
+  if (Option.isSome(existing)) {
+    const entry = existing.value
+    if (entry._tag !== "Compaction" || entry.version !== 2 || !checkpointMatches(entry, prepared)) {
+      return [
+        SessionConflict.make({
+          reason: "checkpoint-id-reused",
+          message: `Session checkpoint id ${prepared.id} was reused with different content`,
+        }),
+        state,
+      ]
+    }
+    const activePath = state.leaf === null ? success<ReadonlyArray<Entry>>([]) : pathFromState(state, state.leaf)
+    if (activePath._tag === "Failure") {
+      return [
+        SessionConflict.make({ reason: "checkpoint-not-on-active-path", message: activePath.error.message }),
+        state,
+      ]
+    }
+    if (!activePath.value.some((active) => active.id === entry.id)) {
+      return [
+        SessionConflict.make({
+          reason: "checkpoint-not-on-active-path",
+          message: `Session checkpoint id ${prepared.id} is not on the active path`,
+        }),
+        state,
+      ]
+    }
+    return [{ _tag: "AlreadyPresent", checkpoint: entry, leafId: state.leaf ?? entry.id }, state]
+  }
+  if (state.leaf !== prepared.parentId) {
+    return [
+      SessionConflict.make({
+        reason: "stale-leaf",
+        message: `Expected Session leaf ${String(prepared.parentId)} but found ${String(state.leaf)}`,
+      }),
+      state,
+    ]
+  }
+  const checkpoint: CheckpointEntry = {
+    _tag: "Compaction",
+    version: 2,
+    id: prepared.id,
+    parentId: prepared.parentId,
+    projectedHistory: prepared.projectedHistory,
+    ...(prepared.summary === undefined ? {} : { summary: prepared.summary }),
+  }
+  return [
+    { _tag: "Appended", checkpoint, leafId: checkpoint.id },
+    {
+      ...state,
+      entries: HashMap.set(state.entries, checkpoint.id, checkpoint),
+      order: [...state.order, checkpoint.id],
+      leaf: checkpoint.id,
     },
   ]
 }
@@ -245,14 +375,20 @@ const handoffMessage = (entry: HandoffEntry): Prompt.Message =>
 
 const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Message> => {
   const compactionIndex = path.findLastIndex((entry) => entry._tag === "Compaction")
-  const messages: Array<Prompt.Message> = []
+  const compaction = compactionIndex === -1 ? undefined : (path[compactionIndex] as CompactionEntry)
+  const messages: Array<Prompt.Message> = compaction?.version === 2 ? [...compaction.projectedHistory.content] : []
   const keptIndex =
-    compactionIndex === -1
+    compaction === undefined || compaction.version === 2
       ? -1
-      : path.findIndex((entry) => entry.id === (path[compactionIndex] as CompactionEntry).firstKeptEntryId)
-  const entries = compactionIndex === -1 ? path : path.slice(keptIndex === -1 ? compactionIndex + 1 : keptIndex)
+      : path.findIndex((entry) => entry.id === compaction.firstKeptEntryId)
+  const entries =
+    compactionIndex === -1
+      ? path
+      : compaction?.version === 2
+        ? path.slice(compactionIndex + 1)
+        : path.slice(keptIndex === -1 ? compactionIndex + 1 : keptIndex)
 
-  if (compactionIndex !== -1) messages.push(checkpointMessage((path[compactionIndex] as CompactionEntry).summary))
+  if (compaction !== undefined && compaction.version !== 2) messages.push(checkpointMessage(compaction.summary))
 
   for (const entry of entries) {
     switch (entry._tag) {
@@ -320,8 +456,20 @@ export const layerMemory: Layer.Layer<SessionStore> = Layer.effect(
   Ref.make(initialState).pipe(
     Effect.map((state) =>
       SessionStore.of({
-        append: (entry) =>
-          Ref.modify(state, (current) => appendState(current, entry)).pipe(Effect.flatMap(effectFromResult)),
+        reserveEntryId: Ref.modify(state, (current) => [
+          String(current.counter),
+          { ...current, counter: current.counter + 1 },
+        ]),
+        append: (entry, options) =>
+          Ref.modify(state, (current) => appendState(current, entry, options)).pipe(
+            Effect.flatMap(effectFromAppendResult),
+          ),
+        appendCheckpoint: (checkpoint) =>
+          Ref.modify(state, (current) => appendCheckpointState(current, checkpoint)).pipe(
+            Effect.flatMap((result) =>
+              result._tag === "@batonfx/core/SessionConflict" ? Effect.fail(result) : Effect.succeed(result),
+            ),
+          ),
         path: (leaf) =>
           Ref.get(state).pipe(
             Effect.flatMap((current) =>

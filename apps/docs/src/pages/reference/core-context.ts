@@ -127,7 +127,7 @@ export const coreContextReference = definePage({
         "MessageEntry | ToolCallEntry | ToolResultEntry | MemoryEntry | SkillEntry | SteeringEntry | HandoffEntry | CompactionEntry | BranchSummaryEntry",
       ),
       "; the store interface is ",
-      code("{ append, path, setLeaf, leaf }"),
+      code("{ reserveEntryId, append, appendCheckpoint, path, setLeaf, leaf }"),
       ".",
     ),
     table(
@@ -142,14 +142,8 @@ export const coreContextReference = definePage({
         [[code("HandoffEntry")], [code("target"), ", ", code("summary")], [code("<handoff>"), " system note"]],
         [
           [code("CompactionEntry")],
-          [code("summary"), ", ", code("firstKeptEntryId")],
-          [
-            "Entries before ",
-            code("firstKeptEntryId"),
-            " are replaced by a ",
-            code("<conversation-checkpoint>"),
-            " user message",
-          ],
+          [code("version: 2"), ", ", code("projectedHistory"), ", optional ", code("summary")],
+          ["Exact point-in-time projection; legacy summary and ", code("firstKeptEntryId"), " entries remain readable"],
         ],
         [
           [code("BranchSummaryEntry")],
@@ -166,9 +160,11 @@ export const coreContextReference = definePage({
       code("Session.memoryLayer"),
       " is the Ref-backed non-durable store; ",
       code("testLayer"),
-      " wraps an explicit interface. Failures are ",
+      " wraps an explicit interface. Store failures are ",
       code("SessionStoreError{ message }"),
-      ".",
+      "; stale leaves and reused checkpoint identities fail with ",
+      code("SessionConflict"),
+      ". Exact checkpoints append idempotently before their stored projection is applied to Chat.",
     ),
     h2("compaction", "Compaction"),
     p(
