@@ -202,6 +202,106 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     expect(error.cause).toBeUndefined()
   })
 
+  ItLayer.make(it, "rejects duplicate static tool names before the model is called", () => {
+    let modelCalls = 0
+    const duplicateEcho = Tool.make("echo", {
+      description: "A second declaration with the same name",
+      parameters: Schema.Struct({ value: Schema.String }),
+      success: Schema.Unknown,
+    })
+    return [
+      modelLayer(() => {
+        modelCalls += 1
+        return Stream.make(textDelta("unexpected"))
+      }),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "collision-agent", tools: [echoTool, duplicateEcho] })
+
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "hello" })))
+
+        expect(failure).toEqual(
+          AgentEvent.ToolNameCollision.make({
+            name: "echo",
+            origins: [
+              { _tag: "Static", agent: "collision-agent" },
+              { _tag: "Static", agent: "collision-agent" },
+            ],
+          }),
+        )
+        expect(Schema.is(AgentEvent.ToolNameCollision)(failure)).toBe(true)
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "advertises and dispatches a __proto__ tool from the same registry snapshot", () => {
+    let modelCalls = 0
+    let executorCalls = 0
+    let advertisedTools: ReadonlyArray<string> = []
+    const prototypeTool = Tool.make("__proto__", {
+      parameters: Schema.Unknown,
+      success: Schema.Unknown,
+    })
+    return [
+      Layer.merge(
+        modelLayer((options) => {
+          modelCalls += 1
+          advertisedTools = options.tools.map((tool) => tool.name)
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("prototype-call", "__proto__", {}))
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executorCalls += 1
+            return Effect.succeed({ _tag: "Success", result: "safe", encodedResult: "safe" })
+          },
+        }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "prototype-agent", tools: [prototypeTool] })
+
+        yield* Stream.runDrain(Agent.stream(agent, { prompt: "call prototype" }))
+
+        expect(advertisedTools).toEqual(["__proto__"])
+        expect(executorCalls).toBe(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "reserves activate_skill before the model is called", () => {
+    let modelCalls = 0
+    const reserved = Tool.make("activate_skill", {
+      parameters: Schema.Unknown,
+      success: Schema.Unknown,
+    })
+    return [
+      Layer.merge(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("unexpected"))
+        }),
+        SkillSource.fromSkills([testSkill("review", "Review code", "Review carefully")]),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "reserved-agent", tools: [reserved] })
+
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "hello" })))
+
+        expect(failure).toEqual(
+          AgentEvent.ToolNameCollision.make({
+            name: "activate_skill",
+            origins: [
+              { _tag: "Static", agent: "reserved-agent" },
+              { _tag: "Builtin", builtin: "activate_skill" },
+            ],
+          }),
+        )
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "fails before model calls when toolOutputMaxBytes is invalid", () => {
     let modelCalls = 0
     const invalidValues = [-1, Number.NaN, Number.POSITIVE_INFINITY]
@@ -794,6 +894,244 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           allowedTools: ["read", "grep"],
         })
         expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects a static and activated-skill collision before another model request", () => {
+    let modelCalls = 0
+    let bodyReads = 0
+    let executorCalls = 0
+    const collidingSkill: SkillSource.Skill = {
+      ...testSkill("collision", "Contributes a colliding tool", "unused"),
+      body: Effect.sync(() => {
+        bodyReads += 1
+        return "unused"
+      }),
+      tools: [echoTool],
+    }
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(toolCallPart("activate-collision", "activate_skill", { name: "collision" }))
+        }),
+        SkillSource.fromSkills([collidingSkill]),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executorCalls += 1
+            return Effect.die("collision candidate must not execute")
+          },
+        }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "static-skill-agent", toolkit: Toolkit.make(echoTool) })
+
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "activate" })))
+
+        expect(failure).toEqual(
+          AgentEvent.ToolNameCollision.make({
+            name: "echo",
+            origins: [
+              { _tag: "Static", agent: "static-skill-agent" },
+              { _tag: "Skill", skill: "collision" },
+            ],
+          }),
+        )
+        expect(modelCalls).toBe(1)
+        expect(bodyReads).toBe(0)
+        expect(executorCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects collisions between activated skills in activation order", () => {
+    let modelCalls = 0
+    let secondBodyReads = 0
+    const sharedTool = Tool.make("shared", { parameters: Schema.Unknown, success: Schema.Unknown })
+    const first: SkillSource.Skill = {
+      ...testSkill("first", "First shared tool", "first body"),
+      tools: [sharedTool],
+    }
+    const second: SkillSource.Skill = {
+      ...testSkill("second", "Second shared tool", "second body"),
+      body: Effect.sync(() => {
+        secondBodyReads += 1
+        return "second body"
+      }),
+      tools: [sharedTool],
+    }
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(
+            toolCallPart(`activate-${modelCalls}`, "activate_skill", { name: modelCalls === 1 ? "first" : "second" }),
+          )
+        }),
+        SkillSource.fromSkills([first, second]),
+        unusedExecutor,
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Effect.flip(
+          Stream.runDrain(Agent.stream(Agent.make({ name: "skill-skill-agent" }), { prompt: "activate both" })),
+        )
+
+        expect(failure).toEqual(
+          AgentEvent.ToolNameCollision.make({
+            name: "shared",
+            origins: [
+              { _tag: "Skill", skill: "first" },
+              { _tag: "Skill", skill: "second" },
+            ],
+          }),
+        )
+        expect(modelCalls).toBe(2)
+        expect(secondBodyReads).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "isolates activated tool registries across concurrent runs", () => {
+    const skillTool = Tool.make("skill_only", { parameters: Schema.Unknown, success: Schema.Unknown })
+    const skill: SkillSource.Skill = {
+      ...testSkill("isolated", "Run-local tools", "isolated body"),
+      tools: [skillTool],
+    }
+    let activationTurns = 0
+    const plainRunTools: Array<ReadonlyArray<string>> = []
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          const content = Json.stringify(options.prompt.content)
+          const names = options.tools.map((tool) => tool.name)
+          if (content.includes("plain run")) {
+            plainRunTools.push(names)
+            return Stream.make(textDelta("plain"))
+          }
+          activationTurns += 1
+          return activationTurns === 1
+            ? Stream.make(toolCallPart("activate-isolated", "activate_skill", { name: "isolated" }))
+            : Stream.make(textDelta("activated"))
+        }),
+        SkillSource.fromSkills([skill]),
+        unusedExecutor,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "concurrent-skill-agent" })
+        yield* Effect.all(
+          [
+            Stream.runDrain(Agent.stream(agent, { prompt: "activation run" })),
+            Stream.runDrain(Agent.stream(agent, { prompt: "plain run" })),
+          ],
+          { concurrency: 2 },
+        )
+
+        expect(plainRunTools).toEqual([["activate_skill"]])
+        expect(activationTurns).toBe(2)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "does not dispatch a newly activated tool in the turn that advertised only activate_skill", () => {
+    let modelCalls = 0
+    let executorCalls = 0
+    const skillTool = Tool.make("new_skill_tool", { parameters: Schema.Unknown, success: Schema.Unknown })
+    const skill: SkillSource.Skill = {
+      ...testSkill("same-turn", "Contributes a tool", "same turn body"),
+      tools: [skillTool],
+    }
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.fromIterable([
+                toolCallPart("activate-same-turn", "activate_skill", { name: "same-turn" }),
+                toolCallPart("call-new-tool", "new_skill_tool", {}),
+              ])
+            : Stream.make(textDelta("done"))
+        }),
+        SkillSource.fromSkills([skill]),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executorCalls += 1
+            return Effect.succeed({ _tag: "Success", result: "unexpected", encodedResult: "unexpected" })
+          },
+        }),
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Agent.stream(Agent.make({ name: "same-turn-agent" }), {
+          prompt: "activate and call",
+        }).pipe(Stream.runDrain, Effect.flip)
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(executorCalls).toBe(0)
+        expect(modelCalls).toBe(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "restores activated tool metadata before resuming its suspended call", () => {
+    let modelCalls = 0
+    let executorCalls = 0
+    let bodyReads = 0
+    let suspendedTranscript: Prompt.Prompt | undefined
+    const resumableTool = Tool.make("resumable_skill_tool", { parameters: Schema.Unknown, success: Schema.Unknown })
+    const skill: SkillSource.Skill = {
+      ...testSkill("resumable", "Contributes a resumable tool", "unused"),
+      body: Effect.sync(() => {
+        bodyReads += 1
+        return "checkpointed body"
+      }),
+      tools: [resumableTool],
+    }
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.make(toolCallPart("activate-resumable", "activate_skill", { name: "resumable" }))
+          }
+          if (modelCalls === 2) return Stream.make(toolCallPart("resumable-call", "resumable_skill_tool", {}))
+          return Stream.make(textDelta("resumed"))
+        }),
+        SkillSource.fromSkills([skill]),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executorCalls += 1
+            return executorCalls === 1
+              ? Effect.succeed({ _tag: "Suspend", token: "resume-skill" })
+              : Effect.succeed({ _tag: "Success", result: "restored", encodedResult: "restored" })
+          },
+        }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "resumable-skill-agent" })
+        const failure = yield* Agent.stream(agent, { prompt: "activate resumable" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") suspendedTranscript = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+
+        expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
+        if (suspendedTranscript === undefined) return yield* Effect.die("missing activated skill checkpoint")
+
+        const resumed = yield* Stream.runCollect(
+          Agent.stream(agent, {
+            prompt: "ignored",
+            history: suspendedTranscript,
+            resume: { call: { id: "resumable-call", name: "resumable_skill_tool", params: {} } },
+          }),
+        )
+
+        expect(resumed.at(-1)?._tag).toBe("Completed")
+        expect(executorCalls).toBe(2)
+        expect(bodyReads).toBe(1)
       }),
     ] as const
   })
@@ -3410,6 +3748,43 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(secondCallSawInjectedSystem).toBe(true)
         expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "does not dispatch a tool excluded by the advertised activeTools snapshot", () => {
+    let modelCalls = 0
+    let executorCalls = 0
+    let secondTurnTools: ReadonlyArray<string> = []
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          modelCalls += 1
+          if (modelCalls === 2) secondTurnTools = options.tools.map((tool) => tool.name)
+          return modelCalls < 3
+            ? Stream.make(toolCallPart(`active-tool-${modelCalls}`, "echo", { text: "hidden" }))
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executorCalls += 1
+            return Effect.succeed({ _tag: "Success", result: "echoed", encodedResult: "echoed" })
+          },
+        }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({
+          name: "active-tools-agent",
+          toolkit: Toolkit.make(echoTool),
+          policy: TurnPolicy.make(() => Effect.succeed(TurnPolicy.decision.continue({ activeTools: [] }))),
+        })
+
+        const failure = yield* Agent.stream(agent, { prompt: "use then hide echo" }).pipe(Stream.runDrain, Effect.flip)
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(secondTurnTools).toEqual([])
+        expect(executorCalls).toBe(1)
+        expect(modelCalls).toBe(2)
       }),
     ] as const
   })

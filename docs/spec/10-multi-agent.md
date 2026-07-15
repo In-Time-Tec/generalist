@@ -23,7 +23,7 @@ Baton does not own durable child state, address books, cross-process routing, sh
 
 The handler runs `Agent.generate` for the child in the current Effect context. It does not provide or override `Ai.LanguageModel.LanguageModel`, `ToolExecutor`, `Approvals`, or `ModelMiddleware`; callers decide what services child runs inherit.
 
-At the tool boundary, child `AgentError`, `TurnPolicyError`, `TurnPolicyStopped`, `TurnLimitExceeded`, `MiddlewareViolation`, and defects thrown by prompt/result mappers become a failed tool result with a string message. Child policy requirements remain in the returned tool handler's Effect requirements.
+At the tool boundary, child `AgentError`, `TurnPolicyError`, `TurnPolicyStopped`, `TurnLimitExceeded`, `MiddlewareViolation`, `ToolNameCollision`, and defects thrown by prompt/result mappers become a failed tool result with a string message. Child policy requirements remain in the returned tool handler's Effect requirements, and collision messages retain the conflicting name and ordered origin evidence.
 
 Child `AgentSuspended` is also collapsed into a failed tool result. The parent agent receives the failure as ordinary tool context and can decide whether to continue, retry, ask the user, or transfer elsewhere. Durable cross-process HITL remains a host concern.
 
@@ -32,6 +32,8 @@ Child `AgentSuspended` is also collapsed into a failed tool result. The parent a
 `Handoff.transferTool(target, options?)` delegates to `AgentTool.asTool` and defaults the tool name to `transfer_to_<target.name>`. The returned tool is only a routing convention; model policy still decides when to call it.
 
 `Handoff.supervisor(options)` builds transfer tools for specialists, a supervisor agent whose toolkit advertises those transfer tools, and a handled toolkit for `ToolExecutor.fromToolkit`. It is pure sugar over `transferTool`, `Ai.Toolkit.make`, and `Agent.make`.
+
+Supervisor construction retains each transfer declaration's `Handoff { specialist }` origin before Effect AI toolkit construction can collapse equal names. The supervisor run validates all transfer declarations as one set and fails with `ToolNameCollision` before its first model request when two specialists produce the same transfer name. Unique specialists preserve input advertisement and dispatch order. The same validated entry selects both the advertised schema and handler; Handoff has no independent first-wins or last-wins map.
 
 ## Fan-out
 

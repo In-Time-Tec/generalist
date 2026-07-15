@@ -2,7 +2,7 @@ import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
 import { Effect, Layer, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "../src/index"
+import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 
@@ -64,6 +64,35 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
         expect(started?._tag === "ToolExecutionStarted" && started.call.name).toBe("transfer_to_math")
         const completed = events.at(-1)
         expect(completed?._tag === "Completed" && completed.text).toBe("supervisor got 42")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects duplicate Handoff names before the supervisor model is called", () => {
+    let modelCalls = 0
+    return [
+      modelLayer(() => {
+        modelCalls += 1
+        return Stream.make(textDelta("unexpected"))
+      }),
+      Effect.gen(function* () {
+        const supervisor = Handoff.supervisor({
+          name: "supervisor",
+          specialists: [Agent.make({ name: "math" }), Agent.make({ name: "math" })],
+        })
+
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisor.agent, { prompt: "solve" })))
+
+        expect(failure).toEqual(
+          AgentEvent.ToolNameCollision.make({
+            name: "transfer_to_math",
+            origins: [
+              { _tag: "Handoff", specialist: "math" },
+              { _tag: "Handoff", specialist: "math" },
+            ],
+          }),
+        )
+        expect(modelCalls).toBe(0)
       }),
     ] as const
   })

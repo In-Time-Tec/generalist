@@ -192,6 +192,23 @@ export class ProgressOverflowError extends Schema.TaggedErrorClass<ProgressOverf
   },
 ) {}
 
+/** @experimental The origin of one tool declaration in an Agent run. */
+export const ToolOrigin = Schema.Union([
+  Schema.TaggedStruct("Static", { agent: Schema.String }),
+  Schema.TaggedStruct("Builtin", { builtin: Schema.Literal("activate_skill") }),
+  Schema.TaggedStruct("Skill", { skill: Schema.String }),
+  Schema.TaggedStruct("Handoff", { specialist: Schema.String }),
+])
+
+/** @experimental */
+export type ToolOrigin = typeof ToolOrigin.Type
+
+/** @experimental The advertised tool set contains more than one declaration for a name. */
+export class ToolNameCollision extends Schema.TaggedErrorClass<ToolNameCollision>()("@batonfx/core/ToolNameCollision", {
+  name: Schema.String,
+  origins: Schema.NonEmptyArray(ToolOrigin),
+}) {}
+
 /**
  * @experimental The run suspended: a tool outcome was `Suspend` or an approval
  * decision was `Pending`. The run did NOT finish; the host resolves `token`
