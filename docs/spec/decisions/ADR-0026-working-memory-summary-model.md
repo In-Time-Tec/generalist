@@ -12,7 +12,7 @@ Working memory accepted a language-model `Layer` in its summarization options an
 
 Introduce `WorkingMemory.SummaryModel` as a dedicated service whose value is an Effect AI `LanguageModel.Service`. `WorkingMemory.make` requires that service when summarization is configured, and `WorkingMemory.layer` carries the same requirement. Construction captures the service once and every overflow reuses it. `summaryModelLayer` adapts the ambient Effect AI `LanguageModel` service into the dedicated role so applications select and scope the summarization model through ordinary layer composition.
 
-Serialize remember operations within each working-memory instance. Summarization and the following state update therefore form one bounded critical section, preventing concurrent overflows from losing summaries or recent messages.
+Own the complete working-memory state map with one `SynchronizedRef` per working-memory instance. Remember and forget use the same serialized update boundary. Summarization and the following publication therefore form one effectful transition, preventing concurrent operations from losing summaries, recent messages, counters, or another key's state. Recall reads the latest committed snapshot while a transition is in flight.
 
 Keep the existing layer-valued `summarize.model` option as a deprecated migration path. The compatibility path builds that layer once during working-memory construction in the owning scope. It does not rebuild the layer during overflow.
 
