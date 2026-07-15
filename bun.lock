@@ -182,6 +182,25 @@
         "typescript": "catalog:",
       },
     },
+    "examples/package-composition-guides": {
+      "name": "@batonfx/example-package-composition-guides",
+      "dependencies": {
+        "@batonfx/core": "workspace:*",
+        "@batonfx/foldkit": "workspace:*",
+        "@batonfx/mcp": "workspace:*",
+        "@batonfx/memory": "workspace:*",
+        "@batonfx/providers": "workspace:*",
+        "@batonfx/skills": "workspace:*",
+        "@batonfx/test": "workspace:*",
+        "@batonfx/transport": "workspace:*",
+        "@effect/platform-bun": "catalog:",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "examples/structured-extraction": {
       "name": "@batonfx/example-structured-extraction",
       "dependencies": {
@@ -406,6 +425,8 @@
     "@batonfx/example-memory-chat": ["@batonfx/example-memory-chat@workspace:examples/memory-chat"],
 
     "@batonfx/example-multi-agent": ["@batonfx/example-multi-agent@workspace:examples/multi-agent"],
+
+    "@batonfx/example-package-composition-guides": ["@batonfx/example-package-composition-guides@workspace:examples/package-composition-guides"],
 
     "@batonfx/example-structured-extraction": ["@batonfx/example-structured-extraction@workspace:examples/structured-extraction"],
 

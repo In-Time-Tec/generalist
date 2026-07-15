@@ -1,8 +1,76 @@
 # `@batonfx/memory`
 
-Non-durable memory implementations for Baton agents.
+Focused composition guide for Baton's non-durable memory implementations.
 
-## Working-memory summaries
+## Install
+
+```sh
+bun add effect @batonfx/core @batonfx/memory
+```
+
+## Imports
+
+```ts
+import { Memory } from "@batonfx/core"
+import { WorkingMemory, VectorStore } from "@batonfx/memory"
+```
+
+## Layer graph
+
+```text
+WorkingMemory.layer({ maxMessages: 4 })
+└─ provides Memory.Memory
+   ├─ remember transcript by Memory.Key
+   └─ recall bounded recent messages
+```
+
+## Runnable program
+
+Checked source: [`../../examples/package-composition-guides/src/memory.ts`](../../examples/package-composition-guides/src/memory.ts)
+
+```ts
+import { Console, Effect } from "effect"
+import { Prompt } from "effect/unstable/ai"
+import { Memory } from "@batonfx/core"
+import { WorkingMemory } from "@batonfx/memory"
+
+const key: Memory.Key = { agent: "assistant", subject: "user-42" }
+const text = (value: string) => Prompt.makePart("text", { text: value })
+const message = (role: "user" | "assistant", value: string) => Prompt.makeMessage(role, { content: [text(value)] })
+
+const program = Memory.Memory.use((memory) =>
+  Effect.gen(function* () {
+    yield* memory.remember({
+      key,
+      turn: 0,
+      terminal: true,
+      transcript: Prompt.fromMessages([message("user", "My name is Ada."), message("assistant", "Hello Ada.")]),
+    })
+    const recalled = yield* memory.recall({
+      key,
+      turn: 0,
+      prompt: Prompt.fromMessages([message("user", "What do you remember?")]),
+    })
+    yield* Console.log(`recalled ${recalled.length} messages`)
+  }),
+).pipe(Effect.provide(WorkingMemory.layer({ maxMessages: 4 })))
+
+await Effect.runPromise(program)
+```
+
+Run `bun examples/package-composition-guides/src/memory.ts`.
+
+## Errors, requirements, and resources
+
+Before provisioning, the program requires `Memory.Memory` and can fail with schema-backed `MemoryError`; `WorkingMemory.layer` discharges the requirement, while retaining that declared production error channel. It succeeds with `void`. The in-process store owns no external resource and bounds each key's recent tail to four messages. Semantic memory additionally uses schema-backed `VectorStoreError`; embedding/vector failures map to `MemoryError`.
+
+## More
+
+- Governing spec: [Memory](../../docs/spec/09-memory.md)
+- Deeper example: [memory chat](../../examples/memory-chat/)
+- `VectorStore.memoryLayer` remains an exact deprecated alias of canonical `VectorStore.layerMemory` through the stated pre-1.0 deprecation window; `combinedLayer` is unchanged.
+
+### Working-memory summaries
 
 Provide a dedicated summary model through Effect layer composition:
 
@@ -17,23 +85,3 @@ const memoryLayer = WorkingMemory.layer({
 ```
 
 The summary model is acquired once in `memoryLayer`'s owning scope and reused across overflows. The former `summarize: { model: modelLayer }` option remains supported but is deprecated; migrate by composing the model through `summaryModelLayer` as shown above.
-
-See the [Baton documentation](https://github.com/In-Time-Tec/batonfx#readme) for installation, examples, and API guidance.
-
-## Imports and migration
-
-Import implementation namespaces from the package root:
-
-```ts
-import { VectorStore } from "@batonfx/memory"
-
-const store = VectorStore.layerMemory
-```
-
-`VectorStore.memoryLayer` remains an exact deprecated alias during the deprecation window. It will not be removed before 1.0.0 and only in a separately planned major release.
-
-| Compatibility name        | Canonical name            |
-| ------------------------- | ------------------------- |
-| `VectorStore.memoryLayer` | `VectorStore.layerMemory` |
-
-The package-level `combinedLayer` composition factory is unchanged.
