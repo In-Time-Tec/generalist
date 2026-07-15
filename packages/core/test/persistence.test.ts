@@ -1,9 +1,9 @@
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
-import { Effect, Layer, Ref, Schema, Stream } from "effect"
-import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, AgentEvent, Approvals, ModelMiddleware, ToolExecutor } from "../src/index"
+import { Agent, AgentEvent, Approvals, Compaction, ModelMiddleware, Session, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 
@@ -174,6 +174,8 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           unusedExecutor,
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
+          Session.memoryLayer,
+          Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
           persistenceLayer,
         ),
         Effect.gen(function* () {
@@ -188,6 +190,11 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           const transcript = yield* historyText("structured")
           expect(transcript).toContain("persist a structured answer")
           expect(transcript).toContain("persisted")
+          const persistence = yield* Chat.Persistence
+          const chat = yield* persistence.get("structured")
+          const history = yield* Ref.get(chat.history)
+          const session = yield* Session.SessionStore
+          expect(Session.buildContext(yield* session.path()).content).toEqual(history.content)
         }),
       ] as const,
   )
@@ -232,6 +239,62 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         const persistence = yield* Chat.Persistence
         const missing = yield* persistence.get("missing-resume-chat").pipe(Effect.flip)
         expect(missing._tag).toBe("ChatNotFoundError")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "does not persist structured output before its Session checkpoint", () => {
+    const sessionLayer = Layer.effect(
+      Session.SessionStore,
+      Ref.make<ReadonlyArray<Session.Entry>>([]).pipe(
+        Effect.map((entries) =>
+          Session.SessionStore.of({
+            reserveEntryId: Effect.succeed("unused"),
+            append: (input) =>
+              input._tag === "Message" && Json.stringify(input.message).includes(Agent.defaultObjectPrompt)
+                ? Effect.fail(Session.SessionStoreError.make({ message: "structured append failed" }))
+                : Ref.modify(entries, (path) => {
+                    const entry = {
+                      ...input,
+                      id: String(path.length),
+                      parentId: path.at(-1)?.id ?? null,
+                    } as Session.Entry
+                    return [entry, [...path, entry]] as const
+                  }),
+            appendCheckpoint: () =>
+              Effect.fail(Session.SessionStoreError.make({ message: "structured checkpoint failed" })),
+            path: () => Ref.get(entries),
+            setLeaf: () => Effect.void,
+            leaf: Ref.get(entries).pipe(Effect.map((path) => path.at(-1)?.id ?? null)),
+          }),
+        ),
+      ),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => assistantText("structured-failure-text", "normal answer"),
+          () => Effect.succeed([{ type: "text", text: '{"value":"must not persist"}' }]),
+        ),
+        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        sessionLayer,
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Agent.generatePersistedObject(Agent.make({ name: "structured-failure-agent" }), {
+          prompt: "structured failure",
+          persistence: { chatId: "structured-failure" },
+          schema: Schema.Struct({ value: Schema.String }),
+        }).pipe(Effect.flip)
+        const transcript = yield* historyText("structured-failure")
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(transcript).toContain("normal answer")
+        expect(transcript).not.toContain(Agent.defaultObjectPrompt)
+        expect(transcript).not.toContain("must not persist")
       }),
     ] as const
   })
@@ -281,6 +344,8 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           }),
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
+          Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+          Session.memoryLayer,
           persistenceLayer,
         ),
         Effect.gen(function* () {
@@ -301,6 +366,11 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           expect(suspendedTranscript).toContain("tool-call-suspend")
           expect(suspendedTranscript).toContain("tool-call-ordinary")
           expect(suspendedTranscript).toContain("ordinary complete")
+          const persistence = yield* Chat.Persistence
+          const suspendedChat = yield* persistence.get("s1")
+          const suspendedHistory = yield* Ref.get(suspendedChat.history)
+          const session = yield* Session.SessionStore
+          expect(Session.buildContext(yield* session.path()).content).toEqual(suspendedHistory.content)
 
           const mismatch = yield* Agent.persisted(agent, {
             prompt: "ignored",
@@ -343,4 +413,463 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
       ] as const
     },
   )
+
+  ItLayer.make(it, "checkpoints a changed token when a persisted call re-suspends", () => {
+    let executions = 0
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("re-suspend-call", "echo", { text: "wait" }))
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: () => {
+            executions += 1
+            return executions < 3
+              ? Effect.succeed({ _tag: "Suspend", token: `wait-${executions}` })
+              : Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" })
+          },
+        }),
+        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Session.memoryLayer,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "re-suspend-agent", toolkit: Toolkit.make(echoTool) })
+        const first = yield* Agent.persisted(agent, {
+          prompt: "suspend twice",
+          persistence: { chatId: "re-suspend" },
+        }).pipe(Stream.runDrain, Effect.flip)
+        if (first._tag !== "@batonfx/core/AgentSuspended") return expect.unreachable()
+
+        const second = yield* Agent.persisted(agent, {
+          prompt: "ignored",
+          persistence: { chatId: "re-suspend" },
+          resume: { suspension: first },
+        }).pipe(Stream.runDrain, Effect.flip)
+        if (second._tag !== "@batonfx/core/AgentSuspended") return expect.unreachable()
+
+        const persistence = yield* Chat.Persistence
+        const chat = yield* persistence.get("re-suspend")
+        const history = yield* Ref.get(chat.history)
+        const session = yield* Session.SessionStore
+        expect(second.token).toBe("wait-2")
+        expect(Session.buildContext(yield* session.path()).content).toEqual(history.content)
+
+        yield* Agent.persisted(agent, {
+          prompt: "ignored",
+          persistence: { chatId: "re-suspend" },
+          resume: { suspension: second },
+        }).pipe(Stream.runDrain)
+        expect(executions).toBe(3)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rejects a stale resume without applying a Session checkpoint ahead of persisted Chat", () => {
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("must not run"))
+        }),
+        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Session.memoryLayer,
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        const persistence = yield* Chat.Persistence
+        yield* persistence.getOrCreate("stale-recovery")
+        const session = yield* Session.SessionStore
+        const call = Prompt.makePart("tool-call", {
+          id: "stale-recovery-call",
+          name: "echo",
+          params: { text: "stale" },
+          providerExecuted: false,
+          options: {
+            "@batonfx/core/suspension": {
+              token: "authoritative-token",
+              reason: "tool-wait",
+            },
+          },
+        })
+        yield* session.appendCheckpoint({
+          id: yield* session.reserveEntryId,
+          parentId: null,
+          projectedHistory: Prompt.fromMessages([Prompt.makeMessage("assistant", { content: [call] })]),
+        })
+        const received = AgentEvent.AgentSuspended.make({
+          token: "stale-token",
+          reason: "tool-wait",
+          tool_call_id: call.id,
+          tool_name: call.name,
+          tool_params: call.params,
+        })
+
+        const mismatch = yield* Agent.persisted(
+          Agent.make({ name: "stale-recovery-agent", toolkit: Toolkit.make(echoTool) }),
+          {
+            prompt: "ignored",
+            persistence: { chatId: "stale-recovery" },
+            resume: { suspension: received },
+          },
+        ).pipe(Stream.runDrain, Effect.flip)
+        const stored = yield* persistence.get("stale-recovery")
+        const history = yield* Ref.get(stored.history)
+
+        expect(mismatch).toMatchObject({
+          _tag: "@batonfx/core/ResumeMismatch",
+          reason: "identity-mismatch",
+          received,
+        })
+        expect(history.content).toEqual([])
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "does not commit Chat before a failed Session compaction append", () => {
+    const failedCheckpointPersistence = Layer.effect(
+      Chat.Persistence,
+      Chat.fromPrompt(Prompt.make("original history")).pipe(
+        Effect.map((chat) => {
+          const persisted: Chat.Persisted = { ...chat, id: "checkpoint-append-failure", save: Effect.void }
+          return Chat.Persistence.of({
+            get: () => Effect.succeed(persisted),
+            getOrCreate: () => Effect.succeed(persisted),
+          })
+        }),
+      ),
+    )
+    const sessionLayer = Layer.effect(
+      Session.SessionStore,
+      Ref.make<ReadonlyArray<Session.Entry>>([]).pipe(
+        Effect.map((entries) =>
+          Session.SessionStore.of({
+            reserveEntryId: Effect.succeed("checkpoint-0"),
+            append: (input) =>
+              Ref.modify(entries, (path) => {
+                const entry = {
+                  ...input,
+                  id: String(path.length),
+                  parentId: path.at(-1)?.id ?? null,
+                } as Session.Entry
+                return [entry, [...path, entry]] as const
+              }),
+            appendCheckpoint: () =>
+              Effect.fail(Session.SessionStoreError.make({ message: "checkpoint append failed" })),
+            path: () => Ref.get(entries),
+            setLeaf: () => Effect.void,
+            leaf: Ref.get(entries).pipe(Effect.map((path) => path.at(-1)?.id ?? null)),
+          }),
+        ),
+      ),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.die("model must not run after checkpoint failure")),
+        Compaction.testLayer({
+          maybeCompact: () =>
+            Effect.succeed(
+              Option.some({
+                _tag: "Summarize",
+                history: Prompt.make("committed too early"),
+                prompt: Prompt.make("retry prompt"),
+                summary: "summary",
+                firstKeptEntryId: "0",
+              }),
+            ),
+        }),
+        sessionLayer,
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        failedCheckpointPersistence,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "checkpoint-append-failure-agent", instructions: "system seed" })
+
+        const failure = yield* Agent.persisted(agent, {
+          prompt: "never sent",
+          persistence: { chatId: "checkpoint-append-failure" },
+        }).pipe(Stream.runDrain, Effect.flip)
+        const transcript = yield* historyText("checkpoint-append-failure")
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(transcript).toContain("original history")
+        expect(transcript).not.toContain("committed too early")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(
+    it,
+    "synchronizes Session when a duplicate tool call id terminates a persisted run",
+    () =>
+      [
+        Layer.mergeAll(
+          modelLayer(() =>
+            Stream.make(
+              toolCallPart("duplicate-persisted", "echo", { text: "first" }),
+              toolCallPart("duplicate-persisted", "echo", { text: "second" }),
+            ),
+          ),
+          Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+          Session.memoryLayer,
+          ToolExecutor.testLayer({
+            execute: () => Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" }),
+          }),
+          Approvals.autoApprove,
+          ModelMiddleware.identityLayer,
+          persistenceLayer,
+        ),
+        Effect.gen(function* () {
+          const failure = yield* Agent.persisted(
+            Agent.make({ name: "duplicate-persisted-agent", toolkit: Toolkit.make(echoTool) }),
+            {
+              prompt: "duplicate",
+              persistence: { chatId: "duplicate-persisted" },
+            },
+          ).pipe(Stream.runDrain, Effect.flip)
+          const persistence = yield* Chat.Persistence
+          const chat = yield* persistence.get("duplicate-persisted")
+          const history = yield* Ref.get(chat.history)
+          const session = yield* Session.SessionStore
+
+          expect(failure._tag).toBe("@batonfx/core/DuplicateToolCallId")
+          expect(Session.buildContext(yield* session.path()).content).toEqual(history.content)
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(it, "serializes concurrent compaction checkpoints for one persisted Chat", () => {
+    let firstEntered: Deferred.Deferred<void> | undefined
+    let releaseFirst: Deferred.Deferred<void> | undefined
+    let calls = 0
+    let active = 0
+    let maxActive = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.empty),
+        Compaction.testLayer({
+          maybeCompact: (request) =>
+            Effect.gen(function* () {
+              calls += 1
+              active += 1
+              maxActive = Math.max(maxActive, active)
+              if (calls === 1) {
+                if (firstEntered === undefined || releaseFirst === undefined) {
+                  return yield* Effect.die("missing compaction barriers")
+                }
+                yield* Deferred.succeed(firstEntered, undefined)
+                yield* Deferred.await(releaseFirst)
+              }
+              return Option.some({
+                _tag: "Microcompact" as const,
+                history: request.history,
+                prompt: request.prompt,
+              })
+            }).pipe(
+              Effect.ensuring(
+                Effect.sync(() => {
+                  active -= 1
+                }),
+              ),
+            ),
+        }),
+        Session.memoryLayer,
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        firstEntered = yield* Deferred.make<void>()
+        releaseFirst = yield* Deferred.make<void>()
+        const agent = Agent.make({ name: "concurrent-checkpoint-agent" })
+        const first = yield* Effect.forkChild(
+          Stream.runDrain(
+            Agent.persisted(agent, { prompt: "first concurrent", persistence: { chatId: "concurrent" } }),
+          ),
+          { startImmediately: true },
+        )
+        yield* Deferred.await(firstEntered)
+        const second = yield* Effect.forkChild(
+          Stream.runDrain(
+            Agent.persisted(agent, { prompt: "second concurrent", persistence: { chatId: "concurrent" } }),
+          ),
+          { startImmediately: true },
+        )
+        yield* Effect.yieldNow
+        yield* Deferred.succeed(releaseFirst, undefined)
+        yield* Fiber.join(first)
+        yield* Fiber.join(second)
+
+        const persistence = yield* Chat.Persistence
+        const chat = yield* persistence.get("concurrent")
+        const live = yield* Ref.get(chat.history)
+        const session = yield* Session.SessionStore
+        const path = yield* session.path()
+
+        expect(calls).toBe(2)
+        expect(maxActive).toBe(1)
+        expect(Session.buildContext(path).content).toEqual(live.content)
+        expect((yield* session.path()).filter((entry) => entry._tag === "Compaction")).toHaveLength(2)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "releases the persisted Chat lock when compaction is interrupted", () => {
+    let firstEntered: Deferred.Deferred<void> | undefined
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.empty),
+        Compaction.testLayer({
+          maybeCompact: () =>
+            Effect.gen(function* () {
+              calls += 1
+              if (calls === 1) {
+                if (firstEntered === undefined) return yield* Effect.die("missing compaction barrier")
+                yield* Deferred.succeed(firstEntered, undefined)
+                return yield* Effect.never
+              }
+              return Option.none()
+            }),
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        firstEntered = yield* Deferred.make<void>()
+        const agent = Agent.make({ name: "interrupted-checkpoint-agent" })
+        const first = yield* Effect.forkChild(
+          Stream.runDrain(Agent.persisted(agent, { prompt: "interrupted", persistence: { chatId: "interrupted" } })),
+          { startImmediately: true },
+        )
+        yield* Deferred.await(firstEntered)
+        yield* Fiber.interrupt(first)
+        yield* Stream.runDrain(Agent.persisted(agent, { prompt: "completed", persistence: { chatId: "interrupted" } }))
+
+        expect(calls).toBe(2)
+        expect(yield* historyText("interrupted")).toContain("completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "recovers after interruption while reading an appended checkpoint", () => {
+    let pathEntered: Deferred.Deferred<void> | undefined
+    let blockCheckpointPath = true
+    let compactionCalls = 0
+    const sessionLayer = Layer.effect(
+      Session.SessionStore,
+      Ref.make<ReadonlyArray<Session.Entry>>([]).pipe(
+        Effect.map((entries) =>
+          Session.SessionStore.of({
+            reserveEntryId: Effect.succeed("checkpoint-interrupted"),
+            append: (input) =>
+              Ref.modify(entries, (path) => {
+                const entry = {
+                  ...input,
+                  id: `message-${path.length}`,
+                  parentId: path.at(-1)?.id ?? null,
+                } as Session.Entry
+                return [entry, [...path, entry]] as const
+              }),
+            appendCheckpoint: (prepared) =>
+              Ref.modify(entries, (path) => {
+                const existing = path.find((entry) => entry.id === prepared.id)
+                if (existing?._tag === "Compaction" && existing.version === 2) {
+                  return [
+                    { _tag: "AlreadyPresent", checkpoint: existing, leafId: path.at(-1)?.id ?? existing.id } as const,
+                    path,
+                  ] as readonly [Session.CheckpointAppend, ReadonlyArray<Session.Entry>]
+                }
+                const checkpoint: Session.CheckpointEntry = {
+                  _tag: "Compaction",
+                  version: 2,
+                  ...prepared,
+                }
+                return [
+                  { _tag: "Appended", checkpoint, leafId: checkpoint.id } as const,
+                  [...path, checkpoint],
+                ] as readonly [Session.CheckpointAppend, ReadonlyArray<Session.Entry>]
+              }),
+            path: () =>
+              Effect.gen(function* () {
+                const path = yield* Ref.get(entries)
+                if (blockCheckpointPath && path.some((entry) => entry._tag === "Compaction")) {
+                  blockCheckpointPath = false
+                  if (pathEntered === undefined) return yield* Effect.die("missing checkpoint path barrier")
+                  yield* Deferred.succeed(pathEntered, undefined)
+                  return yield* Effect.never
+                }
+                return path
+              }),
+            setLeaf: () => Effect.void,
+            leaf: Ref.get(entries).pipe(Effect.map((path) => path.at(-1)?.id ?? null)),
+          }),
+        ),
+      ),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.empty),
+        Compaction.testLayer({
+          maybeCompact: () =>
+            Effect.sync(() => {
+              compactionCalls += 1
+              return compactionCalls === 1
+                ? Option.some({
+                    _tag: "Microcompact" as const,
+                    history: Prompt.make("recovered checkpoint"),
+                    prompt: Prompt.empty,
+                  })
+                : Option.none()
+            }),
+        }),
+        sessionLayer,
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        pathEntered = yield* Deferred.make<void>()
+        const agent = Agent.make({ name: "interrupted-checkpoint-path-agent" })
+        const first = yield* Effect.forkChild(
+          Agent.persisted(agent, {
+            prompt: "first",
+            persistence: { chatId: "interrupted-checkpoint-path" },
+          }).pipe(Stream.runDrain),
+          { startImmediately: true },
+        )
+        yield* Deferred.await(pathEntered)
+        yield* Fiber.interrupt(first)
+        yield* Agent.persisted(agent, {
+          prompt: "second",
+          persistence: { chatId: "interrupted-checkpoint-path" },
+        }).pipe(Stream.runDrain)
+
+        const persistence = yield* Chat.Persistence
+        const chat = yield* persistence.get("interrupted-checkpoint-path")
+        const history = yield* Ref.get(chat.history)
+        const session = yield* Session.SessionStore
+        const path = yield* session.path()
+        expect(path.filter((entry) => entry._tag === "Compaction")).toHaveLength(1)
+        expect(Session.buildContext(path).content).toEqual(history.content)
+      }),
+    ] as const
+  })
 })

@@ -88,7 +88,9 @@ The summary template has fixed sections: Goal, Constraints, Progress, Key Decisi
 
 ## Session and losslessness
 
-When both `Compaction` and `SessionStore` are provided, the loop mirrors chat transcript messages into the session log and appends a `Compaction` entry after summary checkpointing. The full pre-compaction conversation remains in the session path; only the prompt projected into the live `Ai.Chat` shrinks.
+When both `Compaction` and `SessionStore` are provided, the loop mirrors authoritative Chat messages into the session log and commits every changed projection through the same version 2 Session checkpoint protocol. Summary, microcompaction, truncate, and custom results cannot bypass it. The checkpoint stores the exact projected history used by Chat, so `Session.buildContext(path)` and the live history are identical at that point, including the default policy that preserves compacted-head system messages. The full pre-compaction conversation remains in the session path; only projection is lossy.
+
+Checkpoint append precedes Chat mutation. A typed append failure leaves Chat unchanged. Append identity is stable and idempotent across ambiguous retry; a duplicate id with different parent or projection fails typed. Once append acknowledges success or an exact existing checkpoint, Chat application is uninterruptible and uses the store-returned projection. Session path identity, not projected message count, defines synchronization progress.
 
 Compaction implementations receive canonically JSON-detached message data in request history, prompt, and Session-path views. In-place mutation of message containers, opaque JSON tool payloads, file bytes, or URLs cannot modify authoritative Chat or Session state; an accepted result becomes authoritative only after recalled-message lineage validation. Non-message Session entry fields remain readonly borrowed input.
 
@@ -115,3 +117,4 @@ Terminal structured-output compaction is deferred; the same seam can compact nor
 - `docs/spec/decisions/ADR-0009-compaction-strategy-seam.md`
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
 - `docs/spec/decisions/ADR-0040-memory-recall-provenance.md`
+- `docs/spec/decisions/ADR-0041-chat-session-compaction-checkpoints.md`

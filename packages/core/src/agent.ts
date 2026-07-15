@@ -61,7 +61,14 @@ import { type Middleware, ModelMiddleware, type TurnContext } from "./model-midd
 import { type LanguageModelNotRegistered, type ModelSelection, Service } from "./model-registry.js"
 import { ModelResilience, apply } from "./model-resilience.js"
 import { Permissions, RuleStore } from "./permissions.js"
-import { type Entry, SessionStore, SessionStoreError, buildContext, buildMemoryContext } from "./session.js"
+import {
+  type Entry,
+  SessionStore,
+  type SessionConflict,
+  type SessionStoreError,
+  buildContext,
+  buildMemoryContext,
+} from "./session.js"
 import { SkillSource, type SkillSourceError, selectListings } from "./skill-source.js"
 import { type Message, Steering } from "./steering.js"
 import {
@@ -440,13 +447,23 @@ interface ToolCallIdState {
   readonly firstIndexes: HashMap.HashMap<string, number>
 }
 
-const chatLocks = new WeakMap<Chat.Service, Semaphore.Semaphore>()
+interface PersistedChatLock {
+  readonly semaphore: Semaphore.Semaphore
+  users: number
+}
 
-const lockForChat = (chat: Chat.Service): Semaphore.Semaphore => {
-  const existing = chatLocks.get(chat)
-  if (existing !== undefined) return existing
-  const created = Semaphore.makeUnsafe(1)
-  chatLocks.set(chat, created)
+const persistenceLocks = new WeakMap<Chat.Persistence.Service, Map<string, PersistedChatLock>>()
+
+const reservePersistedChatLock = (persistence: Chat.Persistence.Service, chatId: string): PersistedChatLock => {
+  const locks = persistenceLocks.get(persistence) ?? new Map<string, PersistedChatLock>()
+  if (!persistenceLocks.has(persistence)) persistenceLocks.set(persistence, locks)
+  const existing = locks.get(chatId)
+  if (existing !== undefined) {
+    existing.users += 1
+    return existing
+  }
+  const created = { semaphore: Semaphore.makeUnsafe(1), users: 1 }
+  locks.set(chatId, created)
   return created
 }
 
@@ -465,6 +482,19 @@ const suspensionMetadata = Schema.Struct({
   active_tools: Schema.optional(Schema.Array(Schema.String)),
   activated_skills: Schema.optional(Schema.Array(Schema.String)),
 })
+
+const releasePersistedChatLock = (
+  persistence: Chat.Persistence.Service,
+  chatId: string,
+  lock: PersistedChatLock,
+): void => {
+  lock.users -= 1
+  if (lock.users !== 0) return
+  const locks = persistenceLocks.get(persistence)
+  if (locks?.get(chatId) !== lock) return
+  locks.delete(chatId)
+  if (locks.size === 0) persistenceLocks.delete(persistence)
+}
 
 const unresolvedToolCall = (
   messages: ReadonlyArray<Prompt.Message>,
@@ -648,21 +678,6 @@ const detachEntry = (entry: Entry) =>
     ? detachMessage(entry.message).pipe(Effect.map((message): Entry => ({ ...entry, message })))
     : Effect.succeed(entry)
 
-const sessionTranscriptCursor = (path: ReadonlyArray<Entry>, transcript: Prompt.Prompt): Option.Option<number> => {
-  const projected = buildContext(path).content
-  if (projected.length === 0) return Option.some(0)
-  const matches: Array<number> = []
-  for (let start = 0; start <= transcript.content.length - projected.length; start += 1) {
-    if (
-      transcript.content.slice(0, start).every((message) => message.role === "system") &&
-      projected.every((message, index) => Equal.equals(message, transcript.content[start + index]))
-    ) {
-      matches.push(start + projected.length)
-    }
-  }
-  return matches.length === 1 ? Option.some(matches[0] as number) : Option.none()
-}
-
 const preservesRecalledMessages = (
   allowed: ReadonlyArray<Prompt.Message>,
   required: ReadonlyArray<Prompt.Message>,
@@ -736,6 +751,8 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       const persistenceOptions = options.persistence
       const resume = options.resume
       const persistenceService = yield* Effect.serviceOption(Chat.Persistence)
+      const compactionService = yield* Effect.serviceOption(Compaction)
+      const sessionService = yield* Effect.serviceOption(SessionStore)
       const persisted: Chat.Persisted | undefined =
         persistenceOptions === undefined
           ? undefined
@@ -747,38 +764,66 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                     turn: 0,
                   }),
                 ),
-              onSome: (service) => {
-                const getOptions =
-                  persistenceOptions.timeToLive === undefined
-                    ? undefined
-                    : { timeToLive: persistenceOptions.timeToLive }
-                return resume === undefined
-                  ? service
-                      .getOrCreate(persistenceOptions.chatId, getOptions)
-                      .pipe(
+              onSome: (service) =>
+                Effect.gen(function* () {
+                  const lock = yield* Effect.acquireRelease(
+                    Effect.sync(() => reservePersistedChatLock(service, persistenceOptions.chatId)),
+                    (reserved) =>
+                      Effect.sync(() => releasePersistedChatLock(service, persistenceOptions.chatId, reserved)),
+                  )
+                  yield* Effect.acquireRelease(lock.semaphore.take(1), () => lock.semaphore.release(1), {
+                    interruptible: true,
+                  })
+                  const getOptions =
+                    persistenceOptions.timeToLive === undefined
+                      ? undefined
+                      : { timeToLive: persistenceOptions.timeToLive }
+                  return yield* resume === undefined
+                    ? service
+                        .getOrCreate(persistenceOptions.chatId, getOptions)
+                        .pipe(
+                          Effect.mapError((error) =>
+                            AgentError.make({ message: errorMessage(error), turn: 0, cause: error }),
+                          ),
+                        )
+                    : service.get(persistenceOptions.chatId, getOptions).pipe(
                         Effect.mapError((error) =>
-                          AgentError.make({ message: errorMessage(error), turn: 0, cause: error }),
+                          error._tag === "ChatNotFoundError"
+                            ? ResumeMismatch.make({
+                                reason: "checkpoint-not-found",
+                                received: resume.suspension,
+                              })
+                            : AgentError.make({ message: errorMessage(error), turn: 0, cause: error }),
                         ),
                       )
-                  : service.get(persistenceOptions.chatId, getOptions).pipe(
-                      Effect.mapError((error) =>
-                        error._tag === "ChatNotFoundError"
-                          ? ResumeMismatch.make({
-                              reason: "checkpoint-not-found",
-                              received: resume.suspension,
-                            })
-                          : AgentError.make({ message: errorMessage(error), turn: 0, cause: error }),
-                      ),
-                    )
-              },
+                }),
             })
+
+      let recoveredHistory: Prompt.Prompt | undefined
+      if (
+        resume !== undefined &&
+        persisted !== undefined &&
+        Option.isSome(compactionService) &&
+        Option.isSome(sessionService)
+      ) {
+        yield* Effect.gen(function* () {
+          const path = yield* sessionService.value.path()
+          const checkpoint = path.at(-1)
+          if (checkpoint?._tag !== "Compaction" || checkpoint.version !== 2) return
+          const history = yield* Ref.get(persisted.history)
+          const before = buildContext(path.slice(0, -1))
+          if (!Schema.toEquivalence(Prompt.Prompt)(before, history)) return
+          recoveredHistory = buildContext(path)
+        }).pipe(Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })))
+      }
 
       let resumeChat: Chat.Service | undefined
       let validatedResume: SuspensionCheckpoint | undefined
       if (resume !== undefined) {
         resumeChat = persisted ?? (yield* options.history === undefined ? Chat.empty : Chat.fromPrompt(options.history))
         const received = resume.suspension
-        validatedResume = yield* Ref.get(resumeChat.history).pipe(
+        const resumeHistory = recoveredHistory ?? (yield* Ref.get(resumeChat.history))
+        validatedResume = yield* Effect.succeed(resumeHistory).pipe(
           Effect.flatMap((history) => {
             const expected = suspensionCheckpoint(history.content)
             if (expected === undefined) {
@@ -793,6 +838,12 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 })
           }),
         )
+        if (recoveredHistory !== undefined && persisted !== undefined) {
+          yield* Ref.set(persisted.history, recoveredHistory)
+          yield* persisted.save.pipe(
+            Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
+          )
+        }
       }
 
       const staticCandidates: ReadonlyArray<Candidate> = (
@@ -907,9 +958,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       const ruleStoreService = yield* Effect.serviceOption(RuleStore)
       const authorizationService = yield* Effect.serviceOption(ToolAuthorizerService)
       const steeringService = yield* Effect.serviceOption(Steering)
-      const compactionService = yield* Effect.serviceOption(Compaction)
       const memoryService = yield* Effect.serviceOption(Memory)
-      const sessionService = yield* Effect.serviceOption(SessionStore)
       const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
       const authorizer =
         agent.authorization ??
@@ -968,7 +1017,6 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             ? Chat.fromPrompt([Prompt.makeMessage("system", { content: system })])
             : Chat.empty
       const chat: Chat.Service = resumeChat ?? persisted ?? (yield* freshChat)
-      const chatLock = lockForChat(chat)
 
       const savePersisted = (turn: number): Effect.Effect<void, AgentError> =>
         persisted === undefined
@@ -977,16 +1025,14 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn, cause: error })),
             )
 
-      const checkpointPending = (
+      const appendPending = (
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
         pending.length === 0
           ? Ref.get(chat.history)
-          : chatLock.withPermit(
-              Ref.updateAndGet(chat.history, (history) =>
-                Prompt.concat(history, Prompt.fromResponseParts(pending)),
-              ).pipe(Effect.tap(() => savePersisted(turn))),
+          : Ref.updateAndGet(chat.history, (history) => Prompt.concat(history, Prompt.fromResponseParts(pending))).pipe(
+              Effect.tap(() => savePersisted(turn)),
             )
 
       const checkpointSuspended = (
@@ -994,56 +1040,64 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         pending: ReadonlyArray<PendingToolResult>,
         suspension: AgentSuspended,
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
-        chatLock.withPermit(
-          Effect.gen(function* () {
-            const current = yield* Ref.get(chat.history)
-            const withPending =
-              pending.length === 0 ? current : Prompt.concat(current, Prompt.fromResponseParts(pending))
-            const unresolved = unresolvedToolCall(withPending.content)
-            if (
-              unresolved === undefined ||
-              unresolved.call.id !== suspension.tool_call_id ||
-              unresolved.call.name !== suspension.tool_name ||
-              !Equal.equals(unresolved.call.params, suspension.tool_params)
-            ) {
-              return yield* AgentError.make({
-                message: "Suspension does not match the unresolved checkpoint call",
-                turn,
-              })
-            }
-            const metadata = {
-              token: suspension.token,
-              reason: suspension.reason,
-              ...(suspension.authorization_stage === undefined
-                ? {}
-                : { authorization_stage: suspension.authorization_stage }),
-              ...(suspension.active_tools === undefined ? {} : { active_tools: suspension.active_tools }),
-              ...(suspension.activated_skills === undefined ? {} : { activated_skills: suspension.activated_skills }),
-            }
-            const messages = withPending.content.map((message, messageIndex): Prompt.Message => {
-              if (messageIndex !== unresolved.messageIndex || message.role !== "assistant") return message
-              return Prompt.makeMessage("assistant", {
-                content: message.content.map(
-                  (part, partIndex): Prompt.AssistantMessagePart =>
-                    partIndex === unresolved.partIndex && part.type === "tool-call"
-                      ? Prompt.makePart("tool-call", {
-                          id: part.id,
-                          name: part.name,
-                          params: part.params,
-                          providerExecuted: part.providerExecuted,
-                          options: { ...part.options, [suspensionCheckpointOption]: metadata },
-                        })
-                      : part,
-                ),
-                options: message.options,
-              })
+        Effect.gen(function* () {
+          const withPending = yield* appendPending(turn, pending)
+          const unresolved = unresolvedToolCall(withPending.content)
+          if (
+            unresolved === undefined ||
+            unresolved.call.id !== suspension.tool_call_id ||
+            unresolved.call.name !== suspension.tool_name ||
+            !Equal.equals(unresolved.call.params, suspension.tool_params)
+          ) {
+            return yield* AgentError.make({
+              message: "Suspension does not match the unresolved checkpoint call",
+              turn,
             })
-            const checkpoint = Prompt.fromMessages(messages)
-            yield* Ref.set(chat.history, checkpoint)
-            yield* savePersisted(turn)
-            return checkpoint
-          }),
-        )
+          }
+          const metadata = {
+            token: suspension.token,
+            reason: suspension.reason,
+            ...(suspension.authorization_stage === undefined
+              ? {}
+              : { authorization_stage: suspension.authorization_stage }),
+            ...(suspension.active_tools === undefined ? {} : { active_tools: suspension.active_tools }),
+            ...(suspension.activated_skills === undefined ? {} : { activated_skills: suspension.activated_skills }),
+          }
+          const messages = withPending.content.map((message, messageIndex): Prompt.Message => {
+            if (messageIndex !== unresolved.messageIndex || message.role !== "assistant") return message
+            return Prompt.makeMessage("assistant", {
+              content: message.content.map(
+                (part, partIndex): Prompt.AssistantMessagePart =>
+                  partIndex === unresolved.partIndex && part.type === "tool-call"
+                    ? Prompt.makePart("tool-call", {
+                        id: part.id,
+                        name: part.name,
+                        params: part.params,
+                        providerExecuted: part.providerExecuted,
+                        options: { ...part.options, [suspensionCheckpointOption]: metadata },
+                      })
+                    : part,
+              ),
+              options: message.options,
+            })
+          })
+          const checkpoint = Prompt.fromMessages(messages)
+          const path = yield* syncSession(turn, withPending)
+          const parentId = path.at(-1)?.id ?? null
+          yield* applyCompactionResult(
+            turn,
+            { _tag: "Microcompact", history: checkpoint, prompt: Prompt.empty },
+            parentId,
+          )
+          if (Option.isNone(activeSession)) yield* savePersisted(turn)
+          return yield* Ref.get(chat.history)
+        })
+
+      const checkpointPending = (
+        turn: number,
+        pending: ReadonlyArray<PendingToolResult>,
+      ): Effect.Effect<Prompt.Prompt, AgentError> =>
+        appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint)))
 
       const failSuspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "approval") =>
         Stream.fail<RunError>(suspended(call, token, reason))
@@ -1112,14 +1166,11 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 
       if (validatedResume !== undefined) yield* Ref.get(chat.history).pipe(Effect.flatMap(restoreActivatedSkills))
 
-      let sessionSyncedMessages = 0
-      let sessionInitialized = false
-
       const activeSession = Option.isSome(compactionService)
         ? sessionService
         : Option.none<typeof SessionStore.Service>()
 
-      const sessionError = (turn: number, error: SessionStoreError): AgentError =>
+      const sessionError = (turn: number, error: SessionStoreError | SessionConflict): AgentError =>
         AgentError.make({ message: error.message, turn, cause: error })
 
       const compactionError = (turn: number, error: CompactionError): AgentError =>
@@ -1169,30 +1220,60 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               })
               .pipe(Effect.mapError((error) => memoryError(turn, error)))
 
+      const messageEquivalence = Schema.toEquivalence(Prompt.Message)
+      const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
+      const sessionTranscriptCursor = (
+        projection: ReadonlyArray<Prompt.Message>,
+        transcript: ReadonlyArray<Prompt.Message>,
+      ): Option.Option<number> => {
+        if (projection.length === 0) return Option.some(0)
+        const matches: Array<number> = []
+        for (let start = 0; start <= transcript.length - projection.length; start += 1) {
+          if (
+            transcript.slice(0, start).every((message) => message.role === "system") &&
+            projection.every((message, index) =>
+              messageEquivalence(message, transcript[start + index] as Prompt.Message),
+            )
+          ) {
+            matches.push(start + projection.length)
+          }
+        }
+        return matches.length === 1 ? Option.some(matches[0] as number) : Option.none()
+      }
+
       const syncSession = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, AgentError> =>
         Option.match(activeSession, {
           onNone: () => Effect.succeed([]),
           onSome: (session) =>
             Effect.gen(function* () {
-              const existingPath = yield* session.path()
-              if (!sessionInitialized) {
-                sessionInitialized = true
-                if (existingPath.length > 0) {
-                  const cursor = sessionTranscriptCursor(existingPath, transcript)
-                  if (Option.isNone(cursor)) {
-                    return yield* SessionStoreError.make({
-                      message: "Session context does not align with the Chat transcript",
-                    })
-                  }
-                  sessionSyncedMessages = cursor.value
+              let path = yield* session.path()
+              const projection = buildContext(path)
+              const cursor = sessionTranscriptCursor(projection.content, transcript.content)
+              if (Option.isNone(cursor)) {
+                const checkpoint = path.at(-1)
+                const before = buildContext(path.slice(0, -1))
+                if (
+                  checkpoint?._tag === "Compaction" &&
+                  checkpoint.version === 2 &&
+                  promptEquivalence(before, transcript)
+                ) {
+                  yield* Ref.set(chat.history, projection)
+                  yield* savePersisted(turn)
+                  return path
                 }
+                return yield* AgentError.make({
+                  message: "Session projection is not a prefix of authoritative Chat history",
+                  turn,
+                })
               }
-              for (const message of transcript.content.slice(sessionSyncedMessages)) {
-                yield* session.append({ _tag: "Message", message })
+              let expectedLeafId = path.at(-1)?.id ?? null
+              for (const message of transcript.content.slice(cursor.value)) {
+                const appended = yield* session.append({ _tag: "Message", message }, { expectedLeafId })
+                expectedLeafId = appended.id
               }
-              sessionSyncedMessages = transcript.content.length
-              return yield* session.path()
-            }).pipe(Effect.mapError((error) => sessionError(turn, error))),
+              if (expectedLeafId !== (path.at(-1)?.id ?? null)) path = yield* session.path()
+              return path
+            }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
         })
 
       const countTokens = (turn: number, prompt: Prompt.Prompt): Effect.Effect<number, AgentError> =>
@@ -1218,19 +1299,81 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           })),
         )
 
-      const applyCompactionResult = (turn: number, result: CompactionResult): Effect.Effect<void, AgentError> =>
-        Effect.gen(function* () {
-          yield* Ref.set(chat.history, result.history)
-          sessionSyncedMessages = result.history.content.length
-          if (result._tag === "Summarize" && Option.isSome(activeSession)) {
-            yield* activeSession.value
-              .append({
-                _tag: "Compaction",
-                summary: result.summary,
-                firstKeptEntryId: result.firstKeptEntryId,
-              })
-              .pipe(Effect.mapError((error) => sessionError(turn, error)))
+      const validateCompactionProjection = (
+        turn: number,
+        result: CompactionResult,
+      ): Effect.Effect<void, AgentError> => {
+        const pending = new Set<string>()
+        const optional = new Set<string>()
+        for (const message of Prompt.concat(result.history, result.prompt).content) {
+          if (typeof message.content === "string") {
+            if (pending.size > 0) {
+              return Effect.fail(
+                AgentError.make({ message: "Compaction projection separates a tool call from its result", turn }),
+              )
+            }
+            optional.clear()
+            continue
           }
+          const hasResult = message.content.some((part) => part.type === "tool-result")
+          if (pending.size > 0 && !hasResult) {
+            return Effect.fail(
+              AgentError.make({ message: "Compaction projection separates a tool call from its result", turn }),
+            )
+          }
+          if (!hasResult) optional.clear()
+          const responseCalls = new Set<string>()
+          for (const part of message.content) {
+            if (part.type === "tool-call") {
+              if (responseCalls.has(part.id)) {
+                return Effect.fail(
+                  AgentError.make({ message: `Compaction projection contains duplicate tool call ${part.id}`, turn }),
+                )
+              }
+              responseCalls.add(part.id)
+              if (part.providerExecuted) optional.add(part.id)
+              else pending.add(part.id)
+            }
+            if (part.type === "tool-result") {
+              if (!pending.delete(part.id) && !optional.delete(part.id)) {
+                return Effect.fail(
+                  AgentError.make({ message: `Compaction projection contains orphan tool result ${part.id}`, turn }),
+                )
+              }
+            }
+          }
+        }
+        return pending.size === 0
+          ? Effect.void
+          : Effect.fail(AgentError.make({ message: "Compaction projection contains an unresolved tool call", turn }))
+      }
+
+      const applyCompactionResult = (
+        turn: number,
+        result: CompactionResult,
+        parentId: string | null,
+      ): Effect.Effect<void, AgentError> =>
+        Option.match(activeSession, {
+          onNone: () => Ref.set(chat.history, result.history),
+          onSome: (session) =>
+            Effect.gen(function* () {
+              const id = yield* session.reserveEntryId
+              yield* Effect.uninterruptibleMask((restore) =>
+                restore(
+                  session.appendCheckpoint({
+                    id,
+                    parentId,
+                    projectedHistory: result.history,
+                    ...(result._tag === "Summarize" ? { summary: result.summary } : {}),
+                  }),
+                ).pipe(
+                  Effect.flatMap((appended) => restore(session.path(appended.leafId))),
+                  Effect.map(buildContext),
+                  Effect.tap((projection) => Ref.set(chat.history, projection)),
+                  Effect.andThen(restore(savePersisted(turn))),
+                ),
+              )
+            }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
         })
 
       const preparePrompt = (
@@ -1286,7 +1429,8 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                   detail: "Compaction must preserve recalled-memory message lineage outside the lossless Session path",
                 })
               }
-              yield* applyCompactionResult(turn, compacted.value)
+              yield* validateCompactionProjection(turn, compacted.value)
+              yield* applyCompactionResult(turn, compacted.value, path.at(-1)?.id ?? null)
               return compacted.value.prompt
             }),
         })
@@ -1750,6 +1894,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         const attempt = (
           activePrompt: Prompt.Prompt,
           retryOverflow: boolean,
+          compactOverflow = false,
         ): Stream.Stream<
           {
             readonly part: Response.StreamPart<any>
@@ -1761,6 +1906,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         > => {
           let emitted = false
           const transformedParts = new Array<Response.StreamPart<any>>()
+          let preparedState: { readonly history: Prompt.Prompt; readonly preparedPrompt: Prompt.Prompt } | undefined
           const singleFailure = (cause: Cause.Cause<unknown>) => {
             const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
             return reason !== undefined && Cause.isFailReason(reason) ? Option.some(reason.error) : Option.none()
@@ -1777,71 +1923,73 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           }
           return Stream.fromChannel(
             Channel.acquireUseRelease(
-              Effect.gen(function* () {
-                yield* chatLock.take(1)
-                const history = yield* Ref.get(chat.history)
-                const toolCallIds = yield* Ref.make<ToolCallIdState>({
-                  nextIndex: 0,
-                  firstIndexes: HashMap.empty(),
-                })
-                return { history, toolCallIds }
+              Ref.make<ToolCallIdState>({
+                nextIndex: 0,
+                firstIndexes: HashMap.empty(),
               }),
-              ({ history, toolCallIds }) => {
-                const responsePrompt = Prompt.concat(history, activePrompt)
-                const messages = responsePrompt.content
-                const rawParts = LanguageModel.streamText({
-                  prompt: responsePrompt,
-                  toolkit: activeRegistry.toolkit,
-                  disableToolCallResolution: true,
-                }).pipe(
-                  Stream.tap(() =>
-                    Effect.sync(() => {
-                      emitted = true
-                    }),
-                  ),
-                  Stream.catchCause((cause) => {
-                    if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
-                    if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
-                    const error = singleFailure(cause)
-                    if (Option.isNone(error)) return Stream.failCause(cause)
-                    return Stream.make(Response.makePart("error", { error: error.value }))
-                  }),
-                )
-                return rawParts.pipe(
-                  Stream.mapEffect((part) => transformPart(turn, part)),
-                  Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
-                  Stream.map((part) => ({
-                    part,
-                    messages,
-                    accept: validateToolCallId(toolCallIds, part).pipe(
-                      Effect.andThen(
+              (toolCallIds) =>
+                Stream.unwrap(
+                  Effect.gen(function* () {
+                    const preparedPrompt = yield* preparePrompt(turn, activePrompt, compactOverflow)
+                    const history = yield* Ref.get(chat.history)
+                    preparedState = { history, preparedPrompt }
+                    const responsePrompt = Prompt.concat(history, preparedPrompt)
+                    const messages = responsePrompt.content
+                    const rawParts = LanguageModel.streamText({
+                      prompt: responsePrompt,
+                      toolkit: activeRegistry.toolkit,
+                      disableToolCallResolution: true,
+                    }).pipe(
+                      Stream.tap(() =>
                         Effect.sync(() => {
-                          transformedParts.push(part)
+                          emitted = true
                         }),
                       ),
-                    ),
-                  })),
-                  Stream.toChannel,
-                )
-              },
-              ({ history }, exit) =>
-                (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted)
+                      Stream.catchCause((cause) => {
+                        if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
+                        if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
+                        const error = singleFailure(cause)
+                        if (Option.isNone(error)) return Stream.failCause(cause)
+                        return Stream.make(Response.makePart("error", { error: error.value }))
+                      }),
+                    )
+                    return rawParts.pipe(
+                      Stream.mapEffect((part) => transformPart(turn, part)),
+                      Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
+                      Stream.map((part) => ({
+                        part,
+                        messages,
+                        accept: validateToolCallId(toolCallIds, part).pipe(
+                          Effect.andThen(
+                            Effect.sync(() => {
+                              transformedParts.push(part)
+                            }),
+                          ),
+                        ),
+                      })),
+                    )
+                  }),
+                ).pipe(Stream.toChannel),
+              (_, exit) =>
+                preparedState === undefined || (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
                   ? Effect.void
                   : Ref.set(
                       chat.history,
-                      Prompt.concat(Prompt.concat(history, activePrompt), Prompt.fromResponseParts(transformedParts)),
-                    ).pipe(Effect.andThen(persisted === undefined ? Effect.void : persisted.save), Effect.orDie)
-                ).pipe(Effect.ensuring(chatLock.release(1)), Effect.asVoid),
+                      Prompt.concat(
+                        Prompt.concat(preparedState.history, preparedState.preparedPrompt),
+                        Prompt.fromResponseParts(transformedParts),
+                      ),
+                    ).pipe(
+                      Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
+                      Effect.orDie,
+                      Effect.asVoid,
+                    ),
             ),
           ).pipe(
             Stream.catchCause((cause) => {
               if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
               if (retryableOverflow(cause, emitted)) {
-                return Stream.unwrap(
-                  preparePrompt(turn, activePrompt, true).pipe(
-                    Effect.map((compactedPrompt) => attempt(compactedPrompt, false)),
-                  ),
-                )
+                return attempt(preparedState?.preparedPrompt ?? activePrompt, false, true)
               }
               return Stream.failCause(cause)
             }),
@@ -1855,9 +2003,8 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         }
         const parts = Stream.unwrap(
           applyPromptChain(chain, Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
-            Effect.flatMap((transformedPrompt) => preparePrompt(turn, transformedPrompt, false)),
-            Effect.map((preparedPrompt) =>
-              attempt(preparedPrompt, true).pipe(
+            Effect.map((transformedPrompt) =>
+              attempt(transformedPrompt, true).pipe(
                 Stream.flatMap(({ accept, part, messages }) =>
                   Stream.fromEffect(accept).pipe(
                     Stream.flatMap(() => partEvents(turn, part, messages, activeRegistry)),
@@ -1908,34 +2055,42 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               agentName: agent.name,
               turn: structuredTurn,
             })
-            const response = yield* chat
-              .generateObject({
-                prompt: transformedPrompt,
-                schema: config.schema,
-                objectName: config.objectName,
-                toolChoice: "none",
-              })
-              .pipe(
-                withModelResilience,
-                withAgentModel,
-                Effect.catchCause(
-                  (cause): Effect.Effect<never, AgentError | AiError.AiError | LanguageModelNotRegistered> => {
-                    const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
-                    return reason !== undefined && Cause.isFailReason(reason)
-                      ? Effect.fail(
-                          AgentError.make({
-                            message: errorMessage(reason.error),
-                            turn: structuredTurn,
-                            cause: reason.error,
-                          }),
-                        )
-                      : Effect.failCause(cause)
-                  },
-                ),
-              )
+            const history = yield* Ref.get(chat.history)
+            const response = yield* LanguageModel.generateObject({
+              prompt: Prompt.concat(history, transformedPrompt),
+              schema: config.schema,
+              objectName: config.objectName,
+              toolChoice: "none",
+            }).pipe(
+              withModelResilience,
+              withAgentModel,
+              Effect.catchCause(
+                (cause): Effect.Effect<never, AgentError | AiError.AiError | LanguageModelNotRegistered> => {
+                  const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+                  return reason !== undefined && Cause.isFailReason(reason)
+                    ? Effect.fail(
+                        AgentError.make({
+                          message: errorMessage(reason.error),
+                          turn: structuredTurn,
+                          cause: reason.error,
+                        }),
+                      )
+                    : Effect.failCause(cause)
+                },
+              ),
+            )
             yield* captureStructuredUsage(response.content)
-            yield* savePersisted(structuredTurn)
-            const transcript = yield* Ref.get(chat.history)
+            const transcript = Prompt.concat(
+              Prompt.concat(history, transformedPrompt),
+              Prompt.fromResponseParts(response.content),
+            )
+            const path = yield* syncSession(structuredTurn, history)
+            yield* applyCompactionResult(
+              structuredTurn,
+              { _tag: "Microcompact", history: transcript, prompt: Prompt.empty },
+              path.at(-1)?.id ?? null,
+            )
+            if (Option.isNone(activeSession)) yield* savePersisted(structuredTurn)
             const structuredOutput: StructuredOutput = {
               _tag: "StructuredOutput",
               turn: structuredTurn,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Deferred, Effect, Fiber } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Memory, Session } from "../src/index"
 import { ItLayer } from "./it-layer"
@@ -17,6 +17,11 @@ const promptTexts = (prompt: Prompt.Prompt): ReadonlyArray<string> =>
   })
 
 describe("Session", () => {
+  it("excludes exact checkpoints from ordinary append input", () => {
+    const excluded: Extract<Session.AppendInput, { readonly version: 2 }> extends never ? true : false = true
+    expect(excluded).toBe(true)
+  })
+
   ItLayer.make(
     it,
     "starts empty",
@@ -264,11 +269,167 @@ describe("Session", () => {
 
   ItLayer.make(
     it,
+    "appends exact checkpoints idempotently and rejects identity or leaf conflicts",
+    () =>
+      [
+        Session.memoryLayer,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const id = yield* store.reserveEntryId
+          const prepared: Session.PreparedCheckpoint = {
+            id,
+            parentId: source.id,
+            projectedHistory: Prompt.fromMessages([user("exact projection")]),
+          }
+
+          const appended = yield* store.appendCheckpoint(prepared)
+          const repeated = yield* store.appendCheckpoint(prepared)
+          const reused = yield* Effect.flip(
+            store.appendCheckpoint({ ...prepared, projectedHistory: Prompt.fromMessages([user("different")]) }),
+          )
+          const staleId = yield* store.reserveEntryId
+          const stale = yield* Effect.flip(
+            store.appendCheckpoint({
+              id: staleId,
+              parentId: source.id,
+              projectedHistory: Prompt.fromMessages([user("stale")]),
+            }),
+          )
+
+          expect(appended._tag).toBe("Appended")
+          expect(repeated._tag).toBe("AlreadyPresent")
+          expect(reused._tag).toBe("@batonfx/core/SessionConflict")
+          expect(stale._tag).toBe("@batonfx/core/SessionConflict")
+          if (reused._tag === "@batonfx/core/SessionConflict") expect(reused.reason).toBe("checkpoint-id-reused")
+          if (stale._tag === "@batonfx/core/SessionConflict") expect(stale.reason).toBe("stale-leaf")
+          expect((yield* store.path()).filter((entry) => entry._tag === "Compaction")).toHaveLength(1)
+          expect(promptTexts(Session.buildContext(yield* store.path()))).toEqual(["exact projection"])
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
+    "retries an ambiguously interrupted checkpoint append without duplication",
+    () =>
+      [
+        Session.memoryLayer,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const prepared: Session.PreparedCheckpoint = {
+            id: yield* store.reserveEntryId,
+            parentId: source.id,
+            projectedHistory: Prompt.fromMessages([user("committed projection")]),
+          }
+          const committed = yield* Deferred.make<void>()
+          const append = store.appendCheckpoint(prepared).pipe(
+            Effect.tap(() => Deferred.succeed(committed, undefined)),
+            Effect.andThen(Effect.never),
+          )
+          const fiber = yield* Effect.forkChild(append, { startImmediately: true })
+
+          yield* Deferred.await(committed)
+          yield* Fiber.interrupt(fiber)
+          const retried = yield* store.appendCheckpoint(prepared)
+
+          expect(retried._tag).toBe("AlreadyPresent")
+          expect((yield* store.path()).filter((entry) => entry._tag === "Compaction")).toHaveLength(1)
+          expect(promptTexts(Session.buildContext(yield* store.path()))).toEqual(["committed projection"])
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
+    "matches checkpoint identity structurally across reordered object keys",
+    () =>
+      [
+        Session.memoryLayer,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const toolProjection = (params: Readonly<Record<string, number>>) =>
+            Prompt.fromMessages([
+              Prompt.makeMessage("assistant", {
+                content: [
+                  Prompt.makePart("tool-call", {
+                    id: "structural",
+                    name: "echo",
+                    params,
+                    providerExecuted: true,
+                  }),
+                ],
+              }),
+            ])
+          const prepared: Session.PreparedCheckpoint = {
+            id: yield* store.reserveEntryId,
+            parentId: source.id,
+            projectedHistory: toolProjection({ first: 1, second: 2 }),
+          }
+          yield* store.appendCheckpoint(prepared)
+
+          const retried = yield* store.appendCheckpoint({
+            ...prepared,
+            projectedHistory: toolProjection({ second: 2, first: 1 }),
+          })
+
+          expect(retried._tag).toBe("AlreadyPresent")
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
+    "keeps active descendants on delayed retry and rejects checkpoints from abandoned branches",
+    () =>
+      [
+        Session.memoryLayer,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const prepared: Session.PreparedCheckpoint = {
+            id: yield* store.reserveEntryId,
+            parentId: source.id,
+            projectedHistory: Prompt.fromMessages([user("checkpoint")]),
+          }
+          yield* store.appendCheckpoint(prepared)
+          const descendant = yield* store.append(
+            { _tag: "Message", message: user("descendant") },
+            { expectedLeafId: prepared.id },
+          )
+
+          const delayed = yield* store.appendCheckpoint(prepared)
+
+          expect(delayed._tag).toBe("AlreadyPresent")
+          expect(delayed.leafId).toBe(descendant.id)
+          expect(promptTexts(Session.buildContext(yield* store.path(delayed.leafId)))).toEqual([
+            "checkpoint",
+            "descendant",
+          ])
+
+          yield* store.setLeaf(source.id)
+          yield* store.append({ _tag: "Message", message: user("other branch") }, { expectedLeafId: source.id })
+          const abandoned = yield* Effect.flip(store.appendCheckpoint(prepared))
+
+          expect(abandoned._tag).toBe("@batonfx/core/SessionConflict")
+          if (abandoned._tag === "@batonfx/core/SessionConflict") {
+            expect(abandoned.reason).toBe("checkpoint-not-on-active-path")
+          }
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
     "testLayer provides an exact implementation",
     () =>
       [
         Session.testLayer({
+          reserveEntryId: Effect.succeed("reserved"),
           append: () => Effect.die("unused"),
+          appendCheckpoint: () => Effect.die("unused"),
           path: () => Effect.succeed([]),
           setLeaf: () => Effect.void,
           leaf: Effect.succeed("leaf"),
