@@ -3,11 +3,34 @@ import { Json } from "./json"
 import { Deferred, Effect, Exit, Fiber, Layer, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, AgentEvent, AgentTool, Approvals, ModelMiddleware, ToolContext, ToolExecutor } from "../src/index"
+import {
+  Agent,
+  AgentEvent,
+  AgentTool,
+  Approvals,
+  Memory,
+  ModelMiddleware,
+  ToolContext,
+  ToolExecutor,
+} from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false
+type Assert<Value extends true> = Value
+type ToolkitRequirements<Value> =
+  Value extends Toolkit.WithHandler<infer Tools> ? Tool.HandlerServices<Tools[keyof Tools]> : never
+
+const requirementChild = Agent.make({
+  name: "requirement-child",
+  memory: { agent: "requirement-child", subject: "subject" },
+})
+const requirementChildTool = AgentTool.asTool(requirementChild)
+const agentToolRequirementProof: Assert<
+  Equal<ToolkitRequirements<typeof requirementChildTool>, LanguageModel.LanguageModel | Memory.Memory>
+> = true
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
@@ -40,6 +63,8 @@ const gatedTool = Tool.make("gated", {
 })
 
 layer(unusedToolHandlerLayer)("AgentTool", (it) => {
+  expect(agentToolRequirementProof).toBe(true)
+
   ItLayer.make(it, "ToolExecutor.fromToolkit maps returned handler failures to failed outcomes", () => {
     const failingTool = Tool.make("failing", {
       parameters: Schema.Struct({}),

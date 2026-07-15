@@ -42,7 +42,7 @@ When `stripTranscripts` is true, `TurnCompleted` and `Completed` event frames om
 
 `open` creates or returns a session. `sessionId` defaults to a generated id; `chatId` defaults to `sessionId`. The registry stores live run state and replay frames only. Chat history belongs to `Ai.Chat.Persistence`.
 
-`send` starts an `Agent.stream` run with `{ prompt, sessionId, persistence: { chatId } }` and returns after the run fiber starts. By default, a session in `Running` or `Suspended` status rejects another `send` with `SessionBusy`, preserving the original contract.
+`send` starts an `Agent.persisted` run with `{ prompt, sessionId, persistence: { chatId } }` and returns after the run fiber starts. `layerMemory` therefore requires the configured Agent's complete requirement parameter plus `Chat.Persistence`. By default, a session in `Running` or `Suspended` status rejects another `send` with `SessionBusy`, preserving the original contract.
 
 `layerMemory` retains the configured Agent's policy requirements in its Layer input. Policy failures and explicit stops are published unchanged through `Failed`; the registry does not collapse them into `AgentError`.
 
@@ -127,3 +127,4 @@ The SSE client helper decodes `text/event-stream` response bodies into loose ser
 - `docs/spec/decisions/ADR-0015-transport-sse-websocket-client.md`
 - `docs/spec/decisions/ADR-0018-in-process-session-run-queue.md`
 - `docs/spec/decisions/ADR-0024-public-api-import-and-layer-conventions.md`
+- `docs/spec/decisions/ADR-0033-truthful-agent-requirements.md`

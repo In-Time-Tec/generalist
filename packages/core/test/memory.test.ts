@@ -89,34 +89,6 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     expect(protocolParts.map(Memory.itemFromPromptPart)).toEqual(protocolParts.map(() => Option.none()))
   })
 
-  ItLayer.make(it, "fails fast when memory options are set without a Memory service", () => {
-    let modelCalls = 0
-    const agent = Agent.make({ name: "memory-agent" })
-    return [
-      Layer.mergeAll(
-        modelLayer(() =>
-          Stream.sync(() => {
-            modelCalls += 1
-            return textDelta("unexpected")
-          }),
-        ),
-        unusedExecutor,
-        Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
-      ),
-      Effect.gen(function* () {
-        const failure = yield* Effect.flip(Agent.generate(agent, { prompt: "hello", memory: { key } }))
-
-        expect(failure._tag).toBe("@batonfx/core/AgentError")
-        if (failure._tag === "@batonfx/core/AgentError") {
-          expect(failure.message).toBe("RunOptions.memory requires Memory in context")
-          expect(failure.turn).toBe(0)
-        }
-        expect(modelCalls).toBe(0)
-      }),
-    ] as const
-  })
-
   ItLayer.make(it, "inserts text and file content from multiple recalled items in source order", () => {
     let modelPrompt: Prompt.Prompt | undefined
     let middlewarePrompt: Prompt.Prompt | undefined

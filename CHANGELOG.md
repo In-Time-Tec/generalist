@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Made `Agent` opaque and invariant in its inferred Effect requirements, added scoped `Agent.provideModel`, and split persisted runs into `persisted`, `persistedObject`, `generatePersisted`, and `generatePersistedObject` entrypoints.
+
 ## 0.5.0
 
 - Reject ambiguous static, reserved `activate_skill`, activated-skill, and Handoff tool names with schema-backed origin evidence before advertisement or execution. Use `Agent.make({ tools: [...] })` when duplicate static declarations must remain observable; pre-built Effect AI toolkits remain accepted, but `Toolkit.make` has already erased duplicate inputs.

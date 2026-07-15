@@ -127,3 +127,4 @@ SPEC.md
 - ADR-0030 — Effectful Turn Policy Stop Reasons: `docs/spec/decisions/ADR-0030-effectful-turn-policy-stop-reasons.md`
 - ADR-0031 — Model Registry Operation Lifetime: `docs/spec/decisions/ADR-0031-model-registry-operation-lifetime.md`
 - ADR-0032 — Atomic Tool-name Validation: `docs/spec/decisions/ADR-0032-atomic-tool-name-validation.md`
+- ADR-0033 — Truthful Agent Requirements: `docs/spec/decisions/ADR-0033-truthful-agent-requirements.md`

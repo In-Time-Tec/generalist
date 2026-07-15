@@ -45,11 +45,11 @@ const applicationLayer = Layer.mergeAll(
 const agent = Agent.make("assistant", { instructions: "Answer concisely." })
 
 const program = Effect.gen(function* () {
-  yield* Agent.generate(agent, {
+  yield* Agent.generatePersisted(agent, {
     prompt: "My name is Ada.",
     persistence: { chatId: "user-42" },
   })
-  const result = yield* Agent.generate(agent, {
+  const result = yield* Agent.generatePersisted(agent, {
     prompt: "What is my name?",
     persistence: { chatId: "user-42" },
   })
@@ -121,6 +121,7 @@ Remote routes execute once by default. Set `retrySafe: false` explicitly for non
 
 ### Turn policy migration
 
+Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, so a standalone app has no conversation continuity between runs. Use `Agent.generatePersisted` to run the loop on a **persisted** chat instead: the chat identified by `chatId` is created on first use and accumulates history across runs.
 `TurnPolicy` decision Effects expose their requirements and typed `TurnPolicyError` failures. Stops require a schema-backed reason, and only `TurnLimit` is surfaced as `TurnLimitExceeded`; other stops surface as `TurnPolicyStopped` with the reason and pending tool checkpoint.
 
 ```ts
@@ -135,3 +136,32 @@ const policy = TurnPolicy.make<Budget>(({ turn }) =>
 ```
 
 Migrate `TurnPolicy.decision.stop` to `TurnPolicy.decision.stop(reason)`. Existing reasonless custom policy functions can be passed to deprecated `TurnPolicy.fromLegacy` while migrating; legacy stops become `Policy { detail: "Legacy policy stopped" }`. `TurnLimitExceeded` now includes the configured `limit`, and transport consumers must add `TurnPolicyError` and `TurnPolicyStopped` to their terminal-failure handling.
+// Or SQL-backed on the app's own database (requires a SqlClient in context):
+// Chat.layerPersisted({ storeId: "my-app-chats" }).pipe(
+// Layer.provide(Persistence.layerBackingSql),
+// )
+
+const agent = Agent.make("assistant", { instructions: "You are a helpful assistant." })
+
+// Run 1 and run 2 share the same chatId, so run 2 sees run 1's history.
+const program = Effect.gen(function* () {
+const first = yield* Agent.generatePersisted(agent, {
+prompt: "My name is Ada.",
+persistence: { chatId: "user-42" },
+})
+const second = yield\* Agent.generatePersisted(agent, {
+prompt: "What is my name?",
+persistence: { chatId: "user-42" },
+})
+return [first.text, second.text]
+}).pipe(Effect.provide(persistenceLayer))
+
+```
+
+Notes:
+
+- Persisted entrypoints expose `Chat.Persistence` in their Effect requirement, so a missing layer is caught by type checking.
+- Ordinary run options reject `persistence`; persisted run options require it and reject `history`.
+- `Agent.provideModel(layer)` embeds an infallible language-model layer and discharges `LanguageModel` from the agent requirements while preserving the layer's own requirements and scoped lifetime.
+- On a persisted chat the agent's system message is stored once on the first run and not re-added on subsequent runs.
+```
