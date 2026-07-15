@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scheduler, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { AiError, Chat, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Approvals, ModelMiddleware, Permissions } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
@@ -867,6 +867,68 @@ describe("SessionRegistry.layerMemory", () => {
               ),
               toolkit.toLayer({
                 isolated_permission: () =>
+                  Effect.sync(() => {
+                    executions += 1
+                    return "executed"
+                  }),
+              }),
+              Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+              ModelMiddleware.identityLayer,
+              persistenceLayer,
+            ),
+          ),
+        ),
+      ),
+    )
+  })
+
+  it.effect("publishes ResumeMismatch when the persisted suspension checkpoint is stale", () => {
+    const permissioned = Tool.make("stale_permission", {
+      parameters: Schema.Struct({}),
+      success: Schema.String,
+    })
+    const toolkit = Toolkit.make(permissioned)
+    const agent = Agent.make({ name: "stale-permission-agent", toolkit })
+    let modelCalls = 0
+    let executions = 0
+    return Effect.gen(function* () {
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-stale-permission" }))
+      const firstFiber = yield* collectThroughEnded("s-stale-permission").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-stale-permission", "run"))
+      const first = yield* Fiber.join(firstFiber)
+
+      const persistence = yield* Chat.Persistence
+      const chat = yield* persistence.get("s-stale-permission")
+      yield* Ref.set(chat.history, Prompt.empty)
+      yield* chat.save
+
+      const secondFiber = yield* collectThroughEnded("s-stale-permission", first.at(-1)?.seq).pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.resolveApproval("s-stale-permission", "permission:stale-call", { _tag: "Approved" }),
+      )
+      const second = yield* Fiber.join(secondFiber)
+      const info = yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-stale-permission"))
+
+      const failed = second.find((frame) => frame._tag === "Failed")
+      expect(failed?._tag === "Failed" && failed.error).toMatchObject({
+        _tag: "@batonfx/core/ResumeMismatch",
+        reason: "checkpoint-not-found",
+      })
+      expect(second.at(-1)?._tag).toBe("Ended")
+      expect(info.status._tag).toBe("Failed")
+      expect(modelCalls).toBe(1)
+      expect(executions).toBe(0)
+    }).pipe(
+      provideTestLayer(
+        SessionRegistry.layerMemory({ agent }).pipe(
+          Layer.provideMerge(
+            Layer.mergeAll(
+              modelLayer(() => {
+                modelCalls += 1
+                return Stream.make(toolCallPart("stale-call", "stale_permission", {}))
+              }),
+              toolkit.toLayer({
+                stale_permission: () =>
                   Effect.sync(() => {
                     executions += 1
                     return "executed"

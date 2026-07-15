@@ -112,4 +112,4 @@ Terminal structured-output compaction is deferred; the same seam can compact nor
 - `docs/spec/02-session-event-log.md`
 - `docs/spec/decisions/ADR-0009-compaction-strategy-seam.md`
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
-- `docs/spec/decisions/ADR-0039-memory-recall-provenance.md`
+- `docs/spec/decisions/ADR-0040-memory-recall-provenance.md`

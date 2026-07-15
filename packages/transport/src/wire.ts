@@ -22,6 +22,7 @@ const SnapshotSequence = Schema.Union([Schema.Literals([-1]), Sequence])
 /** @experimental A run failure that is not an approval/tool-wait suspension. */
 export const RunFailure = Schema.Union([
   AgentEvent.AgentError,
+  AgentEvent.ResumeMismatch,
   TurnPolicy.TurnPolicyError,
   AgentEvent.TurnPolicyStopped,
   AgentEvent.TurnLimitExceeded,

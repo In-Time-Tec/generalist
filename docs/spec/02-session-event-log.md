@@ -55,4 +55,4 @@ Each entry has an opaque `id`, a `parentId` (`null` for a root entry), and optio
 - `docs/spec/decisions/ADR-0005-session-event-log.md`
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
 - `docs/spec/decisions/ADR-0036-framework-tool-result-checkpoint.md`
-- `docs/spec/decisions/ADR-0039-memory-recall-provenance.md`
+- `docs/spec/decisions/ADR-0040-memory-recall-provenance.md`

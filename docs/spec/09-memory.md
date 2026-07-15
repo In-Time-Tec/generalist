@@ -129,4 +129,4 @@ Forget without `id` drops the exact key's in-process working-memory state. Forge
 - `docs/spec/decisions/ADR-0027-memory-item-user-content.md`
 - `docs/spec/decisions/ADR-0033-truthful-agent-requirements.md`
 - `docs/spec/decisions/ADR-0036-framework-tool-result-checkpoint.md`
-- `docs/spec/decisions/ADR-0039-memory-recall-provenance.md`
+- `docs/spec/decisions/ADR-0040-memory-recall-provenance.md`

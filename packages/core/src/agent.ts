@@ -27,6 +27,7 @@ import {
   type Event,
   MiddlewareViolation,
   ProgressOverflowError,
+  ResumeMismatch,
   type SteeringDrained,
   type StructuredOutput,
   type ToolProgress,
@@ -305,17 +306,9 @@ export function make<
   }
 }
 
-/** @experimental Re-entry after `AgentSuspended`: execute this call first. */
+/** @experimental Re-entry bound to an authoritative `AgentSuspended` checkpoint. */
 export interface Resume {
-  readonly token?: string
-  readonly call: {
-    readonly id: string
-    readonly name: string
-    readonly params: unknown
-  }
-  readonly activeTools?: ReadonlyArray<string>
-  readonly activatedSkills?: ReadonlyArray<string>
-  readonly authorizationStage?: "permission" | "approval"
+  readonly suspension: AgentSuspended
 }
 
 /** @experimental Bounded buffering behavior for tool progress events. */
@@ -422,6 +415,7 @@ interface StructuredRunConfig<StructuredOutputSchema extends ObjectSchema> {
 export type RunError =
   | AgentError
   | AgentSuspended
+  | ResumeMismatch
   | TurnPolicyError
   | TurnPolicyStopped
   | TurnLimitExceeded
@@ -456,24 +450,100 @@ const lockForChat = (chat: Chat.Service): Semaphore.Semaphore => {
   return created
 }
 
+interface SuspensionCheckpoint {
+  readonly call: Prompt.ToolCallPart
+  readonly messages: ReadonlyArray<Prompt.Message>
+  readonly suspension: AgentSuspended
+}
+
+const suspensionCheckpointOption = "@batonfx/core/suspension" as const
+
+const suspensionMetadata = Schema.Struct({
+  token: Schema.String,
+  reason: Schema.Literals(["tool-wait", "approval"]),
+  authorization_stage: Schema.optional(Schema.Literals(["permission", "approval"])),
+  active_tools: Schema.optional(Schema.Array(Schema.String)),
+  activated_skills: Schema.optional(Schema.Array(Schema.String)),
+})
+
 const unresolvedToolCall = (
   messages: ReadonlyArray<Prompt.Message>,
-): { readonly call: Prompt.ToolCallPart; readonly messages: ReadonlyArray<Prompt.Message> } | undefined => {
-  const calls: Array<{ readonly call: Prompt.ToolCallPart; readonly messageIndex: number }> = []
-  const results = new Set<string>()
+):
+  | {
+      readonly call: Prompt.ToolCallPart
+      readonly messages: ReadonlyArray<Prompt.Message>
+      readonly messageIndex: number
+      readonly partIndex: number
+    }
+  | undefined => {
+  interface Occurrence {
+    readonly call: Prompt.ToolCallPart
+    readonly messageIndex: number
+    readonly partIndex: number
+  }
+  const unpaired = new Map<string, Array<Occurrence>>()
+  const ambiguous = new Set<string>()
   for (const [messageIndex, message] of messages.entries()) {
     if (typeof message.content === "string") continue
-    for (const part of message.content) {
-      if (part.type === "tool-call" && !part.providerExecuted) calls.push({ call: part, messageIndex })
-      if (part.type === "tool-result") results.add(part.id)
+    for (const [partIndex, part] of message.content.entries()) {
+      if (part.type === "tool-call") {
+        const occurrences = unpaired.get(part.id) ?? []
+        if (!part.providerExecuted && occurrences.some(({ call }) => !call.providerExecuted)) ambiguous.add(part.id)
+        occurrences.push({ call: part, messageIndex, partIndex })
+        unpaired.set(part.id, occurrences)
+      }
+      if (part.type === "tool-result") {
+        const occurrences = unpaired.get(part.id)
+        if (occurrences === undefined) continue
+        const matched = occurrences.findLastIndex(({ call }) => call.name === part.name)
+        if (matched !== -1) occurrences.splice(matched, 1)
+        if (occurrences.length === 0) {
+          unpaired.delete(part.id)
+          ambiguous.delete(part.id)
+        }
+      }
     }
   }
-  const unresolved = calls.filter(({ call }) => !results.has(call.id))
+  const unresolved = [...unpaired.entries()].flatMap(([id, occurrences]) =>
+    ambiguous.has(id) ? [] : occurrences.filter(({ call }) => !call.providerExecuted),
+  )
   const pending = unresolved[0]
   return unresolved.length === 1 && pending !== undefined
-    ? { call: pending.call, messages: messages.slice(0, pending.messageIndex) }
+    ? {
+        call: pending.call,
+        messages: messages.slice(0, pending.messageIndex),
+        messageIndex: pending.messageIndex,
+        partIndex: pending.partIndex,
+      }
     : undefined
 }
+
+const suspensionCheckpoint = (messages: ReadonlyArray<Prompt.Message>): SuspensionCheckpoint | undefined => {
+  const unresolved = unresolvedToolCall(messages)
+  if (unresolved === undefined) return undefined
+  const metadata = Schema.decodeUnknownOption(suspensionMetadata)(unresolved.call.options[suspensionCheckpointOption])
+  if (Option.isNone(metadata)) return undefined
+  return {
+    call: unresolved.call,
+    messages: unresolved.messages,
+    suspension: AgentSuspended.make({
+      ...metadata.value,
+      tool_call_id: unresolved.call.id,
+      tool_name: unresolved.call.name,
+      tool_params: unresolved.call.params,
+    }),
+  }
+}
+
+const sameSuspension = (left: AgentSuspended, right: AgentSuspended): boolean =>
+  left.token === right.token &&
+  left.reason === right.reason &&
+  left.authorization_stage === right.authorization_stage &&
+  left.tool_call_id === right.tool_call_id &&
+  left.tool_name === right.tool_name &&
+  Equal.equals(left.tool_params, right.tool_params) &&
+  Equal.equals(left.active_tools, right.active_tools) &&
+  Equal.equals(left.activated_skills, right.activated_skills)
 
 const skillListingBudgetTokens = 2_048
 
@@ -640,6 +710,75 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 ): Stream.Stream<Event, RunError, R | StructuredOutputSchema["DecodingServices"]> =>
   Stream.unwrap(
     Effect.gen(function* () {
+      if (options.history !== undefined && options.persistence !== undefined) {
+        return yield* AgentError.make({
+          message: "RunOptions.history and RunOptions.persistence are mutually exclusive",
+          turn: 0,
+        })
+      }
+
+      const persistenceOptions = options.persistence
+      const resume = options.resume
+      const persistenceService = yield* Effect.serviceOption(Chat.Persistence)
+      const persisted: Chat.Persisted | undefined =
+        persistenceOptions === undefined
+          ? undefined
+          : yield* Option.match(persistenceService, {
+              onNone: () =>
+                Effect.fail(
+                  AgentError.make({
+                    message: "RunOptions.persistence requires Chat.Persistence in context",
+                    turn: 0,
+                  }),
+                ),
+              onSome: (service) => {
+                const getOptions =
+                  persistenceOptions.timeToLive === undefined
+                    ? undefined
+                    : { timeToLive: persistenceOptions.timeToLive }
+                return resume === undefined
+                  ? service
+                      .getOrCreate(persistenceOptions.chatId, getOptions)
+                      .pipe(
+                        Effect.mapError((error) =>
+                          AgentError.make({ message: errorMessage(error), turn: 0, cause: error }),
+                        ),
+                      )
+                  : service.get(persistenceOptions.chatId, getOptions).pipe(
+                      Effect.mapError((error) =>
+                        error._tag === "ChatNotFoundError"
+                          ? ResumeMismatch.make({
+                              reason: "checkpoint-not-found",
+                              received: resume.suspension,
+                            })
+                          : AgentError.make({ message: errorMessage(error), turn: 0, cause: error }),
+                      ),
+                    )
+              },
+            })
+
+      let resumeChat: Chat.Service | undefined
+      let validatedResume: SuspensionCheckpoint | undefined
+      if (resume !== undefined) {
+        resumeChat = persisted ?? (yield* options.history === undefined ? Chat.empty : Chat.fromPrompt(options.history))
+        const received = resume.suspension
+        validatedResume = yield* Ref.get(resumeChat.history).pipe(
+          Effect.flatMap((history) => {
+            const expected = suspensionCheckpoint(history.content)
+            if (expected === undefined) {
+              return ResumeMismatch.make({ reason: "checkpoint-not-found", received })
+            }
+            return sameSuspension(expected.suspension, received)
+              ? Effect.succeed(expected)
+              : ResumeMismatch.make({
+                  reason: "identity-mismatch",
+                  expected: expected.suspension,
+                  received,
+                })
+          }),
+        )
+      }
+
       const staticCandidates: ReadonlyArray<Candidate> = (
         agent.toolDeclarations ??
         Object.values(agent.toolkit.tools).map((tool) => ({
@@ -668,13 +807,6 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       const chain = yield* Effect.serviceOption(ModelMiddleware).pipe(
         Effect.map(Option.match({ onNone: () => [], onSome: (service) => service })),
       )
-
-      if (options.history !== undefined && options.persistence !== undefined) {
-        return yield* AgentError.make({
-          message: "RunOptions.history and RunOptions.persistence are mutually exclusive",
-          turn: 0,
-        })
-      }
 
       if (
         options.toolOutputMaxBytes !== undefined &&
@@ -753,8 +885,6 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           : undefined,
       )
 
-      // Resolve `Chat.Persistence` optionally so `stream`'s `R` does not grow.
-      const persistenceService = yield* Effect.serviceOption(Chat.Persistence)
       const resilienceService = yield* Effect.serviceOption(ModelResilience)
       const modelRegistryService = yield* Effect.serviceOption(Service)
       const permissionsService = yield* Effect.serviceOption(Permissions)
@@ -774,7 +904,6 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             ...(Option.isNone(ruleStoreService) ? {} : { ruleStore: ruleStoreService.value }),
           }),
         )
-      const persistenceOptions = options.persistence
       const memoryOptions = options.memory ?? (agent.memory === undefined ? undefined : { key: agent.memory })
       const agentModel = agent.model
       const agentModelRegistry =
@@ -809,32 +938,6 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 onSome: Effect.succeed,
               }),
             }
-      const persisted: Chat.Persisted | undefined =
-        persistenceOptions === undefined
-          ? undefined
-          : yield* Option.match(persistenceService, {
-              onNone: () =>
-                Effect.fail(
-                  AgentError.make({
-                    message: "RunOptions.persistence requires Chat.Persistence in context",
-                    turn: 0,
-                  }),
-                ),
-              onSome: (service) =>
-                service
-                  .getOrCreate(
-                    persistenceOptions.chatId,
-                    persistenceOptions.timeToLive === undefined
-                      ? undefined
-                      : { timeToLive: persistenceOptions.timeToLive },
-                  )
-                  .pipe(
-                    Effect.mapError((error) =>
-                      AgentError.make({ message: errorMessage(error), turn: 0, cause: error }),
-                    ),
-                  ),
-            })
-
       // On a persisted chat with no stored history, seed the system message into
       // the first turn's prompt; on a non-empty history it is already stored.
       const seedSystem =
@@ -848,7 +951,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           : system !== undefined
             ? Chat.fromPrompt([Prompt.makeMessage("system", { content: system })])
             : Chat.empty
-      const chat: Chat.Service = persisted ?? (yield* freshChat)
+      const chat: Chat.Service = resumeChat ?? persisted ?? (yield* freshChat)
       const chatLock = lockForChat(chat)
 
       const savePersisted = (turn: number): Effect.Effect<void, AgentError> =>
@@ -869,6 +972,62 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 Prompt.concat(history, Prompt.fromResponseParts(pending)),
               ).pipe(Effect.tap(() => savePersisted(turn))),
             )
+
+      const checkpointSuspended = (
+        turn: number,
+        pending: ReadonlyArray<PendingToolResult>,
+        suspension: AgentSuspended,
+      ): Effect.Effect<Prompt.Prompt, AgentError> =>
+        chatLock.withPermit(
+          Effect.gen(function* () {
+            const current = yield* Ref.get(chat.history)
+            const withPending =
+              pending.length === 0 ? current : Prompt.concat(current, Prompt.fromResponseParts(pending))
+            const unresolved = unresolvedToolCall(withPending.content)
+            if (
+              unresolved === undefined ||
+              unresolved.call.id !== suspension.tool_call_id ||
+              unresolved.call.name !== suspension.tool_name ||
+              !Equal.equals(unresolved.call.params, suspension.tool_params)
+            ) {
+              return yield* AgentError.make({
+                message: "Suspension does not match the unresolved checkpoint call",
+                turn,
+              })
+            }
+            const metadata = {
+              token: suspension.token,
+              reason: suspension.reason,
+              ...(suspension.authorization_stage === undefined
+                ? {}
+                : { authorization_stage: suspension.authorization_stage }),
+              ...(suspension.active_tools === undefined ? {} : { active_tools: suspension.active_tools }),
+              ...(suspension.activated_skills === undefined ? {} : { activated_skills: suspension.activated_skills }),
+            }
+            const messages = withPending.content.map((message, messageIndex): Prompt.Message => {
+              if (messageIndex !== unresolved.messageIndex || message.role !== "assistant") return message
+              return Prompt.makeMessage("assistant", {
+                content: message.content.map(
+                  (part, partIndex): Prompt.AssistantMessagePart =>
+                    partIndex === unresolved.partIndex && part.type === "tool-call"
+                      ? Prompt.makePart("tool-call", {
+                          id: part.id,
+                          name: part.name,
+                          params: part.params,
+                          providerExecuted: part.providerExecuted,
+                          options: { ...part.options, [suspensionCheckpointOption]: metadata },
+                        })
+                      : part,
+                ),
+                options: message.options,
+              })
+            })
+            const checkpoint = Prompt.fromMessages(messages)
+            yield* Ref.set(chat.history, checkpoint)
+            yield* savePersisted(turn)
+            return checkpoint
+          }),
+        )
 
       const failSuspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "approval") =>
         Stream.fail<RunError>(suspended(call, token, reason))
@@ -935,7 +1094,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           ),
         )
 
-      if (options.resume !== undefined) yield* Ref.get(chat.history).pipe(Effect.flatMap(restoreActivatedSkills))
+      if (validatedResume !== undefined) yield* Ref.get(chat.history).pipe(Effect.flatMap(restoreActivatedSkills))
 
       let sessionSyncedMessages = 0
       let sessionInitialized = false
@@ -1932,7 +2091,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       }
 
       const resumeStream = (
-        resume: Resume,
+        checkpoint: SuspensionCheckpoint,
       ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> => {
         let next:
           | {
@@ -1940,45 +2099,28 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               readonly overrides?: TurnOverrides
             }
           | undefined
-        const suppliedCall = Response.makePart("tool-call", {
-          id: resume.call.id,
-          name: resume.call.name,
-          params: resume.call.params,
-          providerExecuted: false,
-        })
         const currentTurn = resetTurnState(0).pipe(
           Stream.concat(
             Stream.unwrap(
-              Effect.all({ history: Ref.get(chat.history), tools: Ref.get(toolState) }).pipe(
-                Effect.map(({ history, tools }) => {
-                  const checkpoint =
-                    resume.authorizationStage === undefined
-                      ? { call: suppliedCall, messages: history.content }
-                      : unresolvedToolCall(history.content)
-                  if (
-                    checkpoint === undefined ||
-                    checkpoint.call.id !== suppliedCall.id ||
-                    checkpoint.call.name !== suppliedCall.name ||
-                    !Equal.equals(checkpoint.call.params, suppliedCall.params)
-                  ) {
-                    return Stream.fail(
-                      AgentError.make({
-                        message: "Resume call does not match the unresolved checkpoint call",
-                        turn: 0,
-                      }),
-                    )
-                  }
+              Ref.get(toolState).pipe(
+                Effect.map((tools) => {
+                  const suspension = checkpoint.suspension
                   const registry =
-                    resume.authorizationStage === undefined && resume.activeTools === undefined
+                    suspension.authorization_stage === undefined && suspension.active_tools === undefined
                       ? tools.registry
-                      : select(tools.registry, resume.activeTools ?? [])
+                      : select(tools.registry, suspension.active_tools ?? [])
                   return toolCallEvents(
                     0,
-                    checkpoint.call as AnyToolCall,
+                    Response.makePart("tool-call", {
+                      id: checkpoint.call.id,
+                      name: checkpoint.call.name,
+                      params: checkpoint.call.params,
+                      providerExecuted: false,
+                    }),
                     checkpoint.messages,
                     registry,
-                    resume.authorizationStage,
-                    resume.token,
+                    suspension.authorization_stage,
+                    suspension.token,
                   )
                 }),
               ),
@@ -2006,7 +2148,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         seedSystem === undefined ? Prompt.make(options.prompt) : withSystem(seedSystem, Prompt.make(options.prompt))
       const initialPrompt =
         options.resume === undefined ? yield* recallInitialPrompt(baseInitialPrompt) : baseInitialPrompt
-      const runStream = options.resume === undefined ? runTurn(0, initialPrompt) : resumeStream(options.resume)
+      const runStream = validatedResume === undefined ? runTurn(0, initialPrompt) : resumeStream(validatedResume)
       return runStream.pipe(
         Stream.catchCause((cause) => {
           const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
@@ -2016,9 +2158,10 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             )
           }
           if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(AgentSuspended)(reason.error)) {
+            const suspension = reason.error
             return Stream.unwrap(
               Effect.gen(function* () {
-                const checkpoint = yield* checkpointPending(state.turn, state.pending)
+                const checkpoint = yield* checkpointSuspended(state.turn, state.pending, suspension)
                 yield* syncSession(state.turn, checkpoint)
                 return Stream.concat(
                   Stream.fromIterable<Event>([turnCompletedEvent(state.turn, checkpoint)]),

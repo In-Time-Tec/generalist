@@ -417,14 +417,25 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
   ItLayer.make(it, "does not recall on resume", () => {
     let recalls = 0
     const remembers: Array<Memory.RememberInput> = []
-    const recalled = Memory.messageFromRecall([textPart("recalled before suspension")])
-    const authored = Prompt.makeMessage("user", { content: [textPart("authored before suspension")] })
+    let modelCalls = 0
+    let executions = 0
+    let checkpoint: Prompt.Prompt | undefined
     const agent = Agent.make({ name: "memory-agent", toolkit: Toolkit.make(lookupTool) })
     return [
       Layer.mergeAll(
-        modelLayer(() => Stream.make(textDelta("done"))),
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(toolCallPart("call-resume", "lookup", {}))
+            : Stream.make(textDelta("done"))
+        }),
         ToolExecutor.testLayer({
-          execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
+          execute: () => {
+            executions += 1
+            return executions === 1
+              ? Effect.succeed({ _tag: "Suspend", token: "memory-resume" })
+              : Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" })
+          },
         }),
         Approvals.autoApprove,
         ModelMiddleware.identityLayer,
@@ -432,26 +443,42 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           recall: () =>
             Effect.sync(() => {
               recalls += 1
-              return []
+              return [{ id: "recalled", content: [textPart("recalled before suspension")] }]
             }),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
         }),
       ),
       Effect.gen(function* () {
+        const suspension = yield* Agent.stream(agent, {
+          prompt: "authored before suspension",
+          memory: { key },
+        }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (suspension._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing memory suspension checkpoint")
+        }
+        recalls = 0
         const result = yield* Agent.generate(agent, {
           prompt: "ignored on resume",
-          history: Prompt.fromMessages([recalled, authored]),
+          history: checkpoint,
           memory: { key },
-          resume: { call: { id: "call-resume", name: "lookup", params: {} } },
+          resume: { suspension },
         })
 
         expect(result.text).toBe("done")
         expect(recalls).toBe(0)
         expect(remembers.length).toBe(2)
         for (const remembered of remembers) {
-          expect(remembered.transcript.content).not.toContain(recalled)
-          expect(remembered.transcript.content).toContain(authored)
+          expect(remembered.transcript.content.map(messageText)).not.toContain("recalled before suspension")
+          expect(remembered.transcript.content.map(messageText)).toContain("authored before suspension")
         }
       }),
     ] as const
@@ -528,13 +555,13 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
         expect(checkpoint).toBeDefined()
         expect(remembers).toEqual([])
-        if (checkpoint === undefined) return expect.unreachable()
+        if (failure._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) return expect.unreachable()
 
         const result = yield* Agent.generate(agent, {
           prompt: "ignored on resume",
           history: checkpoint,
           memory: { key },
-          resume: { token: "wait-1", call: { id: "call-wait", name: "wait", params: {} } },
+          resume: { suspension: failure },
         })
 
         expect(result.text).toBe("done")

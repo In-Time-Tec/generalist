@@ -132,7 +132,7 @@ export const coreAgentReference = definePage({
         [
           [code("resume")],
           [code("Resume"), " (optional)"],
-          ["Re-entry after ", code("AgentSuspended"), ": execute this call first"],
+          ["Re-entry after ", code("AgentSuspended"), ": verify and execute the checkpointed call"],
         ],
         [[code("sessionId")], [code("string"), " (optional)"], "Opaque host-assigned identity for this run/session"],
         [
@@ -206,7 +206,7 @@ export const coreAgentReference = definePage({
     p(
       "The error channel of every run function is the union ",
       code(
-        "AgentError | AgentSuspended | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | ProgressOverflowError | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure",
+        "AgentError | AgentSuspended | ResumeMismatch | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflowError | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure",
       ),
       ". Field shapes are tabulated in ",
       link("/docs/reference/core-events", "AgentEvent and errors"),
@@ -216,12 +216,12 @@ export const coreAgentReference = definePage({
     p(
       code("Resume"),
       " is ",
-      code("{ call: { id: string; name: string; params: unknown } }"),
-      ". The host constructs it from the fields of an ",
+      code("{ suspension: AgentSuspended }"),
+      ". The host passes the exact ",
       code("AgentSuspended"),
-      " error and passes it as ",
+      " error as ",
       code("RunOptions.resume"),
-      "; the run executes that call first.",
+      "; the run verifies it against the authoritative checkpoint before executing the unresolved call.",
     ),
     h2("result", "Result"),
     table(

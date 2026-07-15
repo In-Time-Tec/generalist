@@ -554,6 +554,10 @@ const failureMessage = (failure: Wire.RunFailure): string => {
       return failure.detail
     case "@batonfx/core/TurnLimitExceeded":
       return `Turn limit exceeded at turn ${failure.turn}`
+    case "@batonfx/core/ResumeMismatch":
+      return failure.reason === "identity-mismatch"
+        ? "Resume suspension does not match the current checkpoint"
+        : "Resume checkpoint not found"
     case "@batonfx/core/FrameworkFailure":
       return `${failure.tool} ${failure.stage}: ${failure.message}`
   }

@@ -1,4 +1,4 @@
-# ADR-0039 — Memory Recall Provenance
+# ADR-0040 — Memory Recall Provenance
 
 ## Status
 
