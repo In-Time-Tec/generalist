@@ -296,7 +296,11 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
           execute: (request) =>
             Effect.sync(() => {
               dispatched.push(request.call.id)
-              return { _tag: "Success", result: "result", encodedResult: "result" } as const
+              return {
+                _tag: "Success",
+                result: "first-result-marker",
+                encodedResult: "first-result-marker",
+              } as const
             }),
         }),
         Approvals.testLayer({
@@ -341,6 +345,8 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         expect(Json.stringify(events)).not.toContain("second")
         expect(Json.stringify(events)).not.toContain("third")
         expect(history).toContain("first")
+        expect(history.match(/"type":"tool-result"/g)).toHaveLength(1)
+        expect(history).toContain("first-result-marker")
         expect(history).not.toContain("second")
         expect(history).not.toContain("third")
         expect("error" in outcome && outcome.error._tag).toBe("@batonfx/core/DuplicateToolCallId")

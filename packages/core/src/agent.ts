@@ -1918,6 +1918,11 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       return runStream.pipe(
         Stream.catchCause((cause) => {
           const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+          if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(DuplicateToolCallId)(reason.error)) {
+            return Stream.unwrap(
+              checkpointPending(state.turn, state.pending).pipe(Effect.map(() => Stream.failCause<RunError>(cause))),
+            )
+          }
           if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(AgentSuspended)(reason.error)) {
             return Stream.unwrap(
               Effect.gen(function* () {
