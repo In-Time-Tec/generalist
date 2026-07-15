@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
-import { Cause, Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Stream, Tracer } from "effect"
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Stream, Tracer } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
@@ -25,6 +25,7 @@ import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
+type StreamServices<T> = T extends Stream.Stream<unknown, unknown, infer R> ? R : never
 
 const modelLayer = (
   streamText: ModelParams["streamText"],
@@ -37,6 +38,10 @@ const modelLayer = (
       streamText,
     }),
   )
+
+class Budget extends Context.Service<Budget, { readonly remaining: (turn: number) => number }>()(
+  "@batonfx/core/test/agent.test/Budget",
+) {}
 
 const characterTokenizerLayer = Layer.succeed(
   Tokenizer.Tokenizer,
@@ -3114,7 +3119,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "fails typed when the turn policy stops with pending tool results", () => {
+  ItLayer.make(it, "preserves TurnLimitExceeded for a configured recurrence limit", () => {
     let calls = 0
     return [
       Layer.mergeAll(
@@ -3139,7 +3144,158 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(failure._tag).toBe("@batonfx/core/TurnLimitExceeded")
         if (failure._tag === "@batonfx/core/TurnLimitExceeded") {
           expect(failure.turn).toBe(1)
+          expect(failure.limit).toBe(0)
           expect(failure.pending).toEqual([{ tool_call_id: "tool-call-1", tool_name: "echo" }])
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "keeps every pending call in order when a configured limit stops", () => [
+    Layer.mergeAll(
+      modelLayer(() =>
+        Stream.make(
+          toolCallPart("tool-call-first", "echo", { text: "first" }),
+          toolCallPart("tool-call-second", "echo", { text: "second" }),
+        ),
+      ),
+      echoExecutor,
+      Approvals.autoApprove,
+      ModelMiddleware.identityLayer,
+    ),
+    Effect.gen(function* () {
+      const agent = Agent.make({
+        name: "ordered-policy-stop-agent",
+        toolkit: Toolkit.make(echoTool),
+        policy: TurnPolicy.recurs(0),
+      })
+      const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "call twice" })))
+      expect(failure._tag).toBe("@batonfx/core/TurnLimitExceeded")
+      if (failure._tag === "@batonfx/core/TurnLimitExceeded") {
+        expect(failure.pending).toEqual([
+          { tool_call_id: "tool-call-first", tool_name: "echo" },
+          { tool_call_id: "tool-call-second", tool_name: "echo" },
+        ])
+      }
+    }),
+  ])
+
+  ItLayer.make(it, "propagates policy requirements and explicit non-limit stop reasons", () => {
+    let calls = 0
+    const budgetLayer = Layer.succeed(Budget, { remaining: () => 0 })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return Stream.make(toolCallPart(`tool-call-${calls}`, "echo", { text: `call ${calls}` }))
+        }),
+        echoExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        budgetLayer,
+      ),
+      Effect.gen(function* () {
+        const policy = TurnPolicy.make<Budget>((info) =>
+          Effect.gen(function* () {
+            const budget = yield* Budget
+            return budget.remaining(info.turn) === 0
+              ? TurnPolicy.decision.stop({ _tag: "BudgetExhausted", budget: "tokens" })
+              : TurnPolicy.decision.continue()
+          }),
+        )
+        const agent = Agent.make({ name: "budget-policy-agent", toolkit: Toolkit.make(echoTool), policy })
+        const run = Agent.stream(agent, { prompt: "use budget" })
+        const requirementProof: Budget extends StreamServices<typeof run> ? true : false = true
+
+        const failure = yield* Effect.flip(Stream.runCollect(run))
+
+        expect(requirementProof).toBe(true)
+        expect(calls).toBe(1)
+        expect(failure._tag).toBe("@batonfx/core/TurnPolicyStopped")
+        if (failure._tag === "@batonfx/core/TurnPolicyStopped") {
+          expect(failure.reason).toEqual({ _tag: "BudgetExhausted", budget: "tokens" })
+          expect(failure.pending).toEqual([{ tool_call_id: "tool-call-1", tool_name: "echo" }])
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "surfaces every non-limit stop reason through terminal output", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return Stream.make(toolCallPart(`tool-call-stop-${calls}`, "echo", { text: `call ${calls}` }))
+        }),
+        echoExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const reasons: ReadonlyArray<Exclude<TurnPolicy.StopReason, { readonly _tag: "TurnLimit" }>> = [
+          { _tag: "GoalSatisfied" },
+          { _tag: "BudgetExhausted", budget: "requests" },
+          { _tag: "Policy", detail: "operator requested stop" },
+        ]
+
+        for (const reason of reasons) {
+          const agent = Agent.make({
+            name: `stop-reason-${reason._tag}`,
+            toolkit: Toolkit.make(echoTool),
+            policy: TurnPolicy.make(() => Effect.succeed(TurnPolicy.decision.stop(reason))),
+          })
+          const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "stop" })))
+          expect(failure._tag).toBe("@batonfx/core/TurnPolicyStopped")
+          if (failure._tag === "@batonfx/core/TurnPolicyStopped") expect(failure.reason).toEqual(reason)
+        }
+
+        expect(calls).toBe(reasons.length)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "surfaces a policy evaluation failure without erasing its cause", () => {
+    const policyCause = { system: "budget-service", status: "offline" }
+    const policyFailure = TurnPolicy.TurnPolicyError.make({ message: "budget unavailable", cause: policyCause })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(toolCallPart("tool-call-policy-failure", "echo", { text: "call" }))),
+        echoExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({
+          name: "policy-failure-agent",
+          toolkit: Toolkit.make(echoTool),
+          policy: TurnPolicy.make(() => Effect.fail(policyFailure)),
+        })
+
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use policy" })))
+
+        expect(failure).toBe(policyFailure)
+        expect(failure.cause).toBe(policyCause)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed when a stale reasonless policy bypasses the migration adapter", () => {
+    const policy = TurnPolicy.recurs(0)
+    Reflect.set(policy, "decide", () => Effect.succeed({ _tag: "Stop" }))
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(toolCallPart("tool-call-stale-policy", "echo", { text: "call" }))),
+        echoExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "stale-policy-agent", toolkit: Toolkit.make(echoTool), policy })
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use stale policy" })))
+        expect(failure._tag).toBe("@batonfx/core/TurnPolicyError")
+        if (failure._tag === "@batonfx/core/TurnPolicyError") {
+          expect(failure.message).toContain("TurnPolicy.fromLegacy")
         }
       }),
     ] as const

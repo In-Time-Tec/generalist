@@ -13,7 +13,7 @@ export const corePoliciesReference = definePage({
     h2("turn-policy", "TurnPolicy"),
     p(
       "A policy is ",
-      code("{ decide: (info: TurnInfo) => Effect<Decision> }"),
+      code("TurnPolicy<R> = { decide: (info: TurnInfo) => Effect<Decision, TurnPolicyError, R> }"),
       ", consulted before each follow-up turn. ",
       code("TurnInfo"),
       " carries ",
@@ -28,7 +28,7 @@ export const corePoliciesReference = definePage({
       ["Export", "Notes"],
       [
         [
-          [code("decision.continue(overrides?)"), " / ", code("decision.stop")],
+          [code("decision.continue(overrides?)"), " / ", code("decision.stop(reason)")],
           [
             code("Decision"),
             " constructors; ",
@@ -42,7 +42,8 @@ export const corePoliciesReference = definePage({
             " for the next turn",
           ],
         ],
-        [[code("make(decide)")], "Policy from a decide function"],
+        [[code("make<R>(decide)")], "Policy from a decide Effect whose R remains in Agent run requirements"],
+        [[code("fromLegacy(decide)")], "Deprecated adapter for reasonless legacy stops"],
         [[code("recurs(n)")], ["Continue for at most ", code("n"), " follow-up turns after the first"]],
         [[code("untilToolCall(name)")], "Continue while the named tool has not yet been called this run"],
         [[code("both(first, second)")], ["Both must continue; overrides merge with ", code("second"), " winning"]],

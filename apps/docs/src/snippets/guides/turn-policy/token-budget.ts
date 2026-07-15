@@ -6,7 +6,9 @@ const approximateTokens = (history: Prompt.Prompt): number => Math.ceil(JSON.str
 export const tokenBudget = (maxTokens: number): TurnPolicy.TurnPolicy =>
   TurnPolicy.make((info) =>
     Effect.succeed(
-      approximateTokens(info.history) > maxTokens ? TurnPolicy.decision.stop : TurnPolicy.decision.continue(),
+      approximateTokens(info.history) > maxTokens
+        ? TurnPolicy.decision.stop({ _tag: "BudgetExhausted", budget: "tokens" })
+        : TurnPolicy.decision.continue(),
     ),
   )
 

@@ -92,7 +92,7 @@ export const coreEventsReference = definePage({
       " when neither side reports a field.",
     ),
     h2("error-classes", "Error classes"),
-    p("All four are Schema tagged error classes with frozen tags under ", code("@batonfx/core/"), "."),
+    p("All errors are Schema tagged error classes with frozen tags under ", code("@batonfx/core/"), "."),
     table(
       ["Error", "Fields", "Raised when"],
       [
@@ -103,8 +103,18 @@ export const coreEventsReference = definePage({
         ],
         [
           [code("TurnLimitExceeded")],
-          [code("turn"), ", ", code("pending: Array<{ tool_call_id, tool_name }>")],
-          "The turn policy declines another turn while tool results are still pending",
+          [code("turn"), ", ", code("limit"), ", ", code("pending: Array<{ tool_call_id, tool_name }>")],
+          "A configured recurrence limit is exhausted while tool results are still pending",
+        ],
+        [
+          [code("TurnPolicyStopped")],
+          [code("turn"), ", ", code("reason"), ", ", code("pending: Array<{ tool_call_id, tool_name }>")],
+          "A policy successfully stops for a non-limit reason",
+        ],
+        [
+          [code("TurnPolicyError")],
+          [code("message"), ", ", code("cause?")],
+          "A turn policy cannot evaluate its decision",
         ],
         [
           [code("MiddlewareViolation")],

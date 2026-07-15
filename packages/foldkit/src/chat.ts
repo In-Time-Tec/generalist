@@ -546,6 +546,10 @@ const failureMessage = (failure: Wire.RunFailure): string => {
   switch (failure._tag) {
     case "@batonfx/core/AgentError":
       return failure.message
+    case "@batonfx/core/TurnPolicyError":
+      return failure.message
+    case "@batonfx/core/TurnPolicyStopped":
+      return failure.reason._tag === "Policy" ? failure.reason.detail : failure.reason._tag
     case "@batonfx/core/MiddlewareViolation":
       return failure.detail
     case "@batonfx/core/TurnLimitExceeded":

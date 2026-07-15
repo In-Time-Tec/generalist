@@ -1,10 +1,12 @@
 import { Schema } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentEvent } from "@batonfx/core"
+import { AgentEvent, TurnPolicy } from "@batonfx/core"
 
 /** @experimental A run failure that is not an approval/tool-wait suspension. */
 export const RunFailure = Schema.Union([
   AgentEvent.AgentError,
+  TurnPolicy.TurnPolicyError,
+  AgentEvent.TurnPolicyStopped,
   AgentEvent.TurnLimitExceeded,
   AgentEvent.MiddlewareViolation,
 ])

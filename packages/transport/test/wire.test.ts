@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentEvent } from "@batonfx/core"
+import { AgentEvent, TurnPolicy } from "@batonfx/core"
 import { Wire } from "../src/index"
 
 const echoTool = Tool.make("echo", {
@@ -82,12 +82,24 @@ describe("Wire", () => {
       const schema = Wire.ServerFrame(toolkit)
       const failures: ReadonlyArray<Wire.RunFailure> = [
         AgentEvent.AgentError.make({ message: "boom", turn: 0 }),
-        AgentEvent.TurnLimitExceeded.make({ turn: 3, pending: [{ tool_call_id: "call-1", tool_name: "echo" }] }),
+        TurnPolicy.TurnPolicyError.make({ message: "policy unavailable", cause: { service: "budget" } }),
+        AgentEvent.TurnPolicyStopped.make({
+          turn: 2,
+          reason: { _tag: "GoalSatisfied" },
+          pending: [{ tool_call_id: "call-1", tool_name: "echo" }],
+        }),
+        AgentEvent.TurnLimitExceeded.make({
+          turn: 3,
+          limit: 2,
+          pending: [{ tool_call_id: "call-1", tool_name: "echo" }],
+        }),
         AgentEvent.MiddlewareViolation.make({ turn: 1, detail: "dropped tool-call" }),
       ]
 
       for (const error of failures) {
-        const decoded = yield* Schema.decodeUnknownEffect(schema)({ _tag: "Failed", seq: 10, error })
+        const jsonSchema = Schema.fromJsonString(schema)
+        const encoded = yield* Schema.encodeUnknownEffect(jsonSchema)({ _tag: "Failed", seq: 10, error })
+        const decoded = yield* Schema.decodeUnknownEffect(jsonSchema)(encoded)
         expect(decoded._tag).toBe("Failed")
       }
 

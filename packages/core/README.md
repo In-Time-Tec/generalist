@@ -4,6 +4,23 @@ Baton is a standalone, **non-durable**, Effect-native agent loop over `effect/un
 
 See [`docs/spec/01-baton-agent-framework.md`](../../docs/spec/01-baton-agent-framework.md) for the full contract.
 
+## Turn policy migration
+
+`TurnPolicy` decision Effects now expose their requirements and typed `TurnPolicyError` failures. Stops require a schema-backed reason, and only `TurnLimit` is surfaced as `TurnLimitExceeded`; other stops surface as `TurnPolicyStopped` with the reason and pending tool checkpoint.
+
+```ts
+const policy = TurnPolicy.make<Budget>(({ turn }) =>
+  Effect.gen(function* () {
+    const budget = yield* Budget
+    return budget.remaining(turn) === 0
+      ? TurnPolicy.decision.stop({ _tag: "BudgetExhausted", budget: "tokens" })
+      : TurnPolicy.decision.continue()
+  }),
+)
+```
+
+Migrate `TurnPolicy.decision.stop` to `TurnPolicy.decision.stop(reason)`. Existing reasonless custom policy functions can be passed to deprecated `TurnPolicy.fromLegacy` while migrating; legacy stops become `Policy { detail: "Legacy policy stopped" }`. `TurnLimitExceeded` now includes the configured `limit`, and transport consumers must add `TurnPolicyError` and `TurnPolicyStopped` to their terminal-failure handling.
+
 ## Imports and Layers
 
 Import intentional namespaces from the package root. Service Layer variants use a noun after `layer`:

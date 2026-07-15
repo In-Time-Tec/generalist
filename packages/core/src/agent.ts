@@ -27,6 +27,7 @@ import {
   type ToolProgress,
   type TurnCompleted,
   TurnLimitExceeded,
+  TurnPolicyStopped,
 } from "./agent-event.js"
 import { Approvals } from "./approvals.js"
 import {
@@ -55,15 +56,26 @@ import {
   executeToolkit,
 } from "./tool-executor.js"
 import { bound } from "./tool-output.js"
-import { defaultPolicy, type TurnOverrides, type TurnPolicy } from "./turn-policy.js"
+import {
+  type Decision,
+  defaultPolicy,
+  StopReason,
+  type TurnOverrides,
+  type TurnPolicy,
+  TurnPolicyError,
+} from "./turn-policy.js"
 
 type CompactionResult = import("./compaction.js").Result
 /** @experimental An agent definition: a plain value, not a service. */
-export interface Agent<Tools extends Record<string, Tool.Any> = {}, HasModel extends boolean = boolean> {
+export interface Agent<
+  Tools extends Record<string, Tool.Any> = {},
+  HasModel extends boolean = boolean,
+  PolicyServices = never,
+> {
   readonly name: string
   readonly instructions?: string
   readonly toolkit: Toolkit.Toolkit<Tools>
-  readonly policy: TurnPolicy
+  readonly policy: TurnPolicy<PolicyServices>
   readonly model?: HasModel extends true ? ModelSelection : ModelSelection
   readonly memory?: Key
   readonly metadata?: Readonly<Record<string, unknown>>
@@ -75,45 +87,46 @@ export interface WithModelDefault {
 }
 
 /** @experimental */
-export interface MakeOptions<Tools extends Record<string, Tool.Any> = {}> {
+export interface MakeOptions<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never> {
   readonly instructions?: string
   readonly toolkit?: Toolkit.Toolkit<Tools>
-  readonly policy?: TurnPolicy
+  readonly policy?: TurnPolicy<PolicyServices>
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly metadata?: Readonly<Record<string, unknown>>
 }
 
 /** @experimental */
-export interface MakeObjectOptions<Tools extends Record<string, Tool.Any> = {}> extends MakeOptions<Tools> {
+export interface MakeObjectOptions<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>
+  extends MakeOptions<Tools, PolicyServices> {
   readonly name: string
 }
 
 /** @experimental Defaults: empty toolkit, `defaultPolicy`. */
-export function make<Tools extends Record<string, Tool.Any> = {}>(
+export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
   name: string,
-  options: MakeOptions<Tools> & WithModelDefault,
-): Agent<Tools, true>
-export function make<Tools extends Record<string, Tool.Any> = {}>(
+  options: MakeOptions<Tools, PolicyServices> & WithModelDefault,
+): Agent<Tools, true, PolicyServices>
+export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
   name: string,
-  options?: MakeOptions<Tools>,
-): Agent<Tools, false>
-export function make<Tools extends Record<string, Tool.Any> = {}>(
-  options: MakeObjectOptions<Tools> & WithModelDefault,
-): Agent<Tools, true>
-export function make<Tools extends Record<string, Tool.Any> = {}>(
-  options: MakeObjectOptions<Tools>,
-): Agent<Tools, false>
-export function make<Tools extends Record<string, Tool.Any> = {}>(
-  options: MakeOptions<Tools> & WithModelDefault,
-): (name: string) => Agent<Tools, true>
-export function make<Tools extends Record<string, Tool.Any> = {}>(
-  options?: MakeOptions<Tools>,
-): (name: string) => Agent<Tools, false>
-export function make<Tools extends Record<string, Tool.Any> = {}>(
-  nameOrOptions?: string | MakeObjectOptions<Tools> | MakeOptions<Tools>,
-  options: MakeOptions<Tools> = {},
-): Agent<Tools, boolean> | ((name: string) => Agent<Tools, boolean>) {
+  options?: MakeOptions<Tools, PolicyServices>,
+): Agent<Tools, false, PolicyServices>
+export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
+  options: MakeObjectOptions<Tools, PolicyServices> & WithModelDefault,
+): Agent<Tools, true, PolicyServices>
+export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
+  options: MakeObjectOptions<Tools, PolicyServices>,
+): Agent<Tools, false, PolicyServices>
+export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
+  options: MakeOptions<Tools, PolicyServices> & WithModelDefault,
+): (name: string) => Agent<Tools, true, PolicyServices>
+export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
+  options?: MakeOptions<Tools, PolicyServices>,
+): (name: string) => Agent<Tools, false, PolicyServices>
+export function make<Tools extends Record<string, Tool.Any> = {}, PolicyServices = never>(
+  nameOrOptions?: string | MakeObjectOptions<Tools, PolicyServices> | MakeOptions<Tools, PolicyServices>,
+  options: MakeOptions<Tools, PolicyServices> = {},
+): Agent<Tools, boolean, PolicyServices> | ((name: string) => Agent<Tools, boolean, PolicyServices>) {
   if (nameOrOptions === undefined || (typeof nameOrOptions !== "string" && !("name" in nameOrOptions))) {
     return (name) => make(name, nameOrOptions ?? {})
   }
@@ -226,7 +239,14 @@ interface StructuredRunConfig<StructuredOutputSchema extends ObjectSchema> {
 }
 
 /** @experimental The error channel of `stream` and `generate`. */
-export type RunError = AgentError | AgentSuspended | TurnLimitExceeded | MiddlewareViolation | ProgressOverflowError
+export type RunError =
+  | AgentError
+  | AgentSuspended
+  | TurnPolicyError
+  | TurnPolicyStopped
+  | TurnLimitExceeded
+  | MiddlewareViolation
+  | ProgressOverflowError
 
 type ModelRunServices<HasModel extends boolean> = [HasModel] extends [true] ? Service : LanguageModel.LanguageModel
 type StaticToolServices<Tools extends Record<string, Tool.Any>> =
@@ -234,9 +254,11 @@ type StaticToolServices<Tools extends Record<string, Tool.Any>> =
   | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
 
 /** @experimental Services required to run an agent. */
-export type RunServices<Tools extends Record<string, Tool.Any> = {}, HasModel extends boolean = boolean> =
-  | StaticToolServices<Tools>
-  | ModelRunServices<HasModel>
+export type RunServices<
+  Tools extends Record<string, Tool.Any> = {},
+  HasModel extends boolean = boolean,
+  PolicyServices = never,
+> = StaticToolServices<Tools> | ModelRunServices<HasModel> | PolicyServices
 
 type AnyToolCall = Response.ToolCallPart<string, unknown>
 
@@ -274,6 +296,12 @@ const appendInstructionFragment = (base: string | undefined, fragment: string | 
   if (fragment === undefined || fragment.length === 0) return base
   if (base === undefined || base.length === 0) return fragment
   return `${base}\n\n${fragment}`
+}
+
+const isTurnPolicyDecision = (input: unknown): input is Decision => {
+  if (typeof input !== "object" || input === null || !("_tag" in input)) return false
+  if (input._tag === "Continue") return true
+  return input._tag === "Stop" && "reason" in input && Schema.is(StopReason)(input.reason)
 }
 
 const successResult = (call: AnyToolCall, outcome: Success): PendingToolResult =>
@@ -363,12 +391,17 @@ const applyPartChain = (
 const streamInternal = <
   Tools extends Record<string, Tool.Any>,
   HasModel extends boolean,
+  PolicyServices,
   StructuredOutputSchema extends ObjectSchema,
 >(
-  agent: Agent<Tools, HasModel>,
+  agent: Agent<Tools, HasModel, PolicyServices>,
   options: RunOptions,
   structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
-): Stream.Stream<Event, RunError, RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]> =>
+): Stream.Stream<
+  Event,
+  RunError,
+  RunServices<Tools, HasModel, PolicyServices> | StructuredOutputSchema["DecodingServices"]
+> =>
   Stream.unwrap(
     Effect.gen(function* () {
       const executor = yield* Effect.serviceOption(ToolExecutor)
@@ -1350,7 +1383,8 @@ const streamInternal = <
           }
           readonly structuredTurn?: number
         },
-        AgentError
+        AgentError | TurnPolicyError,
+        PolicyServices
       > =>
         Effect.gen(function* () {
           const transcript = yield* Ref.get(chat.history)
@@ -1377,23 +1411,39 @@ const streamInternal = <
               events: Stream.fromIterable<Event>([completed, terminalCompletedEvent(turn, transcript)]),
             }
           }
-          const decision = yield* agent.policy.decide({
+          const evaluated = yield* agent.policy.decide({
             turn: turn + 1,
             history: transcript,
             pendingToolResults: pending,
           })
+          if (!isTurnPolicyDecision(evaluated)) {
+            return yield* TurnPolicyError.make({
+              message:
+                "TurnPolicy returned an invalid decision; reasonless Stop decisions must be adapted with TurnPolicy.fromLegacy",
+              cause: evaluated,
+            })
+          }
+          const decision = evaluated
           if (decision._tag === "Stop") {
+            const pendingCalls = pending.map((result) => ({
+              tool_call_id: result.id,
+              tool_name: result.name,
+            }))
             return {
               events: Stream.concat(
                 Stream.fromIterable<Event>([completed]),
                 Stream.fail(
-                  TurnLimitExceeded.make({
-                    turn: turn + 1,
-                    pending: pending.map((result) => ({
-                      tool_call_id: result.id,
-                      tool_name: result.name,
-                    })),
-                  }),
+                  decision.reason._tag === "TurnLimit"
+                    ? TurnLimitExceeded.make({
+                        turn: turn + 1,
+                        limit: decision.reason.limit,
+                        pending: pendingCalls,
+                      })
+                    : TurnPolicyStopped.make({
+                        turn: turn + 1,
+                        reason: decision.reason,
+                        pending: pendingCalls,
+                      }),
                 ),
               ),
             }
@@ -1537,17 +1587,17 @@ const streamInternal = <
 export const stream: {
   (
     options: RunOptions,
-  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    agent: Agent<Tools, HasModel>,
-  ) => Stream.Stream<Event, RunError, RunServices<Tools, HasModel>>
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    agent: Agent<Tools, HasModel>,
+  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
+    agent: Agent<Tools, HasModel, PolicyServices>,
+  ) => Stream.Stream<Event, RunError, RunServices<Tools, HasModel, PolicyServices>>
+  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
+    agent: Agent<Tools, HasModel, PolicyServices>,
     options: RunOptions,
-  ): Stream.Stream<Event, RunError, RunServices<Tools, HasModel>>
+  ): Stream.Stream<Event, RunError, RunServices<Tools, HasModel, PolicyServices>>
 } = dual(
   2,
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    agent: Agent<Tools, HasModel>,
+  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices>(
+    agent: Agent<Tools, HasModel, PolicyServices>,
     options: RunOptions,
   ) => streamInternal(agent, options, undefined),
 )
@@ -1556,19 +1606,41 @@ export const stream: {
 export const streamObject: {
   <StructuredOutputSchema extends ObjectSchema>(
     options: ObjectRunOptions<StructuredOutputSchema>,
-  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    agent: Agent<Tools, HasModel>,
-  ) => Stream.Stream<Event, RunError, RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]>
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, StructuredOutputSchema extends ObjectSchema>(
-    agent: Agent<Tools, HasModel>,
+  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
+    agent: Agent<Tools, HasModel, PolicyServices>,
+  ) => Stream.Stream<
+    Event,
+    RunError,
+    RunServices<Tools, HasModel, PolicyServices> | StructuredOutputSchema["DecodingServices"]
+  >
+  <
+    Tools extends Record<string, Tool.Any>,
+    HasModel extends boolean,
+    StructuredOutputSchema extends ObjectSchema,
+    PolicyServices = never,
+  >(
+    agent: Agent<Tools, HasModel, PolicyServices>,
     options: ObjectRunOptions<StructuredOutputSchema>,
-  ): Stream.Stream<Event, RunError, RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]>
+  ): Stream.Stream<
+    Event,
+    RunError,
+    RunServices<Tools, HasModel, PolicyServices> | StructuredOutputSchema["DecodingServices"]
+  >
 } = dual(
   2,
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, StructuredOutputSchema extends ObjectSchema>(
-    agent: Agent<Tools, HasModel>,
+  <
+    Tools extends Record<string, Tool.Any>,
+    HasModel extends boolean,
+    PolicyServices,
+    StructuredOutputSchema extends ObjectSchema,
+  >(
+    agent: Agent<Tools, HasModel, PolicyServices>,
     options: ObjectRunOptions<StructuredOutputSchema>,
-  ): Stream.Stream<Event, RunError, RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]> =>
+  ): Stream.Stream<
+    Event,
+    RunError,
+    RunServices<Tools, HasModel, PolicyServices> | StructuredOutputSchema["DecodingServices"]
+  > =>
     streamInternal(agent, options, {
       schema: options.schema,
       objectName: options.objectName ?? "output",
@@ -1592,19 +1664,19 @@ export interface ObjectResult<A> extends Result {
 export const generate: {
   (
     options: RunOptions,
-  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    agent: Agent<Tools, HasModel>,
-  ) => Effect.Effect<Result, RunError, RunServices<Tools, HasModel>>
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    agent: Agent<Tools, HasModel>,
+  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
+    agent: Agent<Tools, HasModel, PolicyServices>,
+  ) => Effect.Effect<Result, RunError, RunServices<Tools, HasModel, PolicyServices>>
+  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
+    agent: Agent<Tools, HasModel, PolicyServices>,
     options: RunOptions,
-  ): Effect.Effect<Result, RunError, RunServices<Tools, HasModel>>
+  ): Effect.Effect<Result, RunError, RunServices<Tools, HasModel, PolicyServices>>
 } = dual(
   2,
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    agent: Agent<Tools, HasModel>,
+  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices>(
+    agent: Agent<Tools, HasModel, PolicyServices>,
     options: RunOptions,
-  ): Effect.Effect<Result, RunError, RunServices<Tools, HasModel>> =>
+  ): Effect.Effect<Result, RunError, RunServices<Tools, HasModel, PolicyServices>> =>
     Stream.runLast(stream(agent, options)).pipe(
       Effect.flatMap(
         Option.match({
@@ -1622,30 +1694,40 @@ export const generate: {
 export const generateObject: {
   <StructuredOutputSchema extends ObjectSchema>(
     options: ObjectRunOptions<StructuredOutputSchema>,
-  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean>(
-    agent: Agent<Tools, HasModel>,
+  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
+    agent: Agent<Tools, HasModel, PolicyServices>,
   ) => Effect.Effect<
     ObjectResult<StructuredOutputSchema["Type"]>,
     RunError,
-    RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]
+    RunServices<Tools, HasModel, PolicyServices> | StructuredOutputSchema["DecodingServices"]
   >
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, StructuredOutputSchema extends ObjectSchema>(
-    agent: Agent<Tools, HasModel>,
+  <
+    Tools extends Record<string, Tool.Any>,
+    HasModel extends boolean,
+    StructuredOutputSchema extends ObjectSchema,
+    PolicyServices = never,
+  >(
+    agent: Agent<Tools, HasModel, PolicyServices>,
     options: ObjectRunOptions<StructuredOutputSchema>,
   ): Effect.Effect<
     ObjectResult<StructuredOutputSchema["Type"]>,
     RunError,
-    RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]
+    RunServices<Tools, HasModel, PolicyServices> | StructuredOutputSchema["DecodingServices"]
   >
 } = dual(
   2,
-  <Tools extends Record<string, Tool.Any>, HasModel extends boolean, StructuredOutputSchema extends ObjectSchema>(
-    agent: Agent<Tools, HasModel>,
+  <
+    Tools extends Record<string, Tool.Any>,
+    HasModel extends boolean,
+    PolicyServices,
+    StructuredOutputSchema extends ObjectSchema,
+  >(
+    agent: Agent<Tools, HasModel, PolicyServices>,
     options: ObjectRunOptions<StructuredOutputSchema>,
   ): Effect.Effect<
     ObjectResult<StructuredOutputSchema["Type"]>,
     RunError,
-    RunServices<Tools, HasModel> | StructuredOutputSchema["DecodingServices"]
+    RunServices<Tools, HasModel, PolicyServices> | StructuredOutputSchema["DecodingServices"]
   > =>
     Stream.runFold(
       streamObject(agent, options),

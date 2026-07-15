@@ -1,5 +1,6 @@
 import { Function, Schema } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
+import { StopReason } from "./turn-policy.js"
 /** @experimental Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, unknown>>
 
@@ -151,6 +152,19 @@ export class AgentError extends Schema.TaggedErrorClass<AgentError>()("@batonfx/
 /** @experimental The turn policy declined another turn while tool results were still pending. */
 export class TurnLimitExceeded extends Schema.TaggedErrorClass<TurnLimitExceeded>()("@batonfx/core/TurnLimitExceeded", {
   turn: Schema.Finite,
+  limit: Schema.Finite,
+  pending: Schema.Array(
+    Schema.Struct({
+      tool_call_id: Schema.String,
+      tool_name: Schema.String,
+    }),
+  ),
+}) {}
+
+/** @experimental A turn policy successfully stopped for a reason other than a configured turn limit. */
+export class TurnPolicyStopped extends Schema.TaggedErrorClass<TurnPolicyStopped>()("@batonfx/core/TurnPolicyStopped", {
+  turn: Schema.Finite,
+  reason: StopReason,
   pending: Schema.Array(
     Schema.Struct({
       tool_call_id: Schema.String,

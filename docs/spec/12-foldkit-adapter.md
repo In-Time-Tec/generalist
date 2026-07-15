@@ -75,6 +75,8 @@ User messages update draft state and emit commands. Commands convert every expec
 
 `ChatCommand` now exposes `AgentCommandError` instead of `any`. `ConnectionFailed.reason` and `FailedAgentCommand.reason` remain available as the default display text, while their new `operation` and `error` fields provide structured handling. Consumers that construct either message directly must supply those fields; consumers that only read `reason` remain source-compatible.
 
+Failed policy evaluation displays the `TurnPolicyError.message`. An explicit policy stop displays a custom `Policy.detail` when present and otherwise the standard stop-reason tag. Configured turn limits retain the existing turn-limit message.
+
 Tool entries retain the difference between a tool call observed in model output and execution actually starting. Foldcn tool status helpers map that to `input-streaming` before `ToolExecutionStarted`, `input-available` while execution is running, and `output-available` / `output-error` after completion.
 
 The adapter exposes pure helpers that map the headless model to foldcn component inputs without importing copied foldcn components:

@@ -10,7 +10,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 
 - **Agent**: an agent definition value (name, instructions, toolkit, model selection, memory key, turn policy, and metadata) carrying its own defaults. `Agent.make` builds it; `Agent.stream` is the text loop primitive, `Agent.generate` is derived from it, and `Agent.streamObject` / `Agent.generateObject` run the same loop followed by one terminal structured-output turn. An Agent is not a user, bot, or account.
 - **Turn**: one model call plus the sequential execution of the tool calls it emits. Turn 0 always runs; follow-up turns re-feed tool results via `Ai.Prompt.fromResponseParts(...)`.
-- **TurnPolicy**: a plain, `Schedule`-inspired value (not a service) that decides whether to run another turn when tool results are pending. Finite `recurs`, `untilToolCall`, and fully portable `both` values carry inert serializable snapshots for durable hosts; non-finite recurrence counts and `make` remain opaque runtime policies. Default `recurs(8)`.
+- **TurnPolicy**: a plain, `Schedule`-inspired Effect program (not a service) that decides whether to run another turn when tool results are pending. Its requirements remain visible on the Agent run, evaluation fails with `TurnPolicyError`, and stops carry a serializable `StopReason`. Finite `recurs`, `untilToolCall`, and fully portable `both` values carry inert serializable snapshots for durable hosts; non-finite recurrence counts and `make` remain opaque runtime policies. Default `recurs(8)`.
 - **ToolExecutor**: the tool-call execution seam. `execute(request) => Effect<Outcome>` where `Outcome` is `Success | Failure | Suspend`. Default `fromToolkit` runs the toolkit's own handlers in-process; hosts swap in their own.
 - **ToolContext**: the per-call ambient service provided while a framework-executed tool is running. It carries the run `sessionId`, an `AbortSignal` that is aborted when the run/tool scope is interrupted, and `emit(progress)` for in-flight progress updates.
 - **ToolOutputStore**: the optional spill seam for oversized successful tool outputs. Baton can store the full output out of context and re-feed a bounded inline `ToolOutput` envelope with `outputPaths`; absent or no-op stores preserve inline results unchanged.
@@ -56,6 +56,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Compaction is optional. Absent `Compaction` preserves current turn, session, and completion behavior exactly.
 - Session context is derived from a root-to-leaf path, not stored separately.
 - `TurnPolicy` is a plain value, not a service — agents carry their own default like `Schedule` values.
+- Turn policy requirements remain visible in Agent run requirements, policy failures remain typed, and successful non-limit stops are never reported as `TurnLimitExceeded`.
 - A `TurnPolicy` snapshot describes built-in constructor data only. It never serializes a decision function, Effect, Layer, or service and does not change standalone decision semantics.
 - Every behavior-bearing seam exposes a test or memory layer (`testLayer`) so tests swap implementations through Effect layers.
 - Transport run queues are opt-in, FIFO per session, and process-local. Accepted queued prompts are lost when the registry layer is released; durable work belongs to hosts such as Relay.

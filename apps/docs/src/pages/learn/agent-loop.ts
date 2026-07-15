@@ -35,7 +35,9 @@ export const agentLoop = definePage({
     p(
       "Pending tool results are never silently dropped. If the policy stops the loop while results are still waiting to be re-fed, the run fails with ",
       code("TurnLimitExceeded"),
-      " listing the pending calls, rather than pretending the conversation ended cleanly.",
+      " only for a configured recurrence cap, or with ",
+      code("TurnPolicyStopped"),
+      " for another explicit stop reason. Both list the pending calls rather than pretending the conversation ended cleanly.",
     ),
     h2("turn-policy-gates-follow-ups", "TurnPolicy gates follow-up turns"),
     p(
