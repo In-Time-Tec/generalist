@@ -76,3 +76,10 @@ bun run package:smoke # packed Node and Bun consumers
 - Stop and update the spec/ADR first when code would introduce a new public type, service, seam, or runtime invariant not covered by the spec tree.
 - For library APIs, grep `node_modules` first for matching declarations and examples.
 - Do not create `utils/`, `helpers/`, `common/`, or `lib/` catch-all directories.
+
+## Greenfield changes
+
+- Baton is a greenfield project used only by repositories we control. Do not preserve legacy code, APIs, signatures, schemas, configuration shapes, protocols, or behavior for compatibility.
+- No public or internal API signature is protected. Change or remove any contract when the better design requires it, then update every caller, test, fixture, spec, and example in the same change.
+- Do not add deprecation periods, compatibility layers, version negotiation, fallbacks, shims, dual read/write paths, or parallel old/new implementations unless the task explicitly requires them.
+- Prefer one current contract and a clean break. Replace or reset obsolete local state instead of teaching runtime code to support multiple generations.
