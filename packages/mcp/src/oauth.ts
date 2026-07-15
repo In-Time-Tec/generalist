@@ -3,7 +3,19 @@ import { auth } from "@modelcontextprotocol/sdk/client/auth.js"
 import type { OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js"
 import type { OAuthClientInformationMixed, OAuthClientMetadata } from "@modelcontextprotocol/sdk/shared/auth.js"
 import { OAuthTokensSchema } from "@modelcontextprotocol/sdk/shared/auth.js"
-import { Context, Crypto, Effect, Encoding, Layer, Option, Redacted, Ref, Schema, Semaphore } from "effect"
+import {
+  Context,
+  Crypto,
+  Effect,
+  Encoding,
+  Layer,
+  Option,
+  Redacted,
+  Ref,
+  Schema,
+  Semaphore,
+  SynchronizedRef,
+} from "effect"
 
 /** @experimental */
 export class OAuthPendingError extends Schema.TaggedErrorClass<OAuthPendingError>()("OAuthPendingError", {
@@ -97,6 +109,17 @@ export interface Interface {
 /** @experimental */
 export class OAuth extends Context.Service<OAuth, Interface>()("@batonfx/mcp/oauth") {}
 
+type OAuthFlow =
+  | { readonly _tag: "Idle" }
+  | {
+      readonly _tag: "Pending"
+      readonly state: string
+      readonly verifier?: string
+      readonly authorization?: Authorization
+    }
+
+const Idle: OAuthFlow = { _tag: "Idle" }
+
 /** @experimental */
 export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, TokenStore | Crypto.Crypto> =>
   Layer.effect(
@@ -104,13 +127,10 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
     Effect.gen(function* () {
       const store = yield* TokenStore
       const crypto = yield* Crypto.Crypto
-      const verifier = yield* Ref.make(Option.none<string>())
-      const pending = yield* Ref.make(Option.none<Authorization>())
-      const state = yield* Ref.make(Option.none<string>())
+      const flow = yield* SynchronizedRef.make<OAuthFlow>(Idle)
       const clientInformation = yield* Ref.make(Option.fromUndefinedOr(configuration.clientInformation))
       const discoveryState = yield* Ref.make(Option.none<OAuthDiscoveryState>())
       const boundaryFailure = yield* Ref.make(Option.none<OAuthProviderError>())
-      const stateSemaphore = yield* Semaphore.make(1)
       const lifecycleSemaphore = yield* Semaphore.make(1)
       const context = yield* Effect.context<never>()
       const runPromise = Effect.runPromiseWith(context)
@@ -144,14 +164,16 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
         Effect.map(Encoding.encodeBase64Url),
         Effect.mapError(() => providerFailure("state")),
       )
-      const currentState = stateSemaphore.withPermit(
-        Ref.get(state).pipe(
-          Effect.flatMap(
-            Option.match({
-              onNone: () => freshState.pipe(Effect.tap((generated) => Ref.set(state, Option.some(generated)))),
-              onSome: Effect.succeed,
-            }),
-          ),
+      const currentState = SynchronizedRef.modifyEffect(flow, (current) =>
+        current._tag === "Pending"
+          ? Effect.succeed([current.state, current] as const)
+          : freshState.pipe(Effect.map((generated) => [generated, { _tag: "Pending", state: generated }] as const)),
+      )
+      const currentVerifier = SynchronizedRef.get(flow).pipe(
+        Effect.flatMap((current) =>
+          current._tag === "Pending" && current.verifier !== undefined
+            ? Effect.succeed(current.verifier)
+            : Effect.fail(providerFailure("code verifier")),
         ),
       )
       const provider: OAuthClientProvider = {
@@ -173,10 +195,22 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
           ),
         redirectToAuthorization: (url) =>
           runPromise(
-            Ref.set(pending, Option.some({ url: url.toString(), state: url.searchParams.get("state") ?? "" })),
+            SynchronizedRef.update(flow, (current) =>
+              current._tag === "Pending"
+                ? {
+                    ...current,
+                    authorization: { url: url.toString(), state: url.searchParams.get("state") ?? "" },
+                  }
+                : current,
+            ),
           ),
-        saveCodeVerifier: (value) => runPromise(Ref.set(verifier, Option.some(value))),
-        codeVerifier: () => runPromise(Ref.get(verifier).pipe(Effect.map(Option.getOrThrow))),
+        saveCodeVerifier: (value) =>
+          runPromise(
+            SynchronizedRef.update(flow, (current) =>
+              current._tag === "Pending" ? { ...current, verifier: value } : current,
+            ),
+          ),
+        codeVerifier: () => runPromise(currentVerifier),
         invalidateCredentials: (scope) =>
           runPromise(
             (scope === "tokens" || scope === "all"
@@ -187,13 +221,15 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
                 Effect.all(
                   [
                     scope === "client" || scope === "all" ? Ref.set(clientInformation, Option.none()) : Effect.void,
-                    scope === "verifier" || scope === "all" ? Ref.set(verifier, Option.none()) : Effect.void,
-                    scope === "discovery" || scope === "all" ? Ref.set(discoveryState, Option.none()) : Effect.void,
-                    scope === "all"
-                      ? Effect.all([Ref.set(state, Option.none()), Ref.set(pending, Option.none())], {
-                          discard: true,
+                    scope === "verifier"
+                      ? SynchronizedRef.update(flow, (current) => {
+                          if (current._tag === "Idle") return current
+                          const { verifier: _, ...withoutVerifier } = current
+                          return withoutVerifier
                         })
                       : Effect.void,
+                    scope === "discovery" || scope === "all" ? Ref.set(discoveryState, Option.none()) : Effect.void,
+                    scope === "all" ? SynchronizedRef.set(flow, Idle) : Effect.void,
                   ],
                   { discard: true },
                 ),
@@ -231,9 +267,7 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
         Effect.gen(function* () {
           yield* store.remove(configuration.serverUrl).pipe(Effect.mapError(() => providerFailure("remove tokens")))
           const generated = yield* freshState
-          yield* Ref.set(state, Option.some(generated))
-          yield* Ref.set(pending, Option.none())
-          yield* Ref.set(verifier, Option.none())
+          yield* SynchronizedRef.set(flow, { _tag: "Pending", state: generated })
           yield* Effect.tryPromise({
             try: () =>
               auth(provider, {
@@ -242,9 +276,11 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
               }),
             catch: () => providerFailure("authorize"),
           })
-          const authorization = yield* Ref.get(pending)
-          if (Option.isNone(authorization)) return yield* providerFailure("authorize")
-          return authorization.value
+          const current = yield* SynchronizedRef.get(flow)
+          if (current._tag === "Idle" || current.authorization === undefined) {
+            return yield* providerFailure("authorize")
+          }
+          return current.authorization
         }),
       )
       const callback = Effect.fn("OAuth.callback")((callbackUrl: string) =>
@@ -255,42 +291,39 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
               catch: () => providerFailure("callback"),
             })
             const receivedState = url.searchParams.get("state")
-            const matched = yield* Ref.modify(state, (expected) => {
-              const matches = Option.isSome(expected) && receivedState === expected.value
-              return [matches, matches ? Option.none() : expected]
+            const consumed = yield* SynchronizedRef.modifyEffect(flow, (current) => {
+              const matches = current._tag === "Pending" && receivedState === current.state
+              return Effect.succeed([matches ? Option.some(current) : Option.none(), matches ? Idle : current] as const)
             })
-            if (!matched) {
+            if (Option.isNone(consumed)) {
               return yield* OAuthExpiredError.make({ server: configuration.serverUrl })
             }
             const denial = url.searchParams.get("error")
             if (denial !== null) {
-              yield* Effect.all([Ref.set(verifier, Option.none()), Ref.set(pending, Option.none())], {
-                discard: true,
-              })
               return yield* OAuthDeniedError.make({ reason: denial })
             }
             const code = url.searchParams.get("code")
             if (code === null) {
-              yield* Effect.all([Ref.set(verifier, Option.none()), Ref.set(pending, Option.none())], {
-                discard: true,
-              })
               return yield* OAuthDeniedError.make({ reason: "authorization code missing" })
+            }
+            const callbackProvider: OAuthClientProvider = {
+              ...provider,
+              codeVerifier: () =>
+                runPromise(
+                  consumed.value.verifier === undefined
+                    ? Effect.fail(providerFailure("code verifier"))
+                    : Effect.succeed(consumed.value.verifier),
+                ),
             }
             yield* Effect.tryPromise({
               try: () =>
-                auth(provider, {
+                auth(callbackProvider, {
                   serverUrl: configuration.serverUrl,
                   authorizationCode: code,
                   ...(configuration.scope === undefined ? {} : { scope: configuration.scope }),
                 }),
               catch: () => providerFailure("exchange"),
-            }).pipe(
-              Effect.ensuring(
-                Effect.all([Ref.set(verifier, Option.none()), Ref.set(pending, Option.none())], {
-                  discard: true,
-                }),
-              ),
-            )
+            })
           }),
         ),
       )
@@ -298,7 +331,13 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
         provider,
         withTransport,
         authorize,
-        pending: Ref.get(pending),
+        pending: SynchronizedRef.get(flow).pipe(
+          Effect.map((current) =>
+            current._tag === "Pending" && current.authorization !== undefined
+              ? Option.some(current.authorization)
+              : Option.none(),
+          ),
+        ),
         callback,
         clear: lifecycleSemaphore.withPermit(
           store.remove(configuration.serverUrl).pipe(
@@ -306,9 +345,7 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
             Effect.ensuring(
               Effect.all(
                 [
-                  Ref.set(state, Option.none()),
-                  Ref.set(verifier, Option.none()),
-                  Ref.set(pending, Option.none()),
+                  SynchronizedRef.set(flow, Idle),
                   Ref.set(clientInformation, Option.none()),
                   Ref.set(discoveryState, Option.none()),
                   Ref.set(boundaryFailure, Option.none()),
