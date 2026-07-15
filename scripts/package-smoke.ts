@@ -125,7 +125,7 @@ import { OAuth, McpToolSource } from "@batonfx/mcp"
 import { route as mcpRoute, type BatonTools, type Options as McpRouteOptions } from "@batonfx/mcp/baton"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "@batonfx/skills"
 import { TestModel } from "@batonfx/test"
-import { SessionRegistry } from "@batonfx/transport"
+import { SessionRegistry, Sse, Wire, Ws } from "@batonfx/transport"
 import { Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 type Equal<Left, Right> =
@@ -237,6 +237,36 @@ type TransportWireSubpath = Assert<Equal<TransportRoot["Wire"], typeof import("@
 type TransportSessionRegistrySubpath = Assert<
   Equal<TransportRoot["SessionRegistry"], typeof import("@batonfx/transport/session-registry")>
 >
+type LooseEventDerived = Assert<Equal<Wire.LooseEventType, typeof Wire.LooseEventSchema.Type>>
+type LooseServerFrameDerived = Assert<Equal<Wire.LooseServerFrameType, typeof Wire.LooseServerFrame.Type>>
+type LooseServerFrameIsDistinct = Assert<Equal<Equal<Wire.LooseServerFrameType, Wire.ServerFrameType>, false>>
+const fixedTransportToolkit = Toolkit.empty
+const explicitFixedCapability = { capability: "fixed", toolkit: fixedTransportToolkit } as const
+const runtimeDynamicCapability = { capability: "runtime-dynamic" } as const
+const fixedCodec = Wire.codec(fixedTransportToolkit)
+const explicitFixedCodec = Wire.codec(explicitFixedCapability)
+const fixedSseSchema = Sse.streamSuccess(fixedTransportToolkit)
+const explicitFixedSseSchema = Sse.streamSuccess(explicitFixedCapability)
+const fixedSseRespond = Sse.respond(fixedTransportToolkit)
+const explicitFixedSseRespond = Sse.respond(explicitFixedCapability)
+const fixedWsHandle = Ws.handle(fixedTransportToolkit)
+const explicitFixedWsHandle = Ws.handle(explicitFixedCapability)
+const runtimeDynamicCodec = Wire.codec(runtimeDynamicCapability)
+const runtimeDynamicSseSchema = Sse.streamSuccess(runtimeDynamicCapability)
+const runtimeDynamicSseRespond = Sse.respond(runtimeDynamicCapability)
+const runtimeDynamicWsHandle = Ws.handle(runtimeDynamicCapability)
+void fixedCodec
+void explicitFixedCodec
+void fixedSseSchema
+void explicitFixedSseSchema
+void fixedSseRespond
+void explicitFixedSseRespond
+void fixedWsHandle
+void explicitFixedWsHandle
+void runtimeDynamicCodec
+void runtimeDynamicSseSchema
+void runtimeDynamicSseRespond
+void runtimeDynamicWsHandle
 const reasoning: TestModel.ReasoningPart = TestModel.reasoning("package smoke")
 void reasoning
 const tokenStore: OAuth.TokenStoreInterface = {

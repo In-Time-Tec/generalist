@@ -3,7 +3,7 @@ import { Cause, Effect, Exit, Fiber, Layer, Schedule, Schema, Scope, Stream } fr
 import { TestClock } from "effect/testing"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import { Prompt, Response } from "effect/unstable/ai"
+import { Prompt } from "effect/unstable/ai"
 import { Client, Wire } from "../src/index"
 
 const provideTestLayer =
@@ -12,6 +12,64 @@ const provideTestLayer =
     Layer.build(layer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
 
 const endedFrame = (seq: number): Wire.LooseServerFrameType => ({ _tag: "Ended", seq })
+
+const dynamicToolFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
+  {
+    _tag: "Event",
+    seq: 0,
+    event: {
+      _tag: "ToolExecutionStarted",
+      turn: 0,
+      call: { type: "tool-call", id: "activate-1", name: "activate_skill", params: { name: "review" } },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 1,
+    event: {
+      _tag: "ToolExecutionCompleted",
+      turn: 0,
+      call: { type: "tool-call", id: "activate-1", name: "activate_skill", params: { name: "review" } },
+      result: {
+        type: "tool-result",
+        id: "activate-1",
+        name: "activate_skill",
+        result: { activated: "review" },
+        isFailure: false,
+      },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 2,
+    event: {
+      _tag: "ToolExecutionStarted",
+      turn: 1,
+      call: { type: "tool-call", id: "review-1", name: "review_tool", params: { path: "src" } },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 3,
+    event: { _tag: "ToolProgress", turn: 1, toolCallId: "review-1", message: "reviewing" },
+  },
+  {
+    _tag: "Event",
+    seq: 4,
+    event: {
+      _tag: "ToolExecutionCompleted",
+      turn: 1,
+      call: { type: "tool-call", id: "review-1", name: "review_tool", params: { path: "src" } },
+      result: {
+        type: "tool-result",
+        id: "review-1",
+        name: "review_tool",
+        result: { issues: 0 },
+        isFailure: false,
+      },
+    },
+  },
+]
 
 const eventText = (frame: Wire.LooseServerFrameType, id: string | number = frame.seq): string =>
   `id: ${id}\nevent: ${frame._tag}\ndata: ${Schema.encodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(frame)}\n\n`
@@ -154,31 +212,8 @@ describe("Client", () => {
     Effect.gen(function* () {
       const frames = yield* Client.sseFrames({ url: "http://test/events" }).pipe(Stream.runCollect)
 
-      expect(frames.map((frame) => frame.seq)).toEqual([0, 1])
-      expect(frames[0]?._tag).toBe("Event")
-      if (frames[0]?._tag === "Event") {
-        expect(frames[0].event._tag).toBe("ModelPart")
-      }
-    }).pipe(
-      provideTestLayer(
-        httpClientLayer(
-          eventText({
-            _tag: "Event",
-            seq: 0,
-            event: {
-              _tag: "ModelPart",
-              turn: 0,
-              part: Response.makePart("tool-call", {
-                id: "unknown",
-                name: "missing",
-                params: { x: 1 },
-                providerExecuted: false,
-              }),
-            },
-          }) + eventText(endedFrame(1)),
-        ),
-      ),
-    ),
+      expect(frames).toEqual(dynamicToolFrames)
+    }).pipe(provideTestLayer(httpClientLayer(dynamicToolFrames.map((frame) => eventText(frame)).join("")))),
   )
 
   it.effect("WebSocket client sends Attach on open", () => {
@@ -193,6 +228,25 @@ describe("Client", () => {
         expect(socket?.sent.length).toBe(1)
         expect(socket.binaryType).toBe("arraybuffer")
         expect(typeof socket?.sent[0] === "string" && decodeClientFrame(socket.sent[0])._tag).toBe("Attach")
+      }),
+    ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
+  })
+
+  it.effect("WebSocket client decodes runtime-dynamic tool events with the loose schema", () => {
+    const sockets: Array<FakeWebSocket> = []
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const connection = yield* Client.AgentClient.use((client) =>
+          client.connect({ url: "ws://test", sessionId: "s-dynamic-client" }),
+        )
+        const socket = yield* socketAt(sockets, 0)
+        socket.open()
+        yield* sentAt(socket, 0)
+        for (const frame of dynamicToolFrames) socket.message(encodeServerFrame(frame))
+
+        const frames = yield* connection.frames.pipe(Stream.take(dynamicToolFrames.length), Stream.runCollect)
+
+        expect(frames).toEqual(dynamicToolFrames)
       }),
     ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))
   })

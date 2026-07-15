@@ -22,6 +22,64 @@ const eventFrame: Wire.LooseServerFrameType = {
   event: { _tag: "TurnStarted", turn: 0 },
 }
 
+const dynamicFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
+  {
+    _tag: "Event",
+    seq: 0,
+    event: {
+      _tag: "ToolExecutionStarted",
+      turn: 0,
+      call: { type: "tool-call", id: "activate-1", name: "activate_skill", params: { name: "review" } },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 1,
+    event: {
+      _tag: "ToolExecutionCompleted",
+      turn: 0,
+      call: { type: "tool-call", id: "activate-1", name: "activate_skill", params: { name: "review" } },
+      result: {
+        type: "tool-result",
+        id: "activate-1",
+        name: "activate_skill",
+        result: { activated: "review" },
+        isFailure: false,
+      },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 2,
+    event: {
+      _tag: "ToolExecutionStarted",
+      turn: 1,
+      call: { type: "tool-call", id: "review-1", name: "review_tool", params: { path: "src" } },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 3,
+    event: { _tag: "ToolProgress", turn: 1, toolCallId: "review-1", message: "reviewing", data: { pct: 50 } },
+  },
+  {
+    _tag: "Event",
+    seq: 4,
+    event: {
+      _tag: "ToolExecutionCompleted",
+      turn: 1,
+      call: { type: "tool-call", id: "review-1", name: "review_tool", params: { path: "src" } },
+      result: {
+        type: "tool-result",
+        id: "review-1",
+        name: "review_tool",
+        result: { issues: 0 },
+        isFailure: false,
+      },
+    },
+  },
+]
+
 const registryLayer = (attach: SessionRegistry.Interface["attach"]): Layer.Layer<SessionRegistry.SessionRegistry> =>
   Layer.succeed(
     SessionRegistry.SessionRegistry,
@@ -122,6 +180,34 @@ describe("Sse", () => {
     }).pipe(provideTestLayer(registryLayer(() => Stream.fromIterable([eventFrame, endedFrame])))),
   )
 
+  it.effect("runtime-dynamic SSE streams and replays activated tool events", () =>
+    Effect.gen(function* () {
+      const attach = (_sessionId: string, afterSeq?: number) =>
+        Stream.fromIterable(dynamicFrames.filter((frame) => frame.seq > (afterSeq ?? -1)))
+      const first = yield* respond({ capability: "runtime-dynamic" })({
+        sessionId: "s-dynamic",
+        request: request("http://test/sessions/s-dynamic/events"),
+      }).pipe(provideTestLayer(registryLayer(attach)))
+      const firstEvents = parseSse((yield* streamBodyText(first.body)).join(""))
+      const firstFrames = firstEvents.map((event) =>
+        Schema.decodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(event.data),
+      )
+
+      const replay = yield* respond({ capability: "runtime-dynamic" })({
+        sessionId: "s-dynamic",
+        request: request("http://test/sessions/s-dynamic/events", { "Last-Event-ID": "1" }),
+      }).pipe(provideTestLayer(registryLayer(attach)))
+      const replayEvents = parseSse((yield* streamBodyText(replay.body)).join(""))
+      const replayFrames = replayEvents.map((event) =>
+        Schema.decodeUnknownSync(Schema.fromJsonString(Wire.LooseServerFrame))(event.data),
+      )
+
+      expect(firstFrames).toEqual(dynamicFrames)
+      expect(replayFrames).toEqual(dynamicFrames.slice(2))
+      expect(replayEvents.map((event) => event.id)).toEqual(["2", "3", "4"])
+    }),
+  )
+
   it.effect("respond encodes a pre-history snapshot with its sentinel event id", () =>
     Effect.gen(function* () {
       const response = yield* respond(toolkit)({
@@ -152,6 +238,35 @@ describe("Sse", () => {
 
       expect(Schema.is(Errors.WireEncodeError)(error)).toBe(true)
     }).pipe(provideTestLayer(registryLayer(() => Stream.succeed({ _tag: "Ended", seq: -1 })))),
+  )
+
+  it.effect("keeps runtime-dynamic encoding failures in the typed SSE stream", () =>
+    Effect.gen(function* () {
+      const response = yield* respond({ capability: "runtime-dynamic" })({
+        sessionId: "s-invalid-dynamic-frame",
+        request: request("http://test/sessions/s-invalid-dynamic-frame/events"),
+      })
+      expect(response.body._tag).toBe("Stream")
+      const error = yield* response.body._tag === "Stream"
+        ? response.body.stream.pipe(Stream.runDrain, Effect.flip)
+        : Effect.die("expected stream body")
+
+      expect(Schema.is(Errors.WireEncodeError)(error)).toBe(true)
+    }).pipe(
+      provideTestLayer(
+        registryLayer(() =>
+          Stream.succeed({
+            _tag: "Event",
+            seq: 0,
+            event: {
+              _tag: "ToolExecutionStarted",
+              turn: 0,
+              call: { type: "tool-call", id: "runtime-1", name: "runtime", params: 1n },
+            },
+          }),
+        ),
+      ),
+    ),
   )
 
   it.effect("passes Last-Event-ID to SessionRegistry.attach before query fallback", () =>
@@ -223,5 +338,7 @@ describe("Sse", () => {
 
   it("exposes HttpApi StreamSse schema", () => {
     expect(streamSuccess(toolkit)._tag).toBe("StreamSse")
+    expect(streamSuccess({ capability: "fixed", toolkit })._tag).toBe("StreamSse")
+    expect(streamSuccess({ capability: "runtime-dynamic" })._tag).toBe("StreamSse")
   })
 })

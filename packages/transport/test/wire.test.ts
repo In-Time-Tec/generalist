@@ -247,6 +247,154 @@ describe("Wire", () => {
     expect(decoded._tag === "Event" && decoded.event._tag === "ModelPart" && decoded.event.part.type).toBe("tool-call")
   })
 
+  it("strict frames reject missing tool names and invalid fixed-tool payloads", () => {
+    const schema = Wire.ServerFrame(toolkit)
+    const invalidEvents = [
+      {
+        _tag: "ToolExecutionStarted",
+        turn: 0,
+        call: { type: "tool-call", id: "call-1", params: { text: "hello" } },
+      },
+      {
+        _tag: "ToolExecutionStarted",
+        turn: 0,
+        call: { type: "tool-call", id: "call-1", name: "echo", params: { text: 1 } },
+      },
+      {
+        _tag: "ToolExecutionCompleted",
+        turn: 0,
+        call: toolCall,
+        result: { ...toolResult, result: 1, encodedResult: 1 },
+      },
+      {
+        _tag: "ToolExecutionCompleted",
+        turn: 0,
+        call: toolCall,
+        result: { ...toolResult, isFailure: true, result: 1, encodedResult: 1 },
+      },
+    ]
+
+    for (const event of invalidEvents) {
+      expect(Option.isNone(Schema.decodeUnknownOption(schema)({ _tag: "Event", seq: 0, event }))).toBe(true)
+    }
+  })
+
+  it("loose frames retain common event and frame validation", () => {
+    const malformed = [
+      { _tag: "Event", seq: 0, event: { _tag: "ToolExecutionStarted", turn: 0 } },
+      {
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ToolExecutionStarted",
+          turn: 0,
+          call: { type: "tool-call", id: "call-1", params: {} },
+        },
+      },
+      {
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ToolExecutionCompleted",
+          turn: 0,
+          call: { type: "tool-call", id: "call-1", name: "runtime", params: {} },
+          result: { type: "tool-result", id: "call-1", name: "runtime", result: {} },
+        },
+      },
+      { _tag: "Event", seq: -1, event: { _tag: "TurnStarted", turn: 0 } },
+      { _tag: "Unknown", seq: 0 },
+    ]
+
+    for (const frame of malformed) {
+      expect(Option.isNone(Schema.decodeUnknownOption(Wire.LooseServerFrame)(frame))).toBe(true)
+    }
+  })
+
+  it.effect("selects the runtime-dynamic codec for tools absent from the startup toolkit", () =>
+    Effect.gen(function* () {
+      const frame: Wire.LooseServerFrameType = {
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ToolExecutionStarted",
+          turn: 0,
+          call: {
+            type: "tool-call",
+            id: "activate-1",
+            name: "activate_skill",
+            params: { name: "review" },
+            providerExecuted: false,
+          },
+        },
+      }
+      const fixedFailure = yield* Wire.codec(Toolkit.empty).encodeServer(frame).pipe(Effect.flip)
+      const dynamicJson = yield* Wire.codec({ capability: "runtime-dynamic" }).encodeServer(frame)
+      const decoded = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Wire.LooseServerFrame))(dynamicJson)
+
+      expect(fixedFailure._tag).toBe("@batonfx/transport/WireEncodeError")
+      expect(decoded).toEqual(frame)
+    }),
+  )
+
+  it.effect("keeps toolkit shorthand fixed when the toolkit has a capability property", () =>
+    Effect.gen(function* () {
+      const toolkitWithProperty = Object.assign(toolkit, { capability: "runtime-dynamic" as const })
+      const frame: Wire.LooseServerFrameType = {
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ToolExecutionStarted",
+          turn: 0,
+          call: { type: "tool-call", id: "runtime-1", name: "runtime", params: {} },
+        },
+      }
+      const shorthandError = yield* Wire.codec(toolkitWithProperty).encodeServer(frame).pipe(Effect.flip)
+      const explicitError = yield* Wire.codec({ capability: "fixed", toolkit: toolkitWithProperty })
+        .encodeServer(frame)
+        .pipe(Effect.flip)
+
+      expect(shorthandError._tag).toBe("@batonfx/transport/WireEncodeError")
+      expect(explicitError._tag).toBe("@batonfx/transport/WireEncodeError")
+    }),
+  )
+
+  it.effect("keeps shorthand and explicit fixed codecs strict for declared failures", () =>
+    Effect.gen(function* () {
+      const frame: Wire.LooseServerFrameType = {
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ToolExecutionCompleted",
+          turn: 0,
+          call: toolCall,
+          result: { ...toolResult, isFailure: true, result: 1, encodedResult: 1 },
+        },
+      }
+      const shorthandError = yield* Wire.codec(toolkit).encodeServer(frame).pipe(Effect.flip)
+      const explicitError = yield* Wire.codec({ capability: "fixed", toolkit }).encodeServer(frame).pipe(Effect.flip)
+
+      expect(shorthandError._tag).toBe("@batonfx/transport/WireEncodeError")
+      expect(explicitError._tag).toBe("@batonfx/transport/WireEncodeError")
+    }),
+  )
+
+  it.effect("keeps runtime-dynamic JSON encoding failures typed", () =>
+    Effect.gen(function* () {
+      const frame: Wire.LooseServerFrameType = {
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ToolExecutionStarted",
+          turn: 0,
+          call: { type: "tool-call", id: "runtime-1", name: "runtime", params: 1n },
+        },
+      }
+      const error = yield* Wire.codec({ capability: "runtime-dynamic" }).encodeServer(frame).pipe(Effect.flip)
+
+      expect(error._tag).toBe("@batonfx/transport/WireEncodeError")
+    }),
+  )
+
   it("accepts stripped transcripts on completed events", () => {
     const schema = Wire.ServerFrame(toolkit)
     const decoded = Schema.decodeUnknownSync(schema)({

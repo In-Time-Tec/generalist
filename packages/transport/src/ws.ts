@@ -5,8 +5,15 @@ import { Tool, Toolkit } from "effect/unstable/ai"
 import { NotAttached, SessionMismatch, TransportError } from "./errors.js"
 import { SessionRegistry } from "./session-registry.js"
 import { ClientFrame, codec } from "./wire.js"
-import type { ClientFrameType, LooseServerFrameType } from "./wire.js"
+import type { Capability, ClientFrameType, LooseServerFrameType, WireCodec } from "./wire.js"
 const ClientFrameJson = Schema.fromJsonString(ClientFrame)
+
+type ToolkitInput = Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>
+type Handle = Effect.Effect<
+  HttpServerResponse.HttpServerResponse,
+  HttpServerError.HttpServerError | Socket.SocketError,
+  HttpServerRequest.HttpServerRequest | SessionRegistry | Scope.Scope
+>
 
 type CommandFrame = Exclude<ClientFrameType, { readonly _tag: "Attach" }>
 
@@ -41,22 +48,27 @@ const authorizeCommand = (
     : Effect.fail(SessionMismatch.make({ attachedSessionId: state.sessionId, requestedSessionId: frame.sessionId }))
 }
 
-/** @experimental One-session-per-socket WebSocket handler. */
-export const handle = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(
-  toolkit: T,
-): Effect.Effect<
-  HttpServerResponse.HttpServerResponse,
-  HttpServerError.HttpServerError | Socket.SocketError,
-  HttpServerRequest.HttpServerRequest | SessionRegistry | Scope.Scope
-> =>
-  Effect.gen(function* () {
+/** @experimental One-session-per-socket fixed-tool WebSocket handler using the supplied toolkit. */
+export function handle<T extends ToolkitInput>(toolkit: T): Handle
+/** @experimental One-session-per-socket fixed-tool WebSocket handler using an explicit capability. */
+export function handle<T extends ToolkitInput>(capability: {
+  readonly capability: "fixed"
+  readonly toolkit: T
+}): Handle
+/** @experimental One-session-per-socket runtime-dynamic WebSocket handler. */
+export function handle(capability: { readonly capability: "runtime-dynamic" }): Handle
+/** @experimental One-session-per-socket WebSocket handler using a caller-selected capability. */
+export function handle<T extends ToolkitInput>(capability: Capability<T>): Handle
+export function handle<T extends ToolkitInput>(input: T | Capability<T>): Handle {
+  const capability = "tools" in input ? ({ capability: "fixed", toolkit: input } as const) : input
+  const wireCodec: WireCodec<LooseServerFrameType> = codec(capability)
+  return Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest
     const registry = yield* SessionRegistry
     const scope = yield* Effect.scope
     const socket = yield* request.upgrade
     const writer = yield* socket.writer
     const state = yield* SynchronizedRef.make<SocketState>(Unattached)
-    const wireCodec = codec(toolkit)
 
     const interruptAttachment = SynchronizedRef.modifyEffect(state, (current) =>
       current._tag === "Attached"
@@ -152,3 +164,4 @@ export const handle = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string
     yield* socket.runRaw(handleRaw).pipe(Effect.ensuring(interruptAttachment))
     return HttpServerResponse.empty()
   })
+}

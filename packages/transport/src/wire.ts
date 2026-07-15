@@ -115,11 +115,16 @@ const toolResultBranch = (tool: Tool.Any, isFailure: boolean): Schema.Top =>
 const toolResultSchema = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>): Schema.Top =>
   unionOrNever(toolSchemas(toolkit).flatMap((tool) => [toolResultBranch(tool, false), toolResultBranch(tool, true)]))
 
-const EventSchemaWith = (
-  streamPart: Schema.Top,
-  responsePart: Schema.Top,
-  toolCall: Schema.Top,
-  toolResult: Schema.Top,
+const EventSchemaWith = <
+  StreamPart extends Schema.Constraint,
+  ResponsePart extends Schema.Constraint,
+  ToolCall extends Schema.Constraint,
+  ToolResult extends Schema.Constraint,
+>(
+  streamPart: StreamPart,
+  responsePart: ResponsePart,
+  toolCall: ToolCall,
+  toolResult: ToolResult,
 ) =>
   Schema.Union([
     Schema.Struct({ _tag: Schema.tag("TurnStarted"), turn: Schema.Finite, metadata: OptionalMetadata }),
@@ -181,7 +186,7 @@ const EventSchemaWith = (
       usage: Schema.optionalKey(Response.Usage),
       metadata: OptionalMetadata,
     }),
-  ]) as unknown as Schema.Codec<EventType, unknown, never, never>
+  ])
 
 /** @experimental Codec for one Baton loop event using the supplied toolkit. */
 export const EventSchema = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
@@ -190,7 +195,7 @@ export const EventSchema = <T extends Toolkit.Any | Toolkit.WithHandler<Record<s
     Response.Part(toolkit),
     toolCallSchema(toolkit),
     toolResultSchema(toolkit),
-  )
+  ) as unknown as Schema.Codec<EventType, unknown, never, never>
 
 /** @experimental Loose event codec for browser display of unknown tool names. */
 export const LooseEventSchema = EventSchemaWith(
@@ -199,6 +204,9 @@ export const LooseEventSchema = EventSchemaWith(
   LooseToolCallPart,
   LooseToolResultPart,
 )
+
+/** @experimental Event type for runtime-dynamic tool names and payloads. */
+export type LooseEventType = typeof LooseEventSchema.Type
 
 /** @experimental Wire event type, allowing transcript stripping on terminal transcript events. */
 export type EventType =
@@ -222,7 +230,7 @@ export type ServerFrameType =
   | { readonly _tag: "Snapshot"; readonly seq: number; readonly transcript: Prompt.Prompt }
   | { readonly _tag: "SessionStatus"; readonly seq: number; readonly status: SessionStatus }
 
-const ServerFrameWith = (event: Schema.Top) =>
+const ServerFrameWith = <Event extends Schema.Constraint>(event: Event) =>
   Schema.Union([
     Schema.Struct({ _tag: Schema.tag("Event"), seq: Sequence, event }),
     Schema.Struct({ _tag: Schema.tag("Failed"), seq: Sequence, error: RunFailure }),
@@ -230,32 +238,62 @@ const ServerFrameWith = (event: Schema.Top) =>
     Schema.Struct({ _tag: Schema.tag("Ended"), seq: Sequence }),
     Schema.Struct({ _tag: Schema.tag("Snapshot"), seq: SnapshotSequence, transcript: Prompt.Prompt }),
     Schema.Struct({ _tag: Schema.tag("SessionStatus"), seq: Sequence, status: SessionStatus }),
-  ]) as unknown as Schema.Codec<ServerFrameType, unknown, never, never>
+  ])
 
 /** @experimental Server frame codec using the supplied toolkit. */
 export const ServerFrame = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
-  ServerFrameWith(EventSchema(toolkit))
+  ServerFrameWith(EventSchema(toolkit)) as unknown as Schema.Codec<ServerFrameType, unknown, never, never>
 
 /** @experimental Loose server frame codec for browser display of unknown tool names. */
 export const LooseServerFrame = ServerFrameWith(LooseEventSchema)
 
 /** @experimental */
-export type LooseServerFrameType = ServerFrameType
+export type LooseServerFrameType = typeof LooseServerFrame.Type
+
+/** @experimental Fixed startup-toolkit or runtime-dynamic server-frame validation policy. */
+export type Capability<
+  T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>> =
+    | Toolkit.Any
+    | Toolkit.WithHandler<Record<string, Tool.Any>>,
+> = { readonly capability: "fixed"; readonly toolkit: T } | { readonly capability: "runtime-dynamic" }
 
 /** @experimental Lazy JSON encoders for transport client and server frames. */
-export interface WireCodec {
-  readonly encodeServer: (frame: ServerFrameType) => Effect.Effect<string, WireEncodeError>
+export interface WireCodec<in Frame = ServerFrameType> {
+  readonly encodeServer: (frame: Frame) => Effect.Effect<string, WireEncodeError>
   readonly encodeClient: (frame: ClientFrameType) => Effect.Effect<string, WireEncodeError>
 }
 
 const encodeError = (error: Schema.SchemaError): WireEncodeError => WireEncodeError.make({ message: String(error) })
 
-/** @experimental Builds the JSON wire codec for a toolkit. */
-export const codec = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(
-  toolkit: T,
-): WireCodec => ({
+const makeCodec = <Frame>(serverFrame: Schema.Codec<unknown, unknown, never, never>): WireCodec<Frame> => ({
   encodeServer: (frame) =>
-    Schema.encodeEffect(Schema.fromJsonString(ServerFrame(toolkit)))(frame).pipe(Effect.mapError(encodeError)),
+    Schema.encodeUnknownEffect(Schema.fromJsonString(serverFrame))(frame).pipe(Effect.mapError(encodeError)),
   encodeClient: (frame) =>
     Schema.encodeEffect(Schema.fromJsonString(ClientFrame))(frame).pipe(Effect.mapError(encodeError)),
 })
+
+/** @experimental Builds a fixed JSON wire codec using the supplied toolkit. */
+export function codec<T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(
+  toolkit: T,
+): WireCodec<ServerFrameType | LooseServerFrameType>
+/** @experimental Builds a fixed JSON wire codec using an explicit capability. */
+export function codec<T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(capability: {
+  readonly capability: "fixed"
+  readonly toolkit: T
+}): WireCodec<ServerFrameType | LooseServerFrameType>
+/** @experimental Builds a runtime-dynamic JSON wire codec with unknown tool payloads. */
+export function codec(capability: { readonly capability: "runtime-dynamic" }): WireCodec<LooseServerFrameType>
+/** @experimental Builds a JSON wire codec from a capability selected by the caller. */
+export function codec<T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(
+  capability: Capability<T>,
+): WireCodec<ServerFrameType | LooseServerFrameType>
+export function codec<T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(
+  input: T | Capability<T>,
+): WireCodec<ServerFrameType | LooseServerFrameType> {
+  if ("tools" in input) {
+    return makeCodec<ServerFrameType | LooseServerFrameType>(ServerFrame(input))
+  }
+  return input.capability === "runtime-dynamic"
+    ? makeCodec<LooseServerFrameType>(LooseServerFrame)
+    : makeCodec<ServerFrameType | LooseServerFrameType>(ServerFrame(input.toolkit))
+}
