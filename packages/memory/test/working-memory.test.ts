@@ -356,8 +356,9 @@ layer(Layer.empty)((it) => {
               const memory = yield* Memory.Memory
               const first = yield* Effect.forkChild(rememberOverflow(memory, prompt(user("one"), assistant("two"))))
               yield* Deferred.await(firstStarted)
-              const second = yield* Effect.forkChild(rememberOverflow(memory, prompt(user("three"), assistant("four"))))
-              yield* Effect.yieldNow
+              const second = yield* rememberOverflow(memory, prompt(user("three"), assistant("four"))).pipe(
+                Effect.forkChild({ startImmediately: true }),
+              )
               expect(yield* Ref.get(calls)).toBe(1)
               yield* Deferred.succeed(releaseFirst, undefined)
               yield* Fiber.join(first)
@@ -365,6 +366,103 @@ layer(Layer.empty)((it) => {
               expect(yield* Ref.get(calls)).toBe(2)
               const prompts = yield* Ref.get(summaryPrompts)
               expect(prompts[1]).toContain("Existing summary:\nsummary-1")
+              expect(prompts[1]).toContain("New messages:\nAssistant: two\nUser: three")
+              const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })
+              expect(recalled.map((item) => item.id)).toEqual(["working-summary", "working-4"])
+              expect(recalled.map(itemText)).toEqual([
+                "<working-memory-summary>\nsummary-2\n</working-memory-summary>",
+                "Assistant: four",
+              ])
+            }).pipe(Effect.provide(context)),
+          ),
+        ),
+      )
+    }),
+  )
+
+  it.effect("does not overwrite a concurrent transition for another key", () =>
+    Effect.gen(function* () {
+      const summaryStarted = yield* Deferred.make<void>()
+      const releaseSummary = yield* Deferred.make<void>()
+      const service = yield* LanguageModel.make({
+        generateText: () =>
+          Deferred.succeed(summaryStarted, undefined).pipe(
+            Effect.andThen(Deferred.await(releaseSummary)),
+            Effect.as([{ type: "text" as const, text: "summary" }]),
+          ),
+        streamText: () => Stream.empty,
+      })
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
+        Layer.provide(WorkingMemory.summaryModelLayer),
+        Layer.provide(Layer.succeed(LanguageModel.LanguageModel, service)),
+      )
+
+      yield* Effect.scoped(
+        Layer.build(memoryLayer).pipe(
+          Effect.flatMap((context) =>
+            Effect.gen(function* () {
+              const memory = yield* Memory.Memory
+              yield* memory.remember({
+                key: otherKey,
+                turn: 0,
+                terminal: true,
+                transcript: prompt(user("other")),
+              })
+              const remembering = yield* Effect.forkChild(
+                rememberOverflow(memory, prompt(user("one"), assistant("two"))),
+              )
+              yield* Deferred.await(summaryStarted)
+              const forgetting = yield* memory
+                .forget({ key: otherKey })
+                .pipe(Effect.forkChild({ startImmediately: true }))
+              yield* Deferred.succeed(releaseSummary, undefined)
+              yield* Fiber.join(remembering)
+              yield* Fiber.join(forgetting)
+
+              expect(yield* memory.recall({ key: otherKey, turn: 0, prompt: prompt(user("current")) })).toEqual([])
+              expect((yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })).map(itemText)).toEqual([
+                "<working-memory-summary>\nsummary\n</working-memory-summary>",
+                "Assistant: two",
+              ])
+            }).pipe(Effect.provide(context)),
+          ),
+        ),
+      )
+    }),
+  )
+
+  it.effect("does not restore a key forgotten during an in-flight transition", () =>
+    Effect.gen(function* () {
+      const summaryStarted = yield* Deferred.make<void>()
+      const releaseSummary = yield* Deferred.make<void>()
+      const service = yield* LanguageModel.make({
+        generateText: () =>
+          Deferred.succeed(summaryStarted, undefined).pipe(
+            Effect.andThen(Deferred.await(releaseSummary)),
+            Effect.as([{ type: "text" as const, text: "summary" }]),
+          ),
+        streamText: () => Stream.empty,
+      })
+      const memoryLayer = WorkingMemory.layer({ maxMessages: 1, summarize: {} }).pipe(
+        Layer.provide(WorkingMemory.summaryModelLayer),
+        Layer.provide(Layer.succeed(LanguageModel.LanguageModel, service)),
+      )
+
+      yield* Effect.scoped(
+        Layer.build(memoryLayer).pipe(
+          Effect.flatMap((context) =>
+            Effect.gen(function* () {
+              const memory = yield* Memory.Memory
+              const remembering = yield* Effect.forkChild(
+                rememberOverflow(memory, prompt(user("one"), assistant("two"))),
+              )
+              yield* Deferred.await(summaryStarted)
+              const forgetting = yield* memory.forget({ key }).pipe(Effect.forkChild({ startImmediately: true }))
+              yield* Deferred.succeed(releaseSummary, undefined)
+              yield* Fiber.join(remembering)
+              yield* Fiber.join(forgetting)
+
+              expect(yield* memory.recall({ key, turn: 0, prompt: prompt(user("current")) })).toEqual([])
             }).pipe(Effect.provide(context)),
           ),
         ),

@@ -8,7 +8,7 @@ Accepted
 
 Baton exposes an Effect service for MCP OAuth and adapts it to the public `OAuthClientProvider` extension point of the MCP SDK. Token persistence is an injected host-owned service whose values are `Redacted`. Baton does not own browser UI, callback HTTP servers, or durable secret storage.
 
-Callback state is single-use for every terminal callback attempt: Baton atomically consumes matching state before denial handling or code exchange. Provider errors expose stable operation context instead of forwarding opaque SDK or persistence messages that could contain credentials.
+One Effect `SynchronizedRef` owns the active callback state, PKCE verifier, and pending authorization as a single flow value. Callback state is single-use for every terminal callback attempt: Baton atomically validates and takes the matching flow before malformed-callback or denial handling and before code exchange. The exchange receives only the taken verifier, while concurrent callbacks and the shared provider observe an idle flow. Provider errors expose stable operation context instead of forwarding opaque SDK or persistence messages that could contain credentials.
 
 The OAuth service exposes SDK-captured pending authorization as Effect state. Authenticated HTTP transport connection preserves that state as `OAuthPendingError`, allowing a host to launch its browser flow without importing or interpreting SDK errors.
 
