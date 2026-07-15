@@ -1,4 +1,4 @@
-import { Context, Effect, HashMap, Layer, Ref, Scope, Semaphore } from "effect"
+import { Context, Effect, HashMap, Layer, Scope, SynchronizedRef } from "effect"
 import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
 
@@ -189,28 +189,26 @@ export function make(
 ): Effect.Effect<Memory.Interface, never, SummaryModel | Scope.Scope> {
   return Effect.gen(function* () {
     const summaryModel = yield* resolveSummaryModel(options)
-    const states = yield* Ref.make(HashMap.empty<string, KeyState>())
-    const semaphore = yield* Semaphore.make(1)
+    const states = yield* SynchronizedRef.make(HashMap.empty<string, KeyState>())
     const maxMessages = Math.max(0, Math.floor(options.maxMessages ?? 20))
     return {
       recall: (input) =>
-        Ref.get(states).pipe(
+        SynchronizedRef.get(states).pipe(
           Effect.map((current) => HashMap.get(current, keyId(input.key))),
           Effect.map((state) => (state._tag === "Some" ? recallItems(state.value) : [])),
         ),
       remember: (input) => {
         const incoming = normalize(input.transcript)
         if (incoming.length === 0) return Effect.void
-        return semaphore.withPermits(1)(
+        return SynchronizedRef.updateEffect(states, (current) =>
           Effect.gen(function* () {
-            const current = yield* Ref.get(states)
             const id = keyId(input.key)
             const existing = HashMap.get(current, id).pipe((option) =>
               option._tag === "Some" ? option.value : emptyState,
             )
             const start = appendStart(existing.recent, incoming)
             const appended = incoming.slice(start)
-            if (appended.length === 0) return
+            if (appended.length === 0) return current
             let counter = existing.counter
             const stored = appended.map((item) => {
               counter += 1
@@ -234,12 +232,12 @@ export function make(
               counter,
               ...(summary === undefined ? {} : { summary }),
             }
-            yield* Ref.update(states, HashMap.set(id, nextState))
+            return HashMap.set(current, id, nextState)
           }),
         )
       },
       forget: (input) =>
-        Ref.update(states, (current) => {
+        SynchronizedRef.update(states, (current) => {
           const id = keyId(input.key)
           if (input.id === undefined) return HashMap.remove(current, id)
           const existing = HashMap.get(current, id)
