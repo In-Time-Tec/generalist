@@ -1,5 +1,18 @@
 import { describe, expect, it, layer } from "@effect/vitest"
-import { Context, Crypto, Deferred, Effect, Fiber, Layer, Option, Predicate, Redacted, Ref, Schema } from "effect"
+import {
+  Cause,
+  Context,
+  Crypto,
+  Deferred,
+  Effect,
+  Fiber,
+  Layer,
+  Option,
+  Predicate,
+  Redacted,
+  Ref,
+  Schema,
+} from "effect"
 import { beforeEach, vi } from "vitest"
 import { McpToolSource, OAuth } from "../src/index"
 
@@ -177,6 +190,81 @@ describe("OAuth", () => {
         .callback(`https://app.example/oauth/callback?code=replayed&state=${authorization.state}`)
         .pipe(Effect.flip)
       expect(replay).toBeInstanceOf(OAuth.OAuthExpiredError)
+    }),
+  )
+
+  oauthEffect("consumes state and verifier before token exchange completes", () =>
+    Effect.gen(function* () {
+      const oauth = yield* OAuth.OAuth
+      const authorization = yield* oauth.authorize
+      const exchangeStarted = yield* Deferred.make<void>()
+      const releaseExchange = yield* Deferred.make<void>()
+      const context = yield* Effect.context<never>()
+      const runPromise = Effect.runPromiseWith(context)
+      authMock.mockImplementationOnce((provider: AsyncProvider) =>
+        runPromise(
+          Effect.gen(function* () {
+            yield* Effect.tryPromise(provider.codeVerifier)
+            yield* Deferred.succeed(exchangeStarted, undefined)
+            yield* Deferred.await(releaseExchange)
+            return "AUTHORIZED"
+          }),
+        ),
+      )
+
+      const callback = yield* oauth
+        .callback(`https://app.example/oauth/callback?code=authorization-code&state=${authorization.state}`)
+        .pipe(Effect.forkChild)
+      yield* Deferred.await(exchangeStarted)
+
+      expect((yield* sdkCallback(oauth.provider.codeVerifier).pipe(Effect.exit))._tag).toBe("Failure")
+      expect(Option.isNone(yield* oauth.pending)).toBe(true)
+
+      yield* Deferred.succeed(releaseExchange, undefined)
+      yield* Fiber.join(callback)
+    }),
+  )
+
+  oauthEffect("consumes a matching malformed callback", () =>
+    Effect.gen(function* () {
+      const oauth = yield* OAuth.OAuth
+      const authorization = yield* oauth.authorize
+
+      const malformed = yield* oauth
+        .callback(`https://app.example/oauth/callback?state=${authorization.state}`)
+        .pipe(Effect.flip)
+      expect(malformed).toBeInstanceOf(OAuth.OAuthDeniedError)
+      expect(Option.isNone(yield* oauth.pending)).toBe(true)
+      expect((yield* sdkCallback(oauth.provider.codeVerifier).pipe(Effect.exit))._tag).toBe("Failure")
+
+      const replay = yield* oauth
+        .callback(`https://app.example/oauth/callback?code=replayed&state=${authorization.state}`)
+        .pipe(Effect.flip)
+      expect(replay).toBeInstanceOf(OAuth.OAuthExpiredError)
+    }),
+  )
+
+  oauthEffect("allows exactly one of two concurrent duplicate callbacks", () =>
+    Effect.gen(function* () {
+      const oauth = yield* OAuth.OAuth
+      const authorization = yield* oauth.authorize
+      const callbackUrl = `https://app.example/oauth/callback?code=authorization-code&state=${authorization.state}`
+
+      const outcomes = yield* Effect.all(
+        [oauth.callback(callbackUrl).pipe(Effect.exit), oauth.callback(callbackUrl).pipe(Effect.exit)],
+        {
+          concurrency: 2,
+        },
+      )
+
+      expect(outcomes.filter((outcome) => outcome._tag === "Success")).toHaveLength(1)
+      expect(
+        outcomes.filter(
+          (outcome) => outcome._tag === "Failure" && Schema.is(OAuth.OAuthExpiredError)(Cause.squash(outcome.cause)),
+        ),
+      ).toHaveLength(1)
+      expect(Option.isNone(yield* oauth.pending)).toBe(true)
+      expect((yield* sdkCallback(oauth.provider.codeVerifier).pipe(Effect.exit))._tag).toBe("Failure")
     }),
   )
 
