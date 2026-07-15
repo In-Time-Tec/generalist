@@ -1,6 +1,6 @@
 import { Cause, Effect, Function, Schema } from "effect"
 import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
-import { type Agent, type Result, type RunServices, generate } from "./agent.js"
+import { type Agent, type Result, generate } from "./agent.js"
 import {
   AgentError,
   AgentSuspended,
@@ -111,33 +111,31 @@ export const asTool: {
     Success extends Schema.Top = DefaultSuccess,
   >(
     options?: AsToolOptions<Name, Parameters, Success>,
-  ): <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
-    agent: Agent<Tools, HasModel, PolicyServices>,
-  ) => AgentToolToolkit<Name, Parameters, Success, RunServices<Tools, HasModel, PolicyServices>>
+  ): <Tools extends Record<string, Tool.Any>, R>(
+    agent: Agent<Tools, R>,
+  ) => AgentToolToolkit<Name, Parameters, Success, R>
   <
     Tools extends Record<string, Tool.Any>,
-    HasModel extends boolean,
+    R,
     const Name extends string = string,
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
-    PolicyServices = never,
   >(
-    agent: Agent<Tools, HasModel, PolicyServices>,
+    agent: Agent<Tools, R>,
     options?: AsToolOptions<Name, Parameters, Success>,
-  ): AgentToolToolkit<Name, Parameters, Success, RunServices<Tools, HasModel, PolicyServices>>
+  ): AgentToolToolkit<Name, Parameters, Success, R>
 } = Function.dual(
   (args) => args.length !== 1 || "name" in args[0],
   <
     Tools extends Record<string, Tool.Any>,
-    HasModel extends boolean,
+    R,
     const Name extends string = string,
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
-    PolicyServices = never,
   >(
-    agent: Agent<Tools, HasModel, PolicyServices>,
+    agent: Agent<Tools, R>,
     options: AsToolOptions<Name, Parameters, Success> = {},
-  ): AgentToolToolkit<Name, Parameters, Success, RunServices<Tools, HasModel, PolicyServices>> => {
+  ): AgentToolToolkit<Name, Parameters, Success, R> => {
     const name = (options.name ?? agent.name) as Name
     const parameters = (options.parameters ?? defaultParameters) as Parameters
     const success = (options.success ?? Schema.String) as Success
@@ -151,13 +149,11 @@ export const asTool: {
       success,
       failure: Schema.String,
       failureMode: "return",
-    }) as AgentToolTool<Name, Parameters, Success, RunServices<Tools, HasModel, PolicyServices>>
+    }) as AgentToolTool<Name, Parameters, Success, R>
     const toolkit = Toolkit.make(tool) as unknown as Toolkit.Toolkit<
-      Record<Name, AgentToolTool<Name, Parameters, Success, RunServices<Tools, HasModel, PolicyServices>>>
+      Record<Name, AgentToolTool<Name, Parameters, Success, R>>
     >
-    const handler = (
-      params: Parameters["Type"],
-    ): Effect.Effect<Success["Type"], string, RunServices<Tools, HasModel, PolicyServices>> =>
+    const handler = (params: Parameters["Type"]): Effect.Effect<Success["Type"], string, R> =>
       Effect.gen(function* () {
         const prompt = yield* Effect.try({ try: () => toPrompt(params), catch: errorMessage })
         const result = yield* generate(agent, { prompt }).pipe(

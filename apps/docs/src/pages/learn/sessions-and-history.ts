@@ -98,10 +98,10 @@ export const sessionsAndHistory = definePage({
     ),
     p(
       code("history"),
-      " and ",
+      " uses an ordinary run while ",
       code("persistence.chatId"),
-      " are mutually exclusive on one run, because verbatim history and accumulated chat state would fight over the same seat. The full ",
-      code("RunOptions"),
+      " uses a dedicated persisted entrypoint. Ordinary options reject persistence and persisted options reject history, because verbatim history and accumulated chat state would fight over the same seat. The full ",
+      code("RunOptions and PersistedRunOptions"),
       " field table lives in ",
       link("/docs/reference/core-agent", "Agent and run functions"),
       ", and the session contract in ",

@@ -180,11 +180,11 @@ export const transportReference = definePage({
     p(
       code("layerMemory({ agent, ... })"),
       " requires ",
-      code("Agent.RunServices"),
+      code("Agent.Requirements<typeof agent>"),
       " and ",
       code("Ai.Chat.Persistence"),
       " and runs each send as ",
-      code("Agent.stream"),
+      code("Agent.persisted"),
       " with ",
       code("persistence: { chatId }"),
       ".",

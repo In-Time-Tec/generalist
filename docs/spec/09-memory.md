@@ -55,7 +55,7 @@ Forget is store-agnostic. Omitting `id` deletes all non-durable working state fo
 
 ## Missing services and errors
 
-`Agent.stream` resolves `Memory` with `Effect.serviceOption`, so `RunServices` does not grow. If both `Agent.memory` and `RunOptions.memory` are absent, missing `Memory` preserves current behavior. If a run-specific key is set and `Memory` is absent, Baton fails before the first model call with `AgentError { message: "RunOptions.memory requires Memory in context", turn: 0 }`. If only the agent default is set and `Memory` is absent, it fails with `AgentError { message: "Agent.memory requires Memory in context", turn: 0 }`.
+Configuring `Agent.memory` adds `Memory` to the Agent's requirement parameter. Selecting `RunOptions.memory` adds `Memory` to that operation's environment. If both are absent, `Memory` remains unnecessary. Defensive runtime checks fail before the first model call for JavaScript or unsafe callers that bypass the typed contract.
 
 `MemoryError` from `recall` or `remember` maps to `AgentError { message, turn, cause }` and fails the run. `MemoryError` from host-called `forget` is returned to the host. Hosts that want best-effort memory wrap their implementation to ignore or recover from memory failures.
 
@@ -121,3 +121,4 @@ Forget without `id` drops the exact key's in-process working-memory state. Forge
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
 - `docs/spec/decisions/ADR-0026-working-memory-summary-model.md`
 - `docs/spec/decisions/ADR-0027-memory-item-user-content.md`
+- `docs/spec/decisions/ADR-0033-truthful-agent-requirements.md`

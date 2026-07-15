@@ -24,7 +24,9 @@ Baton does not own durable child state, address books, cross-process routing, sh
 The handler runs `Agent.generate` for the child in the current Effect context. It does not provide or override `Ai.LanguageModel.LanguageModel`, `ToolExecutor`, `Approvals`, or `ModelMiddleware`; callers decide what services child runs inherit.
 
 At the tool boundary, child `AgentError`, `TurnPolicyError`, `TurnPolicyStopped`, `TurnLimitExceeded`, `MiddlewareViolation`, `ToolNameCollision`, and defects thrown by prompt/result mappers become a failed tool result with a string message. Child policy requirements remain in the returned tool handler's Effect requirements, and collision messages retain the conflicting name and ordered origin evidence.
+The handled tool retains the child Agent's complete requirement parameter. Transfer tools do the same. Fan-out unions every child operation requirement, including run-specific memory, and supervisor construction retains every specialist requirement through its transfer-tool handlers.
 
+At the tool boundary, child `AgentError`, `TurnLimitExceeded`, `MiddlewareViolation`, and defects thrown by prompt/result mappers become a failed tool result with a string message.
 Child `AgentSuspended` is also collapsed into a failed tool result. The parent agent receives the failure as ordinary tool context and can decide whether to continue, retry, ask the user, or transfer elsewhere. Durable cross-process HITL remains a host concern.
 
 ## Handoff
@@ -47,3 +49,4 @@ Policy requirements from transfer targets, specialists, supervisors, and fan-out
 
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0013-in-process-multi-agent.md`
+- `docs/spec/decisions/ADR-0033-truthful-agent-requirements.md`

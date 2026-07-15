@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
 import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Stream, Tracer } from "effect"
-import { AiError, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, Chat, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentEvent,
@@ -26,6 +26,151 @@ import { ItLayer } from "./it-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 type StreamServices<T> = T extends Stream.Stream<unknown, unknown, infer R> ? R : never
+
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false
+type Assert<Value extends true> = Value
+type EffectRequirements<Value> =
+  Value extends Effect.Effect<unknown, unknown, infer Requirements> ? Requirements : never
+type StreamRequirements<Value> =
+  Value extends Stream.Stream<unknown, unknown, infer Requirements> ? Requirements : never
+type IsAssignable<Source, Target> = Source extends Target ? true : false
+
+const plainRequiredAgent = Agent.make({ name: "plain-required" })
+const selectedRequiredAgent = Agent.make({ name: "selected-required", model: { provider: "test", model: "test" } })
+const memoryRequiredAgent = Agent.make({
+  name: "memory-required",
+  memory: { agent: "memory-required", subject: "memory-subject" },
+})
+const selectedMemoryRequiredAgent = Agent.make({
+  name: "selected-memory-required",
+  model: { provider: "test", model: "test" },
+  memory: { agent: "selected-memory-required", subject: "memory-subject" },
+})
+const widenedOptions: Agent.MakeObjectOptions = { name: "widened-required" }
+const widenedRequiredAgent = Agent.make(widenedOptions)
+const memoryRequiredRun = Agent.generate(memoryRequiredAgent, { prompt: "hello" })
+const runMemoryRequired = Agent.generate(plainRequiredAgent, {
+  prompt: "hello",
+  memory: { key: { agent: "plain-required", subject: "memory-subject" } },
+})
+const persistedRequired = Agent.persisted(plainRequiredAgent, {
+  prompt: "hello",
+  persistence: { chatId: "chat" },
+})
+const generatedPersistedRequired = Agent.generatePersisted(plainRequiredAgent, {
+  prompt: "hello",
+  persistence: { chatId: "chat" },
+})
+const persistedObjectRequired = Agent.persistedObject(plainRequiredAgent, {
+  prompt: "hello",
+  persistence: { chatId: "chat" },
+  schema: Schema.Struct({ value: Schema.String }),
+})
+const generatedPersistedObjectRequired = Agent.generatePersistedObject(plainRequiredAgent, {
+  prompt: "hello",
+  persistence: { chatId: "chat" },
+  schema: Schema.Struct({ value: Schema.String }),
+})
+
+class ModelDependency extends Context.Service<ModelDependency, { readonly value: string }>()(
+  "@batonfx/core/test/agent.test/ModelDependency",
+) {}
+
+const dependentModelLayer = Layer.effect(
+  LanguageModel.LanguageModel,
+  ModelDependency.pipe(
+    Effect.flatMap(() =>
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => Stream.make(Response.makePart("text-delta", { id: "text", delta: "provided" })),
+      }),
+    ),
+  ),
+)
+const modelProvidedAgent = Agent.provideModel(memoryRequiredAgent, dependentModelLayer)
+
+const agentRequirementProofs: ReadonlyArray<true> = [
+  true satisfies Assert<Equal<Agent.Requirements<typeof plainRequiredAgent>, LanguageModel.LanguageModel>>,
+  true satisfies Assert<Equal<Agent.Requirements<typeof selectedRequiredAgent>, ModelRegistry.Service>>,
+  true satisfies Assert<
+    Equal<Agent.Requirements<typeof memoryRequiredAgent>, LanguageModel.LanguageModel | Memory.Memory>
+  >,
+  true satisfies Assert<
+    Equal<Agent.Requirements<typeof selectedMemoryRequiredAgent>, ModelRegistry.Service | Memory.Memory>
+  >,
+  true satisfies Assert<
+    Equal<
+      Agent.Requirements<typeof widenedRequiredAgent>,
+      LanguageModel.LanguageModel | ModelRegistry.Service | Memory.Memory
+    >
+  >,
+  true satisfies Assert<
+    Equal<EffectRequirements<typeof memoryRequiredRun>, LanguageModel.LanguageModel | Memory.Memory>
+  >,
+  true satisfies Assert<
+    Equal<EffectRequirements<typeof runMemoryRequired>, LanguageModel.LanguageModel | Memory.Memory>
+  >,
+  true satisfies Assert<
+    Equal<StreamRequirements<typeof persistedRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+  >,
+  true satisfies Assert<
+    Equal<EffectRequirements<typeof generatedPersistedRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+  >,
+  true satisfies Assert<
+    Equal<StreamRequirements<typeof persistedObjectRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+  >,
+  true satisfies Assert<
+    Equal<EffectRequirements<typeof generatedPersistedObjectRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+  >,
+  true satisfies Assert<Equal<Agent.Requirements<typeof modelProvidedAgent>, Memory.Memory | ModelDependency>>,
+  true satisfies Assert<
+    Equal<
+      IsAssignable<
+        Agent.Agent<{}, LanguageModel.LanguageModel | Memory.Memory>,
+        Agent.Agent<{}, LanguageModel.LanguageModel>
+      >,
+      false
+    >
+  >,
+  true satisfies Assert<
+    Equal<
+      IsAssignable<
+        Agent.Agent<{}, LanguageModel.LanguageModel>,
+        Agent.Agent<{}, LanguageModel.LanguageModel | Memory.Memory>
+      >,
+      false
+    >
+  >,
+  true satisfies Assert<
+    Equal<
+      IsAssignable<
+        Agent.Agent<{}, LanguageModel.LanguageModel>,
+        Agent.Agent<Record<"tool", Tool.Any>, LanguageModel.LanguageModel>
+      >,
+      false
+    >
+  >,
+  true satisfies Assert<
+    Equal<
+      IsAssignable<{ readonly prompt: "hello"; readonly persistence: { readonly chatId: "chat" } }, Agent.RunOptions>,
+      false
+    >
+  >,
+  true satisfies Assert<
+    Equal<
+      IsAssignable<
+        {
+          readonly prompt: "hello"
+          readonly history: "history"
+          readonly persistence: { readonly chatId: "chat" }
+        },
+        Agent.PersistedRunOptions
+      >,
+      false
+    >
+  >,
+]
 
 const modelLayer = (
   streamText: ModelParams["streamText"],
@@ -56,6 +201,15 @@ const echoTool = Tool.make("echo", {
   parameters: Schema.Struct({ text: Schema.String }),
   success: Schema.Unknown,
 })
+
+const requiredToolkit = Toolkit.make(echoTool)
+const toolkitRequiredAgent = Agent.make({ name: "toolkit-required", toolkit: requiredToolkit })
+const toolkitRequirementProof: Assert<
+  Equal<
+    Agent.Requirements<typeof toolkitRequiredAgent>,
+    LanguageModel.LanguageModel | Tool.HandlersFor<typeof requiredToolkit.tools>
+  >
+> = true
 
 const gatedTool = Tool.make("gated", {
   description: "Requires approval",
@@ -167,6 +321,53 @@ const retryTransientModelError = ModelResilience.layer({
 })
 
 layer(unusedToolHandlerLayer)("Agent", (it) => {
+  expect(agentRequirementProofs.every(Boolean)).toBe(true)
+  expect(toolkitRequirementProof).toBe(true)
+
+  ItLayer.make(
+    it,
+    "runs through a provided model layer while retaining the layer requirement",
+    () =>
+      [
+        Layer.mergeAll(Layer.succeed(ModelDependency, ModelDependency.of({ value: "configured" })), Memory.layerNoop),
+        Effect.gen(function* () {
+          const result = yield* Agent.generate(modelProvidedAgent, { prompt: "hello" })
+
+          expect(result.text).toBe("provided")
+        }),
+      ] as const,
+  )
+
+  it.effect("scopes a provided model layer to stream consumption and interruption", () =>
+    Effect.gen(function* () {
+      let acquisitions = 0
+      let releases = 0
+      const started = yield* Deferred.make<void>()
+      const providedModelLayer = Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.acquireRelease(
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+            streamText: () =>
+              Stream.fromEffect(Deferred.succeed(started, undefined)).pipe(Stream.drain, Stream.concat(Stream.never)),
+          }).pipe(Effect.tap(() => Effect.sync(() => acquisitions++))),
+          () => Effect.sync(() => releases++),
+        ),
+      )
+      const agent = Agent.provideModel(Agent.make({ name: "scoped-model-agent" }), providedModelLayer)
+      const run = Stream.runDrain(Agent.stream(agent, { prompt: "wait" }))
+
+      expect(acquisitions).toBe(0)
+      const fiber = yield* run.pipe(Effect.forkChild({ startImmediately: true }))
+      yield* Deferred.await(started)
+      expect(acquisitions).toBe(1)
+      expect(releases).toBe(0)
+
+      yield* Fiber.interrupt(fiber)
+      expect(releases).toBe(1)
+    }),
+  )
+
   it("adds usage fieldwise without inventing absent leaves", () => {
     const first = usage({ uncached: 1, total: 10, cacheWrite: 3 }, { total: 4, text: 2 })
     const second = usage({ uncached: 4, total: 20, cacheRead: 5 }, { total: 6, reasoning: 7 })

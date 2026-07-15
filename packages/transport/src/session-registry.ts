@@ -42,12 +42,8 @@ export interface SessionInfo {
 }
 
 /** @experimental */
-export interface MemoryOptions<
-  Tools extends Record<string, Tool.Any>,
-  HasModel extends boolean = boolean,
-  PolicyServices = never,
-> {
-  readonly agent: Agent.Agent<Tools, HasModel, PolicyServices>
+export interface MemoryOptions<Tools extends Record<string, Tool.Any>, R> {
+  readonly agent: Agent.Agent<Tools, R>
   readonly ringBufferCapacity?: number
   readonly subscriberQueueCapacity?: number
   readonly idleTimeout?: Duration.Input
@@ -158,14 +154,14 @@ const toApprovalDecision = (decision: ClientApproval): Approvals.Decision => {
 }
 
 /** @experimental */
-export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel extends boolean, PolicyServices = never>(
-  options: MemoryOptions<Tools, HasModel, PolicyServices>,
-): Layer.Layer<SessionRegistry, never, Agent.RunServices<Tools, HasModel, PolicyServices> | Chat.Persistence> =>
+export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
+  options: MemoryOptions<Tools, R>,
+): Layer.Layer<SessionRegistry, never, R | Chat.Persistence> =>
   Layer.effect(
     SessionRegistry,
     Effect.gen(function* () {
       const scope = yield* Effect.scope
-      const context = yield* Effect.context<Agent.RunServices<Tools, HasModel, PolicyServices> | Chat.Persistence>()
+      const context = yield* Effect.context<R | Chat.Persistence>()
       const approvals = yield* Effect.serviceOption(Approvals.Approvals)
       const persistence = yield* Chat.Persistence
       const state = yield* Ref.make<RegistryState>({ sessions: new Map() })
@@ -309,14 +305,14 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, HasModel ext
       ): Effect.Effect<void> =>
         Effect.gen(function* () {
           const overrideApprovals = yield* makeApprovals(resume, approvalDecision)
-          const runOptions: Agent.RunOptions = {
+          const runOptions = {
             prompt,
             sessionId: session.sessionId,
             ...(session.system === undefined ? {} : { system: session.system }),
             persistence: { chatId: session.chatId },
             ...(resume === undefined ? {} : { resume }),
           }
-          const run = Agent.stream(options.agent, runOptions).pipe(
+          const run = Agent.persisted(options.agent, runOptions).pipe(
             Stream.runForEach((event) =>
               (event._tag === "TurnStarted"
                 ? setStatus(session.sessionId, session.coordination.runId, { _tag: "Running", turn: event.turn })

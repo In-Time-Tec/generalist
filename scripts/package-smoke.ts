@@ -119,14 +119,15 @@ const program = Effect.gen(function* () {
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "typecheck.ts"),
     `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}
-import { Agent, Chat, Memory, ModelMiddleware, ModelRegistry, Session, ToolOutput } from "@batonfx/core"
+import { Agent, Chat, Handoff, LanguageModel, Memory, ModelMiddleware, ModelRegistry, Session, ToolOutput } from "@batonfx/core"
 import { VectorStore } from "@batonfx/memory"
 import { OAuth, McpToolSource } from "@batonfx/mcp"
 import { route as mcpRoute, type BatonTools, type Options as McpRouteOptions } from "@batonfx/mcp/baton"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "@batonfx/skills"
 import { TestModel } from "@batonfx/test"
 import { SessionRegistry } from "@batonfx/transport"
-import { Crypto, Effect, Layer, Option, Redacted, Scope } from "effect"
+import { Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
+import { Tool, Toolkit } from "effect/unstable/ai"
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
     ? (<Value>() => Value extends Right ? 1 : 2) extends <Value>() => Value extends Left ? 1 : 2
@@ -140,6 +141,8 @@ type HostedCatalogInternal = Assert<Equal<"HostedCatalog" extends keyof SkillsRo
 type HttpSourceInternal = Assert<Equal<"source" extends keyof HttpCatalog.Options ? true : false, false>>
 type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? true : false, false>>
 type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Options ? true : false, false>>
+type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
+type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
 type MemoryCompatibility = Assert<Equal<typeof Memory.layerNoop, typeof Memory.noopLayer>>
 type MiddlewareCanonical = Assert<
@@ -159,13 +162,59 @@ type VectorStoreCanonical = Assert<
   Equal<LayerShape<typeof VectorStore.layerMemory>, readonly [VectorStore.VectorStore, never, never]>
 >
 type VectorStoreCompatibility = Assert<Equal<typeof VectorStore.layerMemory, typeof VectorStore.memoryLayer>>
+const memoryAgent = Agent.make({
+  name: "memory-package-smoke",
+  memory: { agent: "memory-package-smoke", subject: "subject" },
+})
+type MemoryAgentRequirements = Assert<
+  Equal<Agent.Requirements<typeof memoryAgent>, LanguageModel.LanguageModel | Memory.Memory>
+>
+const persistedRun = Agent.persisted(memoryAgent, {
+  prompt: "hello",
+  persistence: { chatId: "package-smoke" },
+})
+type PersistedRunRequirements = Assert<
+  Equal<
+    StreamServices<typeof persistedRun>,
+    LanguageModel.LanguageModel | Memory.Memory | Chat.Persistence
+  >
+>
 const sessionRegistryLayer = SessionRegistry.layerMemory({ agent: Agent.make("package-smoke") })
+const sessionRegistryOptions: SessionRegistry.MemoryOptions<{}, LanguageModel.LanguageModel> = {
+  agent: Agent.make("annotated-package-smoke"),
+}
+const annotatedSessionRegistryLayer = SessionRegistry.layerMemory(sessionRegistryOptions)
 type SessionRegistryCanonical = Assert<
   Equal<
     LayerShape<typeof sessionRegistryLayer>,
-    readonly [SessionRegistry.SessionRegistry, never, Agent.RunServices<{}, false> | Chat.Persistence]
+    readonly [SessionRegistry.SessionRegistry, never, LanguageModel.LanguageModel | Chat.Persistence]
   >
 >
+type AnnotatedSessionRegistryCanonical = Assert<
+  Equal<
+    LayerShape<typeof annotatedSessionRegistryLayer>,
+    readonly [SessionRegistry.SessionRegistry, never, LanguageModel.LanguageModel | Chat.Persistence]
+  >
+>
+const fanOut = Handoff.fanOut([
+  { agent: Agent.make("plain-package-smoke"), prompt: "plain" },
+  { agent: memoryAgent, prompt: "memory" },
+])
+type FanOutRequirements = Assert<
+  Equal<EffectServices<typeof fanOut>, LanguageModel.LanguageModel | Memory.Memory>
+>
+const packageSmokeTool = Tool.make("package_smoke_tool", {
+  parameters: Schema.Struct({ value: Schema.String }),
+  success: Schema.String,
+})
+const packageSmokeToolAgent = Agent.make({ name: "tool-package-smoke", toolkit: Toolkit.make(packageSmokeTool) })
+const toolFanOut = Handoff.fanOut([{ agent: packageSmokeToolAgent, prompt: "tool" }])
+const heterogeneousSupervisor = Handoff.supervisor({
+  name: "heterogeneous-package-smoke",
+  specialists: [memoryAgent, packageSmokeToolAgent],
+})
+void toolFanOut
+void heterogeneousSupervisor
 type ProviderRoot = typeof import("@batonfx/providers")
 type TransportRoot = typeof import("@batonfx/transport")
 type ProviderCatalogSubpath = Assert<Equal<ProviderRoot["Catalog"], typeof import("@batonfx/providers/catalog")>>

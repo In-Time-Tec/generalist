@@ -9,11 +9,14 @@ import { ItLayer } from "./it-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
-const modelLayer = (streamText: ModelParams["streamText"]) =>
+const modelLayer = (
+  streamText: ModelParams["streamText"],
+  generateText: ModelParams["generateText"] = () => Effect.succeed([{ type: "text", text: "unused" }]),
+) =>
   Layer.effect(
     LanguageModel.LanguageModel,
     LanguageModel.make({
-      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+      generateText,
       streamText,
     }),
   )
@@ -86,8 +89,12 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "continuity-agent", instructions: "system seed" })
 
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "first user message", persistence: { chatId: "c1" } }))
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "second user message", persistence: { chatId: "c1" } }))
+          yield* Stream.runDrain(
+            Agent.persisted(agent, { prompt: "first user message", persistence: { chatId: "c1" } }),
+          )
+          yield* Stream.runDrain(
+            Agent.persisted(agent, { prompt: "second user message", persistence: { chatId: "c1" } }),
+          )
 
           const transcript = yield* historyText("c1")
           expect(transcript).toContain("first user message")
@@ -112,11 +119,11 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "seed-agent", instructions: "the one system message" })
 
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "hello", persistence: { chatId: "seed" } }))
+          yield* Stream.runDrain(Agent.persisted(agent, { prompt: "hello", persistence: { chatId: "seed" } }))
           const afterFirst = yield* systemMessageCount("seed")
           const firstTranscript = yield* historyText("seed")
 
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "again", persistence: { chatId: "seed" } }))
+          yield* Stream.runDrain(Agent.persisted(agent, { prompt: "again", persistence: { chatId: "seed" } }))
           const afterSecond = yield* systemMessageCount("seed")
 
           expect(afterFirst).toBe(1)
@@ -141,8 +148,8 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "isolation-agent", instructions: "system" })
 
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "message for A", persistence: { chatId: "a" } }))
-          yield* Stream.runDrain(Agent.stream(agent, { prompt: "message for B", persistence: { chatId: "b" } }))
+          yield* Stream.runDrain(Agent.persisted(agent, { prompt: "message for A", persistence: { chatId: "a" } }))
+          yield* Stream.runDrain(Agent.persisted(agent, { prompt: "message for B", persistence: { chatId: "b" } }))
 
           const a = yield* historyText("a")
           const b = yield* historyText("b")
@@ -154,59 +161,33 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
       ] as const,
   )
 
-  ItLayer.make(it, "missing service: persistence set without Chat.Persistence fails and never calls the model", () => {
-    let called = false
-    return [
-      Layer.mergeAll(
-        modelLayer(() => {
-          called = true
-          return Stream.make(textDelta("should not run"))
-        }),
-        unusedExecutor,
-        Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
-      ),
-      Effect.gen(function* () {
-        const agent = Agent.make({ name: "missing-agent", instructions: "system" })
-
-        const failure = yield* Effect.flip(
-          Stream.runDrain(Agent.stream(agent, { prompt: "hi", persistence: { chatId: "missing" } })),
-        )
-
-        expect(failure._tag).toBe("@batonfx/core/AgentError")
-        expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toContain("Chat.Persistence")
-        expect(called).toBe(false)
-      }),
-    ] as const
-  })
-
   ItLayer.make(
     it,
-    "mutual exclusivity: history + persistence fails typed",
+    "structured output is saved in persisted chat history",
     () =>
       [
         Layer.mergeAll(
-          modelLayer(() => Stream.make(textDelta("unused"))),
+          modelLayer(
+            () => assistantText("structured-text", "normal answer"),
+            () => Effect.succeed([{ type: "text", text: '{"value":"persisted"}' }]),
+          ),
           unusedExecutor,
           Approvals.autoApprove,
           ModelMiddleware.identityLayer,
           persistenceLayer,
         ),
         Effect.gen(function* () {
-          const agent = Agent.make({ name: "exclusive-agent", instructions: "system" })
+          const agent = Agent.make({ name: "structured-persistence-agent" })
+          const result = yield* Agent.generatePersistedObject(agent, {
+            prompt: "persist a structured answer",
+            persistence: { chatId: "structured" },
+            schema: Schema.Struct({ value: Schema.String }),
+          })
 
-          const failure = yield* Effect.flip(
-            Stream.runDrain(
-              Agent.stream(agent, {
-                prompt: "hi",
-                history: [{ role: "user", content: [{ type: "text", text: "prior" }] }],
-                persistence: { chatId: "x" },
-              }),
-            ),
-          )
-
-          expect(failure._tag).toBe("@batonfx/core/AgentError")
-          expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toContain("mutually exclusive")
+          expect(result.value).toEqual({ value: "persisted" })
+          const transcript = yield* historyText("structured")
+          expect(transcript).toContain("persist a structured answer")
+          expect(transcript).toContain("persisted")
         }),
       ] as const,
   )
@@ -262,7 +243,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           })
 
           const failure = yield* Effect.flip(
-            Stream.runDrain(Agent.stream(agent, { prompt: "please wait", persistence: { chatId: "s1" } })),
+            Stream.runDrain(Agent.persisted(agent, { prompt: "please wait", persistence: { chatId: "s1" } })),
           )
 
           expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
@@ -273,7 +254,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           expect(suspendedTranscript).toContain("ordinary complete")
 
           const events = yield* Stream.runCollect(
-            Agent.stream(agent, {
+            Agent.persisted(agent, {
               prompt: "ignored",
               persistence: { chatId: "s1" },
               resume: { call: { id: "tool-call-suspend", name: "echo", params: { text: "resumed" } } },

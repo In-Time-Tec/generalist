@@ -1,12 +1,117 @@
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
-import { Effect, Layer, Stream } from "effect"
-import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "../src/index"
+import { Effect, Layer, Schema, Stream } from "effect"
+import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import {
+  Agent,
+  AgentEvent,
+  Approvals,
+  Handoff,
+  Memory,
+  ModelMiddleware,
+  ModelRegistry,
+  ToolExecutor,
+} from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false
+type Assert<Value extends true> = Value
+type EffectRequirements<Value> =
+  Value extends Effect.Effect<unknown, unknown, infer Requirements> ? Requirements : never
+type ToolkitRequirements<Value> =
+  Value extends Toolkit.WithHandler<infer Tools> ? Tool.HandlerServices<Tools[keyof Tools]> : never
+
+const handoffPlainAgent = Agent.make({ name: "handoff-plain" })
+const handoffMemoryAgent = Agent.make({
+  name: "handoff-memory",
+  memory: { agent: "handoff-memory", subject: "subject" },
+})
+const handoffSelectedAgent = Agent.make({
+  name: "handoff-selected",
+  model: { provider: "test", model: "test" },
+})
+const handoffTypedTool = Tool.make("handoff_typed", {
+  parameters: Schema.Struct({ value: Schema.String }),
+  success: Schema.String,
+})
+const handoffToolAgent = Agent.make({
+  name: "handoff-tool",
+  toolkit: Toolkit.make(handoffTypedTool),
+})
+const requirementTransfer = Handoff.transferTool(handoffMemoryAgent)
+const requirementFanOut = Handoff.fanOut([
+  { agent: handoffPlainAgent, prompt: "plain" },
+  { agent: handoffMemoryAgent, prompt: "memory" },
+  { agent: handoffSelectedAgent, prompt: "selected" },
+] as const)
+const widenedFanOutOptions: Omit<Agent.RunOptions, "prompt"> = {
+  memory: { key: { agent: "handoff-run-memory", subject: "subject" } },
+}
+const requirementFanOutWidened = Handoff.fanOut([
+  { agent: handoffPlainAgent, prompt: "plain", options: widenedFanOutOptions },
+])
+const requirementFanOutCurried = Handoff.fanOut({ concurrency: 1 })([
+  { agent: handoffPlainAgent, prompt: "plain", options: widenedFanOutOptions },
+])
+const requirementToolFanOut = Handoff.fanOut([{ agent: handoffToolAgent, prompt: "tool" }])
+const requirementSupervisor = Handoff.supervisor({
+  name: "requirement-supervisor",
+  specialists: [handoffPlainAgent, handoffMemoryAgent, handoffSelectedAgent, handoffToolAgent],
+})
+
+const handoffRequirementProofs: ReadonlyArray<true> = [
+  true satisfies Assert<
+    Equal<ToolkitRequirements<typeof requirementTransfer>, LanguageModel.LanguageModel | Memory.Memory>
+  >,
+  true satisfies Assert<
+    Equal<
+      EffectRequirements<typeof requirementFanOut>,
+      LanguageModel.LanguageModel | Memory.Memory | ModelRegistry.Service
+    >
+  >,
+  true satisfies Assert<
+    Equal<EffectRequirements<typeof requirementFanOutWidened>, LanguageModel.LanguageModel | Memory.Memory>
+  >,
+  true satisfies Assert<
+    Equal<EffectRequirements<typeof requirementFanOutCurried>, LanguageModel.LanguageModel | Memory.Memory>
+  >,
+  true satisfies Assert<
+    Equal<
+      Tool.HandlersFor<typeof handoffToolAgent.toolkit.tools> extends EffectRequirements<typeof requirementToolFanOut>
+        ? true
+        : false,
+      true
+    >
+  >,
+  true satisfies Assert<
+    Equal<Memory.Memory extends Agent.Requirements<typeof requirementSupervisor.agent> ? true : false, true>
+  >,
+  true satisfies Assert<
+    Equal<ModelRegistry.Service extends Agent.Requirements<typeof requirementSupervisor.agent> ? true : false, true>
+  >,
+  true satisfies Assert<
+    Equal<
+      LanguageModel.LanguageModel extends Agent.Requirements<typeof requirementSupervisor.agent> ? true : false,
+      true
+    >
+  >,
+  true satisfies Assert<
+    Equal<
+      Tool.HandlersFor<typeof handoffToolAgent.toolkit.tools> extends Agent.Requirements<
+        typeof requirementSupervisor.agent
+      >
+        ? true
+        : false,
+      true
+    >
+  >,
+  true satisfies Assert<
+    Equal<{} extends Handoff.FanOutChild<{}, LanguageModel.LanguageModel>["agent"] ? true : false, false>
+  >,
+]
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
@@ -27,6 +132,8 @@ const promptText = (prompt: Prompt.Prompt): string => Json.stringify(prompt.cont
 const activeToolNames = (options: Parameters<ModelParams["streamText"]>[0]) => options.tools.map((tool) => tool.name)
 
 layer(unusedToolHandlerLayer)("Handoff", (it) => {
+  expect(handoffRequirementProofs.every(Boolean)).toBe(true)
+
   it("names transfer tools by specialist", () => {
     const specialist = Agent.make({ name: "math" })
     const transfer = Handoff.transferTool(specialist)
@@ -58,7 +165,12 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
         const math = Agent.make({ name: "math" })
         const supervisor = Handoff.supervisor({ name: "supervisor", specialists: [math] })
 
-        const events = yield* Stream.runCollect(Agent.stream(supervisor.agent, { prompt: "solve" }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(
+            supervisor.agent as Agent.Agent<typeof supervisor.agent.toolkit.tools, LanguageModel.LanguageModel>,
+            { prompt: "solve" },
+          ),
+        )
 
         const started = events.find((event) => event._tag === "ToolExecutionStarted")
         expect(started?._tag === "ToolExecutionStarted" && started.call.name).toBe("transfer_to_math")
@@ -81,7 +193,14 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
           specialists: [Agent.make({ name: "math" }), Agent.make({ name: "math" })],
         })
 
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisor.agent, { prompt: "solve" })))
+        const failure = yield* Effect.flip(
+          Stream.runDrain(
+            Agent.stream(
+              supervisor.agent as Agent.Agent<typeof supervisor.agent.toolkit.tools, LanguageModel.LanguageModel>,
+              { prompt: "solve" },
+            ),
+          ),
+        )
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
