@@ -264,6 +264,13 @@ const progressMessages = (events: Iterable<AgentEvent.Event>) =>
 const toolCompletionMetadata = (events: Iterable<AgentEvent.Event>) =>
   [...events].find((event) => event._tag === "ToolExecutionCompleted")?.metadata
 
+const toolResultIds = (prompt: Prompt.Prompt) =>
+  prompt.content.flatMap((message) =>
+    Array.isArray(message.content)
+      ? message.content.filter((part) => part.type === "tool-result").map((part) => part.id)
+      : [],
+  )
+
 const systemText = (prompt: Prompt.Prompt): string | undefined => {
   for (const message of prompt.content) {
     if (message.role === "system") return message.content
@@ -2881,7 +2888,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "drains steering after tool calls and before tool results", () => {
+  ItLayer.make(it, "drains steering after checkpointed tool results", () => {
     let calls = 0
     let secondMessages: ReadonlyArray<Prompt.Message> = []
     return [
@@ -2921,9 +2928,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         )
         const toolResultIndex = secondMessages.findIndex((message) => message.role === "tool")
         expect(toolCallIndex).toBeGreaterThanOrEqual(0)
-        expect(steerOneIndex).toBeGreaterThan(toolCallIndex)
+        expect(toolResultIndex).toBeGreaterThan(toolCallIndex)
+        expect(steerOneIndex).toBeGreaterThan(toolResultIndex)
         expect(steerTwoIndex).toBeGreaterThan(steerOneIndex)
-        expect(toolResultIndex).toBeGreaterThan(steerTwoIndex)
         const drained = events.find((event) => event._tag === "SteeringDrained")
         expect(drained).toMatchObject({ _tag: "SteeringDrained", turn: 0, queue: "steering", count: 2 })
         expect(events.at(-1)?._tag).toBe("Completed")
@@ -3329,6 +3336,172 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }
         expect(secondPrompt).toContain("mem:tool-call-spill")
         expect(secondPrompt).not.toContain(largeOutput)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "checkpoints ordered framework results before turn observers without re-appending", () => {
+    let modelCalls = 0
+    let nextModelPrompt: Prompt.Prompt | undefined
+    let policyHistory: Prompt.Prompt | undefined
+    let sessionAtPolicy: Prompt.Prompt | undefined
+    const remembered: Array<Memory.RememberInput> = []
+    const policy = TurnPolicy.make<Session.SessionStore>((info) =>
+      Effect.gen(function* () {
+        policyHistory = info.history
+        const session = yield* Session.SessionStore
+        const path = yield* session
+          .path()
+          .pipe(Effect.mapError((error) => TurnPolicy.TurnPolicyError.make({ message: error.message, cause: error })))
+        sessionAtPolicy = Session.buildContext(path)
+        return TurnPolicy.decision.continue()
+      }),
+    )
+
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.make(
+              toolCallPart("checkpoint-first", "echo", { text: "first" }),
+              toolCallPart("checkpoint-second", "echo", { text: "second" }),
+            )
+          }
+          nextModelPrompt = options.prompt
+          return Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: (request) =>
+            Effect.succeed({
+              _tag: "Success",
+              result: `${String((request.call.params as { readonly text: string }).text)}-result-marker`,
+              encodedResult: `${String((request.call.params as { readonly text: string }).text)}-result-marker`,
+            }),
+        }),
+        Memory.testLayer({
+          recall: () => Effect.succeed([]),
+          remember: (input) =>
+            Effect.sync(() => {
+              remembered.push(input)
+            }),
+          forget: () => Effect.void,
+        }),
+        Session.memoryLayer,
+        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({
+          name: "tool-result-checkpoint-agent",
+          toolkit: Toolkit.make(echoTool),
+          policy,
+        })
+
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, {
+            prompt: "checkpoint both tools",
+            memory: { key: { agent: "tool-result-checkpoint-agent", subject: "issue-67" } },
+          }),
+        )
+        const turnCompleted = events.find((event) => event._tag === "TurnCompleted")
+
+        expect(turnCompleted?._tag).toBe("TurnCompleted")
+        if (turnCompleted?._tag !== "TurnCompleted") return expect.unreachable()
+        expect(toolResultIds(turnCompleted.transcript)).toEqual(["checkpoint-first", "checkpoint-second"])
+        expect(toolResultIds(policyHistory ?? Prompt.empty)).toEqual(["checkpoint-first", "checkpoint-second"])
+        expect(toolResultIds(remembered[0]?.transcript ?? Prompt.empty)).toEqual([
+          "checkpoint-first",
+          "checkpoint-second",
+        ])
+        expect(toolResultIds(sessionAtPolicy ?? Prompt.empty)).toEqual(["checkpoint-first", "checkpoint-second"])
+        expect(toolResultIds(nextModelPrompt ?? Prompt.empty)).toEqual(["checkpoint-first", "checkpoint-second"])
+        expect(Json.stringify(nextModelPrompt?.content).match(/first-result-marker/g)).toHaveLength(1)
+        expect(Json.stringify(nextModelPrompt?.content).match(/second-result-marker/g)).toHaveLength(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed before turn observers when the result checkpoint cannot persist", () => {
+    let saves = 0
+    let remembered = false
+    let policyEvaluated = false
+    const persistence = Layer.effect(
+      Chat.Persistence,
+      Chat.empty.pipe(
+        Effect.map((chat) => {
+          const persisted: Chat.Persisted = {
+            ...chat,
+            id: "checkpoint-save-failure",
+            save: Effect.suspend(() => {
+              saves += 1
+              return saves === 2
+                ? Effect.fail(
+                    AiError.make({
+                      module: "AgentCheckpointTest",
+                      method: "save",
+                      reason: AiError.UnknownError.make({ description: "checkpoint save failed" }),
+                    }),
+                  )
+                : Effect.void
+            }),
+          }
+          return Chat.Persistence.of({
+            get: () => Effect.succeed(persisted),
+            getOrCreate: () => Effect.succeed(persisted),
+          })
+        }),
+      ),
+    )
+
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(toolCallPart("checkpoint-save", "echo", { text: "persist" }))),
+        echoExecutor,
+        Memory.testLayer({
+          recall: () => Effect.succeed([]),
+          remember: () =>
+            Effect.sync(() => {
+              remembered = true
+            }),
+          forget: () => Effect.void,
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+        persistence,
+      ),
+      Effect.gen(function* () {
+        const events: Array<AgentEvent.Event> = []
+        const agent = Agent.make({
+          name: "checkpoint-save-failure-agent",
+          toolkit: Toolkit.make(echoTool),
+          policy: TurnPolicy.make(() =>
+            Effect.sync(() => {
+              policyEvaluated = true
+              return TurnPolicy.decision.continue()
+            }),
+          ),
+        })
+
+        const failure = yield* Agent.persisted(agent, {
+          prompt: "persist the result checkpoint",
+          persistence: { chatId: "checkpoint-save-failure" },
+          memory: { key: { agent: "checkpoint-save-failure-agent", subject: "issue-67" } },
+        }).pipe(
+          Stream.runForEach((event) =>
+            Effect.sync(() => {
+              events.push(event)
+            }),
+          ),
+          Effect.flip,
+        )
+
+        expect(failure).toMatchObject({ _tag: "@batonfx/core/AgentError", turn: 0 })
+        expect(saves).toBe(2)
+        expect(remembered).toBe(false)
+        expect(policyEvaluated).toBe(false)
+        expect(events.some((event) => event._tag === "TurnCompleted")).toBe(false)
       }),
     ] as const
   })
