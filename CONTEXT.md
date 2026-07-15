@@ -47,6 +47,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Every post-middleware tool-call ID is unique within its model response. Duplicate transformed IDs fail typed before the duplicate can initiate authorization, execution, or persistence.
 - No `Date.now()` or raw platform time/concurrency/randomness — use Effect primitives.
 - Pending tool results are never silently dropped: a `Stop` policy with pending results fails the run.
+- Completed framework tool results enter Chat exactly once in call order before Session synchronization, Memory retention, policy evaluation, persistence, and `TurnCompleted`; follow-up turns consume that checkpoint without appending the results again.
 - Permission policy is optional. Absent `Permissions` preserves existing tool execution and `needsApproval` behavior exactly.
 - Instructions context baselines are opened at run start. Baton has no automatic dynamic-instruction update contract. TurnPolicy instruction overrides are independent: the policy prepends one system message to the selected follow-up prompt, which `Ai.Chat` then retains in transcript history.
 - SkillSource is optional and standalone. Absent `SkillSource`, the Agent loop does not advertise skill listings or the `activate_skill` tool.

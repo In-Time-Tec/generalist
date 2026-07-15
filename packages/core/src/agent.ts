@@ -794,11 +794,23 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       const chat: Chat.Service = persisted ?? (yield* freshChat)
       const chatLock = lockForChat(chat)
 
-      const savePersisted: Effect.Effect<void, AgentError> =
+      const savePersisted = (turn: number): Effect.Effect<void, AgentError> =>
         persisted === undefined
           ? Effect.void
           : persisted.save.pipe(
-              Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
+              Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn, cause: error })),
+            )
+
+      const checkpointPending = (
+        turn: number,
+        pending: ReadonlyArray<PendingToolResult>,
+      ): Effect.Effect<Prompt.Prompt, AgentError> =>
+        pending.length === 0
+          ? Ref.get(chat.history)
+          : chatLock.withPermit(
+              Ref.updateAndGet(chat.history, (history) =>
+                Prompt.concat(history, Prompt.fromResponseParts(pending)),
+              ).pipe(Effect.tap(() => savePersisted(turn))),
             )
 
       const failSuspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "approval") =>
@@ -1654,7 +1666,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 ),
               )
             yield* captureStructuredUsage(response.content)
-            yield* savePersisted
+            yield* savePersisted(structuredTurn)
             const transcript = yield* Ref.get(chat.history)
             const structuredOutput: StructuredOutput = {
               _tag: "StructuredOutput",
@@ -1700,9 +1712,9 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         R
       > =>
         Effect.gen(function* () {
-          const transcript = yield* Ref.get(chat.history)
-          yield* syncSession(turn, transcript)
           const pending = state.pending
+          const transcript = yield* checkpointPending(turn, pending)
+          yield* syncSession(turn, transcript)
           yield* rememberTurn(turn, transcript, pending.length === 0)
           const completed: Event = turnCompletedEvent(turn, transcript)
           if (pending.length === 0) {
@@ -1719,7 +1731,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 structuredTurn: turn + 1,
               }
             }
-            yield* savePersisted
+            yield* savePersisted(turn)
             return {
               events: Stream.fromIterable<Event>([completed, terminalCompletedEvent(turn, transcript)]),
             }
@@ -1763,9 +1775,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           }
           state.pending = []
           const steering = yield* takeSteering()
-          const toolPrompt = Prompt.fromResponseParts(pending)
-          const basePrompt =
-            steering.length === 0 ? toolPrompt : Prompt.concat(promptFromSteeringMessages(steering), toolPrompt)
+          const basePrompt = steering.length === 0 ? Prompt.empty : promptFromSteeringMessages(steering)
           const prompt =
             decision.overrides?.instructions === undefined
               ? basePrompt
@@ -1911,13 +1921,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(AgentSuspended)(reason.error)) {
             return Stream.unwrap(
               Effect.gen(function* () {
-                const transcript = yield* Ref.get(chat.history)
-                const checkpoint =
-                  state.pending.length === 0
-                    ? transcript
-                    : Prompt.concat(transcript, Prompt.fromResponseParts(state.pending))
-                yield* Ref.set(chat.history, checkpoint)
-                yield* savePersisted
+                const checkpoint = yield* checkpointPending(state.turn, state.pending)
                 return Stream.concat(
                   Stream.fromIterable<Event>([turnCompletedEvent(state.turn, checkpoint)]),
                   Stream.failCause<RunError>(cause),

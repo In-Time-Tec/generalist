@@ -1,8 +1,11 @@
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js"
 import { auth } from "@modelcontextprotocol/sdk/client/auth.js"
 import type { OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js"
-import type { OAuthClientInformationMixed, OAuthClientMetadata } from "@modelcontextprotocol/sdk/shared/auth.js"
-import { OAuthTokensSchema } from "@modelcontextprotocol/sdk/shared/auth.js"
+import type {
+  OAuthClientInformationMixed,
+  OAuthClientMetadata,
+  OAuthTokens,
+} from "@modelcontextprotocol/sdk/shared/auth.js"
 import {
   Context,
   Crypto,
@@ -10,12 +13,29 @@ import {
   Encoding,
   Layer,
   Option,
+  Predicate,
   Redacted,
   Ref,
   Schema,
   Semaphore,
   SynchronizedRef,
 } from "effect"
+
+const TokenFields = Schema.Struct({
+  access_token: Schema.String,
+  id_token: Schema.optionalKey(Schema.String),
+  token_type: Schema.String,
+  expires_in: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.FiniteFromString])),
+  scope: Schema.optionalKey(Schema.String),
+  refresh_token: Schema.optionalKey(Schema.String),
+})
+
+const TokenDocument = Schema.Struct({
+  version: Schema.Literal(1),
+  tokens: TokenFields,
+})
+
+const TokenDocumentJson = Schema.fromJsonString(TokenDocument)
 
 /** @experimental */
 export class OAuthPendingError extends Schema.TaggedErrorClass<OAuthPendingError>()("OAuthPendingError", {
@@ -142,23 +162,33 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
         })
       const providerBoundary = <A, R>(effect: Effect.Effect<A, OAuthProviderError, R>) =>
         effect.pipe(Effect.tapError((error) => Ref.set(boundaryFailure, Option.some(error))))
+      const persistTokens = (tokens: OAuthTokens) =>
+        Schema.encodeEffect(TokenDocumentJson)({
+          version: 1,
+          tokens: {
+            access_token: tokens.access_token,
+            token_type: tokens.token_type,
+            ...(tokens.id_token === undefined ? {} : { id_token: tokens.id_token }),
+            ...(tokens.expires_in === undefined ? {} : { expires_in: tokens.expires_in }),
+            ...(tokens.scope === undefined ? {} : { scope: tokens.scope }),
+            ...(tokens.refresh_token === undefined ? {} : { refresh_token: tokens.refresh_token }),
+          },
+        }).pipe(Effect.flatMap((encoded) => store.save(configuration.serverUrl, Redacted.make(encoded))))
       const loadTokens = store.load(configuration.serverUrl).pipe(
-        Effect.mapError(() => providerFailure("load tokens")),
         Effect.flatMap(
           Option.match({
             onNone: () => Effect.as(Effect.void, undefined),
             onSome: (secret) =>
               Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(Redacted.value(secret)).pipe(
-                Effect.flatMap((tokens) =>
-                  Effect.try({
-                    try: () => OAuthTokensSchema.parse(tokens),
-                    catch: () => providerFailure("load tokens"),
-                  }),
+                Effect.flatMap((decoded) =>
+                  Predicate.hasProperty(decoded, "version")
+                    ? Schema.decodeUnknownEffect(TokenDocument)(decoded).pipe(Effect.map((document) => document.tokens))
+                    : Schema.decodeUnknownEffect(TokenFields)(decoded).pipe(Effect.tap(persistTokens)),
                 ),
-                Effect.mapError(() => providerFailure("load tokens")),
               ),
           }),
         ),
+        Effect.mapError(() => providerFailure("load tokens")),
       )
       const freshState = crypto.randomBytes(32).pipe(
         Effect.map(Encoding.encodeBase64Url),
@@ -187,8 +217,7 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
         tokens: () => runPromise(loadTokens.pipe(providerBoundary)),
         saveTokens: (tokens) =>
           runPromise(
-            Schema.encodeEffect(Schema.UnknownFromJsonString)(tokens).pipe(
-              Effect.flatMap((encoded) => store.save(configuration.serverUrl, Redacted.make(encoded))),
+            persistTokens(tokens).pipe(
               Effect.mapError(() => providerFailure("save tokens")),
               providerBoundary,
             ),

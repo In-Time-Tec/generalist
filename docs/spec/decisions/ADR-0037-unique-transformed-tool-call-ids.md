@@ -1,4 +1,4 @@
-# ADR-0036 — Unique Transformed Tool-call IDs
+# ADR-0037 — Unique Transformed Tool-call IDs
 
 ## Status
 

@@ -45,10 +45,11 @@ Each entry has an opaque `id`, a `parentId` (`null` for a root entry), and optio
 
 ## Agent integration
 
-`SessionStore` is wired into `Agent.stream` only when `Compaction` is also present. In that mode the loop mirrors the authoritative transformed Chat transcript into the session path and appends a `Compaction` entry after summary checkpointing. Raw pre-middleware response parts never enter the session path. Without `Compaction`, `SessionStore` remains a standalone seam and the current agent loop continues to use `Ai.Chat` only.
+`SessionStore` is wired into `Agent.stream` only when `Compaction` is also present. In that mode the loop mirrors the authoritative transformed Chat transcript into the session path and appends a `Compaction` entry after summary checkpointing. Completed framework tool results enter Chat exactly once before this synchronization, so the same turn's session path includes them in call order. Raw pre-middleware response parts never enter the session path. Without `Compaction`, `SessionStore` remains a standalone seam and the current agent loop continues to use `Ai.Chat` only.
 
 ## Related docs
 
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0005-session-event-log.md`
 - `docs/spec/decisions/ADR-0025-authoritative-transformed-response.md`
+- `docs/spec/decisions/ADR-0036-framework-tool-result-checkpoint.md`

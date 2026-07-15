@@ -62,7 +62,8 @@ SPEC.md
    ├─ ADR-0033-truthful-agent-requirements.md
    ├─ ADR-0034-tool-domain-and-framework-failures.md
    ├─ ADR-0035-unified-tool-authorization.md
-   └─ ADR-0036-unique-transformed-tool-call-ids.md
+   ├─ ADR-0036-framework-tool-result-checkpoint.md
+   └─ ADR-0037-unique-transformed-tool-call-ids.md
 ```
 
 ## Packages
@@ -134,4 +135,5 @@ SPEC.md
 - ADR-0033 — Truthful Agent Requirements: `docs/spec/decisions/ADR-0033-truthful-agent-requirements.md`
 - ADR-0034 — Tool Domain and Framework Failures: `docs/spec/decisions/ADR-0034-tool-domain-and-framework-failures.md`
 - ADR-0035 — Unified Tool Authorization: `docs/spec/decisions/ADR-0035-unified-tool-authorization.md`
-- ADR-0036 — Unique Transformed Tool-call IDs: `docs/spec/decisions/ADR-0036-unique-transformed-tool-call-ids.md`
+- ADR-0036 — Framework Tool-result Checkpoint: `docs/spec/decisions/ADR-0036-framework-tool-result-checkpoint.md`
+- ADR-0037 — Unique Transformed Tool-call IDs: `docs/spec/decisions/ADR-0037-unique-transformed-tool-call-ids.md`

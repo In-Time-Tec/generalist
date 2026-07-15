@@ -48,7 +48,7 @@ const layer = Steering.layer({
 
 `Agent.stream` resolves `Steering` optionally so its static requirement set does not grow. If absent, behavior is unchanged.
 
-- When pending tool results exist and `TurnPolicy` returns `Continue`, Baton drains steering before the next model turn. Drained steering prompts are prepended before `Ai.Prompt.fromResponseParts(pendingToolResults)` using `Ai.Prompt.concat`.
+- When pending tool results exist, Baton checkpoints them in Chat before policy evaluation. If `TurnPolicy` returns `Continue`, Baton drains steering before the next model turn and supplies the drained prompts as new input after the checkpointed results. The next turn reads each tool result once from Chat history rather than rebuilding a tool-result prompt.
 - If pending tool results exist and `TurnPolicy` returns `Stop`, Baton fails with `TurnLimitExceeded` for `TurnLimit` or `TurnPolicyStopped` for any other explicit reason; steering does not bypass the policy stop.
 - When no pending tool results exist, Baton drains follow-up before emitting `Completed` or before running a terminal structured-output turn. Non-empty follow-up starts another normal streamed turn; structured output waits until the tool/follow-up loop is truly empty.
 - Middleware still sees the composed prompt because `modelTurn` applies `ModelMiddleware.transformPrompt` after steering/follow-up composition.
@@ -62,3 +62,4 @@ const layer = Steering.layer({
 
 - `docs/spec/01-baton-agent-framework.md`
 - `docs/spec/decisions/ADR-0008-steering-and-run-interrupts.md`
+- `docs/spec/decisions/ADR-0036-framework-tool-result-checkpoint.md`
