@@ -1,6 +1,6 @@
 # Agent loop
 
-`@batonfx/core` runs a non-durable model-turn loop over Effect AI `Prompt`, `Response`, `Chat`, tools, and language models. Turn zero always runs. Later turns run only while the turn policy continues with pending tool results.
+`@batonfx/core` runs a non-durable model-turn loop over Effect AI `Prompt`, `Response`, `Chat`, tools, and language models. Turn zero always runs. Later turns run only while the turn policy continues with pending tool results. The default policy is `TurnPolicy.forever`: the loop continues until a turn leaves no pending tool results, and a follow-up cap is an explicit author choice via `TurnPolicy.recurs(n)`.
 
 - Middleware-transformed response parts are authoritative for events, history, tools, memory, sessions, and compaction.
 - Transformed tool-call ids must be unique within one model response. A duplicate fails before that call starts work.

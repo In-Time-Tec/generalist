@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Context, Effect, Schema } from "effect"
-import { Prompt } from "effect/unstable/ai"
+import { Prompt, Response } from "effect/unstable/ai"
 import { TurnPolicy } from "../src/index"
 
 type EffectServices<T> = T extends Effect.Effect<unknown, unknown, infer R> ? R : never
@@ -13,6 +13,8 @@ class RightPolicyService extends Context.Service<RightPolicyService, { readonly 
   "@batonfx/core/test/turn-policy.test/RightPolicyService",
 ) {}
 
+const roundTrip = (snapshot: TurnPolicy.Snapshot): unknown => JSON.parse(JSON.stringify(snapshot))
+
 describe("TurnPolicy snapshots", () => {
   it("describes portable built-in constructor data", () => {
     const recurs = TurnPolicy.recurs(3)
@@ -20,12 +22,66 @@ describe("TurnPolicy snapshots", () => {
 
     expect(recurs.snapshot).toEqual({ _tag: "Recurs", count: 3 })
     expect(until.snapshot).toEqual({ _tag: "UntilToolCall", name: "submit_answer" })
+    expect(TurnPolicy.forever.snapshot).toEqual({ _tag: "Forever" })
     expect(TurnPolicy.both(recurs, until).snapshot).toEqual({
       _tag: "Both",
       first: { _tag: "Recurs", count: 3 },
       second: { _tag: "UntilToolCall", name: "submit_answer" },
     })
-    expect(TurnPolicy.defaultPolicy.snapshot).toEqual({ _tag: "Recurs", count: 8 })
+    expect(TurnPolicy.defaultPolicy).toBe(TurnPolicy.forever)
+    expect(TurnPolicy.defaultPolicy.snapshot).toEqual({ _tag: "Forever" })
+  })
+
+  it.effect("forever always continues regardless of turn count or pending results", () =>
+    Effect.gen(function* () {
+      const foreverProof: EffectServices<ReturnType<typeof TurnPolicy.forever.decide>> extends never ? true : false =
+        true
+      expect(foreverProof).toBe(true)
+      const snapshot: TurnPolicy.Snapshot | undefined = TurnPolicy.forever.snapshot
+      expect(snapshot).toEqual({ _tag: "Forever" })
+
+      const pending = [
+        Response.toolResultPart({
+          id: "call-1",
+          name: "echo",
+          isFailure: false,
+          result: "ok",
+          encodedResult: "ok",
+          providerExecuted: false,
+          preliminary: false,
+        }),
+      ]
+      const infos = [
+        { turn: 0, history: Prompt.empty, pendingToolResults: [] },
+        { turn: 9, history: Prompt.empty, pendingToolResults: pending },
+        { turn: 10_000, history: Prompt.empty, pendingToolResults: pending },
+      ]
+      for (const info of infos) {
+        expect(yield* TurnPolicy.forever.decide(info)).toEqual(TurnPolicy.decision.continue())
+      }
+    }),
+  )
+
+  it("round-trips Forever snapshots through JSON alone and inside both trees", () => {
+    expect(roundTrip({ _tag: "Forever" })).toEqual({ _tag: "Forever" })
+
+    const combined = TurnPolicy.both(TurnPolicy.forever, TurnPolicy.untilToolCall("done"))
+    expect(combined.snapshot).toEqual({
+      _tag: "Both",
+      first: { _tag: "Forever" },
+      second: { _tag: "UntilToolCall", name: "done" },
+    })
+    expect(roundTrip(combined.snapshot as TurnPolicy.Snapshot)).toEqual(combined.snapshot)
+
+    const nested = TurnPolicy.both(TurnPolicy.recurs(2), combined)
+    expect(roundTrip(nested.snapshot as TurnPolicy.Snapshot)).toEqual({
+      _tag: "Both",
+      first: { _tag: "Recurs", count: 2 },
+      second: { _tag: "Both", first: { _tag: "Forever" }, second: { _tag: "UntilToolCall", name: "done" } },
+    })
+
+    const custom = TurnPolicy.make(() => Effect.succeed(TurnPolicy.decision.continue()))
+    expect(TurnPolicy.both(TurnPolicy.forever, custom).snapshot).toBeUndefined()
   })
 
   it("keeps custom policies and compositions containing them opaque", () => {

@@ -76,6 +76,11 @@ export interface TurnPolicy<R = never> {
   readonly snapshot?: Snapshot
 }
 
+/** @experimental Portable constructor data for unbounded continuation. */
+export interface ForeverSnapshot {
+  readonly _tag: "Forever"
+}
+
 /** @experimental Portable constructor data for a recursive follow-up cap. */
 export interface RecursSnapshot {
   readonly _tag: "Recurs"
@@ -96,7 +101,7 @@ export interface BothSnapshot {
 }
 
 /** @experimental Portable constructor data exposed by built-in turn policies. */
-export type Snapshot = RecursSnapshot | UntilToolCallSnapshot | BothSnapshot
+export type Snapshot = ForeverSnapshot | RecursSnapshot | UntilToolCallSnapshot | BothSnapshot
 
 /** @experimental */
 export const decision: {
@@ -132,6 +137,12 @@ export const fromLegacy = <R = never>(
       ),
     ),
   )
+
+/** @experimental Continue after every turn; a run still completes naturally without pending tool results. */
+export const forever: TurnPolicy = {
+  decide: () => Effect.succeed(decision.continue()),
+  snapshot: { _tag: "Forever" },
+}
 
 /** @experimental Continue for at most `n` follow-up turns after the first. */
 export const recurs = (n: number): TurnPolicy => ({
@@ -186,5 +197,5 @@ export const both: {
   }),
 )
 
-/** @experimental Default policy: `recurs(8)` — matches Relay's historical cap. */
-export const defaultPolicy: TurnPolicy = recurs(8)
+/** @experimental Default policy: `forever` — no framework-imposed follow-up cap. */
+export const defaultPolicy: TurnPolicy = forever

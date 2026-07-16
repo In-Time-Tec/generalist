@@ -4667,6 +4667,99 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     }),
   ])
 
+  ItLayer.make(it, "default policy continues past eight follow-up turns while tool results are pending", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls <= 12
+            ? Stream.make(toolCallPart(`tool-call-${calls}`, "echo", { text: `call ${calls}` }))
+            : Stream.make(textDelta("done after twelve follow-ups"))
+        }),
+        echoExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const defaultPolicyAgent = Agent.make({ name: "default-policy-agent", toolkit: Toolkit.make(echoTool) })
+        const requirementProof: Assert<
+          IsAssignable<
+            LanguageModel.LanguageModel | Tool.HandlersFor<{ echo: typeof echoTool }>,
+            Agent.Requirements<typeof defaultPolicyAgent>
+          >
+        > = true
+        expect(requirementProof).toBe(true)
+
+        const events = yield* Stream.runCollect(Agent.stream(defaultPolicyAgent, { prompt: "loop until done" }))
+
+        expect(calls).toBe(13)
+        const completed = events.at(-1)
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag === "Completed") expect(completed.text).toBe("done after twelve follow-ups")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "default policy completes naturally when a turn leaves no pending tool results", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return Stream.make(textDelta("plain answer"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "natural-completion-agent" })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "answer once" }))
+
+        expect(calls).toBe(1)
+        const completed = events.at(-1)
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag === "Completed") expect(completed.text).toBe("plain answer")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "interrupting an indefinitely continuing default-policy loop exits interrupted", () => {
+    let deepTurns: Deferred.Deferred<void> | undefined
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return Stream.fromEffect(
+            calls < 10 || deepTurns === undefined ? Effect.void : Deferred.succeed(deepTurns, undefined),
+          ).pipe(Stream.drain, Stream.concat(Stream.make(toolCallPart(`tool-call-${calls}`, "echo", { text: "go" }))))
+        }),
+        echoExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const currentDeepTurns = yield* Deferred.make<void>()
+        deepTurns = currentDeepTurns
+        const agent = Agent.make({ name: "interrupt-forever-agent", toolkit: Toolkit.make(echoTool) })
+        const fiber = yield* Stream.runDrain(Agent.stream(agent, { prompt: "loop forever" })).pipe(
+          Effect.forkChild({ startImmediately: true }),
+        )
+
+        yield* Deferred.await(currentDeepTurns)
+        yield* Fiber.interrupt(fiber)
+        const exit = yield* Fiber.await(fiber)
+
+        expect(Exit.hasInterrupts(exit)).toBe(true)
+        expect(Exit.isSuccess(exit)).toBe(false)
+        expect(calls).toBeGreaterThanOrEqual(10)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "propagates policy requirements and explicit non-limit stop reasons", () => {
     let calls = 0
     const budgetLayer = Layer.succeed(Budget, { remaining: () => 0 })

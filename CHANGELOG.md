@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
+- Default the turn policy to the new first-class `TurnPolicy.forever`, which carries a distinct portable `Forever` snapshot. Policy-free `Agent.make` no longer caps follow-up turns at eight; a run still completes naturally when a turn leaves no pending tool results. Consumers relying on the old implicit cap must opt into `TurnPolicy.recurs(8)`, and exhaustive `Snapshot` matches must add `Forever`.
 - Made `Agent` opaque and invariant in its inferred Effect requirements, added scoped `Agent.provideModel`, and split persisted runs into `persisted`, `persistedObject`, `generatePersisted`, and `generatePersistedObject` entrypoints.
 
 ## 0.5.0

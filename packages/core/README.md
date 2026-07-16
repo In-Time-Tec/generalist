@@ -141,6 +141,8 @@ Placement adapters likewise return `DomainFailure { failure }` instead of `Failu
 Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, so a standalone app has no conversation continuity between runs. Use `Agent.generatePersisted` to run the loop on a **persisted** chat instead: the chat identified by `chatId` is created on first use and accumulates history across runs.
 `TurnPolicy` decision Effects expose their requirements and typed `TurnPolicyError` failures. Stops require a schema-backed reason, and only `TurnLimit` is surfaced as `TurnLimitExceeded`; other stops surface as `TurnPolicyStopped` with the reason and pending tool checkpoint.
 
+The default policy is `TurnPolicy.forever`: Baton imposes no follow-up-turn count, and a turn with no pending tool results still completes the run naturally. `forever` carries the portable snapshot `{ _tag: "Forever" }`, which is distinct from an absent snapshot (an opaque custom policy) and from a legacy persisted record with no policy field; it is never encoded as `Infinity`, `null`, or a `Recurs` sentinel. Consumers that relied on the previous implicit eight-follow-up cap must opt in explicitly with `TurnPolicy.recurs(8)`. Cancellation, interruption, budgets, and tool governance remain independent controls.
+
 ```ts
 const policy = TurnPolicy.make<Budget>(({ turn }) =>
   Effect.gen(function* () {
