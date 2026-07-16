@@ -89,6 +89,6 @@ The layers supply `SessionRegistry`, `LanguageModel`, and chat persistence, leav
 
 ## More
 
-- Governing spec: [Transport](../../docs/spec/11-transport.md)
+- Current behavior: [Transport](../../docs/features/transport.md)
 - Deeper example: [HITL over SSE](../../examples/hitl-over-sse/)
 - Canonical root namespaces are `Client`, `Errors`, `SessionRegistry`, `Sse`, `Wire`, and `Ws`. Established `client`, `errors`, `session-registry`, `sse`, `wire`, and `ws` subpaths remain compatibility imports through the stated pre-1.0 deprecation window.

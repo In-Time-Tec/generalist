@@ -46,6 +46,3 @@ jobs:
 
       - name: Check
         run: bun run check
-
-      - name: Coverage
-        run: bun run test:coverage

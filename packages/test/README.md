@@ -50,5 +50,5 @@ The model layer discharges `LanguageModel`, leaving `R = never`; success is `voi
 
 ## More
 
-- Governing spec: [Deterministic Agent Test Kit](../../docs/spec/13-test-kit.md)
+- Current behavior: [Test kit](../../docs/features/test-kit.md)
 - Deeper example: [eval in CI](../../examples/eval-in-ci/)

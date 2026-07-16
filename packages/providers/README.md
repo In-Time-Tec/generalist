@@ -54,6 +54,6 @@ The layer discharges `ModelRegistry` and `LanguageModel`, leaving `R = never`; s
 
 ## More
 
-- Governing spec: [Providers](../../docs/spec/08-providers.md)
+- Current behavior: [Providers](../../docs/features/providers.md)
 - Deeper examples: [structured extraction](../../examples/structured-extraction/) and [tool-calling chatbot](../../examples/tool-calling-chatbot/)
 - Canonical root namespaces are `Catalog`, `OpenAi`, `Anthropic`, `OpenRouter`, `OpenAiCompatible`, `Deterministic`, `Presets`, and `Embedding`. Their established package subpaths remain compatibility imports through the stated pre-1.0 deprecation window.

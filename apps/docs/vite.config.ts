@@ -1,16 +1,10 @@
 import { fileURLToPath } from "node:url"
 import { foldkit } from "@foldkit/vite-plugin"
 import tailwindcss from "@tailwindcss/vite"
-import type { UserConfig } from "vite"
+import { defineConfig } from "vite"
 
-type VitestConfig = Readonly<{
-  test: {
-    environment: "happy-dom"
-  }
-}>
-
-const config: UserConfig & VitestConfig = {
-  plugins: [tailwindcss(), foldkit(process.env["VITEST"] === undefined ? { devToolsMcpPort: 9989 } : {})],
+export default defineConfig(({ mode }) => ({
+  plugins: [tailwindcss(), foldkit(mode === "test" ? {} : { devToolsMcpPort: 9989 })],
   resolve: {
     alias: [
       { find: "@/components/ui", replacement: fileURLToPath(new URL("./src/components/ui", import.meta.url)) },
@@ -21,6 +15,4 @@ const config: UserConfig & VitestConfig = {
   test: {
     environment: "happy-dom",
   },
-}
-
-export default config
+}))

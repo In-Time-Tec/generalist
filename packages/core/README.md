@@ -67,7 +67,7 @@ The merged layer discharges `Chat.Persistence` and `LanguageModel`, so the progr
 
 ## More
 
-- Governing spec: [Baton Agent Framework](../../docs/spec/01-baton-agent-framework.md)
+- Current behavior: [Agent loop](../../docs/features/agent-loop.md)
 - Deeper examples: [tool-calling chatbot](../../examples/tool-calling-chatbot/) and [memory chat](../../examples/memory-chat/)
 - Baton uses Effect AI `Tool` and `Toolkit` directly. Toolkit handler layers run ordinary in-process tools; optional `ToolExecutor` routes external or durable placement without introducing another tool format.
 - Canonical layer names are `Memory.layerNoop`, `ModelMiddleware.layerIdentity`, `Session.layerMemory`, `ModelRegistry.layerMemory`, and `ToolOutput.layerMemory`. The former noun-first names remain exact deprecated aliases through the stated pre-1.0 deprecation window.

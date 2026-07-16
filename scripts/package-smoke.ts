@@ -1,6 +1,6 @@
 import { runMain } from "@effect/platform-bun/BunRuntime"
 import { layer } from "@effect/platform-bun/BunServices"
-import { Effect, FileSystem, Path, Stream } from "effect"
+import { Config, Effect, FileSystem, Option, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 
 const packages = ["core", "test", "skills", "memory", "providers", "mcp", "transport", "foldkit"] as const
@@ -53,9 +53,11 @@ const program = Effect.gen(function* () {
   const path = yield* Path.Path
   const root = path.resolve(".")
   const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "baton-package-smoke-" })
-  const tarballDirectory = process.env.PACKAGE_ARTIFACT_DIR
-    ? path.resolve(process.env.PACKAGE_ARTIFACT_DIR)
-    : path.join(directory, "packages")
+  const configuredArtifactDirectory = yield* Config.option(Config.string("PACKAGE_ARTIFACT_DIR"))
+  const tarballDirectory = Option.match(configuredArtifactDirectory, {
+    onNone: () => path.join(directory, "packages"),
+    onSome: path.resolve,
+  })
   const consumerDirectory = path.join(directory, "consumer")
   yield* fileSystem.makeDirectory(tarballDirectory, { recursive: true })
   yield* fileSystem.makeDirectory(consumerDirectory, { recursive: true })

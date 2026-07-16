@@ -196,7 +196,8 @@ const CopyCode = Command.define(
   { source: Schema.String },
   CompletedCopyCode,
 )(({ source }) =>
-  Effect.promise(() => navigator.clipboard.writeText(source).catch(() => undefined)).pipe(
+  Effect.tryPromise(() => navigator.clipboard.writeText(source)).pipe(
+    Effect.ignore,
     Effect.as(CompletedCopyCode({ source })),
   ),
 )
@@ -208,6 +209,7 @@ const ScheduleClearCopiedCode = Command.define(
 )(({ source }) => Effect.sleep("2 seconds").pipe(Effect.as(ClearedCopiedCode({ source }))))
 
 const THEME_STORAGE_KEY = "theme-preference"
+const ThemePreferenceJson = Schema.fromJsonString(ThemePreference)
 
 const readThemePreference = (): ThemePreference => {
   try {
@@ -215,8 +217,7 @@ const readThemePreference = (): ThemePreference => {
     if (raw === null) {
       return "System"
     }
-    const parsed: unknown = JSON.parse(raw)
-    return parsed === "Light" || parsed === "Dark" || parsed === "System" ? parsed : "System"
+    return Option.getOrElse(Schema.decodeUnknownOption(ThemePreferenceJson)(raw), () => "System" as const)
   } catch {
     return "System"
   }

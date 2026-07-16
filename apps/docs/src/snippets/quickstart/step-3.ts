@@ -1,4 +1,5 @@
-import { Effect, Layer, Schema, Stream } from "effect"
+import { runMain } from "@effect/platform-bun/BunRuntime"
+import { Console, Effect, Layer, Schema, Stream } from "effect"
 import { Agent, LanguageModel, Response, Tool, Toolkit } from "@batonfx/core"
 
 const weatherTool = Tool.make("get_weather", {
@@ -40,4 +41,4 @@ const modelLayer = Layer.effect(
   }),
 )
 
-console.log(agent.name, Layer.isLayer(modelLayer))
+runMain(Console.log(agent.name, Layer.isLayer(modelLayer)))

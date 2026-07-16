@@ -34,11 +34,22 @@ export interface TransportFixture {
   readonly hang: { readonly started: Deferred.Deferred<void>; readonly aborted: Deferred.Deferred<void> }
 }
 
+export class FixtureSetupError extends Schema.TaggedErrorClass<FixtureSetupError>()("FixtureSetupError", {
+  server: Schema.String,
+  message: Schema.String,
+}) {}
+
+class FixtureTransportCloseError extends Schema.TaggedErrorClass<FixtureTransportCloseError>()(
+  "FixtureTransportCloseError",
+  { message: Schema.String },
+) {}
+
 export const makeTransportFixture = (options?: {
   readonly malformedDiscoverySchema?: "input" | "output"
   readonly malformedStructuredContent?: boolean
   readonly closes?: { count: number }
-}): Effect.Effect<TransportFixture> =>
+  readonly rejectClose?: boolean
+}): Effect.Effect<TransportFixture, FixtureSetupError> =>
   Effect.gen(function* () {
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
 
@@ -111,16 +122,28 @@ export const makeTransportFixture = (options?: {
       }
       return { content: [{ type: "text" as const, text: "boom failed" }], isError: true }
     })
-    yield* Effect.promise(() => server.connect(serverTransport))
+    yield* Effect.tryPromise({
+      try: () => server.connect(serverTransport),
+      catch: (error) =>
+        FixtureSetupError.make({ server: "calc", message: `MCP fixture connection failed: ${String(error)}` }),
+    })
 
     const closes = options?.closes ?? { count: 0 }
     const originalClose = clientTransport.close.bind(clientTransport)
-    clientTransport.close = () =>
-      Effect.runPromiseWith(runtime)(
+    clientTransport.close = () => {
+      const closeEffect: Effect.Effect<void, FixtureTransportCloseError> =
+        options?.rejectClose === true
+          ? Effect.fail(FixtureTransportCloseError.make({ message: "transport close failed" }))
+          : Effect.tryPromise({
+              try: originalClose,
+              catch: (error) => FixtureTransportCloseError.make({ message: String(error) }),
+            })
+      return Effect.runPromiseWith(runtime)(
         Effect.sync(() => {
           closes.count += 1
-        }).pipe(Effect.andThen(Effect.promise(originalClose))),
+        }).pipe(Effect.andThen(closeEffect)),
       )
+    }
 
     return {
       transport: clientTransport,
@@ -139,7 +162,12 @@ export const makeFixtureWith = (options?: {
   readonly malformedDiscoverySchema?: "input" | "output"
   readonly malformedStructuredContent?: boolean
   readonly closes?: { count: number }
-}): Effect.Effect<Fixture, McpToolSource.McpConnectionError | OAuth.OAuthProviderError, Scope.Scope> =>
+  readonly rejectClose?: boolean
+}): Effect.Effect<
+  Fixture,
+  FixtureSetupError | McpToolSource.McpConnectionError | OAuth.OAuthProviderError,
+  Scope.Scope
+> =>
   Effect.gen(function* () {
     const fixture = yield* makeTransportFixture(options)
     const source = yield* McpToolSource.fromTransport("calc", fixture.transport, options)
@@ -148,6 +176,6 @@ export const makeFixtureWith = (options?: {
 
 export const makeFixture: Effect.Effect<
   Fixture,
-  McpToolSource.McpConnectionError | OAuth.OAuthProviderError,
+  FixtureSetupError | McpToolSource.McpConnectionError | OAuth.OAuthProviderError,
   Scope.Scope
 > = makeFixtureWith()

@@ -80,7 +80,7 @@ const defaultResults: ReadonlyArray<SearchResult> = [
   },
   {
     title: "Baton - transport and session registry",
-    url: "https://github.com/batonfx/batonfx/blob/main/docs/spec/11-transport.md",
+    url: "https://github.com/batonfx/batonfx/blob/main/docs/features/transport.md",
     snippet: "The wire protocol and in-process session registry that stream this run to the browser.",
   },
 ]

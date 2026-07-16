@@ -66,7 +66,7 @@ Before provisioning, the program requires `Memory.Memory` and can fail with sche
 
 ## More
 
-- Governing spec: [Memory](../../docs/spec/09-memory.md)
+- Current behavior: [Memory](../../docs/features/memory.md)
 - Deeper example: [memory chat](../../examples/memory-chat/)
 - `VectorStore.memoryLayer` remains an exact deprecated alias of canonical `VectorStore.layerMemory` through the stated pre-1.0 deprecation window; `combinedLayer` is unchanged.
 

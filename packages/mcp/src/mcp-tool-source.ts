@@ -154,7 +154,7 @@ export const fromTransport: {
     Effect.gen(function* () {
       const client = yield* Effect.acquireRelease(
         Effect.sync(() => new Client({ name: `@batonfx/mcp:${name}`, version: "0.0.0" })),
-        (connected) => Effect.promise(() => connected.close()).pipe(Effect.ignore),
+        (connected) => Effect.tryPromise(() => connected.close()).pipe(Effect.ignore),
       )
       yield* Effect.tryPromise({
         try: () => client.connect(transport),

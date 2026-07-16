@@ -1,4 +1,5 @@
-import { Schema } from "effect"
+import { runMain } from "@effect/platform-bun/BunRuntime"
+import { Console, Schema } from "effect"
 import { Agent, Tool, Toolkit } from "@batonfx/core"
 
 const weatherTool = Tool.make("get_weather", {
@@ -13,4 +14,4 @@ const agent = Agent.make({
   toolkit: Toolkit.make(weatherTool),
 })
 
-console.log(agent.name)
+runMain(Console.log(agent.name))

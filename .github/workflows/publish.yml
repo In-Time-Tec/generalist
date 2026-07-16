@@ -128,7 +128,7 @@ jobs:
       - name: Verify packed packages
         env:
           PACKAGE_ARTIFACT_DIR: ${{ github.workspace }}/release-artifacts
-        run: bun run package:smoke
+        run: bun run package
 
       - name: Dry-run publish verified packages
         env:

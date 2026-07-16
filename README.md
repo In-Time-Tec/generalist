@@ -82,7 +82,8 @@ const clientTools = ToolExecutor.router([
 - Consumer docs: [`docs/site/README.md`](docs/site/README.md)
 - 5-minute guide: [`docs/site/getting-started.md`](docs/site/getting-started.md)
 - Runnable examples: [`examples/`](examples/)
-- Normative specification: [`SPEC.md`](SPEC.md)
+- Product direction: [`PRODUCT.md`](PRODUCT.md)
+- Current behavior: [`docs/features/`](docs/features/)
 - Vocabulary: [`CONTEXT.md`](CONTEXT.md)
 
 ## Repository layout
@@ -97,7 +98,9 @@ const clientTools = ToolExecutor.router([
 | `packages/test`      | `@batonfx/test` — scripted model fixtures and normalized request capture.           |
 | `packages/transport` | `@batonfx/transport` — wire frames, session registry, SSE, WS, and client adapters. |
 | `packages/foldkit`   | `@batonfx/foldkit` — FoldKit adapter and headless chat model.                       |
-| `docs/spec`          | Normative specs and ADRs.                                                           |
+| `docs/features`      | Current behavior and rules relied on by the code.                                   |
+| `docs/decisions`     | Important choices and why they were made.                                           |
+| `docs/tradeoffs`     | Useful notes about meaningful gains and costs.                                      |
 | `docs/site`          | Consumer-facing guides, recipes, API stability, and positioning.                    |
 | `examples`           | Private Bun workspaces typechecked in CI.                                           |
 
@@ -105,15 +108,8 @@ const clientTools = ToolExecutor.router([
 
 ```bash
 bun install
-bun run format:check
-bun run lint
-bun run typecheck
-bun run check:docs
-bun run typecheck:examples
-bun run check:release
-bun run test
-bun run build
-bun run package:smoke
+bun run check
+bun run package
 ```
 
 ## Provenance

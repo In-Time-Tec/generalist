@@ -165,7 +165,7 @@ const footer = (): Html =>
               ".",
             ],
           ),
-          h.p([], [`© ${new Date().getFullYear()} Batonfx`]),
+          h.p([], ["Batonfx"]),
         ],
       ),
     ],

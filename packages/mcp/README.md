@@ -73,5 +73,5 @@ This fully provided deterministic program is `Effect<void, never, never>`. Produ
 
 ## More
 
-- Governing specs: [agent framework MCP integration](../../docs/spec/01-baton-agent-framework.md) and [MCP OAuth](../../docs/spec/15-mcp-oauth.md)
+- Current behavior: [MCP](../../docs/features/mcp.md)
 - Deeper example: [MCP agent](../../examples/mcp-agent/)

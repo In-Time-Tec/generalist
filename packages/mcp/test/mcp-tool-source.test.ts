@@ -150,6 +150,16 @@ describe("McpToolSource", () => {
     }),
   )
 
+  it.effect("does not defect when transport cleanup rejects", () =>
+    Effect.gen(function* () {
+      const closes = { count: 0 }
+      const exit = yield* Effect.exit(Effect.scoped(makeFixtureWith({ closes, rejectClose: true })))
+
+      expect(exit._tag).toBe("Success")
+      expect(closes.count).toBeGreaterThanOrEqual(1)
+    }),
+  )
+
   it.live("interrupting an in-flight call aborts the server-side request", () =>
     Effect.scoped(
       Effect.gen(function* () {

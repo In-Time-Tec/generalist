@@ -51,5 +51,5 @@ Run `bun examples/package-composition-guides/src/skills.ts`.
 
 ## More
 
-- Governing spec: [Skills](../../docs/spec/07-skills.md)
+- Current behavior: [Instructions and skills](../../docs/features/instructions-and-skills.md)
 - Deeper example: [capstone local assistant](../../examples/capstone-local-assistant/)

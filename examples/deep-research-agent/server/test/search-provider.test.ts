@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { ConfigProvider, Effect, Layer, Redacted } from "effect"
+import { ConfigProvider, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Service, cannedResultsFor, exaLayerFromApiKey, layer, search } from "../src/search-provider"
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
@@ -10,7 +10,7 @@ const httpClientLayer = (
 
 const bodyJson = (body: { readonly toJSON: () => unknown }) => {
   const value = body.toJSON() as { readonly body?: string }
-  return JSON.parse(value.body ?? "{}") as unknown
+  return Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(value.body ?? "{}")
 }
 
 describe("SearchProvider", () => {

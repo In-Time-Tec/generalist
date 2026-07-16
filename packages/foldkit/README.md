@@ -61,6 +61,6 @@ The fully provided program has type-level result `Effect<void, never, never>` an
 
 ## More
 
-- Governing spec: [FoldKit adapter](../../docs/spec/12-foldkit-adapter.md)
+- Current behavior: [FoldKit adapter](../../docs/features/foldkit.md)
 - Deeper example: [deep research agent](../../examples/deep-research-agent/)
 - Existing custom `AgentConnection` providers must implement the scoped `session` acquisition; `testLayer` remains a compatibility adapter for legacy test implementations.

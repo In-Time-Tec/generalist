@@ -78,7 +78,7 @@ userInvocable: true
 contextFork: true
 agent: reviewer
 model: fast
-paths: ["packages/core/**", "docs/spec/**"]
+paths: ["packages/core/**", "docs/features/**"]
 ---
 # Review body
 Use the checklist.
@@ -102,7 +102,7 @@ Use the checklist.
         contextFork: true,
         agent: "reviewer",
         model: "fast",
-        paths: ["packages/core/**", "docs/spec/**"],
+        paths: ["packages/core/**", "docs/features/**"],
       })
       expect(all[0]?.listing).toBe("- review: Review code carefully")
       expect(reads.streamed[path]).toBe(1)

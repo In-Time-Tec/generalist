@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "bun src/index.ts",
-    "typecheck": "bun tsc --noEmit"
+    "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
     "@batonfx/core": "workspace:*",

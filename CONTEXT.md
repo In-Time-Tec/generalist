@@ -1,6 +1,6 @@
 # BatonFX Context
 
-This file is the canonical vocabulary for BatonFX. Keep implementation details and provider-specific examples out unless they clarify a stable concept. `SPEC.md` is the specification index; the detailed contract lives under `docs/spec/`.
+This file owns BatonFX vocabulary, ownership, and system boundaries. Keep implementation details and provider-specific examples out unless they clarify a stable concept. Current behavior lives in `docs/features/`.
 
 ## Positioning
 
@@ -43,7 +43,7 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Baton depends on `effect` only. It never imports from any durable runtime's schema, event log, or database. In this repo the rule is enforced by the `no-relayfx-imports` ast-grep rule.
 - Payload vocabulary is `Ai.Prompt`/`Ai.Response`. Baton adds loop framing only — no second wire format.
 - Every exported symbol is `@experimental` while `effect/unstable/ai` is itself unstable.
-- Public APIs use package-root module namespaces and noun-after-`layer` service Layer variants; established subpaths and superseded Layer names follow ADR-0024 compatibility policy.
+- Public APIs use package-root module namespaces and noun-after-`layer` service Layer variants.
 - Errors that cross a service boundary are `Schema.TaggedErrorClass`.
 - Every post-middleware tool-call ID is unique within its model response. Duplicate transformed IDs fail typed before the duplicate can initiate authorization, execution, or persistence.
 - Resume is bound to the sole unresolved authoritative suspension checkpoint. Baton persists the suspension token and authorization snapshot on the transformed call, rejects a missing, stale, duplicate, or mismatched suspension with `ResumeMismatch`, and performs no resumed side effect before that comparison succeeds.
@@ -67,18 +67,4 @@ BatonFX is a standalone, **non-durable**, Effect-native agent framework — a mo
 - Every behavior-bearing seam exposes a test or memory layer (`testLayer`) so tests swap implementations through Effect layers.
 - Transport run queues are opt-in, FIFO per session, and process-local. Accepted queued prompts are lost when the registry layer is released; durable work belongs to hosts such as Relay.
 - Transport endpoints with a fixed toolkit validate exact tool payload schemas; endpoints serving skill activation or runtime-discovered tools explicitly select the runtime-dynamic capability and validate those tool payloads as unknown without weakening common event or frame structure.
-- Spec documents are part of the architecture: new concepts require a `docs/spec/` doc; stable decisions require an ADR.
-
-## Spec branches
-
-- Agent framework contract: `docs/spec/01-baton-agent-framework.md`
-- Session event-log contract: `docs/spec/02-session-event-log.md`
-- Instructions and context-epoch contract: `docs/spec/03-instructions-and-context-epoch.md`
-- Permissions policy contract: `docs/spec/04-permissions-policy.md`
-- Steering and interrupts contract: `docs/spec/05-steering-and-interrupts.md`
-- Compaction strategy contract: `docs/spec/06-compaction.md`
-- Skills contract: `docs/spec/07-skills.md`
-- Providers contract: `docs/spec/08-providers.md`
-- Memory contract: `docs/spec/09-memory.md`
-- Deterministic test-kit contract: `docs/spec/13-test-kit.md`
-- MCP Baton tools contract: `docs/spec/16-mcp-baton-tools.md`
+- Feature documents record current behavior and relied-on rules. Decision and tradeoff documents explain only choices whose reasons or costs remain useful.

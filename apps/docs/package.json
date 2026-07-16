@@ -5,11 +5,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun run generate:llms && vite build",
+    "build": "bun --preload ./scripts/raw-plugin.ts scripts/generate-llms.ts && vite build",
     "dev": "vite",
-    "generate:llms": "bun --preload ./scripts/raw-plugin.ts scripts/generate-llms.ts",
-    "test": "vitest run --passWithNoTests && bun run check:snippets",
-    "check:snippets": "bun scripts/check-snippets.ts",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

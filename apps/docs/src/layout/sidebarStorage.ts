@@ -1,14 +1,12 @@
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 
 export const SIDEBAR_GROUPS_STORAGE_KEY = "sidebar-groups"
 
 export const SidebarGroups = Schema.Record(Schema.String, Schema.Boolean)
 export type SidebarGroups = typeof SidebarGroups.Type
+const SidebarGroupsJson = Schema.fromJsonString(SidebarGroups)
 
 export const isSidebarGroupOpen = (open: SidebarGroups, group: string): boolean => open[group] ?? true
-
-const isBooleanEntry = (entry: readonly [string, unknown]): entry is readonly [string, boolean] =>
-  typeof entry[1] === "boolean"
 
 export const readSidebarGroups = (): SidebarGroups => {
   try {
@@ -16,11 +14,7 @@ export const readSidebarGroups = (): SidebarGroups => {
     if (raw === null) {
       return {}
     }
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return {}
-    }
-    return Object.fromEntries(Object.entries(parsed).filter(isBooleanEntry))
+    return Option.getOrElse(Schema.decodeUnknownOption(SidebarGroupsJson)(raw), () => ({}))
   } catch {
     return {}
   }
@@ -28,7 +22,7 @@ export const readSidebarGroups = (): SidebarGroups => {
 
 export const writeSidebarGroups = (open: SidebarGroups): void => {
   try {
-    sessionStorage.setItem(SIDEBAR_GROUPS_STORAGE_KEY, JSON.stringify(open))
+    sessionStorage.setItem(SIDEBAR_GROUPS_STORAGE_KEY, Schema.encodeSync(SidebarGroupsJson)(open))
   } catch {
     return
   }

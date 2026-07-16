@@ -1,9 +1,10 @@
-import { spawn } from "node:child_process"
 import { connect, createServer } from "node:net"
+import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
 import { describe, expect, live } from "@effect/vitest"
 import { Effect, Fiber, Schema, Stream } from "effect"
 import { Sse } from "effect/unstable/encoding"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
+import { ChildProcess } from "effect/unstable/process"
 import { Wire } from "@batonfx/transport"
 import { toolkit } from "../src/tools"
 
@@ -11,6 +12,12 @@ const OpenSessionResponse = Schema.Struct({
   sessionId: Schema.String,
   chatId: Schema.String,
 })
+
+class TransportTestError extends Schema.TaggedErrorClass<TransportTestError>()("TransportTestError", {
+  message: Schema.String,
+}) {}
+
+const ServerFrameJson = Schema.fromJsonString(Wire.ServerFrame(toolkit))
 
 const postJson = (url: string, body: unknown) =>
   HttpClient.post(url, { body: HttpBody.jsonUnsafe(body) }).pipe(Effect.flatMap(HttpClientResponse.filterStatusOk))
@@ -34,31 +41,22 @@ const freePort = Effect.tryPromise({
         server.close(() => resolve(port))
       })
     }),
-  catch: (error) => error,
+  catch: (error) => new TransportTestError({ message: `could not allocate a test port: ${String(error)}` }),
 })
 
-const serverEnv = (port: number): NodeJS.ProcessEnv => {
-  const { OPENROUTER_API_KEY: _openRouterApiKey, EXA_API_KEY: _exaApiKey, PORT: _port, ...rest } = process.env
-  return { ...rest, PORT: String(port) }
-}
-
 const startServer = (port: number) =>
-  Effect.acquireRelease(
-    Effect.sync(() =>
-      spawn("bun", ["run", "--cwd", "examples/deep-research-agent/server", "start"], {
-        cwd: process.cwd(),
-        env: serverEnv(port),
-        stdio: ["ignore", "pipe", "pipe"],
-      }),
-    ),
-    (child) => Effect.sync(() => child.kill()),
-  )
+  ChildProcess.make("bun", ["run", "--cwd", "examples/deep-research-agent/server", "start"], {
+    env: {
+      OPENROUTER_API_KEY: undefined,
+      EXA_API_KEY: undefined,
+      PORT: String(port),
+    },
+    extendEnv: true,
+    stdin: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
+  })
 
-// A spawned Bun server binds its port only after its module tree finishes
-// importing, which on a cold CI runner can take well past the old 5s open-session
-// retry budget — the connection was then refused and the test flaked. Probe the
-// port directly (a TCP connect succeeds the instant Bun is listening) and gate the
-// run on that deterministic signal instead of racing the boot.
 const probePort = (port: number) =>
   Effect.tryPromise({
     try: () =>
@@ -73,16 +71,15 @@ const probePort = (port: number) =>
           reject(error)
         })
       }),
-    catch: (error) => error,
+    catch: (error) =>
+      new TransportTestError({ message: `server on port ${port} did not accept a connection: ${String(error)}` }),
   })
 
-const waitForServerReady = (port: number, attempts: number): Effect.Effect<void> =>
+const waitForServerReady = (port: number, attempts: number): Effect.Effect<void, TransportTestError> =>
   probePort(port).pipe(
     Effect.catch((error) =>
       attempts <= 0
-        ? Effect.die(
-            new Error(`deep-research-agent server on port ${port} never accepted a connection: ${String(error)}`),
-          )
+        ? Effect.fail(error)
         : Effect.sleep("150 millis").pipe(Effect.andThen(waitForServerReady(port, attempts - 1))),
     ),
   )
@@ -105,7 +102,7 @@ const collectSseFrames = (response: HttpClientResponse.HttpClientResponse) =>
     const frames: Array<Wire.LooseServerFrameType> = []
     const parser = Sse.makeParser((event) => {
       if (event._tag === "Event") {
-        frames.push(Schema.decodeUnknownSync(Wire.ServerFrame(toolkit))(JSON.parse(event.data)))
+        frames.push(Schema.decodeUnknownSync(ServerFrameJson)(event.data))
       }
     })
     return { frames, parser }
@@ -144,7 +141,6 @@ describe("deep-research-agent Baton transport e2e", () => {
           const port = yield* freePort
           yield* startServer(port)
           const baseUrl = `http://127.0.0.1:${port}`
-          // 200 × 150ms ≈ 30s budget for a cold CI boot before we touch any route.
           yield* waitForServerReady(port, 200)
           const sessionId = "deep-research-transport-e2e"
           const opened = yield* openSessionWithRetry(baseUrl, sessionId, 50)
@@ -213,7 +209,7 @@ describe("deep-research-agent Baton transport e2e", () => {
             "https://github.com/batonfx/batonfx",
           )
         }),
-      ).pipe(Effect.provide(FetchHttpClient.layer)),
+      ).pipe(Effect.provide(FetchHttpClient.layer), Effect.provide(bunServicesLayer)),
     60_000,
   )
 })

@@ -1,3 +1,6 @@
+import { it } from "@effect/vitest"
+import { Effect } from "effect"
+import { TestClock } from "effect/testing"
 import { Runtime } from "foldkit"
 import { expect, test } from "vitest"
 
@@ -40,11 +43,11 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 }
 
 if (typeof globalThis.IntersectionObserver === "undefined") {
-  globalThis.IntersectionObserver = class {
-    root = null
-    rootMargin = ""
-    scrollMargin = ""
-    thresholds: ReadonlyArray<number> = []
+  globalThis.IntersectionObserver = class implements IntersectionObserver {
+    readonly root: Element | Document | null = null
+    readonly rootMargin = ""
+    readonly scrollMargin = ""
+    readonly thresholds: ReadonlyArray<number> = []
     observe(): void {}
     unobserve(): void {}
     disconnect(): void {}
@@ -54,7 +57,7 @@ if (typeof globalThis.IntersectionObserver === "undefined") {
   }
 }
 
-const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 80))
+const settle = TestClock.adjust("80 millis")
 
 const bootAt = (path: string): void => {
   document.body.innerHTML = '<div id="root"></div>'
@@ -79,27 +82,30 @@ const bootAt = (path: string): void => {
   Runtime.run(application)
 }
 
-test("landing renders the shell", async () => {
-  bootAt("/")
-  await settle()
+it.effect("landing renders the shell", () =>
+  Effect.gen(function* () {
+    bootAt("/")
+    yield* settle
+    expect(document.body.textContent).toContain("Batonfx")
+  }),
+)
 
-  expect(document.body.textContent).toContain("Batonfx")
-})
+it.effect("landing h1 is exactly Batonfx", () =>
+  Effect.gen(function* () {
+    bootAt("/")
+    yield* settle
+    expect(document.querySelector("h1")?.textContent).toBe("Batonfx")
+  }),
+)
 
-test("landing h1 is exactly Batonfx", async () => {
-  bootAt("/")
-  await settle()
-
-  expect(document.querySelector("h1")?.textContent).toBe("Batonfx")
-})
-
-test("no rendered string says BatonFX", async () => {
-  bootAt("/")
-  await settle()
-
-  expect(document.body.textContent).not.toContain("BatonFX")
-  expect(document.body.textContent).not.toContain("Baton Docs")
-})
+it.effect("no rendered string says BatonFX", () =>
+  Effect.gen(function* () {
+    bootAt("/")
+    yield* settle
+    expect(document.body.textContent).not.toContain("BatonFX")
+    expect(document.body.textContent).not.toContain("Baton Docs")
+  }),
+)
 
 test("index.html declares the brand shell", () => {
   expect(indexHtml).toContain("<title>Batonfx</title>")
@@ -109,63 +115,57 @@ test("index.html declares the brand shell", () => {
   expect(indexHtml.indexOf("theme-init.js")).toBeLessThan(indexHtml.indexOf("styles.css"))
 })
 
-test("github links point at In-Time-Tec/batonfx", async () => {
-  bootAt("/")
-  await settle()
+it.effect("github links point at In-Time-Tec/batonfx", () =>
+  Effect.gen(function* () {
+    bootAt("/")
+    yield* settle
+    const links = Array.from(document.querySelectorAll('a[href*="github.com"]'))
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) expect(link.getAttribute("href")).toContain("In-Time-Tec/batonfx")
+  }),
+)
 
-  const links = Array.from(document.querySelectorAll('a[href*="github.com"]'))
-  expect(links.length).toBeGreaterThan(0)
-  for (const link of links) {
-    expect(link.getAttribute("href")).toContain("In-Time-Tec/batonfx")
-  }
-})
+it.effect("theme selector applies dark mode, persists it, and exposes pressed state", () =>
+  Effect.gen(function* () {
+    bootAt("/")
+    yield* settle
+    const darkButton = document.querySelector('button[aria-label="Dark mode"]')
+    expect(darkButton).not.toBeNull()
+    expect(darkButton?.getAttribute("aria-pressed")).toBe("false")
+    ;(darkButton as HTMLButtonElement).click()
+    yield* settle
+    expect(document.documentElement.classList.contains("dark")).toBe(true)
+    expect(localStorage.getItem("theme-preference")).toBe('"Dark"')
+    expect(document.querySelector('button[aria-label="Dark mode"]')?.getAttribute("aria-pressed")).toBe("true")
+    const lightButton = document.querySelector('button[aria-label="Light mode"]')
+    ;(lightButton as HTMLButtonElement).click()
+    yield* settle
+    expect(document.documentElement.classList.contains("dark")).toBe(false)
+    expect(localStorage.getItem("theme-preference")).toBe('"Light"')
+  }),
+)
 
-test("theme selector applies dark mode, persists it, and exposes pressed state", async () => {
-  bootAt("/")
-  await settle()
-
-  const darkButton = document.querySelector('button[aria-label="Dark mode"]')
-  expect(darkButton).not.toBeNull()
-  expect(darkButton?.getAttribute("aria-pressed")).toBe("false")
-  ;(darkButton as HTMLButtonElement).click()
-  await settle()
-
-  expect(document.documentElement.classList.contains("dark")).toBe(true)
-  expect(localStorage.getItem("theme-preference")).toBe('"Dark"')
-  expect(document.querySelector('button[aria-label="Dark mode"]')?.getAttribute("aria-pressed")).toBe("true")
-
-  const lightButton = document.querySelector('button[aria-label="Light mode"]')
-  ;(lightButton as HTMLButtonElement).click()
-  await settle()
-
-  expect(document.documentElement.classList.contains("dark")).toBe(false)
-  expect(localStorage.getItem("theme-preference")).toBe('"Light"')
-})
-
-test("sidebar renders disclosure groups with the active group open", async () => {
-  const firstPage = allPages[0]
-  if (firstPage === undefined) {
-    return
-  }
-  bootAt(firstPage.path)
-  await settle()
-
-  const groupButtons = Array.from(document.querySelectorAll("[data-sidebar-group]"))
-  expect(groupButtons.length).toBeGreaterThan(0)
-
-  const activeGroupButton = groupButtons.find(
-    (groupButton) => groupButton.getAttribute("data-sidebar-group") === firstPage.group,
-  )
-  expect(activeGroupButton?.getAttribute("aria-expanded")).toBe("true")
-
-  const unlockedButton = groupButtons.find((groupButton) => groupButton.getAttribute("aria-disabled") !== "true")
-  if (unlockedButton !== undefined) {
-    const groupName = unlockedButton.getAttribute("data-sidebar-group") ?? ""
-    ;(unlockedButton as HTMLButtonElement).click()
-    await settle()
-    expect(readSidebarGroups()[groupName]).toBe(false)
-  }
-})
+it.effect("sidebar renders disclosure groups with the active group open", () =>
+  Effect.gen(function* () {
+    const firstPage = allPages[0]
+    expect(firstPage).toBeDefined()
+    bootAt(firstPage?.path ?? "/")
+    yield* settle
+    const groupButtons = Array.from(document.querySelectorAll("[data-sidebar-group]"))
+    expect(groupButtons.length).toBeGreaterThan(0)
+    const activeGroupButton = groupButtons.find(
+      (groupButton) => groupButton.getAttribute("data-sidebar-group") === firstPage?.group,
+    )
+    expect(activeGroupButton?.getAttribute("aria-expanded")).toBe("true")
+    const unlockedButton = groupButtons.find((groupButton) => groupButton.getAttribute("aria-disabled") !== "true")
+    if (unlockedButton !== undefined) {
+      const groupName = unlockedButton.getAttribute("data-sidebar-group") ?? ""
+      ;(unlockedButton as HTMLButtonElement).click()
+      yield* settle
+      expect(readSidebarGroups()[groupName]).toBe(false)
+    }
+  }),
+)
 
 test("sidebar group storage round-trips through sessionStorage", () => {
   sessionStorage.clear()
@@ -174,48 +174,35 @@ test("sidebar group storage round-trips through sessionStorage", () => {
   expect(sessionStorage.getItem("sidebar-groups")).toContain("Learn")
 })
 
-const assertPagesRender = async (pages: ReadonlyArray<(typeof allPages)[number]>): Promise<void> => {
+const assertPagesRender = Effect.fn("DocsSmokeTest.assertPagesRender")(function* (
+  pages: ReadonlyArray<(typeof allPages)[number]>,
+): Generator<Effect.Effect<void>, void, void> {
   const [page, ...rest] = pages
-  if (page === undefined) {
-    return
-  }
+  if (page === undefined) return yield* Effect.void
   bootAt(page.path)
-  await settle()
-
+  yield* settle
   expect(document.body.textContent).toContain(page.title)
   expect(document.body.textContent).not.toContain("BatonFX")
-  for (const entry of page.toc) {
-    expect(document.getElementById(entry.id), `${page.path}#${entry.id}`).not.toBeNull()
-  }
-  await assertPagesRender(rest)
-}
-
-test("every registered page renders its title and toc anchors", { timeout: 120_000 }, async () => {
-  await assertPagesRender(allPages)
+  for (const entry of page.toc) expect(document.getElementById(entry.id), `${page.path}#${entry.id}`).not.toBeNull()
+  yield* assertPagesRender(rest)
 })
 
-test("legacy paths redirect to registered pages", async () => {
-  for (const target of legacyRedirects.values()) {
-    expect(target.startsWith("/docs/"), target).toBe(true)
-  }
+it.effect("every registered page renders its title and toc anchors", () => assertPagesRender(allPages), 120_000)
 
-  bootAt("/docs/core/agent-loop")
-  await settle()
-  const target = legacyRedirects.get("/docs/core/agent-loop")
-  if (target !== undefined && pageByPath.has(target)) {
-    expect(window.location.pathname).toBe(target)
-  }
-})
+it.effect("legacy paths redirect to registered pages", () =>
+  Effect.gen(function* () {
+    for (const target of legacyRedirects.values()) expect(target.startsWith("/docs/"), target).toBe(true)
+    bootAt("/docs/core/agent-loop")
+    yield* settle
+    const target = legacyRedirects.get("/docs/core/agent-loop")
+    if (target !== undefined && pageByPath.has(target)) expect(window.location.pathname).toBe(target)
+  }),
+)
 
 test("search finds pages by body text with title matches first", () => {
-  if (allPages.length === 0) {
-    return
-  }
-  const results = searchDocs("baton")
-  expect(results.length).toBeGreaterThan(0)
-
-  const bodyResults = searchDocs("TurnPolicy")
-  expect(bodyResults.length).toBeGreaterThan(0)
+  if (allPages.length === 0) return
+  expect(searchDocs("baton").length).toBeGreaterThan(0)
+  expect(searchDocs("TurnPolicy").length).toBeGreaterThan(0)
 })
 
 test("multi-agent guide preserves the two-channel child-run contract", () => {
@@ -242,19 +229,16 @@ test("multi-agent guide preserves the two-channel child-run contract", () => {
   }
 })
 
-test("command palette opens from shortcut and shows grouped results", async () => {
-  bootAt("/")
-  await settle()
-
-  const paletteSelector = 'input[placeholder="Search docs..."]'
-  expect(document.querySelector(paletteSelector)).toBeNull()
-
-  window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }))
-  await settle()
-
-  expect(document.querySelector(paletteSelector)).not.toBeNull()
-  const firstPage = allPages[0]
-  if (firstPage !== undefined) {
-    expect(document.body.textContent).toContain(firstPage.title)
-  }
-})
+it.effect("command palette opens from shortcut and shows grouped results", () =>
+  Effect.gen(function* () {
+    bootAt("/")
+    yield* settle
+    const paletteSelector = 'input[placeholder="Search docs..."]'
+    expect(document.querySelector(paletteSelector)).toBeNull()
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }))
+    yield* settle
+    expect(document.querySelector(paletteSelector)).not.toBeNull()
+    const firstPage = allPages[0]
+    if (firstPage !== undefined) expect(document.body.textContent).toContain(firstPage.title)
+  }),
+)
