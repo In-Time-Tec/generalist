@@ -189,14 +189,17 @@ const assertPagesRender = Effect.fn("DocsSmokeTest.assertPagesRender")(function*
 
 it.effect("every registered page renders its title and toc anchors", () => assertPagesRender(allPages), 120_000)
 
-it.effect("legacy paths redirect to registered pages", () =>
-  Effect.gen(function* () {
-    for (const target of legacyRedirects.values()) expect(target.startsWith("/docs/"), target).toBe(true)
-    bootAt("/docs/core/agent-loop")
-    yield* settle
-    const target = legacyRedirects.get("/docs/core/agent-loop")
-    if (target !== undefined && pageByPath.has(target)) expect(window.location.pathname).toBe(target)
-  }),
+it.effect(
+  "legacy paths redirect to registered pages",
+  () =>
+    Effect.gen(function* () {
+      for (const target of legacyRedirects.values()) expect(target.startsWith("/docs/"), target).toBe(true)
+      bootAt("/docs/core/agent-loop")
+      yield* settle
+      const target = legacyRedirects.get("/docs/core/agent-loop")
+      if (target !== undefined && pageByPath.has(target)) expect(window.location.pathname).toBe(target)
+    }),
+  120_000,
 )
 
 test("search finds pages by body text with title matches first", () => {
