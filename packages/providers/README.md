@@ -54,6 +54,26 @@ The layer discharges `ModelRegistry` and `LanguageModel`, leaving `R = never`; s
 
 OpenAI, Anthropic, and OpenRouter registrations include provider-specific context-overflow classification for Baton's bounded compact-and-replay path. OpenAI-compatible registrations remain conservative unless `classifyFailure` is explicitly supplied, for example `OpenAi.classifyFailure` for an endpoint known to preserve OpenAI error semantics.
 
+## OpenAI account Responses
+
+`OpenAi.openAiAccount`, `OpenAi.withOpenAiAccount`, and `OpenAi.withOpenAiAccountFetch` register Responses models backed by an OpenAI account session. The host supplies dynamic credentials; Baton reads them for every request:
+
+```ts
+const credentials: OpenAi.OpenAiAccountCredentials = {
+  acquire: loadCurrentCredential,
+  refreshRejected: (generation) => refreshIfGenerationIsCurrent(generation),
+}
+
+const providers = OpenAi.withOpenAiAccountFetch({
+  model: "gpt-5",
+  credentials,
+})
+```
+
+Each credential contains a redacted access token, an account identifier, and an opaque generation. Baton owns the fixed `https://chatgpt.com/backend-api/codex/responses` destination, account request headers, Responses encoding and decoding, and at most one refresh and replay after a 401 received before stream output. Redirects are rejected by the fetch convenience. A custom `HttpClient` supplied to the base helper is a trusted transport and must not follow redirects internally. A second 401 and all other failures are surfaced without an authorization retry.
+
+The host owns browser or device authorization, PKCE and callback UX, credential persistence, proactive refresh, and refresh serialization. `refreshRejected` receives the rejected generation so concurrent callers can share already-rotated credentials instead of rotating the same refresh token repeatedly. Credential failures use `OpenAiAccountCredentialError`; its public shape deliberately contains no provider response, token, or account data. Account credentials never choose the destination and are not added to registration identity or metadata.
+
 ## More
 
 - Current behavior: [Providers](../../docs/features/providers.md)
