@@ -1,13 +1,28 @@
 import { describe, expect, it, layer as testLayer } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Redacted, Ref, Schema } from "effect"
-import { Tool, Toolkit } from "effect/unstable/ai"
+import { AiError, Tool, Toolkit } from "effect/unstable/ai"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
-import { anthropic, withAnthropic, withAnthropicFetch } from "@batonfx/providers/anthropic"
+import {
+  anthropic,
+  classifyFailure as classifyAnthropicFailure,
+  withAnthropic,
+  withAnthropicFetch,
+} from "@batonfx/providers/anthropic"
 import { withOpenAiOrDeterministic, withOpenAiOrDeterministicFetch } from "@batonfx/providers/deterministic"
-import { openAi, withOpenAi, withOpenAiFetch } from "@batonfx/providers/openai"
+import {
+  classifyFailure as classifyOpenAiFailure,
+  openAi,
+  withOpenAi,
+  withOpenAiFetch,
+} from "@batonfx/providers/openai"
 import { openAiCompatible, withOpenAiCompatible, withOpenAiCompatibleFetch } from "@batonfx/providers/openai-compat"
-import { openRouter, withOpenRouter, withOpenRouterFetch } from "@batonfx/providers/openrouter"
+import {
+  classifyFailure as classifyOpenRouterFailure,
+  openRouter,
+  withOpenRouter,
+  withOpenRouterFetch,
+} from "@batonfx/providers/openrouter"
 import { Deterministic, Embedding, Presets } from "../src/index.js"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
@@ -56,6 +71,124 @@ type EveryEffectError<Effects extends ReadonlyArray<unknown>, Error> = Effects e
 const tuple = <const Values extends ReadonlyArray<unknown>>(...values: Values): Values => values
 
 describe("providers", () => {
+  it("classifies provider context failures from structured metadata and narrow messages", () => {
+    const openAiStructured = AiError.make({
+      module: "OpenAiClient",
+      method: "stream",
+      reason: AiError.InvalidRequestError.make({
+        description: "unrelated wording",
+        metadata: {
+          openai: { errorCode: "context_length_exceeded", errorType: "invalid_request_error", requestId: null },
+        },
+      }),
+    })
+    const openAiMessage = AiError.make({
+      module: "OpenAiClient",
+      method: "stream",
+      reason: AiError.InvalidRequestError.make({ description: "This model's maximum context length is 128000 tokens" }),
+    })
+    const anthropicPrompt = AiError.make({
+      module: "AnthropicClient",
+      method: "stream",
+      reason: AiError.InvalidRequestError.make({
+        description: "prompt is too long: 210000 tokens > 200000 maximum",
+        metadata: { anthropic: { errorType: "invalid_request_error", requestId: null } },
+      }),
+    })
+    const openRouterUpstream = AiError.make({
+      module: "OpenRouterClient",
+      method: "stream",
+      reason: AiError.InvalidRequestError.make({
+        description: "upstream rejected request",
+        metadata: {
+          openrouter: { errorCode: "context_window_exceeded", errorType: "invalid_request_error", requestId: null },
+        },
+      }),
+    })
+    const openRouterAnthropicUpstream = AiError.make({
+      module: "OpenRouterClient",
+      method: "stream",
+      reason: AiError.InvalidRequestError.make({
+        description: "prompt is too long: 210000 tokens > 200000 maximum",
+        metadata: { openrouter: { errorCode: 400, errorType: null, requestId: null } },
+      }),
+    })
+
+    expect(classifyOpenAiFailure(openAiStructured)).toBe("context-overflow")
+    expect(classifyOpenAiFailure(openAiMessage)).toBe("context-overflow")
+    expect(classifyAnthropicFailure(anthropicPrompt)).toBe("context-overflow")
+    expect(classifyOpenRouterFailure(openRouterUpstream)).toBe("context-overflow")
+    expect(classifyOpenRouterFailure(openRouterAnthropicUpstream)).toBe("context-overflow")
+  })
+
+  it.effect("rejects provider false positives and keeps compatible endpoints conservative by default", () => {
+    const maximumOutput = AiError.make({
+      module: "OpenAiClient",
+      method: "stream",
+      reason: AiError.InvalidRequestError.make({ description: "maximum output token length exceeded" }),
+    })
+    const rateLimit = AiError.make({
+      module: "OpenAiClient",
+      method: "stream",
+      reason: AiError.RateLimitError.make({
+        metadata: {
+          openai: {
+            errorCode: "context_length_exceeded",
+            errorType: "rate_limit_error",
+            requestId: null,
+            limit: null,
+            remaining: null,
+            resetRequests: null,
+            resetTokens: null,
+          },
+        },
+      }),
+    })
+    const anthropicBytes = AiError.make({
+      module: "AnthropicClient",
+      method: "stream",
+      reason: AiError.UnknownError.make({
+        description: "request body exceeds maximum allowed bytes",
+        metadata: { anthropic: { errorType: "request_too_large", requestId: null } },
+      }),
+    })
+
+    expect(classifyOpenAiFailure(maximumOutput)).toBe("other")
+    expect(classifyOpenAiFailure(rateLimit)).toBe("other")
+    expect(classifyAnthropicFailure(anthropicBytes)).toBe("other")
+    expect(classifyOpenRouterFailure(maximumOutput)).toBe("other")
+
+    const contextOverflow = AiError.make({
+      module: "OpenAiClient",
+      method: "stream",
+      reason: AiError.InvalidRequestError.make({
+        metadata: {
+          openai: { errorCode: "context_length_exceeded", errorType: "invalid_request_error", requestId: null },
+        },
+      }),
+    })
+    const registrations = (classifyFailure?: ModelRegistry.FailureClassifier) =>
+      Effect.scoped(
+        Layer.build(
+          withOpenAiCompatible({
+            model: classifyFailure === undefined ? "compatible-default" : "compatible-openai",
+            apiKey,
+            ...(classifyFailure === undefined ? {} : { classifyFailure }),
+          }),
+        ).pipe(Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context)))),
+      )
+    return Effect.all([registrations(), registrations(classifyOpenAiFailure)]).pipe(
+      Effect.map(([defaultRegistrations, optedInRegistrations]) => {
+        const defaultRegistration = defaultRegistrations[0]!
+        const optedInRegistration = optedInRegistrations[0]!
+        expect(defaultRegistration.classifyFailure).toBeUndefined()
+        expect(optedInRegistration.classifyFailure?.(maximumOutput)).toBe("other")
+        expect(optedInRegistration.classifyFailure?.(contextOverflow)).toBe("context-overflow")
+      }),
+      Effect.provideService(HttpClient.HttpClient, hostHttpClient),
+    )
+  })
+
   testLayer(ModelRegistry.layerFromRegistrationEffects([Presets.groqFetch({ model: "llama-test", apiKey })]))(
     (test) => {
       test.effect("creates an OpenAI-compatible preset registration for ModelRegistry", () =>

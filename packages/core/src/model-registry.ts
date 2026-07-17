@@ -15,6 +15,38 @@ export interface ModelSelection {
   readonly registrationKey?: string
 }
 
+/** @experimental Semantic classification of a model failure. */
+export type FailureClassification = "context-overflow" | "other"
+
+/** @experimental Provider-owned semantic model-failure classifier. */
+export type FailureClassifier = (error: unknown) => FailureClassification
+
+const FailureClassifierTypeId = Symbol.for("@batonfx/core/model-registry/FailureClassifier")
+
+type ClassifiedLanguageModel = LanguageModel.Service & {
+  readonly [FailureClassifierTypeId]?: FailureClassifier
+}
+
+/** @experimental Classify a failure using semantics attached to the active registered model. */
+export const classifyFailure: {
+  (error: unknown): (model: LanguageModel.Service) => FailureClassification
+  (model: LanguageModel.Service, error: unknown): FailureClassification
+} = Function.dual(
+  2,
+  (model: LanguageModel.Service, error: unknown): FailureClassification =>
+    (model as ClassifiedLanguageModel)[FailureClassifierTypeId]?.(error) ?? "other",
+)
+
+const attachFailureClassifier = (registration: Registration, context: Context.Context<ModelEnvironment>) => {
+  if (registration.classifyFailure === undefined) return context
+  const model = Context.get(context, LanguageModel.LanguageModel)
+  const classified: ClassifiedLanguageModel = {
+    ...model,
+    [FailureClassifierTypeId]: registration.classifyFailure,
+  }
+  return Context.add(context, LanguageModel.LanguageModel, classified)
+}
+
 /** @experimental */
 export class LanguageModelNotRegistered extends Schema.TaggedErrorClass<LanguageModelNotRegistered>()(
   "LanguageModelNotRegistered",
@@ -32,6 +64,7 @@ export interface Registration {
   readonly registrationKey?: string
   readonly layer: Layer.Layer<ModelEnvironment>
   readonly metadata?: Metadata
+  readonly classifyFailure?: FailureClassifier
 }
 
 /** @experimental */
@@ -94,6 +127,7 @@ export const registrationFromLayer = <R>(input: {
   readonly registrationKey?: string
   readonly layer: Layer.Layer<LanguageModel.LanguageModel, never, R>
   readonly metadata?: Metadata
+  readonly classifyFailure?: FailureClassifier
 }) =>
   Model.make(input.provider, input.model, input.layer).captureRequirements.pipe(
     Effect.map(
@@ -103,6 +137,7 @@ export const registrationFromLayer = <R>(input: {
         layer,
         ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
         ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+        ...(input.classifyFailure === undefined ? {} : { classifyFailure: input.classifyFailure }),
       }),
     ),
   )
@@ -145,7 +180,9 @@ export const layer: {
             })
           }
           const provided = Effect.scoped(
-            Layer.build(registration.layer).pipe(Effect.flatMap((context) => effect.pipe(Effect.provide(context)))),
+            Layer.build(registration.layer).pipe(
+              Effect.flatMap((context) => effect.pipe(Effect.provide(attachFailureClassifier(registration, context)))),
+            ),
           )
           return yield* semaphore === undefined ? provided : semaphore.withPermits(1)(provided)
         })
@@ -165,7 +202,7 @@ export const layer: {
               if (semaphore !== undefined) {
                 yield* Effect.acquireRelease(semaphore.take(1), () => semaphore.release(1), { interruptible: true })
               }
-              const context = yield* Layer.build(registration.layer)
+              const context = attachFailureClassifier(registration, yield* Layer.build(registration.layer))
               return operation.pipe(Stream.provideContext(context))
             }),
           )

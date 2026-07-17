@@ -140,6 +140,13 @@ export const providersReference = definePage({
       code("FetchHttpClient.layer"),
       ".",
     ),
+    p(
+      "OpenAI, Anthropic, and OpenRouter registrations include provider-specific context-overflow classification. Unknown OpenAI-compatible endpoints classify no failures unless ",
+      code("classifyFailure"),
+      " is explicitly supplied, such as ",
+      code("OpenAi.classifyFailure"),
+      " for an endpoint known to preserve OpenAI failure semantics.",
+    ),
     callout(
       "info",
       "The host owns HTTP",

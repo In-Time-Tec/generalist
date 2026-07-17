@@ -38,13 +38,7 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import { Approvals } from "./approvals.js"
-import {
-  Compaction,
-  type CompactionError,
-  DEFAULT_RESERVE_TOKENS,
-  type Usage,
-  isContextOverflow,
-} from "./compaction.js"
+import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "./compaction.js"
 import { Instructions, openEpoch } from "./instructions.js"
 import {
   type Item,
@@ -58,7 +52,13 @@ import {
   replaceRecalledMessage,
 } from "./memory.js"
 import { type Middleware, ModelMiddleware, type TurnContext } from "./model-middleware.js"
-import { type LanguageModelNotRegistered, type ModelSelection, Service } from "./model-registry.js"
+import {
+  classifyFailure as classifyModelFailure,
+  type FailureClassifier,
+  type LanguageModelNotRegistered,
+  type ModelSelection,
+  Service,
+} from "./model-registry.js"
 import { ModelResilience, apply } from "./model-resilience.js"
 import { Permissions, RuleStore } from "./permissions.js"
 import {
@@ -102,6 +102,7 @@ import {
 type CompactionResult = import("./compaction.js").Result
 const AgentTypeId: unique symbol = Symbol.for("@batonfx/core/Agent")
 const ModelLayerTypeId: unique symbol = Symbol.for("@batonfx/core/Agent/ModelLayer")
+const classifyOtherFailure: FailureClassifier = () => "other"
 
 /** @experimental An agent definition: a plain value, not a service. */
 export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = LanguageModel.LanguageModel> {
@@ -1380,9 +1381,13 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         turn: number,
         prompt: Prompt.Prompt,
         overflow: boolean,
-      ): Effect.Effect<Prompt.Prompt, AgentError | MiddlewareViolation, LanguageModel.LanguageModel> =>
+      ): Effect.Effect<
+        { readonly prompt: Prompt.Prompt; readonly changed: boolean },
+        AgentError | MiddlewareViolation,
+        LanguageModel.LanguageModel
+      > =>
         Option.match(compactionService, {
-          onNone: () => Effect.succeed(prompt),
+          onNone: () => Effect.succeed({ prompt, changed: false }),
           onSome: (compaction) =>
             Effect.gen(function* () {
               const history = yield* Ref.get(chat.history)
@@ -1394,6 +1399,12 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
               )
               const detachedPrompt = yield* detachPrompt(prompt).pipe(
+                Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
+              )
+              const originalHistory = yield* detachPrompt(detachedHistory).pipe(
+                Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
+              )
+              const originalPrompt = yield* detachPrompt(detachedPrompt).pipe(
                 Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
               )
               const detachedPath = yield* Effect.forEach(path, detachEntry).pipe(
@@ -1414,7 +1425,11 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                     : { toolOutputMaxBytes: options.toolOutputMaxBytes }),
                 })
                 .pipe(Effect.mapError((error) => compactionError(turn, error)))
-              if (Option.isNone(compacted)) return prompt
+              if (Option.isNone(compacted)) return { prompt, changed: false }
+              const changed =
+                !Equal.equals(originalHistory.content, compacted.value.history.content) ||
+                !Equal.equals(originalPrompt.content, compacted.value.prompt.content)
+              if (!changed) return { prompt, changed: false }
               const allowed = [...historyRecalled, ...promptRecalled]
               const required = Option.isSome(activeSession) ? promptRecalled : allowed
               if (
@@ -1431,7 +1446,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               }
               yield* validateCompactionProjection(turn, compacted.value)
               yield* applyCompactionResult(turn, compacted.value, path.at(-1)?.id ?? null)
-              return compacted.value.prompt
+              return { prompt: compacted.value.prompt, changed: true }
             }),
         })
 
@@ -1787,7 +1802,18 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           onNone: () => effect,
           onSome: (resilience) =>
             Effect.flatMap(LanguageModel.LanguageModel, (model) =>
-              effect.pipe(Effect.provideService(LanguageModel.LanguageModel, apply(model, resilience))),
+              effect.pipe(
+                Effect.provideService(
+                  LanguageModel.LanguageModel,
+                  apply(model, {
+                    ...resilience,
+                    classify: (error) =>
+                      classifyModelFailure(model, error) === "context-overflow"
+                        ? "terminal"
+                        : resilience.classify(error),
+                  }),
+                ),
+              ),
             ),
         })
 
@@ -1895,6 +1921,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           activePrompt: Prompt.Prompt,
           retryOverflow: boolean,
           compactOverflow = false,
+          overflowCause?: Cause.Cause<RunError>,
         ): Stream.Stream<
           {
             readonly part: Response.StreamPart<any>
@@ -1905,6 +1932,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           LanguageModel.LanguageModel
         > => {
           let emitted = false
+          let classifyFailure = classifyOtherFailure
           const transformedParts = new Array<Response.StreamPart<any>>()
           let preparedState: { readonly history: Prompt.Prompt; readonly preparedPrompt: Prompt.Prompt } | undefined
           const singleFailure = (cause: Cause.Cause<unknown>) => {
@@ -1917,7 +1945,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               retryOverflow &&
               !hasEmitted &&
               Option.isSome(failure) &&
-              isContextOverflow(failure.value) &&
+              classifyFailure(failure.value) === "context-overflow" &&
               Option.isSome(compactionService)
             )
           }
@@ -1930,7 +1958,13 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               (toolCallIds) =>
                 Stream.unwrap(
                   Effect.gen(function* () {
-                    const preparedPrompt = yield* preparePrompt(turn, activePrompt, compactOverflow)
+                    const activeModel = yield* LanguageModel.LanguageModel
+                    classifyFailure = (error) => classifyModelFailure(activeModel, error)
+                    const prepared = yield* preparePrompt(turn, activePrompt, compactOverflow)
+                    if (compactOverflow && !prepared.changed && overflowCause !== undefined) {
+                      return yield* Effect.failCause(overflowCause)
+                    }
+                    const preparedPrompt = prepared.prompt
                     const history = yield* Ref.get(chat.history)
                     preparedState = { history, preparedPrompt }
                     const responsePrompt = Prompt.concat(history, preparedPrompt)
@@ -1989,7 +2023,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             Stream.catchCause((cause) => {
               if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
               if (retryableOverflow(cause, emitted)) {
-                return attempt(preparedState?.preparedPrompt ?? activePrompt, false, true)
+                return attempt(preparedState?.preparedPrompt ?? activePrompt, false, true, cause)
               }
               return Stream.failCause(cause)
             }),
@@ -2020,7 +2054,18 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             Stream.unwrap(
               LanguageModel.LanguageModel.pipe(
                 Effect.map((model) =>
-                  parts.pipe(Stream.provideService(LanguageModel.LanguageModel, apply(model, resilience))),
+                  parts.pipe(
+                    Stream.provideService(
+                      LanguageModel.LanguageModel,
+                      apply(model, {
+                        ...resilience,
+                        classify: (error) =>
+                          classifyModelFailure(model, error) === "context-overflow"
+                            ? "terminal"
+                            : resilience.classify(error),
+                      }),
+                    ),
+                  ),
                 ),
               ),
             ),

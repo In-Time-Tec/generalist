@@ -676,7 +676,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
               return Option.some({
                 _tag: "Microcompact" as const,
                 history: request.history,
-                prompt: request.prompt,
+                prompt: Prompt.concat(request.prompt, Prompt.make("serialized compaction")),
               })
             }).pipe(
               Effect.ensuring(

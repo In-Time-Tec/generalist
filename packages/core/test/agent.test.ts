@@ -326,6 +326,20 @@ const contextOverflowError = (description: string) =>
     reason: AiError.UnknownError.make({ description }),
   })
 
+const overflowSelection = { provider: "test", model: "overflow" }
+
+const overflowModelLayer = (streamText: ModelParams["streamText"], generateText?: ModelParams["generateText"]) =>
+  Layer.unwrap(
+    ModelRegistry.registrationFromLayer({
+      ...overflowSelection,
+      layer: modelLayer(streamText, generateText),
+      classifyFailure: (error) =>
+        AiError.isAiError(error) && error.module === "AgentTestLanguageModel" && error.reason._tag === "UnknownError"
+          ? "context-overflow"
+          : "other",
+    }).pipe(Effect.map((registration) => ModelRegistry.memoryLayer([registration]))),
+  )
+
 const retryTransientModelError = ModelResilience.layer({
   retrySchedule: Schedule.recurs(1),
   classify: (error) => (error === transientModelError ? "transient" : "terminal"),
@@ -3110,7 +3124,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let retriedPrompt = ""
     return [
       Layer.mergeAll(
-        modelLayer((options) => {
+        overflowModelLayer((options) => {
           calls += 1
           if (calls === 1) return Stream.fail(contextOverflowError("maximum context length exceeded"))
           retriedPrompt = Json.stringify(options.prompt.content)
@@ -3130,12 +3144,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               })
             }),
         }),
+        Session.memoryLayer,
         unusedExecutor,
         Approvals.autoApprove,
         ModelMiddleware.identityLayer,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "reactive-compaction-agent" })
+        const session = yield* Session.SessionStore
+        const agent = Agent.make({ name: "reactive-compaction-agent", model: overflowSelection })
 
         const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "too large" }))
 
@@ -3144,6 +3160,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(reactiveInput).toContain("proactive projection")
         expect(reactiveInput).not.toContain("too large")
         expect(retriedPrompt).toContain("after overflow")
+        expect(Json.stringify(Session.buildContext(yield* session.path()).content)).toContain("after overflow")
         expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(1)
         expect(events.at(-1)?._tag).toBe("Completed")
       }),
@@ -3154,20 +3171,26 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
-        modelLayer(() => {
+        overflowModelLayer(() => {
           calls += 1
           return Stream.fail(contextOverflowError("context window overflow"))
         }),
         Compaction.testLayer({
-          maybeCompact: () =>
-            Effect.succeed(Option.some({ _tag: "Microcompact", history: Prompt.empty, prompt: Prompt.make("retry") })),
+          maybeCompact: (request) =>
+            Effect.succeed(
+              Option.some({
+                _tag: "Microcompact",
+                history: Prompt.empty,
+                prompt: Prompt.make(request.overflow ? "overflow retry" : "proactive projection"),
+              }),
+            ),
         }),
         unusedExecutor,
         Approvals.autoApprove,
         ModelMiddleware.identityLayer,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "reactive-compaction-fail-agent" })
+        const agent = Agent.make({ name: "reactive-compaction-fail-agent", model: overflowSelection })
 
         const error = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "too large" })))
 
@@ -3181,7 +3204,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
-        modelLayer(() => {
+        overflowModelLayer(() => {
           calls += 1
           return Stream.concat(
             Stream.make(textDelta("partial")),
@@ -3197,12 +3220,108 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.identityLayer,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "partial-overflow-agent" })
+        const agent = Agent.make({ name: "partial-overflow-agent", model: overflowSelection })
 
         const error = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "partial" })))
 
         expect(calls).toBe(1)
         expect(error._tag).toBe("@batonfx/core/AgentError")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "does not replay after framework and provider tool-call parts escape", () => {
+    let calls = 0
+    let executions = 0
+    return [
+      Layer.mergeAll(
+        overflowModelLayer(() => {
+          calls += 1
+          return Stream.fromIterable([
+            toolCallPart("framework-before-overflow", "echo", { text: "framework" }),
+            providerToolCallPart("provider-before-overflow", "echo", { text: "provider" }),
+          ]).pipe(Stream.concat(Stream.fail(contextOverflowError("context length exceeded"))))
+        }),
+        Compaction.testLayer({
+          maybeCompact: () =>
+            Effect.succeed(Option.some({ _tag: "Microcompact", history: Prompt.empty, prompt: Prompt.make("retry") })),
+        }),
+        ToolExecutor.testLayer({
+          execute: () =>
+            Effect.sync(() => {
+              executions += 1
+              return { _tag: "Success" as const, result: "done", encodedResult: "done" }
+            }),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({
+          name: "tool-call-overflow-agent",
+          model: overflowSelection,
+          toolkit: Toolkit.make(echoTool),
+        })
+
+        yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "tools" })))
+
+        expect(calls).toBe(1)
+        expect(executions).toBeLessThanOrEqual(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "preserves the overflow failure when forced compaction does not change the projection", () => {
+    const overflow = contextOverflowError("context length exceeded")
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        overflowModelLayer(() => {
+          calls += 1
+          return Stream.fail(overflow)
+        }),
+        Compaction.testLayer({
+          maybeCompact: (request) =>
+            Effect.succeed(Option.some({ _tag: "Microcompact", history: request.history, prompt: request.prompt })),
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "unchanged-overflow-agent", model: overflowSelection })
+
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "unchanged" })))
+
+        expect(calls).toBe(1)
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        if (failure._tag === "@batonfx/core/AgentError") expect(failure.cause).toBe(overflow)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "keeps classified context overflow terminal to ModelResilience", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        overflowModelLayer(() => {
+          calls += 1
+          return Stream.fail(contextOverflowError("context length exceeded"))
+        }),
+        Compaction.testLayer({
+          maybeCompact: () => Effect.succeed(Option.none()),
+        }),
+        ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "terminal-overflow-agent", model: overflowSelection })
+
+        yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "too large" })))
+
+        expect(calls).toBe(1)
       }),
     ] as const
   })
@@ -4325,6 +4444,37 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "keeps selected structured context overflow terminal to ModelResilience", () => {
+    const overflow = contextOverflowError("context length exceeded")
+    let structuredCalls = 0
+    return [
+      Layer.mergeAll(
+        overflowModelLayer(
+          () => Stream.make(textDelta("normal answer")),
+          () => {
+            structuredCalls += 1
+            return Effect.fail(overflow)
+          },
+        ),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "terminal-structured-overflow-agent", model: overflowSelection })
+
+        const failure = yield* Effect.flip(
+          Stream.runCollect(Agent.streamObject(agent, { prompt: "large object", schema: objectSchema })),
+        )
+
+        expect(structuredCalls).toBe(1)
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        if (failure._tag === "@batonfx/core/AgentError") expect(failure.cause).toBe(overflow)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "fails typed on in-band stream error parts", () => {
     const streamError = new Error("stream exploded")
     return [
@@ -4574,24 +4724,36 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
   ItLayer.make(it, "wraps per-turn model overrides with ModelResilience", () => {
     let ambientCalls = 0
     let overrideCalls = 0
+    let overflowCompactions = 0
+    const overrideOverflow = contextOverflowError("context length exceeded")
     const overrideModel = modelLayer(() => {
       overrideCalls += 1
-      return overrideCalls === 1 ? Stream.fail(transientModelError) : Stream.make(textDelta("override ok"))
+      return overrideCalls === 1 ? Stream.fail(overrideOverflow) : Stream.make(textDelta("override ok"))
     })
     return [
       Layer.mergeAll(
-        modelLayer(() => {
+        overflowModelLayer(() => {
           ambientCalls += 1
           return Stream.make(toolCallPart("tool-call-override-model", "echo", { text: "from model" }))
         }),
+        Compaction.testLayer({
+          maybeCompact: (request) => {
+            if (request.overflow) overflowCompactions += 1
+            return Effect.succeed(Option.none())
+          },
+        }),
         echoExecutor,
         Approvals.autoApprove,
-        retryTransientModelError,
+        ModelResilience.layer({
+          retrySchedule: Schedule.recurs(1),
+          classify: (error) => (error === overrideOverflow ? "transient" : "terminal"),
+        }),
         ModelMiddleware.identityLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
           name: "override-model-retry-agent",
+          model: overflowSelection,
           toolkit: Toolkit.make(echoTool),
           policy: TurnPolicy.make(() => Effect.succeed(TurnPolicy.decision.continue({ model: overrideModel }))),
         })
@@ -4600,6 +4762,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(ambientCalls).toBe(1)
         expect(overrideCalls).toBe(2)
+        expect(overflowCompactions).toBe(0)
         const completed = events.at(-1)
         if (completed?._tag === "Completed") expect(completed.text).toBe("override ok")
       }),

@@ -226,10 +226,6 @@ export const coreContextReference = definePage({
           ["Truncate-only implementation over an ", code("Ai.Tokenizer"), " when one is provided"],
         ],
         [
-          [code("isContextOverflow(error)")],
-          "Heuristic classifier for reactive compaction after a provider overflow error",
-        ],
-        [
           [code("make(strategy, options?)"), " / ", code("testLayer")],
           "Interface from a strategy; layer from an interface",
         ],

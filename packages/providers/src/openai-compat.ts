@@ -9,6 +9,7 @@ export interface OpenAiCompatibleInput extends RegistrationOptions {
   readonly provider?: string
   readonly model: string
   readonly config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">
+  readonly classifyFailure?: ModelRegistry.FailureClassifier
 }
 
 /** @experimental */
@@ -20,6 +21,7 @@ export const openAiCompatible = (input: OpenAiCompatibleInput) =>
       model: input.model,
       ...(input.config === undefined ? {} : { config: input.config }),
     }),
+    ...(input.classifyFailure === undefined ? {} : { classifyFailure: input.classifyFailure }),
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })

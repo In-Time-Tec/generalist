@@ -1,6 +1,7 @@
 import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
+import { AiError } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 import type { RegistrationOptions } from "./openai.js"
 
@@ -8,6 +9,16 @@ import type { RegistrationOptions } from "./openai.js"
 export interface AnthropicInput extends RegistrationOptions {
   readonly model: (string & {}) | AnthropicLanguageModel.Model
   readonly config?: Omit<typeof AnthropicLanguageModel.Config.Service, "model">
+}
+
+/** @experimental */
+export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
+  if (!AiError.isAiError(error) || error.reason._tag !== "InvalidRequestError") return "other"
+  const metadata = error.reason.metadata.anthropic
+  return metadata?.errorType === "invalid_request_error" &&
+    /\bprompt is too long\b/i.test(error.reason.description ?? "")
+    ? "context-overflow"
+    : "other"
 }
 
 /** @experimental */
@@ -19,6 +30,7 @@ export const anthropic = (input: AnthropicInput) =>
       model: input.model,
       ...(input.config === undefined ? {} : { config: input.config }),
     }),
+    classifyFailure,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })

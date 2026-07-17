@@ -481,10 +481,3 @@ export const truncate = (maxTokens: number): Interface => ({
 /** @experimental */
 export const testLayer = (implementation: Interface): Layer.Layer<Compaction> =>
   Layer.succeed(Compaction, Compaction.of(implementation))
-
-/** @experimental Context-overflow classifier for reactive compaction. */
-export const isContextOverflow = (error: unknown): boolean =>
-  /context|token|prompt/i.test(error instanceof Error ? `${error.name}: ${error.message}` : String(error)) &&
-  /overflow|exceed|exceeded|maximum|too large|too long|length/i.test(
-    error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-  )

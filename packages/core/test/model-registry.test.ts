@@ -151,6 +151,51 @@ describe("ModelRegistry", () => {
       ] as const,
   )
 
+  ItLayer.make(it, "keeps failure classification attached to the in-flight registration snapshot", () => {
+    const selection = { provider: "test", model: "classified" }
+    const failure = new Error("classified failure")
+    return [
+      ModelRegistry.layerFromRegistrationEffects([
+        ModelRegistry.registrationFromLayer({
+          ...selection,
+          layer: modelLayer("first"),
+          classifyFailure: () => "context-overflow",
+        }),
+      ]),
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<void>()
+        const release = yield* Deferred.make<void>()
+        const inFlight = yield* Effect.forkChild(
+          ModelRegistry.operate(
+            selection,
+            Effect.gen(function* () {
+              const model = yield* LanguageModel.LanguageModel
+              yield* Deferred.succeed(entered, undefined)
+              yield* Deferred.await(release)
+              return ModelRegistry.classifyFailure(model, failure)
+            }),
+          ),
+        )
+        yield* Deferred.await(entered)
+        const replacement = yield* ModelRegistry.registrationFromLayer({
+          ...selection,
+          layer: modelLayer("second"),
+          classifyFailure: () => "other",
+        })
+        yield* ModelRegistry.register({ registration: replacement })
+        yield* Deferred.succeed(release, undefined)
+
+        expect(yield* Fiber.join(inFlight)).toBe("context-overflow")
+        expect(
+          yield* ModelRegistry.operate(
+            selection,
+            LanguageModel.LanguageModel.pipe(Effect.map((model) => ModelRegistry.classifyFailure(model, failure))),
+          ),
+        ).toBe("other")
+      }),
+    ] as const
+  })
+
   ItLayer.make(
     it,
     "combine keeps upsert semantics for identical registrations",

@@ -71,11 +71,9 @@ export const compaction = definePage({
     callout(
       "info",
       "Reactive compaction",
-      "When a model call fails with a context-overflow error (classified by ",
-      code("Compaction.isContextOverflow"),
-      "), the loop re-consults the service with ",
+      "When the selected model registration classifies a model call failure as context overflow, the loop re-consults the service with ",
       code("overflow: true"),
-      " and retries the turn once with the compacted prompt.",
+      " and retries the turn once only when compaction changes the prompt projection.",
     ),
     h2("truncate-only", "4. Truncate when summaries are not worth a model call"),
     p(
