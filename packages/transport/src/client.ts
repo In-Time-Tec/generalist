@@ -152,7 +152,7 @@ const defaultBufferPolicy: BufferPolicy = {
 }
 
 const defaultReconnectPolicy: ReconnectPolicy = {
-  schedule: Schedule.exponential("100 millis").pipe(Schedule.both(Schedule.recurs(5))),
+  schedule: Schedule.exponential("100 millis").pipe(Schedule.upTo({ times: 5 })),
   retryable: (error) => error.kind === "socket",
 }
 

@@ -611,7 +611,7 @@ describe("Client", () => {
           url: "ws://test",
           sessionId: "s-client",
           reconnect: {
-            schedule: Schedule.spaced("1 second").pipe(Schedule.both(Schedule.recurs(2))),
+            schedule: Schedule.spaced("1 second").pipe(Schedule.upTo({ times: 2 })),
             retryable: () => true,
           },
         }),

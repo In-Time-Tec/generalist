@@ -4,6 +4,24 @@ import { Config, Effect, FileSystem, Option, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 
 const packages = ["core", "test", "skills", "memory", "providers", "mcp", "transport", "foldkit"] as const
+const effectVersion = "4.0.0-beta.98"
+
+const packedEffectDependencies: Record<(typeof packages)[number], ReadonlyArray<string>> = {
+  core: ["effect"],
+  test: ["effect"],
+  skills: ["effect"],
+  memory: ["effect"],
+  providers: [
+    "effect",
+    "@effect/ai-anthropic",
+    "@effect/ai-openai",
+    "@effect/ai-openai-compat",
+    "@effect/ai-openrouter",
+  ],
+  mcp: ["effect"],
+  transport: ["effect"],
+  foldkit: [],
+}
 
 const exports = [
   "@batonfx/core",
@@ -86,6 +104,19 @@ const program = Effect.gen(function* () {
         new Error(`@batonfx/${packageName} contains unexpected files: ${unexpected.join(", ")}`),
       )
     }
+    const manifest = JSON.parse(yield* run("tar", ["-xOzf", tarball, "package/package.json"], root))
+    for (const dependency of packedEffectDependencies[packageName]) {
+      if (manifest.dependencies?.[dependency] !== effectVersion) {
+        return yield* Effect.fail(
+          new Error(
+            `@batonfx/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
+          ),
+        )
+      }
+    }
+    if (JSON.stringify(manifest).includes("4.0.0-beta.93")) {
+      return yield* Effect.fail(new Error(`@batonfx/${packageName} packed manifest contains Effect beta.93`))
+    }
     tarballs[`@batonfx/${packageName}`] = `file:${tarball}`
   }
 
@@ -97,7 +128,7 @@ const program = Effect.gen(function* () {
       type: "module",
       dependencies: {
         ...tarballs,
-        effect: "4.0.0-beta.93",
+        effect: effectVersion,
         foldkit: "0.122.0",
         typescript: "5.8.2",
       },
@@ -126,6 +157,7 @@ import { VectorStore } from "@batonfx/memory"
 import { OAuth, McpToolSource } from "@batonfx/mcp"
 import { route as mcpRoute, type BatonTools, type Options as McpRouteOptions } from "@batonfx/mcp/baton"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "@batonfx/skills"
+import { Catalog, OpenAi } from "@batonfx/providers"
 import { TestModel } from "@batonfx/test"
 import { SessionRegistry, Sse, Wire, Ws } from "@batonfx/transport"
 import { Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
@@ -210,6 +242,16 @@ const packageSmokeTool = Tool.make("package_smoke_tool", {
   success: Schema.String,
 })
 const packageSmokeToolAgent = Agent.make({ name: "tool-package-smoke", toolkit: Toolkit.make(packageSmokeTool) })
+const providerRegistration = OpenAi.openAi({ model: "gpt-4o-mini" })
+const providerCatalogLayer: Layer.Layer<Catalog.ModelCatalog> = Catalog.layer()
+const testModelLayer: Layer.Layer<LanguageModel.LanguageModel> = TestModel.layer([TestModel.text("identity")])
+type ProviderRegistrationSuccess = ReturnType<typeof OpenAi.openAi> extends Effect.Effect<infer Success, infer _Failure, infer _Requirements>
+  ? Success
+  : never
+type ProviderRegistrationIdentity = Assert<Equal<ProviderRegistrationSuccess, ModelRegistry.Registration>>
+void providerRegistration
+void providerCatalogLayer
+void testModelLayer
 const toolFanOut = Handoff.fanOut([{ agent: packageSmokeToolAgent, prompt: "tool" }])
 const heterogeneousSupervisor = Handoff.supervisor({
   name: "heterogeneous-package-smoke",
@@ -312,9 +354,14 @@ void routed
     path.join(consumerDirectory, "runtime.mjs"),
     `const specifiers = ${JSON.stringify(exports)}
 for (const specifier of specifiers) await import(specifier)
-const { Memory, ModelMiddleware, ModelRegistry, Session } = await import("@batonfx/core")
+const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("@batonfx/core")
 const { VectorStore } = await import("@batonfx/memory")
+const { McpToolSource } = await import("@batonfx/mcp")
+const { Catalog, OpenAi } = await import("@batonfx/providers")
 const skills = await import("@batonfx/skills")
+const { TestModel } = await import("@batonfx/test")
+const { Effect, Layer, Schema } = await import("effect")
+const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
 const aliases = [
   [Memory.layerNoop, Memory.noopLayer, "Memory.noopLayer"],
@@ -327,11 +374,40 @@ const aliases = [
 for (const [canonical, compatibility, name] of aliases) {
   if (canonical !== compatibility) throw new Error(name + " must preserve runtime identity")
 }
+const tool = Tool.make("identity_proof", { parameters: Schema.Struct({ value: Schema.String }) })
+const agent = Agent.make({ name: "identity-proof", toolkit: Toolkit.make(tool) })
+const layers = [
+  ModelRegistry.layerMemory(),
+  Session.layerMemory,
+  Catalog.layer(),
+  TestModel.layer([TestModel.text("identity")]),
+  McpToolSource.layer({ name: "identity", transport: { kind: "http", url: "https://mcp.example/rpc" } }),
+]
+if (layers.some((value) => !Layer.isLayer(value))) throw new Error("Baton layer does not use the root Effect identity")
+if (!Effect.isEffect(OpenAi.openAi({ model: "gpt-4o-mini" }))) {
+  throw new Error("provider registration does not use the root Effect identity")
+}
+if (!Effect.isEffect(TestModel.make([TestModel.text("identity")]))) {
+  throw new Error("TestModel does not use the root Effect identity")
+}
 console.log(\`imported \${specifiers.length} Baton exports\`)
 `,
   )
 
   yield* run("bun", ["install"], consumerDirectory)
+  const installedEffects = (yield* run(
+    "find",
+    ["node_modules", "-path", "*/effect/package.json", "-print"],
+    consumerDirectory,
+  ))
+    .trim()
+    .split("\n")
+    .filter((entry) => entry.length > 0)
+  if (installedEffects.length !== 1) {
+    return yield* Effect.fail(
+      new Error(`consumer installed ${installedEffects.length} Effect copies:\n${installedEffects.join("\n")}`),
+    )
+  }
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
   yield* run("node", ["runtime.mjs"], consumerDirectory)
   yield* run("bun", ["runtime.mjs"], consumerDirectory)

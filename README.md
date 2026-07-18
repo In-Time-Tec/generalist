@@ -75,7 +75,7 @@ const clientTools = ToolExecutor.router([
 
 | Baton release | Tested Effect range                               | Notes                                                                               |
 | ------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `0.4.x`       | `effect@4.0.0-beta.93` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| `0.6.x`       | `effect@4.0.0-beta.98` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 
 ## Start here
 
