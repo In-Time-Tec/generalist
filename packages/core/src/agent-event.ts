@@ -229,6 +229,7 @@ export class AgentSuspended extends Schema.TaggedErrorClass<AgentSuspended>()("@
   token: Schema.String,
   reason: Schema.Literals(["tool-wait", "approval"]),
   authorization_stage: Schema.optional(Schema.Literals(["permission", "approval"])),
+  tool_call_index: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   tool_call_id: Schema.String,
   tool_name: Schema.String,
   tool_params: Schema.Unknown,

@@ -6,6 +6,7 @@ import { ToolContext } from "./tool-context.js"
 export interface Request {
   readonly call: Response.ToolCallPart<string, unknown>
   readonly turn: number
+  readonly toolCallIndex: number
   readonly agentName: string
   readonly sessionId: string
 }

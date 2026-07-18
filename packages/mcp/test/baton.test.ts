@@ -120,7 +120,7 @@ describe("baton adapter", () => {
         const tools = yield* route({ name: "calc", transport: fixture.transport })
         const services = yield* Layer.build(Layer.mergeAll(tools.executorLayer, ToolContext.layerDefault))
         const executor = Context.get(services, ToolExecutor.ToolExecutor)
-        const execute = (id: string, a: number, b: number) =>
+        const execute = (toolCallIndex: number, id: string, a: number, b: number) =>
           executor
             .execute({
               call: Response.makePart("tool-call", {
@@ -130,11 +130,12 @@ describe("baton adapter", () => {
                 providerExecuted: false,
               }),
               turn: 0,
+              toolCallIndex,
               agentName: "concurrent-agent",
               sessionId: "concurrent-session",
             })
             .pipe(Effect.provide(services))
-        const outcomes = yield* Effect.all([execute("add-1", 20, 22), execute("add-2", 19, 23)], {
+        const outcomes = yield* Effect.all([execute(0, "add-1", 20, 22), execute(1, "add-2", 19, 23)], {
           concurrency: 2,
         })
 

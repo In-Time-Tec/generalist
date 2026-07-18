@@ -490,6 +490,7 @@ const suspensionMetadata = Schema.Struct({
   token: Schema.String,
   reason: Schema.Literals(["tool-wait", "approval"]),
   authorization_stage: Schema.optional(Schema.Literals(["permission", "approval"])),
+  tool_call_index: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   active_tools: Schema.optional(Schema.Array(Schema.String)),
   activated_skills: Schema.optional(Schema.Array(Schema.String)),
 })
@@ -580,6 +581,7 @@ const sameSuspension = (left: AgentSuspended, right: AgentSuspended): boolean =>
   left.token === right.token &&
   left.reason === right.reason &&
   left.authorization_stage === right.authorization_stage &&
+  left.tool_call_index === right.tool_call_index &&
   left.tool_call_id === right.tool_call_id &&
   left.tool_name === right.tool_name &&
   Equal.equals(left.tool_params, right.tool_params) &&
@@ -649,10 +651,11 @@ const domainFailureResult = (call: AnyToolCall, outcome: DomainFailure): Pending
     preliminary: false,
   })
 
-const suspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "approval") =>
+const suspended = (call: AnyToolCall, toolCallIndex: number, token: string, reason: "tool-wait" | "approval") =>
   AgentSuspended.make({
     token,
     reason,
+    tool_call_index: toolCallIndex,
     tool_call_id: call.id,
     tool_name: call.name,
     tool_params: call.params,
@@ -1081,6 +1084,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             ...(suspension.authorization_stage === undefined
               ? {}
               : { authorization_stage: suspension.authorization_stage }),
+            ...(suspension.tool_call_index === undefined ? {} : { tool_call_index: suspension.tool_call_index }),
             ...(suspension.active_tools === undefined ? {} : { active_tools: suspension.active_tools }),
             ...(suspension.activated_skills === undefined ? {} : { activated_skills: suspension.activated_skills }),
           }
@@ -1120,8 +1124,12 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
         appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint)))
 
-      const failSuspended = (call: AnyToolCall, token: string, reason: "tool-wait" | "approval") =>
-        Stream.fail<RunError>(suspended(call, token, reason))
+      const failSuspended = (
+        call: AnyToolCall,
+        toolCallIndex: number,
+        token: string,
+        reason: "tool-wait" | "approval",
+      ) => Stream.fail<RunError>(suspended(call, toolCallIndex, token, reason))
 
       const state = {
         text: "",
@@ -1479,6 +1487,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 
       const outcomeEvents = (
         turn: number,
+        toolCallIndex: number,
         call: AnyToolCall,
         outcome: Outcome,
         droppedProgress: number,
@@ -1503,7 +1512,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             )
           }
           case "Suspend":
-            return Effect.succeed(failSuspended(call, outcome.token, "tool-wait"))
+            return Effect.succeed(failSuspended(call, toolCallIndex, outcome.token, "tool-wait"))
         }
       }
 
@@ -1625,7 +1634,9 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                   Stream.flatMap((outcome) =>
                     Stream.unwrap(
                       Ref.get(droppedProgress).pipe(
-                        Effect.flatMap((dropped) => outcomeEvents(turn, call, outcome, dropped, registry)),
+                        Effect.flatMap((dropped) =>
+                          outcomeEvents(turn, request.toolCallIndex, call, outcome, dropped, registry),
+                        ),
                       ),
                     ),
                   ),
@@ -1702,13 +1713,14 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 
       const toolCallEvents = (
         turn: number,
+        toolCallIndex: number,
         call: AnyToolCall,
         messages: ReadonlyArray<Prompt.Message>,
         registry: Registry,
         authorizationStage?: "permission" | "approval",
         authorizationToken?: string,
       ): Stream.Stream<Event, RunError, StaticToolServices<Tools> | R> => {
-        const request: Request = { call, turn, agentName: agent.name, sessionId }
+        const request: Request = { call, turn, toolCallIndex, agentName: agent.name, sessionId }
         const candidate = get(registry, call.name)
         if (candidate === undefined)
           return Stream.fail(
@@ -1764,6 +1776,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                           token: decision.suspension.token,
                           reason: "approval",
                           authorization_stage: decision.suspension.authorization_stage ?? "approval",
+                          tool_call_index: toolCallIndex,
                           tool_call_id: call.id,
                           tool_name: call.name,
                           tool_params: call.params,
@@ -1859,6 +1872,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 
       const partEvents = (
         turn: number,
+        toolCallIndex: number,
         part: Response.StreamPart<Record<string, Tool.Any>>,
         messages: ReadonlyArray<Prompt.Message>,
         registry: Registry,
@@ -1872,7 +1886,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           const call = part as AnyToolCall
           return call.providerExecuted === true
             ? modelPart
-            : Stream.concat(modelPart, toolCallEvents(turn, call, messages, registry))
+            : Stream.concat(modelPart, toolCallEvents(turn, toolCallIndex, call, messages, registry))
         }
         if (part.type === "text-delta") {
           state.text = `${state.text}${part.delta}`
@@ -2060,28 +2074,37 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         }
         const parts = Stream.unwrap(
           applyPromptChain(chain, Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
-            Effect.map((transformedPrompt) =>
-              attempt(transformedPrompt, true).pipe(
+            Effect.map((transformedPrompt) => {
+              let nextToolCallIndex = 0
+              return attempt(transformedPrompt, true).pipe(
                 Stream.mapEffect(({ accept, part, messages }) => accept.pipe(Effect.as({ part, messages }))),
+                Stream.map(({ part, messages }) => {
+                  const toolCallIndex = nextToolCallIndex
+                  if (part.type === "tool-call" && part.providerExecuted !== true) nextToolCallIndex += 1
+                  return { part, messages, toolCallIndex }
+                }),
                 (accepted) => {
                   const concurrency = agent.toolExecution?.concurrency ?? 1
                   if (concurrency === 1) {
                     return accepted.pipe(
-                      Stream.flatMap(({ part, messages }) => partEvents(turn, part, messages, activeRegistry)),
+                      Stream.flatMap(({ part, messages, toolCallIndex }) =>
+                        partEvents(turn, toolCallIndex, part, messages, activeRegistry),
+                      ),
                       Stream.tap(recordPending),
                     )
                   }
                   return accepted.pipe(
                     Stream.mapEffect(
-                      ({ part, messages }) => Stream.runCollect(partEvents(turn, part, messages, activeRegistry)),
+                      ({ part, messages, toolCallIndex }) =>
+                        Stream.runCollect(partEvents(turn, toolCallIndex, part, messages, activeRegistry)),
                       { concurrency },
                     ),
                     Stream.flatMap(Stream.fromIterable),
                     Stream.tap(recordPending),
                   )
                 },
-              ),
-            ),
+              )
+            }),
           ),
         )
         const resilientParts = Option.match(resilienceService, {
@@ -2364,6 +2387,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                       : select(tools.registry, suspension.active_tools ?? [])
                   return toolCallEvents(
                     0,
+                    suspension.tool_call_index ?? 0,
                     Response.makePart("tool-call", {
                       id: checkpoint.call.id,
                       name: checkpoint.call.name,

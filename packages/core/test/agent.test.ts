@@ -3943,6 +3943,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let active = 0
     let maximum = 0
     let modelCalls = 0
+    const requestIndexes: Array<readonly [string, number]> = []
     let allStarted: Deferred.Deferred<void> | undefined
     const releases = new Map<string, Deferred.Deferred<void>>()
     return [
@@ -3962,6 +3963,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           execute: (request) =>
             Effect.acquireUseRelease(
               Effect.gen(function* () {
+                requestIndexes.push([request.call.id, request.toolCallIndex])
                 active += 1
                 maximum = Math.max(maximum, active)
                 if (active === 3 && allStarted !== undefined) yield* Deferred.succeed(allStarted, undefined)
@@ -4000,6 +4002,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(events.filter((event) => event._tag === "ToolExecutionCompleted").map((event) => event.call.id)).toEqual(
           ["concurrent-first", "concurrent-second", "concurrent-third", "concurrent-fourth"],
         )
+        expect(requestIndexes).toEqual([
+          ["concurrent-first", 0],
+          ["concurrent-second", 1],
+          ["concurrent-third", 2],
+          ["concurrent-fourth", 3],
+        ])
         expect(
           events
             .filter((event) => event._tag === "ModelPart" && event.part.type === "tool-call")

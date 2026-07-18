@@ -51,6 +51,7 @@ const activeToolNames = (options: Parameters<ModelParams["streamText"]>[0]) => o
 const request = (name: string, params: unknown): ToolExecutor.Request => ({
   call: toolCallPart(`call-${name}`, name, params),
   turn: 0,
+  toolCallIndex: 0,
   agentName: "tool-executor-test",
   sessionId: "session-1",
 })
