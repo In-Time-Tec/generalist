@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# One-time orb setup for BatonFX: pinned Bun, Node 22, submodules, dependencies.
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+BUN_VERSION="$(sed -n 's/.*"packageManager": "bun@\([0-9.]*\)".*/\1/p' package.json)"
+echo "==> Ensuring Bun ${BUN_VERSION} (pinned in package.json)"
+if [ "$(bun --version 2>/dev/null || true)" != "$BUN_VERSION" ]; then
+  curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+  sudo install -m 0755 "$HOME/.bun/bin/bun" /usr/local/bin/bun
+fi
+bun --version
+
+echo "==> Ensuring Node 22 (used by CI and the package smoke test)"
+if ! node --version 2>/dev/null | grep -q '^v22\.'; then
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+  sudo apt-get install -y nodejs
+  # A preinstalled /usr/local/bin/node can shadow the apt-installed Node.
+  for tool in node npm npx; do
+    if [ -e "/usr/local/bin/$tool" ] && [ -e "/usr/bin/$tool" ]; then
+      sudo ln -sf "/usr/bin/$tool" "/usr/local/bin/$tool"
+    fi
+  done
+fi
+node --version
+
+echo "==> Initializing repos/effect submodule (read-only research material)"
+git submodule update --init --depth 1 repos/effect
+
+echo "==> Installing dependencies"
+bun install --frozen-lockfile
+
+echo "==> Making Effect TypeScript binary executable"
+find node_modules/.bun -path '*/@effect/tsgo-linux-*/lib/tsc' -exec chmod +x {} +
+
+echo "==> Building workspace (warms the Turbo cache)"
+bun run build
+
+echo "==> Setup complete"

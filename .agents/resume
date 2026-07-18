@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Fast, idempotent checks when an existing orb resumes. No services to restart.
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+bun --version >/dev/null
+node --version >/dev/null
+
+# Re-assert the executable bit CI also sets; lost bits break typecheck.
+find node_modules/.bun -path '*/@effect/tsgo-linux-*/lib/tsc' -exec chmod +x {} + 2>/dev/null || true
+
+echo "resume ok"
