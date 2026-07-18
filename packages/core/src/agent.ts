@@ -118,8 +118,14 @@ export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = Language
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly authorization?: ToolAuthorizer<R>
+  readonly toolExecution?: ToolExecutionPolicy
   readonly metadata?: Readonly<Record<string, unknown>>
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
+}
+
+/** @experimental Policy for framework-executed tool calls emitted by one model turn. */
+export interface ToolExecutionPolicy {
+  readonly concurrency: number
 }
 
 /** @experimental One origin-preserving static or Handoff tool declaration. */
@@ -149,6 +155,7 @@ export interface MakeOptions<
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly authorization?: ToolAuthorizer<AuthorizationServices>
+  readonly toolExecution?: ToolExecutionPolicy
   readonly metadata?: Readonly<Record<string, unknown>>
 }
 
@@ -260,6 +267,7 @@ export function make<
           ...(curriedOptions.model === undefined ? {} : { model: curriedOptions.model }),
           ...(curriedOptions.memory === undefined ? {} : { memory: curriedOptions.memory }),
           ...(curriedOptions.authorization === undefined ? {} : { authorization: curriedOptions.authorization }),
+          ...(curriedOptions.toolExecution === undefined ? {} : { toolExecution: curriedOptions.toolExecution }),
           ...(curriedOptions.metadata === undefined ? {} : { metadata: curriedOptions.metadata }),
         })
     }
@@ -272,6 +280,7 @@ export function make<
         ...(curriedOptions.model === undefined ? {} : { model: curriedOptions.model }),
         ...(curriedOptions.memory === undefined ? {} : { memory: curriedOptions.memory }),
         ...(curriedOptions.authorization === undefined ? {} : { authorization: curriedOptions.authorization }),
+        ...(curriedOptions.toolExecution === undefined ? {} : { toolExecution: curriedOptions.toolExecution }),
         ...(curriedOptions.metadata === undefined ? {} : { metadata: curriedOptions.metadata }),
       })
   }
@@ -306,6 +315,7 @@ export function make<
     ...(resolved.model === undefined ? {} : { model: resolved.model }),
     ...(resolved.memory === undefined ? {} : { memory: resolved.memory }),
     ...(resolved.authorization === undefined ? {} : { authorization: resolved.authorization }),
+    ...(resolved.toolExecution === undefined ? {} : { toolExecution: resolved.toolExecution }),
     ...(resolved.metadata === undefined ? {} : { metadata: resolved.metadata }),
     toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map((tool) => ({
       tool,
@@ -898,6 +908,16 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       const progressPolicy: ProgressOverflowPolicy = decodedProgressPolicy.value
 
       if (
+        agent.toolExecution !== undefined &&
+        (!Number.isSafeInteger(agent.toolExecution.concurrency) || agent.toolExecution.concurrency <= 0)
+      ) {
+        return yield* AgentError.make({
+          message: "Agent.toolExecution.concurrency must be a positive safe integer",
+          turn: 0,
+        })
+      }
+
+      if (
         options.compaction?.contextWindow !== undefined &&
         (!Number.isFinite(options.compaction.contextWindow) || options.compaction.contextWindow <= 0)
       ) {
@@ -1472,14 +1492,12 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                 ? Effect.succeed(successResult(call, outcome))
                 : boundedSuccessResult(call, outcome)
             ).pipe(
-              Effect.map((result) => {
-                state.pending.push(result)
-                return Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }])
-              }),
+              Effect.map((result) =>
+                Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }]),
+              ),
             )
           case "DomainFailure": {
             const result = domainFailureResult(call, outcome)
-            state.pending.push(result)
             return Effect.succeed(
               Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }]),
             )
@@ -1865,6 +1883,11 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         return modelPart
       }
 
+      const recordPending = (event: Event): Effect.Effect<void> =>
+        Effect.sync(() => {
+          if (event._tag === "ToolExecutionCompleted") state.pending.push(event.result)
+        })
+
       const transformPart = (
         turn: number,
         part: Response.StreamPart<any>,
@@ -2039,11 +2062,24 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           applyPromptChain(chain, Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
             Effect.map((transformedPrompt) =>
               attempt(transformedPrompt, true).pipe(
-                Stream.flatMap(({ accept, part, messages }) =>
-                  Stream.fromEffect(accept).pipe(
-                    Stream.flatMap(() => partEvents(turn, part, messages, activeRegistry)),
-                  ),
-                ),
+                Stream.mapEffect(({ accept, part, messages }) => accept.pipe(Effect.as({ part, messages }))),
+                (accepted) => {
+                  const concurrency = agent.toolExecution?.concurrency ?? 1
+                  if (concurrency === 1) {
+                    return accepted.pipe(
+                      Stream.flatMap(({ part, messages }) => partEvents(turn, part, messages, activeRegistry)),
+                      Stream.tap(recordPending),
+                    )
+                  }
+                  return accepted.pipe(
+                    Stream.mapEffect(
+                      ({ part, messages }) => Stream.runCollect(partEvents(turn, part, messages, activeRegistry)),
+                      { concurrency },
+                    ),
+                    Stream.flatMap(Stream.fromIterable),
+                    Stream.tap(recordPending),
+                  )
+                },
               ),
             ),
           ),
@@ -2338,7 +2374,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                     registry,
                     suspension.authorization_stage,
                     suspension.token,
-                  )
+                  ).pipe(Stream.tap(recordPending))
                 }),
               ),
             ),

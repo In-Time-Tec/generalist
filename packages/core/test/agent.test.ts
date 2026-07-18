@@ -421,6 +421,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     expect(agent.metadata).toEqual(metadata)
   })
 
+  it("carries tool execution policy through every Agent.make form", () => {
+    const toolExecution = { concurrency: 3 }
+
+    expect(Agent.make("direct-agent", { toolExecution }).toolExecution).toBe(toolExecution)
+    expect(Agent.make({ name: "object-agent", toolExecution }).toolExecution).toBe(toolExecution)
+    expect(Agent.make({ toolExecution })("curried-agent").toolExecution).toBe(toolExecution)
+  })
+
   it("constructs AgentError without a cause", () => {
     const error = AgentEvent.AgentError.make({ message: "boom", turn: 0 })
 
@@ -583,6 +591,34 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           expect(failure._tag).toBe("@batonfx/core/AgentError")
           expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
             "RunOptions.toolProgress must select a supported policy with a positive safe-integer capacity",
+          )
+        }
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails before model calls when tool execution concurrency is invalid", () => {
+    let modelCalls = 0
+    const invalidValues = [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN, Number.POSITIVE_INFINITY]
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("unexpected"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        for (const concurrency of invalidValues) {
+          const agent = Agent.make({ name: "invalid-tool-concurrency-agent", toolExecution: { concurrency } })
+          const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "hello" })))
+
+          expect(failure._tag).toBe("@batonfx/core/AgentError")
+          expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
+            "Agent.toolExecution.concurrency must be a positive safe integer",
           )
         }
         expect(modelCalls).toBe(0)
@@ -3861,6 +3897,128 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "runs sibling tool calls serially by default", () => {
+    let active = 0
+    let maximum = 0
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(
+                toolCallPart("serial-first", "echo", { text: "first" }),
+                toolCallPart("serial-second", "echo", { text: "second" }),
+                toolCallPart("serial-third", "echo", { text: "third" }),
+              )
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: (request) =>
+            Effect.acquireUseRelease(
+              Effect.sync(() => {
+                active += 1
+                maximum = Math.max(maximum, active)
+              }),
+              () =>
+                Effect.yieldNow.pipe(
+                  Effect.as({ _tag: "Success" as const, result: request.call.id, encodedResult: request.call.id }),
+                ),
+              () => Effect.sync(() => active--),
+            ),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        yield* Stream.runDrain(
+          Agent.stream(Agent.make({ name: "serial-tools", toolkit: Toolkit.make(echoTool) }), { prompt: "run" }),
+        )
+        expect(maximum).toBe(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "bounds concurrent sibling tool calls and checkpoints results in provider order", () => {
+    let active = 0
+    let maximum = 0
+    let modelCalls = 0
+    let allStarted: Deferred.Deferred<void> | undefined
+    const releases = new Map<string, Deferred.Deferred<void>>()
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(
+                toolCallPart("concurrent-first", "echo", { text: "first" }),
+                toolCallPart("concurrent-second", "echo", { text: "second" }),
+                toolCallPart("concurrent-third", "echo", { text: "third" }),
+                toolCallPart("concurrent-fourth", "echo", { text: "fourth" }),
+              )
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: (request) =>
+            Effect.acquireUseRelease(
+              Effect.gen(function* () {
+                active += 1
+                maximum = Math.max(maximum, active)
+                if (active === 3 && allStarted !== undefined) yield* Deferred.succeed(allStarted, undefined)
+              }),
+              () =>
+                Effect.gen(function* () {
+                  const release = releases.get(request.call.id)
+                  if (release === undefined) return yield* Effect.die("missing release")
+                  yield* Deferred.await(release)
+                  return { _tag: "Success" as const, result: request.call.id, encodedResult: request.call.id }
+                }),
+              () => Effect.sync(() => active--),
+            ),
+        }),
+        Approvals.autoApprove,
+        ModelMiddleware.identityLayer,
+      ),
+      Effect.gen(function* () {
+        allStarted = yield* Deferred.make<void>()
+        for (const id of ["concurrent-first", "concurrent-second", "concurrent-third", "concurrent-fourth"])
+          releases.set(id, yield* Deferred.make<void>())
+        const agent = Agent.make({
+          name: "concurrent-tools",
+          toolkit: Toolkit.make(echoTool),
+          toolExecution: { concurrency: 3 },
+        })
+        const fiber = yield* Stream.runCollect(Agent.stream(agent, { prompt: "run" })).pipe(Effect.forkChild)
+        yield* Deferred.await(allStarted)
+        expect(maximum).toBe(3)
+        yield* Deferred.succeed(releases.get("concurrent-third")!, undefined)
+        yield* Deferred.succeed(releases.get("concurrent-second")!, undefined)
+        yield* Deferred.succeed(releases.get("concurrent-first")!, undefined)
+        yield* Effect.yieldNow
+        yield* Deferred.succeed(releases.get("concurrent-fourth")!, undefined)
+        const events = yield* Fiber.join(fiber)
+        expect(events.filter((event) => event._tag === "ToolExecutionCompleted").map((event) => event.call.id)).toEqual(
+          ["concurrent-first", "concurrent-second", "concurrent-third", "concurrent-fourth"],
+        )
+        expect(
+          events
+            .filter((event) => event._tag === "ModelPart" && event.part.type === "tool-call")
+            .map((event) => (event._tag === "ModelPart" && event.part.type === "tool-call" ? event.part.id : "")),
+        ).toEqual(["concurrent-first", "concurrent-second", "concurrent-third", "concurrent-fourth"])
+        const completed = events.find((event) => event._tag === "TurnCompleted")
+        expect(completed?._tag).toBe("TurnCompleted")
+        if (completed?._tag === "TurnCompleted") {
+          expect(toolResultIds(completed.transcript)).toEqual([
+            "concurrent-first",
+            "concurrent-second",
+            "concurrent-third",
+            "concurrent-fourth",
+          ])
+        }
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "fails typed before turn observers when the result checkpoint cannot persist", () => {
     let saves = 0
     let remembered = false
@@ -4818,6 +4976,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         name: "ordered-policy-stop-agent",
         toolkit: Toolkit.make(echoTool),
         policy: TurnPolicy.recurs(0),
+        toolExecution: { concurrency: 2 },
       })
       const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "call twice" })))
       expect(failure._tag).toBe("@batonfx/core/TurnLimitExceeded")
@@ -5212,7 +5371,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.identityLayer,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "sibling-suspend-agent", toolkit: Toolkit.make(echoTool) })
+        const agent = Agent.make({
+          name: "sibling-suspend-agent",
+          toolkit: Toolkit.make(echoTool),
+          toolExecution: { concurrency: 2 },
+        })
         const first = Agent.stream(agent, { prompt: "run ordinary and child tools" }).pipe(
           Stream.tap((event) =>
             Effect.sync(() => {
@@ -5633,7 +5796,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           ModelMiddleware.identityLayer,
         ),
         Effect.gen(function* () {
-          const agent = Agent.make({ name: "provider-tool-agent", toolkit: Toolkit.make(gatedTool) })
+          const agent = Agent.make({
+            name: "provider-tool-agent",
+            toolkit: Toolkit.make(gatedTool),
+            toolExecution: { concurrency: 3 },
+          })
 
           const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "provider already handled it" }))
 
