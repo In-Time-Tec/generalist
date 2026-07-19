@@ -35,7 +35,7 @@ export const examples = definePage({
         ],
         [
           [code("structured-extraction")],
-          ["An offline ", code("Agent.generateObject"), " run that validates terminal model output with Effect Schema"],
+          ["An offline ", code("Agent.generate"), " run that validates terminal model output with Effect Schema"],
           [code("bun --cwd examples/structured-extraction start")],
         ],
         [

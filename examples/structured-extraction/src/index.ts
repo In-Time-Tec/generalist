@@ -14,7 +14,7 @@ const modelLayer = (
 const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data." })
 
 const program = Effect.gen(function* () {
-  const result = yield* Agent.generateObject(agent, {
+  const result = yield* Agent.generate(agent, {
     prompt: "Invoice total is 42 USD.",
     schema: invoiceSchema,
   })

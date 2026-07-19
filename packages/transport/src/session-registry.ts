@@ -359,7 +359,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
             persistence: { chatId: session.chatId },
             ...(resume === undefined ? {} : { resume }),
           }
-          const run = Agent.persisted(options.agent, runOptions).pipe(
+          const run = Agent.stream(options.agent, runOptions).pipe(
             Stream.runForEach((event) =>
               (event._tag === "TurnStarted"
                 ? setStatus(session.sessionId, session.coordination.runId, { _tag: "Running", turn: event.turn })

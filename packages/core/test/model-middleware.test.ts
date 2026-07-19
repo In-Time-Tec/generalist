@@ -225,7 +225,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "authority-agent", toolkit: Toolkit.make(echoTool) })
         const events = yield* Stream.runCollect(
-          Agent.persisted(agent, {
+          Agent.stream(agent, {
             prompt: "start",
             memory: { key: memoryKey },
             persistence: { chatId: "authority-chat" },
@@ -316,7 +316,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "duplicate-id-agent", toolkit: Toolkit.make(gatedEchoTool) })
         const events: Array<AgentEvent.Event> = []
-        const outcome = yield* Agent.persisted(agent, {
+        const outcome = yield* Agent.stream(agent, {
           prompt: "call three times",
           persistence: { chatId: "duplicate-id-chat" },
         }).pipe(
@@ -568,27 +568,27 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
 
         exitMode = "typed"
         const typed = yield* Effect.flip(
-          Stream.runDrain(Agent.persisted(agent, { prompt: "typed", persistence: { chatId: "typed" } })),
+          Stream.runDrain(Agent.stream(agent, { prompt: "typed", persistence: { chatId: "typed" } })),
         )
         expect(typed._tag).toBe("@batonfx/core/AgentError")
         yield* assertStored("typed")
 
         exitMode = "defect"
         const defect = yield* Effect.exit(
-          Stream.runDrain(Agent.persisted(agent, { prompt: "defect", persistence: { chatId: "defect" } })),
+          Stream.runDrain(Agent.stream(agent, { prompt: "defect", persistence: { chatId: "defect" } })),
         )
         expect(Exit.hasDies(defect)).toBe(true)
         yield* assertStored("defect")
 
         exitMode = "interrupt"
         const interrupt = yield* Effect.exit(
-          Stream.runDrain(Agent.persisted(agent, { prompt: "interrupt", persistence: { chatId: "interrupt" } })),
+          Stream.runDrain(Agent.stream(agent, { prompt: "interrupt", persistence: { chatId: "interrupt" } })),
         )
         expect(Exit.hasInterrupts(interrupt)).toBe(true)
         yield* assertStored("interrupt")
 
         exitMode = "early"
-        yield* Agent.persisted(agent, { prompt: "early", persistence: { chatId: "early" } }).pipe(
+        yield* Agent.stream(agent, { prompt: "early", persistence: { chatId: "early" } }).pipe(
           Stream.filter((event) => event._tag === "ModelPart"),
           Stream.take(1),
           Stream.runDrain,

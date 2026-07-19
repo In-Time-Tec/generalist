@@ -9,13 +9,13 @@ export const structuredOutput = definePage({
   navTitle: "Structured output",
   group: "Guides",
   description:
-    "End a run with a typed value: generateObject and streamObject add one terminal structured-output turn validated by an Effect Schema.",
+    "End a run with a typed value: generate and stream accept a schema for one terminal structured-output turn validated by Effect Schema.",
   content: [
     p(
       "When the caller needs a typed value instead of prose, run the agent with ",
-      code("Agent.generateObject"),
+      code("Agent.generate"),
       " or ",
-      code("Agent.streamObject"),
+      code("Agent.stream"),
       ". The normal loop runs first (tools, turns, policies all apply), then one terminal turn asks the model for output matching your Schema. Invalid output fails the run loudly; it never returns untyped data.",
     ),
     h2("define-the-schema", "1. Define the schema and fold to a value"),
@@ -25,7 +25,7 @@ export const structuredOutput = definePage({
       " struct codec as ",
       code("schema"),
       ". ",
-      code("generateObject"),
+      code("generate"),
       " folds the stream and returns ",
       code("result.value"),
       " already decoded to the schema's type:",
@@ -42,7 +42,7 @@ export const structuredOutput = definePage({
     ),
     h2("stream-the-events", "2. Stream the run when you need the events"),
     p(
-      code("streamObject"),
+      code("stream"),
       " is the same run as ",
       code("stream"),
       " plus a trailing ",

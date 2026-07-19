@@ -11,11 +11,11 @@ const applicationLayer = Layer.mergeAll(
 const agent = Agent.make({ name: "assistant", instructions: "Answer concisely." })
 
 const program = Effect.gen(function* () {
-  yield* Agent.generatePersisted(agent, {
+  yield* Agent.generate(agent, {
     prompt: "My name is Ada.",
     persistence: { chatId: "user-42" },
   })
-  const result = yield* Agent.generatePersisted(agent, {
+  const result = yield* Agent.generate(agent, {
     prompt: "What is my name?",
     persistence: { chatId: "user-42" },
   })

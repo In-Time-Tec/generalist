@@ -54,20 +54,20 @@ const runMemoryRequired = Agent.generate(plainRequiredAgent, {
   prompt: "hello",
   memory: { key: { agent: "plain-required", subject: "memory-subject" } },
 })
-const persistedRequired = Agent.persisted(plainRequiredAgent, {
+const persistedRequired = Agent.stream(plainRequiredAgent, {
   prompt: "hello",
   persistence: { chatId: "chat" },
 })
-const generatedPersistedRequired = Agent.generatePersisted(plainRequiredAgent, {
+const generatedPersistedRequired = Agent.generate(plainRequiredAgent, {
   prompt: "hello",
   persistence: { chatId: "chat" },
 })
-const persistedObjectRequired = Agent.persistedObject(plainRequiredAgent, {
+const persistedObjectRequired = Agent.stream(plainRequiredAgent, {
   prompt: "hello",
   persistence: { chatId: "chat" },
   schema: Schema.Struct({ value: Schema.String }),
 })
-const generatedPersistedObjectRequired = Agent.generatePersistedObject(plainRequiredAgent, {
+const generatedPersistedObjectRequired = Agent.generate(plainRequiredAgent, {
   prompt: "hello",
   persistence: { chatId: "chat" },
   schema: Schema.Struct({ value: Schema.String }),
@@ -154,7 +154,7 @@ const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<
     Equal<
       IsAssignable<{ readonly prompt: "hello"; readonly persistence: { readonly chatId: "chat" } }, Agent.RunOptions>,
-      false
+      true
     >
   >,
   true satisfies Assert<
@@ -165,9 +165,9 @@ const agentRequirementProofs: ReadonlyArray<true> = [
           readonly history: "history"
           readonly persistence: { readonly chatId: "chat" }
         },
-        Agent.PersistedRunOptions
+        Agent.RunOptions
       >,
-      false
+      true
     >
   >,
 ]
@@ -797,7 +797,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "scoped-structured-agent", model: selection })
         const agentFiber = yield* Effect.forkChild(
-          Agent.generateObject(agent, { prompt: "make object", schema: objectSchema }),
+          Agent.generate(agent, { prompt: "make object", schema: objectSchema }),
         )
         yield* Deferred.await(structuredEntered)
 
@@ -3534,7 +3534,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         yield* steering.followUp({ prompt: "follow before object" })
         const agent = Agent.make({ name: "follow-up-structured-agent" })
 
-        const events = yield* Stream.runCollect(Agent.streamObject(agent, { prompt: "start", schema: objectSchema }))
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start", schema: objectSchema }))
 
         expect(calls).toBe(2)
         expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(2)
@@ -4113,7 +4113,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           ),
         })
 
-        const failure = yield* Agent.persisted(agent, {
+        const failure = yield* Agent.stream(agent, {
           prompt: "persist the result checkpoint",
           persistence: { chatId: "checkpoint-save-failure" },
           memory: { key: { agent: "checkpoint-save-failure-agent", subject: "issue-67" } },
@@ -4196,9 +4196,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-agent" })
 
-        const events = yield* Stream.runCollect(
-          Agent.streamObject(agent, { prompt: "make object", schema: objectSchema }),
-        )
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "make object", schema: objectSchema }))
 
         expect(events.map((event) => event._tag)).toEqual([
           "TurnStarted",
@@ -4246,7 +4244,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "structured-span-agent" })
 
         const events = yield* Stream.runCollect(
-          Agent.streamObject(agent, { prompt: "make object", schema: objectSchema }),
+          Agent.stream(agent, { prompt: "make object", schema: objectSchema }),
         ).pipe(Effect.withTracer(tracer))
 
         const runSpan = spans.find((span) => span.name === "Baton.Agent.run")
@@ -4298,7 +4296,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-lazy-span-agent" })
 
-        const events = yield* Agent.streamObject(agent, { prompt: "make object", schema: objectSchema }).pipe(
+        const events = yield* Agent.stream(agent, { prompt: "make object", schema: objectSchema }).pipe(
           Stream.take(4),
           Stream.runCollect,
           Effect.withTracer(tracer),
@@ -4315,7 +4313,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(
     it,
-    "generateObject returns the typed structured value",
+    "generate returns the typed structured value when schema is set",
     () =>
       [
         Layer.mergeAll(
@@ -4330,7 +4328,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "generate-object-agent" })
 
-          const result = yield* Agent.generateObject(agent, { prompt: "make typed object", schema: objectSchema })
+          const result = yield* Agent.generate(agent, { prompt: "make typed object", schema: objectSchema })
 
           expect(result.text).toBe("normal answer")
           expect(result.turns).toBe(2)
@@ -4365,9 +4363,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-tool-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(
-          Agent.streamObject(agent, { prompt: "use tool", schema: objectSchema }),
-        ).pipe(Effect.withTracer(tracer))
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool", schema: objectSchema })).pipe(
+          Effect.withTracer(tracer),
+        )
 
         expect(streamCalls).toBe(2)
         expect(structuredPrompt).toContain("from model")
@@ -4419,7 +4417,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "structured-decode-agent" })
 
         const failure = yield* Effect.flip(
-          Stream.runCollect(Agent.streamObject(agent, { prompt: "bad object", schema: objectSchema })).pipe(
+          Stream.runCollect(Agent.stream(agent, { prompt: "bad object", schema: objectSchema })).pipe(
             Effect.withTracer(tracer),
           ),
         )
@@ -4459,7 +4457,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "structured-defect-agent" })
 
         const exit = yield* Stream.runDrain(
-          Agent.streamObject(agent, { prompt: "defect object", schema: objectSchema }),
+          Agent.stream(agent, { prompt: "defect object", schema: objectSchema }),
         ).pipe(Effect.withTracer(tracer), Effect.exit)
 
         expect(Exit.isFailure(exit)).toBe(true)
@@ -4498,7 +4496,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         structuredStarted = yield* Deferred.make<void>()
         const agent = Agent.make({ name: "structured-interrupt-agent" })
         const fiber = yield* Stream.runDrain(
-          Agent.streamObject(agent, { prompt: "interrupt object", schema: objectSchema }),
+          Agent.stream(agent, { prompt: "interrupt object", schema: objectSchema }),
         ).pipe(Effect.withTracer(tracer), Effect.forkChild)
 
         yield* Deferred.await(structuredStarted)
@@ -4567,7 +4565,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }
 
         const events = yield* Stream.runCollect(
-          Agent.streamObject(agent, {
+          Agent.stream(agent, {
             prompt: "ignored",
             history: checkpoint,
             resume: { suspension },
@@ -4624,9 +4622,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "resilient-structured-agent" })
 
-        const events = yield* Stream.runCollect(
-          Agent.streamObject(agent, { prompt: "retry object", schema: objectSchema }),
-        )
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "retry object", schema: objectSchema }))
 
         expect(structuredCalls).toBe(2)
         const structured = events.find((event) => event._tag === "StructuredOutput")
@@ -4656,7 +4652,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "terminal-structured-overflow-agent", model: overflowSelection })
 
         const failure = yield* Effect.flip(
-          Stream.runCollect(Agent.streamObject(agent, { prompt: "large object", schema: objectSchema })),
+          Stream.runCollect(Agent.stream(agent, { prompt: "large object", schema: objectSchema })),
         )
 
         expect(structuredCalls).toBe(1)

@@ -268,7 +268,7 @@ const progressOverflowPolicySchema = Schema.Union([
   Schema.TaggedStruct("Fail", { capacity: progressCapacitySchema }),
 ])
 
-/** @experimental */
+/** @experimental Options for an agent run. Set `schema` for a structured-output run; set `persistence` for a persisted run. */
 export interface RunOptions {
   /** User input for the first turn. Ignored when `resume` is set. */
   readonly prompt: Prompt.RawInput
@@ -295,21 +295,13 @@ export interface RunOptions {
   readonly memory?: {
     readonly key: Key
   }
-  /** @experimental Persisted execution uses the dedicated persisted entrypoints. */
-  readonly persistence?: never
-}
-
-/** @experimental Options for a run backed by persisted chat history. */
-export interface PersistedRunOptions extends Omit<RunOptions, "history" | "persistence"> {
-  readonly history?: never
-  readonly persistence: {
+  readonly persistence?: {
     readonly chatId: string
     readonly timeToLive?: Duration.Input
   }
-}
-
-type InternalRunOptions = Omit<RunOptions, "persistence"> & {
-  readonly persistence?: PersistedRunOptions["persistence"]
+  readonly schema?: ObjectSchema
+  readonly objectName?: string
+  readonly objectPrompt?: Prompt.RawInput
 }
 
 type OperationRequirements<O> = [Exclude<OptionValue<O, "memory">, undefined>] extends [never] ? never : Memory
@@ -329,20 +321,6 @@ const steeringDrainedEvent = (
   queue,
   count: messages.length,
 })
-
-/** @experimental Options for a run that ends in a schema-validated result. */
-export interface ObjectRunOptions<StructuredOutputSchema extends ObjectSchema> extends RunOptions {
-  readonly schema: StructuredOutputSchema
-  readonly objectName?: string
-  readonly objectPrompt?: Prompt.RawInput
-}
-
-/** @experimental Persisted options for a schema-validated run. */
-export interface PersistedObjectRunOptions<StructuredOutputSchema extends ObjectSchema> extends PersistedRunOptions {
-  readonly schema: StructuredOutputSchema
-  readonly objectName?: string
-  readonly objectPrompt?: Prompt.RawInput
-}
 
 interface StructuredRunConfig<StructuredOutputSchema extends ObjectSchema> {
   readonly schema: StructuredOutputSchema
@@ -712,7 +690,7 @@ const applyPartChain = (
 
 const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
   agent: Agent<Tools, R>,
-  options: InternalRunOptions,
+  options: RunOptions,
   structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
 ): Stream.Stream<Event, RunError, R | StructuredOutputSchema["DecodingServices"]> =>
   Stream.unwrap(
@@ -2505,84 +2483,6 @@ export const provideModel: {
   }),
 )
 
-/** @experimental The text primitive; everything else derives from it. */
-export const stream: {
-  <O extends RunOptions>(
-    options: O,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-  ) => Stream.Stream<Event, RunError, R | OperationRequirements<O>>
-  <Tools extends Record<string, Tool.Any>, R, O extends RunOptions>(
-    agent: Agent<Tools, R>,
-    options: O,
-  ): Stream.Stream<Event, RunError, R | OperationRequirements<O>>
-} = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-  streamInternal(agent, options, undefined),
-)
-
-/** @experimental The persisted text streaming primitive. */
-export const persisted: {
-  <O extends PersistedRunOptions>(
-    options: O,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-  ) => Stream.Stream<Event, RunError, R | Chat.Persistence | OperationRequirements<O>>
-  <Tools extends Record<string, Tool.Any>, R, O extends PersistedRunOptions>(
-    agent: Agent<Tools, R>,
-    options: O,
-  ): Stream.Stream<Event, RunError, R | Chat.Persistence | OperationRequirements<O>>
-} = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: PersistedRunOptions) =>
-  streamInternal(agent, options, undefined),
-)
-
-/** @experimental `stream` plus one terminal structured-output turn before `Completed`. */
-export const streamObject: {
-  <O extends ObjectRunOptions<ObjectSchema>>(
-    options: O,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-  ) => Stream.Stream<Event, RunError, R | OperationRequirements<O> | O["schema"]["DecodingServices"]>
-  <Tools extends Record<string, Tool.Any>, R, O extends ObjectRunOptions<ObjectSchema>>(
-    agent: Agent<Tools, R>,
-    options: O,
-  ): Stream.Stream<Event, RunError, R | OperationRequirements<O> | O["schema"]["DecodingServices"]>
-} = dual(
-  2,
-  <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
-    agent: Agent<Tools, R>,
-    options: ObjectRunOptions<StructuredOutputSchema>,
-  ): Stream.Stream<Event, RunError, R | StructuredOutputSchema["DecodingServices"]> =>
-    streamInternal(agent, options, {
-      schema: options.schema,
-      objectName: options.objectName ?? "output",
-      objectPrompt: options.objectPrompt ?? defaultObjectPrompt,
-    }),
-)
-
-/** @experimental Persisted structured-output streaming. */
-export const persistedObject: {
-  <O extends PersistedObjectRunOptions<ObjectSchema>>(
-    options: O,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-  ) => Stream.Stream<Event, RunError, R | Chat.Persistence | OperationRequirements<O> | O["schema"]["DecodingServices"]>
-  <Tools extends Record<string, Tool.Any>, R, O extends PersistedObjectRunOptions<ObjectSchema>>(
-    agent: Agent<Tools, R>,
-    options: O,
-  ): Stream.Stream<Event, RunError, R | Chat.Persistence | OperationRequirements<O> | O["schema"]["DecodingServices"]>
-} = dual(
-  2,
-  <Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema>(
-    agent: Agent<Tools, R>,
-    options: PersistedObjectRunOptions<S>,
-  ) =>
-    streamInternal(agent, options, {
-      schema: options.schema,
-      objectName: options.objectName ?? "output",
-      objectPrompt: options.objectPrompt ?? defaultObjectPrompt,
-    }),
-)
-
 /** @experimental Result of a non-streaming run. */
 export interface Result {
   readonly text: string
@@ -2595,49 +2495,43 @@ export interface ObjectResult<A> extends Result {
   readonly value: A
 }
 
-/** @experimental `stream` folded to its `Completed` event. */
-export const generate: {
+type SchemaOf<O> = O extends { readonly schema: infer S extends ObjectSchema } ? S : never
+
+type RunRequirements<R, O> =
+  | R
+  | OperationRequirements<O>
+  | (O extends { readonly persistence: object } ? Chat.Persistence : never)
+  | ([SchemaOf<O>] extends [never] ? never : SchemaOf<O>["DecodingServices"])
+
+type RunResult<O> = [SchemaOf<O>] extends [never] ? Result : ObjectResult<SchemaOf<O>["Type"]>
+
+/** @experimental Stream an agent run as Events. Set options.schema for structured output; set options.persistence for a persisted run. */
+export const stream: {
   <O extends RunOptions>(
     options: O,
   ): <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent<Tools, R>,
-  ) => Effect.Effect<Result, RunError, R | OperationRequirements<O>>
+  ) => Stream.Stream<Event, RunError, RunRequirements<R, O>>
   <Tools extends Record<string, Tool.Any>, R, O extends RunOptions>(
     agent: Agent<Tools, R>,
     options: O,
-  ): Effect.Effect<Result, RunError, R | OperationRequirements<O>>
-} = dual(
-  2,
-  <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-    options: RunOptions,
-  ): Effect.Effect<Result, RunError, R | Memory> =>
-    Stream.runLast(stream(agent, options)).pipe(
-      Effect.flatMap(
-        Option.match({
-          onNone: () => Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
-          onSome: (event) =>
-            event._tag === "Completed"
-              ? Effect.succeed({ text: event.text, turns: event.turns, transcript: event.transcript })
-              : Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
-        }),
-      ),
-    ),
+  ): Stream.Stream<Event, RunError, RunRequirements<R, O>>
+} = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
+  streamInternal(
+    agent,
+    options,
+    options.schema === undefined
+      ? undefined
+      : {
+          schema: options.schema,
+          objectName: options.objectName ?? "output",
+          objectPrompt: options.objectPrompt ?? defaultObjectPrompt,
+        },
+  ),
 )
 
-/** @experimental A persisted run folded to its completed event. */
-export const generatePersisted: {
-  <O extends PersistedRunOptions>(
-    options: O,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-  ) => Effect.Effect<Result, RunError, R | Chat.Persistence | OperationRequirements<O>>
-  <Tools extends Record<string, Tool.Any>, R, O extends PersistedRunOptions>(
-    agent: Agent<Tools, R>,
-    options: O,
-  ): Effect.Effect<Result, RunError, R | Chat.Persistence | OperationRequirements<O>>
-} = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: PersistedRunOptions) =>
-  Stream.runLast(persisted(agent, options)).pipe(
+const generateText = <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
+  Stream.runLast(stream(agent, options)).pipe(
     Effect.flatMap(
       Option.match({
         onNone: () => Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
@@ -2647,134 +2541,54 @@ export const generatePersisted: {
             : Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
       }),
     ),
-  ),
-)
+  )
 
-/** @experimental `streamObject` folded to its `StructuredOutput` and `Completed` events. */
-export const generateObject: {
-  <O extends ObjectRunOptions<ObjectSchema>>(
-    options: O,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R>,
-  ) => Effect.Effect<
-    ObjectResult<O["schema"]["Type"]>,
-    RunError,
-    R | OperationRequirements<O> | O["schema"]["DecodingServices"]
-  >
-  <Tools extends Record<string, Tool.Any>, R, O extends ObjectRunOptions<ObjectSchema>>(
-    agent: Agent<Tools, R>,
-    options: O,
-  ): Effect.Effect<
-    ObjectResult<O["schema"]["Type"]>,
-    RunError,
-    R | OperationRequirements<O> | O["schema"]["DecodingServices"]
-  >
-} = dual(
-  2,
-  <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
-    agent: Agent<Tools, R>,
-    options: ObjectRunOptions<StructuredOutputSchema>,
-  ): Effect.Effect<
-    ObjectResult<StructuredOutputSchema["Type"]>,
-    RunError,
-    R | StructuredOutputSchema["DecodingServices"]
-  > =>
-    Stream.runFold(
-      streamObject(agent, options),
-      () => ({
-        value: Option.none<StructuredOutputSchema["Type"]>(),
-        completed: Option.none<Completed>(),
+const generateObjectResult = <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
+  Stream.runFold(
+    stream(agent, options),
+    () => ({ value: Option.none<unknown>(), completed: Option.none<Completed>() }),
+    (acc, event) =>
+      event._tag === "StructuredOutput"
+        ? { ...acc, value: Option.some(event.value) }
+        : event._tag === "Completed"
+          ? { ...acc, completed: Option.some(event) }
+          : acc,
+  ).pipe(
+    Effect.flatMap(({ value, completed }) =>
+      Option.match(completed, {
+        onNone: () =>
+          Effect.fail(AgentError.make({ message: "Agent object run ended without a Completed event", turn: 0 })),
+        onSome: (event) =>
+          Option.match(value, {
+            onNone: () =>
+              Effect.fail(
+                AgentError.make({ message: "Agent object run ended without a StructuredOutput event", turn: 0 }),
+              ),
+            onSome: (typedValue) =>
+              Effect.succeed({
+                text: event.text,
+                turns: event.turns,
+                transcript: event.transcript,
+                value: typedValue,
+              }),
+          }),
       }),
-      (acc, event) => {
-        if (event._tag === "StructuredOutput") {
-          return { ...acc, value: Option.some(event.value as StructuredOutputSchema["Type"]) }
-        }
-        if (event._tag === "Completed") {
-          return { ...acc, completed: Option.some(event) }
-        }
-        return acc
-      },
-    ).pipe(
-      Effect.flatMap(({ value, completed }) =>
-        Option.match(completed, {
-          onNone: () =>
-            Effect.fail(AgentError.make({ message: "Agent object run ended without a Completed event", turn: 0 })),
-          onSome: (event) =>
-            Option.match(value, {
-              onNone: () =>
-                Effect.fail(
-                  AgentError.make({
-                    message: "Agent object run ended without a StructuredOutput event",
-                    turn: 0,
-                  }),
-                ),
-              onSome: (typedValue) =>
-                Effect.succeed({
-                  text: event.text,
-                  turns: event.turns,
-                  transcript: event.transcript,
-                  value: typedValue,
-                }),
-            }),
-        }),
-      ),
     ),
-)
+  )
 
-/** @experimental A persisted structured-output run folded to its result. */
-export const generatePersistedObject: {
-  <O extends PersistedObjectRunOptions<ObjectSchema>>(
+/** @experimental Run an agent to completion. Returns ObjectResult when options.schema is set, otherwise Result. */
+export const generate: {
+  <O extends RunOptions>(
     options: O,
   ): <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent<Tools, R>,
-  ) => Effect.Effect<
-    ObjectResult<O["schema"]["Type"]>,
-    RunError,
-    R | Chat.Persistence | OperationRequirements<O> | O["schema"]["DecodingServices"]
-  >
-  <Tools extends Record<string, Tool.Any>, R, O extends PersistedObjectRunOptions<ObjectSchema>>(
+  ) => Effect.Effect<RunResult<O>, RunError, RunRequirements<R, O>>
+  <Tools extends Record<string, Tool.Any>, R, O extends RunOptions>(
     agent: Agent<Tools, R>,
     options: O,
-  ): Effect.Effect<
-    ObjectResult<O["schema"]["Type"]>,
-    RunError,
-    R | Chat.Persistence | OperationRequirements<O> | O["schema"]["DecodingServices"]
-  >
+  ): Effect.Effect<RunResult<O>, RunError, RunRequirements<R, O>>
 } = dual(
   2,
-  <Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema>(
-    agent: Agent<Tools, R>,
-    options: PersistedObjectRunOptions<S>,
-  ) =>
-    Stream.runFold(
-      persistedObject(agent, options),
-      () => ({ value: Option.none<S["Type"]>(), completed: Option.none<Completed>() }),
-      (acc, event) =>
-        event._tag === "StructuredOutput"
-          ? { ...acc, value: Option.some(event.value as S["Type"]) }
-          : event._tag === "Completed"
-            ? { ...acc, completed: Option.some(event) }
-            : acc,
-    ).pipe(
-      Effect.flatMap(({ value, completed }) =>
-        Option.match(completed, {
-          onNone: () =>
-            Effect.fail(AgentError.make({ message: "Agent object run ended without a Completed event", turn: 0 })),
-          onSome: (event) =>
-            Option.match(value, {
-              onNone: () =>
-                Effect.fail(
-                  AgentError.make({ message: "Agent object run ended without a StructuredOutput event", turn: 0 }),
-                ),
-              onSome: (typedValue) =>
-                Effect.succeed({
-                  text: event.text,
-                  turns: event.turns,
-                  transcript: event.transcript,
-                  value: typedValue,
-                }),
-            }),
-        }),
-      ),
-    ),
+  <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
+    (options.schema === undefined ? generateText(agent, options) : generateObjectResult(agent, options)) as any,
 )

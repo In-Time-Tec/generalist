@@ -45,11 +45,11 @@ const applicationLayer = Layer.mergeAll(
 const agent = Agent.make({ name: "assistant", instructions: "Answer concisely." })
 
 const program = Effect.gen(function* () {
-  yield* Agent.generatePersisted(agent, {
+  yield* Agent.generate(agent, {
     prompt: "My name is Ada.",
     persistence: { chatId: "user-42" },
   })
-  const result = yield* Agent.generatePersisted(agent, {
+  const result = yield* Agent.generate(agent, {
     prompt: "What is my name?",
     persistence: { chatId: "user-42" },
   })
@@ -148,7 +148,7 @@ Placement adapters likewise return `DomainFailure { failure }` instead of `Failu
 
 ### Turn policy migration
 
-Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, so a standalone app has no conversation continuity between runs. Use `Agent.generatePersisted` to run the loop on a **persisted** chat instead: the chat identified by `chatId` is created on first use and accumulates history across runs.
+Baton's loop builds its `Ai.Chat` internally and discards it when the run ends, so a standalone app has no conversation continuity between runs. Use `Agent.generate` to run the loop on a **persisted** chat instead: the chat identified by `chatId` is created on first use and accumulates history across runs.
 `TurnPolicy` decision Effects expose their requirements and typed `TurnPolicyError` failures. Stops require a schema-backed reason, and only `TurnLimit` is surfaced as `TurnLimitExceeded`; other stops surface as `TurnPolicyStopped` with the reason and pending tool checkpoint.
 
 The default policy is `TurnPolicy.forever`: Baton imposes no follow-up-turn count, and a turn with no pending tool results still completes the run naturally. `forever` carries the portable snapshot `{ _tag: "Forever" }`, which is distinct from an absent snapshot (an opaque custom policy) and from a legacy persisted record with no policy field; it is never encoded as `Infinity`, `null`, or a `Recurs` sentinel. Consumers that relied on the previous implicit eight-follow-up cap must opt in explicitly with `TurnPolicy.recurs(8)`. Cancellation, interruption, budgets, and tool governance remain independent controls.
@@ -174,11 +174,11 @@ const agent = Agent.make({ name: "assistant", instructions: "You are a helpful a
 
 // Run 1 and run 2 share the same chatId, so run 2 sees run 1's history.
 const program = Effect.gen(function* () {
-const first = yield* Agent.generatePersisted(agent, {
+const first = yield* Agent.generate(agent, {
 prompt: "My name is Ada.",
 persistence: { chatId: "user-42" },
 })
-const second = yield\* Agent.generatePersisted(agent, {
+const second = yield\* Agent.generate(agent, {
 prompt: "What is my name?",
 persistence: { chatId: "user-42" },
 })
@@ -189,8 +189,8 @@ return [first.text, second.text]
 
 Notes:
 
-- Persisted entrypoints expose `Chat.Persistence` in their Effect requirement, so a missing layer is caught by type checking.
-- Ordinary run options reject `persistence`; persisted run options require it and reject `history`.
+- Runs with `persistence` expose `Chat.Persistence` in their Effect requirement, so a missing layer is caught by type checking.
+- `RunOptions` accepts optional `persistence`, `history`, and `schema` on the same two run functions.
 - `Agent.provideModel(layer)` embeds an infallible language-model layer and discharges `LanguageModel` from the agent requirements while preserving the layer's own requirements and scoped lifetime.
 - On a persisted chat the agent's system message is stored once on the first run and not re-added on subsequent runs.
 ```

@@ -186,7 +186,7 @@ export const transportReference = definePage({
       " and ",
       code("Ai.Chat.Persistence"),
       " and runs each send as ",
-      code("Agent.persisted"),
+      code("Agent.stream"),
       " with ",
       code("persistence: { chatId }"),
       ".",

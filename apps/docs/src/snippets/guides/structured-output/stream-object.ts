@@ -13,7 +13,7 @@ const modelLayer = Layer.effect(
   }),
 )
 
-const program = Agent.streamObject(agent, {
+const program = Agent.stream(agent, {
   prompt: "Invoice total is 42 USD.",
   schema: invoiceSchema,
   objectName: "invoice",

@@ -8,7 +8,7 @@
 - Framework tool calls run serially by default. `Agent.make({ toolExecution: { concurrency: n } })` allows at most `n` calls from one model turn to execute together while events, results, and checkpoints stay in provider call order. Provider-executed calls are never run locally.
 - Declared tool failures remain schema-valid domain results. Routing, schema, handler-boundary, placement, and authorization failures terminate through typed `FrameworkFailure` values.
 - A policy stop with pending results is typed. It never silently drops results.
-- Ordinary and persisted runs are separate entrypoints; persisted runs require Effect AI `Chat.Persistence`.
+- `Agent.stream` and `Agent.generate` cover every run; `schema` selects structured output and `persistence` requires Effect AI `Chat.Persistence`.
 - Agent requirements remain visible through model selection, memory, tool handlers, policies, handoffs, and transport composition.
 
 Optional seams are discovered only when their behavior is truly optional. Every behavior-bearing seam has a test or memory layer.

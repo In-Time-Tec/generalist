@@ -89,12 +89,8 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "continuity-agent", instructions: "system seed" })
 
-          yield* Stream.runDrain(
-            Agent.persisted(agent, { prompt: "first user message", persistence: { chatId: "c1" } }),
-          )
-          yield* Stream.runDrain(
-            Agent.persisted(agent, { prompt: "second user message", persistence: { chatId: "c1" } }),
-          )
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "first user message", persistence: { chatId: "c1" } }))
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "second user message", persistence: { chatId: "c1" } }))
 
           const transcript = yield* historyText("c1")
           expect(transcript).toContain("first user message")
@@ -119,11 +115,11 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "seed-agent", instructions: "the one system message" })
 
-          yield* Stream.runDrain(Agent.persisted(agent, { prompt: "hello", persistence: { chatId: "seed" } }))
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "hello", persistence: { chatId: "seed" } }))
           const afterFirst = yield* systemMessageCount("seed")
           const firstTranscript = yield* historyText("seed")
 
-          yield* Stream.runDrain(Agent.persisted(agent, { prompt: "again", persistence: { chatId: "seed" } }))
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "again", persistence: { chatId: "seed" } }))
           const afterSecond = yield* systemMessageCount("seed")
 
           expect(afterFirst).toBe(1)
@@ -148,8 +144,8 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "isolation-agent", instructions: "system" })
 
-          yield* Stream.runDrain(Agent.persisted(agent, { prompt: "message for A", persistence: { chatId: "a" } }))
-          yield* Stream.runDrain(Agent.persisted(agent, { prompt: "message for B", persistence: { chatId: "b" } }))
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "message for A", persistence: { chatId: "a" } }))
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "message for B", persistence: { chatId: "b" } }))
 
           const a = yield* historyText("a")
           const b = yield* historyText("b")
@@ -180,7 +176,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         ),
         Effect.gen(function* () {
           const agent = Agent.make({ name: "structured-persistence-agent" })
-          const result = yield* Agent.generatePersistedObject(agent, {
+          const result = yield* Agent.generate(agent, {
             prompt: "persist a structured answer",
             persistence: { chatId: "structured" },
             schema: Schema.Struct({ value: Schema.String }),
@@ -226,7 +222,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           activated_skills: [],
         })
 
-        const mismatch = yield* Agent.persisted(agent, {
+        const mismatch = yield* Agent.stream(agent, {
           prompt: "ignored",
           persistence: { chatId: "missing-resume-chat" },
           resume: { suspension },
@@ -286,7 +282,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         persistenceLayer,
       ),
       Effect.gen(function* () {
-        const failure = yield* Agent.generatePersistedObject(Agent.make({ name: "structured-failure-agent" }), {
+        const failure = yield* Agent.generate(Agent.make({ name: "structured-failure-agent" }), {
           prompt: "structured failure",
           persistence: { chatId: "structured-failure" },
           schema: Schema.Struct({ value: Schema.String }),
@@ -358,7 +354,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           })
 
           const failure = yield* Effect.flip(
-            Stream.runDrain(Agent.persisted(agent, { prompt: "please wait", persistence: { chatId: "s1" } })),
+            Stream.runDrain(Agent.stream(agent, { prompt: "please wait", persistence: { chatId: "s1" } })),
           )
 
           expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
@@ -374,7 +370,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           const session = yield* Session.SessionStore
           expect(Session.buildContext(yield* session.path()).content).toEqual(suspendedHistory.content)
 
-          const mismatch = yield* Agent.persisted(agent, {
+          const mismatch = yield* Agent.stream(agent, {
             prompt: "ignored",
             persistence: { chatId: "s1" },
             resume: {
@@ -387,7 +383,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           expect(suspendedExecutions).toBe(1)
 
           const events = yield* Stream.runCollect(
-            Agent.persisted(agent, {
+            Agent.stream(agent, {
               prompt: "ignored",
               persistence: { chatId: "s1" },
               resume: { suspension: failure },
@@ -397,7 +393,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           expect(events.at(-1)?._tag).toBe("Completed")
           expect(resumeSawStoredContext).toBe(true)
           const completedTranscript = yield* historyText("s1")
-          const duplicate = yield* Agent.persisted(agent, {
+          const duplicate = yield* Agent.stream(agent, {
             prompt: "ignored",
             persistence: { chatId: "s1" },
             resume: { suspension: failure },
@@ -443,13 +439,13 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "re-suspend-agent", toolkit: Toolkit.make(echoTool) })
-        const first = yield* Agent.persisted(agent, {
+        const first = yield* Agent.stream(agent, {
           prompt: "suspend twice",
           persistence: { chatId: "re-suspend" },
         }).pipe(Stream.runDrain, Effect.flip)
         if (first._tag !== "@batonfx/core/AgentSuspended") return expect.unreachable()
 
-        const second = yield* Agent.persisted(agent, {
+        const second = yield* Agent.stream(agent, {
           prompt: "ignored",
           persistence: { chatId: "re-suspend" },
           resume: { suspension: first },
@@ -463,7 +459,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         expect(second.token).toBe("wait-2")
         expect(Session.buildContext(yield* session.path()).content).toEqual(history.content)
 
-        yield* Agent.persisted(agent, {
+        yield* Agent.stream(agent, {
           prompt: "ignored",
           persistence: { chatId: "re-suspend" },
           resume: { suspension: second },
@@ -526,7 +522,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           ],
         })
 
-        const mismatch = yield* Agent.persisted(
+        const mismatch = yield* Agent.stream(
           Agent.make({ name: "stale-recovery-agent", toolkit: Toolkit.make(echoTool) }),
           {
             prompt: "ignored",
@@ -609,7 +605,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "checkpoint-append-failure-agent", instructions: "system seed" })
 
-        const failure = yield* Agent.persisted(agent, {
+        const failure = yield* Agent.stream(agent, {
           prompt: "never sent",
           persistence: { chatId: "checkpoint-append-failure" },
         }).pipe(Stream.runDrain, Effect.flip)
@@ -644,7 +640,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           persistenceLayer,
         ),
         Effect.gen(function* () {
-          const failure = yield* Agent.persisted(
+          const failure = yield* Agent.stream(
             Agent.make({ name: "duplicate-persisted-agent", toolkit: Toolkit.make(echoTool) }),
             {
               prompt: "duplicate",
@@ -708,16 +704,12 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         releaseFirst = yield* Deferred.make<void>()
         const agent = Agent.make({ name: "concurrent-checkpoint-agent" })
         const first = yield* Effect.forkChild(
-          Stream.runDrain(
-            Agent.persisted(agent, { prompt: "first concurrent", persistence: { chatId: "concurrent" } }),
-          ),
+          Stream.runDrain(Agent.stream(agent, { prompt: "first concurrent", persistence: { chatId: "concurrent" } })),
           { startImmediately: true },
         )
         yield* Deferred.await(firstEntered)
         const second = yield* Effect.forkChild(
-          Stream.runDrain(
-            Agent.persisted(agent, { prompt: "second concurrent", persistence: { chatId: "concurrent" } }),
-          ),
+          Stream.runDrain(Agent.stream(agent, { prompt: "second concurrent", persistence: { chatId: "concurrent" } })),
           { startImmediately: true },
         )
         yield* Effect.yieldNow
@@ -766,12 +758,12 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         firstEntered = yield* Deferred.make<void>()
         const agent = Agent.make({ name: "interrupted-checkpoint-agent" })
         const first = yield* Effect.forkChild(
-          Stream.runDrain(Agent.persisted(agent, { prompt: "interrupted", persistence: { chatId: "interrupted" } })),
+          Stream.runDrain(Agent.stream(agent, { prompt: "interrupted", persistence: { chatId: "interrupted" } })),
           { startImmediately: true },
         )
         yield* Deferred.await(firstEntered)
         yield* Fiber.interrupt(first)
-        yield* Stream.runDrain(Agent.persisted(agent, { prompt: "completed", persistence: { chatId: "interrupted" } }))
+        yield* Stream.runDrain(Agent.stream(agent, { prompt: "completed", persistence: { chatId: "interrupted" } }))
 
         expect(calls).toBe(2)
         expect(yield* historyText("interrupted")).toContain("completed")
@@ -860,7 +852,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         pathEntered = yield* Deferred.make<void>()
         const agent = Agent.make({ name: "interrupted-checkpoint-path-agent" })
         const first = yield* Effect.forkChild(
-          Agent.persisted(agent, {
+          Agent.stream(agent, {
             prompt: "first",
             persistence: { chatId: "interrupted-checkpoint-path" },
           }).pipe(Stream.runDrain),
@@ -868,7 +860,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         )
         yield* Deferred.await(pathEntered)
         yield* Fiber.interrupt(first)
-        yield* Agent.persisted(agent, {
+        yield* Agent.stream(agent, {
           prompt: "second",
           persistence: { chatId: "interrupted-checkpoint-path" },
         }).pipe(Stream.runDrain)

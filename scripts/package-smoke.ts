@@ -203,7 +203,7 @@ const memoryAgent = Agent.make({
 type MemoryAgentRequirements = Assert<
   Equal<Agent.Requirements<typeof memoryAgent>, LanguageModel.LanguageModel | Memory.Memory>
 >
-const persistedRun = Agent.persisted(memoryAgent, {
+const persistedRun = Agent.stream(memoryAgent, {
   prompt: "hello",
   persistence: { chatId: "package-smoke" },
 })
