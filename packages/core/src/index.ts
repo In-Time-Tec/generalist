@@ -18,6 +18,7 @@ export * as ToolAuthorization from "./tool-authorization.js"
 export * as ToolContext from "./tool-context.js"
 export * as ToolExecutor from "./tool-executor.js"
 export * as ToolOutput from "./tool-output.js"
+export * as ToolPlacement from "./tool-placement.js"
 export * as TurnPolicy from "./turn-policy.js"
 
 export {

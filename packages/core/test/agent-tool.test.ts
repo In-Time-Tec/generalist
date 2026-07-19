@@ -12,6 +12,7 @@ import {
   ModelMiddleware,
   ToolContext,
   ToolExecutor,
+  ToolPlacement,
 } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
@@ -430,7 +431,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             operationKey: ({ call }) => call.id,
             maxRetries: 1,
             schedule: Schedule.recurs(1),
-            execute: ({ call }): Effect.Effect<ToolExecutor.PlacementResponse, string> =>
+            execute: ({ call }): Effect.Effect<ToolPlacement.PlacementResponse, string> =>
               Effect.gen(function* () {
                 attempts += 1
                 if ("toolFailure" in (call.params as Record<string, unknown>)) {
@@ -484,7 +485,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           ToolExecutor.remote({
             toolkit,
             schedule: Schedule.recurs(1),
-            execute: (): Effect.Effect<ToolExecutor.PlacementResponse, string> => {
+            execute: (): Effect.Effect<ToolPlacement.PlacementResponse, string> => {
               attempts += 1
               return Effect.fail("network unavailable")
             },
@@ -521,7 +522,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             operationKey: ({ call, sessionId }) => `${sessionId}:${call.id}`,
             maxRetries: 2,
             schedule: Schedule.forever,
-            execute: ({ operationKey }): Effect.Effect<ToolExecutor.PlacementResponse, string> =>
+            execute: ({ operationKey }): Effect.Effect<ToolPlacement.PlacementResponse, string> =>
               Effect.gen(function* () {
                 attempts += 1
                 observedKeys.push(operationKey)
@@ -695,7 +696,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       operationKey: ({ call }) => call.id,
       maxRetries: 2,
       schedule: Schedule.forever,
-      execute: ({ call }): Effect.Effect<ToolExecutor.PlacementResponse, string | AgentEvent.AgentError> => {
+      execute: ({ call }): Effect.Effect<ToolPlacement.PlacementResponse, string | AgentEvent.AgentError> => {
         const mode = (call.params as { readonly mode: string }).mode
         attempts[mode] = (attempts[mode] ?? 0) + 1
         if (mode === "domain") return Effect.succeed({ _tag: "DomainFailure", failure: { message: "not found" } })

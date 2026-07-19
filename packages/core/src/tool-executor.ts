@@ -1,7 +1,20 @@
-import { Context, Effect, Layer, Option, Schedule, Schema, Sink, Stream } from "effect"
+import { Context, Effect, Layer, Option, Schema, Sink, Stream } from "effect"
 import { AiError, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError } from "./agent-event.js"
 import { ToolContext } from "./tool-context.js"
+import {
+  type Placement,
+  type PlacementRequest,
+  type PlacementResponse,
+  type PlacementRouteOptions,
+  placementOutcome,
+  type RemoteRouteOptions,
+  type RemoteRouteRetrySafeOptions,
+  type Route,
+  type RouteInput,
+  type RouteOptions,
+} from "./tool-placement.js"
+import { toolResultCodec } from "./tool-result-codec.js"
 /** @experimental */
 export interface Request {
   readonly call: Response.ToolCallPart<string, unknown>
@@ -78,188 +91,6 @@ export class ToolExecutor extends Context.Service<ToolExecutor, Interface>()(
 /** @experimental */
 export type ToolkitInput<Tools extends Record<string, Tool.Any>> = Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
 
-/** @experimental */
-export interface Route {
-  readonly tools: ReadonlyArray<string>
-  readonly matches: (request: Request) => boolean
-  readonly execute: Interface["execute"]
-}
-
-/** @experimental */
-export interface RouteOptions {
-  readonly tools?: ReadonlyArray<string> | undefined
-  readonly matches?: ((request: Request) => boolean) | undefined
-  readonly execute: Interface["execute"]
-}
-
-/** @experimental */
-export type RouteInput<R = never> = Route | Effect.Effect<Route, never, R>
-
-/** @experimental */
-export type Placement = "client" | "remote" | "mcp" | "sandbox"
-
-/** @experimental */
-export interface PlacementRequest extends Request {
-  readonly placement: Placement
-  readonly tool: Tool.Any
-}
-
-/** @experimental A retry-safe remote placement request carrying its endpoint deduplication key. */
-export interface RemotePlacementRequest extends PlacementRequest {
-  readonly operationKey: string
-}
-
-/** @experimental */
-export type PlacementResponse =
-  | { readonly _tag: "Success"; readonly result: unknown }
-  | { readonly _tag: "DomainFailure"; readonly failure: unknown }
-  | { readonly _tag: "Suspend"; readonly token: string }
-
-type PlacementSchemaServices<Tools extends Record<string, Tool.Any>> =
-  | Tool.ParametersSchema<Tools[keyof Tools]>["DecodingServices"]
-  | Tool.ResultEncodingServices<Tools[keyof Tools]>
-
-type PlacementToolkit<Tools extends Record<string, Tool.Any>> = [PlacementSchemaServices<Tools>] extends [never]
-  ? ToolkitInput<Tools>
-  : never
-
-/** @experimental */
-export interface PlacementRouteOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure> {
-  readonly toolkit: PlacementToolkit<Tools>
-  readonly tools?: ReadonlyArray<string> | undefined
-  readonly execute: (request: PlacementRequest) => Effect.Effect<PlacementResponse, E, ToolContext>
-}
-
-/** @experimental */
-export interface RemoteRouteUnsafeOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure>
-  extends PlacementRouteOptions<Tools, E> {
-  readonly retrySafe?: false | undefined
-  readonly schedule?: Schedule.Schedule<unknown, unknown> | undefined
-}
-
-/** @experimental Retry-safe remote route whose endpoint deduplicates the stable operation key. */
-export interface RemoteRouteRetrySafeOptions<Tools extends Record<string, Tool.Any>, E> {
-  readonly toolkit: PlacementToolkit<Tools>
-  readonly tools?: ReadonlyArray<string> | undefined
-  readonly retrySafe: true
-  readonly operationKey: (request: PlacementRequest) => string
-  readonly maxRetries: number
-  readonly schedule: Schedule.Schedule<unknown, E>
-  readonly execute: (request: RemotePlacementRequest) => Effect.Effect<PlacementResponse, E, ToolContext>
-}
-
-/** @experimental */
-export type RemoteRouteOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure> =
-  | RemoteRouteUnsafeOptions<Tools, E>
-  | RemoteRouteRetrySafeOptions<Tools, E>
-const resultMessage = (result: unknown): string => {
-  if (typeof result === "string") return result
-  if (result instanceof Error) return `${result.name}: ${result.message}`
-  try {
-    const message = JSON.stringify(result)
-    return message === undefined ? String(result) : message
-  } catch {
-    return String(result)
-  }
-}
-
-const schemaMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : typeof error === "string" ? error : resultMessage(error)
-
-const frameworkFailure = (stage: FrameworkStage, tool: string, error: unknown): FrameworkFailure =>
-  FrameworkFailure.make({ stage, tool, message: schemaMessage(error) })
-
-const encodeSuccess = (tool: Tool.Any, result: unknown): Effect.Effect<Success, FrameworkFailure> => {
-  const schema = tool.successSchema as unknown as Schema.ConstraintCodec<unknown, unknown, never, never>
-  return Schema.encodeUnknownEffect(schema)(result).pipe(
-    Effect.map((encodedResult): Success => ({ _tag: "Success", result, encodedResult })),
-    Effect.mapError((error) => frameworkFailure("encode-success", tool.name, error)),
-  )
-}
-
-const encodeDomainFailure = (tool: Tool.Any, failure: unknown): Effect.Effect<DomainFailure, FrameworkFailure> => {
-  const schema = tool.failureSchema as unknown as Schema.ConstraintCodec<unknown, unknown, never, never>
-  return Schema.encodeUnknownEffect(schema)(failure).pipe(
-    Effect.map((encodedFailure): DomainFailure => ({ _tag: "DomainFailure", failure, encodedFailure })),
-    Effect.mapError((error) => frameworkFailure("encode-domain-failure", tool.name, error)),
-  )
-}
-
-const encodeDomainCandidate = (tool: Tool.Any, failure: unknown): Effect.Effect<DomainFailure, FrameworkFailure> =>
-  !Schema.is(tool.failureSchema)(failure)
-    ? Effect.fail(frameworkFailure("handler", tool.name, failure))
-    : encodeDomainFailure(tool, failure)
-
-const decodeInput = (tool: Tool.Any, input: unknown): Effect.Effect<void, FrameworkFailure> => {
-  const schema = tool.parametersSchema as unknown as Schema.ConstraintCodec<unknown, unknown, never, never>
-  return Schema.decodeUnknownEffect(schema)(input).pipe(
-    Effect.asVoid,
-    Effect.mapError((error) => frameworkFailure("decode-input", tool.name, error)),
-  )
-}
-
-const decodeSuccess = (tool: Tool.Any, result: unknown): Effect.Effect<Success, FrameworkFailure> => {
-  const schema = tool.successSchema as unknown as Schema.ConstraintCodec<unknown, unknown, never, never>
-  return Schema.decodeUnknownEffect(schema)(result).pipe(
-    Effect.mapError((error) => frameworkFailure("encode-success", tool.name, error)),
-    Effect.flatMap((decoded) => encodeSuccess(tool, decoded)),
-  )
-}
-
-const aiFrameworkFailure = (tool: Tool.Any, error: AiError.AiError): FrameworkFailure => {
-  switch (error.reason._tag) {
-    case "ToolParameterValidationError":
-      return frameworkFailure("decode-input", tool.name, error)
-    case "ToolNotFoundError":
-      return frameworkFailure("missing-handler", tool.name, error)
-    case "InvalidToolResultError":
-      return frameworkFailure("handler", tool.name, error)
-    case "ToolResultEncodingError": {
-      if (tool.failureMode === "error") return frameworkFailure("encode-success", tool.name, error)
-      const isSuccess = Schema.isSchema(tool.successSchema) && Schema.is(tool.successSchema)(error.reason.toolResult)
-      const isDomainFailure =
-        Schema.isSchema(tool.failureSchema) && Schema.is(tool.failureSchema)(error.reason.toolResult)
-      return frameworkFailure(
-        isSuccess === isDomainFailure ? "handler" : isDomainFailure ? "encode-domain-failure" : "encode-success",
-        tool.name,
-        error,
-      )
-    }
-    default:
-      return frameworkFailure("handler", tool.name, error)
-  }
-}
-
-const placementOutcome = (
-  placement: Placement,
-  tool: Tool.Any,
-  response: unknown,
-): Effect.Effect<Outcome, FrameworkFailure> => {
-  if (typeof response !== "object" || response === null || !("_tag" in response)) {
-    return Effect.fail(frameworkFailure("placement", tool.name, "Placement returned an invalid response"))
-  }
-  switch (response._tag) {
-    case "DomainFailure":
-      return "failure" in response
-        ? encodeDomainFailure(tool, response.failure)
-        : Effect.fail(frameworkFailure("placement", tool.name, "DomainFailure response is missing failure"))
-    case "Suspend":
-      return "token" in response && typeof response.token === "string"
-        ? Effect.succeed({ _tag: "Suspend", token: response.token })
-        : Effect.fail(frameworkFailure("placement", tool.name, "Suspend response is missing a string token"))
-    case "Success":
-      return "result" in response
-        ? decodeSuccess(tool, response.result).pipe(
-            Effect.mapError((error) =>
-              FrameworkFailure.make({ ...error, message: `${placement} result: ${error.message}` }),
-            ),
-          )
-        : Effect.fail(frameworkFailure("placement", tool.name, "Success response is missing result"))
-    default:
-      return Effect.fail(frameworkFailure("placement", tool.name, "Placement returned an unknown response tag"))
-  }
-}
-
 const findTool = <Tools extends Record<string, Tool.Any>>(tools: Tools, name: string): Tools[keyof Tools] | undefined =>
   tools[name as keyof Tools]
 
@@ -270,13 +101,17 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
   const tool = findTool(toolkit.tools, request.call.name)
   if (tool === undefined) {
     return Effect.fail(
-      frameworkFailure("missing-handler", request.call.name, `Tool ${request.call.name} is not registered`),
+      toolResultCodec.frameworkFailure(
+        "missing-handler",
+        request.call.name,
+        `Tool ${request.call.name} is not registered`,
+      ),
     )
   }
   const handleFailure = (error: unknown): Effect.Effect<Outcome, FrameworkFailure> => {
     if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
-    if (AiError.isAiError(error)) return Effect.fail(aiFrameworkFailure(tool, error))
-    return encodeDomainCandidate(tool, error)
+    if (AiError.isAiError(error)) return Effect.fail(toolResultCodec.aiFrameworkFailure(tool, error))
+    return toolResultCodec.encodeDomainCandidate(tool, error)
   }
   return toolkit.handle(request.call.name as keyof Tools, request.call.params as never).pipe(
     Effect.flatMap((results) =>
@@ -287,15 +122,17 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
     ),
     Effect.flatMap((option): Effect.Effect<Outcome, FrameworkFailure> => {
       if (Option.isNone(option)) {
-        return Effect.fail(frameworkFailure("handler", tool.name, "Tool handler did not produce a final result"))
+        return Effect.fail(
+          toolResultCodec.frameworkFailure("handler", tool.name, "Tool handler did not produce a final result"),
+        )
       }
       const result = option.value
       if (!result.isFailure) {
         return Effect.succeed({ _tag: "Success", result: result.result, encodedResult: result.encodedResult })
       }
       return AiError.isAiError(result.result)
-        ? Effect.fail(aiFrameworkFailure(tool, result.result))
-        : encodeDomainFailure(tool, result.result)
+        ? Effect.fail(toolResultCodec.aiFrameworkFailure(tool, result.result))
+        : toolResultCodec.encodeDomainFailure(tool, result.result)
     }),
     Effect.catchIf(() => true, handleFailure, handleFailure),
   )
@@ -403,10 +240,14 @@ const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
       const tool = findTool(options.toolkit.tools, request.call.name)
       if (tool === undefined) {
         return Effect.fail(
-          frameworkFailure("missing-handler", request.call.name, `Tool ${request.call.name} is not registered`),
+          toolResultCodec.frameworkFailure(
+            "missing-handler",
+            request.call.name,
+            `Tool ${request.call.name} is not registered`,
+          ),
         )
       }
-      return decodeInput(tool, request.call.params).pipe(
+      return toolResultCodec.decodeInput(tool, request.call.params).pipe(
         Effect.flatMap(() => {
           const effect = options.execute({ ...request, placement, tool })
           return effect
@@ -414,9 +255,9 @@ const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
         Effect.mapError((error) =>
           Schema.is(FrameworkFailure)(error) || Schema.is(RemoteRetryError)(error)
             ? error
-            : frameworkFailure("placement", request.call.name, error),
+            : toolResultCodec.frameworkFailure("placement", request.call.name, error),
         ),
-        Effect.flatMap((response) => placementOutcome(placement, tool, response)),
+        Effect.flatMap((response) => placementOutcome.fromResponse(placement, tool, response)),
       )
     },
   })
@@ -543,7 +384,11 @@ export function router<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExec
             const matched = resolved.find((candidate) => candidate.matches(request))
             return matched === undefined
               ? Effect.fail(
-                  frameworkFailure("route", request.call.name, `Tool ${request.call.name} has no matching route`),
+                  toolResultCodec.frameworkFailure(
+                    "route",
+                    request.call.name,
+                    `Tool ${request.call.name} has no matching route`,
+                  ),
                 )
               : matched.execute(request)
           },
