@@ -86,6 +86,7 @@ const suspension = (request: Request, token: string, stage: "permission" | "appr
     tool_call_id: request.call.id,
     tool_name: request.call.name,
     tool_params: request.call.params,
+    tool_call_batch: request.execution.toolCallBatch.calls,
     active_tools: request.activeTools,
     activated_skills: request.activatedSkills,
   }),

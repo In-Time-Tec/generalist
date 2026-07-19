@@ -5,6 +5,9 @@ import { ToolContext } from "./tool-context.js"
 /** @experimental */
 export interface Request {
   readonly call: Response.ToolCallPart<string, unknown>
+  readonly toolCallBatch: {
+    readonly calls: ReadonlyArray<Response.ToolCallPart<string, unknown>>
+  }
   readonly turn: number
   readonly toolCallIndex: number
   readonly agentName: string

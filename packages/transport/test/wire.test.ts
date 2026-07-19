@@ -194,6 +194,14 @@ describe("Wire", () => {
             tool_call_id: "call-1",
             tool_name: "echo",
             tool_params: { text: "hello" },
+            tool_call_batch: [
+              Response.makePart("tool-call", {
+                id: "call-1",
+                name: "echo",
+                params: { text: "hello" },
+                providerExecuted: false,
+              }),
+            ],
           }),
         }),
         TurnPolicy.TurnPolicyError.make({ message: "policy unavailable", cause: { service: "budget" } }),
@@ -232,6 +240,14 @@ describe("Wire", () => {
         tool_call_id: "call-1",
         tool_name: "echo",
         tool_params: { text: "hello" },
+        tool_call_batch: [
+          Response.makePart("tool-call", {
+            id: "call-1",
+            name: "echo",
+            params: { text: "hello" },
+            providerExecuted: false,
+          }),
+        ],
       })
       const suspended = yield* Schema.decodeUnknownEffect(schema)({ _tag: "Suspended", seq: 11, suspension })
       expect(suspended._tag).toBe("Suspended")

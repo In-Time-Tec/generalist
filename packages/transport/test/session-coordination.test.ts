@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
+import { Response } from "effect/unstable/ai"
 import { AgentEvent } from "@batonfx/core"
 import { coordination } from "../src/session-coordination.js"
 
@@ -43,6 +44,9 @@ describe("session coordination", () => {
         tool_call_id: "call",
         tool_name: "tool",
         tool_params: {},
+        tool_call_batch: [
+          Response.makePart("tool-call", { id: "call", name: "tool", params: {}, providerExecuted: false }),
+        ],
       }),
     }
     const [, suspended] = coordination.finalizeRun(queued, running.runId, suspension, 10)

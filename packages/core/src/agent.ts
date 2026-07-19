@@ -491,6 +491,7 @@ const suspensionMetadata = Schema.Struct({
   reason: Schema.Literals(["tool-wait", "approval"]),
   authorization_stage: Schema.optional(Schema.Literals(["permission", "approval"])),
   tool_call_index: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  tool_call_batch_ids: Schema.Array(Schema.String),
   active_tools: Schema.optional(Schema.Array(Schema.String)),
   activated_skills: Schema.optional(Schema.Array(Schema.String)),
 })
@@ -510,12 +511,14 @@ const releasePersistedChatLock = (
 
 const unresolvedToolCall = (
   messages: ReadonlyArray<Prompt.Message>,
+  toolCallId?: string,
 ):
   | {
       readonly call: Prompt.ToolCallPart
       readonly messages: ReadonlyArray<Prompt.Message>
       readonly messageIndex: number
       readonly partIndex: number
+      readonly toolCallBatch: ReadonlyArray<AnyToolCall>
     }
   | undefined => {
   interface Occurrence {
@@ -549,13 +552,35 @@ const unresolvedToolCall = (
   const unresolved = [...unpaired.entries()].flatMap(([id, occurrences]) =>
     ambiguous.has(id) ? [] : occurrences.filter(({ call }) => !call.providerExecuted),
   )
-  const pending = unresolved[0]
-  return unresolved.length === 1 && pending !== undefined
+  const pending =
+    toolCallId === undefined
+      ? unresolved.find(({ call }) =>
+          Option.isSome(Schema.decodeUnknownOption(suspensionMetadata)(call.options[suspensionCheckpointOption])),
+        )
+      : unresolved.find(({ call }) => call.id === toolCallId)
+  const pendingMessage = pending === undefined ? undefined : messages[pending.messageIndex]
+  const toolCallBatch =
+    pendingMessage?.role === "assistant"
+      ? pendingMessage.content.flatMap((part) =>
+          part.type === "tool-call" && !part.providerExecuted
+            ? [
+                Response.makePart("tool-call", {
+                  id: part.id,
+                  name: part.name,
+                  params: part.params,
+                  providerExecuted: false,
+                }),
+              ]
+            : [],
+        )
+      : []
+  return pending !== undefined
     ? {
         call: pending.call,
         messages: messages.slice(0, pending.messageIndex),
         messageIndex: pending.messageIndex,
         partIndex: pending.partIndex,
+        toolCallBatch,
       }
     : undefined
 }
@@ -565,11 +590,19 @@ const suspensionCheckpoint = (messages: ReadonlyArray<Prompt.Message>): Suspensi
   if (unresolved === undefined) return undefined
   const metadata = Schema.decodeUnknownOption(suspensionMetadata)(unresolved.call.options[suspensionCheckpointOption])
   if (Option.isNone(metadata)) return undefined
+  if (
+    !Equal.equals(
+      metadata.value.tool_call_batch_ids,
+      unresolved.toolCallBatch.map((call) => call.id),
+    )
+  )
+    return undefined
   return {
     call: unresolved.call,
     messages: unresolved.messages,
     suspension: AgentSuspended.make({
       ...metadata.value,
+      tool_call_batch: unresolved.toolCallBatch,
       tool_call_id: unresolved.call.id,
       tool_name: unresolved.call.name,
       tool_params: unresolved.call.params,
@@ -582,6 +615,7 @@ const sameSuspension = (left: AgentSuspended, right: AgentSuspended): boolean =>
   left.reason === right.reason &&
   left.authorization_stage === right.authorization_stage &&
   left.tool_call_index === right.tool_call_index &&
+  Equal.equals(left.tool_call_batch, right.tool_call_batch) &&
   left.tool_call_id === right.tool_call_id &&
   left.tool_name === right.tool_name &&
   Equal.equals(left.tool_params, right.tool_params) &&
@@ -651,7 +685,13 @@ const domainFailureResult = (call: AnyToolCall, outcome: DomainFailure): Pending
     preliminary: false,
   })
 
-const suspended = (call: AnyToolCall, toolCallIndex: number, token: string, reason: "tool-wait" | "approval") =>
+const suspended = (
+  call: AnyToolCall,
+  toolCallBatch: Request["toolCallBatch"],
+  toolCallIndex: number,
+  token: string,
+  reason: "tool-wait" | "approval",
+) =>
   AgentSuspended.make({
     token,
     reason,
@@ -659,6 +699,7 @@ const suspended = (call: AnyToolCall, toolCallIndex: number, token: string, reas
     tool_call_id: call.id,
     tool_name: call.name,
     tool_params: call.params,
+    tool_call_batch: toolCallBatch.calls,
   })
 
 const withSystem = (instructions: string, prompt: Prompt.Prompt): Prompt.Prompt =>
@@ -1066,7 +1107,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
         Effect.gen(function* () {
           const withPending = yield* appendPending(turn, pending)
-          const unresolved = unresolvedToolCall(withPending.content)
+          const unresolved = unresolvedToolCall(withPending.content, suspension.tool_call_id)
           if (
             unresolved === undefined ||
             unresolved.call.id !== suspension.tool_call_id ||
@@ -1085,6 +1126,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
               ? {}
               : { authorization_stage: suspension.authorization_stage }),
             ...(suspension.tool_call_index === undefined ? {} : { tool_call_index: suspension.tool_call_index }),
+            tool_call_batch_ids: suspension.tool_call_batch.map((call) => call.id),
             ...(suspension.active_tools === undefined ? {} : { active_tools: suspension.active_tools }),
             ...(suspension.activated_skills === undefined ? {} : { activated_skills: suspension.activated_skills }),
           }
@@ -1126,10 +1168,11 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 
       const failSuspended = (
         call: AnyToolCall,
+        toolCallBatch: Request["toolCallBatch"],
         toolCallIndex: number,
         token: string,
         reason: "tool-wait" | "approval",
-      ) => Stream.fail<RunError>(suspended(call, toolCallIndex, token, reason))
+      ) => Stream.fail<RunError>(suspended(call, toolCallBatch, toolCallIndex, token, reason))
 
       const state = {
         text: "",
@@ -1487,6 +1530,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 
       const outcomeEvents = (
         turn: number,
+        toolCallBatch: Request["toolCallBatch"],
         toolCallIndex: number,
         call: AnyToolCall,
         outcome: Outcome,
@@ -1512,7 +1556,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
             )
           }
           case "Suspend":
-            return Effect.succeed(failSuspended(call, toolCallIndex, outcome.token, "tool-wait"))
+            return Effect.succeed(failSuspended(call, toolCallBatch, toolCallIndex, outcome.token, "tool-wait"))
         }
       }
 
@@ -1635,7 +1679,15 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                     Stream.unwrap(
                       Ref.get(droppedProgress).pipe(
                         Effect.flatMap((dropped) =>
-                          outcomeEvents(turn, request.toolCallIndex, call, outcome, dropped, registry),
+                          outcomeEvents(
+                            turn,
+                            request.toolCallBatch,
+                            request.toolCallIndex,
+                            call,
+                            outcome,
+                            dropped,
+                            registry,
+                          ),
                         ),
                       ),
                     ),
@@ -1713,6 +1765,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 
       const toolCallEvents = (
         turn: number,
+        toolCallBatch: Request["toolCallBatch"],
         toolCallIndex: number,
         call: AnyToolCall,
         messages: ReadonlyArray<Prompt.Message>,
@@ -1720,7 +1773,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
         authorizationStage?: "permission" | "approval",
         authorizationToken?: string,
       ): Stream.Stream<Event, RunError, StaticToolServices<Tools> | R> => {
-        const request: Request = { call, turn, toolCallIndex, agentName: agent.name, sessionId }
+        const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: agent.name, sessionId }
         const candidate = get(registry, call.name)
         if (candidate === undefined)
           return Stream.fail(
@@ -1780,6 +1833,7 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                           tool_call_id: call.id,
                           tool_name: call.name,
                           tool_params: call.params,
+                          tool_call_batch: toolCallBatch.calls,
                           active_tools: activeTools,
                           activated_skills: activatedSkills,
                         }),
@@ -1872,22 +1926,13 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
 
       const partEvents = (
         turn: number,
-        toolCallIndex: number,
         part: Response.StreamPart<Record<string, Tool.Any>>,
-        messages: ReadonlyArray<Prompt.Message>,
-        registry: Registry,
-      ): Stream.Stream<Event, RunError, StaticToolServices<Tools> | R> => {
+      ): Stream.Stream<Event, RunError> => {
         if (part.type === "error") {
           if (isToolNameCollision(part.error)) return Stream.fail(part.error)
           return Stream.fail(AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }))
         }
         const modelPart = Stream.fromIterable<Event>([{ _tag: "ModelPart", turn, part }])
-        if (part.type === "tool-call") {
-          const call = part as AnyToolCall
-          return call.providerExecuted === true
-            ? modelPart
-            : Stream.concat(modelPart, toolCallEvents(turn, toolCallIndex, call, messages, registry))
-        }
         if (part.type === "text-delta") {
           state.text = `${state.text}${part.delta}`
         }
@@ -2076,33 +2121,53 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
           applyPromptChain(chain, Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
             Effect.map((transformedPrompt) => {
               let nextToolCallIndex = 0
-              return attempt(transformedPrompt, true).pipe(
+              const calls = new Array<AnyToolCall>()
+              const executions = new Array<{
+                readonly call: AnyToolCall
+                readonly messages: ReadonlyArray<Prompt.Message>
+                readonly toolCallIndex: number
+              }>()
+              const toolCallBatch: Request["toolCallBatch"] = { calls }
+              const accepted = attempt(transformedPrompt, true).pipe(
                 Stream.mapEffect(({ accept, part, messages }) => accept.pipe(Effect.as({ part, messages }))),
                 Stream.map(({ part, messages }) => {
                   const toolCallIndex = nextToolCallIndex
-                  if (part.type === "tool-call" && part.providerExecuted !== true) nextToolCallIndex += 1
+                  if (part.type === "tool-call" && part.providerExecuted !== true) {
+                    const call = part as AnyToolCall
+                    nextToolCallIndex += 1
+                    calls.push(call)
+                    executions.push({ call, messages, toolCallIndex })
+                  }
                   return { part, messages, toolCallIndex }
                 }),
-                (accepted) => {
+                Stream.flatMap(({ part }) => partEvents(turn, part)),
+              )
+              return Stream.concat(
+                accepted,
+                Stream.suspend(() => {
+                  Object.freeze(calls)
+                  Object.freeze(toolCallBatch)
                   const concurrency = agent.toolExecution?.concurrency ?? 1
-                  if (concurrency === 1) {
-                    return accepted.pipe(
-                      Stream.flatMap(({ part, messages, toolCallIndex }) =>
-                        partEvents(turn, toolCallIndex, part, messages, activeRegistry),
-                      ),
-                      Stream.tap(recordPending),
-                    )
-                  }
-                  return accepted.pipe(
-                    Stream.mapEffect(
-                      ({ part, messages, toolCallIndex }) =>
-                        Stream.runCollect(partEvents(turn, toolCallIndex, part, messages, activeRegistry)),
-                      { concurrency },
-                    ),
-                    Stream.flatMap(Stream.fromIterable),
-                    Stream.tap(recordPending),
-                  )
-                },
+                  const executionStreams = Stream.fromIterable(executions)
+                  return concurrency === 1
+                    ? executionStreams.pipe(
+                        Stream.flatMap(({ call, messages, toolCallIndex }) =>
+                          toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
+                        ),
+                        Stream.tap(recordPending),
+                      )
+                    : executionStreams.pipe(
+                        Stream.mapEffect(
+                          ({ call, messages, toolCallIndex }) =>
+                            Stream.runCollect(
+                              toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
+                            ),
+                          { concurrency },
+                        ),
+                        Stream.flatMap(Stream.fromIterable),
+                        Stream.tap(recordPending),
+                      )
+                }),
               )
             }),
           ),
@@ -2385,20 +2450,50 @@ const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOut
                     suspension.authorization_stage === undefined && suspension.active_tools === undefined
                       ? tools.registry
                       : select(tools.registry, suspension.active_tools ?? [])
-                  return toolCallEvents(
-                    0,
-                    suspension.tool_call_index ?? 0,
+                  const calls = suspension.tool_call_batch.map((call) =>
                     Response.makePart("tool-call", {
-                      id: checkpoint.call.id,
-                      name: checkpoint.call.name,
-                      params: checkpoint.call.params,
-                      providerExecuted: false,
+                      id: call.id,
+                      name: call.name,
+                      params: call.params,
+                      providerExecuted: call.providerExecuted,
+                      metadata: call.metadata,
                     }),
-                    checkpoint.messages,
-                    registry,
-                    suspension.authorization_stage,
-                    suspension.token,
-                  ).pipe(Stream.tap(recordPending))
+                  )
+                  const toolCallBatch: Request["toolCallBatch"] = { calls }
+                  const startIndex = suspension.tool_call_index ?? 0
+                  if (calls[startIndex] === undefined) {
+                    return Stream.fail(
+                      AgentError.make({ message: "Suspension tool call index is outside its batch", turn: 0 }),
+                    )
+                  }
+                  const executions = Stream.fromIterable(
+                    calls.slice(startIndex).map((call, offset) => ({ call, toolCallIndex: startIndex + offset })),
+                  )
+                  const execute = ({
+                    call,
+                    toolCallIndex,
+                  }: {
+                    readonly call: AnyToolCall
+                    readonly toolCallIndex: number
+                  }) =>
+                    toolCallEvents(
+                      0,
+                      toolCallBatch,
+                      toolCallIndex,
+                      call,
+                      checkpoint.messages,
+                      registry,
+                      toolCallIndex === startIndex ? suspension.authorization_stage : undefined,
+                      toolCallIndex === startIndex ? suspension.token : undefined,
+                    )
+                  const concurrency = agent.toolExecution?.concurrency ?? 1
+                  return concurrency === 1
+                    ? executions.pipe(Stream.flatMap(execute), Stream.tap(recordPending))
+                    : executions.pipe(
+                        Stream.mapEffect((execution) => Stream.runCollect(execute(execution)), { concurrency }),
+                        Stream.flatMap(Stream.fromIterable),
+                        Stream.tap(recordPending),
+                      )
                 }),
               ),
             ),

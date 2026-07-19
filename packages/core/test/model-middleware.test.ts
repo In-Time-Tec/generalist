@@ -335,18 +335,18 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         const executionStarted = events.filter((event) => event._tag === "ToolExecutionStarted")
         const executionCompleted = events.filter((event) => event._tag === "ToolExecutionCompleted")
 
-        expect(dispatched).toEqual(["shared"])
-        expect(approvalChecks).toBe(1)
+        expect(dispatched).toEqual([])
+        expect(approvalChecks).toBe(0)
         expect(modelToolCalls).toHaveLength(1)
-        expect(approvalRequests).toHaveLength(1)
-        expect(executionStarted).toHaveLength(1)
-        expect(executionCompleted).toHaveLength(1)
+        expect(approvalRequests).toHaveLength(0)
+        expect(executionStarted).toHaveLength(0)
+        expect(executionCompleted).toHaveLength(0)
         expect(Json.stringify(events)).toContain("first")
         expect(Json.stringify(events)).not.toContain("second")
         expect(Json.stringify(events)).not.toContain("third")
         expect(history).toContain("first")
-        expect(history.match(/"type":"tool-result"/g)).toHaveLength(1)
-        expect(history).toContain("first-result-marker")
+        expect(history.match(/"type":"tool-result"/g)).toBeNull()
+        expect(history).not.toContain("first-result-marker")
         expect(history).not.toContain("second")
         expect(history).not.toContain("third")
         expect("error" in outcome && outcome.error._tag).toBe("@batonfx/core/DuplicateToolCallId")
@@ -402,7 +402,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         const modelToolCalls = events.filter((event) => event._tag === "ModelPart" && event.part.type === "tool-call")
 
         expect(failure._tag).toBe("@batonfx/core/DuplicateToolCallId")
-        expect(dispatched).toEqual(["duplicate", "middle"])
+        expect(dispatched).toEqual([])
         expect(modelToolCalls).toHaveLength(2)
         expect(Json.stringify(modelToolCalls)).not.toContain('"text":"provider"')
         expect(Json.stringify(events)).not.toContain("later")
@@ -446,7 +446,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "call locally" })))
 
         expect(failure._tag).toBe("@batonfx/core/DuplicateToolCallId")
-        expect(handled).toEqual(["first"])
+        expect(handled).toEqual([])
       }),
     ] as const
   })

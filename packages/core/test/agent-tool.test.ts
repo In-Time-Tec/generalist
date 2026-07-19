@@ -48,13 +48,17 @@ const toolCallPart = (id: string, name: string, params: unknown) =>
 
 const activeToolNames = (options: Parameters<ModelParams["streamText"]>[0]) => options.tools.map((tool) => tool.name)
 
-const request = (name: string, params: unknown): ToolExecutor.Request => ({
-  call: toolCallPart(`call-${name}`, name, params),
-  turn: 0,
-  toolCallIndex: 0,
-  agentName: "tool-executor-test",
-  sessionId: "session-1",
-})
+const request = (name: string, params: unknown): ToolExecutor.Request => {
+  const call = toolCallPart(`call-${name}`, name, params)
+  return {
+    call,
+    toolCallBatch: { calls: [call] },
+    turn: 0,
+    toolCallIndex: 0,
+    agentName: "tool-executor-test",
+    sessionId: "session-1",
+  }
+}
 
 const gatedTool = Tool.make("gated", {
   description: "Needs child approval",

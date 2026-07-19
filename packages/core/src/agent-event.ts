@@ -233,6 +233,16 @@ export class AgentSuspended extends Schema.TaggedErrorClass<AgentSuspended>()("@
   tool_call_id: Schema.String,
   tool_name: Schema.String,
   tool_params: Schema.Unknown,
+  tool_call_batch: Schema.Array(
+    Schema.Struct({
+      type: Schema.Literal("tool-call"),
+      id: Schema.String,
+      name: Schema.String,
+      params: Schema.Unknown,
+      providerExecuted: Schema.Boolean,
+      metadata: Response.ProviderMetadata,
+    }),
+  ),
   active_tools: Schema.optional(Schema.Array(Schema.String)),
   activated_skills: Schema.optional(Schema.Array(Schema.String)),
 }) {}

@@ -165,6 +165,16 @@ describe("Chat", () => {
           tool_call_id: "call-approval",
           tool_name: "lookup",
           tool_params: { q: "baton" },
+          tool_call_batch: [
+            {
+              type: "tool-call",
+              id: "call-approval",
+              name: "lookup",
+              params: { q: "baton" },
+              providerExecuted: false,
+              metadata: {},
+            },
+          ],
         },
       }),
     )

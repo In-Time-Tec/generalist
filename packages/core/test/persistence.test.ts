@@ -214,12 +214,14 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "missing-persisted-checkpoint-agent", toolkit: Toolkit.make(echoTool) })
+        const missingCall = toolCallPart("missing-call", "echo", { text: "missing" })
         const suspension = AgentEvent.AgentSuspended.make({
           token: "missing-token",
           reason: "approval",
           tool_call_id: "missing-call",
           tool_name: "echo",
           tool_params: { text: "missing" },
+          tool_call_batch: [missingCall],
           active_tools: ["echo"],
           activated_skills: [],
         })
@@ -499,6 +501,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
             "@batonfx/core/suspension": {
               token: "authoritative-token",
               reason: "tool-wait",
+              tool_call_batch_ids: ["stale-recovery-call"],
             },
           },
         })
@@ -513,6 +516,14 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           tool_call_id: call.id,
           tool_name: call.name,
           tool_params: call.params,
+          tool_call_batch: [
+            Response.makePart("tool-call", {
+              id: call.id,
+              name: call.name,
+              params: call.params,
+              providerExecuted: false,
+            }),
+          ],
         })
 
         const mismatch = yield* Agent.persisted(

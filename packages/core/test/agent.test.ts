@@ -3943,7 +3943,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let active = 0
     let maximum = 0
     let modelCalls = 0
-    const requestIndexes: Array<readonly [string, number]> = []
+    const requests: Array<{
+      readonly id: string
+      readonly index: number
+      readonly batch: ReadonlyArray<string>
+    }> = []
     let allStarted: Deferred.Deferred<void> | undefined
     const releases = new Map<string, Deferred.Deferred<void>>()
     return [
@@ -3963,7 +3967,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           execute: (request) =>
             Effect.acquireUseRelease(
               Effect.gen(function* () {
-                requestIndexes.push([request.call.id, request.toolCallIndex])
+                requests.push({
+                  id: request.call.id,
+                  index: request.toolCallIndex,
+                  batch: request.toolCallBatch.calls.map((call) => call.id),
+                })
                 active += 1
                 maximum = Math.max(maximum, active)
                 if (active === 3 && allStarted !== undefined) yield* Deferred.succeed(allStarted, undefined)
@@ -4002,11 +4010,27 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(events.filter((event) => event._tag === "ToolExecutionCompleted").map((event) => event.call.id)).toEqual(
           ["concurrent-first", "concurrent-second", "concurrent-third", "concurrent-fourth"],
         )
-        expect(requestIndexes).toEqual([
-          ["concurrent-first", 0],
-          ["concurrent-second", 1],
-          ["concurrent-third", 2],
-          ["concurrent-fourth", 3],
+        expect(requests).toEqual([
+          {
+            id: "concurrent-first",
+            index: 0,
+            batch: ["concurrent-first", "concurrent-second", "concurrent-third", "concurrent-fourth"],
+          },
+          {
+            id: "concurrent-second",
+            index: 1,
+            batch: ["concurrent-first", "concurrent-second", "concurrent-third", "concurrent-fourth"],
+          },
+          {
+            id: "concurrent-third",
+            index: 2,
+            batch: ["concurrent-first", "concurrent-second", "concurrent-third", "concurrent-fourth"],
+          },
+          {
+            id: "concurrent-fourth",
+            index: 3,
+            batch: ["concurrent-first", "concurrent-second", "concurrent-third", "concurrent-fourth"],
+          },
         ])
         expect(
           events
@@ -5317,6 +5341,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     let suspendedTranscript: Prompt.Prompt | undefined
     let ordinaryExecutions = 0
     let suspendedExecutions = 0
+    let laterExecutions = 0
     let modelCalls = 0
     let resumedPrompt = ""
     const assertExchange = (prompt: Prompt.Prompt, expectedResultIds: ReadonlyArray<string>) => {
@@ -5332,6 +5357,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       expect(assistant.content.filter((part) => part.type === "tool-call").map((part) => part.id)).toEqual([
         "tool-call-ordinary",
         "tool-call-child",
+        "tool-call-later",
       ])
       const resultIds: Array<string> = []
       for (const message of prompt.content.slice(assistantIndex + 1)) {
@@ -5348,6 +5374,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             _tag: "Success" as const,
             result: { text: "README.md" },
             encodedResult: { text: "README.md" },
+          })
+        }
+        if (request.call.id === "tool-call-later") {
+          laterExecutions += 1
+          return Effect.succeed({
+            _tag: "Success" as const,
+            result: { text: "later complete" },
+            encodedResult: { text: "later complete" },
           })
         }
         suspendedExecutions += 1
@@ -5368,9 +5402,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             return Stream.fromIterable([
               toolCallPart("tool-call-ordinary", "echo", { text: "ordinary" }),
               toolCallPart("tool-call-child", "echo", { text: "child" }),
+              toolCallPart("tool-call-later", "echo", { text: "later" }),
             ])
           }
-          assertExchange(options.prompt, ["tool-call-ordinary", "tool-call-child"])
+          assertExchange(options.prompt, ["tool-call-ordinary", "tool-call-child", "tool-call-later"])
           resumedPrompt = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("completed after resume"))
         }),
@@ -5405,7 +5440,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(checkpoint).toContain("tool-call-ordinary")
         expect(checkpoint).toContain("README.md")
         expect(checkpoint).toContain("tool-call-child")
+        expect(checkpoint).toContain("tool-call-later")
         expect(checkpoint).not.toContain("child complete")
+        expect(checkpoint).not.toContain("later complete")
 
         const resumed = yield* Stream.runCollect(
           Agent.stream(agent, {
@@ -5418,9 +5455,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         expect(resumed.at(-1)?._tag).toBe("Completed")
         expect(ordinaryExecutions).toBe(1)
         expect(suspendedExecutions).toBe(2)
-        expect(resumedPrompt.match(/tool-call-ordinary/g)).toHaveLength(2)
+        expect(laterExecutions).toBe(1)
+        expect(resumedPrompt.match(/tool-call-ordinary/g)).toHaveLength(3)
         expect(resumedPrompt.match(/README\.md/g)).toHaveLength(1)
-        expect(resumedPrompt.match(/tool-call-child/g)).toHaveLength(2)
+        expect(resumedPrompt.match(/tool-call-child/g)).toHaveLength(3)
         expect(resumedPrompt.match(/child complete/g)).toHaveLength(1)
       }),
     ] as const
@@ -5611,12 +5649,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelMiddleware.identityLayer,
       ),
       Effect.gen(function* () {
+        const staleCall = toolCallPart("stale-call", "echo", { text: "stale" })
         const received = AgentEvent.AgentSuspended.make({
           token: "stale-token",
           reason: "tool-wait",
           tool_call_id: "stale-call",
           tool_name: "echo",
           tool_params: { text: "stale" },
+          tool_call_batch: [staleCall],
         })
         const agent = Agent.make({ name: "missing-resume-agent", toolkit: Toolkit.make(echoTool) })
         const failure = yield* Agent.stream(agent, {
@@ -5636,12 +5676,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
   })
 
   ItLayer.make(it, "normalizes custom authorization suspensions to the attempted call snapshot", () => {
+    const forgedCall = toolCallPart("forged-call", "echo", { text: "forged" })
     const forged = AgentEvent.AgentSuspended.make({
       token: "custom-token",
       reason: "approval",
       tool_call_id: "forged-call",
       tool_name: "echo",
       tool_params: { text: "forged" },
+      tool_call_batch: [forgedCall],
       active_tools: ["echo", "gated"],
       activated_skills: ["forged-skill"],
     })

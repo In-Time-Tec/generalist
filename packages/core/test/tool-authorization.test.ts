@@ -23,7 +23,14 @@ const request: ToolAuthorization.Request = {
   activeTools: ["gated"],
   activatedSkills: [],
   messages: Prompt.make("run").content,
-  execution: { call, turn: 0, toolCallIndex: 0, agentName: "agent", sessionId: "session" },
+  execution: {
+    call,
+    toolCallBatch: { calls: [call] },
+    turn: 0,
+    toolCallIndex: 0,
+    agentName: "agent",
+    sessionId: "session",
+  },
   onApprovalRequired: Effect.void,
 }
 
