@@ -27,6 +27,7 @@ BatonFX is a standalone, non-durable, Effect-native agent framework over `effect
 - Every exported symbol carries `@experimental` while Effect AI is unstable.
 - Public modules use intentional package-root namespaces. Services expose `Interface`, `Context.Service`, explicit Layers, schema-backed boundary errors, and a `testLayer` or memory layer for behavior-bearing seams.
 - Prefer direct imports. Do not add wrapper files, catch-all `utils`/`helpers`/`common`/`lib` directories, or namespace imports.
+- Keep each package `src` file under 500 lines; `oxlint`'s `max-lines` rule enforces it. A few cohesive engine files are recorded exceptions in `.oxlintrc.json`; split a file rather than adding to that list.
 - Do not put rationale in code comments. Put stable behavior in types, tests, `CONTEXT.md`, feature docs, decision docs, tradeoff docs, or package READMEs.
 
 ## Commands
