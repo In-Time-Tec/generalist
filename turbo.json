@@ -1,18 +1,23 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["tsconfig.json", ".oxlintrc.json", "vitest.config.ts"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "!test/**", "!**/*.test.ts", "!README.md"],
       "outputs": ["dist/**"]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "!README.md"]
     },
     "test": {
-      "dependsOn": ["build", "^build"]
+      "dependsOn": ["build", "^build"],
+      "inputs": ["$TURBO_DEFAULT$", "!README.md"]
     },
     "typecheck": {
-      "dependsOn": ["build", "^build"]
+      "dependsOn": ["build", "^build"],
+      "inputs": ["$TURBO_DEFAULT$", "!README.md"]
     }
   }
 }
