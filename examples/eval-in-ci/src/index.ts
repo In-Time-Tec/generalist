@@ -2,7 +2,7 @@ import { Console, Effect, Layer } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { Deterministic } from "@batonfx/providers"
 
-const agent = Agent.make("eval-agent")
+const agent = Agent.make({ name: "eval-agent" })
 
 const program = Effect.gen(function* () {
   const result = yield* ModelRegistry.provide(

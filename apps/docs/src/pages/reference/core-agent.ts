@@ -17,7 +17,7 @@ export const coreAgentReference = definePage({
       " is a plain value ",
       code("{ name, instructions?, toolkit, policy, model?, memory?, metadata? }"),
       ", not a service. ",
-      code("Agent.make(name, options)"),
+      code("Agent.make(options)"),
       " fills defaults:",
     ),
     table(

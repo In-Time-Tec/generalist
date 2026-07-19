@@ -42,7 +42,7 @@ const applicationLayer = Layer.mergeAll(
   Chat.layerPersisted({ storeId: "composition-guide-chats" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
 )
 
-const agent = Agent.make("assistant", { instructions: "Answer concisely." })
+const agent = Agent.make({ name: "assistant", instructions: "Answer concisely." })
 
 const program = Effect.gen(function* () {
   yield* Agent.generatePersisted(agent, {
@@ -170,7 +170,7 @@ Migrate `TurnPolicy.decision.stop` to `TurnPolicy.decision.stop(reason)`. Existi
 // Layer.provide(Persistence.layerBackingSql),
 // )
 
-const agent = Agent.make("assistant", { instructions: "You are a helpful assistant." })
+const agent = Agent.make({ name: "assistant", instructions: "You are a helpful assistant." })
 
 // Run 1 and run 2 share the same chatId, so run 2 sees run 1's history.
 const program = Effect.gen(function* () {

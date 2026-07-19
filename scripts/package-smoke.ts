@@ -213,9 +213,9 @@ type PersistedRunRequirements = Assert<
     LanguageModel.LanguageModel | Memory.Memory | Chat.Persistence
   >
 >
-const sessionRegistryLayer = SessionRegistry.layerMemory({ agent: Agent.make("package-smoke") })
+const sessionRegistryLayer = SessionRegistry.layerMemory({ agent: Agent.make({ name: "package-smoke" }) })
 const sessionRegistryOptions: SessionRegistry.MemoryOptions<{}, LanguageModel.LanguageModel> = {
-  agent: Agent.make("annotated-package-smoke"),
+  agent: Agent.make({ name: "annotated-package-smoke" }),
 }
 const annotatedSessionRegistryLayer = SessionRegistry.layerMemory(sessionRegistryOptions)
 type SessionRegistryCanonical = Assert<
@@ -231,7 +231,7 @@ type AnnotatedSessionRegistryCanonical = Assert<
   >
 >
 const fanOut = Handoff.fanOut([
-  { agent: Agent.make("plain-package-smoke"), prompt: "plain" },
+  { agent: Agent.make({ name: "plain-package-smoke" }), prompt: "plain" },
   { agent: memoryAgent, prompt: "memory" },
 ])
 type FanOutRequirements = Assert<

@@ -47,7 +47,7 @@ const selectedMemoryRequiredAgent = Agent.make({
   model: { provider: "test", model: "test" },
   memory: { agent: "selected-memory-required", subject: "memory-subject" },
 })
-const widenedOptions: Agent.MakeObjectOptions = { name: "widened-required" }
+const widenedOptions: Agent.MakeOptions = { name: "widened-required" }
 const widenedRequiredAgent = Agent.make(widenedOptions)
 const memoryRequiredRun = Agent.generate(memoryRequiredAgent, { prompt: "hello" })
 const runMemoryRequired = Agent.generate(plainRequiredAgent, {
@@ -414,19 +414,19 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     const memory = { agent: "defaults-agent", subject: "subject-1" }
     const metadata = { audience: "internal", revision: 1 }
 
-    const agent = Agent.make("defaults-agent", { model, memory, metadata })
+    const agent = Agent.make({ name: "defaults-agent", model, memory, metadata })
 
     expect(agent.model).toEqual(model)
     expect(agent.memory).toEqual(memory)
     expect(agent.metadata).toEqual(metadata)
   })
 
-  it("carries tool execution policy through every Agent.make form", () => {
+  it("carries tool execution policy through Agent.make", () => {
     const toolExecution = { concurrency: 3 }
 
-    expect(Agent.make("direct-agent", { toolExecution }).toolExecution).toBe(toolExecution)
+    expect(Agent.make({ name: "direct-agent", toolExecution }).toolExecution).toBe(toolExecution)
     expect(Agent.make({ name: "object-agent", toolExecution }).toolExecution).toBe(toolExecution)
-    expect(Agent.make({ toolExecution })("curried-agent").toolExecution).toBe(toolExecution)
+    expect(Agent.make({ name: "curried-agent", toolExecution }).toolExecution).toBe(toolExecution)
   })
 
   it("constructs AgentError without a cause", () => {
@@ -713,7 +713,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       [
         modelLayer(() => Stream.make(textDelta("minimal done"))),
         Effect.gen(function* () {
-          const agent = Agent.make("minimal-agent", { instructions: "Answer directly." })
+          const agent = Agent.make({ name: "minimal-agent", instructions: "Answer directly." })
 
           const result = yield* Agent.generate(agent, { prompt: "hello" })
 
@@ -735,7 +735,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           }).pipe(Effect.map((registration) => ModelRegistry.memoryLayer([registration]))),
         ),
         Effect.gen(function* () {
-          const agent = Agent.make("model-default-agent", {
+          const agent = Agent.make({
+            name: "model-default-agent",
             model: { provider: "test", model: "agent-default" },
           })
 
@@ -794,7 +795,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
       ),
       Effect.gen(function* () {
-        const agent = Agent.make("scoped-structured-agent", { model: selection })
+        const agent = Agent.make({ name: "scoped-structured-agent", model: selection })
         const agentFiber = yield* Effect.forkChild(
           Agent.generateObject(agent, { prompt: "make object", schema: objectSchema }),
         )
@@ -851,7 +852,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const agent = Agent.make("memory-default-agent", { memory: key })
+        const agent = Agent.make({ name: "memory-default-agent", memory: key })
 
         const result = yield* Agent.generate(agent, { prompt: "live prompt" })
 
@@ -885,7 +886,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const agent = Agent.make("toolkit-handler-agent", { toolkit })
+        const agent = Agent.make({ name: "toolkit-handler-agent", toolkit })
 
         const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use echo" }))
 
@@ -933,7 +934,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const agent = Agent.make("snapshot-agent", { toolkit })
+        const agent = Agent.make({ name: "snapshot-agent", toolkit })
 
         yield* Stream.runCollect(Agent.stream(agent, { prompt: "run snapshot" }))
 
@@ -977,7 +978,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const agent = Agent.make("tool-executor-override-agent", { toolkit })
+        const agent = Agent.make({ name: "tool-executor-override-agent", toolkit })
 
         const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use echo" }))
 
@@ -1003,7 +1004,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
       ),
       Effect.gen(function* () {
-        const agent = Agent.make("missing-approvals-agent", { toolkit: Toolkit.make(gatedTool) })
+        const agent = Agent.make({ name: "missing-approvals-agent", toolkit: Toolkit.make(gatedTool) })
         const events: Array<AgentEvent.Event> = []
 
         const failure = yield* Effect.flip(

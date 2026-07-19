@@ -32,7 +32,7 @@ import { Console, Effect } from "effect"
 import { Agent, ModelRegistry } from "@batonfx/core"
 import { Deterministic } from "@batonfx/providers"
 
-const agent = Agent.make("local-assistant")
+const agent = Agent.make({ name: "local-assistant" })
 const selection = { provider: "deterministic", model: "local" }
 
 const program = ModelRegistry.provide(

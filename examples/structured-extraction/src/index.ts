@@ -11,7 +11,7 @@ const modelLayer = (
 ): Layer.Layer<LanguageModel.LanguageModel> =>
   Layer.effect(LanguageModel.LanguageModel, LanguageModel.make({ streamText, generateText }))
 
-const agent = Agent.make("extractor", { instructions: "Extract invoice data." })
+const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data." })
 
 const program = Effect.gen(function* () {
   const result = yield* Agent.generateObject(agent, {

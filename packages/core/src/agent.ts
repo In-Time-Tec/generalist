@@ -148,6 +148,7 @@ export interface MakeOptions<
   PolicyServices = never,
   AuthorizationServices = never,
 > {
+  readonly name: string
   readonly instructions?: string
   readonly toolkit?: Toolkit.Toolkit<Tools>
   readonly tools?: never
@@ -167,24 +168,6 @@ export interface MakeToolsOptions<
 > extends Omit<MakeOptions<{}, PolicyServices, AuthorizationServices>, "toolkit" | "tools"> {
   readonly tools: StaticTools
   readonly toolkit?: never
-}
-
-/** @experimental */
-export interface MakeObjectOptions<
-  Tools extends Record<string, Tool.Any> = {},
-  PolicyServices = never,
-  AuthorizationServices = never,
-> extends MakeOptions<Tools, PolicyServices, AuthorizationServices> {
-  readonly name: string
-}
-
-/** @experimental */
-export interface MakeToolsObjectOptions<
-  StaticTools extends ReadonlyArray<Tool.Any>,
-  PolicyServices = never,
-  AuthorizationServices = never,
-> extends MakeToolsOptions<StaticTools, PolicyServices, AuthorizationServices> {
-  readonly name: string
 }
 
 type OptionValue<O, K extends PropertyKey> = K extends keyof O ? O[K] : never
@@ -208,88 +191,26 @@ export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
   const O extends MakeToolsOptions<StaticTools, any, any> = MakeToolsOptions<StaticTools>,
 >(
-  name: string,
   options: MakeToolsOptions<StaticTools, any, any> & O,
 ): Agent<Toolkit.ToolsByName<StaticTools>, OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>>
 export function make<
-  const StaticTools extends ReadonlyArray<Tool.Any>,
-  const O extends MakeToolsObjectOptions<StaticTools, any, any> = MakeToolsObjectOptions<StaticTools>,
->(
-  options: MakeToolsObjectOptions<StaticTools, any, any> & O,
-): Agent<Toolkit.ToolsByName<StaticTools>, OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>>
-export function make<
-  const StaticTools extends ReadonlyArray<Tool.Any>,
-  const O extends MakeToolsOptions<StaticTools, any, any> = MakeToolsOptions<StaticTools>,
->(
-  options: MakeToolsOptions<StaticTools, any, any> & O & { readonly name?: never },
-): (name: string) => Agent<Toolkit.ToolsByName<StaticTools>, OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>>
-export function make<
   Tools extends Record<string, Tool.Any> = {},
   const O extends MakeOptions<Tools, any, any> = MakeOptions<Tools>,
->(name: string, options: MakeOptions<Tools, any, any> & O): Agent<Tools, OptionRequirements<Tools, O>>
-export function make(name: string): Agent<{}, LanguageModel.LanguageModel>
-export function make<
-  Tools extends Record<string, Tool.Any> = {},
-  const O extends MakeObjectOptions<Tools, any, any> = MakeObjectOptions<Tools>,
->(options: MakeObjectOptions<Tools, any, any> & O): Agent<Tools, OptionRequirements<Tools, O>>
-export function make<
-  Tools extends Record<string, Tool.Any> = {},
-  const O extends MakeOptions<Tools, any, any> = MakeOptions<Tools>,
->(
-  options: MakeOptions<Tools, any, any> & O & { readonly name?: never },
-): (name: string) => Agent<Tools, OptionRequirements<Tools, O>>
-export function make(): (name: string) => Agent<{}, LanguageModel.LanguageModel>
+>(options: MakeOptions<Tools, any, any> & O): Agent<Tools, OptionRequirements<Tools, O>>
 export function make<
   Tools extends Record<string, Tool.Any> = {},
   PolicyServices = never,
   AuthorizationServices = never,
 >(
-  nameOrOptions?:
-    | string
-    | MakeObjectOptions<Tools, PolicyServices, AuthorizationServices>
-    | MakeOptions<Tools, PolicyServices, AuthorizationServices>
-    | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices>
-    | MakeToolsObjectOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices>,
   options:
     | MakeOptions<Tools, PolicyServices, AuthorizationServices>
-    | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices> = {},
+    | MakeToolsOptions<ReadonlyArray<Tool.Any>, PolicyServices, AuthorizationServices>,
 ): unknown {
-  if (nameOrOptions === undefined || (typeof nameOrOptions !== "string" && !("name" in nameOrOptions))) {
-    const curriedOptions = nameOrOptions ?? {}
-    if ("tools" in curriedOptions && Array.isArray(curriedOptions.tools)) {
-      const tools = curriedOptions.tools
-      return (name: string) =>
-        make({
-          name,
-          tools,
-          ...(curriedOptions.instructions === undefined ? {} : { instructions: curriedOptions.instructions }),
-          ...(curriedOptions.policy === undefined ? {} : { policy: curriedOptions.policy }),
-          ...(curriedOptions.model === undefined ? {} : { model: curriedOptions.model }),
-          ...(curriedOptions.memory === undefined ? {} : { memory: curriedOptions.memory }),
-          ...(curriedOptions.authorization === undefined ? {} : { authorization: curriedOptions.authorization }),
-          ...(curriedOptions.toolExecution === undefined ? {} : { toolExecution: curriedOptions.toolExecution }),
-          ...(curriedOptions.metadata === undefined ? {} : { metadata: curriedOptions.metadata }),
-        })
-    }
-    return (name: string) =>
-      make({
-        name,
-        ...(curriedOptions.instructions === undefined ? {} : { instructions: curriedOptions.instructions }),
-        ...(curriedOptions.toolkit === undefined ? {} : { toolkit: curriedOptions.toolkit }),
-        ...(curriedOptions.policy === undefined ? {} : { policy: curriedOptions.policy }),
-        ...(curriedOptions.model === undefined ? {} : { model: curriedOptions.model }),
-        ...(curriedOptions.memory === undefined ? {} : { memory: curriedOptions.memory }),
-        ...(curriedOptions.authorization === undefined ? {} : { authorization: curriedOptions.authorization }),
-        ...(curriedOptions.toolExecution === undefined ? {} : { toolExecution: curriedOptions.toolExecution }),
-        ...(curriedOptions.metadata === undefined ? {} : { metadata: curriedOptions.metadata }),
-      })
-  }
-  const resolved = typeof nameOrOptions === "string" ? { ...options, name: nameOrOptions } : nameOrOptions
   const declaredTools: ReadonlyArray<Tool.Any> | undefined =
-    "tools" in resolved && Array.isArray(resolved.tools) ? resolved.tools : undefined
+    "tools" in options && Array.isArray(options.tools) ? options.tools : undefined
   const toolkit =
     declaredTools === undefined
-      ? (resolved.toolkit ?? (Toolkit.empty as unknown as Toolkit.Toolkit<Tools>))
+      ? (options.toolkit ?? (Toolkit.empty as unknown as Toolkit.Toolkit<Tools>))
       : Toolkit.make(...declaredTools)
   if (declaredTools !== undefined) {
     for (const tool of declaredTools) {
@@ -308,18 +229,18 @@ export function make<
       tools: (value: Tools) => value,
       requirements: (value: unknown) => value,
     },
-    name: resolved.name,
-    ...(resolved.instructions === undefined ? {} : { instructions: resolved.instructions }),
+    name: options.name,
+    ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
     toolkit: toolkit as unknown as Toolkit.Toolkit<Tools>,
-    policy: resolved.policy ?? defaultPolicy,
-    ...(resolved.model === undefined ? {} : { model: resolved.model }),
-    ...(resolved.memory === undefined ? {} : { memory: resolved.memory }),
-    ...(resolved.authorization === undefined ? {} : { authorization: resolved.authorization }),
-    ...(resolved.toolExecution === undefined ? {} : { toolExecution: resolved.toolExecution }),
-    ...(resolved.metadata === undefined ? {} : { metadata: resolved.metadata }),
+    policy: options.policy ?? defaultPolicy,
+    ...(options.model === undefined ? {} : { model: options.model }),
+    ...(options.memory === undefined ? {} : { memory: options.memory }),
+    ...(options.authorization === undefined ? {} : { authorization: options.authorization }),
+    ...(options.toolExecution === undefined ? {} : { toolExecution: options.toolExecution }),
+    ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
     toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map((tool) => ({
       tool,
-      origin: { _tag: "Static", agent: resolved.name },
+      origin: { _tag: "Static", agent: options.name },
     })),
   }
 }

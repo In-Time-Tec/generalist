@@ -216,7 +216,7 @@ describe("providers", () => {
     ),
   )((test) => {
     test.effect("round-trips the deterministic model through Agent.generate", () => {
-      const agent = Agent.make("deterministic-agent", { toolkit: unexpectedToolkit })
+      const agent = Agent.make({ name: "deterministic-agent", toolkit: unexpectedToolkit })
       return Effect.gen(function* () {
         const result = yield* ModelRegistry.provide(
           { provider: "deterministic", model: "local" },
@@ -344,7 +344,7 @@ describe("providers", () => {
     ),
   )((test) => {
     test.effect("combines two withProvider layers so models from both resolve", () => {
-      const agent = Agent.make("combined-agent", { toolkit: unexpectedToolkit })
+      const agent = Agent.make({ name: "combined-agent", toolkit: unexpectedToolkit })
       return Effect.gen(function* () {
         const registered = yield* ModelRegistry.registrations()
         expect(registered.map((item) => [item.provider, item.model])).toEqual([

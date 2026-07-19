@@ -32,7 +32,7 @@ import { Agent } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
 
 const modelLayer = TestModel.layer([TestModel.text("A deterministic answer.")])
-const agent = Agent.make("tested-agent")
+const agent = Agent.make({ name: "tested-agent" })
 
 const program = Agent.generate(agent, { prompt: "Answer deterministically." }).pipe(
   Effect.flatMap((result) => Console.log(result.text)),

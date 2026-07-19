@@ -10,7 +10,7 @@ const agentServices = Layer.mergeAll(
 )
 
 const registryLayer = SessionRegistry.layerMemory({
-  agent: Agent.make("transport-agent"),
+  agent: Agent.make({ name: "transport-agent" }),
   onConcurrentMessage: "enqueue",
   pendingMessageCapacity: 16,
   maxConcurrentRuns: 4,

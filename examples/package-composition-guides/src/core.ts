@@ -8,7 +8,7 @@ const applicationLayer = Layer.mergeAll(
   Chat.layerPersisted({ storeId: "composition-guide-chats" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
 )
 
-const agent = Agent.make("assistant", { instructions: "Answer concisely." })
+const agent = Agent.make({ name: "assistant", instructions: "Answer concisely." })
 
 const program = Effect.gen(function* () {
   yield* Agent.generatePersisted(agent, {

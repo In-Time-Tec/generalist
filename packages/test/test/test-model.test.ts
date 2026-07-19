@@ -62,7 +62,7 @@ layer(
   it.effect("runs the script and captures normalized prompts", () =>
     Effect.gen(function* () {
       const fixture = yield* Fixture
-      const agent = Agent.make("scripted-agent", { toolkit: echoToolkit })
+      const agent = Agent.make({ name: "scripted-agent", toolkit: echoToolkit })
 
       const result = yield* Agent.generate(agent, { prompt: "start" })
       const requests = yield* fixture.requests
@@ -121,7 +121,7 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
           echoToolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) }),
         ),
       )
-      const events = yield* Agent.stream(Agent.make("reasoning-agent", { toolkit: echoToolkit }), {
+      const events = yield* Agent.stream(Agent.make({ name: "reasoning-agent", toolkit: echoToolkit }), {
         prompt: "think",
       }).pipe(Stream.runCollect, Effect.provide(services))
       const modelParts = events.filter((event) => event._tag === "ModelPart").map((event) => event.part)
@@ -276,7 +276,7 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
         const steering = yield* Steering.Steering
         yield* steering.steer({ prompt: "steer one" })
         yield* steering.steer({ prompt: "steer two" })
-        return yield* Agent.stream(Agent.make("steered", { toolkit: echoToolkit }), {
+        return yield* Agent.stream(Agent.make({ name: "steered", toolkit: echoToolkit }), {
           prompt: "start",
         }).pipe(Stream.runCollect)
       }).pipe(Effect.provide(services))

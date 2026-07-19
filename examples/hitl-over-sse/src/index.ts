@@ -22,7 +22,7 @@ const deployTool = Tool.make("deploy", {
 })
 
 const toolkit = Toolkit.make(deployTool)
-const agent = Agent.make("release-agent", { toolkit })
+const agent = Agent.make({ name: "release-agent", toolkit })
 const toolkitLayer = toolkit.toLayer({ deploy: () => Effect.die("approval should suspend before execution") })
 const persistenceLayer = Chat.layerPersisted({ storeId: "hitl-over-sse" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),
