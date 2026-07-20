@@ -1,5 +1,6 @@
 import { Context, Effect, Layer, Option, Ref, Schema } from "effect"
 import { dual } from "effect/Function"
+import type { AccessRequest } from "./tool-authorization.js"
 
 /** @experimental What a matched permission rule grants. */
 export type Level = "allow" | "deny" | "ask"
@@ -15,16 +16,6 @@ export interface Rule {
 export interface Ruleset {
   readonly rules: ReadonlyArray<Rule>
   readonly fallback?: Level
-}
-
-/** @experimental Tool-call information used by permission policies. */
-export interface EvaluationRequest {
-  readonly tool: string
-  readonly params: unknown
-  readonly agentName: string
-  readonly turn: number
-  readonly toolCallId?: string
-  readonly sessionId?: string
 }
 
 /** @experimental */
@@ -47,35 +38,6 @@ export interface Ask {
 /** @experimental Resolved policy decision for one tool call. */
 export type Decision = Allow | Deny | Ask
 
-/** @experimental */
-export interface Approved {
-  readonly _tag: "Approved"
-}
-
-/** @experimental */
-export interface Denied {
-  readonly _tag: "Denied"
-  readonly reason?: string
-}
-
-/** @experimental */
-export interface Always {
-  readonly _tag: "Always"
-}
-
-/** @experimental Out-of-band answer to a permission ask. */
-export type Answer = Approved | Denied | Always
-
-/** @experimental Pending permission ask surfaced to an approver. */
-export interface Pending {
-  readonly token: string
-  readonly tool: string
-  readonly params: unknown
-  readonly agentName: string
-  readonly turn: number
-  readonly toolCallId?: string
-}
-
 /** @experimental Permission service failure. */
 export class PermissionError extends Schema.TaggedErrorClass<PermissionError>()("@batonfx/core/PermissionError", {
   message: Schema.String,
@@ -83,17 +45,16 @@ export class PermissionError extends Schema.TaggedErrorClass<PermissionError>()(
 
 /** @experimental Permission policy service boundary. */
 export interface Interface {
-  readonly evaluate: (request: EvaluationRequest) => Effect.Effect<Decision, PermissionError>
-  readonly await: (pending: Pending) => Effect.Effect<Option.Option<Answer>, PermissionError>
+  readonly evaluate: (request: AccessRequest) => Effect.Effect<Decision, PermissionError>
 }
 
 /** @experimental */
 export class Permissions extends Context.Service<Permissions, Interface>()("@batonfx/core/Permissions") {}
 
-/** @experimental Optional remembered-rule store. */
+/** @experimental Remembered-rule store. */
 export interface RuleStoreInterface {
   readonly remember: (rule: Rule) => Effect.Effect<void, PermissionError>
-  readonly rules?: Effect.Effect<ReadonlyArray<Rule>, PermissionError>
+  readonly rules: Effect.Effect<ReadonlyArray<Rule>, PermissionError>
 }
 
 /** @experimental */
@@ -203,11 +164,10 @@ export const evaluate: {
     matchingRule(ruleset, tool, params)?.level ?? ruleset.fallback ?? "ask",
 )
 
-const tokenFor = (request: EvaluationRequest): string =>
-  `permission:${request.toolCallId ?? `${request.agentName}:${request.turn}:${request.tool}`}`
+const tokenFor = (request: AccessRequest): string => `permission:${request.call.id}`
 
-const decisionFor = (ruleset: Ruleset, request: EvaluationRequest): Decision => {
-  const rule = matchingRule(ruleset, request.tool, request.params)
+const decisionFor = (ruleset: Ruleset, request: AccessRequest): Decision => {
+  const rule = matchingRule(ruleset, request.call.name, request.call.params)
   const level = rule?.level ?? ruleset.fallback ?? "ask"
   switch (level) {
     case "allow":
@@ -219,13 +179,36 @@ const decisionFor = (ruleset: Ruleset, request: EvaluationRequest): Decision => 
   }
 }
 
+/** @experimental Evaluate a base policy with remembered rules as a last-match overlay. */
+export const evaluateWithRules: {
+  (store: RuleStoreInterface, request: AccessRequest): (base: Interface) => Effect.Effect<Decision, PermissionError>
+  (base: Interface, store: RuleStoreInterface, request: AccessRequest): Effect.Effect<Decision, PermissionError>
+} = dual(
+  3,
+  (base: Interface, store: RuleStoreInterface, request: AccessRequest): Effect.Effect<Decision, PermissionError> =>
+    Effect.gen(function* () {
+      const baseDecision = yield* base.evaluate(request)
+      if (baseDecision._tag === "Deny") return baseDecision
+      const rules = yield* store.rules
+      const rule = matchingRule({ rules }, request.call.name, request.call.params)
+      if (rule === undefined) return baseDecision
+      switch (rule.level) {
+        case "allow":
+          return { _tag: "Allow" }
+        case "deny":
+          return { _tag: "Deny", ...(rule.reason === undefined ? {} : { reason: rule.reason }) }
+        case "ask":
+          return { _tag: "Ask", token: tokenFor(request) }
+      }
+    }),
+)
+
 /** @experimental Policy from a static ruleset. */
 export const fromRuleset = (ruleset: Ruleset): Layer.Layer<Permissions> =>
   Layer.succeed(
     Permissions,
     Permissions.of({
       evaluate: (request) => Effect.succeed(decisionFor(ruleset, request)),
-      await: () => Effect.succeed(Option.none()),
     }),
   )
 
@@ -234,25 +217,8 @@ export const allowAll: Layer.Layer<Permissions> = Layer.succeed(
   Permissions,
   Permissions.of({
     evaluate: () => Effect.succeed({ _tag: "Allow" }),
-    await: () => Effect.succeed(Option.none()),
   }),
 )
-
-/** @experimental Options for an in-process interactive permission layer. */
-export interface InteractiveOptions {
-  readonly ruleset: Ruleset
-  readonly onAsk: (pending: Pending) => Effect.Effect<Answer, PermissionError>
-}
-
-/** @experimental In-process permission layer whose asks are answered by `onAsk`. */
-export const interactive = (options: InteractiveOptions): Layer.Layer<Permissions> =>
-  Layer.succeed(
-    Permissions,
-    Permissions.of({
-      evaluate: (request) => Effect.succeed(decisionFor(options.ruleset, request)),
-      await: (pending) => options.onAsk(pending).pipe(Effect.map(Option.some)),
-    }),
-  )
 
 /** @experimental Non-durable in-memory remembered-rule store. */
 export const ruleStoreMemory = (initialRules: ReadonlyArray<Rule> = []): Layer.Layer<RuleStore> =>

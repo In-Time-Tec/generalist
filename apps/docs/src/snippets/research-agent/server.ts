@@ -74,7 +74,7 @@ export const routesLayer = HttpRouter.use((router) =>
 )
 
 export const approvalsLayer = Approvals.testLayer({
-  check: (request) => Effect.succeed({ _tag: "Pending", token: `approve-${request.call.id}` }),
+  resolve: (request) => Effect.succeed({ ...request, token: `approve-${request.call.id}` }),
 })
 
 export const toolExecutorLayer = Layer.unwrap(

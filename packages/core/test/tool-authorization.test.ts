@@ -1,255 +1,176 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Option, Queue, Schema } from "effect"
-import { Prompt, Response, Tool } from "effect/unstable/ai"
+import { Effect, Schema } from "effect"
+import { Response, Tool } from "effect/unstable/ai"
 import { Approvals, Permissions, ToolAuthorization } from "../src/index"
-
-const gated = Tool.make("gated", {
-  parameters: Schema.Struct({ text: Schema.String }),
-  success: Schema.Unknown,
-  needsApproval: () => true,
-})
 
 const call = Response.makePart("tool-call", {
   id: "call-1",
-  name: "gated",
-  params: { text: "run" },
+  name: "echo",
+  params: { text: "hi" },
   providerExecuted: false,
 })
-
+const tool = Tool.make("echo", {
+  description: "echo",
+  parameters: Schema.Struct({ text: Schema.String }),
+  success: Schema.String,
+})
 const request: ToolAuthorization.Request = {
   call,
-  tool: gated,
+  tool,
   active: true,
-  activeTools: ["gated"],
+  activeTools: ["echo"],
   activatedSkills: [],
-  messages: Prompt.make("run").content,
-  execution: {
-    call,
-    toolCallBatch: { calls: [call] },
-    turn: 0,
-    toolCallIndex: 0,
-    agentName: "agent",
-    sessionId: "session",
-  },
+  messages: [],
+  agentName: "agent",
+  turn: 1,
+  sessionId: "session",
   onApprovalRequired: Effect.void,
 }
+const store = (rules: ReadonlyArray<Permissions.Rule> = []): Permissions.RuleStoreInterface => ({
+  rules: Effect.succeed(rules),
+  remember: () => Effect.void,
+})
+const permissions = (decision: Permissions.Decision): Permissions.Interface => ({
+  evaluate: () => Effect.succeed(decision),
+})
 
 describe("ToolAuthorization", () => {
-  it.effect("adapts Permissions without bypassing Approvals", () =>
+  it.effect("allows and denies in one pass", () =>
     Effect.gen(function* () {
-      const permissions: Permissions.Interface = {
-        evaluate: () => Effect.succeed({ _tag: "Ask", token: "permission-1" }),
-        await: () => Effect.succeed(Option.some({ _tag: "Approved" })),
-      }
-      const approvals: Approvals.Interface = {
-        check: () => Effect.succeed({ _tag: "Denied", reason: "review denied" }),
-      }
-
-      const decision = yield* ToolAuthorization.fromPermissions(permissions, { approvals }).authorize(request)
-
-      expect(decision._tag).toBe("Deny")
-      if (decision._tag === "Deny") expect(decision.error.message).toBe("review denied")
+      const approvals: Approvals.Interface = { resolve: () => Effect.succeed({ _tag: "Approved" }) }
+      expect(
+        (yield* ToolAuthorization.make({
+          permissions: permissions({ _tag: "Allow" }),
+          approvals,
+          ruleStore: store(),
+        }).authorize(request))._tag,
+      ).toBe("Execute")
+      expect(
+        (yield* ToolAuthorization.make({
+          permissions: permissions({ _tag: "Deny", reason: "no" }),
+          approvals,
+          ruleStore: store(),
+        }).authorize(request))._tag,
+      ).toBe("Deny")
     }),
   )
 
-  it.effect("adapts Approvals and returns replay-safe suspension data", () =>
+  it.effect("routes asks through Approved, Denied, and Pending resolutions", () =>
     Effect.gen(function* () {
-      const approvals: Approvals.Interface = {
-        check: () => Effect.succeed({ _tag: "Pending", token: "approval-1" }),
-      }
-
-      const decision = yield* ToolAuthorization.fromApprovals(approvals).authorize(request)
-
-      expect(decision._tag).toBe("Suspend")
-      if (decision._tag === "Suspend") {
-        expect(decision.suspension.token).toBe("approval-1")
-        expect(decision.suspension.tool_call_id).toBe("call-1")
+      const policy = permissions({ _tag: "Ask", token: "approval-1" })
+      for (const resolution of [
+        { _tag: "Approved" },
+        { _tag: "Denied" },
+        { ...request, _tag: "Pending", token: "approval-1" },
+      ] as const) {
+        const result = yield* ToolAuthorization.make({
+          permissions: policy,
+          approvals: { resolve: () => Effect.succeed(resolution) },
+          ruleStore: store(),
+        }).authorize(request)
+        expect(result._tag).toBe(
+          resolution._tag === "Approved" ? "Execute" : resolution._tag === "Denied" ? "Deny" : "Suspend",
+        )
       }
     }),
   )
 
-  it.effect("maps permission service failures to AuthorizationError", () =>
+  it.effect("remembers only the explicit rule carried by Approved", () =>
     Effect.gen(function* () {
-      const permissions: Permissions.Interface = {
-        evaluate: () => Effect.fail(Permissions.PermissionError.make({ message: "policy unavailable" })),
-        await: () => Effect.succeed(Option.none()),
-      }
-
-      const failure = yield* Effect.flip(ToolAuthorization.fromPermissions(permissions).authorize(request))
-
-      expect(failure._tag).toBe("@batonfx/core/AuthorizationError")
-      expect(failure.message).toBe("policy unavailable")
-    }),
-  )
-
-  it.effect("gives remembered denials precedence over current allows", () =>
-    Effect.gen(function* () {
-      const permissions: Permissions.Interface = {
-        evaluate: () => Effect.succeed({ _tag: "Allow" }),
-        await: () => Effect.succeed(Option.none()),
-      }
+      const remembered: Array<Permissions.Rule> = []
       const ruleStore: Permissions.RuleStoreInterface = {
-        remember: () => Effect.void,
-        rules: Effect.succeed([{ pattern: "gated", level: "deny" }]),
+        rules: Effect.succeed([]),
+        remember: (rule) => Effect.sync(() => remembered.push(rule)),
       }
-
-      const decision = yield* ToolAuthorization.fromPermissions(permissions, { ruleStore }).authorize(request)
-
-      expect(decision._tag).toBe("Deny")
-    }),
-  )
-
-  it.effect("honors a captured denial on permission-stage resume despite a remembered allow", () =>
-    Effect.gen(function* () {
-      const permissions: Permissions.Interface = {
-        evaluate: () => Effect.succeed({ _tag: "Allow" }),
-        await: () => Effect.succeedSome({ _tag: "Denied", reason: "captured denial" }),
-      }
-      const ruleStore: Permissions.RuleStoreInterface = {
-        remember: () => Effect.void,
-        rules: Effect.succeed([{ pattern: "gated", level: "allow" }]),
-      }
-
-      const decision = yield* ToolAuthorization.fromPermissions(permissions, { ruleStore }).authorize({
-        ...request,
-        authorizationStage: "permission",
-        authorizationToken: "original-permission-token",
-      })
-
-      expect(decision._tag).toBe("Deny")
-      if (decision._tag === "Deny") expect(decision.error.message).toBe("captured denial")
-    }),
-  )
-
-  it.effect("retains the authorization token when permission-stage resume has no answer", () =>
-    Effect.gen(function* () {
-      const permissions: Permissions.Interface = {
-        evaluate: () => Effect.succeed({ _tag: "Allow" }),
-        await: () => Effect.succeedNone,
-      }
-
-      const decision = yield* ToolAuthorization.fromPermissions(permissions).authorize({
-        ...request,
-        authorizationStage: "permission",
-        authorizationToken: "original-permission-token",
-      })
-
-      expect(decision._tag).toBe("Suspend")
-      if (decision._tag === "Suspend") expect(decision.suspension.token).toBe("original-permission-token")
-    }),
-  )
-
-  it.effect("denies inactive calls before permission and approval compatibility services", () =>
-    Effect.gen(function* () {
-      const permissions: Permissions.Interface = {
-        evaluate: () => Effect.die("inactive call must not evaluate permissions"),
-        await: () => Effect.die("inactive call must not await permissions"),
-      }
-      const approvals: Approvals.Interface = {
-        check: () => Effect.die("inactive call must not check approvals"),
-      }
-
-      const decision = yield* ToolAuthorization.fromPermissions(permissions, { approvals }).authorize({
-        ...request,
-        active: false,
-      })
-
-      expect(decision._tag).toBe("Deny")
-    }),
-  )
-
-  it.effect("suspends for a remembered ask when Permissions is absent", () =>
-    Effect.gen(function* () {
-      const ruleStore: Permissions.RuleStoreInterface = {
-        remember: () => Effect.void,
-        rules: Effect.succeed([{ pattern: "gated:*run*", level: "ask" }]),
-      }
-
-      const decision = yield* ToolAuthorization.make({ ruleStore }).authorize(request)
-
-      expect(decision._tag).toBe("Suspend")
-      if (decision._tag === "Suspend") expect(decision.suspension.active_tools).toEqual(["gated"])
-    }),
-  )
-
-  it.effect("does not re-evaluate dynamic approval on approval-stage resume", () =>
-    Effect.gen(function* () {
-      let checks = 0
-      const dynamic = Tool.make("gated", {
-        parameters: Schema.Struct({ text: Schema.String }),
-        success: Schema.Unknown,
-        needsApproval: () => {
-          checks += 1
-          return checks === 1
+      yield* ToolAuthorization.make({
+        permissions: permissions({ _tag: "Ask", token: "approval-1" }),
+        approvals: {
+          resolve: () => Effect.succeed({ _tag: "Approved", remember: { pattern: "echo", level: "allow" } }),
         },
-      })
-      const approvals: Approvals.Interface = {
-        check: () => Effect.succeed({ _tag: "Denied", reason: "resume denied" }),
-      }
-
-      const decision = yield* ToolAuthorization.make({ approvals }).authorize({
-        ...request,
-        tool: dynamic,
-        authorizationStage: "approval",
-      })
-
-      expect(decision._tag).toBe("Deny")
-      expect(checks).toBe(0)
+        ruleStore,
+      }).authorize(request)
+      expect(remembered).toEqual([{ pattern: "echo", level: "allow" }])
     }),
   )
 
-  it.effect("notifies before both permission and dynamic approval waits", () =>
+  it.effect("routes Allow plus needsApproval through Approvals.resolve", () =>
     Effect.gen(function* () {
-      const notifications = yield* Queue.unbounded<void>()
-      const approval = yield* Deferred.make<Approvals.Decision>()
-      const permissions: Permissions.Interface = {
-        evaluate: () => Effect.succeed({ _tag: "Ask", token: "permission-1" }),
-        await: () => Effect.succeedSome({ _tag: "Approved" }),
-      }
-      const approvals: Approvals.Interface = {
-        check: () => Deferred.await(approval),
-      }
-      const fiber = yield* ToolAuthorization.fromPermissions(permissions, { approvals })
-        .authorize({
-          ...request,
-          onApprovalRequired: Queue.offer(notifications, undefined).pipe(Effect.asVoid),
-        })
-        .pipe(Effect.forkChild)
+      let resolutions = 0
+      const gated = Tool.make("echo", {
+        parameters: Schema.Struct({ text: Schema.String }),
+        success: Schema.String,
+        needsApproval: true,
+      })
+      const result = yield* ToolAuthorization.make({
+        permissions: permissions({ _tag: "Allow" }),
+        approvals: {
+          resolve: () =>
+            Effect.sync(() => {
+              resolutions += 1
+              return { _tag: "Denied", reason: "review denied" }
+            }),
+        },
+        ruleStore: store(),
+      }).authorize({ ...request, tool: gated })
 
-      yield* Queue.take(notifications)
-      yield* Queue.take(notifications)
-      yield* Deferred.succeed(approval, { _tag: "Approved" })
-      expect((yield* Fiber.join(fiber))._tag).toBe("Execute")
+      expect(resolutions).toBe(1)
+      expect(result._tag).toBe("Deny")
     }),
   )
 
-  it.effect("keeps concurrent permission answers associated with their calls", () =>
+  it.effect("maps permission failures to AuthorizationError", () =>
     Effect.gen(function* () {
-      const permissions: Permissions.Interface = {
-        evaluate: (evaluation) => Effect.succeed({ _tag: "Ask", token: `permission:${evaluation.toolCallId}` }),
-        await: (pending) =>
-          Effect.succeedSome(
-            pending.toolCallId === "call-1"
-              ? ({ _tag: "Approved" } as const)
-              : ({ _tag: "Denied", reason: "second denied" } as const),
-          ),
-      }
+      const failure = yield* ToolAuthorization.make({
+        permissions: {
+          evaluate: () => Effect.fail(Permissions.PermissionError.make({ message: "policy unavailable" })),
+        },
+        approvals: { resolve: () => Effect.succeed({ _tag: "Approved" }) },
+        ruleStore: store(),
+      })
+        .authorize(request)
+        .pipe(Effect.flip)
+
+      expect(failure).toMatchObject({ _tag: "@batonfx/core/AuthorizationError", message: "policy unavailable" })
+    }),
+  )
+
+  it.effect("denies inactive calls before Permissions or Approvals", () =>
+    Effect.gen(function* () {
+      const result = yield* ToolAuthorization.make({
+        permissions: { evaluate: () => Effect.die("inactive call must not evaluate") },
+        approvals: { resolve: () => Effect.die("inactive call must not resolve") },
+        ruleStore: { rules: Effect.die("inactive call must not read rules"), remember: () => Effect.void },
+      }).authorize({ ...request, active: false })
+
+      expect(result._tag).toBe("Deny")
+    }),
+  )
+
+  it.effect("keeps concurrent resolutions associated with their calls", () =>
+    Effect.gen(function* () {
       const secondCall = Response.makePart("tool-call", {
         id: "call-2",
-        name: "gated",
+        name: "echo",
         params: { text: "second" },
         providerExecuted: false,
       })
-      const approvals: Approvals.Interface = { check: () => Effect.succeed({ _tag: "Approved" }) }
-      const authorizer = ToolAuthorization.fromPermissions(permissions, { approvals })
+      const authorizer = ToolAuthorization.make({
+        permissions: { evaluate: (access) => Effect.succeed({ _tag: "Ask", token: access.call.id }) },
+        approvals: {
+          resolve: (pending) =>
+            Effect.succeed(
+              pending.call.id === "call-1"
+                ? ({ _tag: "Approved" } as const)
+                : ({ _tag: "Denied", reason: "second denied" } as const),
+            ),
+        },
+        ruleStore: store(),
+      })
 
-      const decisions = yield* Effect.forEach(
-        [request, { ...request, call: secondCall, execution: { ...request.execution, call: secondCall } }],
-        authorizer.authorize,
-        { concurrency: 2 },
-      )
-
-      expect(decisions.map((decision) => decision._tag)).toEqual(["Execute", "Deny"])
+      const results = yield* Effect.forEach([request, { ...request, call: secondCall }], authorizer.authorize, {
+        concurrency: 2,
+      })
+      expect(results.map((result) => result._tag)).toEqual(["Execute", "Deny"])
     }),
   )
 })

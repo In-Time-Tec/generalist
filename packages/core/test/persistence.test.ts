@@ -204,7 +204,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           return Stream.make(textDelta("must not run"))
         }),
         unusedExecutor,
-        Approvals.testLayer({ check: () => Effect.die("authorization must not run") }),
+        Approvals.testLayer({ resolve: () => Effect.die("authorization must not run") }),
         ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),

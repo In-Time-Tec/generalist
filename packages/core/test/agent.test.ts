@@ -1135,8 +1135,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "fails approval-gated tools closed when Approvals is absent", () => {
+  ItLayer.make(it, "uses the auto-approve default when approval policy is absent", () => {
     let calls = 0
+    let handled = false
     return [
       Layer.mergeAll(
         modelLayer(() => {
@@ -1146,23 +1147,23 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             : Stream.make(textDelta("after failed approval"))
         }),
         Toolkit.make(gatedTool).toLayer({
-          gated: () => Effect.die("approval-gated call must not execute"),
+          gated: () =>
+            Effect.sync(() => {
+              handled = true
+              return { approved: true }
+            }),
         }),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "missing-approvals-agent", toolkit: Toolkit.make(gatedTool) })
-        const events: Array<AgentEvent.Event> = []
 
-        const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "use gated" }), (event) =>
-            Effect.sync(() => events.push(event)),
-          ),
-        )
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use gated" }))
 
-        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+        expect(handled).toBe(true)
         expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
-        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
-        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
+        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
+        expect(events.at(-1)?._tag).toBe("Completed")
       }),
     ] as const
   })
@@ -2231,8 +2232,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.testLayer({
-          check: (request) => {
-            approvalSessionId = request.sessionId
+          resolve: (request) => {
+            approvalSessionId = request.sessionId ?? ""
             return Effect.succeed({ _tag: "Denied" })
           },
         }),
@@ -2253,7 +2254,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "emits ApprovalRequested before a blocking approval check completes", () => {
     let modelCalls = 0
-    let approval: Deferred.Deferred<Approvals.Decision> | undefined
+    let approval: Deferred.Deferred<Approvals.Resolution> | undefined
     return [
       Layer.mergeAll(
         modelLayer(() => {
@@ -2264,12 +2265,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.testLayer({
-          check: () => (approval === undefined ? Effect.die("missing approval Deferred") : Deferred.await(approval)),
+          resolve: () => (approval === undefined ? Effect.die("missing approval Deferred") : Deferred.await(approval)),
         }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        approval = yield* Deferred.make<Approvals.Decision>()
+        approval = yield* Deferred.make<Approvals.Resolution>()
         const requested = yield* Deferred.make<void>()
         const agent = Agent.make({ name: "blocking-approval-agent", toolkit: Toolkit.make(gatedTool) })
         const fiber = yield* Stream.runForEach(Agent.stream(agent, { prompt: "wait for approval" }), (event) =>
@@ -2297,7 +2298,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           return Stream.make(textDelta("saw denied permission"))
         }),
         ToolExecutor.testLayer({ execute: () => Effect.die("permission-denied call must not execute") }),
-        Approvals.testLayer({ check: () => Effect.die("permission-denied call must not ask approvals") }),
+        Approvals.testLayer({ resolve: () => Effect.die("permission-denied call must not ask approvals") }),
         Permissions.fromRuleset({ rules: [{ pattern: "gated", level: "deny" }] }),
         ModelMiddleware.layerIdentity,
       ),
@@ -2361,7 +2362,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("tool-call-permission-ask", "gated", { text: "ask" }))),
         ToolExecutor.testLayer({ execute: () => Effect.die("permission ask must not execute") }),
-        Approvals.testLayer({ check: () => Effect.die("permission ask must not ask approvals") }),
+        Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
         Permissions.fromRuleset({ rules: [], fallback: "ask" }),
         ModelMiddleware.layerIdentity,
       ),
@@ -2393,7 +2394,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "does not let permission Approved answers bypass needsApproval", () => {
+  ItLayer.make(it, "does not let permission Allow bypass needsApproval", () => {
     let calls = 0
     return [
       Layer.mergeAll(
@@ -2403,12 +2404,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             ? Stream.make(toolCallPart("tool-call-permission-approved", "gated", { text: "approved" }))
             : Stream.make(textDelta("after approved permission"))
         }),
-        ToolExecutor.testLayer({ execute: () => Effect.die("approval-denied call must not execute") }),
-        Approvals.denyAll,
-        Permissions.interactive({
-          ruleset: { rules: [], fallback: "ask" },
-          onAsk: () => Effect.succeed({ _tag: "Approved" }),
+        ToolExecutor.testLayer({
+          execute: () => Effect.succeed({ _tag: "Success", result: "approved", encodedResult: "approved" }),
         }),
+        Approvals.denyAll,
+        Permissions.allowAll,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2429,7 +2429,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "remembers Always without bypassing needsApproval", () => {
+  ItLayer.make(it, "remembers an approved rule through the single approval flow", () => {
     let calls = 0
     const remembered: Array<Permissions.Rule> = []
     return [
@@ -2440,17 +2440,19 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             ? Stream.make(toolCallPart("tool-call-permission-always", "gated", { text: "always" }))
             : Stream.make(textDelta("after always"))
         }),
-        ToolExecutor.testLayer({ execute: () => Effect.die("approval-denied call must not execute") }),
-        Approvals.denyAll,
-        Permissions.interactive({
-          ruleset: { rules: [], fallback: "ask" },
-          onAsk: () => Effect.succeed({ _tag: "Always" }),
+        ToolExecutor.testLayer({
+          execute: () => Effect.succeed({ _tag: "Success", result: "approved", encodedResult: "approved" }),
         }),
+        Approvals.testLayer({
+          resolve: () => Effect.succeed({ _tag: "Approved", remember: { pattern: "gated", level: "allow" } }),
+        }),
+        Permissions.fromRuleset({ rules: [], fallback: "ask" }),
         Permissions.ruleStoreTestLayer({
           remember: (rule) =>
             Effect.sync(() => {
               remembered.push(rule)
             }),
+          rules: Effect.succeed([]),
         }),
         ModelMiddleware.layerIdentity,
       ),
@@ -2458,21 +2460,19 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "permission-always-agent", toolkit: Toolkit.make(gatedTool) })
         const events: Array<AgentEvent.Event> = []
 
-        const failure = yield* Effect.flip(
-          Stream.runForEach(Agent.stream(agent, { prompt: "ask always" }), (event) =>
-            Effect.sync(() => events.push(event)),
-          ),
+        yield* Stream.runForEach(Agent.stream(agent, { prompt: "ask always" }), (event) =>
+          Effect.sync(() => events.push(event)),
         )
 
-        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
         expect(remembered).toEqual([{ pattern: "gated", level: "allow" }])
-        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
-        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(false)
+        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
+        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
+        expect(events.at(-1)?._tag).toBe("Completed")
       }),
     ] as const
   })
 
-  ItLayer.make(it, "reads a remembered Always rule before asking again", () => {
+  ItLayer.make(it, "reads a remembered approved rule before asking again", () => {
     let modelCalls = 0
     let asks = 0
     let executions = 0
@@ -2497,11 +2497,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             })
           },
         }),
-        Permissions.interactive({
-          ruleset: { rules: [], fallback: "ask" },
-          onAsk: () => {
+        Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+        Approvals.testLayer({
+          resolve: () => {
             asks += 1
-            return Effect.succeed({ _tag: "Always" })
+            return Effect.succeed({
+              _tag: "Approved",
+              remember: { pattern: "echo", level: "allow" },
+            })
           },
         }),
         Permissions.ruleStoreMemory(),
@@ -2513,6 +2516,55 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "remember approval" }))
 
         expect(asks).toBe(1)
+        expect(executions).toBe(2)
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "owns the default RuleStore for later calls in the run", () => {
+    let modelCalls = 0
+    let resolutions = 0
+    let executions = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.fromIterable([
+                toolCallPart("default-store-first", "echo", { text: "first" }),
+                toolCallPart("default-store-second", "echo", { text: "second" }),
+              ])
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.testLayer({
+          execute: (request) => {
+            executions += 1
+            return Effect.succeed({
+              _tag: "Success",
+              result: request.call.params,
+              encodedResult: request.call.params,
+            })
+          },
+        }),
+        Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+        Approvals.testLayer({
+          resolve: () => {
+            resolutions += 1
+            return Effect.succeed({
+              _tag: "Approved",
+              remember: { pattern: "echo", level: "allow" },
+            })
+          },
+        }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "default-rule-store-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "remember" }))
+
+        expect(resolutions).toBe(1)
         expect(executions).toBe(2)
         expect(events.at(-1)?._tag).toBe("Completed")
       }),
@@ -2543,7 +2595,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             })
           },
         }),
-        Approvals.testLayer({ check: () => Effect.die("excluded tool must not request approval") }),
+        Approvals.testLayer({ resolve: () => Effect.die("excluded tool must not request approval") }),
         ModelMiddleware.layer([
           {
             transformPart: (part) =>
@@ -5665,7 +5717,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(it, "resumes an authorization suspension with its active-tool snapshot", () => {
     let modelCalls = 0
-    let permissionAnswers = 0
+    let approvalResolutions = 0
     let executions = 0
     let checkpoint: Prompt.Prompt | undefined
     return [
@@ -5684,12 +5736,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         Permissions.testLayer({
           evaluate: () => Effect.succeed({ _tag: "Ask", token: "authorization-token" }),
-          await: () => {
-            permissionAnswers += 1
-            return Effect.succeed(permissionAnswers === 1 ? Option.none() : Option.some({ _tag: "Approved" as const }))
+        }),
+        Approvals.testLayer({
+          resolve: (pending) => {
+            approvalResolutions += 1
+            return Effect.succeed(approvalResolutions === 1 ? pending : { _tag: "Approved" as const })
           },
         }),
-        Approvals.autoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5765,7 +5818,6 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           AgentEvent.AgentSuspended.make({ ...suspension, tool_name: "gated" }),
           AgentEvent.AgentSuspended.make({ ...suspension, tool_params: { text: "substituted" } }),
           AgentEvent.AgentSuspended.make({ ...suspension, reason: "approval" }),
-          AgentEvent.AgentSuspended.make({ ...suspension, authorization_stage: "permission" }),
           AgentEvent.AgentSuspended.make({ ...suspension, active_tools: [] }),
           AgentEvent.AgentSuspended.make({ ...suspension, activated_skills: ["substituted-skill"] }),
         ]
@@ -5873,6 +5925,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         modelLayer(() => Stream.make(toolCallPart("bound-call", "gated", { text: "original" }))),
         ToolExecutor.testLayer({ execute: () => Effect.die("substituted params must not execute") }),
         Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+        Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5946,13 +5999,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         }),
         Approvals.testLayer({
-          check: () => {
+          resolve: (pending) => {
             approvalChecks += 1
-            return Effect.succeed(
-              approvalChecks === 1
-                ? { _tag: "Pending", token: "skill-approval" as const }
-                : { _tag: "Approved" as const },
-            )
+            return Effect.succeed(approvalChecks === 1 ? { ...pending, token: "skill-approval" } : { _tag: "Approved" })
           },
         }),
         SkillSource.fromSkills([review]),
@@ -5994,7 +6043,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Layer.mergeAll(
           modelLayer(() => Stream.make(providerToolCallPart("provider-call", "gated", { text: "done upstream" }))),
           unusedExecutor,
-          Approvals.testLayer({ check: () => Effect.die("approvals must not be consulted") }),
+          Approvals.testLayer({ resolve: () => Effect.die("approvals must not be consulted") }),
           ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
@@ -6040,12 +6089,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         }),
         Approvals.testLayer({
-          check: () => {
+          resolve: (pending) => {
             approvalChecks += 1
             return Effect.succeed(
-              approvalChecks === 1
-                ? { _tag: "Pending", token: "reused-call-token" as const }
-                : { _tag: "Approved" as const },
+              approvalChecks === 1 ? { ...pending, token: "reused-call-token" } : { _tag: "Approved" },
             )
           },
         }),
@@ -6130,7 +6177,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             return Effect.succeed({ _tag: "Success", result: { ok: true }, encodedResult: { ok: true } })
           },
         }),
-        Approvals.testLayer({ check: () => Effect.die("approvals must not be consulted") }),
+        Approvals.testLayer({ resolve: () => Effect.die("approvals must not be consulted") }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -6168,7 +6215,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.testLayer({
-          check: () => {
+          resolve: () => {
             approvals += 1
             return Effect.succeed({ _tag: "Denied" })
           },
@@ -6228,7 +6275,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.testLayer({
-          check: () => {
+          resolve: () => {
             approvals += 1
             return Effect.succeed({ _tag: "Denied" })
           },
@@ -6331,7 +6378,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Layer.mergeAll(
           modelLayer(() => Stream.make(toolCallPart("tool-call-pending", "gated", { text: "please" }))),
           unusedExecutor,
-          Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-1" }) }),
+          Approvals.testLayer({
+            resolve: (pending) => Effect.succeed({ ...pending, token: "approval-1" }),
+          }),
           ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
@@ -6363,7 +6412,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             : Stream.make(textDelta("done"))
         }),
         echoExecutor,
-        Approvals.testLayer({ check: () => Effect.die("approvals must not be consulted") }),
+        Approvals.testLayer({ resolve: () => Effect.die("approvals must not be consulted") }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {

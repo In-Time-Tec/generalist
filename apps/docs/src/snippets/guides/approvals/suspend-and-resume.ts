@@ -51,7 +51,7 @@ const pendingLayers = Layer.mergeAll(
   modelLayer,
   toolkitLayer,
   Approvals.testLayer({
-    check: (request) => Effect.succeed({ _tag: "Pending", token: `approval:${request.call.id}` }),
+    resolve: (request) => Effect.succeed({ ...request, token: `approval:${request.call.id}` }),
   }),
   ModelMiddleware.layerIdentity,
 )

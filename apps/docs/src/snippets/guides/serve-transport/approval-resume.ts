@@ -40,7 +40,9 @@ const registryLayer = SessionRegistry.layerMemory({ agent }).pipe(
     Layer.mergeAll(
       modelLayer,
       toolkit.toLayer({ deploy: () => Effect.succeed("deployed") }),
-      Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "deploy-token-1" }) }),
+      Approvals.testLayer({
+        resolve: (pending) => Effect.succeed({ ...pending, token: "deploy-token-1" }),
+      }),
       ModelMiddleware.layerIdentity,
       Chat.layerPersisted({ storeId: "approval-demo" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
     ),

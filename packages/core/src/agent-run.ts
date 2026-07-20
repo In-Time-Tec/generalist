@@ -384,13 +384,27 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       const steeringService = yield* Effect.serviceOption(Steering)
       const memoryService = yield* Effect.serviceOption(Memory)
       const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
+      const defaultRules = yield* Ref.make<ReadonlyArray<import("./permissions.js").Rule>>([])
       const authorizer =
         agent.authorization ??
         Option.getOrElse(authorizationService, () =>
           makeToolAuthorizer({
-            ...(Option.isNone(permissionsService) ? {} : { permissions: permissionsService.value }),
-            ...(Option.isNone(approvals) ? {} : { approvals: approvals.value }),
-            ...(Option.isNone(ruleStoreService) ? {} : { ruleStore: ruleStoreService.value }),
+            permissions: Option.getOrElse(permissionsService, () =>
+              Permissions.of({ evaluate: () => Effect.succeed({ _tag: "Allow" }) }),
+            ),
+            approvals: Option.getOrElse(approvals, () =>
+              Approvals.of({ resolve: () => Effect.succeed({ _tag: "Approved" }) }),
+            ),
+            ruleStore: Option.getOrElse(ruleStoreService, () =>
+              RuleStore.of({
+                rules: Ref.get(defaultRules),
+                remember: (rule) =>
+                  Ref.update(defaultRules, (rules) => [
+                    ...rules.filter((current) => current.pattern !== rule.pattern),
+                    rule,
+                  ]),
+              }),
+            ),
           }),
         )
       const memoryOptions = options.memory ?? (agent.memory === undefined ? undefined : { key: agent.memory })
@@ -481,9 +495,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           const metadata = {
             token: suspension.token,
             reason: suspension.reason,
-            ...(suspension.authorization_stage === undefined
-              ? {}
-              : { authorization_stage: suspension.authorization_stage }),
             ...(suspension.tool_call_index === undefined ? {} : { tool_call_index: suspension.tool_call_index }),
             tool_call_batch_ids: suspension.tool_call_batch.map((call) => call.id),
             ...(suspension.active_tools === undefined ? {} : { active_tools: suspension.active_tools }),
@@ -1129,8 +1140,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         call: AnyToolCall,
         messages: ReadonlyArray<Prompt.Message>,
         registry: Registry,
-        authorizationStage?: "permission" | "approval",
-        authorizationToken?: string,
       ): Stream.Stream<Event, RunError, StaticToolServices<Tools> | R> => {
         const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: agent.name, sessionId }
         const candidate = get(registry, call.name)
@@ -1150,14 +1159,14 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             const fiber = yield* authorizer
               .authorize({
                 call,
+                agentName: agent.name,
+                turn,
+                sessionId,
                 tool: candidate.tool,
                 active: true,
                 activeTools,
                 activatedSkills,
-                ...(authorizationStage === undefined ? {} : { authorizationStage }),
-                ...(authorizationToken === undefined ? {} : { authorizationToken }),
                 messages,
-                execution: request,
                 onApprovalRequired: Queue.offer(approvalEvents, { _tag: "ApprovalRequested", turn, call }).pipe(
                   Effect.asVoid,
                 ),
@@ -1187,7 +1196,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                         AgentSuspended.make({
                           token: decision.suspension.token,
                           reason: "approval",
-                          authorization_stage: decision.suspension.authorization_stage ?? "approval",
                           tool_call_index: toolCallIndex,
                           tool_call_id: call.id,
                           tool_name: call.name,
@@ -1805,9 +1813,9 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                 Effect.map((tools) => {
                   const suspension = checkpoint.suspension
                   const registry =
-                    suspension.authorization_stage === undefined && suspension.active_tools === undefined
+                    suspension.active_tools === undefined
                       ? tools.registry
-                      : select(tools.registry, suspension.active_tools ?? [])
+                      : select(tools.registry, suspension.active_tools)
                   const calls = suspension.tool_call_batch.map((call) =>
                     Response.makePart("tool-call", {
                       id: call.id,
@@ -1833,17 +1841,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                   }: {
                     readonly call: AnyToolCall
                     readonly toolCallIndex: number
-                  }) =>
-                    toolCallEvents(
-                      0,
-                      toolCallBatch,
-                      toolCallIndex,
-                      call,
-                      checkpoint.messages,
-                      registry,
-                      toolCallIndex === startIndex ? suspension.authorization_stage : undefined,
-                      toolCallIndex === startIndex ? suspension.token : undefined,
-                    )
+                  }) => toolCallEvents(0, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
                   const concurrency = agent.toolExecution?.concurrency ?? 1
                   return concurrency === 1
                     ? executions.pipe(Stream.flatMap(execute), Stream.tap(recordPending))

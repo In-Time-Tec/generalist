@@ -717,6 +717,11 @@ describe("SessionRegistry.layerMemory", () => {
       expect(suspended?._tag).toBe("Suspended")
       expect(first.at(-1)?._tag).toBe("Ended")
 
+      const wrongToken = yield* SessionRegistry.SessionRegistry.use((registry) =>
+        registry.resolveApproval("s-approval", "wrong-token", { _tag: "Approved" }).pipe(Effect.flip),
+      )
+      expect(wrongToken).toMatchObject({ _tag: "@batonfx/transport/SessionError" })
+
       const secondFiber = yield* collectThroughEnded("s-approval", first.at(-1)?.seq).pipe(Effect.forkChild)
       yield* SessionRegistry.SessionRegistry.use((registry) =>
         registry.resolveApproval("s-approval", "approval-token", { _tag: "Approved" }),
@@ -743,7 +748,9 @@ describe("SessionRegistry.layerMemory", () => {
                     return "approved"
                   }),
               }),
-              Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-token" }) }),
+              Approvals.testLayer({
+                resolve: (pending) => Effect.succeed({ ...pending, token: "approval-token" }),
+              }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -797,6 +804,7 @@ describe("SessionRegistry.layerMemory", () => {
                   }),
               }),
               Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -873,6 +881,7 @@ describe("SessionRegistry.layerMemory", () => {
                   }),
               }),
               Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -935,6 +944,7 @@ describe("SessionRegistry.layerMemory", () => {
                   }),
               }),
               Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -944,15 +954,16 @@ describe("SessionRegistry.layerMemory", () => {
     )
   })
 
-  it.effect("honors the captured permission answer when live policy changes to allow", () => {
-    const permissioned = Tool.make("permission_drift", {
+  it.effect("does not leak a stale captured denial to a later same-id call after policy drift", () => {
+    const permissioned = Tool.make("policy_drift", {
       parameters: Schema.Struct({}),
       success: Schema.String,
     })
     const toolkit = Toolkit.make(permissioned)
-    const agent = Agent.make({ name: "permission-drift-agent", toolkit })
+    const agent = Agent.make({ name: "policy-drift-agent", toolkit })
+    let modelCalls = 0
     let evaluations = 0
-    let handled = false
+    let executions = 0
     return Effect.gen(function* () {
       yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-permission-drift" }))
       const firstFiber = yield* collectThroughEnded("s-permission-drift").pipe(Effect.forkChild)
@@ -965,31 +976,37 @@ describe("SessionRegistry.layerMemory", () => {
       )
       const second = yield* Fiber.join(secondFiber)
 
-      expect(handled).toBe(false)
+      expect(evaluations).toBe(3)
+      expect(executions).toBe(1)
       expect(second.some((frame) => frame._tag === "Event" && frame.event._tag === "ApprovalRequested")).toBe(true)
-      expect(second.some((frame) => frame._tag === "Failed")).toBe(true)
+      expect(second.some((frame) => frame._tag === "Suspended")).toBe(true)
+      expect(second.some((frame) => frame._tag === "Failed")).toBe(false)
     }).pipe(
       provideTestLayer(
         SessionRegistry.layerMemory({ agent }).pipe(
           Layer.provide(
             Layer.mergeAll(
-              modelLayer(() => Stream.make(toolCallPart("call-drift", "permission_drift", {}))),
+              modelLayer(() =>
+                modelCalls++ < 2
+                  ? Stream.make(toolCallPart("call-drift", "policy_drift", {}))
+                  : assistantText("reply", "done"),
+              ),
               toolkit.toLayer({
-                permission_drift: () =>
+                policy_drift: () =>
                   Effect.sync(() => {
-                    handled = true
+                    executions += 1
                     return "executed"
                   }),
               }),
               Permissions.testLayer({
                 evaluate: () =>
                   Effect.sync(() =>
-                    evaluations++ === 0
-                      ? ({ _tag: "Ask", token: "original-token" } as const)
-                      : ({ _tag: "Allow" } as const),
+                    ++evaluations === 2
+                      ? ({ _tag: "Allow" } as const)
+                      : ({ _tag: "Ask", token: "original-token" } as const),
                   ),
-                await: () => Effect.succeedNone,
               }),
+              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -999,48 +1016,42 @@ describe("SessionRegistry.layerMemory", () => {
     )
   })
 
-  it.effect("continues from permission approval through a separate dynamic approval", () => {
+  it.effect("resolves permission ask and needsApproval through one override", () => {
     let approvalChecks = 0
-    let approvalMessageRoles: ReadonlyArray<string> = []
-    const gated = Tool.make("two_stage", {
+    let resolutions = 0
+    const gated = Tool.make("single_gate", {
       parameters: Schema.Struct({ text: Schema.String }),
       success: Schema.String,
       needsApproval: (_params, context) => {
         approvalChecks += 1
-        approvalMessageRoles = context.messages.map((message) => message.role)
         return context.messages.at(-1)?.role === "user"
       },
     })
     const toolkit = Toolkit.make(gated)
-    const agent = Agent.make({ name: "two-stage-approval-agent", toolkit })
+    const agent = Agent.make({ name: "single-gate-agent", toolkit })
     let calls = 0
     let handled = false
     return Effect.gen(function* () {
-      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-two-stage" }))
-      const permissionFrames = yield* collectThroughEnded("s-two-stage").pipe(Effect.forkChild)
-      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-two-stage", "needs both approvals"))
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-single-gate" }))
+      const permissionFrames = yield* collectThroughEnded("s-single-gate").pipe(Effect.forkChild)
+      yield* SessionRegistry.SessionRegistry.use((registry) => registry.send("s-single-gate", "needs approval"))
       const first = yield* Fiber.join(permissionFrames)
 
-      const approvalFrames = yield* collectThroughEnded("s-two-stage", first.at(-1)?.seq).pipe(Effect.forkChild)
+      const suspended = first.find((frame) => frame._tag === "Suspended")
+      expect(suspended?._tag === "Suspended" && suspended.suspension.token).toBe("dynamic-approval")
+      expect(approvalChecks).toBe(0)
+      expect(resolutions).toBe(1)
+
+      const completionFrames = yield* collectThroughEnded("s-single-gate", first.at(-1)?.seq).pipe(Effect.forkChild)
       yield* SessionRegistry.SessionRegistry.use((registry) =>
-        registry.resolveApproval("s-two-stage", "permission:call-two-stage", { _tag: "Approved" }),
+        registry.resolveApproval("s-single-gate", "dynamic-approval", { _tag: "Approved" }),
       )
-      const second = yield* Fiber.join(approvalFrames)
-      const approvalSuspension = second.find((frame) => frame._tag === "Suspended")
+      const second = yield* Fiber.join(completionFrames)
 
-      expect(approvalMessageRoles).toEqual(["user"])
-      expect(approvalSuspension?._tag === "Suspended" && approvalSuspension.suspension.token).toBe("dynamic-approval")
-      expect(approvalChecks).toBe(1)
-
-      const completionFrames = yield* collectThroughEnded("s-two-stage", second.at(-1)?.seq).pipe(Effect.forkChild)
-      yield* SessionRegistry.SessionRegistry.use((registry) =>
-        registry.resolveApproval("s-two-stage", "dynamic-approval", { _tag: "Denied", reason: "review denied" }),
-      )
-      const third = yield* Fiber.join(completionFrames)
-
-      expect(approvalChecks).toBe(1)
-      expect(handled).toBe(false)
-      expect(third.some((frame) => frame._tag === "Failed")).toBe(true)
+      expect(approvalChecks).toBe(0)
+      expect(resolutions).toBe(1)
+      expect(handled).toBe(true)
+      expect(second.some((frame) => frame._tag === "Event" && frame.event._tag === "Completed")).toBe(true)
     }).pipe(
       provideTestLayer(
         SessionRegistry.layerMemory({ agent }).pipe(
@@ -1049,18 +1060,23 @@ describe("SessionRegistry.layerMemory", () => {
               modelLayer(() => {
                 calls += 1
                 return calls === 1
-                  ? Stream.make(toolCallPart("call-two-stage", "two_stage", { text: "approved" }))
-                  : assistantText("reply", "two-stage done")
+                  ? Stream.make(toolCallPart("call-single-gate", "single_gate", { text: "approved" }))
+                  : assistantText("reply", "single-gate done")
               }),
               toolkit.toLayer({
-                two_stage: () =>
+                single_gate: () =>
                   Effect.sync(() => {
                     handled = true
                     return "approved"
                   }),
               }),
               Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-              Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "dynamic-approval" }) }),
+              Approvals.testLayer({
+                resolve: (pending) => {
+                  resolutions += 1
+                  return Effect.succeed({ ...pending, token: "dynamic-approval" })
+                },
+              }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -1115,6 +1131,7 @@ describe("SessionRegistry.layerMemory", () => {
                 remember: () => Effect.void,
                 rules: Effect.succeed([{ pattern: "remembered_ask", level: "ask" }]),
               }),
+              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -1190,7 +1207,9 @@ describe("SessionRegistry.layerMemory", () => {
                     return "approved"
                   }),
               }),
-              Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-token" }) }),
+              Approvals.testLayer({
+                resolve: (pending) => Effect.succeed({ ...pending, token: "approval-token" }),
+              }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -1240,10 +1259,13 @@ describe("SessionRegistry.layerMemory", () => {
               }),
               toolkit.toLayer({ gated: () => Effect.succeed("approved") }),
               Approvals.testLayer({
-                check: () =>
+                resolve: (pending) =>
                   Effect.sync(() => {
                     approvalChecks += 1
-                    return { _tag: "Pending" as const, token: approvalChecks === 1 ? "approval-token" : "second-token" }
+                    return {
+                      ...pending,
+                      token: approvalChecks === 1 ? "approval-token" : "second-token",
+                    }
                   }),
               }),
               ModelMiddleware.layerIdentity,

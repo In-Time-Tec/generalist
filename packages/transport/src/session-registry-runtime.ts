@@ -1,11 +1,11 @@
 import { Cause, Effect, Ref, Schema } from "effect"
 import { Chat } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, ToolExecutor, TurnPolicy } from "@batonfx/core"
+import { Agent, AgentEvent, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import type { FrameJournal } from "./frame-journal.js"
 import type { CoordinationState } from "./session-coordination.js"
 import { SessionError } from "./session-registry-errors.js"
 import type { SessionInfo } from "./session-registry.js"
-import type { ClientApproval, EventType, RunFailure } from "./wire.js"
+import type { EventType, RunFailure } from "./wire.js"
 
 export interface SessionState {
   readonly sessionId: string
@@ -77,11 +77,6 @@ const runFailureFromCause = (cause: Cause.Cause<Agent.RunError | SessionError>, 
   return AgentEvent.AgentError.make({ message, turn, cause: error })
 }
 
-const toApprovalDecision = (decision: ClientApproval): Approvals.Decision => {
-  if (decision._tag === "Approved") return { _tag: "Approved" }
-  return decision.reason === undefined ? { _tag: "Denied" } : { _tag: "Denied", reason: decision.reason }
-}
-
 export const sessionRegistryRuntime = {
   errorMessage,
   sessionError,
@@ -90,5 +85,4 @@ export const sessionRegistryRuntime = {
   positiveInteger,
   stripEventTranscript,
   runFailureFromCause,
-  toApprovalDecision,
 }

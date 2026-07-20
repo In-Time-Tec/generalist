@@ -16,7 +16,6 @@ export const suspensionCheckpointOption = "@batonfx/core/suspension" as const
 export const suspensionMetadata = Schema.Struct({
   token: Schema.String,
   reason: Schema.Literals(["tool-wait", "approval"]),
-  authorization_stage: Schema.optional(Schema.Literals(["permission", "approval"])),
   tool_call_index: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   tool_call_batch_ids: Schema.Array(Schema.String),
   active_tools: Schema.optional(Schema.Array(Schema.String)),
@@ -127,7 +126,6 @@ export const suspensionCheckpoint = (messages: ReadonlyArray<Prompt.Message>): S
 export const sameSuspension = (left: AgentSuspended, right: AgentSuspended): boolean =>
   left.token === right.token &&
   left.reason === right.reason &&
-  left.authorization_stage === right.authorization_stage &&
   left.tool_call_index === right.tool_call_index &&
   Equal.equals(left.tool_call_batch, right.tool_call_batch) &&
   left.tool_call_id === right.tool_call_id &&

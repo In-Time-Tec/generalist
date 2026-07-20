@@ -3,6 +3,7 @@ import {
   Clock,
   Context,
   Duration,
+  Equal,
   Effect,
   Exit,
   Fiber,
@@ -16,7 +17,7 @@ import {
   Stream,
 } from "effect"
 import { Chat, Prompt, Tool } from "effect/unstable/ai"
-import { Agent, AgentEvent, Approvals, Permissions } from "@batonfx/core"
+import { Agent, AgentEvent, Approvals } from "@batonfx/core"
 import { type FrameWithoutSeq, makeFrameJournal } from "./frame-journal.js"
 import {
   coordination,
@@ -42,7 +43,6 @@ const {
   runFailureFromCause,
   sessionError,
   stripEventTranscript,
-  toApprovalDecision,
 } = sessionRegistryRuntime
 
 export { SessionBusy, SessionError, SessionQueueFull, SubscriberLagged } from "./session-registry-errors.js"
@@ -108,7 +108,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
       const scope = yield* Effect.scope
       const context = yield* Effect.context<R | Chat.Persistence>()
       const approvals = yield* Effect.serviceOption(Approvals.Approvals)
-      const permissions = yield* Effect.serviceOption(Permissions.Permissions)
       const persistence = yield* Chat.Persistence
       const state = yield* Ref.make<RegistryState>({ sessions: new Map() })
       const ringBufferCapacity = options.ringBufferCapacity ?? 1024
@@ -214,70 +213,39 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
       const makeApprovals = (
         resume: Agent.Resume | undefined,
         decision: ClientApproval | undefined,
+        sessionId: string,
       ): Effect.Effect<Option.Option<Approvals.Interface>> => {
-        if (resume === undefined || decision === undefined || resume.suspension.authorization_stage !== "approval") {
-          return Effect.succeed(approvals)
-        }
+        if (resume === undefined || decision === undefined) return Effect.succeed(approvals)
         const fallbackApprovals = Option.getOrElse(approvals, () =>
-          Approvals.Approvals.of({
-            check: () =>
-              Effect.succeed({
-                _tag: "Denied",
-                reason: "Approvals service is required for approval-gated tools",
-              }),
-          }),
+          Approvals.Approvals.of({ resolve: () => Effect.succeed({ _tag: "Approved" }) }),
         )
         return Ref.make(false).pipe(
           Effect.map((consumed) =>
             Option.some(
               Approvals.Approvals.of({
-                check: (request) => {
-                  if (request.call.id !== resume.suspension.tool_call_id) return fallbackApprovals.check(request)
+                resolve: (pending) => {
+                  if (
+                    pending.turn !== 0 ||
+                    pending.agentName !== options.agent.name ||
+                    pending.sessionId !== sessionId ||
+                    pending.call.id !== resume.suspension.tool_call_id ||
+                    pending.call.name !== resume.suspension.tool_name ||
+                    !Equal.equals(pending.call.params, resume.suspension.tool_params)
+                  )
+                    return fallbackApprovals.resolve(pending)
                   return Ref.modify(consumed, (used) => [!used, true]).pipe(
                     Effect.flatMap((useOverride) =>
-                      useOverride ? Effect.succeed(toApprovalDecision(decision)) : fallbackApprovals.check(request),
+                      useOverride
+                        ? Effect.succeed(
+                            decision._tag === "Approved"
+                              ? { _tag: "Approved" }
+                              : {
+                                  _tag: "Denied",
+                                  ...(decision.reason === undefined ? {} : { reason: decision.reason }),
+                                },
+                          )
+                        : fallbackApprovals.resolve(pending),
                     ),
-                  )
-                },
-              }),
-            ),
-          ),
-        )
-      }
-
-      const makePermissions = (
-        resume: Agent.Resume | undefined,
-        decision: ClientApproval | undefined,
-      ): Effect.Effect<Option.Option<Permissions.Interface>> => {
-        if (resume === undefined || decision === undefined || resume.suspension.authorization_stage !== "permission") {
-          return Effect.succeed(permissions)
-        }
-        const fallbackPermissions = Option.getOrElse(permissions, () =>
-          Permissions.Permissions.of({
-            evaluate: () => Effect.succeed({ _tag: "Ask", token: `permission:${resume.suspension.tool_call_id}` }),
-            await: () => Effect.succeedNone,
-          }),
-        )
-        return Ref.make(false).pipe(
-          Effect.map((consumed) =>
-            Option.some(
-              Permissions.Permissions.of({
-                evaluate: fallbackPermissions.evaluate,
-                await: (pending) => {
-                  if (pending.toolCallId !== resume.suspension.tool_call_id) return fallbackPermissions.await(pending)
-                  return Ref.modify(consumed, (used) => [!used, true]).pipe(
-                    Effect.flatMap((useOverride) => {
-                      if (!useOverride) return fallbackPermissions.await(pending)
-                      return Effect.succeed(
-                        Option.some(
-                          decision._tag === "Approved"
-                            ? ({ _tag: "Approved" } as const)
-                            : decision.reason === undefined
-                              ? ({ _tag: "Denied" } as const)
-                              : ({ _tag: "Denied", reason: decision.reason } as const),
-                        ),
-                      )
-                    }),
                   )
                 },
               }),
@@ -293,8 +261,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
         approvalDecision: ClientApproval | undefined,
       ): Effect.Effect<void> =>
         Effect.gen(function* () {
-          const overrideApprovals = yield* makeApprovals(resume, approvalDecision)
-          const overridePermissions = yield* makePermissions(resume, approvalDecision)
+          const overrideApprovals = yield* makeApprovals(resume, approvalDecision, session.sessionId)
           const runOptions = {
             prompt,
             sessionId: session.sessionId,
@@ -350,10 +317,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
             onNone: () => context,
             onSome: (overrideService) => Context.add(context, Approvals.Approvals, overrideService),
           })
-          const permissionContext = Option.match(overridePermissions, {
-            onNone: () => approvalContext,
-            onSome: (overrideService) => Context.add(approvalContext, Permissions.Permissions, overrideService),
-          })
           const runPersistence = Chat.Persistence.of({
             get: (chatId, chatOptions) =>
               chatId === session.chatId
@@ -364,7 +327,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
                 ? persistence.getOrCreate(chatId, chatOptions).pipe(Effect.tap((chat) => Ref.set(session.chat, chat)))
                 : persistence.getOrCreate(chatId, chatOptions),
           })
-          const runContext = Context.add(permissionContext, Chat.Persistence, runPersistence)
+          const runContext = Context.add(approvalContext, Chat.Persistence, runPersistence)
           return yield* run.pipe(Effect.provide(runContext))
         })
 

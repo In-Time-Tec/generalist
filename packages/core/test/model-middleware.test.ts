@@ -304,7 +304,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
             }),
         }),
         Approvals.testLayer({
-          check: () =>
+          resolve: () =>
             Effect.sync(() => {
               approvalChecks += 1
               return { _tag: "Approved" } as const

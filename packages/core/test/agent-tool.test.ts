@@ -949,7 +949,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             name: "ask_reviewer",
           }),
         ),
-        Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-1" }) }),
+        Approvals.testLayer({ resolve: (pending) => Effect.succeed({ ...pending, token: "approval-1" }) }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {

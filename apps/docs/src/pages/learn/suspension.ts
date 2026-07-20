@@ -40,7 +40,7 @@ export const suspension = definePage({
     ),
     p(
       "There are exactly two producers. ",
-      code("Approvals.check"),
+      code("Approvals.resolve"),
       " returning ",
       code("Pending"),
       " suspends a ",

@@ -50,7 +50,7 @@ export interface ToolExecutionCompleted {
   }
 }
 
-/** @experimental Emitted before consulting Approvals for a needsApproval tool. */
+/** @experimental Emitted before resolving a permission ask or needsApproval tool. */
 export interface ApprovalRequested {
   readonly _tag: "ApprovalRequested"
   readonly turn: number
@@ -228,7 +228,6 @@ export class ToolNameCollision extends Schema.TaggedErrorClass<ToolNameCollision
 export class AgentSuspended extends Schema.TaggedErrorClass<AgentSuspended>()("@batonfx/core/AgentSuspended", {
   token: Schema.String,
   reason: Schema.Literals(["tool-wait", "approval"]),
-  authorization_stage: Schema.optional(Schema.Literals(["permission", "approval"])),
   tool_call_index: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   tool_call_id: Schema.String,
   tool_name: Schema.String,

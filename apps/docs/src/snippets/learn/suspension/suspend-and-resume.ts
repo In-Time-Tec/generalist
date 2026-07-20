@@ -54,10 +54,10 @@ const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ deploy: () => Effect.succeed("deployed api") }),
   Approvals.testLayer({
-    check: () => {
+    resolve: (pending) => {
       approvalChecks += 1
-      return Effect.succeed<Approvals.Decision>(
-        approvalChecks === 1 ? { _tag: "Pending", token: "approval-deploy-1" } : { _tag: "Approved" },
+      return Effect.succeed<Approvals.Resolution>(
+        approvalChecks === 1 ? { ...pending, token: "approval-deploy-1" } : { _tag: "Approved" },
       )
     },
   }),
