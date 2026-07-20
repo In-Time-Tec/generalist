@@ -191,6 +191,6 @@ Notes:
 
 - Runs with `persistence` expose `Chat.Persistence` in their Effect requirement, so a missing layer is caught by type checking.
 - `RunOptions` accepts optional `persistence`, `history`, and `schema` on the same two run functions.
-- `Agent.provideModel(layer)` embeds an infallible language-model layer and discharges `LanguageModel` from the agent requirements while preserving the layer's own requirements and scoped lifetime.
+- An agent's default model is its visible `model` selection, resolved through `ModelRegistry` at run time. For a registry-free run, omit `model` and provide a concrete `LanguageModel` layer at the `Agent.stream` or `Agent.generate` run boundary; the layer's requirements and scoped lifetime remain visible there.
 - On a persisted chat the agent's system message is stored once on the first run and not re-added on subsequent runs.
 ```

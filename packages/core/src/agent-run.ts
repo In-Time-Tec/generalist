@@ -107,7 +107,6 @@ import {
   type ToolCallIdState,
 } from "./agent-tool-result.js"
 type CompactionResult = import("./compaction.js").Result
-export const ModelLayerTypeId: unique symbol = Symbol.for("@batonfx/core/Agent/ModelLayer")
 const classifyOtherFailure: FailureClassifier = () => "other"
 const defaultProgressOverflowPolicy: ProgressOverflowPolicy = { _tag: "Backpressure", capacity: 64 }
 const progressCapacitySchema = Schema.Finite.pipe(Schema.check(Schema.isInt(), Schema.isGreaterThan(0)))
@@ -1906,6 +1905,4 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         }),
       )
     }),
-  ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } }), (run) =>
-    agent[ModelLayerTypeId] === undefined ? run : run.pipe(Stream.provide(agent[ModelLayerTypeId])),
-  )
+  ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } }))

@@ -1,4 +1,4 @@
-import { type Duration, Effect, Layer, Option, Schema, Stream, Types } from "effect"
+import { type Duration, Effect, Option, Schema, Stream, Types } from "effect"
 import { dual } from "effect/Function"
 import { AiError, Chat, LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import {
@@ -22,7 +22,7 @@ import { ToolContext } from "./tool-context.js"
 import { FrameworkFailure } from "./tool-executor.js"
 import { defaultPolicy, type TurnPolicy, TurnPolicyError } from "./turn-policy.js"
 
-import { ModelLayerTypeId, streamInternal } from "./agent-run.js"
+import { streamInternal } from "./agent-run.js"
 
 const AgentTypeId: unique symbol = Symbol.for("@batonfx/core/Agent")
 /** @experimental An agent definition: a plain value, not a service. */
@@ -31,7 +31,6 @@ export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = Language
     readonly tools: Types.Invariant<Tools>
     readonly requirements: Types.Invariant<R>
   }
-  readonly [ModelLayerTypeId]?: Layer.Layer<LanguageModel.LanguageModel, never, R>
   readonly name: string
   readonly instructions?: string
   readonly toolkit: Toolkit.Toolkit<Tools>
@@ -239,40 +238,6 @@ export type RunError =
   | AiError.AiError
   | LanguageModelNotRegistered
   | FrameworkFailure
-
-type Requires<R, Required> = Required extends R ? unknown : never
-
-/** @experimental Provide the default language model for an agent. */
-export const provideModel: {
-  <RM>(
-    layer: Layer.Layer<LanguageModel.LanguageModel, never, RM>,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R> & Requires<R, LanguageModel.LanguageModel>,
-  ) => Agent<Tools, Exclude<R, LanguageModel.LanguageModel> | RM>
-  <Tools extends Record<string, Tool.Any>, R, RM>(
-    agent: Agent<Tools, R> & Requires<R, LanguageModel.LanguageModel>,
-    layer: Layer.Layer<LanguageModel.LanguageModel, never, RM>,
-  ): Agent<Tools, Exclude<R, LanguageModel.LanguageModel> | RM>
-} = dual(
-  2,
-  <Tools extends Record<string, Tool.Any>, R, RM>(
-    agent: Agent<Tools, R> & Requires<R, LanguageModel.LanguageModel>,
-    layer: Layer.Layer<LanguageModel.LanguageModel, never, RM>,
-  ): Agent<Tools, Exclude<R, LanguageModel.LanguageModel> | RM> => ({
-    ...agent,
-    policy: agent.policy as TurnPolicy<Exclude<R, LanguageModel.LanguageModel> | RM>,
-    ...(agent.authorization === undefined
-      ? {}
-      : {
-          authorization: agent.authorization as ToolAuthorizer<Exclude<R, LanguageModel.LanguageModel> | RM>,
-        }),
-    [AgentTypeId]: {
-      tools: (value: Tools) => value,
-      requirements: (value: Exclude<R, LanguageModel.LanguageModel> | RM) => value,
-    },
-    [ModelLayerTypeId]: layer,
-  }),
-)
 
 /** @experimental Result of a non-streaming run. */
 export interface Result {

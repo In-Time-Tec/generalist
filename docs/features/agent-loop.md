@@ -9,6 +9,7 @@
 - Declared tool failures remain schema-valid domain results. Routing, schema, handler-boundary, placement, and authorization failures terminate through typed `FrameworkFailure` values.
 - A policy stop with pending results is typed. It never silently drops results.
 - `Agent.stream` and `Agent.generate` cover every run; `schema` selects structured output and `persistence` requires Effect AI `Chat.Persistence`.
-- Agent requirements remain visible through model selection, memory, tool handlers, policies, handoffs, and transport composition.
+- An agent's only default model is its visible `model` selection, resolved through `ModelRegistry` at run time. A registry-free agent retains `LanguageModel` in its requirements and receives a concrete model layer at the run boundary.
+- Agent requirements remain visible through model selection, the direct-model requirement channel, memory, tool handlers, policies, handoffs, and transport composition.
 
 Optional seams are discovered only when their behavior is truly optional. Every behavior-bearing seam has a test or memory layer.

@@ -88,7 +88,9 @@ const dependentModelLayer = Layer.effect(
     ),
   ),
 )
-const modelProvidedAgent = Agent.provideModel(memoryRequiredAgent, dependentModelLayer)
+const runBoundaryModelProvided = Agent.stream(memoryRequiredAgent, { prompt: "hello" }).pipe(
+  Stream.provide(dependentModelLayer),
+)
 
 const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<Equal<Agent.Requirements<typeof plainRequiredAgent>, LanguageModel.LanguageModel>>,
@@ -123,7 +125,7 @@ const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<
     Equal<EffectRequirements<typeof generatedPersistedObjectRequired>, LanguageModel.LanguageModel | Chat.Persistence>
   >,
-  true satisfies Assert<Equal<Agent.Requirements<typeof modelProvidedAgent>, Memory.Memory | ModelDependency>>,
+  true satisfies Assert<Equal<StreamRequirements<typeof runBoundaryModelProvided>, Memory.Memory | ModelDependency>>,
   true satisfies Assert<
     Equal<
       IsAssignable<
@@ -351,19 +353,20 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
   ItLayer.make(
     it,
-    "runs through a provided model layer while retaining the layer requirement",
+    "runs through a model layer provided at the run boundary while retaining the layer requirement",
     () =>
       [
         Layer.mergeAll(Layer.succeed(ModelDependency, ModelDependency.of({ value: "configured" })), Memory.layerNoop),
         Effect.gen(function* () {
-          const result = yield* Agent.generate(modelProvidedAgent, { prompt: "hello" })
+          const events = yield* Stream.runCollect(runBoundaryModelProvided)
+          const completed = events.at(-1)
 
-          expect(result.text).toBe("provided")
+          expect(completed?._tag === "Completed" && completed.text).toBe("provided")
         }),
       ] as const,
   )
 
-  it.effect("scopes a provided model layer to stream consumption and interruption", () =>
+  it.effect("scopes a run-boundary model layer to stream consumption and interruption", () =>
     Effect.gen(function* () {
       let acquisitions = 0
       let releases = 0
@@ -379,8 +382,8 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           () => Effect.sync(() => releases++),
         ),
       )
-      const agent = Agent.provideModel(Agent.make({ name: "scoped-model-agent" }), providedModelLayer)
-      const run = Stream.runDrain(Agent.stream(agent, { prompt: "wait" }))
+      const agent = Agent.make({ name: "scoped-model-agent" })
+      const run = Stream.runDrain(Agent.stream(agent, { prompt: "wait" }).pipe(Stream.provide(providedModelLayer)))
 
       expect(acquisitions).toBe(0)
       const fiber = yield* run.pipe(Effect.forkChild({ startImmediately: true }))
