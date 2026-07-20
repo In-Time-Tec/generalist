@@ -8,8 +8,8 @@ import {
   type PlacementResponse,
   type PlacementRouteOptions,
   placementOutcome,
+  type RemoteRouteIdempotentOptions,
   type RemoteRouteOptions,
-  type RemoteRouteRetrySafeOptions,
   type Route,
   type RouteInput,
   type RouteOptions,
@@ -72,7 +72,7 @@ export class FrameworkFailure extends Schema.TaggedErrorClass<FrameworkFailure>(
   message: Schema.String,
 }) {}
 
-/** @experimental A retry-safe remote route supplied an invalid or unstable operation key or retry bound. */
+/** @experimental An idempotent remote route supplied an invalid or unstable operation key or retry bound. */
 export class RemoteRetryError extends Schema.TaggedErrorClass<RemoteRetryError>()("@batonfx/core/RemoteRetryError", {
   reason: Schema.Literals(["invalid-max-retries", "missing-operation-key", "changed-operation-key"]),
   message: Schema.String,
@@ -272,7 +272,7 @@ const validateOperationKey = (operationKey: unknown): Effect.Effect<string, Remo
     : Effect.succeed(operationKey)
 
 const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
-  options: RemoteRouteRetrySafeOptions<Tools, E>,
+  options: RemoteRouteIdempotentOptions<Tools, E>,
   request: PlacementRequest,
 ): Effect.Effect<PlacementResponse, E | RemoteRetryError, ToolContext> =>
   Effect.suspend(() => {
@@ -334,7 +334,7 @@ export const client = <Tools extends Record<string, Tool.Any>, E = FrameworkFail
 export const remote = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
   options: RemoteRouteOptions<Tools, E>,
 ): Route =>
-  options.retrySafe === true
+  options.idempotent === true
     ? placementRoute("remote", {
         toolkit: options.toolkit,
         ...(options.tools === undefined ? {} : { tools: options.tools }),

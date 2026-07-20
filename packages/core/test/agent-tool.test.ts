@@ -427,7 +427,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         ToolExecutor.router([
           ToolExecutor.remote({
             toolkit,
-            retrySafe: true,
+            idempotent: true,
             operationKey: ({ call }) => call.id,
             maxRetries: 1,
             schedule: Schedule.recurs(1),
@@ -471,7 +471,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "ToolExecutor.remote ignores legacy schedules unless retry safety is explicit", () => {
+  ItLayer.make(it, "ToolExecutor.remote ignores legacy schedules unless idempotency is explicit", () => {
     const runCi = Tool.make("run_ci", {
       parameters: Schema.Struct({}),
       success: Schema.Struct({ status: Schema.String }),
@@ -518,7 +518,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         ToolExecutor.router([
           ToolExecutor.remote({
             toolkit,
-            retrySafe: true,
+            idempotent: true,
             operationKey: ({ call, sessionId }) => `${sessionId}:${call.id}`,
             maxRetries: 2,
             schedule: Schedule.forever,
@@ -564,7 +564,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       let changingAttempts = 0
       const empty = ToolExecutor.remote({
         toolkit,
-        retrySafe: true,
+        idempotent: true,
         operationKey: () => " ",
         maxRetries: 1,
         schedule: Schedule.recurs(1),
@@ -575,7 +575,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       })
       const changing = ToolExecutor.remote({
         toolkit,
-        retrySafe: true,
+        idempotent: true,
         operationKey: () => `lookup-${changingKey++}`,
         maxRetries: 1,
         schedule: Schedule.recurs(1),
@@ -615,7 +615,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         const firstAttempt = yield* Deferred.make<void>()
         const remote = ToolExecutor.remote({
           toolkit,
-          retrySafe: true,
+          idempotent: true,
           operationKey: () => operationKey,
           maxRetries: 1,
           schedule: Schedule.spaced("1 hour"),
@@ -646,7 +646,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     let attempts = 0
     const noRetries = ToolExecutor.remote({
       toolkit,
-      retrySafe: true,
+      idempotent: true,
       operationKey: () => `lookup-${keyEvaluations++}`,
       maxRetries: 0,
       schedule: Schedule.forever,
@@ -657,7 +657,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     })
     const invalidBound = ToolExecutor.remote({
       toolkit,
-      retrySafe: true,
+      idempotent: true,
       operationKey: () => "lookup-1",
       maxRetries: Number.POSITIVE_INFINITY,
       schedule: Schedule.forever,
@@ -692,7 +692,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const attempts: Record<string, number> = {}
     const remote = ToolExecutor.remote({
       toolkit,
-      retrySafe: true,
+      idempotent: true,
       operationKey: ({ call }) => call.id,
       maxRetries: 2,
       schedule: Schedule.forever,

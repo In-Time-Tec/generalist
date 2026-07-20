@@ -117,7 +117,7 @@ import { ToolExecutor } from "@batonfx/core"
 const executorLayer = ToolExecutor.router([
   ToolExecutor.remote({
     toolkit,
-    retrySafe: true,
+    idempotent: true,
     operationKey: ({ call, sessionId }) => `${sessionId}:${call.id}`,
     maxRetries: 2,
     schedule: Schedule.exponential("100 millis"),
@@ -129,7 +129,7 @@ const executorLayer = ToolExecutor.router([
 ])
 ```
 
-Remote routes execute once by default. Set `retrySafe: false` explicitly for non-idempotent work. Enable retries only when the remote endpoint deduplicates the supplied stable `operationKey`; `maxRetries` bounds even an otherwise unbounded schedule. A legacy `schedule` without `retrySafe: true` is ignored. Client, MCP, sandbox, and custom routes remain one-shot and require no migration.
+Remote routes execute once by default. Set `idempotent: false` explicitly for non-idempotent work. Enable retries only when the remote endpoint deduplicates the supplied stable `operationKey`; `maxRetries` bounds even an otherwise unbounded schedule. A legacy `schedule` without `idempotent: true` is ignored. Client, MCP, sandbox, and custom routes remain one-shot and require no migration.
 
 `ToolExecutor.execute` returns `Success | DomainFailure | Suspend`. A declared domain failure retains both `failure`, the decoded value, and `encodedFailure`, the value encoded by the tool's failure schema. Decode, encode, handler-boundary, missing-handler, route, placement, and authorization failures fail the Effect with schema-backed `FrameworkFailure` instead of becoming tool output.
 

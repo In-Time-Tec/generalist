@@ -62,7 +62,7 @@ export const coreToolsReference = definePage({
         [[code("ToolExecutor.router(routes)")], "Layer that tries routes in order and fails unmatched names"],
         [[code("ToolExecutor.client({ toolkit, execute })")], "Route toolkit calls to a user/browser/desktop client"],
         [
-          [code("ToolExecutor.remote({ toolkit, retrySafe?, execute, ... })")],
+          [code("ToolExecutor.remote({ toolkit, idempotent?, execute, ... })")],
           "Route toolkit calls to a remote worker; one attempt unless explicit idempotency and bounded retry are configured",
         ],
         [[code("ToolExecutor.mcp({ toolkit, execute })")], "Route toolkit calls through an MCP adapter"],
@@ -94,7 +94,7 @@ export const coreToolsReference = definePage({
     ),
     p(
       "Remote routes execute once by default. Retrying requires ",
-      code("retrySafe: true"),
+      code("idempotent: true"),
       ", a stable non-empty ",
       code("operationKey"),
       ", a non-negative finite integer ",

@@ -30,7 +30,7 @@ export interface PlacementRequest extends Request {
   readonly tool: Tool.Any
 }
 
-/** @experimental A retry-safe remote placement request carrying its endpoint deduplication key. */
+/** @experimental An idempotent remote placement request carrying its endpoint deduplication key. */
 export interface RemotePlacementRequest extends PlacementRequest {
   readonly operationKey: string
 }
@@ -57,17 +57,17 @@ export interface PlacementRouteOptions<Tools extends Record<string, Tool.Any>, E
 }
 
 /** @experimental */
-export interface RemoteRouteUnsafeOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure>
+export interface RemoteRouteNonIdempotentOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure>
   extends PlacementRouteOptions<Tools, E> {
-  readonly retrySafe?: false | undefined
+  readonly idempotent?: false | undefined
   readonly schedule?: Schedule.Schedule<unknown, unknown> | undefined
 }
 
-/** @experimental Retry-safe remote route whose endpoint deduplicates the stable operation key. */
-export interface RemoteRouteRetrySafeOptions<Tools extends Record<string, Tool.Any>, E> {
+/** @experimental Idempotent remote route whose endpoint deduplicates the stable operation key. */
+export interface RemoteRouteIdempotentOptions<Tools extends Record<string, Tool.Any>, E> {
   readonly toolkit: PlacementToolkit<Tools>
   readonly tools?: ReadonlyArray<string> | undefined
-  readonly retrySafe: true
+  readonly idempotent: true
   readonly operationKey: (request: PlacementRequest) => string
   readonly maxRetries: number
   readonly schedule: Schedule.Schedule<unknown, E>
@@ -76,8 +76,8 @@ export interface RemoteRouteRetrySafeOptions<Tools extends Record<string, Tool.A
 
 /** @experimental */
 export type RemoteRouteOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure> =
-  | RemoteRouteUnsafeOptions<Tools, E>
-  | RemoteRouteRetrySafeOptions<Tools, E>
+  | RemoteRouteNonIdempotentOptions<Tools, E>
+  | RemoteRouteIdempotentOptions<Tools, E>
 
 const placementOutcomeFromResponse = (
   placement: Placement,
