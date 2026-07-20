@@ -67,7 +67,7 @@ const systemMessageCount = (chatId: string) =>
     return history.content.filter((message) => message.role === "system").length
   })
 
-layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persistence", (it) => {
   ItLayer.make(
     it,
     "continuity: a second run sees the first run's user and assistant messages",
@@ -702,14 +702,19 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
       Effect.gen(function* () {
         firstEntered = yield* Deferred.make<void>()
         releaseFirst = yield* Deferred.make<void>()
-        const agent = Agent.make({ name: "concurrent-checkpoint-agent" })
+        const firstAgent = Agent.make({ name: "first-concurrent-checkpoint-agent" })
+        const secondAgent = Agent.make({ name: "second-concurrent-checkpoint-agent" })
         const first = yield* Effect.forkChild(
-          Stream.runDrain(Agent.stream(agent, { prompt: "first concurrent", persistence: { chatId: "concurrent" } })),
+          Stream.runDrain(
+            Agent.stream(firstAgent, { prompt: "first concurrent", persistence: { chatId: "concurrent" } }),
+          ),
           { startImmediately: true },
         )
         yield* Deferred.await(firstEntered)
         const second = yield* Effect.forkChild(
-          Stream.runDrain(Agent.stream(agent, { prompt: "second concurrent", persistence: { chatId: "concurrent" } })),
+          Stream.runDrain(
+            Agent.stream(secondAgent, { prompt: "second concurrent", persistence: { chatId: "concurrent" } }),
+          ),
           { startImmediately: true },
         )
         yield* Effect.yieldNow
@@ -767,6 +772,57 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
 
         expect(calls).toBe(2)
         expect(yield* historyText("interrupted")).toContain("completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "releases RcMap references when a persisted run is interrupted while waiting", () => {
+    let firstEntered: Deferred.Deferred<void> | undefined
+    let releaseFirst: Deferred.Deferred<void> | undefined
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.empty),
+        Compaction.testLayer({
+          maybeCompact: () =>
+            Effect.gen(function* () {
+              calls += 1
+              if (calls === 1) {
+                if (firstEntered === undefined || releaseFirst === undefined) {
+                  return yield* Effect.die("missing compaction barriers")
+                }
+                yield* Deferred.succeed(firstEntered, undefined)
+                yield* Deferred.await(releaseFirst)
+              }
+              return Option.none()
+            }),
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layerIdentity,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        firstEntered = yield* Deferred.make<void>()
+        releaseFirst = yield* Deferred.make<void>()
+        const agent = Agent.make({ name: "waiting-interruption-agent" })
+        const first = yield* Stream.runDrain(
+          Agent.stream(agent, { prompt: "first", persistence: { chatId: "waiting-interruption" } }),
+        ).pipe(Effect.forkChild)
+        yield* Deferred.await(firstEntered)
+        const waiting = yield* Stream.runDrain(
+          Agent.stream(agent, { prompt: "waiting", persistence: { chatId: "waiting-interruption" } }),
+        ).pipe(Effect.forkChild)
+        yield* Effect.yieldNow
+        yield* Fiber.interrupt(waiting)
+        yield* Deferred.succeed(releaseFirst, undefined)
+        yield* Fiber.join(first)
+        yield* Stream.runDrain(
+          Agent.stream(agent, { prompt: "third", persistence: { chatId: "waiting-interruption" } }),
+        )
+
+        expect(calls).toBe(2)
+        expect(yield* historyText("waiting-interruption")).toContain("third")
       }),
     ] as const
   })

@@ -1,4 +1,4 @@
-import { Effect, Option, Queue, Ref, Semaphore } from "effect"
+import { Effect, Option, Queue, Ref, SynchronizedRef } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { SessionError, SubscriberLagged } from "./session-registry-errors.js"
 import type { LooseServerFrameType } from "./wire.js"
@@ -60,7 +60,7 @@ const sessionError = (sessionId: string): SessionError =>
 
 export const makeFrameJournal = (options: Options): Effect.Effect<FrameJournal> =>
   Effect.gen(function* () {
-    const state = yield* Ref.make<State>({
+    const state = yield* SynchronizedRef.make<State>({
       lastSeq: -1,
       replayPoint: { throughSeq: -1, transcript: options.initialTranscript },
       originMinusOneAvailable: options.initialTranscript.content.length === 0,
@@ -69,33 +69,38 @@ export const makeFrameJournal = (options: Options): Effect.Effect<FrameJournal> 
       nextSubscriberId: 0,
       closed: false,
     })
-    const lock = yield* Semaphore.make(1)
-    const locked = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> =>
-      lock.withPermit(Effect.uninterruptible(effect))
+
+    const modifyEffect = <A, E, R>(
+      transition: (current: State) => Effect.Effect<readonly [A, State], E, R>,
+    ): Effect.Effect<A, E, R> =>
+      SynchronizedRef.modifyEffect(state, (current) =>
+        Effect.uninterruptible(transition(current).pipe(Effect.tap(([, next]) => Ref.set(state.backing, next)))),
+      )
 
     const closeWith = (error: Option.Option<SessionError>): Effect.Effect<void> =>
-      locked(
+      modifyEffect((current) =>
         Effect.gen(function* () {
-          const current = yield* Ref.get(state)
-          if (current.closed) return
+          if (current.closed) return [undefined, current] as const
           yield* Effect.forEach(
             current.subscribers.values(),
             (queue) => (Option.isSome(error) ? Queue.fail(queue, error.value) : Queue.shutdown(queue)),
             { discard: true },
           )
-          yield* Ref.set(state, {
-            ...current,
-            subscribers: new Map<number, SubscriberQueue>(),
-            closed: true,
-          })
+          return [
+            undefined,
+            {
+              ...current,
+              subscribers: new Map<number, SubscriberQueue>(),
+              closed: true,
+            },
+          ] as const
         }),
       )
 
     return {
       publish: (input, transcript) =>
-        locked(
+        modifyEffect((current) =>
           Effect.gen(function* () {
-            const current = yield* Ref.get(state)
             if (current.closed) return yield* sessionError(options.sessionId)
             const frame: LooseServerFrameType = { ...input, seq: current.lastSeq + 1 }
             if (options.onAllocated !== undefined) yield* options.onAllocated(frame)
@@ -111,55 +116,53 @@ export const makeFrameJournal = (options: Options): Effect.Effect<FrameJournal> 
               }
             }
             if (options.onDelivered !== undefined) yield* options.onDelivered(frame)
-            yield* Ref.set(state, {
-              ...current,
-              lastSeq: frame.seq,
-              replayPoint: {
-                throughSeq: frame.seq,
-                transcript: transcript ?? current.replayPoint.transcript,
+            return [
+              frame,
+              {
+                ...current,
+                lastSeq: frame.seq,
+                replayPoint: {
+                  throughSeq: frame.seq,
+                  transcript: transcript ?? current.replayPoint.transcript,
+                },
+                ring: trimRing([...current.ring, frame], options.capacity),
+                subscribers,
               },
-              ring: trimRing([...current.ring, frame], options.capacity),
-              subscribers,
-            })
-            return frame
+            ] as const
           }),
         ),
       subscribe: (queue, afterSeq) =>
-        locked(
-          Ref.modify(state, (current): readonly [Option.Option<ReplayPlan>, State] => {
-            if (current.closed) return [Option.none(), current]
-            const subscriberId = current.nextSubscriberId
-            const floor = current.ring[0]?.seq ?? current.lastSeq + 1
-            const cursor = afterSeq ?? -1
-            const unavailable =
-              cursor > current.lastSeq || cursor < floor - 1 || (cursor === -1 && !current.originMinusOneAvailable)
-            const snapshot = unavailable ? Option.some(current.replayPoint) : Option.none<ReplayPoint>()
-            const boundary = Option.isSome(snapshot) ? snapshot.value.throughSeq : cursor
-            const replay = current.ring.filter((frame) => frame.seq > boundary)
-            const subscribers = new Map(current.subscribers)
-            subscribers.set(subscriberId, queue)
-            return [
-              Option.some({ subscriberId, replay, snapshot }),
-              { ...current, subscribers, nextSubscriberId: subscriberId + 1 },
-            ]
-          }).pipe(
-            Effect.flatMap(
-              Option.match({
-                onNone: () => Effect.fail(sessionError(options.sessionId)),
-                onSome: Effect.succeed,
-              }),
-            ),
+        SynchronizedRef.modify(state, (current): readonly [Option.Option<ReplayPlan>, State] => {
+          if (current.closed) return [Option.none(), current]
+          const subscriberId = current.nextSubscriberId
+          const floor = current.ring[0]?.seq ?? current.lastSeq + 1
+          const cursor = afterSeq ?? -1
+          const unavailable =
+            cursor > current.lastSeq || cursor < floor - 1 || (cursor === -1 && !current.originMinusOneAvailable)
+          const snapshot = unavailable ? Option.some(current.replayPoint) : Option.none<ReplayPoint>()
+          const boundary = Option.isSome(snapshot) ? snapshot.value.throughSeq : cursor
+          const replay = current.ring.filter((frame) => frame.seq > boundary)
+          const subscribers = new Map(current.subscribers)
+          subscribers.set(subscriberId, queue)
+          return [
+            Option.some({ subscriberId, replay, snapshot }),
+            { ...current, subscribers, nextSubscriberId: subscriberId + 1 },
+          ]
+        }).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () => Effect.fail(sessionError(options.sessionId)),
+              onSome: Effect.succeed,
+            }),
           ),
         ),
       removeSubscriber: (subscriberId) =>
-        locked(
-          Ref.update(state, (current) => {
-            const subscribers = new Map(current.subscribers)
-            subscribers.delete(subscriberId)
-            return { ...current, subscribers }
-          }),
-        ),
-      lastSeq: lock.withPermit(Ref.get(state).pipe(Effect.map((current) => current.lastSeq))),
+        SynchronizedRef.update(state, (current) => {
+          const subscribers = new Map(current.subscribers)
+          subscribers.delete(subscriberId)
+          return { ...current, subscribers }
+        }),
+      lastSeq: SynchronizedRef.modify(state, (current) => [current.lastSeq, current] as const),
       shutdown: closeWith(Option.none()),
       evict: closeWith(Option.some(SessionError.make({ message: `Session ${options.sessionId} was evicted` }))),
     }

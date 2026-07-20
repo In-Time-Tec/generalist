@@ -68,7 +68,7 @@ export const coreContextReference = definePage({
         ],
         [
           [code("makeListing(frontmatter, descriptionCap?)")],
-          ["One listing line; descriptions capped at ", code("DESCRIPTION_CAP"), " (1536) characters"],
+          ["One listing line; descriptions capped at ", code("DESCRIPTION_CAP"), " (1024) characters"],
         ],
         [
           [code("selectListings(skills, budgetTokens, recentlyUsed)")],

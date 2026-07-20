@@ -1,4 +1,4 @@
-import { Effect, Function, Schema } from "effect"
+import { Array, Effect, Function, Schema } from "effect"
 import { AiError, LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { type Agent, type Requirements, type Result, type RunError, type RunOptions, generate, make } from "./agent.js"
 import { AgentError } from "./agent-event.js"
@@ -199,7 +199,7 @@ export const fanOut: {
     children: Children,
   ): Effect.Effect<ReadonlyArray<Result>, RunError, FanOutRequirements<Children>>
 } = Function.dual(
-  (args) => args.length !== 1 || Array.isArray(args[0]),
+  (args) => args.length !== 1 || globalThis.Array.isArray(args[0]),
   <Children extends ReadonlyArray<FanOutInput>>(
     children: Children,
     options: FanOutOptions = {},
@@ -242,10 +242,10 @@ export const supervisor = <const Specialists extends ReadonlyArray<Agent<any, an
   return {
     agent: {
       ...agent,
-      toolDeclarations: transferTools.flatMap((transfer, index) =>
+      toolDeclarations: Array.zip(specialists, transferTools).flatMap(([specialist, transfer]) =>
         Object.values(transfer.tools).map((tool) => ({
           tool,
-          origin: { _tag: "Handoff" as const, specialist: options.specialists[index]!.name },
+          origin: { _tag: "Handoff" as const, specialist: specialist.name },
         })),
       ),
     },

@@ -1,18 +1,25 @@
 import { Context, Effect, Function, Layer, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
+
+/** @experimental Per-entry description character cap. */
+export const DESCRIPTION_CAP = 1_024
+
 /** @experimental Parsed SKILL.md frontmatter. */
-export interface Frontmatter {
-  readonly name: string
-  readonly description: string
-  readonly whenToUse?: string
-  readonly allowedTools?: ReadonlyArray<string>
-  readonly disableModelInvocation?: boolean
-  readonly userInvocable?: boolean
-  readonly contextFork?: boolean
-  readonly agent?: string
-  readonly model?: string
-  readonly paths?: ReadonlyArray<string>
-}
+export const Frontmatter = Schema.Struct({
+  name: Schema.String,
+  description: Schema.String.pipe(Schema.check(Schema.isMinLength(1), Schema.isMaxLength(DESCRIPTION_CAP))),
+  whenToUse: Schema.optionalKey(Schema.String),
+  allowedTools: Schema.optionalKey(Schema.Array(Schema.String)),
+  disableModelInvocation: Schema.optionalKey(Schema.Boolean),
+  userInvocable: Schema.optionalKey(Schema.Boolean),
+  contextFork: Schema.optionalKey(Schema.Boolean),
+  agent: Schema.optionalKey(Schema.String),
+  model: Schema.optionalKey(Schema.String),
+  paths: Schema.optionalKey(Schema.Array(Schema.String)),
+})
+
+/** @experimental Parsed SKILL.md frontmatter. */
+export type Frontmatter = typeof Frontmatter.Type
 
 /** @experimental Skill source operation failed. */
 export class SkillSourceError extends Schema.TaggedErrorClass<SkillSourceError>()("@batonfx/core/SkillSourceError", {
@@ -28,9 +35,6 @@ export interface Skill {
   readonly body: Effect.Effect<string, SkillSourceError>
   readonly tools: ReadonlyArray<Tool.Any>
 }
-
-/** @experimental Per-entry description character cap. */
-export const DESCRIPTION_CAP = 1_024
 
 /** @experimental Skill registry seam. */
 export interface Interface {

@@ -1,36 +1,32 @@
 /** @effect-diagnostics missingPipeableSignature:skip-file */
-import { Semaphore } from "effect"
+import { Context, Effect, Layer, RcMap, Scope, Semaphore } from "effect"
 import { Chat } from "effect/unstable/ai"
 
-export interface PersistedChatLock {
-  readonly semaphore: Semaphore.Semaphore
-  users: number
+/** @experimental Shared resources owned by persisted agent runs. */
+export interface RuntimeInterface {
+  readonly persistenceSemaphore: (
+    persistence: Chat.Persistence.Service,
+    chatId: string,
+  ) => Effect.Effect<Semaphore.Semaphore, never, Scope.Scope>
 }
 
-export const persistenceLocks = new WeakMap<Chat.Persistence.Service, Map<string, PersistedChatLock>>()
+/** @experimental Application-scoped owner for resources shared across agent runs. */
+export class Runtime extends Context.Service<Runtime, RuntimeInterface>()("@batonfx/core/Runtime") {}
 
-export const reservePersistedChatLock = (persistence: Chat.Persistence.Service, chatId: string): PersistedChatLock => {
-  const locks = persistenceLocks.get(persistence) ?? new Map<string, PersistedChatLock>()
-  if (!persistenceLocks.has(persistence)) persistenceLocks.set(persistence, locks)
-  const existing = locks.get(chatId)
-  if (existing !== undefined) {
-    existing.users += 1
-    return existing
-  }
-  const created = { semaphore: Semaphore.makeUnsafe(1), users: 1 }
-  locks.set(chatId, created)
-  return created
-}
+/** @experimental Build one application-scoped agent runtime. */
+export const makeRuntime: Effect.Effect<RuntimeInterface, never, Scope.Scope> = Effect.gen(function* () {
+  const persistenceLocks = yield* RcMap.make({
+    lookup: (_persistence: Chat.Persistence.Service) =>
+      RcMap.make({
+        lookup: (_chatId: string) => Semaphore.make(1),
+      }),
+  })
 
-export const releasePersistedChatLock = (
-  persistence: Chat.Persistence.Service,
-  chatId: string,
-  lock: PersistedChatLock,
-): void => {
-  lock.users -= 1
-  if (lock.users !== 0) return
-  const locks = persistenceLocks.get(persistence)
-  if (locks?.get(chatId) !== lock) return
-  locks.delete(chatId)
-  if (locks.size === 0) persistenceLocks.delete(persistence)
-}
+  return Runtime.of({
+    persistenceSemaphore: (persistence, chatId) =>
+      RcMap.get(persistenceLocks, persistence).pipe(Effect.flatMap((chatLocks) => RcMap.get(chatLocks, chatId))),
+  })
+})
+
+/** @experimental Application-scoped owner for resources shared across agent runs. */
+export const layerRuntime: Layer.Layer<Runtime> = Layer.effect(Runtime, makeRuntime)

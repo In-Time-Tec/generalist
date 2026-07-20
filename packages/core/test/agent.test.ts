@@ -169,16 +169,25 @@ const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<Equal<EffectRequirements<typeof plainGenerateRequired>, LanguageModel.LanguageModel>>,
   true satisfies Assert<Equal<EffectSuccess<typeof plainGenerateRequired>, Agent.Result>>,
   true satisfies Assert<
-    Equal<StreamRequirements<typeof persistedRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+    Equal<StreamRequirements<typeof persistedRequired>, LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime>
   >,
   true satisfies Assert<
-    Equal<EffectRequirements<typeof generatedPersistedRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+    Equal<
+      EffectRequirements<typeof generatedPersistedRequired>,
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
+    >
   >,
   true satisfies Assert<
-    Equal<StreamRequirements<typeof persistedObjectRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+    Equal<
+      StreamRequirements<typeof persistedObjectRequired>,
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
+    >
   >,
   true satisfies Assert<
-    Equal<EffectRequirements<typeof generatedPersistedObjectRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+    Equal<
+      EffectRequirements<typeof generatedPersistedObjectRequired>,
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
+    >
   >,
   true satisfies Assert<Equal<StreamRequirements<typeof runBoundaryModelProvided>, Memory.Memory | ModelDependency>>,
   true satisfies Assert<
@@ -189,7 +198,10 @@ const agentRequirementProofs: ReadonlyArray<true> = [
   >,
   true satisfies Assert<Equal<EffectSuccess<typeof decodingGenerated>, Agent.ObjectResult<{ readonly value: string }>>>,
   true satisfies Assert<
-    Equal<StreamRequirements<typeof optionalPersistenceRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+    Equal<
+      StreamRequirements<typeof optionalPersistenceRequired>,
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
+    >
   >,
   true satisfies Assert<
     Equal<StreamRequirements<typeof optionalOutputRequired>, LanguageModel.LanguageModel | SchemaDependency>
@@ -207,7 +219,10 @@ const agentRequirementProofs: ReadonlyArray<true> = [
     >
   >,
   true satisfies Assert<
-    Equal<StreamRequirements<typeof curriedPersistenceRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+    Equal<
+      StreamRequirements<typeof curriedPersistenceRequired>,
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
+    >
   >,
   true satisfies Assert<
     Equal<EffectRequirements<typeof curriedOutputRequired>, LanguageModel.LanguageModel | SchemaDependency>
@@ -436,7 +451,7 @@ const retryTransientModelError = ModelResilience.layer({
   classify: (error) => (error === transientModelError ? "transient" : "terminal"),
 })
 
-layer(unusedToolHandlerLayer)("Agent", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) => {
   expect(agentRequirementProofs.every(Boolean)).toBe(true)
   expect(toolkitRequirementProof).toBe(true)
 
@@ -589,6 +604,34 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(advertisedTools).toEqual(["__proto__"])
         expect(executorCalls).toBe(1)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "reports duplicate __proto__ declarations in source order", () => {
+    let modelCalls = 0
+    const first = Tool.make("__proto__", { parameters: Schema.Unknown, success: Schema.Unknown })
+    const second = Tool.make("__proto__", { parameters: Schema.Unknown, success: Schema.Unknown })
+    return [
+      modelLayer(() => {
+        modelCalls += 1
+        return Stream.make(textDelta("unexpected"))
+      }),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "duplicate-prototype-agent", tools: [first, second] })
+
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(agent, { prompt: "hello" })))
+
+        expect(failure).toEqual(
+          AgentEvent.ToolNameCollision.make({
+            name: "__proto__",
+            origins: [
+              { _tag: "Static", agent: "duplicate-prototype-agent" },
+              { _tag: "Static", agent: "duplicate-prototype-agent" },
+            ],
+          }),
+        )
+        expect(modelCalls).toBe(0)
       }),
     ] as const
   })

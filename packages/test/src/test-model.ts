@@ -359,7 +359,9 @@ export const make: {
           Effect.map((current) => Math.max(0, script.length - current.cursor)),
         ),
         awaitRequests: (count: number) => {
-          if (!Number.isSafeInteger(count) || count < 0) return Effect.die("count must be a non-negative safe integer")
+          if (!Number.isSafeInteger(count) || count < 0) {
+            return Effect.die(new TypeError("count must be a non-negative safe integer"))
+          }
           return SubscriptionRef.changes(state).pipe(
             Stream.filter((current) => current.requests.length >= count),
             Stream.runHead,

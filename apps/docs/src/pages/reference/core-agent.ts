@@ -153,6 +153,8 @@ export const coreAgentReference = definePage({
       code("Memory"),
       ", and persistence options add ",
       code("Chat.Persistence"),
+      " and an application-scoped ",
+      code("Agent.Runtime"),
       ". Ambient enhancements such as approvals, compaction, instructions, middleware, resilience, permissions, sessions, skills, steering, tokenization, tool execution overrides, and output spill remain optional.",
     ),
     table(
@@ -163,6 +165,10 @@ export const coreAgentReference = definePage({
         [[code("Ai.Tool.HandlersFor<Tools>")], ["When local toolkit handlers execute in-process"]],
         [[code("Memory.Memory")], ["When agent or run configuration selects a memory key"]],
         [[code("Ai.Chat.Persistence")], ["When RunOptions.persistence is set"]],
+        [
+          [code("Agent.Runtime")],
+          ["When RunOptions.persistence is set; provide Agent.layerRuntime once per application"],
+        ],
         [[code('S["DecodingServices"]')], ["When RunOptions.output.schema is set"]],
         [[code("ToolExecutor.ToolExecutor")], ["Optional override for remote, client, MCP, sandbox, or durable tools"]],
         [[code("Approvals.Approvals")], ["Ambient optional approval behavior"]],

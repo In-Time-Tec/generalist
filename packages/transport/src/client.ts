@@ -157,7 +157,9 @@ const defaultReconnectPolicy: ReconnectPolicy = {
 }
 
 const validateCapacity = (name: string, value: number): Effect.Effect<void> =>
-  Number.isSafeInteger(value) && value > 0 ? Effect.void : Effect.die(`${name} must be a positive safe integer`)
+  Number.isSafeInteger(value) && value > 0
+    ? Effect.void
+    : Effect.die(new TypeError(`${name} must be a positive safe integer`))
 
 const validateBufferPolicy = (policy: BufferPolicy): Effect.Effect<void> =>
   validateCapacity("frameCapacity", policy.frameCapacity).pipe(
@@ -167,12 +169,12 @@ const validateBufferPolicy = (policy: BufferPolicy): Effect.Effect<void> =>
         policy.frameStrategy === "dropping" ||
         policy.frameStrategy === "sliding"
         ? Effect.void
-        : Effect.die("frameStrategy must be backpressure, dropping, or sliding"),
+        : Effect.die(new TypeError("frameStrategy must be backpressure, dropping, or sliding")),
     ),
     Effect.andThen(
       policy.statusStrategy === "dropping" || policy.statusStrategy === "sliding"
         ? Effect.void
-        : Effect.die("statusStrategy must be dropping or sliding"),
+        : Effect.die(new TypeError("statusStrategy must be dropping or sliding")),
     ),
   )
 

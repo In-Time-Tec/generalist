@@ -73,7 +73,7 @@ import { type Candidate, type Registry, assemble, get, select } from "./tool-reg
 import { type Decision, StopReason, type TurnOverrides, TurnPolicyError } from "./turn-policy.js"
 
 import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "./agent.js"
-import { reservePersistedChatLock, releasePersistedChatLock } from "./agent-persistence-lock.js"
+import { Runtime } from "./agent-persistence-lock.js"
 import {
   applyPartChain,
   applyPromptChain,
@@ -165,6 +165,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       const persistenceOptions = options.persistence
       const resume = options.resume
       const persistenceService = yield* Effect.serviceOption(Chat.Persistence)
+      const runtimeService = yield* Effect.serviceOption(Runtime)
       const compactionService = yield* Effect.serviceOption(Compaction)
       const sessionService = yield* Effect.serviceOption(SessionStore)
       const persisted: Chat.Persisted | undefined =
@@ -180,12 +181,18 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                 ),
               onSome: (service) =>
                 Effect.gen(function* () {
-                  const lock = yield* Effect.acquireRelease(
-                    Effect.sync(() => reservePersistedChatLock(service, persistenceOptions.chatId)),
-                    (reserved) =>
-                      Effect.sync(() => releasePersistedChatLock(service, persistenceOptions.chatId, reserved)),
-                  )
-                  yield* Effect.acquireRelease(lock.semaphore.take(1), () => lock.semaphore.release(1), {
+                  const runtime = yield* Option.match(runtimeService, {
+                    onNone: () =>
+                      Effect.fail(
+                        AgentError.make({
+                          message: "RunOptions.persistence requires Agent.Runtime in context",
+                          turn: 0,
+                        }),
+                      ),
+                    onSome: Effect.succeed,
+                  })
+                  const semaphore = yield* runtime.persistenceSemaphore(service, persistenceOptions.chatId)
+                  yield* Effect.acquireRelease(semaphore.take(1), () => semaphore.release(1), {
                     interruptible: true,
                   })
                   const getOptions =

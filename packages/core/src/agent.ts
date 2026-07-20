@@ -23,6 +23,9 @@ import { FrameworkFailure } from "./tool-executor.js"
 import { defaultPolicy, type TurnPolicy, TurnPolicyError } from "./turn-policy.js"
 
 import { streamInternal } from "./agent-run.js"
+import { Runtime } from "./agent-persistence-lock.js"
+
+export { Runtime, layerRuntime } from "./agent-persistence-lock.js"
 
 const AgentTypeId: unique symbol = Symbol.for("@batonfx/core/Agent")
 /** @experimental An agent definition: a plain value, not a service. */
@@ -257,7 +260,7 @@ export interface ObjectResult<A> extends Result {
 
 type SchemaFromOutput<Output> = Output extends { readonly schema: infer S extends ObjectSchema } ? S : never
 type SchemaOf<O> = SchemaFromOutput<PresentOption<O, "output">>
-type PersistenceRequirement<O> = [PresentOption<O, "persistence">] extends [never] ? never : Chat.Persistence
+type PersistenceRequirement<O> = [PresentOption<O, "persistence">] extends [never] ? never : Chat.Persistence | Runtime
 type OutputRequirement<O> = [SchemaOf<O>] extends [never] ? never : SchemaOf<O>["DecodingServices"]
 
 type RunRequirements<R, O> = R | OperationRequirements<O> | PersistenceRequirement<O> | OutputRequirement<O>

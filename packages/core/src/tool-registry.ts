@@ -1,4 +1,4 @@
-import { Effect, HashMap, Option } from "effect"
+import { Array, Effect, HashMap, Option } from "effect"
 import { dual } from "effect/Function"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { ToolNameCollision, type ToolOrigin } from "./agent-event.js"
@@ -37,19 +37,14 @@ const makeToolkit = (entries: ReadonlyArray<Candidate>): Toolkit.Toolkit<Record<
 
 /** @experimental */
 export const assemble = (candidates: ReadonlyArray<Candidate>): Effect.Effect<Registry, ToolNameCollision> => {
-  const grouped = new Map<string, Array<Candidate>>()
+  const grouped = Array.groupBy(candidates, (candidate) => `tool:${candidate.tool.name}`)
   for (const candidate of candidates) {
-    const existing = grouped.get(candidate.tool.name)
-    if (existing === undefined) grouped.set(candidate.tool.name, [candidate])
-    else existing.push(candidate)
-  }
-  for (const candidate of candidates) {
-    const conflicts = grouped.get(candidate.tool.name)
+    const conflicts = grouped[`tool:${candidate.tool.name}`]
     if (conflicts !== undefined && conflicts.length > 1) {
       return Effect.fail(
         ToolNameCollision.make({
           name: candidate.tool.name,
-          origins: [conflicts[0]!.origin, ...conflicts.slice(1).map((conflict) => conflict.origin)],
+          origins: Array.map(conflicts, (conflict) => conflict.origin),
         }),
       )
     }

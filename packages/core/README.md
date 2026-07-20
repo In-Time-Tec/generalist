@@ -21,11 +21,12 @@ import { Agent, Chat, Memory, ModelMiddleware, Session, ToolOutput } from "@bato
 ```text
 Persistence.layerBackingMemory
 └─ Chat.layerPersisted ───────────> Chat.Persistence
+Agent.layerRuntime ───────────────> Agent.Runtime
 TestModel.layer ─────────────────> LanguageModel
-                    both ────────> Agent.generate
+                     all ────────> Agent.generate
 ```
 
-The persistence composition deliberately supplies both `Chat.Persistence` and `LanguageModel`. Persistence alone cannot run an agent.
+The persistence composition deliberately supplies `Agent.Runtime`, `Chat.Persistence`, and `LanguageModel`. The runtime owns resources shared across concurrent runs; persistence alone cannot run an agent.
 
 ## Runnable program
 
@@ -38,6 +39,7 @@ import { Agent, Chat } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
 
 const applicationLayer = Layer.mergeAll(
+  Agent.layerRuntime,
   TestModel.layer([TestModel.text("I will remember that."), TestModel.text("Your name is Ada.")]),
   Chat.layerPersisted({ storeId: "composition-guide-chats" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
 )
@@ -63,7 +65,7 @@ Run `bun examples/package-composition-guides/src/core.ts`. The program remains l
 
 ## Errors, requirements, and resources
 
-The merged layer discharges `Chat.Persistence` and `LanguageModel`, so the program has `R = never` and succeeds with `void`. Its error channel is `Agent.RunError`: `AgentError | AgentSuspended | ResumeMismatch | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflowError | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure`. Sole persistence and model failures map to `AgentError`; compound model causes retain their typed branches, and tool framework faults remain `FrameworkFailure`. `history` and `persistence` are mutually exclusive. The memory backing store is owned by its layer. The sequential example has no timers, detached fibers, buffers, or concurrent work.
+The merged layer discharges `Agent.Runtime`, `Chat.Persistence`, and `LanguageModel`, so the program has `R = never` and succeeds with `void`. Its error channel is `Agent.RunError`: `AgentError | AgentSuspended | ResumeMismatch | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflowError | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure`. Sole persistence and model failures map to `AgentError`; compound model causes retain their typed branches, and tool framework faults remain `FrameworkFailure`. `history` and `persistence` are mutually exclusive. The runtime and memory backing store are owned by their layers. The sequential example has no timers, detached fibers, buffers, or concurrent work.
 
 ## More
 
@@ -71,7 +73,7 @@ The merged layer discharges `Chat.Persistence` and `LanguageModel`, so the progr
 - Deeper examples: [tool-calling chatbot](../../examples/tool-calling-chatbot/) and [memory chat](../../examples/memory-chat/)
 - Baton uses Effect AI `Tool` and `Toolkit` directly. Toolkit handler layers run ordinary in-process tools; optional `ToolExecutor` routes external or durable placement without introducing another tool format.
 - Layer names are `Memory.layerNoop`, `ModelMiddleware.layerIdentity`, `Session.layerMemory`, `ModelRegistry.layerMemory`, and `ToolOutput.layerMemory`.
-- Persisted chat delegates storage to Effect AI `Chat.Persistence`. Reusing a `chatId` carries history across runs; the system message is stored once, and requesting persistence without its layer fails loudly with `AgentError`.
+- Persisted chat delegates storage to Effect AI `Chat.Persistence`. Reusing a `chatId` carries history across runs; the system message is stored once. Persisted runs require `Agent.Runtime` and `Chat.Persistence`; missing either layer fails loudly with `AgentError`.
 
 ### Memory item content
 
@@ -171,6 +173,7 @@ Custom policies return `TurnPolicy.decision.stop(reason)` for explicit, observab
 // )
 
 const agent = Agent.make({ name: "assistant", instructions: "You are a helpful assistant." })
+const applicationLayer = Layer.mergeAll(Agent.layerRuntime, persistenceLayer, modelLayer)
 
 // Run 1 and run 2 share the same chatId, so run 2 sees run 1's history.
 const program = Effect.gen(function* () {
@@ -183,13 +186,13 @@ prompt: "What is my name?",
 persistence: { chatId: "user-42" },
 })
 return [first.text, second.text]
-}).pipe(Effect.provide(persistenceLayer))
+}).pipe(Effect.provide(applicationLayer))
 
 ```
 
 Notes:
 
-- Runs with `persistence` expose `Chat.Persistence` in their Effect requirement, so a missing layer is caught by type checking.
+- Runs with `persistence` expose `Agent.Runtime | Chat.Persistence` in their Effect requirement, so a missing layer is caught by type checking.
 - `RunOptions` accepts optional `persistence`, `history`, and `output` on the same two run functions.
 - An agent's default model is its visible `model` selection, resolved through `ModelRegistry` at run time. For a registry-free run, omit `model` and provide a concrete `LanguageModel` layer at the `Agent.stream` or `Agent.generate` run boundary; the layer's requirements and scoped lifetime remain visible there.
 - On a persisted chat the agent's system message is stored once on the first run and not re-added on subsequent runs.

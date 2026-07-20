@@ -4,6 +4,7 @@ import { Agent, Chat } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
 
 const applicationLayer = Layer.mergeAll(
+  Agent.layerRuntime,
   TestModel.layer([TestModel.text("I will remember that."), TestModel.text("Your name is Ada.")]),
   Chat.layerPersisted({ storeId: "composition-guide-chats" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
 )

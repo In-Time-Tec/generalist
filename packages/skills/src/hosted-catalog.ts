@@ -4,18 +4,9 @@ import { SkillSource } from "@batonfx/core"
 import { parseDocument, validateName } from "./skill-document.js"
 
 const ManifestSkill = Schema.Struct({
-  name: Schema.String,
-  description: Schema.String,
+  ...SkillSource.Frontmatter.fields,
   skillPath: Schema.String,
   sha256: Schema.String,
-  whenToUse: Schema.optionalKey(Schema.String),
-  allowedTools: Schema.optionalKey(Schema.Array(Schema.String)),
-  disableModelInvocation: Schema.optionalKey(Schema.Boolean),
-  userInvocable: Schema.optionalKey(Schema.Boolean),
-  contextFork: Schema.optionalKey(Schema.Boolean),
-  agent: Schema.optionalKey(Schema.String),
-  model: Schema.optionalKey(Schema.String),
-  paths: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 
 type ManifestSkill = typeof ManifestSkill.Type
@@ -107,19 +98,6 @@ const decodeText = (source: string, bytes: Uint8Array): Effect.Effect<string, Sk
     catch: (cause) => sourceError(source, "Hosted skill response is not valid UTF-8", cause),
   })
 
-const frontmatter = (entry: ManifestSkill): SkillSource.Frontmatter => ({
-  name: entry.name,
-  description: entry.description,
-  ...(entry.whenToUse === undefined ? {} : { whenToUse: entry.whenToUse }),
-  ...(entry.allowedTools === undefined ? {} : { allowedTools: entry.allowedTools }),
-  ...(entry.disableModelInvocation === undefined ? {} : { disableModelInvocation: entry.disableModelInvocation }),
-  ...(entry.userInvocable === undefined ? {} : { userInvocable: entry.userInvocable }),
-  ...(entry.contextFork === undefined ? {} : { contextFork: entry.contextFork }),
-  ...(entry.agent === undefined ? {} : { agent: entry.agent }),
-  ...(entry.model === undefined ? {} : { model: entry.model }),
-  ...(entry.paths === undefined ? {} : { paths: entry.paths }),
-})
-
 const sameFrontmatter = (left: SkillSource.Frontmatter, right: SkillSource.Frontmatter): boolean =>
   JSON.stringify(left) === JSON.stringify(right)
 
@@ -204,9 +182,6 @@ export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpCl
     const byName = new Map<string, SkillSource.Skill>()
     for (const entry of manifest.skills) {
       yield* validateName(options.source, entry.name)
-      if (entry.description.length === 0 || entry.description.length > 1_024) {
-        return yield* sourceError(options.source, "Hosted skill description must contain 1-1024 characters")
-      }
       if (!/^[0-9a-f]{64}$/.test(entry.sha256)) {
         return yield* sourceError(options.source, `Invalid SHA-256 for hosted skill ${entry.name}`)
       }
@@ -218,7 +193,7 @@ export const make = (options: MakeOptions): SkillSource.Source<HttpClient.HttpCl
         return yield* sourceError(options.source, `Hosted skill path directory must match skill name: ${entry.name}`)
       }
       const skillUrl = yield* options.resolveSkillUrl(entry.skillPath)
-      const metadata = frontmatter(entry)
+      const { sha256: _, skillPath: __, ...metadata } = entry
       const body = fetchBytes(client, options.source, skillUrl, options.bodyHeaders, bodyMaxBytes).pipe(
         Effect.flatMap((bytes) =>
           crypto.digest("SHA-256", bytes).pipe(

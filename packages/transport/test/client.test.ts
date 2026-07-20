@@ -271,6 +271,9 @@ describe("Client", () => {
         )
 
         expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true)
+        if (Exit.isFailure(exit)) {
+          expect(exit.cause.reasons.find(Cause.isDieReason)?.defect).toBeInstanceOf(TypeError)
+        }
         expect(sockets).toHaveLength(0)
       }),
     ).pipe(provideTestLayer(Client.layerWebSocket.pipe(Layer.provide(webSocketLayer(sockets)))))

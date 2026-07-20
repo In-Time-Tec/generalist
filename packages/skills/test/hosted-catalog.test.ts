@@ -379,6 +379,27 @@ describe("hosted skill catalogs", () => {
     )
   })
 
+  it.effect("rejects hosted descriptions outside the shared frontmatter bound", () => {
+    const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
+    const manifestUrl = "https://skills.example/invalid-description.json"
+    const invalid = stringify({
+      version: 1,
+      skills: [
+        {
+          name: "remote",
+          description: "x".repeat(SkillSource.DESCRIPTION_CAP + 1),
+          skillPath: "remote/SKILL.md",
+          sha256: digest,
+        },
+      ],
+    })
+    return Effect.gen(function* () {
+      const failure = yield* Effect.flip(HttpCatalog.make({ manifestUrl }))
+
+      expect(failure.message).toContain("Invalid hosted skill manifest")
+    }).pipe(provideTestLayer(Layer.mergeAll(cryptoLayer(), httpLayer({ [manifestUrl]: { body: invalid } }, requests))))
+  })
+
   it.effect("maps non-success HTTP responses to safe source errors", () => {
     const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
     const manifestUrl = "https://user:password@skills.example/private/skills.json?signature=secret#fragment"

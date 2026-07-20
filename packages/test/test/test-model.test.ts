@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Context, Effect, Fiber, Layer, Schedule, Schema, Stream } from "effect"
+import { Cause, Context, Effect, Exit, Fiber, Layer, Schedule, Schema, Stream } from "effect"
 import {
   Agent,
   AiError,
@@ -233,6 +233,18 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
       expect(entered.map((request) => request.index)).toEqual([0])
       expect(second.text).toBe("two")
       expect((yield* fixture.requests).map((request) => request.index)).toEqual([0, 1])
+    }),
+  )
+
+  it.effect("reports invalid request counts as TypeError defects", () =>
+    Effect.gen(function* () {
+      const fixture = yield* TestModel.make([])
+      const exit = yield* Effect.exit(fixture.awaitRequests(-1))
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) {
+        expect(exit.cause.reasons.find(Cause.isDieReason)?.defect).toBeInstanceOf(TypeError)
+      }
     }),
   )
 

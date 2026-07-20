@@ -107,6 +107,9 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
     Effect.gen(function* () {
       const scope = yield* Effect.scope
       const context = yield* Effect.context<R | Chat.Persistence>()
+      const agentRuntime = yield* Layer.build(Agent.layerRuntime).pipe(
+        Effect.map((runtimeContext) => Context.get(runtimeContext, Agent.Runtime)),
+      )
       const approvals = yield* Effect.serviceOption(Approvals.Approvals)
       const persistence = yield* Chat.Persistence
       const state = yield* Ref.make<RegistryState>({ sessions: new Map() })
@@ -327,7 +330,11 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
                 ? persistence.getOrCreate(chatId, chatOptions).pipe(Effect.tap((chat) => Ref.set(session.chat, chat)))
                 : persistence.getOrCreate(chatId, chatOptions),
           })
-          const runContext = Context.add(approvalContext, Chat.Persistence, runPersistence)
+          const runContext = Context.add(
+            Context.add(approvalContext, Chat.Persistence, runPersistence),
+            Agent.Runtime,
+            agentRuntime,
+          )
           return yield* run.pipe(Effect.provide(runContext))
         })
 

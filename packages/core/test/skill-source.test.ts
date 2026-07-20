@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Context, Effect, Layer, pipe } from "effect"
+import { Context, Effect, Layer, Schema, pipe } from "effect"
 import { SkillSource } from "../src/index"
 import { ItLayer } from "./it-layer"
 
@@ -60,6 +60,14 @@ describe("SkillSource", () => {
     expect(SkillSource.makeListing(frontmatter)).toBe("- long: abcdef")
     expect(SkillSource.makeListing(frontmatter, 3)).toBe("- long: abc")
     expect(SkillSource.DESCRIPTION_CAP).toBe(1_024)
+  })
+
+  it("validates descriptions through the shared frontmatter schema", () => {
+    const isFrontmatter = Schema.is(SkillSource.Frontmatter)
+
+    expect(isFrontmatter({ name: "valid", description: "a" })).toBe(true)
+    expect(isFrontmatter({ name: "empty", description: "" })).toBe(false)
+    expect(isFrontmatter({ name: "long", description: "a".repeat(SkillSource.DESCRIPTION_CAP + 1) })).toBe(false)
   })
 
   it("selectListings preserves source order under budget and excludes user-only skills", () => {

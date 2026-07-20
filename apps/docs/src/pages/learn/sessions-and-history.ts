@@ -87,6 +87,8 @@ export const sessionsAndHistory = definePage({
             code("Ai.Chat"),
             " via ",
             code("Chat.layerPersisted"),
+            " and an application-scoped ",
+            code("Agent.layerRuntime"),
             "; history accumulates across runs under one id",
           ],
           "You want multi-run conversations with storage delegated to an upstream persistence layer",

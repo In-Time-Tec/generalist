@@ -88,7 +88,7 @@ const failingPrompt: ModelMiddleware.Middleware = {
   transformPrompt: () => Effect.fail(AgentEvent.AgentError.make({ message: "prompt middleware boom", turn: 0 })),
 }
 
-layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddleware", (it) => {
   ItLayer.make(
     it,
     "identity default: empty chain behaves like the pre-middleware loop",

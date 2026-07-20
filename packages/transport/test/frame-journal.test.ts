@@ -261,6 +261,59 @@ describe("frame journal", () => {
     }),
   )
 
+  it.effect("interrupts queued publishers before they enter the journal transition", () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      const journal = yield* makeFrameJournal({
+        sessionId: "queued-interruption",
+        capacity: 8,
+        initialTranscript: Prompt.empty,
+        onAllocated: (frame) =>
+          frame.seq === 0
+            ? Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(release)))
+            : Effect.void,
+      })
+
+      const first = yield* journal.publish(status(0)).pipe(Effect.forkChild)
+      yield* Deferred.await(entered)
+      const queued = yield* journal.publish(status(1)).pipe(Effect.forkChild)
+      yield* Effect.yieldNow
+      yield* Fiber.interrupt(queued)
+      yield* Deferred.succeed(release, undefined)
+      yield* Fiber.join(first)
+
+      expect(yield* journal.publish(status(2))).toMatchObject({ seq: 1 })
+    }),
+  )
+
+  it.effect("reads lastSeq after an in-flight publication commits", () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      const observed = yield* Deferred.make<number>()
+      const journal = yield* makeFrameJournal({
+        sessionId: "last-seq",
+        capacity: 8,
+        initialTranscript: Prompt.empty,
+        onAllocated: () => Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(release))),
+      })
+
+      const publisher = yield* journal.publish(status(0)).pipe(Effect.forkChild)
+      yield* Deferred.await(entered)
+      const reader = yield* journal.lastSeq.pipe(
+        Effect.tap((seq) => Deferred.succeed(observed, seq)),
+        Effect.forkChild,
+      )
+      yield* Effect.yieldNow
+      expect(Option.isNone(yield* Deferred.poll(observed))).toBe(true)
+      yield* Deferred.succeed(release, undefined)
+
+      yield* Fiber.join(publisher)
+      expect(yield* Fiber.join(reader)).toBe(0)
+    }),
+  )
+
   it.effect("does not serialize publication across journals", () =>
     Effect.gen(function* () {
       const blocked = yield* Deferred.make<void>()

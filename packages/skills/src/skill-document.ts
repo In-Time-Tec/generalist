@@ -1,4 +1,4 @@
-import { Effect, Function } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { SkillSource } from "@batonfx/core"
 
 export interface ParsedDocument {
@@ -157,21 +157,11 @@ export const parseFrontmatter: {
     if (parsed.name !== directoryName) {
       return yield* sourceError(source, `SKILL.md name must match directory ${directoryName}`)
     }
-    if (parsed.description === undefined || parsed.description.length === 0 || parsed.description.length > 1_024) {
-      return yield* sourceError(source, "SKILL.md description must contain 1-1024 characters")
-    }
-    return {
-      name: parsed.name,
-      description: parsed.description,
-      ...(parsed.whenToUse === undefined ? {} : { whenToUse: parsed.whenToUse }),
-      ...(parsed.allowedTools === undefined ? {} : { allowedTools: parsed.allowedTools }),
-      ...(parsed.disableModelInvocation === undefined ? {} : { disableModelInvocation: parsed.disableModelInvocation }),
-      ...(parsed.userInvocable === undefined ? {} : { userInvocable: parsed.userInvocable }),
-      ...(parsed.contextFork === undefined ? {} : { contextFork: parsed.contextFork }),
-      ...(parsed.agent === undefined ? {} : { agent: parsed.agent }),
-      ...(parsed.model === undefined ? {} : { model: parsed.model }),
-      ...(parsed.paths === undefined ? {} : { paths: parsed.paths }),
-    }
+    return yield* Schema.decodeUnknownEffect(SkillSource.Frontmatter)(parsed).pipe(
+      Effect.mapError((cause) =>
+        sourceError(source, `SKILL.md description must contain 1-${SkillSource.DESCRIPTION_CAP} characters`, cause),
+      ),
+    )
   }),
 )
 

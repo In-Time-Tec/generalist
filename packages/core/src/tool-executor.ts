@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Option, Schema, Sink, Stream } from "effect"
+import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
 import { AiError, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError } from "./agent-event.js"
 import { ToolContext } from "./tool-context.js"
@@ -115,7 +115,7 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
     Effect.flatMap((results) =>
       results.pipe(
         Stream.filter((item) => item.preliminary === false),
-        Stream.run(Sink.last()),
+        Stream.runLast,
       ),
     ),
     Effect.flatMap((option): Effect.Effect<Outcome, FrameworkFailure> => {

@@ -207,7 +207,7 @@ const persistedRun = Agent.stream(memoryAgent, {
 type PersistedRunRequirements = Assert<
   Equal<
     StreamServices<typeof persistedRun>,
-    LanguageModel.LanguageModel | Memory.Memory | Chat.Persistence
+    LanguageModel.LanguageModel | Memory.Memory | Chat.Persistence | Agent.Runtime
   >
 >
 const sessionRegistryLayer = SessionRegistry.layerMemory({ agent: Agent.make({ name: "package-smoke" }) })
