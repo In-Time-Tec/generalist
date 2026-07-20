@@ -1,4 +1,4 @@
-import { Chunk, Context, Effect, Function, Layer, Option, Ref, Schema, Semaphore, Stream } from "effect"
+import { Chunk, Context, Effect, Function, Layer, Option, Ref, Schema, Scope, Semaphore, Stream } from "effect"
 import { LanguageModel, Model } from "effect/unstable/ai"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
@@ -121,7 +121,7 @@ const findRegistration = (registry: Registry, selection: ModelSelection) =>
   Chunk.findFirst(registry, matchesSelection(selection)).pipe(Option.getOrUndefined)
 
 /** @experimental */
-export const registrationFromLayer = <R>(input: {
+export const registration = <R>(input: {
   readonly provider: string
   readonly model: string
   readonly registrationKey?: string
@@ -142,97 +142,100 @@ export const registrationFromLayer = <R>(input: {
     ),
   )
 
+const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: GovernanceOptions) =>
+  Layer.effect(
+    Service,
+    Effect.gen(function* () {
+      const registry = yield* Ref.make<Registry>(initialRegistrations.reduce(upsertRegistration, Chunk.empty()))
+
+      const semaphore =
+        options?.maxConcurrentModelCalls === undefined
+          ? undefined
+          : yield* Semaphore.make(options.maxConcurrentModelCalls)
+
+      const register = Effect.fn("ModelRegistry.register")(function* (input: RegisterInput) {
+        yield* Ref.update(registry, (items) => upsertRegistration(items, input.registration))
+      })
+
+      const registrations = Ref.get(registry).pipe(Effect.map(Chunk.toReadonlyArray))
+
+      const operate = Effect.fn("ModelRegistry.operate")(function* <A, E, R>(
+        selection: ModelSelection,
+        effect: Effect.Effect<A, E, R>,
+      ) {
+        const items = yield* Ref.get(registry)
+        const selectedRegistration = findRegistration(items, selection)
+        if (selectedRegistration === undefined) {
+          return yield* LanguageModelNotRegistered.make({
+            provider: selection.provider,
+            model: selection.model,
+            ...(selection.registrationKey === undefined ? {} : { registration_key: selection.registrationKey }),
+          })
+        }
+        const provided = Effect.scoped(
+          Layer.build(selectedRegistration.layer).pipe(
+            Effect.flatMap((context) =>
+              effect.pipe(Effect.provide(attachFailureClassifier(selectedRegistration, context))),
+            ),
+          ),
+        )
+        return yield* semaphore === undefined ? provided : semaphore.withPermits(1)(provided)
+      })
+
+      const stream = <A, E, R>(selection: ModelSelection, operation: Stream.Stream<A, E, R>) =>
+        Stream.unwrap(
+          Effect.gen(function* () {
+            const items = yield* Ref.get(registry)
+            const selectedRegistration = findRegistration(items, selection)
+            if (selectedRegistration === undefined) {
+              return yield* LanguageModelNotRegistered.make({
+                provider: selection.provider,
+                model: selection.model,
+                ...(selection.registrationKey === undefined ? {} : { registration_key: selection.registrationKey }),
+              })
+            }
+            if (semaphore !== undefined) {
+              yield* Effect.acquireRelease(semaphore.take(1), () => semaphore.release(1), { interruptible: true })
+            }
+            const context = attachFailureClassifier(
+              selectedRegistration,
+              yield* Layer.build(selectedRegistration.layer),
+            )
+            return operation.pipe(Stream.provideContext(context))
+          }),
+        )
+
+      return Service.of({
+        register,
+        registrations,
+        operate,
+        stream,
+        provide: operate,
+      })
+    }),
+  )
+
 /** @experimental */
 export const layer: {
   (): Layer.Layer<Service>
-  (options?: GovernanceOptions): (initialRegistrations?: ReadonlyArray<Registration>) => Layer.Layer<Service>
-  (initialRegistrations?: ReadonlyArray<Registration>, options?: GovernanceOptions): Layer.Layer<Service>
-} = Function.dual(
-  (args) => args.length === 0 || args.length > 1 || Array.isArray(args[0]),
-  (initialRegistrations: ReadonlyArray<Registration> = [], options?: GovernanceOptions) =>
-    Layer.effect(
-      Service,
-      Effect.gen(function* () {
-        const registry = yield* Ref.make<Registry>(initialRegistrations.reduce(upsertRegistration, Chunk.empty()))
-
-        const semaphore =
-          options?.maxConcurrentModelCalls === undefined
-            ? undefined
-            : yield* Semaphore.make(options.maxConcurrentModelCalls)
-
-        const register = Effect.fn("ModelRegistry.register")(function* (input: RegisterInput) {
-          yield* Ref.update(registry, (items) => upsertRegistration(items, input.registration))
-        })
-
-        const registrations = Ref.get(registry).pipe(Effect.map(Chunk.toReadonlyArray))
-
-        const operate = Effect.fn("ModelRegistry.operate")(function* <A, E, R>(
-          selection: ModelSelection,
-          effect: Effect.Effect<A, E, R>,
-        ) {
-          const items = yield* Ref.get(registry)
-          const registration = findRegistration(items, selection)
-          if (registration === undefined) {
-            return yield* LanguageModelNotRegistered.make({
-              provider: selection.provider,
-              model: selection.model,
-              ...(selection.registrationKey === undefined ? {} : { registration_key: selection.registrationKey }),
-            })
-          }
-          const provided = Effect.scoped(
-            Layer.build(registration.layer).pipe(
-              Effect.flatMap((context) => effect.pipe(Effect.provide(attachFailureClassifier(registration, context)))),
-            ),
-          )
-          return yield* semaphore === undefined ? provided : semaphore.withPermits(1)(provided)
-        })
-
-        const stream = <A, E, R>(selection: ModelSelection, operation: Stream.Stream<A, E, R>) =>
-          Stream.unwrap(
-            Effect.gen(function* () {
-              const items = yield* Ref.get(registry)
-              const registration = findRegistration(items, selection)
-              if (registration === undefined) {
-                return yield* LanguageModelNotRegistered.make({
-                  provider: selection.provider,
-                  model: selection.model,
-                  ...(selection.registrationKey === undefined ? {} : { registration_key: selection.registrationKey }),
-                })
-              }
-              if (semaphore !== undefined) {
-                yield* Effect.acquireRelease(semaphore.take(1), () => semaphore.release(1), { interruptible: true })
-              }
-              const context = attachFailureClassifier(registration, yield* Layer.build(registration.layer))
-              return operation.pipe(Stream.provideContext(context))
-            }),
-          )
-
-        return Service.of({
-          register,
-          registrations,
-          operate,
-          stream,
-          provide: operate,
-        })
-      }),
-    ),
-)
-
-/** @experimental */
-export const layerFromRegistrationEffects: {
-  <E, R>(
+  <E = never, R = never>(
     options?: GovernanceOptions,
   ): (
-    registrations: ReadonlyArray<Effect.Effect<Registration, E, R>>,
-  ) => Layer.Layer<Service, E, Exclude<R, import("effect/Scope").Scope>>
-  <E, R>(
-    registrations: ReadonlyArray<Effect.Effect<Registration, E, R>>,
+    registrations?: ReadonlyArray<Effect.Effect<Registration, E, R>>,
+  ) => Layer.Layer<Service, E, Exclude<R, Scope.Scope>>
+  <E = never, R = never>(
+    registrations?: ReadonlyArray<Effect.Effect<Registration, E, R>>,
     options?: GovernanceOptions,
-  ): Layer.Layer<Service, E, Exclude<R, import("effect/Scope").Scope>>
+  ): Layer.Layer<Service, E, Exclude<R, Scope.Scope>>
 } = Function.dual(
-  (args) => args.length !== 1 || Array.isArray(args[0]),
-  <E, R>(registrations: ReadonlyArray<Effect.Effect<Registration, E, R>>, options?: GovernanceOptions) =>
-    Layer.unwrap(Effect.all(registrations).pipe(Effect.map((items) => layer(items, options)))),
+  (args) => args.length === 0 || args.length > 1 || Array.isArray(args[0]),
+  <E = never, R = never>(
+    registrations: ReadonlyArray<Effect.Effect<Registration, E, R>> = [],
+    options?: GovernanceOptions,
+  ): Layer.Layer<Service, E, Exclude<R, Scope.Scope>> =>
+    Layer.unwrap(
+      Effect.all(registrations).pipe(Effect.map((initialRegistrations) => makeLayer(initialRegistrations, options))),
+    ),
 )
 
 /** @experimental */
@@ -253,7 +256,7 @@ export const combine: {
     Layer.unwrap(
       Effect.forEach(registries, (registry) =>
         Layer.build(registry).pipe(Effect.flatMap((context) => Context.get(context, Service).registrations)),
-      ).pipe(Effect.map((groups) => layer(groups.flat(), options))),
+      ).pipe(Effect.map((groups) => makeLayer(groups.flat(), options))),
     ),
 )
 

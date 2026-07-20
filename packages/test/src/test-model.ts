@@ -342,7 +342,7 @@ export const make: {
         model: options.model ?? "scripted",
         ...(options.registrationKey === undefined ? {} : { registrationKey: options.registrationKey }),
       }
-      const registration = yield* ModelRegistry.registrationFromLayer({
+      const registration = yield* ModelRegistry.registration({
         ...selection,
         layer: modelLayer,
         ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
@@ -352,7 +352,7 @@ export const make: {
         layer: modelLayer,
         selection,
         registration,
-        registryLayer: ModelRegistry.memoryLayer([registration]),
+        registryLayer: ModelRegistry.memoryLayer([Effect.succeed(registration)]),
         requests,
         prompts: requests.pipe(Effect.map((items) => items.map((request) => request.prompt))),
         remaining: SubscriptionRef.get(state).pipe(
@@ -390,7 +390,7 @@ export const registryLayer: {
   (args) => Array.isArray(args[0]),
   (fixtures: ReadonlyArray<Fixture>, governance?: ModelRegistry.GovernanceOptions) =>
     ModelRegistry.memoryLayer(
-      fixtures.map((fixture) => fixture.registration),
+      fixtures.map((fixture) => Effect.succeed(fixture.registration)),
       governance,
     ),
 )

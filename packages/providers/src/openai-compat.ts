@@ -14,7 +14,7 @@ export interface OpenAiCompatibleInput extends RegistrationOptions {
 
 /** @experimental */
 export const openAiCompatible = (input: OpenAiCompatibleInput) =>
-  ModelRegistry.registrationFromLayer({
+  ModelRegistry.registration({
     provider: input.provider ?? "openai-compatible",
     model: input.model,
     layer: OpenAiLanguageModel.layer({
@@ -45,9 +45,7 @@ const clientLayerConfig = (options: WithOpenAiCompatibleOptions) =>
 
 /** @experimental */
 export const withOpenAiCompatible = (options: WithOpenAiCompatibleOptions) =>
-  ModelRegistry.layerFromRegistrationEffects([openAiCompatible(options)]).pipe(
-    Layer.provide(clientLayerConfig(options)),
-  )
+  ModelRegistry.layer([openAiCompatible(options)]).pipe(Layer.provide(clientLayerConfig(options)))
 
 /** @experimental */
 export const withOpenAiCompatibleFetch = (options: WithOpenAiCompatibleOptions) =>

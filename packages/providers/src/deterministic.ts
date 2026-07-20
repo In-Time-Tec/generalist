@@ -21,7 +21,7 @@ export interface DeterministicInput extends RegistrationOptions {
 
 /** @experimental */
 export const deterministicModel = (input: DeterministicInput = {}) =>
-  ModelRegistry.registrationFromLayer({
+  ModelRegistry.registration({
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",
     layer: deterministicModelLayer,
@@ -30,8 +30,7 @@ export const deterministicModel = (input: DeterministicInput = {}) =>
   })
 
 /** @experimental */
-export const withDeterministic = (input: DeterministicInput = {}) =>
-  ModelRegistry.layerFromRegistrationEffects([deterministicModel(input)])
+export const withDeterministic = (input: DeterministicInput = {}) => ModelRegistry.layer([deterministicModel(input)])
 
 /** @experimental */
 export interface WithOpenAiOrDeterministicOptions extends WithOpenAiOptions {
@@ -62,8 +61,8 @@ export const withOpenAiOrDeterministic = (options: WithOpenAiOrDeterministicOpti
           ),
       })
       return ModelRegistry.layer([
-        deterministic,
-        ...(Option.isSome(openAiRegistration) ? [openAiRegistration.value] : []),
+        Effect.succeed(deterministic),
+        ...(Option.isSome(openAiRegistration) ? [Effect.succeed(openAiRegistration.value)] : []),
       ])
     }),
   )

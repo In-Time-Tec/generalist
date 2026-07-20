@@ -37,7 +37,7 @@ export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
 
 /** @experimental */
 export const openRouter = (input: OpenRouterInput) =>
-  ModelRegistry.registrationFromLayer({
+  ModelRegistry.registration({
     provider: "openrouter",
     model: input.model,
     layer: OpenRouterLanguageModel.layer({
@@ -60,7 +60,7 @@ export interface WithOpenRouterOptions extends OpenRouterInput {
 
 /** @experimental */
 export const withOpenRouter = (options: WithOpenRouterOptions) =>
-  ModelRegistry.layerFromRegistrationEffects([openRouter(options)]).pipe(
+  ModelRegistry.layer([openRouter(options)]).pipe(
     Layer.provide(OpenRouterClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
   )
 

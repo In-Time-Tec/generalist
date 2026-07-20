@@ -332,14 +332,14 @@ const overflowSelection = { provider: "test", model: "overflow" }
 
 const overflowModelLayer = (streamText: ModelParams["streamText"], generateText?: ModelParams["generateText"]) =>
   Layer.unwrap(
-    ModelRegistry.registrationFromLayer({
+    ModelRegistry.registration({
       ...overflowSelection,
       layer: modelLayer(streamText, generateText),
       classifyFailure: (error) =>
         AiError.isAiError(error) && error.module === "AgentTestLanguageModel" && error.reason._tag === "UnknownError"
           ? "context-overflow"
           : "other",
-    }).pipe(Effect.map((registration) => ModelRegistry.memoryLayer([registration]))),
+    }).pipe(Effect.map((registration) => ModelRegistry.memoryLayer([Effect.succeed(registration)]))),
   )
 
 const retryTransientModelError = ModelResilience.layer({
@@ -731,11 +731,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     () =>
       [
         Layer.unwrap(
-          ModelRegistry.registrationFromLayer({
+          ModelRegistry.registration({
             provider: "test",
             model: "agent-default",
             layer: modelLayer(() => Stream.make(textDelta("registry done"))),
-          }).pipe(Effect.map((registration) => ModelRegistry.memoryLayer([registration]))),
+          }).pipe(Effect.map((registration) => ModelRegistry.memoryLayer([Effect.succeed(registration)]))),
         ),
         Effect.gen(function* () {
           const agent = Agent.make({
@@ -786,10 +786,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
     return [
       Layer.unwrap(
-        ModelRegistry.registrationFromLayer({ ...selection, layer: selectedModel }).pipe(
+        ModelRegistry.registration({ ...selection, layer: selectedModel }).pipe(
           Effect.map((registration) =>
             Layer.mergeAll(
-              ModelRegistry.memoryLayer([registration], { maxConcurrentModelCalls: 1 }),
+              ModelRegistry.memoryLayer([Effect.succeed(registration)], { maxConcurrentModelCalls: 1 }),
               unusedExecutor,
               Approvals.autoApprove,
               ModelMiddleware.identityLayer,

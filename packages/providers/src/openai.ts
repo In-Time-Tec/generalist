@@ -53,7 +53,7 @@ export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
 
 /** @experimental */
 export const openAi = (input: OpenAiInput) =>
-  ModelRegistry.registrationFromLayer({
+  ModelRegistry.registration({
     provider: "openai",
     model: input.model,
     layer: OpenAiLanguageModel.layer({
@@ -76,7 +76,7 @@ export interface WithOpenAiOptions extends OpenAiInput {
 
 /** @experimental */
 export const withOpenAi = (options: WithOpenAiOptions) =>
-  ModelRegistry.layerFromRegistrationEffects([openAi(options)]).pipe(
+  ModelRegistry.layer([openAi(options)]).pipe(
     Layer.provide(OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
   )
 
@@ -208,7 +208,7 @@ const openAiAccountClientLayer = (credentials: OpenAiAccountCredentials) =>
 
 /** @experimental */
 export const openAiAccount = (input: OpenAiAccountInput) =>
-  ModelRegistry.registrationFromLayer({
+  ModelRegistry.registration({
     provider: "openai",
     model: input.model,
     layer: OpenAiLanguageModel.layer({
@@ -221,8 +221,7 @@ export const openAiAccount = (input: OpenAiAccountInput) =>
   })
 
 /** @experimental */
-export const withOpenAiAccount = (input: OpenAiAccountInput) =>
-  ModelRegistry.layerFromRegistrationEffects([openAiAccount(input)])
+export const withOpenAiAccount = (input: OpenAiAccountInput) => ModelRegistry.layer([openAiAccount(input)])
 
 /** @experimental */
 export const withOpenAiAccountFetch = (input: OpenAiAccountInput) =>

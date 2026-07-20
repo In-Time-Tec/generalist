@@ -23,7 +23,7 @@ export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
 
 /** @experimental */
 export const anthropic = (input: AnthropicInput) =>
-  ModelRegistry.registrationFromLayer({
+  ModelRegistry.registration({
     provider: "anthropic",
     model: input.model,
     layer: AnthropicLanguageModel.layer({
@@ -46,7 +46,7 @@ export interface WithAnthropicOptions extends AnthropicInput {
 
 /** @experimental */
 export const withAnthropic = (options: WithAnthropicOptions) =>
-  ModelRegistry.layerFromRegistrationEffects([anthropic(options)]).pipe(
+  ModelRegistry.layer([anthropic(options)]).pipe(
     Layer.provide(AnthropicClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
   )
 

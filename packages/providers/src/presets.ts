@@ -37,7 +37,7 @@ const preset = (provider: string, baseUrl: string, input: PresetInput) =>
   )
 
 const presetLayer = <R>(registration: Effect.Effect<ModelRegistry.Registration, Config.ConfigError, R>) =>
-  ModelRegistry.layerFromRegistrationEffects([registration])
+  ModelRegistry.layer([registration])
 
 const presetFetch = (
   registration: Effect.Effect<ModelRegistry.Registration, Config.ConfigError, HttpClient.HttpClient>,

@@ -35,18 +35,17 @@ export const coreModelsReference = definePage({
           ],
         ],
         [
-          [code("registrationFromLayer(input)")],
+          [code("registration(input)")],
           ["Builds a ", code("Registration"), " from a plain ", code("LanguageModel"), " layer"],
         ],
         [
-          [code("layer(initialRegistrations?, options?)")],
+          [code("layer(registrations?, options?)")],
           [
-            "Registry service layer; ",
+            "Registry service layer from registration effects; ",
             code("GovernanceOptions.maxConcurrentModelCalls"),
             " caps concurrent provided runs with a semaphore",
           ],
         ],
-        [[code("layerFromRegistrationEffects(registrations, options?)")], "Registry layer from registration effects"],
         [[code("combine(registries, options?)")], "Merges the registrations of several registry layers into one"],
         [
           [code("register"), " / ", code("registrations"), " / ", code("provide")],

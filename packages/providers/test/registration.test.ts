@@ -189,22 +189,20 @@ describe("providers", () => {
     )
   })
 
-  testLayer(ModelRegistry.layerFromRegistrationEffects([Presets.groqFetch({ model: "llama-test", apiKey })]))(
-    (test) => {
-      test.effect("creates an OpenAI-compatible preset registration for ModelRegistry", () =>
-        Effect.gen(function* () {
-          const registration = yield* Presets.groqFetch({ model: "llama-test", apiKey })
+  testLayer(ModelRegistry.layer([Presets.groqFetch({ model: "llama-test", apiKey })]))((test) => {
+    test.effect("creates an OpenAI-compatible preset registration for ModelRegistry", () =>
+      Effect.gen(function* () {
+        const registration = yield* Presets.groqFetch({ model: "llama-test", apiKey })
 
-          expect(registration.provider).toBe("groq")
-          expect(registration.model).toBe("llama-test")
+        expect(registration.provider).toBe("groq")
+        expect(registration.model).toBe("llama-test")
 
-          const registered = yield* ModelRegistry.registrations()
+        const registered = yield* ModelRegistry.registrations()
 
-          expect(registered.map((item) => [item.provider, item.model])).toEqual([["groq", "llama-test"]])
-        }),
-      )
-    },
-  )
+        expect(registered.map((item) => [item.provider, item.model])).toEqual([["groq", "llama-test"]])
+      }),
+    )
+  })
 
   testLayer(
     Layer.mergeAll(

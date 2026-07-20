@@ -4,6 +4,10 @@ import { LanguageModel, Response } from "effect/unstable/ai"
 import { ModelRegistry } from "../src/index"
 import { ItLayer } from "./it-layer"
 
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false
+type Assert<Value extends true> = Value
+
 const modelLayer = (delta: string) =>
   Layer.effect(
     LanguageModel.LanguageModel,
@@ -14,6 +18,37 @@ const modelLayer = (delta: string) =>
   )
 
 describe("ModelRegistry", () => {
+  it("infers requirement-free data-first, data-last, and empty registry layers", () => {
+    const registration = ModelRegistry.registration({ provider: "test", model: "typed", layer: modelLayer("typed") })
+    const dataFirst = ModelRegistry.layer([registration])
+    const dataLast = ModelRegistry.layer({})([registration])
+    const empty = ModelRegistry.layer()
+    const inference: Assert<
+      Equal<typeof dataFirst, Layer.Layer<ModelRegistry.Service>> &
+        Equal<typeof dataLast, Layer.Layer<ModelRegistry.Service>> &
+        Equal<typeof empty, Layer.Layer<ModelRegistry.Service>>
+    > = true
+
+    expect(inference).toBe(true)
+  })
+
+  ItLayer.make(it, "registers an already-resolved registration value", () => {
+    const registrationValue = Effect.runSync(
+      ModelRegistry.registration({
+        provider: "test",
+        model: "resolved",
+        layer: modelLayer("resolved output"),
+      }),
+    )
+    return [
+      ModelRegistry.layer([Effect.succeed(registrationValue)]),
+      ModelRegistry.operate(
+        { provider: "test", model: "resolved" },
+        LanguageModel.generateText({ prompt: "hello" }),
+      ).pipe(Effect.map((response) => expect(response.text).toBe("resolved output"))),
+    ] as const
+  })
+
   ItLayer.make(
     it,
     "fails typed when the selected model is not registered",
@@ -61,7 +96,7 @@ describe("ModelRegistry", () => {
       [
         ModelRegistry.memoryLayer(),
         Effect.gen(function* () {
-          const registration = yield* ModelRegistry.registrationFromLayer({
+          const registration = yield* ModelRegistry.registration({
             provider: "test",
             model: "deterministic",
             layer: modelLayer("registered output"),
@@ -85,19 +120,19 @@ describe("ModelRegistry", () => {
       [
         ModelRegistry.memoryLayer(),
         Effect.gen(function* () {
-          const first = yield* ModelRegistry.registrationFromLayer({
+          const first = yield* ModelRegistry.registration({
             provider: "test",
             model: "deterministic",
             layer: modelLayer("first"),
             metadata: { revision: 1 },
           })
-          const second = yield* ModelRegistry.registrationFromLayer({
+          const second = yield* ModelRegistry.registration({
             provider: "test",
             model: "deterministic",
             layer: modelLayer("second"),
             metadata: { revision: 2 },
           })
-          const keyed = yield* ModelRegistry.registrationFromLayer({
+          const keyed = yield* ModelRegistry.registration({
             provider: "test",
             model: "deterministic",
             registrationKey: "eu",
@@ -128,11 +163,11 @@ describe("ModelRegistry", () => {
     () =>
       [
         ModelRegistry.combine([
-          ModelRegistry.layerFromRegistrationEffects([
-            ModelRegistry.registrationFromLayer({ provider: "prov-a", model: "model-a", layer: modelLayer("from-a") }),
+          ModelRegistry.layer([
+            ModelRegistry.registration({ provider: "prov-a", model: "model-a", layer: modelLayer("from-a") }),
           ]),
-          ModelRegistry.layerFromRegistrationEffects([
-            ModelRegistry.registrationFromLayer({ provider: "prov-b", model: "model-b", layer: modelLayer("from-b") }),
+          ModelRegistry.layer([
+            ModelRegistry.registration({ provider: "prov-b", model: "model-b", layer: modelLayer("from-b") }),
           ]),
         ]),
         Effect.gen(function* () {
@@ -155,8 +190,8 @@ describe("ModelRegistry", () => {
     const selection = { provider: "test", model: "classified" }
     const failure = new Error("classified failure")
     return [
-      ModelRegistry.layerFromRegistrationEffects([
-        ModelRegistry.registrationFromLayer({
+      ModelRegistry.layer([
+        ModelRegistry.registration({
           ...selection,
           layer: modelLayer("first"),
           classifyFailure: () => "context-overflow",
@@ -177,7 +212,7 @@ describe("ModelRegistry", () => {
           ),
         )
         yield* Deferred.await(entered)
-        const replacement = yield* ModelRegistry.registrationFromLayer({
+        const replacement = yield* ModelRegistry.registration({
           ...selection,
           layer: modelLayer("second"),
           classifyFailure: () => "other",
@@ -202,15 +237,15 @@ describe("ModelRegistry", () => {
     () =>
       [
         ModelRegistry.combine([
-          ModelRegistry.layerFromRegistrationEffects([
-            ModelRegistry.registrationFromLayer({
+          ModelRegistry.layer([
+            ModelRegistry.registration({
               provider: "test",
               model: "deterministic",
               layer: modelLayer("first"),
             }),
           ]),
-          ModelRegistry.layerFromRegistrationEffects([
-            ModelRegistry.registrationFromLayer({
+          ModelRegistry.layer([
+            ModelRegistry.registration({
               provider: "test",
               model: "deterministic",
               layer: modelLayer("second"),
@@ -237,7 +272,7 @@ describe("ModelRegistry", () => {
       [
         ModelRegistry.memoryLayer([], { maxConcurrentModelCalls: 1 }),
         Effect.gen(function* () {
-          const registration = yield* ModelRegistry.registrationFromLayer({
+          const registration = yield* ModelRegistry.registration({
             provider: "test",
             model: "deterministic",
             layer: modelLayer("unused"),
@@ -299,7 +334,7 @@ describe("ModelRegistry", () => {
     )
 
     return [
-      ModelRegistry.layerFromRegistrationEffects([ModelRegistry.registrationFromLayer({ ...selected, layer })]),
+      ModelRegistry.layer([ModelRegistry.registration({ ...selected, layer })]),
       Effect.gen(function* () {
         const parts = ModelRegistry.stream(selected, LanguageModel.streamText({ prompt: "hello" }))
         const result = yield* Stream.runCollect(parts)
@@ -315,10 +350,9 @@ describe("ModelRegistry", () => {
   ItLayer.make(it, "holds one governance permit until each selected stream exits", () => {
     const selected = { provider: "test", model: "governed-stream" }
     return [
-      ModelRegistry.layerFromRegistrationEffects(
-        [ModelRegistry.registrationFromLayer({ ...selected, layer: modelLayer("unused") })],
-        { maxConcurrentModelCalls: 1 },
-      ),
+      ModelRegistry.layer([ModelRegistry.registration({ ...selected, layer: modelLayer("unused") })], {
+        maxConcurrentModelCalls: 1,
+      }),
       Effect.gen(function* () {
         const entered = yield* Ref.make(0)
         const firstEntered = yield* Deferred.make<void>()
@@ -346,10 +380,9 @@ describe("ModelRegistry", () => {
   ItLayer.make(it, "cancels a stream waiting for a governance permit without leaking it", () => {
     const selected = { provider: "test", model: "queued-cancellation" }
     return [
-      ModelRegistry.layerFromRegistrationEffects(
-        [ModelRegistry.registrationFromLayer({ ...selected, layer: modelLayer("unused") })],
-        { maxConcurrentModelCalls: 1 },
-      ),
+      ModelRegistry.layer([ModelRegistry.registration({ ...selected, layer: modelLayer("unused") })], {
+        maxConcurrentModelCalls: 1,
+      }),
       Effect.gen(function* () {
         const entered = yield* Ref.make(0)
         const firstEntered = yield* Deferred.make<void>()
@@ -413,7 +446,7 @@ describe("ModelRegistry", () => {
     )
 
     return [
-      ModelRegistry.layerFromRegistrationEffects([ModelRegistry.registrationFromLayer({ ...selected, layer })], {
+      ModelRegistry.layer([ModelRegistry.registration({ ...selected, layer })], {
         maxConcurrentModelCalls: 1,
       }),
       Effect.gen(function* () {
@@ -456,7 +489,7 @@ describe("ModelRegistry", () => {
       ),
     )
     return [
-      ModelRegistry.layerFromRegistrationEffects([ModelRegistry.registrationFromLayer({ ...selected, layer })], {
+      ModelRegistry.layer([ModelRegistry.registration({ ...selected, layer })], {
         maxConcurrentModelCalls: 1,
       }),
       Effect.gen(function* () {
