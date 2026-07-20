@@ -53,10 +53,10 @@ const pendingLayers = Layer.mergeAll(
   Approvals.testLayer({
     check: (request) => Effect.succeed({ _tag: "Pending", token: `approval:${request.call.id}` }),
   }),
-  ModelMiddleware.identityLayer,
+  ModelMiddleware.layerIdentity,
 )
 
-const approvedLayers = Layer.mergeAll(modelLayer, toolkitLayer, Approvals.autoApprove, ModelMiddleware.identityLayer)
+const approvedLayers = Layer.mergeAll(modelLayer, toolkitLayer, Approvals.autoApprove, ModelMiddleware.layerIdentity)
 
 const prompt = "Deploy the api service."
 

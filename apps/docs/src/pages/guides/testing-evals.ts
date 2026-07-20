@@ -59,7 +59,7 @@ export const testingEvals = definePage({
             " tokens",
           ],
         ],
-        [[code("ModelMiddleware")], [code("ModelMiddleware.identityLayer")]],
+        [[code("ModelMiddleware")], [code("ModelMiddleware.layerIdentity")]],
         [[code("ModelRegistry")], [code("Deterministic.withDeterministic"), " registration"]],
         [
           [code("Steering"), ", ", code("ModelResilience"), ", ", code("Connection"), ", …"],
@@ -70,7 +70,7 @@ export const testingEvals = definePage({
     h2("gate-ci-on-a-deterministic-eval", "3. Gate CI on a deterministic eval"),
     p(
       "For an eval binary, select the deterministic registration through the same ",
-      code("ModelRegistry.provide"),
+      code("ModelRegistry.operate"),
       " pattern used for real providers. Swapping in OpenRouter later changes the selection and the layer, nothing else (",
       link("/docs/guides/providers", "How to register real model providers"),
       "). This is ",
@@ -95,7 +95,7 @@ export const testingEvals = definePage({
         " is required: it registers a model in the ",
         code("ModelRegistry"),
         "; ",
-        code("ModelRegistry.provide"),
+        code("ModelRegistry.operate"),
         " supplies the actual model per run.",
       ],
     ),

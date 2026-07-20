@@ -27,7 +27,7 @@ const program = Handoff.fanOut(children, { concurrency: 2 }).pipe(
       modelLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

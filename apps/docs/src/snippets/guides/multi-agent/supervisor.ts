@@ -50,7 +50,7 @@ const program = Agent.generate(supervisor.agent, { prompt: "I want a refund for 
       supervisorToolkitLayer,
       ToolExecutor.fromToolkit(supervisor.toolkit),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

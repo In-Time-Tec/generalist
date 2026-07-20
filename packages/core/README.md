@@ -70,7 +70,7 @@ The merged layer discharges `Chat.Persistence` and `LanguageModel`, so the progr
 - Current behavior: [Agent loop](../../docs/features/agent-loop.md)
 - Deeper examples: [tool-calling chatbot](../../examples/tool-calling-chatbot/) and [memory chat](../../examples/memory-chat/)
 - Baton uses Effect AI `Tool` and `Toolkit` directly. Toolkit handler layers run ordinary in-process tools; optional `ToolExecutor` routes external or durable placement without introducing another tool format.
-- Canonical layer names are `Memory.layerNoop`, `ModelMiddleware.layerIdentity`, `Session.layerMemory`, `ModelRegistry.layerMemory`, and `ToolOutput.layerMemory`. The former noun-first names remain exact deprecated aliases through the stated pre-1.0 deprecation window.
+- Layer names are `Memory.layerNoop`, `ModelMiddleware.layerIdentity`, `Session.layerMemory`, `ModelRegistry.layerMemory`, and `ToolOutput.layerMemory`.
 - Persisted chat delegates storage to Effect AI `Chat.Persistence`. Reusing a `chatId` carries history across runs; the system message is stored once, and requesting persistence without its layer fails loudly with `AgentError`.
 
 ### Memory item content
@@ -164,7 +164,7 @@ const policy = TurnPolicy.make<Budget>(({ turn }) =>
 )
 ```
 
-Migrate `TurnPolicy.decision.stop` to `TurnPolicy.decision.stop(reason)`. Existing reasonless custom policy functions can be passed to deprecated `TurnPolicy.fromLegacy` while migrating; legacy stops become `Policy { detail: "Legacy policy stopped" }`. `TurnLimitExceeded` now includes the configured `limit`, and transport consumers must add `TurnPolicyError` and `TurnPolicyStopped` to their terminal-failure handling.
+Custom policies return `TurnPolicy.decision.stop(reason)` for explicit, observable completion. `TurnLimitExceeded` includes the configured `limit`, and transport consumers must handle `TurnPolicyError` and `TurnPolicyStopped` as terminal failures.
 // Or SQL-backed on the app's own database (requires a SqlClient in context):
 // Chat.layerPersisted({ storeId: "my-app-chats" }).pipe(
 // Layer.provide(Persistence.layerBackingSql),

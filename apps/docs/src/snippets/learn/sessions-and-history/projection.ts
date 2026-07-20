@@ -29,6 +29,6 @@ const program = Effect.gen(function* () {
   const after = Session.buildContext(path)
   yield* Console.log(`after: ${after.content.map((entry) => entry.role).join(" ")}`)
   yield* Console.log(`log entries: ${path.length}`)
-}).pipe(Effect.provide(Session.memoryLayer))
+}).pipe(Effect.provide(Session.layerMemory))
 
 await Effect.runPromise(program)

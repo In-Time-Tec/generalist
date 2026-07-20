@@ -68,7 +68,7 @@ Before provisioning, the program requires `Memory.Memory` and can fail with sche
 
 - Current behavior: [Memory](../../docs/features/memory.md)
 - Deeper example: [memory chat](../../examples/memory-chat/)
-- `VectorStore.memoryLayer` remains an exact deprecated alias of canonical `VectorStore.layerMemory` through the stated pre-1.0 deprecation window; `combinedLayer` is unchanged.
+- `VectorStore.layerMemory` provides the non-durable in-memory vector store; `combinedLayer` is unchanged.
 
 ### Working-memory summaries
 
@@ -84,4 +84,4 @@ const memoryLayer = WorkingMemory.layer({
 }).pipe(Layer.provide(WorkingMemory.summaryModelLayer.pipe(Layer.provide(modelLayer))))
 ```
 
-The summary model is acquired once in `memoryLayer`'s owning scope and reused across overflows. The former `summarize: { model: modelLayer }` option remains supported but is deprecated; migrate by composing the model through `summaryModelLayer` as shown above.
+The summary model is acquired once in the memory layer's owning scope and reused across overflows. It is composed through `summaryModelLayer` as shown above.

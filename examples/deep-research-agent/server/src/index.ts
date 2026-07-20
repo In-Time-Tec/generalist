@@ -112,7 +112,7 @@ export const sessionRegistryLayer = SessionRegistry.layerMemory({ agent }).pipe(
       modelLayer,
       toolkitHandlersLayer,
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       persistenceLayer,
     ),
   ),

@@ -43,7 +43,7 @@ const program = Effect.gen(function* () {
       modelLayer,
       toolkit.toLayer({ drop_table: () => Effect.die("denied calls never reach the handler") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       permissionsLayer,
     ),
   ),

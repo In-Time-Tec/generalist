@@ -826,7 +826,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           return Stream.make(textDelta("handled failure"))
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
@@ -864,7 +864,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         }),
         ToolExecutor.fromToolkit(AgentTool.asTool(Agent.make({ name: "child" }), { name: "ask_child" })),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const child = Agent.make({ name: "child" })
@@ -914,7 +914,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         ),
         ToolContext.layerDefault,
         Layer.succeed(AuthorizationDependency, "available"),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
@@ -950,7 +950,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           }),
         ),
         Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-1" }) }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const child = Agent.make({ name: "reviewer", toolkit: Toolkit.make(gatedTool) })
@@ -995,7 +995,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           }),
         ),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const child = Agent.make({ name: "custom-child" })

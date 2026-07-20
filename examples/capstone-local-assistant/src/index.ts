@@ -80,7 +80,7 @@ const renderedChat = chatFrames.reduce(
 const program = Effect.gen(function* () {
   const source = yield* SkillSource.SkillSource
   const skills = yield* source.all
-  const result = yield* ModelRegistry.provide(
+  const result = yield* ModelRegistry.operate(
     { provider: "deterministic", model: "capstone" },
     Agent.generate(agent, { prompt: "Use the research skill before answering.", memory: { key } }),
   )
@@ -92,7 +92,7 @@ const program = Effect.gen(function* () {
       Deterministic.withDeterministic({ model: "capstone" }),
       toolkitLayer,
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       SkillSource.fromSkills([researchSkill]),
       WorkingMemory.layer({ maxMessages: 4 }),
       Connection.testLayer({ frames: () => Stream.empty, send: () => Effect.void }),

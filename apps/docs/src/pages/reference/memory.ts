@@ -46,9 +46,14 @@ export const memoryReference = definePage({
       [
         [[code("maxMessages")], [code("20")], "Recency window size"],
         [
-          [code("summarize.model")],
-          "none",
-          ["A ", code("LanguageModel"), " layer; without it, overflow is dropped and the summary unchanged"],
+          [code("summarize")],
+          "disabled",
+          [
+            "Enables overflow summarization and requires ",
+            code("WorkingMemory.SummaryModel"),
+            ", normally composed through ",
+            code("WorkingMemory.summaryModelLayer"),
+          ],
         ],
         [[code("summarize.prompt")], "built-in summary prompt", "Instruction for folding overflow into the summary"],
       ],
@@ -92,7 +97,7 @@ export const memoryReference = definePage({
       ],
     ),
     p(
-      code("VectorStore.memoryLayer"),
+      code("VectorStore.layerMemory"),
       " is the in-process implementation using cosine similarity; it rejects non-finite vectors and mismatched dimensions. ",
       code("testLayer(implementation)"),
       " wraps an explicit interface; a Postgres/pgvector store implements the same two functions.",
@@ -106,7 +111,11 @@ export const memoryReference = definePage({
       code("VectorStore"),
       " and ",
       code("Ai.EmbeddingModel"),
-      ").",
+      "). Enabling ",
+      code("working.summarize"),
+      " also requires ",
+      code("WorkingMemory.SummaryModel"),
+      ".",
     ),
     p(
       "Embedding layers live in ",

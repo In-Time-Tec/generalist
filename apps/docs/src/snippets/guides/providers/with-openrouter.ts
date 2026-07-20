@@ -12,7 +12,7 @@ const providerLayer = OpenRouter.withOpenRouterFetch({
   apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })
 
-const program = ModelRegistry.provide(
+const program = ModelRegistry.operate(
   { provider: "openrouter", model: "openai/gpt-4o-mini" },
   Agent.generate(agent, { prompt: "Name one Effect data type." }),
 ).pipe(
@@ -22,7 +22,7 @@ const program = ModelRegistry.provide(
       providerLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

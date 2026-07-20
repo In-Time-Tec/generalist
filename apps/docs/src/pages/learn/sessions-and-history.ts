@@ -113,7 +113,7 @@ export const sessionsAndHistory = definePage({
     h2("where-durable-history-lives", "Where durable history lives"),
     p(
       "Everything on this page is non-durable by design: ",
-      code("Session.memoryLayer"),
+      code("Session.layerMemory"),
       " is a ",
       code("Ref"),
       ", and the persisted-chat layer in the examples backs onto memory too. Durable, addressable conversation storage belongs to the host: a durable runtime implements ",

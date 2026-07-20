@@ -46,7 +46,7 @@ const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ get_weather: ({ city }) => Effect.succeed(`sunny and 72°F in ${city}`) }),
   Approvals.autoApprove,
-  ModelMiddleware.identityLayer,
+  ModelMiddleware.layerIdentity,
 )
 
 const program = Agent.stream(agent, { prompt: "Should I bring a jacket in Boise?" }).pipe(

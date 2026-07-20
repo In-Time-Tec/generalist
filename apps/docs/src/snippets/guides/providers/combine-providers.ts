@@ -10,7 +10,7 @@ const registryLayer = ModelRegistry.combine([
 ])
 
 const runWith = (selection: ModelRegistry.ModelSelection) =>
-  ModelRegistry.provide(selection, Agent.generate(agent, { prompt: "Summarize the incident." }))
+  ModelRegistry.operate(selection, Agent.generate(agent, { prompt: "Summarize the incident." }))
 
 const program = runWith({ provider: "anthropic", model: "claude-sonnet-4-5" }).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
@@ -19,7 +19,7 @@ const program = runWith({ provider: "anthropic", model: "claude-sonnet-4-5" }).p
       registryLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

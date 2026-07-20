@@ -2,7 +2,9 @@ import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { EmbeddingModel, LanguageModel, Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
-import { combinedLayer, VectorStore } from "../src/index"
+import { expectTypeOf } from "vitest"
+import { combinedLayer, VectorStore, WorkingMemory } from "../src/index"
+import type { CombinedOptions } from "../src/index"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 
@@ -37,13 +39,21 @@ const summaryModel = Layer.effect(
 )
 
 const combinedOptions = {
-  working: { maxMessages: 1, summarize: { model: summaryModel, prompt: "Preserve facts." } },
+  working: { maxMessages: 1, summarize: { prompt: "Preserve facts." } },
   semantic: { limit: 5 },
 }
+const widenedCombinedOptions: CombinedOptions = combinedOptions
+expectTypeOf(combinedLayer(widenedCombinedOptions)).toEqualTypeOf<
+  Layer.Layer<
+    Memory.Memory,
+    never,
+    VectorStore.VectorStore | EmbeddingModel.EmbeddingModel | WorkingMemory.SummaryModel
+  >
+>()
 const memoryLayer: Layer.Layer<Memory.Memory, never, VectorStore.VectorStore | EmbeddingModel.EmbeddingModel> =
-  combinedLayer(combinedOptions)
+  combinedLayer(combinedOptions).pipe(Layer.provide(WorkingMemory.summaryModelLayer), Layer.provide(summaryModel))
 
-layer(memoryLayer.pipe(Layer.provideMerge(VectorStore.memoryLayer), Layer.provideMerge(embeddingLayer)))(
+layer(memoryLayer.pipe(Layer.provideMerge(VectorStore.layerMemory), Layer.provideMerge(embeddingLayer)))(
   "@batonfx/memory",
   (it) => {
     it.effect("combinedLayer recalls working memory before semantic matches", () =>

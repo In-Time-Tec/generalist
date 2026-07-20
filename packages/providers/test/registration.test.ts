@@ -209,14 +209,14 @@ describe("providers", () => {
       Deterministic.withDeterministic({ model: "local" }),
       ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       unexpectedToolLayer,
     ),
   )((test) => {
     test.effect("round-trips the deterministic model through Agent.generate", () => {
       const agent = Agent.make({ name: "deterministic-agent", toolkit: unexpectedToolkit })
       return Effect.gen(function* () {
-        const result = yield* ModelRegistry.provide(
+        const result = yield* ModelRegistry.operate(
           { provider: "deterministic", model: "local" },
           Agent.generate({ prompt: "hello" })(agent),
         )
@@ -337,7 +337,7 @@ describe("providers", () => {
       ]),
       ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       unexpectedToolLayer,
     ),
   )((test) => {
@@ -350,11 +350,11 @@ describe("providers", () => {
           ["det-b", "model-b"],
         ])
 
-        const first = yield* ModelRegistry.provide(
+        const first = yield* ModelRegistry.operate(
           { provider: "det-a", model: "model-a" },
           Agent.generate({ prompt: "hello" })(agent),
         )
-        const second = yield* ModelRegistry.provide(
+        const second = yield* ModelRegistry.operate(
           { provider: "det-b", model: "model-b" },
           Agent.generate({ prompt: "hello" })(agent),
         )

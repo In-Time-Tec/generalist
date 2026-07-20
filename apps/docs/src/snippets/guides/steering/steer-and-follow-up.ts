@@ -46,7 +46,7 @@ const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ check_status: ({ service }) => Effect.succeed(`${service} is healthy`) }),
   Approvals.autoApprove,
-  ModelMiddleware.identityLayer,
+  ModelMiddleware.layerIdentity,
   Steering.layer(),
 )
 

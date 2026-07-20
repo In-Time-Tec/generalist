@@ -84,11 +84,6 @@ export interface Interface {
     selection: ModelSelection,
     stream: Stream.Stream<A, E, R>,
   ) => Stream.Stream<A, E | LanguageModelNotRegistered, Exclude<R, ModelEnvironment>>
-  /** @deprecated Use `operate`. */
-  readonly provide: <A, E, R>(
-    selection: ModelSelection,
-    effect: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, E | LanguageModelNotRegistered, Exclude<R, ModelEnvironment>>
 }
 
 /** @experimental */
@@ -210,7 +205,6 @@ const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: 
         registrations,
         operate,
         stream,
-        provide: operate,
       })
     }),
   )
@@ -263,12 +257,6 @@ export const combine: {
 /** @experimental In-memory model registry. */
 export const layerMemory: typeof layer = layer
 
-/**
- * @experimental
- * @deprecated Use {@link layerMemory}. This alias will not be removed before 1.0.0 and only in a separately planned major release.
- */
-export const memoryLayer: typeof layerMemory = layerMemory
-
 /** @experimental */
 export const testLayer = (implementation: Interface) => Layer.succeed(ModelRegistry, ModelRegistry.of(implementation))
 
@@ -316,9 +304,3 @@ export const stream: {
 } = Function.dual(2, <A, E, R>(selection: ModelSelection, operation: Stream.Stream<A, E, R>) =>
   Stream.unwrap(ModelRegistry.pipe(Effect.map((service) => service.stream(selection, operation)))),
 )
-
-/**
- * @experimental
- * @deprecated Use {@link operate}. This alias will not be removed before 1.0.0 and only in a separately planned major release.
- */
-export const provide: typeof operate = operate

@@ -58,7 +58,7 @@ const program = Effect.gen(function* () {
       modelLayer,
       toolkit.toLayer({ lookup: ({ topic }) => Effect.succeed(`found ${topic}`) }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

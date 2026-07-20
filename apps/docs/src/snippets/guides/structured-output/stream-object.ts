@@ -29,7 +29,7 @@ const program = Agent.stream(agent, {
       modelLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

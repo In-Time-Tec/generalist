@@ -182,7 +182,7 @@ describe("Compaction", () => {
     let summaryPrompt = ""
     return [
       Layer.mergeAll(
-        Session.memoryLayer,
+        Session.layerMemory,
         modelLayer((options) => {
           summaryCalls += 1
           summaryPrompt = Json.stringify(options.prompt.content)
@@ -239,7 +239,7 @@ describe("Compaction", () => {
     () =>
       [
         Layer.mergeAll(
-          Session.memoryLayer,
+          Session.layerMemory,
           modelLayer(() => Effect.succeed([{ type: "text", text: "checkpoint summary" }])),
         ),
         Effect.gen(function* () {

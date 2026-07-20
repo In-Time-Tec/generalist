@@ -366,9 +366,9 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         options.system ??
         (instructionsEpoch === undefined
           ? agent.instructions
-          : instructionsEpoch.baseline.length === 0
+          : instructionsEpoch.length === 0
             ? agent.instructions
-            : instructionsEpoch.baseline)
+            : instructionsEpoch)
       const system = appendInstructionFragment(
         baseSystem,
         options.history === undefined && skillListings.length > 0
@@ -1694,8 +1694,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           })
           if (!isTurnPolicyDecision(evaluated)) {
             return yield* TurnPolicyError.make({
-              message:
-                "TurnPolicy returned an invalid decision; reasonless Stop decisions must be adapted with TurnPolicy.fromLegacy",
+              message: "TurnPolicy returned an invalid decision; Stop decisions must include a reason",
               cause: evaluated,
             })
           }

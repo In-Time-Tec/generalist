@@ -178,24 +178,19 @@ type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Op
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
-type MemoryCompatibility = Assert<Equal<typeof Memory.layerNoop, typeof Memory.noopLayer>>
 type MiddlewareCanonical = Assert<
   Equal<LayerShape<typeof ModelMiddleware.layerIdentity>, readonly [ModelMiddleware.ModelMiddleware, never, never]>
 >
-type MiddlewareCompatibility = Assert<Equal<typeof ModelMiddleware.layerIdentity, typeof ModelMiddleware.identityLayer>>
 type SessionCanonical = Assert<
   Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionStore, never, never]>
 >
-type SessionCompatibility = Assert<Equal<typeof Session.layerMemory, typeof Session.memoryLayer>>
 type RegistryCanonical = Assert<Equal<typeof ModelRegistry.layerMemory, typeof ModelRegistry.layer>>
-type RegistryCompatibility = Assert<Equal<typeof ModelRegistry.layerMemory, typeof ModelRegistry.memoryLayer>>
 type ToolOutputCanonical = Assert<
   Equal<LayerShape<typeof ToolOutput.layerMemory>, readonly [ToolOutput.ToolOutputStore, never, never]>
 >
 type VectorStoreCanonical = Assert<
   Equal<LayerShape<typeof VectorStore.layerMemory>, readonly [VectorStore.VectorStore, never, never]>
 >
-type VectorStoreCompatibility = Assert<Equal<typeof VectorStore.layerMemory, typeof VectorStore.memoryLayer>>
 const memoryAgent = Agent.make({
   name: "memory-package-smoke",
   memory: { agent: "memory-package-smoke", subject: "subject" },
@@ -363,17 +358,6 @@ const { TestModel } = await import("@batonfx/test")
 const { Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
-const aliases = [
-  [Memory.layerNoop, Memory.noopLayer, "Memory.noopLayer"],
-  [ModelMiddleware.layerIdentity, ModelMiddleware.identityLayer, "ModelMiddleware.identityLayer"],
-  [Session.layerMemory, Session.memoryLayer, "Session.memoryLayer"],
-  [ModelRegistry.layerMemory, ModelRegistry.layer, "ModelRegistry.layer"],
-  [ModelRegistry.layerMemory, ModelRegistry.memoryLayer, "ModelRegistry.memoryLayer"],
-  [VectorStore.layerMemory, VectorStore.memoryLayer, "VectorStore.memoryLayer"],
-]
-for (const [canonical, compatibility, name] of aliases) {
-  if (canonical !== compatibility) throw new Error(name + " must preserve runtime identity")
-}
 const tool = Tool.make("identity_proof", { parameters: Schema.Struct({ value: Schema.String }) })
 const agent = Agent.make({ name: "identity-proof", toolkit: Toolkit.make(tool) })
 const layers = [

@@ -28,7 +28,7 @@ const program = Effect.gen(function* () {
       modelLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       WorkingMemory.layer({ maxMessages: 8 }),
     ),
   ),

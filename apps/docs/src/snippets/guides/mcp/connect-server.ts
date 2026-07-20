@@ -14,7 +14,7 @@ const program = Effect.gen(function* () {
     instructions: "Use the filesystem tools to answer.",
     toolkit: tools.toolkit,
   })
-  const result = yield* ModelRegistry.provide(
+  const result = yield* ModelRegistry.operate(
     { provider: "openrouter", model: "openai/gpt-4o-mini" },
     Agent.generate(agent, { prompt: "List the markdown files in this project." }),
   ).pipe(

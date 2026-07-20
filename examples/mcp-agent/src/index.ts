@@ -59,7 +59,7 @@ const program = Effect.gen(function* () {
         }),
         toolkitLayer(source),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
     ),
   )

@@ -54,7 +54,7 @@ describe("ModelRegistry", () => {
     "fails typed when the selected model is not registered",
     () =>
       [
-        ModelRegistry.memoryLayer(),
+        ModelRegistry.layerMemory(),
         Effect.gen(function* () {
           const failure = yield* Effect.flip(
             ModelRegistry.operate({ provider: "missing", model: "none" }, Effect.succeed("unused")),
@@ -74,7 +74,7 @@ describe("ModelRegistry", () => {
     "fails streams typed when the selected model is not registered",
     () =>
       [
-        ModelRegistry.memoryLayer(),
+        ModelRegistry.layerMemory(),
         Effect.gen(function* () {
           const failure = yield* Effect.flip(
             ModelRegistry.stream({ provider: "missing", model: "none" }, Stream.make("unused")).pipe(Stream.runDrain),
@@ -85,16 +85,12 @@ describe("ModelRegistry", () => {
       ] as const,
   )
 
-  it("keeps provide as the operate compatibility alias", () => {
-    expect(ModelRegistry.provide).toBe(ModelRegistry.operate)
-  })
-
   ItLayer.make(
     it,
     "provides a registered language model layer",
     () =>
       [
-        ModelRegistry.memoryLayer(),
+        ModelRegistry.layerMemory(),
         Effect.gen(function* () {
           const registration = yield* ModelRegistry.registration({
             provider: "test",
@@ -103,7 +99,7 @@ describe("ModelRegistry", () => {
           })
           yield* ModelRegistry.register({ registration })
 
-          const response = yield* ModelRegistry.provide(
+          const response = yield* ModelRegistry.operate(
             { provider: "test", model: "deterministic" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
@@ -118,7 +114,7 @@ describe("ModelRegistry", () => {
     "upserts registrations by provider, model, and registrationKey",
     () =>
       [
-        ModelRegistry.memoryLayer(),
+        ModelRegistry.layerMemory(),
         Effect.gen(function* () {
           const first = yield* ModelRegistry.registration({
             provider: "test",
@@ -148,7 +144,7 @@ describe("ModelRegistry", () => {
           expect(registrations[0]?.metadata).toEqual({ revision: 2 })
           expect(registrations[1]?.registrationKey).toBe("eu")
 
-          const keyedResponse = yield* ModelRegistry.provide(
+          const keyedResponse = yield* ModelRegistry.operate(
             { provider: "test", model: "deterministic", registrationKey: "eu" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
@@ -171,11 +167,11 @@ describe("ModelRegistry", () => {
           ]),
         ]),
         Effect.gen(function* () {
-          const first = yield* ModelRegistry.provide(
+          const first = yield* ModelRegistry.operate(
             { provider: "prov-a", model: "model-a" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
-          const second = yield* ModelRegistry.provide(
+          const second = yield* ModelRegistry.operate(
             { provider: "prov-b", model: "model-b" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
@@ -254,7 +250,7 @@ describe("ModelRegistry", () => {
         ]),
         Effect.gen(function* () {
           const registrations = yield* ModelRegistry.registrations()
-          const response = yield* ModelRegistry.provide(
+          const response = yield* ModelRegistry.operate(
             { provider: "test", model: "deterministic" },
             LanguageModel.generateText({ prompt: "hello" }),
           )
@@ -270,7 +266,7 @@ describe("ModelRegistry", () => {
     "bounds concurrent provides to maxConcurrentModelCalls",
     () =>
       [
-        ModelRegistry.memoryLayer([], { maxConcurrentModelCalls: 1 }),
+        ModelRegistry.layerMemory([], { maxConcurrentModelCalls: 1 }),
         Effect.gen(function* () {
           const registration = yield* ModelRegistry.registration({
             provider: "test",
@@ -281,7 +277,7 @@ describe("ModelRegistry", () => {
           const entered = yield* Ref.make(0)
           const firstEntered = yield* Deferred.make<void>()
           const gate = yield* Deferred.make<void>()
-          const call = ModelRegistry.provide(
+          const call = ModelRegistry.operate(
             { provider: "test", model: "deterministic" },
             Ref.updateAndGet(entered, (count) => count + 1).pipe(
               Effect.tap((count) => (count === 1 ? Deferred.succeed(firstEntered, undefined) : Effect.void)),

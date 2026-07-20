@@ -1,7 +1,8 @@
 import { expect, layer } from "@effect/vitest"
-import { Context, Deferred, Effect, Fiber, Layer, Ref, Scope, Stream } from "effect"
+import { Context, Deferred, Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Memory } from "@batonfx/core"
+import { expectTypeOf } from "vitest"
 import { WorkingMemory } from "../src/index"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
@@ -44,6 +45,14 @@ const summaryModel = Layer.effect(
     streamText: () => Stream.empty,
   }),
 )
+
+const widenedSummaryOptions: WorkingMemory.Options = { summarize: {} }
+expectTypeOf(WorkingMemory.layer(widenedSummaryOptions)).toEqualTypeOf<
+  Layer.Layer<Memory.Memory, never, WorkingMemory.SummaryModel>
+>()
+expectTypeOf(WorkingMemory.make(widenedSummaryOptions)).toEqualTypeOf<
+  Effect.Effect<Memory.Interface, never, WorkingMemory.SummaryModel>
+>()
 
 layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
   it.effect("does not recursively remember recalled context while retaining identical authored text", () =>
@@ -174,7 +183,12 @@ layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
   )
 })
 
-layer(WorkingMemory.layer({ maxMessages: 2, summarize: { model: summaryModel } }))((it) => {
+layer(
+  WorkingMemory.layer({ maxMessages: 2, summarize: {} }).pipe(
+    Layer.provide(WorkingMemory.summaryModelLayer),
+    Layer.provide(summaryModel),
+  ),
+)((it) => {
   it.effect("keeps repeated Agent runs bounded and excludes recalled context from summary overflow", () =>
     Effect.gen(function* () {
       summaryCalls = 0
@@ -278,46 +292,6 @@ layer(Layer.empty)((it) => {
       const memoryLayer = WorkingMemory.layer({ maxMessages: 2, summarize: {} }).pipe(
         Layer.provide(WorkingMemory.summaryModelLayer.pipe(Layer.provide(model))),
       )
-
-      yield* Effect.scoped(
-        Layer.build(memoryLayer).pipe(
-          Effect.flatMap((context) =>
-            Effect.gen(function* () {
-              const memory = yield* Memory.Memory
-              yield* rememberOverflow(memory, prompt(user("one"), assistant("two"), user("three")))
-              yield* rememberOverflow(memory, prompt(user("one"), assistant("two"), user("three"), assistant("four")))
-            }).pipe(Effect.provide(context)),
-          ),
-        ),
-      )
-
-      expect(yield* Ref.get(acquisitions)).toBe(1)
-      expect(yield* Ref.get(calls)).toBe(2)
-      expect(yield* Ref.get(releases)).toBe(1)
-    }),
-  )
-
-  it.effect("acquires the deprecated layer-valued model once in the working-memory scope", () =>
-    Effect.gen(function* () {
-      const acquisitions = yield* Ref.make(0)
-      const releases = yield* Ref.make(0)
-      const calls = yield* Ref.make(0)
-      const service = yield* LanguageModel.make({
-        generateText: () =>
-          Ref.update(calls, (count) => count + 1).pipe(Effect.as([{ type: "text" as const, text: "legacy-summary" }])),
-        streamText: () => Stream.empty,
-      })
-      const model = Layer.effect(
-        LanguageModel.LanguageModel,
-        Effect.acquireRelease(Ref.update(acquisitions, (count) => count + 1).pipe(Effect.as(service)), () =>
-          Ref.update(releases, (count) => count + 1),
-        ),
-      )
-      const options = { maxMessages: 2, summarize: { model, prompt: "Preserve facts." } }
-      const memoryLayer: Layer.Layer<Memory.Memory> = WorkingMemory.layer(options)
-      const makeEffect: Effect.Effect<Memory.Interface, never, Scope.Scope> = WorkingMemory.make(options)
-
-      expect(makeEffect).toBeDefined()
 
       yield* Effect.scoped(
         Layer.build(memoryLayer).pipe(

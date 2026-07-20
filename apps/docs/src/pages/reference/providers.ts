@@ -167,11 +167,11 @@ export const providersReference = definePage({
     ),
     callout(
       "warning",
-      "Registry layers require ModelRegistry.provide",
+      "Registry layers require ModelRegistry.operate",
       "All ",
       code("with*"),
       " helpers return registry layers, not LanguageModel layers. Wrap the run in ",
-      code("ModelRegistry.provide({ provider, model }, effect)"),
+      code("ModelRegistry.operate({ provider, model }, effect)"),
       " to supply the actual model per run.",
     ),
     h2("deterministic", "Deterministic"),

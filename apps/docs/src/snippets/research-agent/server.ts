@@ -90,7 +90,7 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "research-agent" }).pipe
 
 export const sessionRegistryLayer = SessionRegistry.layerMemory({ agent, stripTranscripts: true }).pipe(
   Layer.provide(
-    Layer.mergeAll(modelLayer, toolExecutorLayer, approvalsLayer, ModelMiddleware.identityLayer, persistenceLayer),
+    Layer.mergeAll(modelLayer, toolExecutorLayer, approvalsLayer, ModelMiddleware.layerIdentity, persistenceLayer),
   ),
 )
 

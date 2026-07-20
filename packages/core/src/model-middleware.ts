@@ -31,12 +31,6 @@ export class ModelMiddleware extends Context.Service<ModelMiddleware, ReadonlyAr
 /** @experimental Identity chain — the default. */
 export const layerIdentity: Layer.Layer<ModelMiddleware> = Layer.succeed(ModelMiddleware, [])
 
-/**
- * @experimental
- * @deprecated Use {@link layerIdentity}. This alias will not be removed before 1.0.0 and only in a separately planned major release.
- */
-export const identityLayer: typeof layerIdentity = layerIdentity
-
 /** @experimental Provide an explicit chain. */
 export const layer = (middleware: ReadonlyArray<Middleware>): Layer.Layer<ModelMiddleware> =>
   Layer.succeed(ModelMiddleware, middleware)

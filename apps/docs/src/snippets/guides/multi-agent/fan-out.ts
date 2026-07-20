@@ -24,7 +24,7 @@ const program = Handoff.fanOut(children, { concurrency: 2 }).pipe(
       modelLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("fanOut children have no tools") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

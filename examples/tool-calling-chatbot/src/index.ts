@@ -51,7 +51,7 @@ const program = Effect.gen(function* () {
       }),
       toolkitLayer,
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

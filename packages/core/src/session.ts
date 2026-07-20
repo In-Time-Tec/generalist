@@ -486,12 +486,6 @@ export const layerMemory: Layer.Layer<SessionStore> = Layer.effect(
   ),
 )
 
-/**
- * @experimental
- * @deprecated Use {@link layerMemory}. This alias will not be removed before 1.0.0 and only in a separately planned major release.
- */
-export const memoryLayer: typeof layerMemory = layerMemory
-
 /** @experimental */
 export const testLayer = (implementation: Interface): Layer.Layer<SessionStore> =>
   Layer.succeed(SessionStore, SessionStore.of(implementation))

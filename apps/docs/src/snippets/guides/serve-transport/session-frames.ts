@@ -23,7 +23,7 @@ const registryLayer = SessionRegistry.layerMemory({ agent }).pipe(
       modelLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       persistenceLayer,
     ),
   ),

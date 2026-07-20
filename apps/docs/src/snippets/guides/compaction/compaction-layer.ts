@@ -21,7 +21,7 @@ export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.Lang
     Layer.mergeAll(
       ToolExecutor.testLayer({ execute: () => Effect.die("no tools in this example") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       compactionLayer,
       ToolOutput.layerMemory,
     ),

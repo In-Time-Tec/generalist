@@ -9,7 +9,7 @@ const providerLayer = Presets.withGoogleAiStudioFetch({
   apiKey: Config.redacted("GOOGLE_AI_STUDIO_API_KEY"),
 })
 
-const program = ModelRegistry.provide(
+const program = ModelRegistry.operate(
   { provider: "google", model: "gemini-2.0-flash" },
   Agent.generate(agent, { prompt: "Summarize the Effect Layer type in one sentence." }),
 ).pipe(
@@ -19,7 +19,7 @@ const program = ModelRegistry.provide(
       providerLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

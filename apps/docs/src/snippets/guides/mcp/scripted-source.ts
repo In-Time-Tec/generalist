@@ -52,7 +52,7 @@ const program = Effect.gen(function* () {
   const agent = Agent.make({ name: "mcp-agent", toolkit: mcpToolkit })
   const result = yield* Agent.generate(agent, { prompt: "Find the setup docs" }).pipe(
     Effect.provide(
-      Layer.mergeAll(modelLayer, toolkitLayer(source), Approvals.autoApprove, ModelMiddleware.identityLayer),
+      Layer.mergeAll(modelLayer, toolkitLayer(source), Approvals.autoApprove, ModelMiddleware.layerIdentity),
     ),
   )
   yield* Console.log(result.text)

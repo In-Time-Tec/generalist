@@ -5,7 +5,7 @@ import { Deterministic } from "@batonfx/providers"
 const agent = Agent.make({ name: "eval-agent" })
 
 const program = Effect.gen(function* () {
-  const result = yield* ModelRegistry.provide(
+  const result = yield* ModelRegistry.operate(
     { provider: "deterministic", model: "local" },
     Agent.generate(agent, { prompt: "Say the deterministic answer." }),
   )
@@ -19,7 +19,7 @@ const program = Effect.gen(function* () {
       Deterministic.withDeterministic({ model: "local" }),
       ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

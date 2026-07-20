@@ -46,7 +46,7 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "transport-test" }).pipe
 )
 
 const dependencies = (streamText: ModelParams["streamText"]) =>
-  Layer.mergeAll(modelLayer(streamText), Approvals.autoApprove, ModelMiddleware.identityLayer, persistenceLayer)
+  Layer.mergeAll(modelLayer(streamText), Approvals.autoApprove, ModelMiddleware.layerIdentity, persistenceLayer)
 
 const baseLayers = <Tools extends Record<string, Tool.Any>>(
   agent: Agent.Agent<Tools, LanguageModel.LanguageModel>,
@@ -191,7 +191,7 @@ describe("SessionRegistry.layerMemory", () => {
             onConcurrentMessage: "enqueue",
           }).pipe(
             Layer.provide(
-              Layer.mergeAll(fixture.layer, Approvals.autoApprove, ModelMiddleware.identityLayer, persistenceLayer),
+              Layer.mergeAll(fixture.layer, Approvals.autoApprove, ModelMiddleware.layerIdentity, persistenceLayer),
             ),
           ),
         ),
@@ -744,7 +744,7 @@ describe("SessionRegistry.layerMemory", () => {
                   }),
               }),
               Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-token" }) }),
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
           ),
@@ -797,7 +797,7 @@ describe("SessionRegistry.layerMemory", () => {
                   }),
               }),
               Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
           ),
@@ -873,7 +873,7 @@ describe("SessionRegistry.layerMemory", () => {
                   }),
               }),
               Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
           ),
@@ -935,7 +935,7 @@ describe("SessionRegistry.layerMemory", () => {
                   }),
               }),
               Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
           ),
@@ -990,7 +990,7 @@ describe("SessionRegistry.layerMemory", () => {
                   ),
                 await: () => Effect.succeedNone,
               }),
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
           ),
@@ -1061,7 +1061,7 @@ describe("SessionRegistry.layerMemory", () => {
               }),
               Permissions.fromRuleset({ rules: [], fallback: "ask" }),
               Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "dynamic-approval" }) }),
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
           ),
@@ -1115,7 +1115,7 @@ describe("SessionRegistry.layerMemory", () => {
                 remember: () => Effect.void,
                 rules: Effect.succeed([{ pattern: "remembered_ask", level: "ask" }]),
               }),
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
           ),
@@ -1191,7 +1191,7 @@ describe("SessionRegistry.layerMemory", () => {
                   }),
               }),
               Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-token" }) }),
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
           ),
@@ -1246,7 +1246,7 @@ describe("SessionRegistry.layerMemory", () => {
                     return { _tag: "Pending" as const, token: approvalChecks === 1 ? "approval-token" : "second-token" }
                   }),
               }),
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
           ),

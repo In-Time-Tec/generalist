@@ -19,7 +19,7 @@ const document = (
   embedding,
 })
 
-layer(VectorStore.memoryLayer)("VectorStore", (it) => {
+layer(VectorStore.layerMemory)("VectorStore", (it) => {
   it.effect("ranks matching-key documents by cosine score", () =>
     Effect.gen(function* () {
       const store = yield* VectorStore.VectorStore

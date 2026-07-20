@@ -4,7 +4,7 @@ import { Deterministic } from "@batonfx/providers"
 
 const agent = Agent.make({ name: "keyless-agent" })
 
-const program = ModelRegistry.provide(
+const program = ModelRegistry.operate(
   { provider: "deterministic", model: "local" },
   Agent.generate(agent, { prompt: "Say the deterministic answer." }),
 ).pipe(
@@ -14,7 +14,7 @@ const program = ModelRegistry.provide(
       Deterministic.withDeterministic({ model: "local" }),
       ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

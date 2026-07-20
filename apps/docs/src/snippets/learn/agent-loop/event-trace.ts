@@ -50,7 +50,7 @@ const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ search_docs: () => Effect.succeed("TurnPolicy is a plain value with a default of forever.") }),
   Approvals.autoApprove,
-  ModelMiddleware.identityLayer,
+  ModelMiddleware.layerIdentity,
 )
 
 const describe = (event: AgentEvent.Event): string =>

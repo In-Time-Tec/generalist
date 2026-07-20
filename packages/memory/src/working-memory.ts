@@ -1,11 +1,9 @@
-import { Context, Effect, HashMap, Layer, Scope, SynchronizedRef } from "effect"
+import { Context, Effect, HashMap, Layer, SynchronizedRef } from "effect"
 import { LanguageModel, Prompt, Toolkit } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
 
 /** @experimental */
 export interface SummarizeOptions {
-  /** @deprecated Provide `SummaryModel` through Effect composition instead. */
-  readonly model: Layer.Layer<LanguageModel.LanguageModel>
   readonly prompt?: string
 }
 
@@ -13,15 +11,6 @@ export interface SummarizeOptions {
 export interface Options {
   readonly maxMessages?: number
   readonly summarize?: SummarizeOptions
-}
-
-/** @experimental */
-export interface ComposedOptions {
-  readonly maxMessages?: number
-  readonly summarize: {
-    readonly model?: never
-    readonly prompt?: string
-  }
 }
 
 /** @experimental */
@@ -149,16 +138,8 @@ const summarizeOverflow = (
       Effect.mapError(memoryError),
     )
 
-const resolveSummaryModel = (
-  options: Options | ComposedOptions,
-): Effect.Effect<LanguageModel.Service | void, never, SummaryModel | Scope.Scope> =>
-  options.summarize === undefined
-    ? Effect.void
-    : "model" in options.summarize
-      ? Layer.build(options.summarize.model).pipe(
-          Effect.map((context) => Context.get(context, LanguageModel.LanguageModel)),
-        )
-      : SummaryModel
+const resolveSummaryModel = (options: Options): Effect.Effect<LanguageModel.Service | void, never, SummaryModel> =>
+  options.summarize === undefined ? Effect.void : SummaryModel
 
 type WithoutSummaryOptions = Options & { readonly summarize?: undefined }
 
@@ -175,18 +156,14 @@ const recallItems = (state: KeyState): ReadonlyArray<Memory.Item> => [
 ]
 
 /** @experimental */
-export function make(options: ComposedOptions): Effect.Effect<Memory.Interface, never, SummaryModel>
+export function make(
+  options: Options & { readonly summarize: SummarizeOptions },
+): Effect.Effect<Memory.Interface, never, SummaryModel>
 /** @experimental */
 export function make(options?: WithoutSummaryOptions): Effect.Effect<Memory.Interface>
 /** @experimental */
-export function make(options: Options): Effect.Effect<Memory.Interface, never, Scope.Scope>
-/** @experimental */
-export function make(
-  options: Options | ComposedOptions,
-): Effect.Effect<Memory.Interface, never, SummaryModel | Scope.Scope>
-export function make(
-  options: Options | ComposedOptions = {},
-): Effect.Effect<Memory.Interface, never, SummaryModel | Scope.Scope> {
+export function make(options: Options): Effect.Effect<Memory.Interface, never, SummaryModel>
+export function make(options: Options = {}): Effect.Effect<Memory.Interface, never, SummaryModel> {
   return Effect.gen(function* () {
     const summaryModel = yield* resolveSummaryModel(options)
     const states = yield* SynchronizedRef.make(HashMap.empty<string, KeyState>())
@@ -260,9 +237,13 @@ export function make(
 export const makeWorkingMemory = make
 
 /** @experimental */
-export function layer(options: ComposedOptions): Layer.Layer<Memory.Memory, never, SummaryModel>
+export function layer(
+  options: Options & { readonly summarize: SummarizeOptions },
+): Layer.Layer<Memory.Memory, never, SummaryModel>
 /** @experimental */
-export function layer(options?: Options): Layer.Layer<Memory.Memory>
-export function layer(options: Options | ComposedOptions = {}): Layer.Layer<Memory.Memory, never, SummaryModel> {
+export function layer(options?: WithoutSummaryOptions): Layer.Layer<Memory.Memory>
+/** @experimental */
+export function layer(options: Options): Layer.Layer<Memory.Memory, never, SummaryModel>
+export function layer(options: Options = {}): Layer.Layer<Memory.Memory, never, SummaryModel> {
   return Layer.effect(Memory.Memory, make(options).pipe(Effect.map(Memory.Memory.of)))
 }

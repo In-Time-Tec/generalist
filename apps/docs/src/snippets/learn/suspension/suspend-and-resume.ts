@@ -61,7 +61,7 @@ const layers = Layer.mergeAll(
       )
     },
   }),
-  ModelMiddleware.identityLayer,
+  ModelMiddleware.layerIdentity,
 )
 
 let transcript: Prompt.Prompt = Prompt.empty

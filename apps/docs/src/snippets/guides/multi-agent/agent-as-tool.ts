@@ -72,7 +72,7 @@ const program = Agent.generate(parent, { prompt: "Summarize the intro document."
       parentToolkit.toLayer({ summarize: () => Effect.die("agent tool bridge handles summarize") }),
       ToolExecutor.fromToolkit(summarizeToolkit),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

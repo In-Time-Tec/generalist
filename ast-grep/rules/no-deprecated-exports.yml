@@ -1,0 +1,9 @@
+id: no-deprecated-exports
+language: TypeScript
+severity: error
+message: Public package source must use one current contract; delete deprecated exports instead.
+rule:
+  kind: comment
+  regex: "@deprecated"
+files:
+  - "packages/*/src/**/*.ts"

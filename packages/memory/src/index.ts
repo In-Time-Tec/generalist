@@ -15,22 +15,28 @@ export interface CombinedOptions {
   readonly semantic?: import("./semantic-recall.js").Options
 }
 
-/** @experimental */
-export interface CombinedComposedOptions {
-  readonly working: import("./working-memory.js").ComposedOptions
-  readonly semantic?: import("./semantic-recall.js").Options
+type WithoutSummaryCombinedOptions = CombinedOptions & {
+  readonly working?: import("./working-memory.js").Options & { readonly summarize?: undefined }
 }
 
 /** @experimental */
 export function combinedLayer(
-  options: CombinedComposedOptions,
+  options: CombinedOptions & {
+    readonly working: import("./working-memory.js").Options & {
+      readonly summarize: import("./working-memory.js").SummarizeOptions
+    }
+  },
 ): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel>
 /** @experimental */
 export function combinedLayer(
-  options?: CombinedOptions,
+  options?: WithoutSummaryCombinedOptions,
 ): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel>
+/** @experimental */
 export function combinedLayer(
-  options: CombinedOptions | CombinedComposedOptions = {},
+  options: CombinedOptions,
+): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel>
+export function combinedLayer(
+  options: CombinedOptions = {},
 ): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel> {
   return Layer.effect(
     Memory.Memory,

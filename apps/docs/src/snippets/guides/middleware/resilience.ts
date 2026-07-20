@@ -9,7 +9,7 @@ const resilienceLayer = ModelResilience.layer({
   retrySchedule: Schedule.recurs(3),
 })
 
-const program = ModelRegistry.provide(
+const program = ModelRegistry.operate(
   { provider: "openrouter", model: "openai/gpt-4o-mini" },
   Agent.generate(agent, { prompt: "Summarize today's alerts." }),
 ).pipe(
@@ -22,7 +22,7 @@ const program = ModelRegistry.provide(
       }),
       ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       resilienceLayer,
     ),
   ),

@@ -346,7 +346,7 @@ const overflowModelLayer = (streamText: ModelParams["streamText"], generateText?
         AiError.isAiError(error) && error.module === "AgentTestLanguageModel" && error.reason._tag === "UnknownError"
           ? "context-overflow"
           : "other",
-    }).pipe(Effect.map((registration) => ModelRegistry.memoryLayer([Effect.succeed(registration)]))),
+    }).pipe(Effect.map((registration) => ModelRegistry.layerMemory([Effect.succeed(registration)]))),
   )
 
 const retryTransientModelError = ModelResilience.layer({
@@ -555,7 +555,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "invalid-tool-output-limit-agent" })
@@ -586,7 +586,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "invalid-progress-capacity-agent" })
@@ -617,7 +617,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         for (const concurrency of invalidValues) {
@@ -645,7 +645,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "invalid-context-window-agent" })
@@ -683,7 +683,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           ),
           unusedExecutor,
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
           const agent = Agent.make({
@@ -740,7 +740,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             provider: "test",
             model: "agent-default",
             layer: modelLayer(() => Stream.make(textDelta("registry done"))),
-          }).pipe(Effect.map((registration) => ModelRegistry.memoryLayer([Effect.succeed(registration)]))),
+          }).pipe(Effect.map((registration) => ModelRegistry.layerMemory([Effect.succeed(registration)]))),
         ),
         Effect.gen(function* () {
           const agent = Agent.make({
@@ -794,10 +794,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelRegistry.registration({ ...selection, layer: selectedModel }).pipe(
           Effect.map((registration) =>
             Layer.mergeAll(
-              ModelRegistry.memoryLayer([Effect.succeed(registration)], { maxConcurrentModelCalls: 1 }),
+              ModelRegistry.layerMemory([Effect.succeed(registration)], { maxConcurrentModelCalls: 1 }),
               unusedExecutor,
               Approvals.autoApprove,
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
             ),
           ),
         ),
@@ -1039,7 +1039,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Instructions.layer([
           Instructions.staticSource("first", "first"),
           Instructions.staticSource("second", "second"),
@@ -1065,7 +1065,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Instructions.layer([Instructions.staticSource("registry", "registry")]),
       ),
       Effect.gen(function* () {
@@ -1090,7 +1090,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Instructions.layer([Instructions.staticSource("registry", "registry")]),
       ),
       Effect.gen(function* () {
@@ -1123,7 +1123,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Instructions.layer([Instructions.staticSource("empty", "")]),
       ),
       Effect.gen(function* () {
@@ -1180,7 +1180,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         SkillSource.fromSkills([review, deploy]),
       ),
       Effect.gen(function* () {
@@ -1467,7 +1467,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "no-skills-agent", instructions: "plain instructions" })
@@ -1493,7 +1493,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "empty-system-agent", instructions: "" })
@@ -1515,7 +1515,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         modelLayer(() => Stream.fromIterable([textDelta("done"), finishPart("stop", reportedUsage)])),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "usage-agent" })
@@ -1559,7 +1559,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -1594,7 +1594,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             : Stream.make(textDelta("authorized"))
         }),
         echoExecutor,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Layer.succeed(AuthorizationDependency, "available"),
       ),
       Effect.gen(function* () {
@@ -1640,7 +1640,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "context-agent", toolkit: Toolkit.make(echoTool) })
@@ -1697,7 +1697,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
                 }),
             }),
             Approvals.autoApprove,
-            ModelMiddleware.identityLayer,
+            ModelMiddleware.layerIdentity,
           )
         }),
       ),
@@ -1761,7 +1761,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
                 }),
             }),
             Approvals.autoApprove,
-            ModelMiddleware.identityLayer,
+            ModelMiddleware.layerIdentity,
           )
         }),
       ),
@@ -1814,7 +1814,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "lossy-progress-agent", toolkit: Toolkit.make(echoTool) })
@@ -1885,7 +1885,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
                 }).pipe(Effect.ensuring(Deferred.succeed(executionFinalized, undefined))),
             }),
             Approvals.autoApprove,
-            ModelMiddleware.identityLayer,
+            ModelMiddleware.layerIdentity,
           )
         }),
       ),
@@ -1947,7 +1947,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "progress-failure-agent", toolkit: Toolkit.make(echoTool) })
@@ -2006,7 +2006,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
                 }).pipe(Effect.ensuring(Deferred.succeed(executionFinalized, undefined))),
             }),
             Approvals.autoApprove,
-            ModelMiddleware.identityLayer,
+            ModelMiddleware.layerIdentity,
           )
         }),
       ),
@@ -2064,7 +2064,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             : Stream.make(textDelta("after handler"))
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "toolkit-context-agent", toolkit })
@@ -2098,7 +2098,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             return Effect.succeed({ _tag: "Denied" })
           },
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "gated-session-agent", toolkit: Toolkit.make(gatedTool) })
@@ -2128,7 +2128,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Approvals.testLayer({
           check: () => (approval === undefined ? Effect.die("missing approval Deferred") : Deferred.await(approval)),
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         approval = yield* Deferred.make<Approvals.Decision>()
@@ -2161,7 +2161,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ToolExecutor.testLayer({ execute: () => Effect.die("permission-denied call must not execute") }),
         Approvals.testLayer({ check: () => Effect.die("permission-denied call must not ask approvals") }),
         Permissions.fromRuleset({ rules: [{ pattern: "gated", level: "deny" }] }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "permission-deny-agent", toolkit: Toolkit.make(gatedTool) })
@@ -2196,7 +2196,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ToolExecutor.testLayer({ execute: () => Effect.die("approval-denied call must not execute") }),
         Approvals.denyAll,
         Permissions.allowAll,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "permission-allow-agent", toolkit: Toolkit.make(gatedTool) })
@@ -2225,7 +2225,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ToolExecutor.testLayer({ execute: () => Effect.die("permission ask must not execute") }),
         Approvals.testLayer({ check: () => Effect.die("permission ask must not ask approvals") }),
         Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "permission-ask-agent", toolkit: Toolkit.make(gatedTool) })
@@ -2271,7 +2271,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           ruleset: { rules: [], fallback: "ask" },
           onAsk: () => Effect.succeed({ _tag: "Approved" }),
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "permission-approved-agent", toolkit: Toolkit.make(gatedTool) })
@@ -2314,7 +2314,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               remembered.push(rule)
             }),
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "permission-always-agent", toolkit: Toolkit.make(gatedTool) })
@@ -2367,7 +2367,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         }),
         Permissions.ruleStoreMemory(),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "remembered-always-agent", toolkit: Toolkit.make(echoTool) })
@@ -2510,7 +2510,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "no-steering-agent" })
@@ -2531,10 +2531,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           calls += 1
           return Stream.make(textDelta("done"))
         }),
-        Session.memoryLayer,
+        Session.layerMemory,
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "no-compaction-agent" })
@@ -2558,11 +2558,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           calls += 1
           return Stream.make(textDelta("done"))
         }),
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const session = yield* Session.SessionStore
@@ -2604,7 +2604,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "proactive-compaction-agent" })
@@ -2660,7 +2660,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "current-prompt-compaction-agent", toolkit: Toolkit.make(echoTool) })
@@ -2704,7 +2704,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         characterTokenizerLayer,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "post-compaction-measurement-agent", toolkit: Toolkit.make(echoTool) })
@@ -2747,9 +2747,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         echoExecutor,
         Approvals.autoApprove,
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "default-compaction-agent", toolkit: Toolkit.make(echoTool) })
@@ -2790,9 +2790,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         echoExecutor,
         Approvals.autoApprove,
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "system-compaction-agent", toolkit: Toolkit.make(echoTool) })
@@ -2828,7 +2828,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             : Stream.make(textDelta("mixed complete"))
         }),
         echoExecutor,
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.testLayer({
           maybeCompact: () =>
             Effect.sync(() => {
@@ -2853,7 +2853,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "mixed-checkpoint-agent", toolkit: Toolkit.make(echoTool) })
@@ -2889,12 +2889,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("truncated"))),
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.testLayer(Compaction.truncate(1)),
         tokenizer,
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
@@ -2935,7 +2935,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.die("invalid projection must fail before the model")),
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.testLayer({
           maybeCompact: () =>
             Effect.succeed(
@@ -2948,7 +2948,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const failure = yield* Agent.stream(Agent.make({ name: "orphan-checkpoint-agent" }), {
@@ -2989,7 +2989,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.die("invalid projection must fail before the model")),
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.testLayer({
           maybeCompact: () =>
             Effect.succeed(
@@ -3002,7 +3002,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const failure = yield* Agent.stream(Agent.make({ name: "duplicate-tool-checkpoint-agent" }), {
@@ -3047,7 +3047,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.empty),
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.testLayer({
           maybeCompact: () =>
             Effect.succeed(
@@ -3060,7 +3060,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const events = yield* Stream.runCollect(
@@ -3094,11 +3094,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.empty),
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const session = yield* Session.SessionStore
@@ -3145,9 +3145,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         echoExecutor,
         Approvals.autoApprove,
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.layer({ contextWindow: 20_000, reserveTokens: 1, keepRecentTokens: 1 }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reserve-compaction-agent", toolkit: Toolkit.make(echoTool) })
@@ -3189,10 +3189,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               })
             }),
         }),
-        Session.memoryLayer,
+        Session.layerMemory,
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const session = yield* Session.SessionStore
@@ -3232,7 +3232,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reactive-compaction-fail-agent", model: overflowSelection })
@@ -3262,7 +3262,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "partial-overflow-agent", model: overflowSelection })
@@ -3299,7 +3299,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -3331,7 +3331,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "unchanged-overflow-agent", model: overflowSelection })
@@ -3359,7 +3359,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "terminal-overflow-agent", model: overflowSelection })
@@ -3387,7 +3387,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         echoExecutor,
         Approvals.autoApprove,
         Steering.layer({ steering: { mode: "all" } }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const steering = yield* Steering.Steering
@@ -3437,7 +3437,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         echoExecutor,
         Approvals.autoApprove,
         Steering.layer({ steering: { mode: "one-at-a-time" } }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const steering = yield* Steering.Steering
@@ -3468,7 +3468,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.autoApprove,
         Steering.layer(),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const steering = yield* Steering.Steering
@@ -3502,7 +3502,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.autoApprove,
         Steering.layer({ followUp: { mode: "all" } }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const steering = yield* Steering.Steering
@@ -3535,7 +3535,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.autoApprove,
         Steering.layer(),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const steering = yield* Steering.Steering
@@ -3566,7 +3566,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.autoApprove,
         Steering.layer(),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const currentStarted = yield* Deferred.make<void>()
@@ -3605,7 +3605,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         modelLayer(() => Stream.make(toolCallPart("tool-call-waiting-approval", "waiting-approval", { text: "wait" }))),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const currentStarted = yield* Deferred.make<void>()
@@ -3638,7 +3638,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const currentStarted = yield* Deferred.make<void>()
@@ -3677,7 +3677,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const currentStarted = yield* Deferred.make<void>()
@@ -3709,7 +3709,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const currentStarted = yield* Deferred.make<void>()
@@ -3753,7 +3753,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
                   }),
               }),
               Approvals.autoApprove,
-              ModelMiddleware.identityLayer,
+              ModelMiddleware.layerIdentity,
             )
           }),
         ),
@@ -3796,7 +3796,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "spill-agent", toolkit: Toolkit.make(echoTool) })
@@ -3870,10 +3870,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             }),
           forget: () => Effect.void,
         }),
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -3937,7 +3937,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             ),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         yield* Stream.runDrain(
@@ -3996,7 +3996,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             ),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         allStarted = yield* Deferred.make<void>()
@@ -4105,7 +4105,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           forget: () => Effect.void,
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         persistence,
       ),
       Effect.gen(function* () {
@@ -4161,7 +4161,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "multi-usage-agent", toolkit: Toolkit.make(echoTool) })
@@ -4195,11 +4195,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           () => Stream.make(textDelta("normal answer")),
           () => Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)]),
         ),
-        Session.memoryLayer,
+        Session.layerMemory,
         Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-agent" })
@@ -4246,7 +4246,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-span-agent" })
@@ -4299,7 +4299,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-lazy-span-agent" })
@@ -4331,7 +4331,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           ),
           unusedExecutor,
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
           const agent = Agent.make({ name: "generate-object-agent" })
@@ -4366,7 +4366,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-tool-agent", toolkit: Toolkit.make(echoTool) })
@@ -4419,7 +4419,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-decode-agent" })
@@ -4459,7 +4459,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-defect-agent" })
@@ -4498,7 +4498,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         structuredStarted = yield* Deferred.make<void>()
@@ -4555,7 +4555,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "resume-structured-agent", toolkit: Toolkit.make(echoTool) })
@@ -4625,7 +4625,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.autoApprove,
         retryTransientModelError,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "resilient-structured-agent" })
@@ -4654,7 +4654,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.autoApprove,
         ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "terminal-structured-overflow-agent", model: overflowSelection })
@@ -4679,7 +4679,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "error-agent" })
@@ -4705,7 +4705,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         modelLayer(() => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.fail(streamFailure)))),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "channel-error-agent" })
@@ -4726,7 +4726,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         modelLayer(() => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(cause)))),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const events: Array<AgentEvent.Event> = []
@@ -4786,7 +4786,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "no-model-retry-agent" })
@@ -4811,7 +4811,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.autoApprove,
         retryTransientModelError,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "model-retry-agent" })
@@ -4843,7 +4843,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             return "terminal"
           },
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "model-terminal-failure-agent" })
@@ -4869,7 +4869,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         unusedExecutor,
         Approvals.autoApprove,
         ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "model-partial-failure-agent" })
@@ -4901,7 +4901,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             return "transient"
           },
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "model-in-band-error-agent" })
@@ -4943,7 +4943,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           retrySchedule: Schedule.recurs(1),
           classify: (error) => (error === overrideOverflow ? "transient" : "terminal"),
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -4974,7 +4974,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -5006,7 +5006,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       ),
       echoExecutor,
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
     Effect.gen(function* () {
       const agent = Agent.make({
@@ -5038,7 +5038,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const defaultPolicyAgent = Agent.make({ name: "default-policy-agent", toolkit: Toolkit.make(echoTool) })
@@ -5070,7 +5070,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "natural-completion-agent" })
@@ -5098,7 +5098,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const currentDeepTurns = yield* Deferred.make<void>()
@@ -5130,7 +5130,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         budgetLayer,
       ),
       Effect.gen(function* () {
@@ -5169,7 +5169,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const reasons: ReadonlyArray<Exclude<TurnPolicy.StopReason, { readonly _tag: "TurnLimit" }>> = [
@@ -5202,7 +5202,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         modelLayer(() => Stream.make(toolCallPart("tool-call-policy-failure", "echo", { text: "call" }))),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -5219,7 +5219,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "fails typed when a stale reasonless policy bypasses the migration adapter", () => {
+  ItLayer.make(it, "fails typed when a policy returns a reasonless Stop", () => {
     const policy = TurnPolicy.recurs(0)
     Reflect.set(policy, "decide", () => Effect.succeed({ _tag: "Stop" }))
     return [
@@ -5227,14 +5227,14 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         modelLayer(() => Stream.make(toolCallPart("tool-call-stale-policy", "echo", { text: "call" }))),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "stale-policy-agent", toolkit: Toolkit.make(echoTool), policy })
         const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "use stale policy" })))
         expect(failure._tag).toBe("@batonfx/core/TurnPolicyError")
         if (failure._tag === "@batonfx/core/TurnPolicyError") {
-          expect(failure.message).toContain("TurnPolicy.fromLegacy")
+          expect(failure.message).toContain("Stop decisions must include a reason")
         }
       }),
     ] as const
@@ -5255,7 +5255,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -5320,7 +5320,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           modelLayer(() => Stream.make(toolCallPart("tool-call-wait", "echo", { text: "hold" }))),
           ToolExecutor.testLayer({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
           const agent = Agent.make({
@@ -5416,7 +5416,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         executor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -5485,7 +5485,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         modelLayer(() => Stream.make(toolCallPart("bound-resume", "echo", { text: "original" }))),
         executor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "bound-resume-token-agent", toolkit: Toolkit.make(echoTool) })
@@ -5543,7 +5543,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "authorization-resume-agent", toolkit: Toolkit.make(gatedTool) })
@@ -5593,7 +5593,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -5651,7 +5651,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           return Stream.make(textDelta("must not run"))
         }),
         ToolExecutor.testLayer({ execute: () => Effect.die("missing checkpoint must not execute") }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const staleCall = toolCallPart("stale-call", "echo", { text: "stale" })
@@ -5696,7 +5696,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("actual-call", "gated", { text: "actual" }))),
         ToolExecutor.testLayer({ execute: () => Effect.die("suspended call must not execute") }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -5726,7 +5726,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         modelLayer(() => Stream.make(toolCallPart("bound-call", "gated", { text: "original" }))),
         ToolExecutor.testLayer({ execute: () => Effect.die("substituted params must not execute") }),
         Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "bound-resume-agent", toolkit: Toolkit.make(gatedTool) })
@@ -5809,7 +5809,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         }),
         SkillSource.fromSkills([review]),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "resumable-skill-agent", policy })
@@ -5848,7 +5848,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           modelLayer(() => Stream.make(providerToolCallPart("provider-call", "gated", { text: "done upstream" }))),
           unusedExecutor,
           Approvals.testLayer({ check: () => Effect.die("approvals must not be consulted") }),
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
           const agent = Agent.make({
@@ -5902,7 +5902,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             )
           },
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reused-provider-call-agent", toolkit: Toolkit.make(gatedTool) })
@@ -5984,7 +5984,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           },
         }),
         Approvals.testLayer({ check: () => Effect.die("approvals must not be consulted") }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "dynamic-approval-agent", toolkit: Toolkit.make(dynamicTool) })
@@ -6026,7 +6026,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             return Effect.succeed({ _tag: "Denied" })
           },
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "dynamic-gated-agent", toolkit: Toolkit.make(dynamicTool) })
@@ -6086,7 +6086,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             return Effect.succeed({ _tag: "Denied" })
           },
         }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -6122,7 +6122,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -6152,7 +6152,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         unusedExecutor,
         Approvals.denyAll,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -6185,7 +6185,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           modelLayer(() => Stream.make(toolCallPart("tool-call-pending", "gated", { text: "please" }))),
           unusedExecutor,
           Approvals.testLayer({ check: () => Effect.succeed({ _tag: "Pending", token: "approval-1" }) }),
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
           const agent = Agent.make({
@@ -6217,7 +6217,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         }),
         echoExecutor,
         Approvals.testLayer({ check: () => Effect.die("approvals must not be consulted") }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({

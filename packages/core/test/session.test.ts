@@ -27,7 +27,7 @@ describe("Session", () => {
     "starts empty",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
 
@@ -43,7 +43,7 @@ describe("Session", () => {
     "appends linear messages and projects them in order",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
 
@@ -65,7 +65,7 @@ describe("Session", () => {
     "moves the leaf pointer to fork a branch",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
 
@@ -87,7 +87,7 @@ describe("Session", () => {
     "projects the last compaction as a checkpoint plus kept entries",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
 
@@ -118,7 +118,7 @@ describe("Session", () => {
     "projects lossless memory context across compaction without recalled or synthetic entries",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
 
@@ -151,7 +151,7 @@ describe("Session", () => {
     "uses the last compaction on a path",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
 
@@ -174,7 +174,7 @@ describe("Session", () => {
     "renders branch summaries as system notes",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
 
@@ -196,7 +196,7 @@ describe("Session", () => {
     "projects memory, skills, steering, tool calls, tool results, and handoffs as prompt context",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
           const toolCall = Prompt.makePart("tool-call", {
@@ -249,7 +249,7 @@ describe("Session", () => {
     "fails typed for unknown leaves and invalid compactions",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
 
@@ -272,7 +272,7 @@ describe("Session", () => {
     "appends exact checkpoints idempotently and rejects identity or leaf conflicts",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
           const source = yield* store.append({ _tag: "Message", message: user("source") })
@@ -314,7 +314,7 @@ describe("Session", () => {
     "retries an ambiguously interrupted checkpoint append without duplication",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
           const source = yield* store.append({ _tag: "Message", message: user("source") })
@@ -346,7 +346,7 @@ describe("Session", () => {
     "matches checkpoint identity structurally across reordered object keys",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
           const source = yield* store.append({ _tag: "Message", message: user("source") })
@@ -385,7 +385,7 @@ describe("Session", () => {
     "keeps active descendants on delayed retry and rejects checkpoints from abandoned branches",
     () =>
       [
-        Session.memoryLayer,
+        Session.layerMemory,
         Effect.gen(function* () {
           const store = yield* Session.SessionStore
           const source = yield* store.append({ _tag: "Message", message: user("source") })

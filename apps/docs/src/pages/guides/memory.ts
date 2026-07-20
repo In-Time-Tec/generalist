@@ -41,10 +41,10 @@ export const memory = definePage({
       "info",
       "Summarize the overflow",
       "Pass ",
-      code("summarize: { model }"),
+      code("summarize: {}"),
       " to ",
       code("WorkingMemory.layer"),
-      " and messages that fall out of the window are folded into a running summary instead of being dropped.",
+      " and provide `WorkingMemory.summaryModelLayer` with a language model. Messages that fall out of the window are folded into a running summary instead of being dropped.",
     ),
     h2("semantic-recall", "2. Add semantic recall for long-lived subjects"),
     p(
@@ -83,7 +83,7 @@ export const memory = definePage({
     codeBlock({ label: "pgvector-store.ts", source: pgvectorStore }),
     p(
       "The in-process ",
-      code("VectorStore.memoryLayer"),
+      code("VectorStore.layerMemory"),
       " remains the offline-safe default; swap layers, not call sites, when you move to Postgres.",
     ),
     h2("next-steps", "Next steps"),

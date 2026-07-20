@@ -226,7 +226,7 @@ test("multi-agent guide preserves the two-channel child-run contract", () => {
     "Effect.provide",
     "ToolExecutor.fromToolkit",
     "Approvals.autoApprove",
-    "ModelMiddleware.identityLayer",
+    "ModelMiddleware.layerIdentity",
   ]) {
     expect(multiAgent.markdown, marker).toContain(marker)
   }

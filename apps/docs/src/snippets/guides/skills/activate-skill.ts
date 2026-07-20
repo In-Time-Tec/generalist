@@ -54,7 +54,7 @@ const program = Effect.gen(function* () {
       modelLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("activate_skill is handled by the loop, not the executor") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       SkillSource.fromSkills([releaseNotesSkill]),
     ),
   ),

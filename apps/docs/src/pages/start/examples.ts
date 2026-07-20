@@ -29,7 +29,7 @@ export const examples = definePage({
           [
             "A deterministic no-credential smoke eval over ",
             code("Agent.generate"),
-            " using the ModelRegistry.provide pattern",
+            " using the ModelRegistry.operate pattern",
           ],
           [code("bun --cwd examples/eval-in-ci start")],
         ],

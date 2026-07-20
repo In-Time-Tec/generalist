@@ -142,27 +142,6 @@ describe("TurnPolicy snapshots", () => {
     })
   })
 
-  it.effect("adapts legacy reasonless stop decisions", () =>
-    Effect.gen(function* () {
-      const policy = TurnPolicy.fromLegacy(() => Effect.succeed({ _tag: "Stop" }))
-      const result = yield* policy.decide({ turn: 1, history: Prompt.empty, pendingToolResults: [] })
-      expect(result).toEqual({ _tag: "Stop", reason: { _tag: "Policy", detail: "Legacy policy stopped" } })
-      expect(policy.snapshot).toBeUndefined()
-    }),
-  )
-
-  it.effect("passes legacy Continue overrides through unchanged", () => {
-    const legacy = TurnPolicy.decision.continue({ instructions: "finish now" })
-    return Effect.gen(function* () {
-      const result = yield* TurnPolicy.fromLegacy(() => Effect.succeed(legacy)).decide({
-        turn: 1,
-        history: Prompt.empty,
-        pendingToolResults: [],
-      })
-      expect(result).toBe(legacy)
-    })
-  })
-
   it.effect("unions both policy requirements and evaluates only to the first stop", () => {
     let leftEvaluations = 0
     let rightEvaluations = 0

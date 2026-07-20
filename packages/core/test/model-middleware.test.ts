@@ -98,7 +98,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
           modelLayer(() => Stream.make(textDelta("plain output"))),
           unusedExecutor,
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
           const agent = Agent.make({ name: "identity-agent" })
@@ -219,7 +219,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
         Compaction.testLayer({
           maybeCompact: (request) => Effect.sync(() => compactionRequests.push(request)).pipe(Effect.as(Option.none())),
         }),
-        Session.memoryLayer,
+        Session.layerMemory,
         persistenceLayer,
       ),
       Effect.gen(function* () {
@@ -385,7 +385,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "non-adjacent-agent", toolkit: Toolkit.make(gatedEchoTool) })
@@ -439,7 +439,7 @@ layer(unusedToolHandlerLayer)("ModelMiddleware", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "local-duplicate-agent", toolkit })

@@ -135,12 +135,6 @@ export const merge: {
 /** @experimental Memory implementation that recalls and records nothing. */
 export const layerNoop: Layer.Layer<Memory> = Layer.succeed(Memory, Memory.of(noop))
 
-/**
- * @experimental
- * @deprecated Use {@link layerNoop}. This alias will not be removed before 1.0.0 and only in a separately planned major release.
- */
-export const noopLayer: typeof layerNoop = layerNoop
-
 /** @experimental */
 export const testLayer = (implementation: Interface): Layer.Layer<Memory> =>
   Layer.succeed(Memory, Memory.of(implementation))

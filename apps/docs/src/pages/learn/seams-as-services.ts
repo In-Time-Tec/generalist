@@ -98,7 +98,7 @@ export const seamsAsServices = definePage({
       " scripts tool outcomes, ",
       code("Approvals.testLayer"),
       " scripts decisions, ",
-      code("Session.memoryLayer"),
+      code("Session.layerMemory"),
       " keeps the event log in a ",
       code("Ref"),
       ", and a scripted ",

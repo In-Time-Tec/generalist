@@ -162,7 +162,7 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
           Handoff.supervisor({ name: "supervisor", specialists: [Agent.make({ name: "math" })] }).toolkit,
         ),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const math = Agent.make({ name: "math" })
@@ -243,7 +243,7 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
         ),
         ToolExecutor.testLayer({ execute: () => Effect.die("fanOut children should not execute tools") }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const results = yield* Handoff.fanOut(children)
@@ -273,7 +273,7 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
         modelLayer(() => Stream.fail(modelError)),
         ToolExecutor.testLayer({ execute: () => Effect.die("fanOut failure should not execute tools") }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const failure = yield* Effect.flip(Handoff.fanOut([{ agent: child, prompt: "fail" }]))

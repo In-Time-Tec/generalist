@@ -120,24 +120,6 @@ export const make = <R = never>(
   decide: (info: TurnInfo) => Effect.Effect<Decision, TurnPolicyError, R>,
 ): TurnPolicy<R> => ({ decide })
 
-/** @experimental Legacy decision shape without an explicit stop reason. */
-export type LegacyDecision = Continue | { readonly _tag: "Stop" }
-
-/**
- * @experimental Adapt a reasonless legacy policy during migration.
- * @deprecated Return `decision.stop(reason)` from `make` instead.
- */
-export const fromLegacy = <R = never>(
-  decide: (info: TurnInfo) => Effect.Effect<LegacyDecision, TurnPolicyError, R>,
-): TurnPolicy<R> =>
-  make((info) =>
-    decide(info).pipe(
-      Effect.map((result) =>
-        result._tag === "Stop" ? decision.stop({ _tag: "Policy", detail: "Legacy policy stopped" }) : result,
-      ),
-    ),
-  )
-
 /** @experimental Continue after every turn; a run still completes naturally without pending tool results. */
 export const forever: TurnPolicy = {
   decide: () => Effect.succeed(decision.continue()),

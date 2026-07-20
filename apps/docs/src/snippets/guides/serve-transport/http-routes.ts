@@ -117,7 +117,7 @@ const sessionRegistryLayer = SessionRegistry.layerMemory({ agent }).pipe(
         execute: () => Effect.succeed({ _tag: "Success", result: "results", encodedResult: "results" }),
       }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
       Chat.layerPersisted({ storeId: "research-agent" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
     ),
   ),

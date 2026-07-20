@@ -83,7 +83,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           })(),
           unusedExecutor,
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
           persistenceLayer,
         ),
         Effect.gen(function* () {
@@ -109,7 +109,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           modelLayer(() => Stream.make(textDelta("ok"))),
           unusedExecutor,
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
           persistenceLayer,
         ),
         Effect.gen(function* () {
@@ -138,7 +138,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           modelLayer(() => Stream.make(textDelta("ok"))),
           unusedExecutor,
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
           persistenceLayer,
         ),
         Effect.gen(function* () {
@@ -169,8 +169,8 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           ),
           unusedExecutor,
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
-          Session.memoryLayer,
+          ModelMiddleware.layerIdentity,
+          Session.layerMemory,
           Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
           persistenceLayer,
         ),
@@ -205,7 +205,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         }),
         unusedExecutor,
         Approvals.testLayer({ check: () => Effect.die("authorization must not run") }),
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
       Effect.gen(function* () {
@@ -278,7 +278,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         sessionLayer,
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
       Effect.gen(function* () {
@@ -341,9 +341,9 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
             },
           }),
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
           Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
-          Session.memoryLayer,
+          Session.layerMemory,
           persistenceLayer,
         ),
         Effect.gen(function* () {
@@ -432,9 +432,9 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           },
         }),
         Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
-        Session.memoryLayer,
+        Session.layerMemory,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
       Effect.gen(function* () {
@@ -478,10 +478,10 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           return Stream.make(textDelta("must not run"))
         }),
         Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
-        Session.memoryLayer,
+        Session.layerMemory,
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
       Effect.gen(function* () {
@@ -599,7 +599,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         sessionLayer,
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         failedCheckpointPersistence,
       ),
       Effect.gen(function* () {
@@ -631,12 +631,12 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
             ),
           ),
           Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
-          Session.memoryLayer,
+          Session.layerMemory,
           ToolExecutor.testLayer({
             execute: () => Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" }),
           }),
           Approvals.autoApprove,
-          ModelMiddleware.identityLayer,
+          ModelMiddleware.layerIdentity,
           persistenceLayer,
         ),
         Effect.gen(function* () {
@@ -693,10 +693,10 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
               ),
             ),
         }),
-        Session.memoryLayer,
+        Session.layerMemory,
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
       Effect.gen(function* () {
@@ -751,7 +751,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
       Effect.gen(function* () {
@@ -845,7 +845,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         sessionLayer,
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
       Effect.gen(function* () {

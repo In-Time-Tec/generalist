@@ -184,7 +184,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Memory.testLayer({
           recall: () => Effect.succeed([{ id: "item-empty", content: [] }]),
           remember: () => Effect.void,
@@ -390,7 +390,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Memory.testLayer({
           recall: () =>
             Effect.sync(() => {
@@ -438,7 +438,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Memory.testLayer({
           recall: () =>
             Effect.sync(() => {
@@ -492,7 +492,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         modelLayer(() => Stream.make(toolCallPart("call-1", "wait", {}))),
         ToolExecutor.testLayer({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Memory.testLayer({
           recall: () => Effect.succeed([]),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
@@ -531,7 +531,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Compaction.layer({}),
         Session.layerMemory,
         Memory.testLayer({
@@ -590,7 +590,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           execute: () => Effect.succeed({ _tag: "Success", result: "tool value", encodedResult: "tool value" }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Compaction.testLayer({
           maybeCompact: (request) => {
             if (request.turn === 0) return Effect.succeedNone
@@ -653,7 +653,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Compaction.testLayer({
           maybeCompact: (request) =>
             Effect.succeed(
@@ -701,7 +701,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Compaction.testLayer({
           maybeCompact: (request) =>
             Effect.sync(() => {
@@ -751,7 +751,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         }),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Compaction.testLayer({
           maybeCompact: (request) =>
             Effect.sync(() => {
@@ -818,7 +818,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Compaction.testLayer({
           maybeCompact: (request) => {
             if (request.turn === 0) return Effect.succeedNone
@@ -903,7 +903,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Compaction.testLayer({
           maybeCompact: (request) =>
             Effect.sync(() => {
@@ -970,7 +970,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           execute: () => Effect.succeed({ _tag: "Success", result: "tool value", encodedResult: "tool value" }),
         }),
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Compaction.testLayer({
           maybeCompact: (request) => {
             if (request.turn === 0) return Effect.succeedNone
@@ -1042,7 +1042,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         modelLayer(() => Stream.make(textDelta("done"))),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Compaction.layer({}),
         Session.layerMemory,
         Memory.testLayer({
@@ -1083,7 +1083,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         ),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Memory.testLayer({
           recall: () => Effect.fail(memoryError),
           remember: () => Effect.void,
@@ -1113,7 +1113,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         modelLayer(() => Stream.make(textDelta("done"))),
         unusedExecutor,
         Approvals.autoApprove,
-        ModelMiddleware.identityLayer,
+        ModelMiddleware.layerIdentity,
         Memory.testLayer({
           recall: () => Effect.succeed([]),
           remember: () => Effect.fail(memoryError),
@@ -1146,10 +1146,10 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
 
   ItLayer.make(
     it,
-    "noopLayer forget succeeds",
+    "layerNoop forget succeeds",
     () =>
       [
-        Memory.noopLayer,
+        Memory.layerNoop,
         Effect.gen(function* () {
           const memory = yield* Memory.Memory
 

@@ -11,6 +11,6 @@ const embeddingLayer = Embedding.withOpenAiEmbeddingFetch({
 export const semanticLayer: Layer.Layer<Memory.Memory, Config.ConfigError> = SemanticRecall.layer({
   limit: 5,
   minScore: 0.4,
-}).pipe(Layer.provide(Layer.mergeAll(VectorStore.memoryLayer, embeddingLayer)))
+}).pipe(Layer.provide(Layer.mergeAll(VectorStore.layerMemory, embeddingLayer)))
 
 export const workingLayer: Layer.Layer<Memory.Memory> = WorkingMemory.layer({ maxMessages: 20 })

@@ -43,7 +43,6 @@ export const corePoliciesReference = definePage({
           ],
         ],
         [[code("make<R>(decide)")], "Policy from a decide Effect whose R remains in Agent run requirements"],
-        [[code("fromLegacy(decide)")], "Deprecated adapter for reasonless legacy stops"],
         [
           [code("forever")],
           "Continue after every turn; the run still completes naturally without pending tool results",

@@ -17,7 +17,7 @@ export const middleware = definePage({
     p(
       code("ModelMiddleware"),
       " is optional. When absent, Baton uses the same identity behavior as ",
-      code("ModelMiddleware.identityLayer"),
+      code("ModelMiddleware.layerIdentity"),
       ". A middleware has two optional hooks: ",
       code("transformPrompt"),
       " rewrites the composed prompt before each model call, and ",

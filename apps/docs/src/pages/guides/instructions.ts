@@ -1,7 +1,7 @@
 import contextSources from "../../snippets/guides/instructions/context-sources.ts?raw"
 import contextSourcesExpected from "../../snippets/guides/instructions/context-sources.expected.txt?raw"
 import instructionFiles from "../../snippets/guides/instructions/instruction-files.ts?raw"
-import { bullets, callout, code, codeBlock, definePage, h2, link, p, table } from "../../prose"
+import { bullets, callout, code, codeBlock, definePage, h2, link, p } from "../../prose"
 export const instructions = definePage({
   path: "/docs/guides/instructions",
   title: "How to compose instructions and context sources",
@@ -37,33 +37,14 @@ export const instructions = definePage({
       " transcript is used verbatim. Both skip epoch rendering entirely.",
     ),
     h2("baseline-contract", "2. Keep Agent instructions in the baseline"),
-    table(
-      ["Cache class", "Rendered", "Use for"],
-      [
-        [
-          [code('"baseline"')],
-          ["Once, at run start, into the system message"],
-          ["Persona, style rules, repository instructions"],
-        ],
-        [
-          [code('"dynamic"')],
-          ["Not rendered or injected by the Agent"],
-          ["Compatibility with hosts that already own changing-context insertion and persistence"],
-        ],
-      ],
-    ),
     p(
-      "Keeping the baseline stable makes provider prompt caching effective. A source returning ",
+      "Every source renders once at run start into the stable system-message baseline. This makes provider prompt caching effective. A source returning ",
       code("Option.none()"),
-      " contributes nothing. ",
-      code("Instructions.renderUpdate"),
-      " is deprecated: Baton does not call it or define insertion, replay, resume, or persistence semantics. For stable content, change the source to ",
-      code('cache: "baseline"'),
-      " or use ",
+      " contributes nothing. Use ",
       code("staticSource"),
       ", provide it through ",
       code("Instructions.layer"),
-      ", and let Agent open the epoch. Changing content has no Agent-integrated replacement; hosts that continue rendering it must own those lifecycle concerns. TurnPolicy instruction overrides are independent: they prepend a system message once to the selected follow-up prompt, and that message remains in chat history.",
+      ", and let Agent open the epoch. TurnPolicy instruction overrides are independent: they prepend a system message once to the selected follow-up prompt, and that message remains in chat history.",
     ),
     h2("load-instruction-files", "3. Load AGENTS.md files as sources"),
     p(

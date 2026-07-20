@@ -33,7 +33,7 @@ const embeddingLayer = Layer.effect(
 )
 
 const memoryLayer = SemanticRecall.layer({ limit: 5 }).pipe(
-  Layer.provideMerge(VectorStore.memoryLayer),
+  Layer.provideMerge(VectorStore.layerMemory),
   Layer.provideMerge(embeddingLayer),
 )
 
@@ -147,7 +147,7 @@ const failingEmbedding = Layer.effect(
 
 layer(
   SemanticRecall.layer({ limit: 5 }).pipe(
-    Layer.provideMerge(VectorStore.memoryLayer),
+    Layer.provideMerge(VectorStore.layerMemory),
     Layer.provideMerge(failingEmbedding),
   ),
 )((it) => {

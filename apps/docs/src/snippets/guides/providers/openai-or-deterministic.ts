@@ -12,14 +12,14 @@ const modelLayer = Deterministic.withOpenAiOrDeterministicFetch({
 
 const selection: ModelRegistry.ModelSelection = { provider: "deterministic", model: "gpt-4o-mini" }
 
-const program = ModelRegistry.provide(selection, Agent.generate(agent, { prompt: "Draft the release note." })).pipe(
+const program = ModelRegistry.operate(selection, Agent.generate(agent, { prompt: "Draft the release note." })).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
   Effect.provide(
     Layer.mergeAll(
       modelLayer,
       ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
       Approvals.autoApprove,
-      ModelMiddleware.identityLayer,
+      ModelMiddleware.layerIdentity,
     ),
   ),
 )

@@ -246,7 +246,7 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
       })
       const services = yield* Layer.build(fixture.registryLayer)
       const call = (prompt: string) =>
-        ModelRegistry.provide(fixture.selection, LanguageModel.generateText({ prompt })).pipe(Effect.provide(services))
+        ModelRegistry.operate(fixture.selection, LanguageModel.generateText({ prompt })).pipe(Effect.provide(services))
 
       const first = yield* call("first")
       const second = yield* call("second")

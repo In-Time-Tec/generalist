@@ -61,7 +61,7 @@ const program = Agent.stream(agent, { prompt: "Fetch the quarterly report." }).p
       ),
   ),
   Effect.provide(
-    Layer.mergeAll(modelLayer, toolkitLayer, durableHostExecutor, Approvals.autoApprove, ModelMiddleware.identityLayer),
+    Layer.mergeAll(modelLayer, toolkitLayer, durableHostExecutor, Approvals.autoApprove, ModelMiddleware.layerIdentity),
   ),
 )
 

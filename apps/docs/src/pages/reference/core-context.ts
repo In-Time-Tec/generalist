@@ -15,21 +15,14 @@ export const coreContextReference = definePage({
       "An ordered registry of ",
       code("ContextSource"),
       " values: ",
-      code('{ id, cache: "baseline" | "dynamic", render }'),
-      ". Baseline sources render once into the system message when an epoch opens. The Agent does not render or inject dynamic sources.",
+      code("{ id, render }"),
+      ". Every source renders once into the system message when an epoch opens.",
     ),
     table(
       ["Export", "Notes"],
       [
         [[code("staticSource(id, text)")], "A static baseline source; empty text renders nothing"],
-        [
-          [code("openEpoch(instructions, context)")],
-          ["Renders baseline sources and freezes dynamic sources into a ", code("ContextEpoch")],
-        ],
-        [
-          [code("renderUpdate(epoch, context)")],
-          "Deprecated compatibility utility; callers own transcript insertion and persistence",
-        ],
+        [[code("openEpoch(instructions, context)")], "Renders every source once and returns the joined baseline"],
         [
           [code("layer(sources)"), " / ", code("testLayer(implementation)")],
           "Explicit ordered registry; layer from an interface",
@@ -112,7 +105,7 @@ export const coreContextReference = definePage({
       ["Export", "Notes"],
       [
         [[code("merge(first, second)")], "Concatenates recalls, fans out remembers"],
-        [[code("noopLayer")], "Recalls nothing, remembers nothing"],
+        [[code("layerNoop")], "Recalls nothing, remembers nothing"],
         [[code("testLayer(implementation)")], "Layer from an explicit interface"],
         [[code("MemoryError")], [code("{ message }")]],
       ],
@@ -157,7 +150,7 @@ export const coreContextReference = definePage({
       " purely projects a root-to-leaf path into an ",
       code("Ai.Prompt.Prompt"),
       ". ",
-      code("Session.memoryLayer"),
+      code("Session.layerMemory"),
       " is the Ref-backed non-durable store; ",
       code("testLayer"),
       " wraps an explicit interface. Store failures are ",
