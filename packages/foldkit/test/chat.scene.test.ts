@@ -51,29 +51,29 @@ const frames: ReadonlyArray<Wire.LooseServerFrameType> = [
   eventFrame(9, { _tag: "Completed", turns: 2, text: "Final answer" }),
 ]
 
-const reduceMessage = (model: Chat.Model, message: Chat.Message): Chat.Model => Chat.update(model, message)[0]
+const reduceAction = (model: Chat.Model, action: Chat.Action): Chat.Model => Chat.update(model, action)[0]
 
 const withModel = <Model>(initialModel: Model) =>
   Object.assign(
-    <M, Message, OutMessage = undefined>(simulation: SceneSimulation<M, Message, OutMessage>) =>
-      ({ ...simulation, model: initialModel }) as unknown as SceneSimulation<M, Message, OutMessage>,
+    <M, Action, Output = undefined>(simulation: SceneSimulation<M, Action, Output>) =>
+      ({ ...simulation, model: initialModel }) as unknown as SceneSimulation<M, Action, Output>,
     { _phantomModel: undefined },
   )
 
 const scriptedModel = (): Chat.Model => {
   let model = Chat.initialModel(null)
-  model = reduceMessage(model, Chat.OpenedSession({ sessionId }))
-  model = reduceMessage(model, Chat.ReceivedAgent({ incoming: Connection.ConnectionOpened() }))
-  model = reduceMessage(model, Chat.ChangedDraft({ text: "Render this run" }))
-  model = reduceMessage(model, Chat.SubmittedMessage())
+  model = reduceAction(model, Chat.OpenedSession({ sessionId }))
+  model = reduceAction(model, Chat.ReceivedAgent({ incoming: Connection.ConnectionOpened() }))
+  model = reduceAction(model, Chat.ChangedDraft({ text: "Render this run" }))
+  model = reduceAction(model, Chat.SubmittedMessage())
   for (const frame of frames) {
-    model = reduceMessage(model, Chat.ReceivedAgent({ incoming: frame }))
+    model = reduceAction(model, Chat.ReceivedAgent({ incoming: frame }))
   }
   return model
 }
 
 const rowView = (item: Chat.ConversationItem): Html => {
-  const h = html<Chat.Message>()
+  const h = html<Chat.Action>()
   switch (item._tag) {
     case "UserConversationItem":
       return h.section([h.Role("article"), h.AriaLabel("User message")], [item.entry.text])
@@ -99,7 +99,7 @@ const rowView = (item: Chat.ConversationItem): Html => {
 }
 
 const view = (model: Chat.Model): Document => {
-  const h = html<Chat.Message>()
+  const h = html<Chat.Action>()
   return {
     title: "Chat scene",
     body: h.main(
@@ -138,7 +138,7 @@ describe("Chat Scene", () => {
   })
 
   test("send message dispatches the Baton send command", () => {
-    const model = reduceMessage(Chat.initialModel(null), Chat.OpenedSession({ sessionId }))
+    const model = reduceAction(Chat.initialModel(null), Chat.OpenedSession({ sessionId }))
     scene(
       { update: Chat.update, view },
       withModel(model),

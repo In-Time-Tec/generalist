@@ -3683,7 +3683,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
         expect(secondPrompt).toContain("first steer")
         expect(secondPrompt).not.toContain("second steer")
-        expect(remaining.map((message) => message.prompt)).toEqual(["second steer"])
+        expect(remaining.map((input) => input.prompt)).toEqual(["second steer"])
       }),
     ] as const
   })
@@ -3816,8 +3816,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         yield* Deferred.await(currentStarted)
         yield* Fiber.interrupt(fiber)
 
-        expect((yield* steering.takeSteering).map((message) => message.prompt)).toEqual(["queued steering"])
-        expect((yield* steering.takeFollowUp).map((message) => message.prompt)).toEqual(["queued follow-up"])
+        expect((yield* steering.takeSteering).map((input) => input.prompt)).toEqual(["queued steering"])
+        expect((yield* steering.takeFollowUp).map((input) => input.prompt)).toEqual(["queued follow-up"])
       }),
     ] as const
   })

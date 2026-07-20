@@ -16,11 +16,11 @@ export interface Model {
 
 export const Model: Schema.Schema<Model> = Schema.Struct({ chat: Chat.Model })
 
-const GotChatMessageFields = { message: Chat.Message }
+const GotChatActionFields = { action: Chat.Action }
 
-export const GotChatMessage: CallableTaggedStruct<"GotChatMessage", typeof GotChatMessageFields> = m(
-  "GotChatMessage",
-  GotChatMessageFields,
+export const GotChatAction: CallableTaggedStruct<"GotChatAction", typeof GotChatActionFields> = m(
+  "GotChatAction",
+  GotChatActionFields,
 )
 
 const FailedOpenSessionFields = { reason: Schema.String }
@@ -30,19 +30,19 @@ export const FailedOpenSession: CallableTaggedStruct<"FailedOpenSession", typeof
   FailedOpenSessionFields,
 )
 
-export type Message = typeof GotChatMessage.Type | typeof FailedOpenSession.Type
+export type Message = typeof GotChatAction.Type | typeof FailedOpenSession.Type
 
-export const Message: Schema.Schema<Message> = Schema.Union([GotChatMessage, FailedOpenSession])
+export const Message: Schema.Schema<Message> = Schema.Union([GotChatAction, FailedOpenSession])
 
 const OpenSession = define(
   "OpenSession",
-  GotChatMessage,
+  GotChatAction,
   FailedOpenSession,
 )(
   Effect.gen(function* () {
     const response = yield* HttpClient.post(`${SERVER_URL}/sessions`, { body: HttpBody.jsonUnsafe({}) })
     const body = (yield* response.json) as { readonly sessionId: string }
-    return GotChatMessage({ message: Chat.OpenedSession({ sessionId: body.sessionId }) })
+    return GotChatAction({ action: Chat.OpenedSession({ sessionId: body.sessionId }) })
   }).pipe(
     Effect.provide(FetchHttpClient.layer),
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
@@ -62,11 +62,11 @@ const asProgramCommands = (
 
 export const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
   switch (message._tag) {
-    case "GotChatMessage": {
-      const [chat, chatCommands] = Chat.update(model.chat, message.message)
+    case "GotChatAction": {
+      const [chat, chatCommands] = Chat.update(model.chat, message.action)
       return [
         { chat },
-        asProgramCommands(mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
+        asProgramCommands(mapMessages(chatCommands, (chatAction) => GotChatAction({ action: chatAction }))),
       ]
     }
     case "FailedOpenSession":
@@ -76,5 +76,5 @@ export const update = (model: Model, message: Message): readonly [Model, Readonl
 
 export const subscriptions: Subscriptions<Model, Message, Connection.AgentConnection> = lift(Chat.subscriptions)({
   toChildModel: (model: Model) => model.chat,
-  toParentMessage: (chatMessage) => GotChatMessage({ message: chatMessage }),
+  toParentMessage: (chatAction) => GotChatAction({ action: chatAction }),
 })

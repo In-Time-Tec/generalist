@@ -262,7 +262,7 @@ export const coreContextReference = definePage({
             ", ",
             code("takeFollowUp"),
             " over ",
-            code("Message = { prompt }"),
+            code("Input = { prompt }"),
           ],
         ],
         [[code("testLayer(implementation)")], "Layer from an explicit interface"],

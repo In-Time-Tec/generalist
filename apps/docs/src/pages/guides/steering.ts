@@ -15,19 +15,19 @@ export const steering = definePage({
       code("Steering"),
       " is the optional in-process seam for injecting prompts into an active run. It holds two independent FIFO queues with different drain points: ",
       code("steer"),
-      " messages are seen before the next model turn after tool results, and ",
+      " inputs are seen before the next model turn after tool results, and ",
       code("followUp"),
-      " messages are seen only when the run would otherwise complete. Like every optional seam, the agent discovers it with ",
+      " inputs are seen only when the run would otherwise complete. Like every optional seam, the agent discovers it with ",
       code("Effect.serviceOption"),
       ", and absent means unchanged behavior (",
       link("/docs/learn/seams-as-services", "Seams as services"),
       ").",
     ),
-    h2("provide-the-layer-and-queue-messages", "1. Provide the layer and queue messages"),
+    h2("provide-the-layer-and-queue-inputs", "1. Provide the layer and queue inputs"),
     p(
       "To steer a run, provide ",
       code("Steering.layer()"),
-      " alongside the run's model/tool layers and queue messages on the same service instance the run sees. The scripted model below calls a tool on turn 0, so the steered prompt lands before turn 1 and the follow-up starts one extra turn at the end.",
+      " alongside the run's model/tool layers and queue inputs on the same service instance the run sees. The scripted model below calls a tool on turn 0, so the steered prompt lands before turn 1 and the follow-up starts one extra turn at the end.",
     ),
     codeBlock({
       label: "steer-and-follow-up.ts",
@@ -64,7 +64,7 @@ export const steering = definePage({
     ),
     h2("choose-queue-policies", "2. Choose queue policies"),
     p(
-      "Each queue has a drain mode and can also be bounded with explicit overflow behavior. The defaults differ because steering corrections compose, while follow-up tasks usually deserve one turn each. If you set a capacity, choose whether overload should fail typed, suspend the producer, drop the newest message, or keep the newest bounded window.",
+      "Each queue has a drain mode and can also be bounded with explicit overflow behavior. The defaults differ because steering corrections compose, while follow-up tasks usually deserve one turn each. If you set a capacity, choose whether overload should fail typed, suspend the producer, drop the newest input, or keep the newest bounded window.",
     ),
     table(
       ["Queue", "Drain point", "Default mode"],
@@ -72,12 +72,12 @@ export const steering = definePage({
         [
           [code("steer")],
           ["after tool results, before the next model turn"],
-          [code('"all"'), ": every buffered message, FIFO"],
+          [code('"all"'), ": every buffered input, FIFO"],
         ],
         [
           [code("followUp")],
           ["when the run would otherwise complete"],
-          [code('"one-at-a-time"'), ": at most one message per boundary"],
+          [code('"one-at-a-time"'), ": at most one input per boundary"],
         ],
       ],
     ),
@@ -105,7 +105,7 @@ export const steering = definePage({
     ),
     h2("interrupt-a-run", "3. Interrupt a run"),
     p(
-      "There is no second abort API: interrupting the run's fiber with ordinary Effect interruption cancels the live model stream and any scoped tool execution. Undrained steering and follow-up messages stay in the layer after interruption, so the host decides whether to reuse or discard them on the next run.",
+      "There is no second abort API: interrupting the run's fiber with ordinary Effect interruption cancels the live model stream and any scoped tool execution. Undrained steering and follow-up inputs stay in the layer after interruption, so the host decides whether to reuse or discard them on the next run.",
     ),
     p(
       "Use steering for soft in-run guidance. For hard gates on what an agent may do, use ",

@@ -122,16 +122,16 @@ export const foldkitReference = definePage({
         ],
       ],
     ),
-    h2("chat-messages", "Chat.Message"),
+    h2("chat-actions", "Chat.Action"),
     p(
-      "Route these through your app's message wrapper into ",
-      code("Chat.update(model, message)"),
+      "Route these through your app's action wrapper into ",
+      code("Chat.update(model, action)"),
       ", which returns ",
-      code("[Model, Array<ChatCommand>, Option<OutMessage>]"),
+      code("[Model, Array<ChatCommand>, Option<Output>]"),
       ".",
     ),
     table(
-      ["Message", "Fields", "Meaning"],
+      ["Action", "Fields", "Meaning"],
       [
         [
           [code("ReceivedAgent")],
@@ -161,7 +161,7 @@ export const foldkitReference = definePage({
       ],
     ),
     p(
-      code("OutMessage"),
+      code("Output"),
       " surfaces run milestones to the host app: ",
       code("RunCompleted{ text }"),
       ", ",

@@ -26,8 +26,8 @@ export const foldkitChat = definePage({
       "Embed ",
       code("Chat.Model"),
       " in the application model and route every ",
-      code("Chat.Message"),
-      " through one wrapper message. The host owns session creation: a command POSTs to the server from ",
+      code("Chat.Action"),
+      " through one wrapper action. The host owns session creation: a command POSTs to the server from ",
       link("/docs/guides/serve-transport", "the transport guide"),
       ", then dispatches ",
       code("Chat.OpenedSession"),
@@ -96,7 +96,7 @@ export const foldkitChat = definePage({
         ", so a dropped socket resumes where it left off.",
       ],
       [
-        "Connection facts fold into the same message stream: ",
+        "Connection facts fold into the same action stream: ",
         code("model.connection"),
         " moves through ",
         code("connecting"),
@@ -117,7 +117,7 @@ export const foldkitChat = definePage({
       ],
     ),
     p(
-      "The full model, message, and helper tables are in ",
+      "The full model, action, output, and helper tables are in ",
       link("/docs/reference/foldkit", "the @batonfx/foldkit reference"),
       ". To build the server side of this page, start at ",
       link("/docs/start/research-agent", "the research-agent tutorial"),

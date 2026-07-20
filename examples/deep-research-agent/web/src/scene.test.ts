@@ -13,7 +13,7 @@ import {
   ScrolledViewport,
   TrackViewportScroll,
 } from "./components/ui/message-scroller"
-import { GotChatMessage, GotScrollerMessage, SessionReady, init, type Model, update, view } from "./main"
+import { GotChatAction, GotScrollerMessage, SessionReady, init, type Model, update, view } from "./main"
 
 const baseModel = (): Model => ({
   ...init()[0],
@@ -104,8 +104,8 @@ describe("deep-research-agent web view", () => {
       Scene.expect(Scene.role("button", { name: "Stop" })).toBeEnabled(),
       Scene.click(Scene.role("button", { name: "Stop" })),
       Scene.Command.expectExact(Chat.CancelRun({ sessionId: "deep-research-scene" })),
-      Scene.Command.resolve(Chat.CancelRun({ sessionId: "deep-research-scene" }), Chat.CancelledRun(), (message) =>
-        GotChatMessage({ message }),
+      Scene.Command.resolve(Chat.CancelRun({ sessionId: "deep-research-scene" }), Chat.CancelledRun(), (action) =>
+        GotChatAction({ action }),
       ),
     )
   })

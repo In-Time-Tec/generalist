@@ -55,7 +55,7 @@ import {
   buildMemoryContext,
 } from "./session.js"
 import { SkillSource, type SkillSourceError, selectListings } from "./skill-source.js"
-import { type Message, Steering } from "./steering.js"
+import { type Input, Steering } from "./steering.js"
 import { type AuthorizationError, ToolAuthorizerService, make as makeToolAuthorizer } from "./tool-authorization.js"
 import { ToolContext } from "./tool-context.js"
 import {
@@ -140,12 +140,12 @@ const isTurnPolicyDecision = (input: unknown): input is Decision => {
 const steeringDrainedEvent = (
   turn: number,
   queue: SteeringDrained["queue"],
-  messages: ReadonlyArray<Message>,
+  inputs: ReadonlyArray<Input>,
 ): SteeringDrained => ({
   _tag: "SteeringDrained",
   turn,
   queue,
-  count: messages.length,
+  count: inputs.length,
 })
 
 export const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
@@ -1644,16 +1644,16 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           }),
         ).pipe(Stream.flatMap((events) => Stream.fromIterable<Event>(events)))
 
-      const promptFromSteeringMessages = (messages: ReadonlyArray<Message>): Prompt.Prompt =>
-        messages.reduce<Prompt.Prompt>((prompt, message) => Prompt.concat(prompt, message.prompt), Prompt.empty)
+      const promptFromSteeringInputs = (inputs: ReadonlyArray<Input>): Prompt.Prompt =>
+        inputs.reduce<Prompt.Prompt>((prompt, input) => Prompt.concat(prompt, input.prompt), Prompt.empty)
 
-      const takeSteering = (): Effect.Effect<ReadonlyArray<Message>> =>
+      const takeSteering = (): Effect.Effect<ReadonlyArray<Input>> =>
         Option.match(steeringService, {
           onNone: () => Effect.succeed([]),
           onSome: (service) => service.takeSteering,
         })
 
-      const takeFollowUp = (): Effect.Effect<ReadonlyArray<Message>> =>
+      const takeFollowUp = (): Effect.Effect<ReadonlyArray<Input>> =>
         Option.match(steeringService, {
           onNone: () => Effect.succeed([]),
           onSome: (service) => service.takeFollowUp,
@@ -1688,7 +1688,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             if (followUp.length > 0) {
               return {
                 events: Stream.fromIterable<Event>([completed, steeringDrainedEvent(turn, "followUp", followUp)]),
-                next: { prompt: promptFromSteeringMessages(followUp) },
+                next: { prompt: promptFromSteeringInputs(followUp) },
               }
             }
             if (structured !== undefined) {
@@ -1740,7 +1740,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           }
           state.pending = []
           const steering = yield* takeSteering()
-          const basePrompt = steering.length === 0 ? Prompt.empty : promptFromSteeringMessages(steering)
+          const basePrompt = steering.length === 0 ? Prompt.empty : promptFromSteeringInputs(steering)
           const prompt =
             decision.overrides?.instructions === undefined
               ? basePrompt

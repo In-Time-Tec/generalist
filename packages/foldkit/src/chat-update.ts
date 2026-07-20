@@ -24,7 +24,7 @@ import {
   UserEntry,
   type ChatEntry,
   type Model,
-  type OutMessage,
+  type Output,
   type ToolPendingPhase,
 } from "./chat.js"
 
@@ -230,7 +230,7 @@ const applySuspension = (model: Model, suspension: Suspension) => {
   return [{ ...model, run: Failed({ message }) }, Option.some(RunFailed({ message }))] as const
 }
 
-const applyStatus = (model: Model, status: Wire.SessionStatus): readonly [Model, Option.Option<OutMessage>] => {
+const applyStatus = (model: Model, status: Wire.SessionStatus): readonly [Model, Option.Option<Output>] => {
   switch (status._tag) {
     case "Idle":
       return [{ ...model, run: Idle() }, Option.none()]
@@ -245,7 +245,7 @@ const applyStatus = (model: Model, status: Wire.SessionStatus): readonly [Model,
   }
 }
 
-const applyEvent = (model: Model, event: Wire.LooseEventType): readonly [Model, Option.Option<OutMessage>] => {
+const applyEvent = (model: Model, event: Wire.LooseEventType): readonly [Model, Option.Option<Output>] => {
   switch (event._tag) {
     case "TurnStarted":
       return [
@@ -317,7 +317,7 @@ const projectPrompt = (prompt: Prompt.Prompt): ReadonlyArray<ChatEntry> => {
   return entries
 }
 
-const applyFrame = (model: Model, frame: Wire.LooseServerFrameType): readonly [Model, Option.Option<OutMessage>] => {
+const applyFrame = (model: Model, frame: Wire.LooseServerFrameType): readonly [Model, Option.Option<Output>] => {
   if (frame._tag === "Snapshot") {
     return [{ ...model, lastSeq: frame.seq, entries: projectPrompt(frame.transcript), streaming: null }, Option.none()]
   }

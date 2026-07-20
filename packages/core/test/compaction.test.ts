@@ -592,7 +592,7 @@ describe("Compaction", () => {
   ItLayer.make(it, "keeps retained tool results bounded after semantic summarization", () => {
     let stores = 0
     const paths = ["mem:retained-tool", "s3:retained-tool"]
-    const envelope: ToolOutput.ToolOutput = {
+    const value: ToolOutput.ToolOutput = {
       inline: { truncated: true, bytes: 1_000, maxBytes: 12, preview: '"retained-t' },
       outputPaths: paths,
     }
@@ -621,7 +621,7 @@ describe("Compaction", () => {
           path: [
             entry("0", user("old goal")),
             entry("1", assistantToolCall("call-retained")),
-            entry("2", toolResult("call-retained", envelope)),
+            entry("2", toolResult("call-retained", value)),
           ],
           usage: { contextTokens: 100, contextWindow: 1, reserveTokens: 0 },
           overflow: false,

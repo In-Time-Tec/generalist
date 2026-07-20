@@ -13,8 +13,8 @@ const receivedFrame = (frame: Wire.LooseServerFrameType) => Chat.ReceivedAgent({
 
 const withModel = <Model>(initialModel: Model) =>
   Object.assign(
-    <M, Message, OutMessage = undefined>(simulation: StorySimulation<M, Message, OutMessage>) =>
-      ({ ...simulation, model: initialModel }) as unknown as StorySimulation<M, Message, OutMessage>,
+    <M, Action, Output = undefined>(simulation: StorySimulation<M, Action, Output>) =>
+      ({ ...simulation, model: initialModel }) as unknown as StorySimulation<M, Action, Output>,
     { _phantomModel: undefined },
   )
 

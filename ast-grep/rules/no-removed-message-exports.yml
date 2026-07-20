@@ -1,0 +1,13 @@
+id: no-removed-message-exports
+language: TypeScript
+severity: error
+message: Steering and Chat must not re-export their removed Message or OutMessage contracts.
+rule:
+  any:
+    - kind: identifier
+      regex: ^(.*\s+as\s+)?(Message|OutMessage)$
+    - kind: type_identifier
+      regex: ^(Message|OutMessage)$
+files:
+  - "packages/core/src/steering.ts"
+  - "packages/foldkit/src/chat.ts"

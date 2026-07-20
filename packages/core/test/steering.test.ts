@@ -3,8 +3,8 @@ import { Effect } from "effect"
 import { Steering } from "../src/index"
 import { ItLayer } from "./it-layer"
 
-const message = (prompt: string): Steering.Message => ({ prompt })
-const prompts = (messages: ReadonlyArray<Steering.Message>) => messages.map((item) => item.prompt)
+const input = (prompt: string): Steering.Input => ({ prompt })
+const prompts = (inputs: ReadonlyArray<Steering.Input>) => inputs.map((item) => item.prompt)
 
 describe("Steering", () => {
   ItLayer.make(
@@ -16,10 +16,10 @@ describe("Steering", () => {
         Effect.gen(function* () {
           const steering = yield* Steering.Steering
 
-          yield* steering.steer(message("steer one"))
-          yield* steering.steer(message("steer two"))
-          yield* steering.followUp(message("follow one"))
-          yield* steering.followUp(message("follow two"))
+          yield* steering.steer(input("steer one"))
+          yield* steering.steer(input("steer two"))
+          yield* steering.followUp(input("follow one"))
+          yield* steering.followUp(input("follow two"))
 
           expect(prompts(yield* steering.takeSteering)).toEqual(["steer one", "steer two"])
           expect(yield* steering.takeSteering).toEqual([])
@@ -39,10 +39,10 @@ describe("Steering", () => {
         Effect.gen(function* () {
           const steering = yield* Steering.Steering
 
-          yield* steering.steer(message("steer one"))
-          yield* steering.steer(message("steer two"))
-          yield* steering.followUp(message("follow one"))
-          yield* steering.followUp(message("follow two"))
+          yield* steering.steer(input("steer one"))
+          yield* steering.steer(input("steer two"))
+          yield* steering.followUp(input("follow one"))
+          yield* steering.followUp(input("follow two"))
 
           expect(prompts(yield* steering.takeSteering)).toEqual(["steer one"])
           expect(prompts(yield* steering.takeSteering)).toEqual(["steer two"])
@@ -61,8 +61,8 @@ describe("Steering", () => {
         Effect.gen(function* () {
           const steering = yield* Steering.Steering
 
-          yield* steering.steer(message("kept"))
-          const error = yield* Effect.flip(steering.steer(message("rejected")))
+          yield* steering.steer(input("kept"))
+          const error = yield* Effect.flip(steering.steer(input("rejected")))
 
           expect(error).toBeInstanceOf(Steering.SteeringQueueFull)
           expect(error.queue).toBe("steering")
@@ -83,12 +83,12 @@ describe("Steering", () => {
         Effect.gen(function* () {
           const steering = yield* Steering.Steering
 
-          yield* steering.steer(message("oldest"))
-          yield* steering.steer(message("kept"))
-          yield* steering.steer(message("dropped newest"))
-          yield* steering.followUp(message("dropped oldest"))
-          yield* steering.followUp(message("kept one"))
-          yield* steering.followUp(message("kept two"))
+          yield* steering.steer(input("oldest"))
+          yield* steering.steer(input("kept"))
+          yield* steering.steer(input("dropped newest"))
+          yield* steering.followUp(input("dropped oldest"))
+          yield* steering.followUp(input("kept one"))
+          yield* steering.followUp(input("kept two"))
 
           expect(prompts(yield* steering.takeSteering)).toEqual(["oldest", "kept"])
           expect(prompts(yield* steering.takeFollowUp)).toEqual(["kept one", "kept two"])
@@ -102,14 +102,14 @@ describe("Steering", () => {
       Steering.testLayer({
         steer: (item) => Effect.sync(() => recorded.push(String(item.prompt))),
         followUp: (item) => Effect.sync(() => recorded.push(String(item.prompt))),
-        takeSteering: Effect.succeed([message("test steer")]),
+        takeSteering: Effect.succeed([input("test steer")]),
         takeFollowUp: Effect.succeed([]),
       }),
       Effect.gen(function* () {
         const steering = yield* Steering.Steering
 
-        yield* steering.steer(message("steer"))
-        yield* steering.followUp(message("follow"))
+        yield* steering.steer(input("steer"))
+        yield* steering.followUp(input("follow"))
         expect(recorded).toEqual(["steer", "follow"])
         expect(prompts(yield* steering.takeSteering)).toEqual(["test steer"])
         expect(yield* steering.takeFollowUp).toEqual([])

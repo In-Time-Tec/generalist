@@ -58,7 +58,7 @@ export interface ApprovalRequested {
   readonly metadata?: Metadata
 }
 
-/** @experimental Steering queue whose messages were consumed at a turn boundary. */
+/** @experimental Steering queue whose inputs were consumed at a turn boundary. */
 export type SteeringQueueName = "steering" | "followUp"
 
 /** @experimental A steering or follow-up queue was drained into the next prompt. */

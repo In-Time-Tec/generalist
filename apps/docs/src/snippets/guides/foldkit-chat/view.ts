@@ -1,7 +1,7 @@
 import { Chat } from "@batonfx/foldkit"
 import type { Document, Html } from "foldkit/html"
 import { html } from "foldkit/html"
-import { GotChatMessage, type Message, type Model } from "./model"
+import { GotChatAction, type Message, type Model } from "./model"
 
 const entryView = (entry: Chat.ChatEntry): Html => {
   const h = html<Message>()
@@ -27,11 +27,8 @@ const approvalView = (run: Chat.RunState): Html => {
     [h.Class("approval")],
     [
       h.p([], [`The agent wants to run ${run.toolName}.`]),
-      h.button([h.Type("button"), h.OnClick(GotChatMessage({ message: Chat.ClickedApprove() }))], ["Approve"]),
-      h.button(
-        [h.Type("button"), h.OnClick(GotChatMessage({ message: Chat.ClickedDeny({ reason: null }) }))],
-        ["Deny"],
-      ),
+      h.button([h.Type("button"), h.OnClick(GotChatAction({ action: Chat.ClickedApprove() }))], ["Approve"]),
+      h.button([h.Type("button"), h.OnClick(GotChatAction({ action: Chat.ClickedDeny({ reason: null }) }))], ["Deny"]),
     ],
   )
 }
@@ -39,15 +36,15 @@ const approvalView = (run: Chat.RunState): Html => {
 const promptView = (model: Model): Html => {
   const h = html<Message>()
   return h.form(
-    [h.OnSubmit(GotChatMessage({ message: Chat.SubmittedMessage() })), h.Class("prompt")],
+    [h.OnSubmit(GotChatAction({ action: Chat.SubmittedMessage() })), h.Class("prompt")],
     [
       h.input([
         h.Value(model.chat.draft),
         h.Placeholder("Ask something"),
-        h.OnInput((value) => GotChatMessage({ message: Chat.ChangedDraft({ text: value }) })),
+        h.OnInput((value) => GotChatAction({ action: Chat.ChangedDraft({ text: value }) })),
       ]),
       h.button([h.Type("submit")], ["Send"]),
-      h.button([h.Type("button"), h.OnClick(GotChatMessage({ message: Chat.ClickedCancel() }))], ["Cancel"]),
+      h.button([h.Type("button"), h.OnClick(GotChatAction({ action: Chat.ClickedCancel() }))], ["Cancel"]),
     ],
   )
 }

@@ -170,7 +170,7 @@ export const FailedAgentCommand: CallableTaggedStruct<
 })
 
 /** @experimental */
-export type Message =
+export type Action =
   | typeof ReceivedAgent.Type
   | typeof OpenedSession.Type
   | typeof ChangedDraft.Type
@@ -184,7 +184,7 @@ export type Message =
   | typeof FailedAgentCommand.Type
 
 /** @experimental */
-export const Message: Schema.Schema<Message> = Schema.Union([
+export const Action: Schema.Schema<Action> = Schema.Union([
   ReceivedAgent,
   OpenedSession,
   ChangedDraft,
@@ -213,10 +213,10 @@ export const RunFailed: CallableTaggedStruct<"RunFailed", { message: typeof Sche
 })
 
 /** @experimental */
-export type OutMessage = typeof RunCompleted.Type | typeof ApprovalRequired.Type | typeof RunFailed.Type
+export type Output = typeof RunCompleted.Type | typeof ApprovalRequired.Type | typeof RunFailed.Type
 
 /** @experimental */
-export const OutMessage: Schema.Schema<OutMessage> = Schema.Union([RunCompleted, ApprovalRequired, RunFailed])
+export const Output: Schema.Schema<Output> = Schema.Union([RunCompleted, ApprovalRequired, RunFailed])
 
 /** @experimental */
 export const MessageAlign = Schema.Literals(["start", "end"])
@@ -336,7 +336,7 @@ export const ConversationItem: Schema.Schema<ConversationItem> = Schema.Union([
 ])
 
 /** @experimental */
-export type ChatCommand = Command<Message, AgentCommandError, AgentConnection>
+export type ChatCommand = Command<Action, AgentCommandError, AgentConnection>
 
 /** @experimental */
 export const initialModel = (sessionId: string | null = null): Model => ({
@@ -490,16 +490,16 @@ export const conversationItems = (model: Model): ReadonlyArray<ConversationItem>
 
 /** @experimental */
 export const update: {
-  (message: Message): (model: Model) => readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<OutMessage>]
-  (model: Model, message: Message): readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<OutMessage>]
-} = dual(2, (model: Model, message: Message) => {
-  switch (message._tag) {
+  (action: Action): (model: Model) => readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<Output>]
+  (model: Model, action: Action): readonly [Model, ReadonlyArray<ChatCommand>, Option.Option<Output>]
+} = dual(2, (model: Model, action: Action) => {
+  switch (action._tag) {
     case "ReceivedAgent":
-      if (isServerFrame(message.incoming)) {
-        const [next, out] = applyFrame(model, message.incoming)
-        return [next, [], out]
+      if (isServerFrame(action.incoming)) {
+        const [next, output] = applyFrame(model, action.incoming)
+        return [next, [], output]
       }
-      switch (message.incoming._tag) {
+      switch (action.incoming._tag) {
         case "ConnectionOpened":
           return [{ ...model, connection: "open" }, [], Option.none()]
         case "ConnectionLost":
@@ -510,16 +510,16 @@ export const update: {
           ]
         case "ConnectionFailed":
           return [
-            { ...model, connection: "disconnected", run: Failed({ message: message.incoming.reason }) },
+            { ...model, connection: "disconnected", run: Failed({ message: action.incoming.reason }) },
             [],
-            Option.some(RunFailed({ message: message.incoming.reason })),
+            Option.some(RunFailed({ message: action.incoming.reason })),
           ]
       }
     case "OpenedSession":
       return [
         {
           ...model,
-          sessionId: message.sessionId,
+          sessionId: action.sessionId,
           connection: "connecting",
           lastSeq: -1,
           run: Idle(),
@@ -530,7 +530,7 @@ export const update: {
         Option.none(),
       ]
     case "ChangedDraft":
-      return [{ ...model, draft: message.text }, [], Option.none()]
+      return [{ ...model, draft: action.text }, [], Option.none()]
     case "SubmittedMessage": {
       const text = model.draft.trim()
       if (model.sessionId === null || text.length === 0) return [model, [], Option.none()]
@@ -564,7 +564,7 @@ export const update: {
                 sessionId: model.sessionId,
                 token: model.run.token,
                 approved: false,
-                reason: message.reason,
+                reason: action.reason,
               }),
             ],
             Option.none(),
@@ -575,7 +575,7 @@ export const update: {
         ? [model, [], Option.none()]
         : [model, [CancelRun({ sessionId: model.sessionId })], Option.none()]
     case "FailedAgentCommand":
-      return [{ ...model, run: Failed({ message: message.reason }) }, [], Option.none()]
+      return [{ ...model, run: Failed({ message: action.reason }) }, [], Option.none()]
     case "SentUserMessage":
     case "ResolvedApproval":
     case "CancelledRun":
@@ -584,7 +584,7 @@ export const update: {
 })
 
 /** @experimental */
-export const subscriptions = make<Model, Message, AgentConnection>()((entry) => ({
+export const subscriptions = make<Model, Action, AgentConnection>()((entry) => ({
   agentFrames: entry(
     { sessionId: Schema.NullOr(Schema.String), afterSeq: Schema.Finite },
     {

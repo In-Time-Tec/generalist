@@ -29,11 +29,11 @@ const Model = Schema.Struct({
 
 type Model = typeof Model.Type
 
-const GotChatMessage = m("GotChatMessage", { message: Chat.Message })
+const GotChatAction = m("GotChatAction", { action: Chat.Action })
 const OpenedSession = m("OpenedSession", { sessionId: Schema.String })
 const FailedOpenSession = m("FailedOpenSession", { reason: Schema.String })
 
-const Message = Schema.Union([GotChatMessage, OpenedSession, FailedOpenSession])
+const Message = Schema.Union([GotChatAction, OpenedSession, FailedOpenSession])
 
 type Message = typeof Message.Type
 
@@ -69,11 +69,11 @@ const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<
       return [{ ...model, chat: { ...model.chat, sessionId: message.sessionId }, session: SessionReady() }, []]
     case "FailedOpenSession":
       return [{ ...model, session: SessionFailed({ message: message.reason }) }, []]
-    case "GotChatMessage": {
-      const [chat, chatCommands] = Chat.update(model.chat, message.message)
+    case "GotChatAction": {
+      const [chat, chatCommands] = Chat.update(model.chat, message.action)
       return [
         { ...model, chat },
-        asProgramCommands(mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
+        asProgramCommands(mapMessages(chatCommands, (chatAction) => GotChatAction({ action: chatAction }))),
       ]
     }
   }
@@ -81,7 +81,7 @@ const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<
 
 const subscriptions: Subscriptions<Model, Message, Connection.AgentConnection> = lift(Chat.subscriptions)({
   toChildModel: (model: Model) => model.chat,
-  toParentMessage: (chatMessage) => GotChatMessage({ message: chatMessage }),
+  toParentMessage: (chatAction) => GotChatAction({ action: chatAction }),
 })
 
 const entryView = (entry: Chat.ChatEntry): Html => {
@@ -117,14 +117,14 @@ const approvalView = (awaitingApproval: Extract<Chat.RunState, { _tag: "Awaiting
         [
           h.button(
             [
-              h.OnClick(GotChatMessage({ message: Chat.ClickedApprove() })),
+              h.OnClick(GotChatAction({ action: Chat.ClickedApprove() })),
               h.Class("rounded bg-emerald-600 px-3 py-1 text-white"),
             ],
             ["Approve"],
           ),
           h.button(
             [
-              h.OnClick(GotChatMessage({ message: Chat.ClickedDeny({ reason: null }) })),
+              h.OnClick(GotChatAction({ action: Chat.ClickedDeny({ reason: null }) })),
               h.Class("rounded bg-red-600 px-3 py-1 text-white"),
             ],
             ["Deny"],
@@ -140,11 +140,11 @@ const footerView = (model: Model): Html => {
   const isReady = model.session._tag === "SessionReady"
   const isRunning = model.chat.run._tag === "Running" || model.chat.run._tag === "AwaitingApproval"
   return h.form(
-    [h.OnSubmit(GotChatMessage({ message: Chat.SubmittedMessage() })), h.Class("flex gap-2 border-t p-4")],
+    [h.OnSubmit(GotChatAction({ action: Chat.SubmittedMessage() })), h.Class("flex gap-2 border-t p-4")],
     [
       h.input([
         h.Value(model.chat.draft),
-        h.OnInput((text) => GotChatMessage({ message: Chat.ChangedDraft({ text }) })),
+        h.OnInput((text) => GotChatAction({ action: Chat.ChangedDraft({ text }) })),
         h.Placeholder(isReady ? "Ask a research question…" : "Opening a session…"),
         h.Class("flex-1 rounded border px-3 py-2"),
       ]),
@@ -152,7 +152,7 @@ const footerView = (model: Model): Html => {
         ? h.button(
             [
               h.Type("button"),
-              h.OnClick(GotChatMessage({ message: Chat.ClickedCancel() })),
+              h.OnClick(GotChatAction({ action: Chat.ClickedCancel() })),
               h.Class("rounded bg-gray-200 px-4 py-2"),
             ],
             ["Cancel"],

@@ -145,7 +145,7 @@ describe("ToolOutput", () => {
     ] as const
   })
 
-  ItLayer.make(it, "stores oversized outputs and returns a bounded inline envelope", () => {
+  ItLayer.make(it, "stores oversized outputs and returns a bounded inline ToolOutput value", () => {
     let stores = 0
     let stored: unknown
     return [
@@ -177,7 +177,7 @@ describe("ToolOutput", () => {
     ] as const
   })
 
-  ItLayer.make(it, "tightens existing envelopes without storing or changing their paths", () => {
+  ItLayer.make(it, "tightens existing ToolOutput values without storing or changing their paths", () => {
     let stores = 0
     return [
       ToolOutput.testLayer({
@@ -187,12 +187,12 @@ describe("ToolOutput", () => {
         },
       }),
       Effect.gen(function* () {
-        const envelope: ToolOutput.ToolOutput = {
+        const value: ToolOutput.ToolOutput = {
           inline: { truncated: true, bytes: 100, maxBytes: 8, preview: '"xxxxxxx' },
           outputPaths: ["mem:original", "s3:original"],
         }
 
-        const bounded = yield* ToolOutput.bound(success(envelope), { toolCallId: "tool-call-repeat", maxBytes: 1 })
+        const bounded = yield* ToolOutput.bound(success(value), { toolCallId: "tool-call-repeat", maxBytes: 1 })
 
         expect(stores).toBe(0)
         expect(bounded.outputPaths).toEqual(["mem:original", "s3:original"])
@@ -205,13 +205,13 @@ describe("ToolOutput", () => {
     ] as const
   })
 
-  ItLayer.make(it, "does not mistake non-envelope tool values for Baton envelopes", () => {
+  ItLayer.make(it, "does not mistake domain values for canonical ToolOutput values", () => {
     let stores = 0
     return [
       ToolOutput.testLayer({
         put: () => {
           stores += 1
-          return Effect.succeed(Option.some("mem:actual-envelope"))
+          return Effect.succeed(Option.some("mem:actual-value"))
         },
       }),
       Effect.gen(function* () {
@@ -220,12 +220,12 @@ describe("ToolOutput", () => {
         const bounded = yield* ToolOutput.bound(success(value), { toolCallId: "tool-call-domain-value", maxBytes: 8 })
 
         expect(stores).toBe(1)
-        expect(bounded.outputPaths).toEqual(["mem:actual-envelope"])
+        expect(bounded.outputPaths).toEqual(["mem:actual-value"])
       }),
     ] as const
   })
 
-  ItLayer.make(it, "recognizes canonical envelopes with omitted optional paths", () => {
+  ItLayer.make(it, "recognizes canonical ToolOutput values with omitted optional paths", () => {
     let stores = 0
     return [
       ToolOutput.testLayer({
@@ -235,15 +235,15 @@ describe("ToolOutput", () => {
         },
       }),
       Effect.gen(function* () {
-        const envelope: ToolOutput.ToolOutput = {
+        const value: ToolOutput.ToolOutput = {
           inline: { truncated: true, bytes: 100, maxBytes: 8, preview: '"xxxxxxx' },
         }
 
-        const bounded = yield* ToolOutput.bound(success(envelope), { toolCallId: "tool-call-no-paths", maxBytes: 8 })
+        const bounded = yield* ToolOutput.bound(success(value), { toolCallId: "tool-call-no-paths", maxBytes: 8 })
 
         expect(stores).toBe(0)
         expect(bounded.outputPaths).toEqual([])
-        expect(bounded.encodedResult).toEqual({ ...envelope, outputPaths: [] })
+        expect(bounded.encodedResult).toEqual({ ...value, outputPaths: [] })
       }),
     ] as const
   })

@@ -15,14 +15,14 @@ const provideTestLayer =
     Layer.build(testLayer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
 
 describe("Chat", () => {
-  it("folds a full run into display entries and a completion out-message", () => {
+  it("folds a full run into display entries and a completion output", () => {
     let model = Chat.initialModel("s-chat")
-    let out: Option.Option<Chat.OutMessage> = Option.none()
+    let output: Option.Option<Chat.Output> = Option.none()
 
-    ;[model, , out] = updateWith(model, eventFrame(0, { _tag: "TurnStarted", turn: 0 }))
+    ;[model, , output] = updateWith(model, eventFrame(0, { _tag: "TurnStarted", turn: 0 }))
     expect(model.run).toEqual({ _tag: "Running", turn: 0 })
     expect(model.streaming).toEqual({ turn: 0, text: "", reasoning: "" })
-    expect(Option.isNone(out)).toBe(true)
+    expect(Option.isNone(output)).toBe(true)
     ;[model] = updateWith(
       model,
       eventFrame(1, {
@@ -83,18 +83,18 @@ describe("Chat", () => {
     ;[model] = updateWith(model, eventFrame(5, { _tag: "TurnCompleted", turn: 0 }))
     expect(model.streaming).toBeNull()
     expect(model.entries[1]).toEqual({ _tag: "AssistantEntry", text: "Hello world", reasoning: null })
-    ;[model, , out] = updateWith(model, eventFrame(6, { _tag: "Completed", turns: 1, text: "Done" }))
+    ;[model, , output] = updateWith(model, eventFrame(6, { _tag: "Completed", turns: 1, text: "Done" }))
     expect(model.run).toEqual({ _tag: "Idle" })
-    expect(Option.getOrUndefined(out)).toEqual({ _tag: "RunCompleted", text: "Done" })
+    expect(Option.getOrUndefined(output)).toEqual({ _tag: "RunCompleted", text: "Done" })
   })
 
   it("drops replayed frames whose seq is not newer than lastSeq", () => {
     const model = { ...Chat.initialModel("s-chat"), lastSeq: 5, entries: [Chat.UserEntry({ text: "already" })] }
-    const [next, commands, out] = updateWith(model, eventFrame(5, { _tag: "TurnStarted", turn: 1 }))
+    const [next, commands, output] = updateWith(model, eventFrame(5, { _tag: "TurnStarted", turn: 1 }))
 
     expect(next).toEqual(model)
     expect(commands).toEqual([])
-    expect(Option.isNone(out)).toBe(true)
+    expect(Option.isNone(output)).toBe(true)
   })
 
   it("applies authoritative snapshots before ordinary sequence deduplication", () => {
@@ -152,8 +152,8 @@ describe("Chat", () => {
 
   it("surfaces approval suspension and emits approval commands", () => {
     let model = Chat.initialModel("s-chat")
-    let out: Option.Option<Chat.OutMessage> = Option.none()
-    ;[model, , out] = updateWith(
+    let output: Option.Option<Chat.Output> = Option.none()
+    ;[model, , output] = updateWith(
       model,
       Schema.decodeUnknownSync(Wire.LooseServerFrame)({
         _tag: "Suspended",
@@ -185,7 +185,7 @@ describe("Chat", () => {
       toolName: "lookup",
       params: { q: "baton" },
     })
-    expect(Option.getOrUndefined(out)).toEqual({ _tag: "ApprovalRequired" })
+    expect(Option.getOrUndefined(output)).toEqual({ _tag: "ApprovalRequired" })
 
     const [, commands] = Chat.update(model, Chat.ClickedApprove())
     expect(commands).toHaveLength(1)
@@ -209,15 +209,15 @@ describe("Chat", () => {
     expect(commands[0]).toMatchObject({ name: "SendUserMessage", args: { sessionId: "s-chat", text: "hello" } })
   })
 
-  it.effect("preserves a typed command failure as a structured message", () => {
+  it.effect("preserves a typed command failure as a structured action", () => {
     const error = Connection.SendFailed.make({ reason: "command rejected" })
     const command: Chat.ChatCommand = Chat.CancelRun({ sessionId: "s-chat" })
 
     return Effect.gen(function* () {
-      const message = yield* command.effect
+      const action = yield* command.effect
 
-      expect(message).toEqual(Chat.FailedAgentCommand({ operation: "cancel", error, reason: "command rejected" }))
-      expect(Schema.is(Chat.Message)(message)).toBe(true)
+      expect(action).toEqual(Chat.FailedAgentCommand({ operation: "cancel", error, reason: "command rejected" }))
+      expect(Schema.is(Chat.Action)(action)).toBe(true)
     }).pipe(
       provideTestLayer(
         Connection.testLayer({
@@ -231,9 +231,9 @@ describe("Chat", () => {
   it.effect("retains transport command error tags and fields", () => {
     const error = Errors.TransportError.make({ message: "socket closed" })
     return Effect.gen(function* () {
-      const message = yield* Chat.SendUserMessage({ sessionId: "s-chat", text: "hello" }).effect
+      const action = yield* Chat.SendUserMessage({ sessionId: "s-chat", text: "hello" }).effect
 
-      expect(message).toEqual(Chat.FailedAgentCommand({ operation: "send", error, reason: "socket closed" }))
+      expect(action).toEqual(Chat.FailedAgentCommand({ operation: "send", error, reason: "socket closed" }))
     }).pipe(
       provideTestLayer(
         Connection.testLayer({
@@ -247,14 +247,14 @@ describe("Chat", () => {
   it.effect("labels approval command failures", () => {
     const error = Connection.SendFailed.make({ reason: "approval rejected" })
     return Effect.gen(function* () {
-      const message = yield* Chat.ResolveApproval({
+      const action = yield* Chat.ResolveApproval({
         sessionId: "s-chat",
         token: "approval-token",
         approved: false,
         reason: null,
       }).effect
 
-      expect(message).toEqual(
+      expect(action).toEqual(
         Chat.FailedAgentCommand({ operation: "resolveApproval", error, reason: "approval rejected" }),
       )
     }).pipe(
@@ -267,7 +267,7 @@ describe("Chat", () => {
     )
   })
 
-  it.effect("keeps command defects and interruption out of UI messages", () => {
+  it.effect("keeps command defects and interruption out of UI actions", () => {
     const commandExit = (send: Connection.Interface["send"]) =>
       Chat.CancelRun({ sessionId: "s-chat" }).effect.pipe(
         provideTestLayer(

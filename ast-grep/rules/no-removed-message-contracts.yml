@@ -1,0 +1,91 @@
+id: no-removed-message-contracts
+language: TypeScript
+severity: error
+message: Use Steering.Input, Chat.Action, or Chat.Output for non-conversational values.
+rule:
+  any:
+    - all:
+        - kind: nested_type_identifier
+        - has:
+            field: module
+            regex: ^Steering$
+        - has:
+            field: name
+            regex: ^Message$
+    - all:
+        - kind: nested_type_identifier
+        - has:
+            field: module
+            regex: ^Chat$
+        - has:
+            field: name
+            regex: ^(Message|OutMessage)$
+    - all:
+        - kind: member_expression
+        - has:
+            kind: identifier
+            regex: ^Steering$
+            stopBy: end
+        - has:
+            field: property
+            regex: ^Message$
+    - all:
+        - kind: member_expression
+        - has:
+            kind: identifier
+            regex: ^Chat$
+            stopBy: end
+        - has:
+            field: property
+            regex: ^(Message|OutMessage)$
+    - all:
+        - kind: subscript_expression
+        - has:
+            kind: identifier
+            regex: ^Steering$
+            stopBy: end
+        - has:
+            field: index
+            regex: ^["'`]Message["'`]$
+    - all:
+        - kind: subscript_expression
+        - has:
+            kind: identifier
+            regex: ^Chat$
+            stopBy: end
+        - has:
+            field: index
+            regex: ^["'`](Message|OutMessage)["'`]$
+    - all:
+        - kind: lookup_type
+        - has:
+            kind: identifier
+            regex: ^Steering$
+            stopBy: end
+        - has:
+            kind: string_fragment
+            regex: ^Message$
+            stopBy: end
+    - all:
+        - kind: lookup_type
+        - has:
+            kind: identifier
+            regex: ^Chat$
+            stopBy: end
+        - has:
+            kind: string_fragment
+            regex: ^(Message|OutMessage)$
+            stopBy: end
+files:
+  - "packages/**/*.ts"
+  - "packages/**/*.tsx"
+  - "apps/**/*.ts"
+  - "apps/**/*.tsx"
+  - "examples/**/*.ts"
+  - "examples/**/*.tsx"
+  - "scripts/**/*.ts"
+  - "scripts/**/*.tsx"
+ignores:
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "node_modules/**"

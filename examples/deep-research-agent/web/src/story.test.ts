@@ -5,14 +5,13 @@ import { Chat } from "@batonfx/foldkit"
 import { Wire } from "@batonfx/transport"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
-import { GotChatMessage, OpenedSession, SessionReady, init, type Model, update } from "./main"
+import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } from "./main"
 
 const sessionId = "deep-research-story"
 
 const eventFrame = (seq: number, event: Wire.EventType): Wire.LooseServerFrameType => ({ _tag: "Event", seq, event })
 
-const agentMessage = (incoming: Wire.LooseServerFrameType) =>
-  GotChatMessage({ message: Chat.ReceivedAgent({ incoming }) })
+const agentAction = (incoming: Wire.LooseServerFrameType) => GotChatAction({ action: Chat.ReceivedAgent({ incoming }) })
 
 const readyModel = (): Model => {
   const [model] = update(init()[0], OpenedSession({ sessionId }))
@@ -22,9 +21,9 @@ const readyModel = (): Model => {
 const submittedQuestionModel = (): Model => {
   const [drafted] = update(
     readyModel(),
-    GotChatMessage({ message: Chat.ChangedDraft({ text: "What makes Baton standalone?" }) }),
+    GotChatAction({ action: Chat.ChangedDraft({ text: "What makes Baton standalone?" }) }),
   )
-  const [submitted, commands] = update(drafted, GotChatMessage({ message: Chat.SubmittedMessage() }))
+  const [submitted, commands] = update(drafted, GotChatAction({ action: Chat.SubmittedMessage() }))
   expect(commands).toHaveLength(1)
   expect(commands[0]?.name).toBe("SendUserMessage")
   expect(submitted.chat.entries).toEqual([Chat.UserEntry({ text: "What makes Baton standalone?" })])
@@ -78,7 +77,7 @@ describe("deep-research-agent web update", () => {
     Story.story(
       update,
       Story.with(submittedQuestionModel()),
-      ...completionFrames.map((frame) => Story.message(agentMessage(frame))),
+      ...completionFrames.map((frame) => Story.message(agentAction(frame))),
       Story.model((model) => {
         expect(model.chat.run._tag).toBe("Idle")
         expect(model.chat.connection).toBe("open")
@@ -129,11 +128,9 @@ describe("deep-research-agent web update", () => {
         ...readyModel(),
         chat: { ...readyModel().chat, run: Chat.Running({ turn: 0 }) },
       }),
-      Story.message(GotChatMessage({ message: Chat.ClickedCancel() })),
+      Story.message(GotChatAction({ action: Chat.ClickedCancel() })),
       Story.Command.expectExact(Chat.CancelRun({ sessionId })),
-      Story.Command.resolve(Chat.CancelRun({ sessionId }), Chat.CancelledRun(), (message) =>
-        GotChatMessage({ message }),
-      ),
+      Story.Command.resolve(Chat.CancelRun({ sessionId }), Chat.CancelledRun(), (action) => GotChatAction({ action })),
       Story.model((model) => {
         expect(model.chat.run).toEqual(Chat.Running({ turn: 0 }))
       }),
@@ -162,7 +159,7 @@ describe("deep-research-agent web update", () => {
         },
       }),
       Story.message(
-        agentMessage({
+        agentAction({
           _tag: "Failed",
           seq: 9,
           error: new AgentEvent.AgentError({ message: "model unavailable", turn: 0 }),

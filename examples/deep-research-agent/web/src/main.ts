@@ -53,14 +53,14 @@ export type Model = typeof Model.Type
 
 // MESSAGE
 
-export const GotChatMessage = m("GotChatMessage", { message: Chat.Message })
+export const GotChatAction = m("GotChatAction", { action: Chat.Action })
 export const GotScrollerMessage = m("GotScrollerMessage", { message: MessageScrollerMessage })
 export const OpenedSession = m("OpenedSession", { sessionId: Schema.String })
 export const FailedOpenSession = m("FailedOpenSession", { reason: Schema.String })
 export const ToggledExpanded = m("ToggledExpanded", { key: Schema.String })
 
 export const Message = Schema.Union([
-  GotChatMessage,
+  GotChatAction,
   GotScrollerMessage,
   OpenedSession,
   FailedOpenSession,
@@ -124,11 +124,11 @@ export const update = (model: Model, currentMessage: Message): readonly [Model, 
       return [{ ...model, chat: { ...model.chat, sessionId: currentMessage.sessionId }, session: SessionReady() }, []]
     case "FailedOpenSession":
       return [{ ...model, session: SessionFailed({ message: currentMessage.reason }) }, []]
-    case "GotChatMessage": {
-      const [chat, chatCommands] = Chat.update(model.chat, currentMessage.message)
+    case "GotChatAction": {
+      const [chat, chatCommands] = Chat.update(model.chat, currentMessage.action)
       return [
         { ...model, chat },
-        asProgramCommands(mapMessages(chatCommands, (chatMessage) => GotChatMessage({ message: chatMessage }))),
+        asProgramCommands(mapMessages(chatCommands, (chatAction) => GotChatAction({ action: chatAction }))),
       ]
     }
     case "GotScrollerMessage": {
@@ -149,7 +149,7 @@ export const update = (model: Model, currentMessage: Message): readonly [Model, 
 
 export const subscriptions: Subscriptions<Model, Message, Connection.AgentConnection> = lift(Chat.subscriptions)({
   toChildModel: (model: Model) => model.chat,
-  toParentMessage: (chatMessage) => GotChatMessage({ message: chatMessage }),
+  toParentMessage: (chatAction) => GotChatAction({ action: chatAction }),
 })
 
 // VIEW
@@ -453,22 +453,22 @@ const footerView = (model: Model): Html => {
   const isReady = model.session._tag === "SessionReady"
   const isCancellable =
     model.chat.sessionId !== null && (model.chat.run._tag === "Running" || model.chat.run._tag === "AwaitingApproval")
-  const submitMessage = GotChatMessage({ message: Chat.SubmittedMessage() })
-  const cancelMessage = GotChatMessage({ message: Chat.ClickedCancel() })
-  return promptInput({ class: "mx-auto w-full max-w-3xl", onSubmitted: submitMessage }, [
+  const submitAction = GotChatAction({ action: Chat.SubmittedMessage() })
+  const cancelAction = GotChatAction({ action: Chat.ClickedCancel() })
+  return promptInput({ class: "mx-auto w-full max-w-3xl", onSubmitted: submitAction }, [
     promptInputTextarea({
       id: "research-question",
       value: model.chat.draft,
       placeholder: "Ask a research question…",
       isDisabled: !isReady,
-      onInput: (value) => GotChatMessage({ message: Chat.ChangedDraft({ text: value }) }),
-      onSubmitRequested: submitMessage,
+      onInput: (value) => GotChatAction({ action: Chat.ChangedDraft({ text: value }) }),
+      onSubmitRequested: submitAction,
     }),
     promptInputToolbar({}, [
       promptInputSubmit({
         status: Chat.promptInputStatusOf(model.chat.run),
         type: isCancellable ? "button" : "submit",
-        onClick: isCancellable ? cancelMessage : undefined,
+        onClick: isCancellable ? cancelAction : undefined,
         isDisabled: !isReady || (!isCancellable && model.chat.draft.trim().length === 0),
       }),
     ]),
