@@ -8,15 +8,71 @@ import { addInputSchema, makeFixture, makeFixtureWith, statsOutputSchema } from 
 describe("McpToolSource", () => {
   it.effect("preserves connection details for non-OAuth transports", () =>
     Effect.gen(function* () {
+      const state = { open: false, closes: 0 }
       const transport: Transport = {
-        start: () => Promise.reject(new Error("custom transport unavailable")),
+        start: () => {
+          state.open = true
+          return Promise.reject(new Error("custom transport unavailable"))
+        },
         send: () => Promise.resolve(),
-        close: () => Promise.resolve(),
+        close: () => {
+          if (state.open) {
+            state.open = false
+            state.closes += 1
+          }
+          return Promise.resolve()
+        },
       }
       const error = yield* McpToolSource.fromTransport("custom", transport).pipe(Effect.flip, Effect.scoped)
 
       expect(error).toBeInstanceOf(McpToolSource.McpConnectionError)
       expect(error.message).toContain("custom transport unavailable")
+      expect(state.open).toBe(false)
+      expect(state.closes).toBe(1)
+    }),
+  )
+
+  it.effect("releases a transport when interrupted during connect", () =>
+    Effect.gen(function* () {
+      const connectStarted = yield* Deferred.make<void>()
+      const allowConnect = yield* Deferred.make<void>()
+      const connected = yield* Deferred.make<void>()
+      const runtime = yield* Effect.context<never>()
+      const state = { open: false, closes: 0 }
+      const transport: Transport = {
+        sessionId: "existing-session",
+        start: () =>
+          Effect.runPromiseWith(runtime)(
+            Deferred.succeed(connectStarted, undefined).pipe(
+              Effect.andThen(Deferred.await(allowConnect)),
+              Effect.andThen(
+                Effect.sync(() => {
+                  state.open = true
+                }),
+              ),
+              Effect.andThen(Deferred.succeed(connected, undefined)),
+              Effect.asVoid,
+            ),
+          ),
+        send: () => Promise.resolve(),
+        close: () => {
+          if (state.open) {
+            state.open = false
+            state.closes += 1
+          }
+          return Promise.resolve()
+        },
+      }
+      const fiber = yield* McpToolSource.fromTransport("custom", transport).pipe(Effect.scoped, Effect.forkChild)
+      yield* Deferred.await(connectStarted)
+      const interruption = yield* Fiber.interrupt(fiber).pipe(Effect.forkChild({ startImmediately: true }))
+
+      yield* Deferred.succeed(allowConnect, undefined)
+      yield* Deferred.await(connected)
+      yield* Fiber.join(interruption)
+
+      expect(state.open).toBe(false)
+      expect(state.closes).toBe(1)
     }),
   )
 

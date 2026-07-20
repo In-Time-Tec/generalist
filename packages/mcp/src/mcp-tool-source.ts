@@ -153,13 +153,16 @@ export const fromTransport: {
   (name: string, transport: Transport, options?: CallOptions) =>
     Effect.gen(function* () {
       const client = yield* Effect.acquireRelease(
-        Effect.sync(() => new Client({ name: `@batonfx/mcp:${name}`, version: "0.0.0" })),
+        Effect.gen(function* () {
+          const connectedClient = new Client({ name: `@batonfx/mcp:${name}`, version: "0.0.0" })
+          yield* Effect.tryPromise({
+            try: () => connectedClient.connect(transport),
+            catch: (error) => connectionError(name, error),
+          }).pipe(Effect.tapError(() => Effect.tryPromise(() => connectedClient.close()).pipe(Effect.ignore)))
+          return connectedClient
+        }),
         (connected) => Effect.tryPromise(() => connected.close()).pipe(Effect.ignore),
       )
-      yield* Effect.tryPromise({
-        try: () => client.connect(transport),
-        catch: (error) => connectionError(name, error),
-      })
 
       const listed = yield* Effect.tryPromise({
         try: () => client.listTools(),
