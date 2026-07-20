@@ -23,6 +23,13 @@
         "ignoreEffectSuggestionsInTscExitCode": false,
         "ignoreEffectWarningsInTscExitCode": false,
         "ignoreEffectErrorsInTscExitCode": false,
+        "keyPatterns": [
+          {
+            "target": "custom",
+            "pattern": "default",
+            "skipLeadingPath": ["src/"]
+          }
+        ],
         "diagnosticSeverity": {
           "anyUnknownInErrorContext": "error",
           "asyncFunction": "error",

@@ -67,7 +67,7 @@ export interface TokenStoreInterface {
 }
 
 /** @experimental */
-export class TokenStore extends Context.Service<TokenStore, TokenStoreInterface>()("@batonfx/mcp/oauth/TokenStore") {}
+export class TokenStore extends Context.Service<TokenStore, TokenStoreInterface>()("@batonfx/mcp/TokenStore") {}
 
 /** @experimental */
 export const tokenStoreTestLayer = (implementation: TokenStoreInterface): Layer.Layer<TokenStore> =>
@@ -127,7 +127,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class OAuth extends Context.Service<OAuth, Interface>()("@batonfx/mcp/oauth") {}
+export class OAuth extends Context.Service<OAuth, Interface>()("@batonfx/mcp/OAuth") {}
 
 type OAuthFlow =
   | { readonly _tag: "Idle" }

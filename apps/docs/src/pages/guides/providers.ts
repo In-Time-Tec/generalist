@@ -55,7 +55,7 @@ export const providers = definePage({
       "A ",
       code("with*"),
       " layer provides ",
-      code("ModelRegistry.Service"),
+      code("ModelRegistry.ModelRegistry"),
       ", not ",
       code("Ai.LanguageModel"),
       ". Providing it where a run expects a language model fails with a missing-service error, so always pair it with ",

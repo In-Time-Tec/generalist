@@ -131,7 +131,7 @@ export const providersReference = definePage({
       " and ",
       code("clientConfig"),
       " and returns an integrated ",
-      code("ModelRegistry.Service"),
+      code("ModelRegistry.ModelRegistry"),
       " layer requiring ",
       code("HttpClient.HttpClient"),
       ". Each matching ",

@@ -84,9 +84,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ToolExecutor extends Context.Service<ToolExecutor, Interface>()(
-  "@batonfx/core/tool-executor/ToolExecutor",
-) {}
+export class ToolExecutor extends Context.Service<ToolExecutor, Interface>()("@batonfx/core/ToolExecutor") {}
 
 /** @experimental */
 export type ToolkitInput<Tools extends Record<string, Tool.Any>> = Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>

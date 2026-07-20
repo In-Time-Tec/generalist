@@ -108,7 +108,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Memory extends Context.Service<Memory, Interface>()("@batonfx/core/memory") {}
+export class Memory extends Context.Service<Memory, Interface>()("@batonfx/core/Memory") {}
 
 const noop: Interface = {
   recall: () => Effect.succeed([]),

@@ -69,7 +69,7 @@ const handoffRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<
     Equal<
       EffectRequirements<typeof requirementFanOut>,
-      LanguageModel.LanguageModel | Memory.Memory | ModelRegistry.Service
+      LanguageModel.LanguageModel | Memory.Memory | ModelRegistry.ModelRegistry
     >
   >,
   true satisfies Assert<
@@ -90,7 +90,10 @@ const handoffRequirementProofs: ReadonlyArray<true> = [
     Equal<Memory.Memory extends Agent.Requirements<typeof requirementSupervisor.agent> ? true : false, true>
   >,
   true satisfies Assert<
-    Equal<ModelRegistry.Service extends Agent.Requirements<typeof requirementSupervisor.agent> ? true : false, true>
+    Equal<
+      ModelRegistry.ModelRegistry extends Agent.Requirements<typeof requirementSupervisor.agent> ? true : false,
+      true
+    >
   >,
   true satisfies Assert<
     Equal<

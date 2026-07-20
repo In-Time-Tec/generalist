@@ -29,7 +29,7 @@ class Fixture extends Context.Service<Fixture, TestModel.Fixture>()("@batonfx/te
 const fixtureLayer = (
   script: ReadonlyArray<TestModel.Step>,
   options?: TestModel.MakeOptions,
-): Layer.Layer<Fixture | LanguageModel.LanguageModel | ModelRegistry.Service> =>
+): Layer.Layer<Fixture | LanguageModel.LanguageModel | ModelRegistry.ModelRegistry> =>
   Layer.unwrap(
     TestModel.make(script, options).pipe(
       Effect.map((fixture) => Layer.mergeAll(Layer.succeed(Fixture, fixture), fixture.layer, fixture.registryLayer)),

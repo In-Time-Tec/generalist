@@ -64,7 +64,7 @@ export interface AgentClientInterface {
 
 /** @experimental */
 export class AgentClient extends Context.Service<AgentClient, AgentClientInterface>()(
-  "@batonfx/transport/client/AgentClient",
+  "@batonfx/transport/AgentClient",
 ) {}
 
 const ServerFrameJson = Schema.fromJsonString(LooseServerFrame)

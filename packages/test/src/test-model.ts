@@ -88,7 +88,7 @@ export interface Fixture {
   readonly layer: Layer.Layer<LanguageModel.LanguageModel>
   readonly selection: ModelRegistry.ModelSelection
   readonly registration: ModelRegistry.Registration
-  readonly registryLayer: Layer.Layer<ModelRegistry.Service>
+  readonly registryLayer: Layer.Layer<ModelRegistry.ModelRegistry>
   readonly requests: Effect.Effect<ReadonlyArray<Request>>
   readonly prompts: Effect.Effect<ReadonlyArray<Prompt.Prompt>>
   readonly remaining: Effect.Effect<number>
@@ -384,8 +384,11 @@ export const layer: {
 export const registryLayer: {
   (
     governance?: ModelRegistry.GovernanceOptions,
-  ): (fixtures: ReadonlyArray<Fixture>) => Layer.Layer<ModelRegistry.Service>
-  (fixtures: ReadonlyArray<Fixture>, governance?: ModelRegistry.GovernanceOptions): Layer.Layer<ModelRegistry.Service>
+  ): (fixtures: ReadonlyArray<Fixture>) => Layer.Layer<ModelRegistry.ModelRegistry>
+  (
+    fixtures: ReadonlyArray<Fixture>,
+    governance?: ModelRegistry.GovernanceOptions,
+  ): Layer.Layer<ModelRegistry.ModelRegistry>
 } = Function.dual(
   (args) => Array.isArray(args[0]),
   (fixtures: ReadonlyArray<Fixture>, governance?: ModelRegistry.GovernanceOptions) =>

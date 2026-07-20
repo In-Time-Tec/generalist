@@ -38,9 +38,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ModelCatalog extends Context.Service<ModelCatalog, Interface>()(
-  "@batonfx/providers/catalog/ModelCatalog",
-) {}
+export class ModelCatalog extends Context.Service<ModelCatalog, Interface>()("@batonfx/providers/ModelCatalog") {}
 
 /** @experimental Hand-maintained static metadata snapshot. */
 export const bundled: ReadonlyArray<ModelMetadata> = [

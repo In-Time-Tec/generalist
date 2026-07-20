@@ -92,7 +92,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Service extends Context.Service<Service, Interface>()("@batonfx/core/model-registry/Service") {}
+export class ModelRegistry extends Context.Service<ModelRegistry, Interface>()("@batonfx/core/ModelRegistry") {}
 
 /** @experimental */
 export type ModelEnvironment = LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName
@@ -144,7 +144,7 @@ export const registration = <R>(input: {
 
 const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: GovernanceOptions) =>
   Layer.effect(
-    Service,
+    ModelRegistry,
     Effect.gen(function* () {
       const registry = yield* Ref.make<Registry>(initialRegistrations.reduce(upsertRegistration, Chunk.empty()))
 
@@ -205,7 +205,7 @@ const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: 
           }),
         )
 
-      return Service.of({
+      return ModelRegistry.of({
         register,
         registrations,
         operate,
@@ -217,22 +217,22 @@ const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: 
 
 /** @experimental */
 export const layer: {
-  (): Layer.Layer<Service>
+  (): Layer.Layer<ModelRegistry>
   <E = never, R = never>(
     options?: GovernanceOptions,
   ): (
     registrations?: ReadonlyArray<Effect.Effect<Registration, E, R>>,
-  ) => Layer.Layer<Service, E, Exclude<R, Scope.Scope>>
+  ) => Layer.Layer<ModelRegistry, E, Exclude<R, Scope.Scope>>
   <E = never, R = never>(
     registrations?: ReadonlyArray<Effect.Effect<Registration, E, R>>,
     options?: GovernanceOptions,
-  ): Layer.Layer<Service, E, Exclude<R, Scope.Scope>>
+  ): Layer.Layer<ModelRegistry, E, Exclude<R, Scope.Scope>>
 } = Function.dual(
   (args) => args.length === 0 || args.length > 1 || Array.isArray(args[0]),
   <E = never, R = never>(
     registrations: ReadonlyArray<Effect.Effect<Registration, E, R>> = [],
     options?: GovernanceOptions,
-  ): Layer.Layer<Service, E, Exclude<R, Scope.Scope>> =>
+  ): Layer.Layer<ModelRegistry, E, Exclude<R, Scope.Scope>> =>
     Layer.unwrap(
       Effect.all(registrations).pipe(Effect.map((initialRegistrations) => makeLayer(initialRegistrations, options))),
     ),
@@ -242,20 +242,20 @@ export const layer: {
 export const combine: {
   <E = never, R = never>(
     options?: GovernanceOptions,
-  ): (registries: ReadonlyArray<Layer.Layer<Service, E, R>>) => Layer.Layer<Service, E, R>
+  ): (registries: ReadonlyArray<Layer.Layer<ModelRegistry, E, R>>) => Layer.Layer<ModelRegistry, E, R>
   <E = never, R = never>(
-    registries: ReadonlyArray<Layer.Layer<Service, E, R>>,
+    registries: ReadonlyArray<Layer.Layer<ModelRegistry, E, R>>,
     options?: GovernanceOptions,
-  ): Layer.Layer<Service, E, R>
+  ): Layer.Layer<ModelRegistry, E, R>
 } = Function.dual(
   (args) => args.length !== 1 || Array.isArray(args[0]),
   <E = never, R = never>(
-    registries: ReadonlyArray<Layer.Layer<Service, E, R>>,
+    registries: ReadonlyArray<Layer.Layer<ModelRegistry, E, R>>,
     options?: GovernanceOptions,
-  ): Layer.Layer<Service, E, R> =>
+  ): Layer.Layer<ModelRegistry, E, R> =>
     Layer.unwrap(
       Effect.forEach(registries, (registry) =>
-        Layer.build(registry).pipe(Effect.flatMap((context) => Context.get(context, Service).registrations)),
+        Layer.build(registry).pipe(Effect.flatMap((context) => Context.get(context, ModelRegistry).registrations)),
       ).pipe(Effect.map((groups) => makeLayer(groups.flat(), options))),
     ),
 )
@@ -270,17 +270,17 @@ export const layerMemory: typeof layer = layer
 export const memoryLayer: typeof layerMemory = layerMemory
 
 /** @experimental */
-export const testLayer = (implementation: Interface) => Layer.succeed(Service, Service.of(implementation))
+export const testLayer = (implementation: Interface) => Layer.succeed(ModelRegistry, ModelRegistry.of(implementation))
 
 /** @experimental */
 export const register = Effect.fn("ModelRegistry.register.call")(function* (input: RegisterInput) {
-  const service = yield* Service
+  const service = yield* ModelRegistry
   return yield* service.register(input)
 })
 
 /** @experimental */
 export const registrations = Effect.fn("ModelRegistry.registrations.call")(function* () {
-  const service = yield* Service
+  const service = yield* ModelRegistry
   return yield* service.registrations
 })
 
@@ -290,14 +290,14 @@ export const operate: {
     effect: Effect.Effect<A, E, R>,
   ): (
     selection: ModelSelection,
-  ) => Effect.Effect<A, E | LanguageModelNotRegistered, Service | Exclude<R, ModelEnvironment>>
+  ) => Effect.Effect<A, E | LanguageModelNotRegistered, ModelRegistry | Exclude<R, ModelEnvironment>>
   <A, E, R>(
     selection: ModelSelection,
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | LanguageModelNotRegistered, Service | Exclude<R, ModelEnvironment>>
+  ): Effect.Effect<A, E | LanguageModelNotRegistered, ModelRegistry | Exclude<R, ModelEnvironment>>
 } = Function.dual(2, <A, E, R>(selection: ModelSelection, effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
-    const service = yield* Service
+    const service = yield* ModelRegistry
     return yield* service.operate(selection, effect)
   }),
 )
@@ -308,13 +308,13 @@ export const stream: {
     operation: Stream.Stream<A, E, R>,
   ): (
     selection: ModelSelection,
-  ) => Stream.Stream<A, E | LanguageModelNotRegistered, Service | Exclude<R, ModelEnvironment>>
+  ) => Stream.Stream<A, E | LanguageModelNotRegistered, ModelRegistry | Exclude<R, ModelEnvironment>>
   <A, E, R>(
     selection: ModelSelection,
     operation: Stream.Stream<A, E, R>,
-  ): Stream.Stream<A, E | LanguageModelNotRegistered, Service | Exclude<R, ModelEnvironment>>
+  ): Stream.Stream<A, E | LanguageModelNotRegistered, ModelRegistry | Exclude<R, ModelEnvironment>>
 } = Function.dual(2, <A, E, R>(selection: ModelSelection, operation: Stream.Stream<A, E, R>) =>
-  Stream.unwrap(Service.pipe(Effect.map((service) => service.stream(selection, operation)))),
+  Stream.unwrap(ModelRegistry.pipe(Effect.map((service) => service.stream(selection, operation)))),
 )
 
 /**

@@ -16,7 +16,7 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import { type Key, Memory } from "./memory.js"
-import { type LanguageModelNotRegistered, type ModelSelection, Service } from "./model-registry.js"
+import { type LanguageModelNotRegistered, type ModelSelection, ModelRegistry } from "./model-registry.js"
 import type { ToolAuthorizer } from "./tool-authorization.js"
 import { ToolContext } from "./tool-context.js"
 import { FrameworkFailure } from "./tool-executor.js"
@@ -94,8 +94,8 @@ type OptionValue<O, K extends PropertyKey> = K extends keyof O ? O[K] : never
 type ModelRequirement<O> = [Exclude<OptionValue<O, "model">, undefined>] extends [never]
   ? LanguageModel.LanguageModel
   : undefined extends OptionValue<O, "model">
-    ? LanguageModel.LanguageModel | Service
-    : Service
+    ? LanguageModel.LanguageModel | ModelRegistry
+    : ModelRegistry
 type MemoryRequirement<O> = [Exclude<OptionValue<O, "memory">, undefined>] extends [never] ? never : Memory
 type PolicyRequirement<O> = O extends { readonly policy: TurnPolicy<infer R> } ? R : never
 type AuthorizationRequirement<O> = O extends { readonly authorization: ToolAuthorizer<infer R> } ? R : never

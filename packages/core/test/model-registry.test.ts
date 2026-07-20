@@ -24,9 +24,9 @@ describe("ModelRegistry", () => {
     const dataLast = ModelRegistry.layer({})([registration])
     const empty = ModelRegistry.layer()
     const inference: Assert<
-      Equal<typeof dataFirst, Layer.Layer<ModelRegistry.Service>> &
-        Equal<typeof dataLast, Layer.Layer<ModelRegistry.Service>> &
-        Equal<typeof empty, Layer.Layer<ModelRegistry.Service>>
+      Equal<typeof dataFirst, Layer.Layer<ModelRegistry.ModelRegistry>> &
+        Equal<typeof dataLast, Layer.Layer<ModelRegistry.ModelRegistry>> &
+        Equal<typeof empty, Layer.Layer<ModelRegistry.ModelRegistry>>
     > = true
 
     expect(inference).toBe(true)

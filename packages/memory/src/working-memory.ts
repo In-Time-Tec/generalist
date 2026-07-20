@@ -26,7 +26,7 @@ export interface ComposedOptions {
 
 /** @experimental */
 export class SummaryModel extends Context.Service<SummaryModel, LanguageModel.Service>()(
-  "@batonfx/memory/working-memory/SummaryModel",
+  "@batonfx/memory/SummaryModel",
 ) {}
 
 /** @experimental */

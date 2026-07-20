@@ -42,7 +42,7 @@ import {
   classifyFailure as classifyModelFailure,
   type FailureClassifier,
   type LanguageModelNotRegistered,
-  Service,
+  ModelRegistry,
 } from "./model-registry.js"
 import { ModelResilience, apply } from "./model-resilience.js"
 import { Permissions, RuleStore } from "./permissions.js"
@@ -377,7 +377,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       )
 
       const resilienceService = yield* Effect.serviceOption(ModelResilience)
-      const modelRegistryService = yield* Effect.serviceOption(Service)
+      const modelRegistryService = yield* Effect.serviceOption(ModelRegistry)
       const permissionsService = yield* Effect.serviceOption(Permissions)
       const ruleStoreService = yield* Effect.serviceOption(RuleStore)
       const authorizationService = yield* Effect.serviceOption(ToolAuthorizerService)
@@ -1268,10 +1268,10 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           ? effect
           : agentModelRegistry.operate(agentModel, effect)
 
-      function provideAgentModel<A, E, R2>(stream: Stream.Stream<A, E, R2>): Stream.Stream<A, E, R2 | Service>
+      function provideAgentModel<A, E, R2>(stream: Stream.Stream<A, E, R2>): Stream.Stream<A, E, R2 | ModelRegistry>
       function provideAgentModel<A, E, R2>(
         stream: Stream.Stream<A, E, R2>,
-      ): Stream.Stream<A, E | AgentError, R2 | Service> {
+      ): Stream.Stream<A, E | AgentError, R2 | ModelRegistry> {
         return agentModelRegistry === undefined || agentModel === undefined
           ? stream
           : agentModelRegistry

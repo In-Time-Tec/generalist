@@ -63,7 +63,7 @@ export const coreModelsReference = definePage({
       "Provider helpers like ",
       code("Deterministic.withDeterministic()"),
       " return a ",
-      code("ModelRegistry.Service"),
+      code("ModelRegistry.ModelRegistry"),
       " layer, not a ",
       code("LanguageModel"),
       " layer. Wrap the run in ",

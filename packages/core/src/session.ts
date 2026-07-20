@@ -147,7 +147,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class SessionStore extends Context.Service<SessionStore, Interface>()("@batonfx/core/session/SessionStore") {}
+export class SessionStore extends Context.Service<SessionStore, Interface>()("@batonfx/core/SessionStore") {}
 
 interface State {
   readonly entries: HashMap.HashMap<EntryId, Entry>

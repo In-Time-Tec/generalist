@@ -88,7 +88,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Permissions extends Context.Service<Permissions, Interface>()("@batonfx/core/permissions") {}
+export class Permissions extends Context.Service<Permissions, Interface>()("@batonfx/core/Permissions") {}
 
 /** @experimental Optional remembered-rule store. */
 export interface RuleStoreInterface {
@@ -97,9 +97,7 @@ export interface RuleStoreInterface {
 }
 
 /** @experimental */
-export class RuleStore extends Context.Service<RuleStore, RuleStoreInterface>()(
-  "@batonfx/core/permissions/RuleStore",
-) {}
+export class RuleStore extends Context.Service<RuleStore, RuleStoreInterface>()("@batonfx/core/RuleStore") {}
 
 const escapeRegExp = (value: string): string => value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&")
 

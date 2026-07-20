@@ -36,7 +36,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Steering extends Context.Service<Steering, Interface>()("@batonfx/core/steering") {}
+export class Steering extends Context.Service<Steering, Interface>()("@batonfx/core/Steering") {}
 
 /** @experimental Bounded steering queue rejected a message. */
 export class SteeringQueueFull extends Schema.TaggedErrorClass<SteeringQueueFull>()("@batonfx/core/SteeringQueueFull", {

@@ -101,17 +101,17 @@ const runBoundaryModelProvided = Agent.stream(memoryRequiredAgent, { prompt: "he
 
 const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<Equal<Agent.Requirements<typeof plainRequiredAgent>, LanguageModel.LanguageModel>>,
-  true satisfies Assert<Equal<Agent.Requirements<typeof selectedRequiredAgent>, ModelRegistry.Service>>,
+  true satisfies Assert<Equal<Agent.Requirements<typeof selectedRequiredAgent>, ModelRegistry.ModelRegistry>>,
   true satisfies Assert<
     Equal<Agent.Requirements<typeof memoryRequiredAgent>, LanguageModel.LanguageModel | Memory.Memory>
   >,
   true satisfies Assert<
-    Equal<Agent.Requirements<typeof selectedMemoryRequiredAgent>, ModelRegistry.Service | Memory.Memory>
+    Equal<Agent.Requirements<typeof selectedMemoryRequiredAgent>, ModelRegistry.ModelRegistry | Memory.Memory>
   >,
   true satisfies Assert<
     Equal<
       Agent.Requirements<typeof widenedRequiredAgent>,
-      LanguageModel.LanguageModel | ModelRegistry.Service | Memory.Memory
+      LanguageModel.LanguageModel | ModelRegistry.ModelRegistry | Memory.Memory
     >
   >,
   true satisfies Assert<

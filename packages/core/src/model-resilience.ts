@@ -10,9 +10,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ModelResilience extends Context.Service<ModelResilience, Interface>()(
-  "@batonfx/core/model-resilience/ModelResilience",
-) {}
+export class ModelResilience extends Context.Service<ModelResilience, Interface>()("@batonfx/core/ModelResilience") {}
 
 /** @experimental */
 export const defaultClassify = (error: unknown): Classification =>

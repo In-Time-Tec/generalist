@@ -95,7 +95,7 @@ export interface Interface {
 
 /** @experimental */
 export class SessionRegistry extends Context.Service<SessionRegistry, Interface>()(
-  "@batonfx/transport/session-registry/SessionRegistry",
+  "@batonfx/transport/SessionRegistry",
 ) {}
 
 /** @experimental */

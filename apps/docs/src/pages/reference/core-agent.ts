@@ -51,7 +51,7 @@ export const coreAgentReference = definePage({
       "; setting ",
       code("model"),
       " replaces it with ",
-      code("ModelRegistry.Service"),
+      code("ModelRegistry.ModelRegistry"),
       "; setting ",
       code("memory"),
       " adds ",
@@ -173,7 +173,7 @@ export const coreAgentReference = definePage({
       ["Service", "When it is needed"],
       [
         [[code("Ai.LanguageModel.LanguageModel")], ["When the agent has no ", code("model"), " default"]],
-        [[code("ModelRegistry.Service")], ["When the agent has a ", code("model"), " default"]],
+        [[code("ModelRegistry.ModelRegistry")], ["When the agent has a ", code("model"), " default"]],
         [[code("Ai.Tool.HandlersFor<Tools>")], ["When local toolkit handlers execute in-process"]],
         [[code("Memory.Memory")], ["When agent or run configuration selects a memory key"]],
         [[code("Ai.Chat.Persistence")], ["When RunOptions.persistence is set"]],

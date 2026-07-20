@@ -20,7 +20,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Instructions extends Context.Service<Instructions, Interface>()("@batonfx/core/instructions") {}
+export class Instructions extends Context.Service<Instructions, Interface>()("@batonfx/core/Instructions") {}
 
 /** @experimental Frozen baseline plus compatibility-only dynamic sources. */
 export interface ContextEpoch {

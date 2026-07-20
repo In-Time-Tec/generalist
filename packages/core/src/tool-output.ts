@@ -18,7 +18,7 @@ export interface StoreInterface {
 
 /** @experimental */
 export class ToolOutputStore extends Context.Service<ToolOutputStore, StoreInterface>()(
-  "@batonfx/core/tool-output/ToolOutputStore",
+  "@batonfx/core/ToolOutputStore",
 ) {}
 
 /** @experimental */
