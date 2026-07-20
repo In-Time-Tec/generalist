@@ -2,7 +2,6 @@ import { OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
 import { AiError } from "effect/unstable/ai"
-import { FetchHttpClient } from "effect/unstable/http"
 import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
@@ -36,34 +35,26 @@ export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
 }
 
 /** @experimental */
-export const openRouter = (input: OpenRouterInput) =>
-  ModelRegistry.registration({
-    provider: "openrouter",
-    model: input.model,
-    layer: OpenRouterLanguageModel.layer({
-      model: input.model,
-      ...(input.config === undefined ? {} : { config: input.config }),
-    }),
-    classifyFailure,
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  })
-
-/** @experimental */
-export const openRouterClientLayerConfig = OpenRouterClient.layerConfig
-
-/** @experimental */
-export interface WithOpenRouterOptions extends OpenRouterInput {
+export interface LayerOptions extends OpenRouterInput {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenRouterClient.layerConfig>[0]>, "apiKey">
 }
 
 /** @experimental */
-export const withOpenRouter = (options: WithOpenRouterOptions) =>
-  ModelRegistry.layer([openRouter(options)]).pipe(
-    Layer.provide(OpenRouterClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
-  )
+export const layer = (input: LayerOptions) =>
+  ModelRegistry.layer([
+    ModelRegistry.registration({
+      provider: "openrouter",
+      model: input.model,
+      layer: OpenRouterLanguageModel.layer({
+        model: input.model,
+        ...(input.config === undefined ? {} : { config: input.config }),
+      }),
+      classifyFailure,
+      ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
+      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+    }),
+  ]).pipe(Layer.provide(OpenRouterClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
 
 /** @experimental */
-export const withOpenRouterFetch = (options: WithOpenRouterOptions) =>
-  withOpenRouter(options).pipe(Layer.provide(FetchHttpClient.layer))
+export const layerConfig = OpenRouterClient.layerConfig

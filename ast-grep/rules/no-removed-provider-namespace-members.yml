@@ -1,0 +1,169 @@
+id: no-removed-provider-namespace-members
+language: TypeScript
+severity: error
+message: Provider construction is Layer-only; use the provider namespace's layer constructor.
+rule:
+  any:
+    - all:
+        - any:
+            - pattern: Anthropic.anthropic
+            - pattern: Anthropic.anthropicClientLayerConfig
+            - pattern: Anthropic.withAnthropic
+            - pattern: Anthropic.withAnthropicFetch
+        - inside:
+            kind: program
+            has:
+              any:
+                - pattern: import { Anthropic } from "@batonfx/providers"
+                - pattern: import * as Anthropic from "@batonfx/providers/anthropic"
+              stopBy: end
+            stopBy: end
+    - all:
+        - any:
+            - pattern: OpenAi.openAi
+            - pattern: OpenAi.openAiClientLayerConfig
+            - pattern: OpenAi.withOpenAi
+            - pattern: OpenAi.withOpenAiFetch
+            - pattern: OpenAi.openAiAccount
+            - pattern: OpenAi.withOpenAiAccount
+            - pattern: OpenAi.withOpenAiAccountFetch
+        - inside:
+            kind: program
+            has:
+              any:
+                - pattern: import { OpenAi } from "@batonfx/providers"
+                - pattern: import * as OpenAi from "@batonfx/providers/openai"
+              stopBy: end
+            stopBy: end
+    - all:
+        - any:
+            - pattern: OpenAiCompatible.openAiCompatible
+            - pattern: OpenAiCompatible.openAiCompatibleClientLayerConfig
+            - pattern: OpenAiCompatible.withOpenAiCompatible
+            - pattern: OpenAiCompatible.withOpenAiCompatibleFetch
+        - inside:
+            kind: program
+            has:
+              any:
+                - pattern: import { OpenAiCompatible } from "@batonfx/providers"
+                - pattern: import * as OpenAiCompatible from "@batonfx/providers/openai-compat"
+              stopBy: end
+            stopBy: end
+    - all:
+        - any:
+            - pattern: OpenRouter.openRouter
+            - pattern: OpenRouter.openRouterClientLayerConfig
+            - pattern: OpenRouter.withOpenRouter
+            - pattern: OpenRouter.withOpenRouterFetch
+        - inside:
+            kind: program
+            has:
+              any:
+                - pattern: import { OpenRouter } from "@batonfx/providers"
+                - pattern: import * as OpenRouter from "@batonfx/providers/openrouter"
+              stopBy: end
+            stopBy: end
+    - all:
+        - any:
+            - pattern: Deterministic.deterministicModel
+            - pattern: Deterministic.withDeterministic
+            - pattern: Deterministic.withOpenAiOrDeterministic
+            - pattern: Deterministic.withOpenAiOrDeterministicFetch
+        - inside:
+            kind: program
+            has:
+              any:
+                - pattern: import { Deterministic } from "@batonfx/providers"
+                - pattern: import * as Deterministic from "@batonfx/providers/deterministic"
+              stopBy: end
+            stopBy: end
+    - all:
+        - any:
+            - pattern: Embedding.withOpenAiEmbedding
+            - pattern: Embedding.withOpenAiEmbeddingFetch
+            - pattern: Embedding.withOpenAiCompatibleEmbedding
+            - pattern: Embedding.withOpenAiCompatibleEmbeddingFetch
+        - inside:
+            kind: program
+            has:
+              any:
+                - pattern: import { Embedding } from "@batonfx/providers"
+                - pattern: import * as Embedding from "@batonfx/providers/embedding"
+              stopBy: end
+            stopBy: end
+    - all:
+        - any:
+            - pattern: Presets.groq
+            - pattern: Presets.withGroq
+            - pattern: Presets.groqFetch
+            - pattern: Presets.withGroqFetch
+            - pattern: Presets.mistral
+            - pattern: Presets.withMistral
+            - pattern: Presets.mistralFetch
+            - pattern: Presets.withMistralFetch
+            - pattern: Presets.xai
+            - pattern: Presets.withXai
+            - pattern: Presets.xaiFetch
+            - pattern: Presets.withXaiFetch
+            - pattern: Presets.deepseek
+            - pattern: Presets.withDeepseek
+            - pattern: Presets.deepseekFetch
+            - pattern: Presets.withDeepseekFetch
+            - pattern: Presets.googleAiStudio
+            - pattern: Presets.withGoogleAiStudio
+            - pattern: Presets.googleAiStudioFetch
+            - pattern: Presets.withGoogleAiStudioFetch
+            - pattern: Presets.azureOpenAi
+            - pattern: Presets.withAzureOpenAi
+            - pattern: Presets.azureOpenAiFetch
+            - pattern: Presets.withAzureOpenAiFetch
+            - pattern: Presets.ollama
+            - pattern: Presets.withOllama
+            - pattern: Presets.ollamaFetch
+            - pattern: Presets.withOllamaFetch
+        - inside:
+            kind: program
+            has:
+              any:
+                - pattern: import { Presets } from "@batonfx/providers"
+                - pattern: import * as Presets from "@batonfx/providers/presets"
+              stopBy: end
+            stopBy: end
+    - all:
+        - pattern: $NAMESPACE.$API
+        - inside:
+            kind: program
+            has:
+              any:
+                - pattern: import { Anthropic as $NAMESPACE } from "@batonfx/providers"
+                - pattern: import { OpenAi as $NAMESPACE } from "@batonfx/providers"
+                - pattern: import { OpenAiCompatible as $NAMESPACE } from "@batonfx/providers"
+                - pattern: import { OpenRouter as $NAMESPACE } from "@batonfx/providers"
+                - pattern: import { Deterministic as $NAMESPACE } from "@batonfx/providers"
+                - pattern: import { Embedding as $NAMESPACE } from "@batonfx/providers"
+                - pattern: import { Presets as $NAMESPACE } from "@batonfx/providers"
+                - pattern: import * as $NAMESPACE from "@batonfx/providers/anthropic"
+                - pattern: import * as $NAMESPACE from "@batonfx/providers/openai"
+                - pattern: import * as $NAMESPACE from "@batonfx/providers/openai-compat"
+                - pattern: import * as $NAMESPACE from "@batonfx/providers/openrouter"
+                - pattern: import * as $NAMESPACE from "@batonfx/providers/deterministic"
+                - pattern: import * as $NAMESPACE from "@batonfx/providers/embedding"
+                - pattern: import * as $NAMESPACE from "@batonfx/providers/presets"
+              stopBy: end
+            stopBy: end
+constraints:
+  API:
+    regex: ^(anthropic|anthropicClientLayerConfig|withAnthropic|withAnthropicFetch|openAi|openAiClientLayerConfig|withOpenAi|withOpenAiFetch|openAiAccount|withOpenAiAccount|withOpenAiAccountFetch|openAiCompatible|openAiCompatibleClientLayerConfig|withOpenAiCompatible|withOpenAiCompatibleFetch|openRouter|openRouterClientLayerConfig|withOpenRouter|withOpenRouterFetch|deterministicModel|withDeterministic|withOpenAiOrDeterministic|withOpenAiOrDeterministicFetch|withOpenAiEmbedding|withOpenAiEmbeddingFetch|withOpenAiCompatibleEmbedding|withOpenAiCompatibleEmbeddingFetch|groq|withGroq|groqFetch|withGroqFetch|mistral|withMistral|mistralFetch|withMistralFetch|xai|withXai|xaiFetch|withXaiFetch|deepseek|withDeepseek|deepseekFetch|withDeepseekFetch|googleAiStudio|withGoogleAiStudio|googleAiStudioFetch|withGoogleAiStudioFetch|azureOpenAi|withAzureOpenAi|azureOpenAiFetch|withAzureOpenAiFetch|ollama|withOllama|ollamaFetch|withOllamaFetch)$
+files:
+  - "packages/**/*.ts"
+  - "packages/**/*.tsx"
+  - "apps/**/*.ts"
+  - "apps/**/*.tsx"
+  - "examples/**/*.ts"
+  - "examples/**/*.tsx"
+  - "scripts/**/*.ts"
+  - "scripts/**/*.tsx"
+ignores:
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "node_modules/**"

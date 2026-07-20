@@ -2,6 +2,7 @@ import { Config, Console, Effect, Layer } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "@batonfx/core"
 import { route } from "@batonfx/mcp/baton"
 import { OpenRouter } from "@batonfx/providers"
+import { FetchHttpClient } from "effect/unstable/http"
 
 const program = Effect.gen(function* () {
   const tools = yield* route({
@@ -20,7 +21,7 @@ const program = Effect.gen(function* () {
   ).pipe(
     Effect.provide(
       Layer.mergeAll(
-        OpenRouter.withOpenRouterFetch({
+        OpenRouter.layer({
           model: "openai/gpt-4o-mini",
           apiKey: Config.redacted("OPENROUTER_API_KEY"),
         }),
@@ -31,6 +32,6 @@ const program = Effect.gen(function* () {
     ),
   )
   yield* Console.log(result.text)
-}).pipe(Effect.scoped)
+}).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
 
 await Effect.runPromise(program)

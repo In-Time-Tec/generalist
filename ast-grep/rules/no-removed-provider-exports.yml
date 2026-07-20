@@ -1,0 +1,185 @@
+id: no-removed-provider-exports
+language: TypeScript
+severity: error
+message: Deleted provider construction families must not be exported.
+rule:
+  any:
+    - pattern: export const $API = $VALUE
+    - pattern: export let $API = $VALUE
+    - pattern: export var $API = $VALUE
+    - pattern: export function $API($$$PARAMS) { $$$BODY }
+    - pattern: export class $API { $$$BODY }
+    - pattern: export abstract class $API { $$$BODY }
+    - pattern: export interface $API { $$$FIELDS }
+    - pattern: export type $API = $TYPE
+    - pattern: export enum $API { $$$MEMBERS }
+    - pattern: export namespace $API { $$$BODY }
+    - pattern: export module $API { $$$BODY }
+    - pattern: "export declare const $API: $TYPE"
+    - pattern: "export declare let $API: $TYPE"
+    - pattern: "export declare var $API: $TYPE"
+    - pattern: "export declare function $API($$$PARAMS): $TYPE"
+    - pattern: export declare class $API { $$$BODY }
+    - pattern: export declare namespace $API { $$$BODY }
+    - pattern: export declare module $API { $$$BODY }
+    - pattern:
+        context: export { $VALUE as $API }
+        selector: export_statement
+    - pattern:
+        context: export { $API }
+        selector: export_statement
+    - pattern:
+        context: export type { $API }
+        selector: export_statement
+    - pattern:
+        context: export { type $API }
+        selector: export_statement
+    - pattern:
+        context: export type { $VALUE as $API } from "module"
+        selector: export_specifier
+    - pattern:
+        context: export { type $VALUE as $API } from "module"
+        selector: export_specifier
+    - pattern:
+        context: export type * as $API from "module"
+        selector: namespace_export
+    - pattern:
+        context: export * as $API from "$SOURCE"
+        selector: export_statement
+    - all:
+        - any:
+            - kind: identifier
+            - kind: type_identifier
+        - pattern: $API
+        - nthChild: 1
+        - inside:
+            any:
+              - all:
+                  - kind: variable_declarator
+                  - inside:
+                      all:
+                        - any:
+                            - kind: lexical_declaration
+                            - kind: variable_declaration
+                        - inside:
+                            any:
+                              - kind: export_statement
+                              - all:
+                                  - kind: ambient_declaration
+                                  - inside:
+                                      kind: export_statement
+                                      stopBy: neighbor
+                            stopBy: neighbor
+                      stopBy: neighbor
+              - all:
+                  - any:
+                      - kind: function_declaration
+                      - kind: generator_function_declaration
+                      - kind: function_signature
+                      - kind: class_declaration
+                      - kind: abstract_class_declaration
+                      - kind: interface_declaration
+                      - kind: type_alias_declaration
+                      - kind: enum_declaration
+                      - kind: internal_module
+                      - kind: import_alias
+                  - inside:
+                      any:
+                        - kind: export_statement
+                        - all:
+                            - kind: ambient_declaration
+                            - inside:
+                                kind: export_statement
+                                stopBy: neighbor
+                      stopBy: neighbor
+            stopBy: neighbor
+    - all:
+        - kind: shorthand_property_identifier_pattern
+        - pattern: $API
+        - matches: bindingTargetCandidate
+        - inside:
+            matches: exportedVariableBinding
+            stopBy: end
+    - all:
+        - pattern:
+            context: "const { $KEY: $API } = $VALUE"
+            selector: pair_pattern
+        - matches: bindingTargetCandidate
+        - inside:
+            matches: exportedVariableBinding
+            stopBy: end
+    - all:
+        - kind: identifier
+        - pattern: $API
+        - matches: bindingTargetCandidate
+        - inside:
+            kind: array_pattern
+            stopBy: neighbor
+        - inside:
+            matches: exportedVariableBinding
+            stopBy: end
+    - all:
+        - pattern:
+            context: "const [$API = $DEFAULT] = $VALUE"
+            selector: assignment_pattern
+        - matches: bindingTargetCandidate
+        - inside:
+            matches: exportedVariableBinding
+            stopBy: end
+    - all:
+        - pattern:
+            context: "const [...$API] = $VALUE"
+            selector: rest_pattern
+        - matches: bindingTargetCandidate
+        - inside:
+            matches: exportedVariableBinding
+            stopBy: end
+    - all:
+        - pattern:
+            context: "const { ...$API } = $VALUE"
+            selector: rest_pattern
+        - matches: bindingTargetCandidate
+        - inside:
+            matches: exportedVariableBinding
+            stopBy: end
+constraints:
+  API:
+    regex: ^(anthropic|anthropicClientLayerConfig|WithAnthropicOptions|withAnthropic|withAnthropicFetch|openAi|openAiClientLayerConfig|WithOpenAiOptions|withOpenAi|withOpenAiFetch|openAiAccount|withOpenAiAccount|withOpenAiAccountFetch|openAiCompatible|openAiCompatibleClientLayerConfig|WithOpenAiCompatibleOptions|withOpenAiCompatible|withOpenAiCompatibleFetch|openRouter|openRouterClientLayerConfig|WithOpenRouterOptions|withOpenRouter|withOpenRouterFetch|deterministicModel|WithOpenAiOrDeterministicOptions|withDeterministic|withOpenAiOrDeterministic|withOpenAiOrDeterministicFetch|withOpenAiEmbedding|withOpenAiEmbeddingFetch|withOpenAiCompatibleEmbedding|withOpenAiCompatibleEmbeddingFetch|groq|withGroq|groqFetch|withGroqFetch|mistral|withMistral|mistralFetch|withMistralFetch|xai|withXai|xaiFetch|withXaiFetch|deepseek|withDeepseek|deepseekFetch|withDeepseekFetch|googleAiStudio|withGoogleAiStudio|googleAiStudioFetch|withGoogleAiStudioFetch|azureOpenAi|withAzureOpenAi|azureOpenAiFetch|withAzureOpenAiFetch|ollama|withOllama|ollamaFetch|withOllamaFetch)$
+utils:
+  bindingTargetCandidate:
+    not:
+      inside:
+        any:
+          - kind: arrow_function
+          - kind: function_expression
+          - kind: function_declaration
+          - kind: generator_function
+          - kind: generator_function_declaration
+          - kind: method_definition
+          - kind: class
+          - kind: class_declaration
+          - kind: assignment_expression
+        stopBy: end
+  exportedVariableBinding:
+    all:
+      - any:
+          - kind: object_pattern
+          - kind: array_pattern
+      - nthChild: 1
+      - inside:
+          all:
+            - kind: variable_declarator
+            - inside:
+                all:
+                  - any:
+                      - kind: lexical_declaration
+                      - kind: variable_declaration
+                  - inside:
+                      kind: export_statement
+                      stopBy: neighbor
+                stopBy: neighbor
+          stopBy: neighbor
+files:
+  - "packages/providers/src/**/*.ts"
+ignores:
+  - "**/dist/**"

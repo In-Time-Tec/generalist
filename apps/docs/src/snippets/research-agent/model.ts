@@ -1,6 +1,6 @@
 import { OpenRouter } from "@batonfx/providers"
 import { Config, Effect, Layer, Option, Stream } from "effect"
-import { LanguageModel, Prompt, Response } from "@batonfx/core"
+import { LanguageModel, ModelRegistry, Prompt, Response } from "@batonfx/core"
 import { FetchHttpClient } from "effect/unstable/http"
 
 interface WebSearchSuccess {
@@ -64,15 +64,23 @@ const scriptedModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effect(
 
 export const modelLayer: Layer.Layer<LanguageModel.LanguageModel> = Layer.unwrap(
   Effect.gen(function* () {
-    const registration = yield* OpenRouter.openRouter({ model: "openai/gpt-4o-mini" }).pipe(
-      Effect.provide(OpenRouter.openRouterClientLayerConfig({ apiKey: Config.redacted("OPENROUTER_API_KEY") })),
-      Effect.provide(FetchHttpClient.layer),
+    const registration = yield* Effect.scoped(
+      Layer.build(
+        Layer.provide(
+          OpenRouter.layer({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
+          FetchHttpClient.layer,
+        ),
+      ).pipe(
+        Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context))),
+        Effect.map((registrations) => registrations[0]),
+      ),
+    ).pipe(
       Effect.asSome,
       Effect.catchTag("ConfigError", () => Effect.succeedNone),
     )
     return Option.match(registration, {
       onNone: () => scriptedModel,
-      onSome: (openRouter) => openRouter.layer,
+      onSome: (openRouter) => openRouter?.layer ?? scriptedModel,
     })
   }),
 )

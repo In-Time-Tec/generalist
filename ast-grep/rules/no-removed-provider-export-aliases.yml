@@ -1,0 +1,126 @@
+id: no-removed-provider-export-aliases
+language: TypeScript
+severity: error
+message: Provider exports must not recreate a deleted construction-family name.
+rule:
+  any:
+    - all:
+        - kind: import_statement
+        - has:
+            any:
+              - all:
+                  - kind: identifier
+                  - pattern: $API
+              - all:
+                  - kind: type_identifier
+                  - pattern: $API
+            stopBy: end
+        - has:
+            all:
+              - kind: string
+              - regex: ^["']@batonfx/providers(?:/(?:anthropic|openai|openai-compat|openrouter|deterministic|embedding|presets))?["']$
+            stopBy: end
+    - all:
+        - kind: export_statement
+        - has:
+            any:
+              - all:
+                  - kind: identifier
+                  - pattern: $API
+              - all:
+                  - kind: type_identifier
+                  - pattern: $API
+            stopBy: end
+        - has:
+            all:
+              - kind: string
+              - regex: ^["']@batonfx/providers(?:/(?:anthropic|openai|openai-compat|openrouter|deterministic|embedding|presets))?["']$
+            stopBy: end
+    - pattern: import type { $VALUE as $API } from "@batonfx/providers"
+    - pattern: import { type $VALUE as $API } from "@batonfx/providers"
+    - pattern:
+        context: export type { $VALUE as $API } from "@batonfx/providers"
+        selector: export_statement
+    - pattern:
+        context: export { type $VALUE as $API } from "@batonfx/providers"
+        selector: export_statement
+    - pattern: import * as $API from "@batonfx/providers"
+    - pattern: import * as $API from "@batonfx/providers/anthropic"
+    - pattern: import * as $API from "@batonfx/providers/openai"
+    - pattern: import * as $API from "@batonfx/providers/openai-compat"
+    - pattern: import * as $API from "@batonfx/providers/openrouter"
+    - pattern: import * as $API from "@batonfx/providers/deterministic"
+    - pattern: import * as $API from "@batonfx/providers/embedding"
+    - pattern: import * as $API from "@batonfx/providers/presets"
+    - pattern:
+        context: export * as $API from "@batonfx/providers"
+        selector: export_statement
+    - pattern:
+        context: export * as $API from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern:
+        context: export * as $API from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern:
+        context: export * as $API from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern:
+        context: export * as $API from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern:
+        context: export * as $API from "@batonfx/providers/deterministic"
+        selector: export_statement
+    - pattern:
+        context: export * as $API from "@batonfx/providers/embedding"
+        selector: export_statement
+    - pattern:
+        context: export * as $API from "@batonfx/providers/presets"
+        selector: export_statement
+    - pattern: import { $VALUE as $API } from "@batonfx/providers"
+    - pattern: import { $VALUE as $API } from "@batonfx/providers/anthropic"
+    - pattern: import { $VALUE as $API } from "@batonfx/providers/openai"
+    - pattern: import { $VALUE as $API } from "@batonfx/providers/openai-compat"
+    - pattern: import { $VALUE as $API } from "@batonfx/providers/openrouter"
+    - pattern: import { $VALUE as $API } from "@batonfx/providers/deterministic"
+    - pattern: import { $VALUE as $API } from "@batonfx/providers/embedding"
+    - pattern: import { $VALUE as $API } from "@batonfx/providers/presets"
+    - pattern:
+        context: export { $VALUE as $API } from "@batonfx/providers"
+        selector: export_statement
+    - pattern:
+        context: export { $VALUE as $API } from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern:
+        context: export { $VALUE as $API } from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern:
+        context: export { $VALUE as $API } from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern:
+        context: export { $VALUE as $API } from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern:
+        context: export { $VALUE as $API } from "@batonfx/providers/deterministic"
+        selector: export_statement
+    - pattern:
+        context: export { $VALUE as $API } from "@batonfx/providers/embedding"
+        selector: export_statement
+    - pattern:
+        context: export { $VALUE as $API } from "@batonfx/providers/presets"
+        selector: export_statement
+constraints:
+  API:
+    regex: ^(anthropic|anthropicClientLayerConfig|WithAnthropicOptions|withAnthropic|withAnthropicFetch|openAi|openAiClientLayerConfig|WithOpenAiOptions|withOpenAi|withOpenAiFetch|openAiAccount|withOpenAiAccount|withOpenAiAccountFetch|openAiCompatible|openAiCompatibleClientLayerConfig|WithOpenAiCompatibleOptions|withOpenAiCompatible|withOpenAiCompatibleFetch|openRouter|openRouterClientLayerConfig|WithOpenRouterOptions|withOpenRouter|withOpenRouterFetch|deterministicModel|WithOpenAiOrDeterministicOptions|withDeterministic|withOpenAiOrDeterministic|withOpenAiOrDeterministicFetch|withOpenAiEmbedding|withOpenAiEmbeddingFetch|withOpenAiCompatibleEmbedding|withOpenAiCompatibleEmbeddingFetch|groq|withGroq|groqFetch|withGroqFetch|mistral|withMistral|mistralFetch|withMistralFetch|xai|withXai|xaiFetch|withXaiFetch|deepseek|withDeepseek|deepseekFetch|withDeepseekFetch|googleAiStudio|withGoogleAiStudio|googleAiStudioFetch|withGoogleAiStudioFetch|azureOpenAi|withAzureOpenAi|azureOpenAiFetch|withAzureOpenAiFetch|ollama|withOllama|ollamaFetch|withOllamaFetch)$
+files:
+  - "packages/**/*.ts"
+  - "packages/**/*.tsx"
+  - "apps/**/*.ts"
+  - "apps/**/*.tsx"
+  - "examples/**/*.ts"
+  - "examples/**/*.tsx"
+  - "scripts/**/*.ts"
+  - "scripts/**/*.tsx"
+ignores:
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "node_modules/**"

@@ -60,7 +60,7 @@ export const testingEvals = definePage({
           ],
         ],
         [[code("ModelMiddleware")], [code("ModelMiddleware.layerIdentity")]],
-        [[code("ModelRegistry")], [code("Deterministic.withDeterministic"), " registration"]],
+        [[code("ModelRegistry")], [code("Deterministic.layer"), " registration"]],
         [
           [code("Steering"), ", ", code("ModelResilience"), ", ", code("Connection"), ", …"],
           ["every optional seam ships its own ", code("layerTest(implementation)")],
@@ -89,7 +89,7 @@ export const testingEvals = definePage({
       ],
       [
         "Never provide ",
-        code("Deterministic.withDeterministic()"),
+        code("Deterministic.layer()"),
         " where a ",
         code("LanguageModel"),
         " is required: it registers a model in the ",

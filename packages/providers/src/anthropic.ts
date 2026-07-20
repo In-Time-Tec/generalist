@@ -2,7 +2,6 @@ import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
 import { AiError } from "effect/unstable/ai"
-import { FetchHttpClient } from "effect/unstable/http"
 import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
@@ -22,34 +21,26 @@ export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
 }
 
 /** @experimental */
-export const anthropic = (input: AnthropicInput) =>
-  ModelRegistry.registration({
-    provider: "anthropic",
-    model: input.model,
-    layer: AnthropicLanguageModel.layer({
-      model: input.model,
-      ...(input.config === undefined ? {} : { config: input.config }),
-    }),
-    classifyFailure,
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  })
-
-/** @experimental */
-export const anthropicClientLayerConfig = AnthropicClient.layerConfig
-
-/** @experimental */
-export interface WithAnthropicOptions extends AnthropicInput {
+export interface LayerOptions extends AnthropicInput {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof AnthropicClient.layerConfig>[0]>, "apiKey">
 }
 
 /** @experimental */
-export const withAnthropic = (options: WithAnthropicOptions) =>
-  ModelRegistry.layer([anthropic(options)]).pipe(
-    Layer.provide(AnthropicClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
-  )
+export const layer = (input: LayerOptions) =>
+  ModelRegistry.layer([
+    ModelRegistry.registration({
+      provider: "anthropic",
+      model: input.model,
+      layer: AnthropicLanguageModel.layer({
+        model: input.model,
+        ...(input.config === undefined ? {} : { config: input.config }),
+      }),
+      classifyFailure,
+      ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
+      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+    }),
+  ]).pipe(Layer.provide(AnthropicClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
 
 /** @experimental */
-export const withAnthropicFetch = (options: WithAnthropicOptions) =>
-  withAnthropic(options).pipe(Layer.provide(FetchHttpClient.layer))
+export const layerConfig = AnthropicClient.layerConfig

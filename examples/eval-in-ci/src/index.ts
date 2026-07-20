@@ -16,7 +16,7 @@ const program = Effect.gen(function* () {
 }).pipe(
   Effect.provide(
     Layer.mergeAll(
-      Deterministic.withDeterministic({ model: "local" }),
+      Deterministic.layer({ model: "local" }),
       ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,

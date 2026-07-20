@@ -10,11 +10,8 @@ import {
   type OpenAiAccountCredentials,
   classifyFailure,
   credentialsFromAccountAuth,
-  openAi,
-  openAiAccount,
-  withOpenAi,
-  withOpenAiAccount,
-  withOpenAiAccountFetch,
+  layer as openAiLayer,
+  layerAccount,
 } from "@batonfx/providers/openai"
 import type { ServiceInterface } from "@batonfx/providers/openai-account-auth"
 
@@ -72,7 +69,7 @@ const provideLayer =
 
 const provideAccount = (accountCredentials: OpenAiAccountCredentials, client: HttpClient.HttpClient) => {
   const layer = Layer.provide(
-    withOpenAiAccount({ model: "gpt-test", credentials: accountCredentials }),
+    layerAccount({ model: "gpt-test", credentials: accountCredentials }),
     Layer.succeed(HttpClient.HttpClient, client),
   )
   return provideLayer(layer)
@@ -81,7 +78,7 @@ const provideAccount = (accountCredentials: OpenAiAccountCredentials, client: Ht
 const provideAccountStream = (accountCredentials: OpenAiAccountCredentials, client: HttpClient.HttpClient) =>
   Stream.provide(
     Layer.provide(
-      withOpenAiAccount({ model: "gpt-test", credentials: accountCredentials }),
+      layerAccount({ model: "gpt-test", credentials: accountCredentials }),
       Layer.succeed(HttpClient.HttpClient, client),
     ),
   )
@@ -99,12 +96,20 @@ describe("OpenAI account Responses registration", () => {
       const current = yield* Ref.make(credential("one"))
       const accountCredentials = credentials(Ref.get(current))
       const client = mockClient([200, 200], requests)
-      const registration = yield* openAiAccount({
-        model: "gpt-test",
-        credentials: accountCredentials,
-        registrationKey: "account",
-        metadata: { mode: "account" },
-      }).pipe(Effect.provideService(HttpClient.HttpClient, client))
+      const registrations = yield* Effect.scoped(
+        Layer.build(
+          Layer.provide(
+            layerAccount({
+              model: "gpt-test",
+              credentials: accountCredentials,
+              registrationKey: "account",
+              metadata: { mode: "account" },
+            }),
+            Layer.succeed(HttpClient.HttpClient, client),
+          ),
+        ).pipe(Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context)))),
+      )
+      const registration = registrations[0]!
 
       yield* generate(accountCredentials, client)
       yield* Ref.set(current, credential("two"))
@@ -348,7 +353,7 @@ describe("OpenAI account Responses registration", () => {
     })
   })
 
-  it.effect("forces redirect rejection for the fetch convenience", () => {
+  it.effect("forces redirect rejection when composed with FetchHttpClient.layer", () => {
     const requests: Array<{ readonly url: string; readonly redirect: RequestRedirect | undefined }> = []
     const fetch: typeof globalThis.fetch = (input, init) => {
       requests.push({ url: String(input), redirect: init?.redirect })
@@ -359,10 +364,10 @@ describe("OpenAI account Responses registration", () => {
         }),
       )
     }
-    const layer = withOpenAiAccountFetch({
-      model: "gpt-test",
-      credentials: credentials(Effect.succeed(credential("current"))),
-    })
+    const layer = Layer.provide(
+      layerAccount({ model: "gpt-test", credentials: credentials(Effect.succeed(credential("current"))) }),
+      FetchHttpClient.layer,
+    )
 
     return Effect.gen(function* () {
       yield* Effect.flip(
@@ -423,11 +428,10 @@ describe("OpenAI account Responses registration", () => {
     }),
   )
 
-  it("preserves the existing API-key OpenAI helpers", () => {
+  it("exposes API-key and account Layer constructors", () => {
     const accountCredentials = credentials(Effect.succeed(credential("current")))
 
-    expect(typeof openAi({ model: "gpt-test" })).toBe("object")
-    expect(typeof withOpenAi({ model: "gpt-test", apiKey: Config.succeed(Redacted.make("key")) })).toBe("object")
-    expect(typeof openAiAccount({ model: "gpt-test", credentials: accountCredentials })).toBe("object")
+    expect(Layer.isLayer(openAiLayer({ model: "gpt-test", apiKey: Config.succeed(Redacted.make("key")) }))).toBe(true)
+    expect(Layer.isLayer(layerAccount({ model: "gpt-test", credentials: accountCredentials }))).toBe(true)
   })
 })

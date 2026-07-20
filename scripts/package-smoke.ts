@@ -162,8 +162,9 @@ import { GitHubCatalog, HttpCatalog, S3Catalog } from "@batonfx/skills"
 import { Catalog, OpenAi } from "@batonfx/providers"
 import { TestModel } from "@batonfx/test"
 import { SessionRegistry, Sse, Wire, Ws } from "@batonfx/transport"
-import { Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
+import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
+import { HttpClient } from "effect/unstable/http"
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
     ? (<Value>() => Value extends Right ? 1 : 2) extends <Value>() => Value extends Left ? 1 : 2
@@ -239,14 +240,13 @@ const packageSmokeTool = Tool.make("package_smoke_tool", {
   success: Schema.String,
 })
 const packageSmokeToolAgent = Agent.make({ name: "tool-package-smoke", toolkit: Toolkit.make(packageSmokeTool) })
-const providerRegistration = OpenAi.openAi({ model: "gpt-4o-mini" })
+const providerLayer = OpenAi.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") })
 const providerCatalogLayer: Layer.Layer<Catalog.ModelCatalog> = Catalog.layer()
 const testModelLayer: Layer.Layer<LanguageModel.LanguageModel> = TestModel.layer([TestModel.text("identity")])
-type ProviderRegistrationSuccess = ReturnType<typeof OpenAi.openAi> extends Effect.Effect<infer Success, infer _Failure, infer _Requirements>
-  ? Success
-  : never
-type ProviderRegistrationIdentity = Assert<Equal<ProviderRegistrationSuccess, ModelRegistry.Registration>>
-void providerRegistration
+type ProviderLayerRequirements = Assert<Equal<Layer.Services<typeof providerLayer>, HttpClient.HttpClient>>
+type ProviderLayerFailure = Assert<Equal<Layer.Error<typeof providerLayer>, Config.ConfigError>>
+type ProviderLayerSuccess = Assert<Equal<Layer.Success<typeof providerLayer>, ModelRegistry.ModelRegistry>>
+void providerLayer
 void providerCatalogLayer
 void testModelLayer
 const toolFanOut = Handoff.fanOut([{ agent: packageSmokeToolAgent, prompt: "tool" }])
@@ -363,7 +363,7 @@ const { McpToolSource } = await import("@batonfx/mcp")
 const { Catalog, OpenAi } = await import("@batonfx/providers")
 const skills = await import("@batonfx/skills")
 const { TestModel } = await import("@batonfx/test")
-const { Effect, Layer, Schema } = await import("effect")
+const { Config, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
 const tool = Tool.make("identity_proof", { parameters: Schema.Struct({ value: Schema.String }) })
@@ -376,8 +376,8 @@ const layers = [
   McpToolSource.layer({ name: "identity", transport: { kind: "http", url: "https://mcp.example/rpc" } }),
 ]
 if (layers.some((value) => !Layer.isLayer(value))) throw new Error("Baton layer does not use the root Effect identity")
-if (!Effect.isEffect(OpenAi.openAi({ model: "gpt-4o-mini" }))) {
-  throw new Error("provider registration does not use the root Effect identity")
+if (!Layer.isLayer(OpenAi.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") }))) {
+  throw new Error("provider constructor does not use the root Layer identity")
 }
 if (!Effect.isEffect(TestModel.make([TestModel.text("identity")]))) {
   throw new Error("TestModel does not use the root Effect identity")

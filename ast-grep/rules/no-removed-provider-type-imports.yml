@@ -1,0 +1,150 @@
+id: no-removed-provider-type-imports
+language: TypeScript
+severity: error
+message: Deleted provider option types must not be imported or re-exported.
+rule:
+  any:
+    - pattern: import type { $VALUE as $TYPE } from "@batonfx/providers"
+    - pattern: import { type $VALUE as $TYPE } from "@batonfx/providers"
+    - pattern:
+        context: export type { $VALUE as $TYPE } from "@batonfx/providers"
+        selector: export_statement
+    - pattern:
+        context: export { type $VALUE as $TYPE } from "@batonfx/providers"
+        selector: export_statement
+    - pattern: import type { $VALUE as $TYPE } from "@batonfx/providers/anthropic"
+    - pattern: import { type $VALUE as $TYPE } from "@batonfx/providers/anthropic"
+    - pattern:
+        context: export type { $VALUE as $TYPE } from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern:
+        context: export { type $VALUE as $TYPE } from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "@batonfx/providers/anthropic"
+    - pattern: import type { $TYPE } from "@batonfx/providers/anthropic"
+    - pattern: import { type $TYPE as $LOCAL } from "@batonfx/providers/anthropic"
+    - pattern: import { type $TYPE } from "@batonfx/providers/anthropic"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern:
+        context: export type { $TYPE } from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE as $LOCAL } from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE } from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern: import type { $VALUE as $TYPE } from "@batonfx/providers/openai"
+    - pattern: import { type $VALUE as $TYPE } from "@batonfx/providers/openai"
+    - pattern:
+        context: export type { $VALUE as $TYPE } from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern:
+        context: export { type $VALUE as $TYPE } from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "@batonfx/providers/openai"
+    - pattern: import type { $TYPE } from "@batonfx/providers/openai"
+    - pattern: import { type $TYPE as $LOCAL } from "@batonfx/providers/openai"
+    - pattern: import { type $TYPE } from "@batonfx/providers/openai"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern:
+        context: export type { $TYPE } from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE as $LOCAL } from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE } from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern: import type { $VALUE as $TYPE } from "@batonfx/providers/openai-compat"
+    - pattern: import { type $VALUE as $TYPE } from "@batonfx/providers/openai-compat"
+    - pattern:
+        context: export type { $VALUE as $TYPE } from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern:
+        context: export { type $VALUE as $TYPE } from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "@batonfx/providers/openai-compat"
+    - pattern: import type { $TYPE } from "@batonfx/providers/openai-compat"
+    - pattern: import { type $TYPE as $LOCAL } from "@batonfx/providers/openai-compat"
+    - pattern: import { type $TYPE } from "@batonfx/providers/openai-compat"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern:
+        context: export type { $TYPE } from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE as $LOCAL } from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE } from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern: import type { $VALUE as $TYPE } from "@batonfx/providers/openrouter"
+    - pattern: import { type $VALUE as $TYPE } from "@batonfx/providers/openrouter"
+    - pattern:
+        context: export type { $VALUE as $TYPE } from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern:
+        context: export { type $VALUE as $TYPE } from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "@batonfx/providers/openrouter"
+    - pattern: import type { $TYPE } from "@batonfx/providers/openrouter"
+    - pattern: import { type $TYPE as $LOCAL } from "@batonfx/providers/openrouter"
+    - pattern: import { type $TYPE } from "@batonfx/providers/openrouter"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern:
+        context: export type { $TYPE } from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE as $LOCAL } from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE } from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern: import type { $VALUE as $TYPE } from "@batonfx/providers/deterministic"
+    - pattern: import { type $VALUE as $TYPE } from "@batonfx/providers/deterministic"
+    - pattern:
+        context: export type { $VALUE as $TYPE } from "@batonfx/providers/deterministic"
+        selector: export_statement
+    - pattern:
+        context: export { type $VALUE as $TYPE } from "@batonfx/providers/deterministic"
+        selector: export_statement
+    - pattern: import type { $TYPE as $LOCAL } from "@batonfx/providers/deterministic"
+    - pattern: import type { $TYPE } from "@batonfx/providers/deterministic"
+    - pattern: import { type $TYPE as $LOCAL } from "@batonfx/providers/deterministic"
+    - pattern: import { type $TYPE } from "@batonfx/providers/deterministic"
+    - pattern:
+        context: export type { $TYPE as $LOCAL } from "@batonfx/providers/deterministic"
+        selector: export_statement
+    - pattern:
+        context: export type { $TYPE } from "@batonfx/providers/deterministic"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE as $LOCAL } from "@batonfx/providers/deterministic"
+        selector: export_statement
+    - pattern:
+        context: export { type $TYPE } from "@batonfx/providers/deterministic"
+        selector: export_statement
+constraints:
+  TYPE:
+    regex: ^(WithAnthropicOptions|WithOpenAiOptions|WithOpenAiCompatibleOptions|WithOpenRouterOptions|WithOpenAiOrDeterministicOptions)$
+files:
+  - "packages/**/*.ts"
+  - "packages/**/*.tsx"
+  - "apps/**/*.ts"
+  - "apps/**/*.tsx"
+  - "examples/**/*.ts"
+  - "examples/**/*.tsx"
+  - "scripts/**/*.ts"
+  - "scripts/**/*.tsx"
+ignores:
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "node_modules/**"

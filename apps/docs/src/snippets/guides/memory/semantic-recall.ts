@@ -2,8 +2,9 @@ import { Config, Layer } from "effect"
 import { Memory } from "@batonfx/core"
 import { SemanticRecall, VectorStore, WorkingMemory } from "@batonfx/memory"
 import { Embedding } from "@batonfx/providers"
+import { FetchHttpClient } from "effect/unstable/http"
 
-const embeddingLayer = Embedding.withOpenAiEmbeddingFetch({
+const embeddingLayer = Embedding.layer({
   model: "text-embedding-3-small",
   apiKey: Config.redacted("OPENAI_API_KEY"),
 })
@@ -11,6 +12,6 @@ const embeddingLayer = Embedding.withOpenAiEmbeddingFetch({
 export const semanticLayer: Layer.Layer<Memory.Memory, Config.ConfigError> = SemanticRecall.layer({
   limit: 5,
   minScore: 0.4,
-}).pipe(Layer.provide(Layer.mergeAll(VectorStore.layerMemory, embeddingLayer)))
+}).pipe(Layer.provide(Layer.mergeAll(VectorStore.layerMemory, embeddingLayer)), Layer.provide(FetchHttpClient.layer))
 
 export const workingLayer: Layer.Layer<Memory.Memory> = WorkingMemory.layer({ maxMessages: 20 })

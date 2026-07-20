@@ -10,7 +10,7 @@ const program = ModelRegistry.operate(
   Agent.generate(agent, { prompt: "Give me the deterministic response." }),
 ).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(Deterministic.withDeterministic(selection)),
+  Effect.provide(Deterministic.layer(selection)),
 )
 
 await Effect.runPromise(program)

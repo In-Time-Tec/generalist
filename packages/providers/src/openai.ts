@@ -53,37 +53,29 @@ export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
 }
 
 /** @experimental */
-export const openAi = (input: OpenAiInput) =>
-  ModelRegistry.registration({
-    provider: "openai",
-    model: input.model,
-    layer: OpenAiLanguageModel.layer({
-      model: input.model,
-      ...(input.config === undefined ? {} : { config: input.config }),
-    }),
-    classifyFailure,
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  })
-
-/** @experimental */
-export const openAiClientLayerConfig = OpenAiClient.layerConfig
-
-/** @experimental */
-export interface WithOpenAiOptions extends OpenAiInput {
+export interface LayerOptions extends OpenAiInput {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey">
 }
 
 /** @experimental */
-export const withOpenAi = (options: WithOpenAiOptions) =>
-  ModelRegistry.layer([openAi(options)]).pipe(
-    Layer.provide(OpenAiClient.layerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
-  )
+export const layer = (input: LayerOptions) =>
+  ModelRegistry.layer([
+    ModelRegistry.registration({
+      provider: "openai",
+      model: input.model,
+      layer: OpenAiLanguageModel.layer({
+        model: input.model,
+        ...(input.config === undefined ? {} : { config: input.config }),
+      }),
+      classifyFailure,
+      ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
+      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+    }),
+  ]).pipe(Layer.provide(OpenAiClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
 
 /** @experimental */
-export const withOpenAiFetch = (options: WithOpenAiOptions) =>
-  withOpenAi(options).pipe(Layer.provide(FetchHttpClient.layer))
+export const layerConfig = OpenAiClient.layerConfig
 
 /** @experimental */
 export interface OpenAiAccountCredential {
@@ -238,22 +230,17 @@ const openAiAccountClientLayer = (credentials: OpenAiAccountCredentials) =>
   )
 
 /** @experimental */
-export const openAiAccount = (input: OpenAiAccountInput) =>
-  ModelRegistry.registration({
-    provider: "openai",
-    model: input.model,
-    layer: OpenAiLanguageModel.layer({
+export const layerAccount = (input: OpenAiAccountInput) =>
+  ModelRegistry.layer([
+    ModelRegistry.registration({
+      provider: "openai",
       model: input.model,
-      ...(input.config === undefined ? {} : { config: input.config }),
-    }).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
-    classifyFailure,
-    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-  })
-
-/** @experimental */
-export const withOpenAiAccount = (input: OpenAiAccountInput) => ModelRegistry.layer([openAiAccount(input)])
-
-/** @experimental */
-export const withOpenAiAccountFetch = (input: OpenAiAccountInput) =>
-  withOpenAiAccount(input).pipe(Layer.provide(FetchHttpClient.layer))
+      layer: OpenAiLanguageModel.layer({
+        model: input.model,
+        ...(input.config === undefined ? {} : { config: input.config }),
+      }).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
+      classifyFailure,
+      ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
+      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+    }),
+  ])

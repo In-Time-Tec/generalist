@@ -61,7 +61,7 @@ export const coreModelsReference = definePage({
       "warning",
       "Registry layers are not model layers",
       "Provider helpers like ",
-      code("Deterministic.withDeterministic()"),
+      code("Deterministic.layer()"),
       " return a ",
       code("ModelRegistry.ModelRegistry"),
       " layer, not a ",

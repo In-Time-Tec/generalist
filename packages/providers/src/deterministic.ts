@@ -1,9 +1,9 @@
-import { OpenAiClient } from "@effect/ai-openai"
+import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Effect, Layer, Option, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { FetchHttpClient } from "effect/unstable/http"
-import { openAi, type RegistrationOptions, type WithOpenAiOptions } from "./openai.js"
+import { HttpClient } from "effect/unstable/http"
+import { classifyFailure, type LayerOptions, type RegistrationOptions } from "./openai.js"
 
 const deterministicModelLayer = Layer.effect(
   LanguageModel.LanguageModel,
@@ -20,7 +20,7 @@ export interface DeterministicInput extends RegistrationOptions {
 }
 
 /** @experimental */
-export const deterministicModel = (input: DeterministicInput = {}) =>
+const registration = (input: DeterministicInput = {}) =>
   ModelRegistry.registration({
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",
@@ -30,19 +30,19 @@ export const deterministicModel = (input: DeterministicInput = {}) =>
   })
 
 /** @experimental */
-export const withDeterministic = (input: DeterministicInput = {}) => ModelRegistry.layer([deterministicModel(input)])
+export const layer = (input: DeterministicInput = {}) => ModelRegistry.layer([registration(input)])
 
 /** @experimental */
-export interface WithOpenAiOrDeterministicOptions extends WithOpenAiOptions {
+export interface OpenAiFallbackOptions extends LayerOptions {
   readonly fallbackModel: string
   readonly fallbackProvider?: string
 }
 
 /** @experimental */
-export const withOpenAiOrDeterministic = (options: WithOpenAiOrDeterministicOptions) =>
+export const layerOpenAi = (options: OpenAiFallbackOptions) =>
   Layer.unwrap(
     Effect.gen(function* () {
-      const deterministic = yield* deterministicModel({
+      const deterministic = yield* registration({
         provider: options.fallbackProvider ?? "deterministic",
         model: options.fallbackModel,
       })
@@ -56,7 +56,19 @@ export const withOpenAiOrDeterministic = (options: WithOpenAiOrDeterministicOpti
               apiKey: Config.succeed(apiKey),
             }),
           ).pipe(
-            Effect.flatMap((context) => openAi(options).pipe(Effect.provide(context))),
+            Effect.flatMap((context) =>
+              ModelRegistry.registration({
+                provider: "openai",
+                model: options.model,
+                layer: OpenAiLanguageModel.layer({
+                  model: options.model,
+                  ...(options.config === undefined ? {} : { config: options.config }),
+                }),
+                classifyFailure,
+                ...(options.registrationKey === undefined ? {} : { registrationKey: options.registrationKey }),
+                ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
+              }).pipe(Effect.provide(context)),
+            ),
             Effect.asSome,
           ),
       })
@@ -65,8 +77,4 @@ export const withOpenAiOrDeterministic = (options: WithOpenAiOrDeterministicOpti
         ...(Option.isSome(openAiRegistration) ? [Effect.succeed(openAiRegistration.value)] : []),
       ])
     }),
-  )
-
-/** @experimental */
-export const withOpenAiOrDeterministicFetch = (options: WithOpenAiOrDeterministicOptions) =>
-  withOpenAiOrDeterministic(options).pipe(Layer.provide(FetchHttpClient.layer))
+  ) as Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient>

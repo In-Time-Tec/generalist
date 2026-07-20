@@ -1,6 +1,6 @@
 import { OpenRouter } from "@batonfx/providers"
 import { Effect, Layer, Option, Stream } from "effect"
-import { LanguageModel, Prompt, Response } from "@batonfx/core"
+import { LanguageModel, ModelRegistry, Prompt, Response } from "@batonfx/core"
 import { FetchHttpClient } from "effect/unstable/http"
 
 type StreamText = Parameters<typeof LanguageModel.make>[0]["streamText"]
@@ -85,10 +85,10 @@ const scriptedDeterministicModel: Layer.Layer<LanguageModel.LanguageModel> = Lay
 )
 
 /** @experimental */
-export interface WithOpenRouterOrDeterministicOptions extends OpenRouter.WithOpenRouterOptions {}
+export interface LayerOrDeterministicOptions extends OpenRouter.LayerOptions {}
 
 /**
- * @experimental Copies the shape of `Deterministic.withOpenAiOrDeterministic`
+ * @experimental Copies the shape of `Deterministic.layerOpenAi`
  * (`packages/providers/src/deterministic.ts`), swapping OpenAI for
  * OpenRouter: try to build a real OpenRouter model layer from `options`, and
  * fall back to the scripted deterministic model above when the API key
@@ -96,20 +96,21 @@ export interface WithOpenRouterOrDeterministicOptions extends OpenRouter.WithOpe
  * `LanguageModel` directly (not a `ModelRegistry` registration), which is
  * what `SessionRegistry.layerMemory` needs for its single-agent server.
  */
-export const withOpenRouterOrDeterministic = (
-  options: WithOpenRouterOrDeterministicOptions,
-): Layer.Layer<LanguageModel.LanguageModel> =>
+export const layerOrDeterministic = (options: LayerOrDeterministicOptions): Layer.Layer<LanguageModel.LanguageModel> =>
   Layer.unwrap(
     Effect.gen(function* () {
-      const openRouterRegistration = yield* OpenRouter.openRouter(options).pipe(
-        Effect.provide(OpenRouter.openRouterClientLayerConfig({ ...options.clientConfig, apiKey: options.apiKey })),
-        Effect.provide(FetchHttpClient.layer),
+      const openRouterRegistration = yield* Effect.scoped(
+        Layer.build(Layer.provide(OpenRouter.layer(options), FetchHttpClient.layer)).pipe(
+          Effect.flatMap((context) => ModelRegistry.registrations().pipe(Effect.provide(context))),
+          Effect.map((registrations) => registrations[0]),
+        ),
+      ).pipe(
         Effect.asSome,
         Effect.catchTag("ConfigError", () => Effect.succeedNone),
       )
       return Option.match(openRouterRegistration, {
         onNone: () => scriptedDeterministicModel,
-        onSome: (registration) => registration.layer,
+        onSome: (registration) => registration?.layer ?? scriptedDeterministicModel,
       })
     }),
   )

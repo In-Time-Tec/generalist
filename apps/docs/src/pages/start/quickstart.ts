@@ -108,11 +108,11 @@ export const quickstart = definePage({
     callout(
       "info",
       "The ModelRegistry.operate pattern",
-      code("Deterministic.withDeterministic"),
+      code("Deterministic.layer"),
       " registers a model in the ModelRegistry; ",
       code("ModelRegistry.operate(selection, effect)"),
       " supplies the actual LanguageModel per run. Swapping to a real model is the same shape with ",
-      code("withOpenRouterFetch"),
+      code("layer"),
       " (see ",
       link("/docs/guides/providers", "How to register real model providers"),
       "). The registry layer is never a LanguageModel layer by itself.",

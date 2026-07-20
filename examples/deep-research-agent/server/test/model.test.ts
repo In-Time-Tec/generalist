@@ -1,13 +1,13 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Stream } from "effect"
 import { LanguageModel, Prompt } from "@batonfx/core"
-import { withOpenRouterOrDeterministic } from "../src/model"
+import { layerOrDeterministic } from "../src/model"
 import { testLayer } from "../src/search-provider"
 import { toolkit, toolkitLayer } from "../src/tools"
 
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 
-const modelLayer = withOpenRouterOrDeterministic({
+const modelLayer = layerOrDeterministic({
   model: "openai/gpt-4o-mini",
   apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })

@@ -6,7 +6,7 @@ import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
 import { agent } from "./agent"
-import { withOpenRouterOrDeterministic } from "./model"
+import { layerOrDeterministic } from "./model"
 import { searchProviderLayer } from "./search-provider"
 import { toolkit, toolkitLayer } from "./tools"
 
@@ -100,7 +100,7 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "deep-research-agent" })
 export const toolkitHandlersLayer = toolkitLayer.pipe(Layer.provideMerge(searchProviderLayer))
 
 /** @experimental */
-export const modelLayer = withOpenRouterOrDeterministic({
+export const modelLayer = layerOrDeterministic({
   model: "openai/gpt-4o-mini",
   apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })

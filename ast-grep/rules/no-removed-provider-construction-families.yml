@@ -1,0 +1,118 @@
+id: no-removed-provider-construction-families
+language: TypeScript
+severity: error
+message: Provider construction is Layer-only; use the provider module's layer constructor.
+rule:
+  any:
+    - pattern:
+        context: import { $API as $LOCAL } from "@batonfx/providers"
+        selector: import_statement
+    - pattern:
+        context: import { $API } from "@batonfx/providers"
+        selector: import_statement
+    - pattern:
+        context: export { $API as $LOCAL } from "@batonfx/providers"
+        selector: export_statement
+    - pattern:
+        context: export { $API } from "@batonfx/providers"
+        selector: export_statement
+    - pattern:
+        context: import { $API as $LOCAL } from "@batonfx/providers/anthropic"
+        selector: import_statement
+    - pattern:
+        context: import { $API } from "@batonfx/providers/anthropic"
+        selector: import_statement
+    - pattern:
+        context: export { $API as $LOCAL } from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern:
+        context: export { $API } from "@batonfx/providers/anthropic"
+        selector: export_statement
+    - pattern:
+        context: import { $API as $LOCAL } from "@batonfx/providers/openai"
+        selector: import_statement
+    - pattern:
+        context: import { $API } from "@batonfx/providers/openai"
+        selector: import_statement
+    - pattern:
+        context: export { $API as $LOCAL } from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern:
+        context: export { $API } from "@batonfx/providers/openai"
+        selector: export_statement
+    - pattern:
+        context: import { $API as $LOCAL } from "@batonfx/providers/openai-compat"
+        selector: import_statement
+    - pattern:
+        context: import { $API } from "@batonfx/providers/openai-compat"
+        selector: import_statement
+    - pattern:
+        context: export { $API as $LOCAL } from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern:
+        context: export { $API } from "@batonfx/providers/openai-compat"
+        selector: export_statement
+    - pattern:
+        context: import { $API as $LOCAL } from "@batonfx/providers/openrouter"
+        selector: import_statement
+    - pattern:
+        context: import { $API } from "@batonfx/providers/openrouter"
+        selector: import_statement
+    - pattern:
+        context: export { $API as $LOCAL } from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern:
+        context: export { $API } from "@batonfx/providers/openrouter"
+        selector: export_statement
+    - pattern:
+        context: import { $API as $LOCAL } from "@batonfx/providers/deterministic"
+        selector: import_statement
+    - pattern:
+        context: import { $API } from "@batonfx/providers/deterministic"
+        selector: import_statement
+    - pattern:
+        context: export { $API as $LOCAL } from "@batonfx/providers/deterministic"
+        selector: export_statement
+    - pattern:
+        context: export { $API } from "@batonfx/providers/deterministic"
+        selector: export_statement
+    - pattern:
+        context: import { $API as $LOCAL } from "@batonfx/providers/embedding"
+        selector: import_statement
+    - pattern:
+        context: import { $API } from "@batonfx/providers/embedding"
+        selector: import_statement
+    - pattern:
+        context: export { $API as $LOCAL } from "@batonfx/providers/embedding"
+        selector: export_statement
+    - pattern:
+        context: export { $API } from "@batonfx/providers/embedding"
+        selector: export_statement
+    - pattern:
+        context: import { $API as $LOCAL } from "@batonfx/providers/presets"
+        selector: import_statement
+    - pattern:
+        context: import { $API } from "@batonfx/providers/presets"
+        selector: import_statement
+    - pattern:
+        context: export { $API as $LOCAL } from "@batonfx/providers/presets"
+        selector: export_statement
+    - pattern:
+        context: export { $API } from "@batonfx/providers/presets"
+        selector: export_statement
+constraints:
+  API:
+    regex: ^(anthropic|anthropicClientLayerConfig|WithAnthropicOptions|withAnthropic|withAnthropicFetch|openAi|openAiClientLayerConfig|WithOpenAiOptions|withOpenAi|withOpenAiFetch|openAiAccount|withOpenAiAccount|withOpenAiAccountFetch|openAiCompatible|openAiCompatibleClientLayerConfig|WithOpenAiCompatibleOptions|withOpenAiCompatible|withOpenAiCompatibleFetch|openRouter|openRouterClientLayerConfig|WithOpenRouterOptions|withOpenRouter|withOpenRouterFetch|deterministicModel|WithOpenAiOrDeterministicOptions|withDeterministic|withOpenAiOrDeterministic|withOpenAiOrDeterministicFetch|withOpenAiEmbedding|withOpenAiEmbeddingFetch|withOpenAiCompatibleEmbedding|withOpenAiCompatibleEmbeddingFetch|groq|withGroq|groqFetch|withGroqFetch|mistral|withMistral|mistralFetch|withMistralFetch|xai|withXai|xaiFetch|withXaiFetch|deepseek|withDeepseek|deepseekFetch|withDeepseekFetch|googleAiStudio|withGoogleAiStudio|googleAiStudioFetch|withGoogleAiStudioFetch|azureOpenAi|withAzureOpenAi|azureOpenAiFetch|withAzureOpenAiFetch|ollama|withOllama|ollamaFetch|withOllamaFetch)$
+files:
+  - "packages/**/*.ts"
+  - "packages/**/*.tsx"
+  - "apps/**/*.ts"
+  - "apps/**/*.tsx"
+  - "examples/**/*.ts"
+  - "examples/**/*.tsx"
+  - "scripts/**/*.ts"
+  - "scripts/**/*.tsx"
+ignores:
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "node_modules/**"

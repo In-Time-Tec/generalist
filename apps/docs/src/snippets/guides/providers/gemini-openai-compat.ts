@@ -1,10 +1,11 @@
 import { Config, Console, Effect, Layer } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { Presets } from "@batonfx/providers"
+import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "gemini-agent" })
 
-const providerLayer = Presets.withGoogleAiStudioFetch({
+const providerLayer = Presets.layerGoogleAiStudio({
   model: "gemini-2.0-flash",
   apiKey: Config.redacted("GOOGLE_AI_STUDIO_API_KEY"),
 })
@@ -24,4 +25,4 @@ const program = ModelRegistry.operate(
   ),
 )
 
-await Effect.runPromise(program)
+await Effect.runPromise(program.pipe(Effect.provide(FetchHttpClient.layer)))

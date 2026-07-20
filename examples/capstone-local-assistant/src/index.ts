@@ -89,7 +89,7 @@ const program = Effect.gen(function* () {
 }).pipe(
   Effect.provide(
     Layer.mergeAll(
-      Deterministic.withDeterministic({ model: "capstone" }),
+      Deterministic.layer({ model: "capstone" }),
       toolkitLayer,
       Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,

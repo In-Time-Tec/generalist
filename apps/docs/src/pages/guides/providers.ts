@@ -3,7 +3,7 @@ import deterministicRegistry from "../../snippets/guides/providers/deterministic
 import deterministicRegistryExpected from "../../snippets/guides/providers/deterministic-registry.expected.txt?raw"
 import geminiOpenaiCompat from "../../snippets/guides/providers/gemini-openai-compat.ts?raw"
 import openaiOrDeterministic from "../../snippets/guides/providers/openai-or-deterministic.ts?raw"
-import withOpenrouter from "../../snippets/guides/providers/with-openrouter.ts?raw"
+import openrouter from "../../snippets/guides/providers/openrouter.ts?raw"
 import { callout, code, codeBlock, command, definePage, h2, link, p, table } from "../../prose"
 export const providers = definePage({
   path: "/docs/guides/providers",
@@ -32,13 +32,11 @@ export const providers = definePage({
     command("Terminal", "bun add @batonfx/core @batonfx/providers"),
     h2("register-one-provider", "1. Register a provider"),
     p(
-      "Each provider module ships a ",
-      code("with*"),
-      " layer that composes the registration and upstream client layer while requiring a host ",
+      "Each provider module ships one ",
+      code("layer(config)"),
+      " constructor that composes the registration and upstream client while requiring a host ",
       code("HttpClient"),
-      ". This lets applications provide tracing, proxy, test, or platform clients. The matching explicitly named ",
-      code("with*Fetch"),
-      " convenience additionally provides ",
+      ". This lets applications provide tracing, proxy, test, or platform clients. Applications choosing the global fetch transport explicitly compose ",
       code("FetchHttpClient.layer"),
       ". Credentials come from Effect ",
       code("Config"),
@@ -48,13 +46,11 @@ export const providers = definePage({
       code("LanguageModel"),
       " layer for exactly that run.",
     ),
-    codeBlock({ label: "with-openrouter.ts", source: withOpenrouter }),
+    codeBlock({ label: "openrouter.ts", source: openrouter }),
     callout(
       "warning",
       "The registry is not a model",
-      "A ",
-      code("with*"),
-      " layer provides ",
+      "A provider layer provides ",
       code("ModelRegistry.ModelRegistry"),
       ", not ",
       code("Ai.LanguageModel"),
@@ -64,9 +60,7 @@ export const providers = definePage({
     ),
     h2("combine-several-providers", "2. Combine several providers"),
     p(
-      "Every ",
-      code("with*"),
-      " layer installs its own fresh registry under the same service tag, so ",
+      "Every provider layer installs its own fresh registry under the same service tag, so ",
       code("Layer.mergeAll"),
       " keeps only one provider's registrations. Combine registries with ",
       code("ModelRegistry.layerCombined"),
@@ -87,7 +81,7 @@ export const providers = definePage({
       expectedOutput: deterministicRegistryExpected,
     }),
     p(
-      code("Deterministic.withOpenAiOrDeterministicFetch"),
+      code("Deterministic.layerOpenAi"),
       " installs the deterministic fallback always and OpenAI only when its API-key config is present. Missing key data selects deterministic-only registration; invalid values and configuration-source failures remain typed failures. The selection stays data, so each environment picks its own pair.",
     ),
     codeBlock({ label: "openai-or-deterministic.ts", source: openaiOrDeterministic }),
@@ -97,42 +91,36 @@ export const providers = definePage({
       " layer rather than a registry, the deep-research example builds the same fallback at the model-layer level; see ",
       link(
         "https://github.com/In-Time-Tec/batonfx/blob/main/examples/deep-research-agent/server/src/model.ts",
-        "withOpenRouterOrDeterministic in examples/deep-research-agent",
+        "layerOrDeterministic in examples/deep-research-agent",
       ),
       ".",
     ),
     h2("openai-compatible-presets", "4. Pick an OpenAI-compatible preset"),
     p(
       "Presets are thin wrappers over ",
-      code("OpenAiCompatible.openAiCompatible"),
-      " that fix the provider name and base URL. Each has a matching ",
-      code("with*"),
-      " layer form requiring a host HttpClient plus explicitly named ",
-      code("*Fetch"),
-      " and ",
-      code("with*Fetch"),
-      " conveniences.",
+      code("OpenAiCompatible.layer"),
+      " that fix the provider name and base URL. Each preset constructor returns a registry layer requiring a host HttpClient; compose FetchHttpClient.layer explicitly when selecting fetch.",
     ),
     table(
       ["Preset", "Provider", "Base URL"],
       [
-        [[code("Presets.groq")], [code("groq")], [code("https://api.groq.com/openai/v1")]],
-        [[code("Presets.mistral")], [code("mistral")], [code("https://api.mistral.ai/v1")]],
-        [[code("Presets.xai")], [code("xai")], [code("https://api.x.ai/v1")]],
-        [[code("Presets.deepseek")], [code("deepseek")], [code("https://api.deepseek.com/v1")]],
+        [[code("Presets.layerGroq")], [code("groq")], [code("https://api.groq.com/openai/v1")]],
+        [[code("Presets.layerMistral")], [code("mistral")], [code("https://api.mistral.ai/v1")]],
+        [[code("Presets.layerXai")], [code("xai")], [code("https://api.x.ai/v1")]],
+        [[code("Presets.layerDeepseek")], [code("deepseek")], [code("https://api.deepseek.com/v1")]],
         [
-          [code("Presets.googleAiStudio")],
+          [code("Presets.layerGoogleAiStudio")],
           [code("google")],
           [code("https://generativelanguage.googleapis.com/v1beta/openai/")],
         ],
-        [[code("Presets.azureOpenAi")], [code("azure")], [code("https://{resource}.openai.azure.com/openai/v1")]],
-        [[code("Presets.ollama")], [code("ollama")], [code("http://localhost:11434/v1")]],
+        [[code("Presets.layerAzureOpenAi")], [code("azure")], [code("https://{resource}.openai.azure.com/openai/v1")]],
+        [[code("Presets.layerOllama")], [code("ollama")], [code("http://localhost:11434/v1")]],
       ],
     ),
     h2("recipe-gemini", "Recipe: Gemini via the OpenAI-compatible preset"),
     p(
       "Baton has no first-party Google helper yet because the upstream Effect AI Google provider is not compatible with the pinned beta, but Google AI Studio speaks the OpenAI protocol. Register it with the ",
-      code("googleAiStudio"),
+      code("layerGoogleAiStudio"),
       " preset and select ",
       code('{ provider: "google", model: "gemini-2.0-flash" }'),
       ".",

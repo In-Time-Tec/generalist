@@ -1,12 +1,13 @@
 import { Config, Console, Effect, Layer } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { Anthropic, OpenRouter } from "@batonfx/providers"
+import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "router" })
 
 const registryLayer = ModelRegistry.layerCombined([
-  Anthropic.withAnthropicFetch({ model: "claude-sonnet-4-5", apiKey: Config.redacted("ANTHROPIC_API_KEY") }),
-  OpenRouter.withOpenRouterFetch({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
+  Anthropic.layer({ model: "claude-sonnet-4-5", apiKey: Config.redacted("ANTHROPIC_API_KEY") }),
+  OpenRouter.layer({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
 ])
 
 const runWith = (selection: ModelRegistry.ModelSelection) =>
@@ -24,4 +25,4 @@ const program = runWith({ provider: "anthropic", model: "claude-sonnet-4-5" }).p
   ),
 )
 
-await Effect.runPromise(program)
+await Effect.runPromise(program.pipe(Effect.provide(FetchHttpClient.layer)))

@@ -11,7 +11,7 @@ const program = ModelRegistry.operate(
   Effect.flatMap((result) => Console.log(result.text)),
   Effect.provide(
     Layer.mergeAll(
-      Deterministic.withDeterministic({ model: "local" }),
+      Deterministic.layer({ model: "local" }),
       ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
       Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,

@@ -13,6 +13,6 @@ const program = Effect.gen(function* () {
     return yield* Effect.die(`Unexpected eval output: ${result.text}`)
   }
   yield* Console.log("eval passed")
-}).pipe(Effect.provide(Deterministic.withDeterministic({ model: "local" })))
+}).pipe(Effect.provide(Deterministic.layer({ model: "local" })))
 
 await Effect.runPromise(program)

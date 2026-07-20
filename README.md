@@ -22,7 +22,7 @@ const program = ModelRegistry.operate(
 ).pipe(
   Effect.provide(
     Layer.mergeAll(
-      Deterministic.withDeterministic({ model: "local" }),
+      Deterministic.layer({ model: "local" }),
       toolkit.toLayer({ search_docs: () => Effect.succeed(["Getting started"]) }),
     ),
   ),

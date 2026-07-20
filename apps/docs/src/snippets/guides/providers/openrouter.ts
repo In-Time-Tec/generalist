@@ -1,13 +1,14 @@
 import { Config, Console, Effect, Layer } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { OpenRouter } from "@batonfx/providers"
+import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({
   name: "assistant",
   instructions: "Answer in one sentence.",
 })
 
-const providerLayer = OpenRouter.withOpenRouterFetch({
+const registryLayer = OpenRouter.layer({
   model: "openai/gpt-4o-mini",
   apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })
@@ -19,7 +20,7 @@ const program = ModelRegistry.operate(
   Effect.flatMap((result) => Console.log(result.text)),
   Effect.provide(
     Layer.mergeAll(
-      providerLayer,
+      registryLayer,
       ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
       Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
@@ -27,4 +28,4 @@ const program = ModelRegistry.operate(
   ),
 )
 
-await Effect.runPromise(program)
+await Effect.runPromise(program.pipe(Effect.provide(FetchHttpClient.layer)))

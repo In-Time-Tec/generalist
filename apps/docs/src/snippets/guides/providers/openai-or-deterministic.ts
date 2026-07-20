@@ -1,10 +1,11 @@
 import { Config, Console, Effect, Layer } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { Deterministic } from "@batonfx/providers"
+import { FetchHttpClient } from "effect/unstable/http"
 
 const agent = Agent.make({ name: "release-notes" })
 
-const modelLayer = Deterministic.withOpenAiOrDeterministicFetch({
+const modelLayer = Deterministic.layerOpenAi({
   model: "gpt-4o-mini",
   fallbackModel: "gpt-4o-mini",
   apiKey: Config.redacted("OPENAI_API_KEY"),
@@ -24,4 +25,4 @@ const program = ModelRegistry.operate(selection, Agent.generate(agent, { prompt:
   ),
 )
 
-await Effect.runPromise(program)
+await Effect.runPromise(program.pipe(Effect.provide(FetchHttpClient.layer)))
