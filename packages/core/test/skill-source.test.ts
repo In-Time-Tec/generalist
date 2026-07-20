@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer } from "effect"
+import { Context, Effect, Layer, pipe } from "effect"
 import { SkillSource } from "../src/index"
 import { ItLayer } from "./it-layer"
 
@@ -98,27 +98,76 @@ describe("SkillSource", () => {
       ] as const,
   )
 
-  it.effect("merge deduplicates names with later sources winning consistently", () => {
+  it.effect("merge folds binary sources with later sources winning consistently", () => {
     const firstOnly = skill("first", "first only")
     const firstDuplicate = skill("duplicate", "first duplicate")
     const secondDuplicate = skill("duplicate", "second duplicate")
     const secondOnly = skill("second", "second only")
-    const merged = SkillSource.merge([
-      {
-        all: Effect.succeed([firstOnly, firstDuplicate]),
-        get: (name) => Effect.succeed(name === "duplicate" ? firstDuplicate : name === "first" ? firstOnly : undefined),
-      },
-      {
-        all: Effect.succeed([secondDuplicate, secondOnly]),
-        get: (name) =>
-          Effect.succeed(name === "duplicate" ? secondDuplicate : name === "second" ? secondOnly : undefined),
-      },
-    ])
+    const thirdDuplicate = skill("duplicate", "third duplicate")
+    const thirdOnly = skill("third", "third only")
+    const first: SkillSource.Interface = {
+      all: Effect.succeed([firstOnly, firstDuplicate]),
+      get: (name) => Effect.succeed(name === "duplicate" ? firstDuplicate : name === "first" ? firstOnly : undefined),
+    }
+    const second: SkillSource.Interface = {
+      all: Effect.succeed([secondDuplicate, secondOnly]),
+      get: (name) =>
+        Effect.succeed(name === "duplicate" ? secondDuplicate : name === "second" ? secondOnly : undefined),
+    }
+    const third: SkillSource.Interface = {
+      all: Effect.succeed([thirdDuplicate, thirdOnly]),
+      get: (name) => Effect.succeed(name === "duplicate" ? thirdDuplicate : name === "third" ? thirdOnly : undefined),
+    }
+    const binary = SkillSource.merge(first, second)
+    const folded = SkillSource.merge(binary, third)
+    const pipeable = pipe(first, SkillSource.merge(second), SkillSource.merge(third))
+
     return Effect.gen(function* () {
-      expect(yield* merged.all).toEqual([firstOnly, secondDuplicate, secondOnly])
-      expect(yield* merged.get("duplicate")).toBe(secondDuplicate)
-      expect(yield* merged.get("missing")).toBeUndefined()
+      expect(yield* binary.all).toEqual([firstOnly, secondDuplicate, secondOnly])
+      expect(yield* binary.get("duplicate")).toBe(secondDuplicate)
+      expect(yield* folded.all).toEqual([firstOnly, thirdDuplicate, secondOnly, thirdOnly])
+      expect(yield* folded.get("duplicate")).toBe(thirdDuplicate)
+      expect(yield* folded.get("first")).toBe(firstOnly)
+      expect(yield* folded.get("missing")).toBeUndefined()
+      expect(yield* pipeable.all).toEqual(yield* folded.all)
+      expect(yield* pipeable.get("duplicate")).toBe(yield* folded.get("duplicate"))
     })
+  })
+
+  it.effect("layer composes zero, one, and multiple sources", () => {
+    const first = skill("first", "first")
+    const earlier = skill("duplicate", "earlier")
+    const later = skill("duplicate", "later")
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const empty = Context.get(yield* Layer.build(SkillSource.layer<never>([])), SkillSource.SkillSource)
+        const single = Context.get(
+          yield* Layer.build(
+            SkillSource.layer<never>([
+              Effect.succeed({
+                all: Effect.succeed([first]),
+                get: (name) => Effect.succeed(name === "first" ? first : undefined),
+              }),
+            ]),
+          ),
+          SkillSource.SkillSource,
+        )
+        const multiple = Context.get(
+          yield* Layer.build(
+            SkillSource.layer<never>([
+              Effect.succeed({ all: Effect.succeed([earlier]), get: () => Effect.succeed(earlier) }),
+              Effect.succeed({ all: Effect.succeed([later]), get: () => Effect.succeed(later) }),
+            ]),
+          ),
+          SkillSource.SkillSource,
+        )
+
+        expect(yield* empty.all).toEqual([])
+        expect(yield* single.all).toEqual([first])
+        expect(yield* multiple.all).toEqual([later])
+        expect(yield* multiple.get("duplicate")).toBe(later)
+      }),
+    )
   })
 
   it.effect("layer evaluates composable sources and fails fast", () => {

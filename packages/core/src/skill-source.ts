@@ -74,32 +74,39 @@ export const empty: Layer.Layer<SkillSource> = fromSkills([])
 export const testLayer = (implementation: Interface): Layer.Layer<SkillSource> =>
   Layer.succeed(SkillSource, SkillSource.of(implementation))
 
-/** @experimental Merge built sources with later duplicate names winning. */
-export const merge = (sources: ReadonlyArray<Interface>): Interface => ({
-  all: Effect.forEach(sources, (source) => source.all).pipe(
-    Effect.map((groups) => {
-      const byName = new Map<string, Skill>()
-      for (const skills of groups) {
-        for (const skill of skills) byName.set(skill.frontmatter.name, skill)
-      }
-      return [...byName.values()]
-    }),
-  ),
-  get: (name) =>
-    Effect.gen(function* () {
-      for (const source of sources.toReversed()) {
-        const found = yield* source.get(name)
-        if (found !== undefined) return found
-      }
-      return undefined
-    }),
-})
+const emptySource: Interface = {
+  all: Effect.succeed([]),
+  get: () => Effect.void.pipe(Effect.as(undefined)),
+}
+
+/** @experimental Merge two built sources with the second source winning duplicate names. */
+export const merge: {
+  (second: Interface): (first: Interface) => Interface
+  (first: Interface, second: Interface): Interface
+} = Function.dual(
+  2,
+  (first: Interface, second: Interface): Interface => ({
+    all: Effect.all([first.all, second.all]).pipe(
+      Effect.map((groups) => {
+        const byName = new Map<string, Skill>()
+        for (const skills of groups) {
+          for (const skill of skills) byName.set(skill.frontmatter.name, skill)
+        }
+        return [...byName.values()]
+      }),
+    ),
+    get: (name) =>
+      second.get(name).pipe(Effect.flatMap((found) => (found === undefined ? first.get(name) : Effect.succeed(found)))),
+  }),
+)
 
 /** @experimental Build one layer from composable sources. */
 export const layer = <R>(sources: ReadonlyArray<Source<R>>): Layer.Layer<SkillSource, SkillSourceError, R> =>
   Layer.effect(
     SkillSource,
-    Effect.forEach(sources, (source) => source).pipe(Effect.map((built) => SkillSource.of(merge(built)))),
+    Effect.forEach(sources, (source) => source).pipe(
+      Effect.map((built) => SkillSource.of(built.reduce((first, second) => merge(first, second), emptySource))),
+    ),
   )
 
 const estimatedTokens = (listing: string): number => Math.ceil(listing.length / 4)
