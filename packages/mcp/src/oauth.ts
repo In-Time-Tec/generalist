@@ -38,26 +38,29 @@ const TokenDocument = Schema.Struct({
 const TokenDocumentJson = Schema.fromJsonString(TokenDocument)
 
 /** @experimental */
-export class OAuthPendingError extends Schema.TaggedErrorClass<OAuthPendingError>()("OAuthPendingError", {
+export class OAuthPending extends Schema.TaggedErrorClass<OAuthPending>()("@batonfx/mcp/OAuthPending", {
   authorizationUrl: Schema.String,
 }) {}
 
 /** @experimental */
-export class OAuthDeniedError extends Schema.TaggedErrorClass<OAuthDeniedError>()("OAuthDeniedError", {
+export class OAuthDenied extends Schema.TaggedErrorClass<OAuthDenied>()("@batonfx/mcp/OAuthDenied", {
   reason: Schema.String,
 }) {}
 
 /** @experimental */
-export class OAuthExpiredError extends Schema.TaggedErrorClass<OAuthExpiredError>()("OAuthExpiredError", {
+export class OAuthExpired extends Schema.TaggedErrorClass<OAuthExpired>()("@batonfx/mcp/OAuthExpired", {
   server: Schema.String,
 }) {}
 
 /** @experimental */
-export class OAuthProviderError extends Schema.TaggedErrorClass<OAuthProviderError>()("OAuthProviderError", {
-  server: Schema.String,
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+export class OAuthProviderError extends Schema.TaggedErrorClass<OAuthProviderError>()(
+  "@batonfx/mcp/OAuthProviderError",
+  {
+    server: Schema.String,
+    operation: Schema.String,
+    message: Schema.String,
+  },
+) {}
 
 /** @experimental */
 export interface TokenStoreInterface {
@@ -122,7 +125,7 @@ export interface Interface {
   readonly withTransport: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | OAuthProviderError, R>
   readonly authorize: Effect.Effect<Authorization, OAuthProviderError>
   readonly pending: Effect.Effect<Option.Option<Authorization>>
-  readonly callback: (url: string) => Effect.Effect<void, OAuthDeniedError | OAuthExpiredError | OAuthProviderError>
+  readonly callback: (url: string) => Effect.Effect<void, OAuthDenied | OAuthExpired | OAuthProviderError>
   readonly clear: Effect.Effect<void, OAuthProviderError>
 }
 
@@ -325,15 +328,15 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
               return Effect.succeed([matches ? Option.some(current) : Option.none(), matches ? Idle : current] as const)
             })
             if (Option.isNone(consumed)) {
-              return yield* OAuthExpiredError.make({ server: configuration.serverUrl })
+              return yield* OAuthExpired.make({ server: configuration.serverUrl })
             }
             const denial = url.searchParams.get("error")
             if (denial !== null) {
-              return yield* OAuthDeniedError.make({ reason: denial })
+              return yield* OAuthDenied.make({ reason: denial })
             }
             const code = url.searchParams.get("code")
             if (code === null) {
-              return yield* OAuthDeniedError.make({ reason: "authorization code missing" })
+              return yield* OAuthDenied.make({ reason: "authorization code missing" })
             }
             const callbackProvider: OAuthClientProvider = {
               ...provider,

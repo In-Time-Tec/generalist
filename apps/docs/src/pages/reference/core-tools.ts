@@ -15,8 +15,8 @@ export const coreToolsReference = definePage({
       "Optional override seam for durable hosts, client-executed tools, remote workers, MCP, sandboxing, and suspension. Ordinary in-process tools use the active Effect AI ",
       code("Toolkit"),
       " handlers directly, so no executor layer is required. When you do provide the service, its interface is a single function ",
-      code("execute: (request: Request) => Effect<Outcome, FrameworkFailure | RemoteRetryError, ToolContext>"),
-      ". Direct executor consumers observe typed framework and retry errors; the Agent loop preserves framework failures and wraps RemoteRetryError in AgentError with the typed cause retained.",
+      code("execute: (request: Request) => Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured, ToolContext>"),
+      ". Direct executor consumers observe typed framework and retry errors; the Agent loop preserves framework failures and wraps RemoteRetryMisconfigured in AgentError with the typed cause retained.",
     ),
     table(
       ["Request field", "Type", "Notes"],

@@ -236,7 +236,7 @@ describe("Sse", () => {
         ? response.body.stream.pipe(Stream.runDrain, Effect.flip)
         : Effect.die("expected stream body")
 
-      expect(Schema.is(Errors.WireEncodeError)(error)).toBe(true)
+      expect(Schema.is(Errors.WireEncodeFailed)(error)).toBe(true)
     }).pipe(provideTestLayer(registryLayer(() => Stream.succeed({ _tag: "Ended", seq: -1 })))),
   )
 
@@ -251,7 +251,7 @@ describe("Sse", () => {
         ? response.body.stream.pipe(Stream.runDrain, Effect.flip)
         : Effect.die("expected stream body")
 
-      expect(Schema.is(Errors.WireEncodeError)(error)).toBe(true)
+      expect(Schema.is(Errors.WireEncodeFailed)(error)).toBe(true)
     }).pipe(
       provideTestLayer(
         registryLayer(() =>

@@ -24,6 +24,9 @@ export class ReconnectExhausted extends Schema.TaggedErrorClass<ReconnectExhaust
 ) {}
 
 /** @experimental A client or server wire frame could not be schema-encoded. */
-export class WireEncodeError extends Schema.TaggedErrorClass<WireEncodeError>()("@batonfx/transport/WireEncodeError", {
-  message: Schema.String,
-}) {}
+export class WireEncodeFailed extends Schema.TaggedErrorClass<WireEncodeFailed>()(
+  "@batonfx/transport/WireEncodeFailed",
+  {
+    message: Schema.String,
+  },
+) {}

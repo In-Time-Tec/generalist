@@ -65,7 +65,7 @@ Run `bun examples/package-composition-guides/src/core.ts`. The program remains l
 
 ## Errors, requirements, and resources
 
-The merged layer discharges `Agent.Runtime`, `Chat.Persistence`, and `LanguageModel`, so the program has `R = never` and succeeds with `void`. Its error channel is `Agent.RunError`: `AgentError | AgentSuspended | ResumeMismatch | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflowError | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure`. Sole persistence and model failures map to `AgentError`; compound model causes retain their typed branches, and tool framework faults remain `FrameworkFailure`. `history` and `persistence` are mutually exclusive. The runtime and memory backing store are owned by their layers. The sequential example has no timers, detached fibers, buffers, or concurrent work.
+The merged layer discharges `Agent.Runtime`, `Chat.Persistence`, and `LanguageModel`, so the program has `R = never` and succeeds with `void`. Its error channel is `Agent.RunError`: `AgentError | AgentSuspended | ResumeMismatch | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflow | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure`. Sole persistence and model failures map to `AgentError`; compound model causes retain their typed branches, and tool framework faults remain `FrameworkFailure`. `history` and `persistence` are mutually exclusive. The runtime and memory backing store are owned by their layers. The sequential example has no timers, detached fibers, buffers, or concurrent work.
 
 ## More
 

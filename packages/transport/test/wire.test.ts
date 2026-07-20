@@ -117,8 +117,8 @@ describe("Wire", () => {
       const serverError = yield* Effect.flip(serverEffect)
       const clientError = yield* Effect.flip(clientEffect)
 
-      expect(serverError._tag).toBe("@batonfx/transport/WireEncodeError")
-      expect(clientError._tag).toBe("@batonfx/transport/WireEncodeError")
+      expect(serverError._tag).toBe("@batonfx/transport/WireEncodeFailed")
+      expect(clientError._tag).toBe("@batonfx/transport/WireEncodeFailed")
     }),
   )
 
@@ -357,7 +357,7 @@ describe("Wire", () => {
       const dynamicJson = yield* Wire.codec({ capability: "runtime-dynamic" }).encodeServer(frame)
       const decoded = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Wire.LooseServerFrame))(dynamicJson)
 
-      expect(fixedFailure._tag).toBe("@batonfx/transport/WireEncodeError")
+      expect(fixedFailure._tag).toBe("@batonfx/transport/WireEncodeFailed")
       expect(decoded).toEqual(frame)
     }),
   )
@@ -379,8 +379,8 @@ describe("Wire", () => {
         .encodeServer(frame)
         .pipe(Effect.flip)
 
-      expect(shorthandError._tag).toBe("@batonfx/transport/WireEncodeError")
-      expect(explicitError._tag).toBe("@batonfx/transport/WireEncodeError")
+      expect(shorthandError._tag).toBe("@batonfx/transport/WireEncodeFailed")
+      expect(explicitError._tag).toBe("@batonfx/transport/WireEncodeFailed")
     }),
   )
 
@@ -399,8 +399,8 @@ describe("Wire", () => {
       const shorthandError = yield* Wire.codec(toolkit).encodeServer(frame).pipe(Effect.flip)
       const explicitError = yield* Wire.codec({ capability: "fixed", toolkit }).encodeServer(frame).pipe(Effect.flip)
 
-      expect(shorthandError._tag).toBe("@batonfx/transport/WireEncodeError")
-      expect(explicitError._tag).toBe("@batonfx/transport/WireEncodeError")
+      expect(shorthandError._tag).toBe("@batonfx/transport/WireEncodeFailed")
+      expect(explicitError._tag).toBe("@batonfx/transport/WireEncodeFailed")
     }),
   )
 
@@ -417,7 +417,7 @@ describe("Wire", () => {
       }
       const error = yield* Wire.codec({ capability: "runtime-dynamic" }).encodeServer(frame).pipe(Effect.flip)
 
-      expect(error._tag).toBe("@batonfx/transport/WireEncodeError")
+      expect(error._tag).toBe("@batonfx/transport/WireEncodeFailed")
     }),
   )
 

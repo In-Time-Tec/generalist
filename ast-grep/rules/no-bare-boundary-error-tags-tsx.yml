@@ -1,0 +1,12 @@
+id: no-bare-boundary-error-tags-tsx
+language: Tsx
+severity: error
+message: Boundary error tags must use @batonfx/<package>/<Name> for wire uniqueness.
+rule:
+  pattern: Schema.TaggedErrorClass<$$$>()($TAG, $$$ARGS)
+constraints:
+  TAG:
+    not:
+      regex: '^"@batonfx/[a-z-]+/[A-Z][A-Za-z]*"$'
+files:
+  - "packages/*/src/**/*.tsx"

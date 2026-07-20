@@ -49,7 +49,7 @@ export const mcpReference = definePage({
         ],
         [
           [code("layer({ name, transport, callTimeout? })")],
-          ["Scoped layer that connects, lists tools once, and fails with ", code("McpConnectionError")],
+          ["Scoped layer that connects, lists tools once, and fails with ", code("McpConnectionFailed")],
         ],
         [
           [code("layerTagged(tag, options)")],
@@ -61,7 +61,7 @@ export const mcpReference = definePage({
         ],
         [[code("CallOptions")], [code("{ callTimeout?: Duration.Input }"), " applied to every tool call"]],
         [
-          [code("McpConnectionError"), " / ", code("McpToolCallError")],
+          [code("McpConnectionFailed"), " / ", code("McpToolCallFailed")],
           [code("{ server, message }"), " and ", code("{ server, tool, message }")],
         ],
       ],
@@ -71,7 +71,7 @@ export const mcpReference = definePage({
       " returns the server's structured content when present, otherwise the joined text content; ",
       code("isError"),
       " results fail with ",
-      code("McpToolCallError"),
+      code("McpToolCallFailed"),
       ".",
     ),
     h2("baton-adapter", "The baton adapter"),

@@ -23,7 +23,7 @@ import {
   DuplicateToolCallId,
   type Event,
   MiddlewareViolation,
-  ProgressOverflowError,
+  ProgressOverflow,
   ResumeMismatch,
   type SteeringDrained,
   type StructuredOutput,
@@ -63,7 +63,7 @@ import {
   FrameworkFailure,
   type Outcome,
   type Request,
-  RemoteRetryError,
+  RemoteRetryMisconfigured,
   type Success,
   ToolExecutor,
   executeToolkit,
@@ -966,7 +966,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             )
       }
 
-      const makeProgressQueue = (): Effect.Effect<Queue.Queue<ToolProgress, Cause.Done | ProgressOverflowError>> => {
+      const makeProgressQueue = (): Effect.Effect<Queue.Queue<ToolProgress, Cause.Done | ProgressOverflow>> => {
         switch (progressPolicy._tag) {
           case "Backpressure":
             return Queue.bounded(progressPolicy.capacity)
@@ -1020,7 +1020,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                       } else if (progressPolicy._tag === "Fail" && !offered) {
                         yield* Queue.fail(
                           progressQueue,
-                          ProgressOverflowError.make({ turn, toolCallId: call.id, capacity: progressPolicy.capacity }),
+                          ProgressOverflow.make({ turn, toolCallId: call.id, capacity: progressPolicy.capacity }),
                         )
                       }
                     }),
@@ -1039,7 +1039,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                       .execute(request)
                       .pipe(
                         Effect.mapError((error) =>
-                          Schema.is(RemoteRetryError)(error)
+                          Schema.is(RemoteRetryMisconfigured)(error)
                             ? AgentError.make({ message: error.message, turn, cause: error })
                             : error,
                         ),
@@ -1292,7 +1292,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           : agentModelRegistry
               .stream(agentModel, stream)
               .pipe(
-                Stream.catchTag("LanguageModelNotRegistered", (error) =>
+                Stream.catchTag("@batonfx/core/LanguageModelNotRegistered", (error) =>
                   Stream.fail(AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error })),
                 ),
               )

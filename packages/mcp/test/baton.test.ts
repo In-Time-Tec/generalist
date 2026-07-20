@@ -100,7 +100,7 @@ describe("baton adapter", () => {
         if (completed?._tag === "ToolExecutionCompleted") {
           expect(completed.result.isFailure).toBe(true)
           expect(completed.result.result).toEqual({
-            _tag: "McpToolCallError",
+            _tag: "@batonfx/mcp/McpToolCallFailed",
             server: "calc",
             tool: "boom",
             message: "boom failed",
@@ -176,8 +176,8 @@ describe("baton adapter", () => {
         Effect.flip,
       )
 
-      expect(error).toBeInstanceOf(McpToolSource.McpConnectionError)
-      if (error._tag === "McpConnectionError") expect(error.server).toBe("broken")
+      expect(error).toBeInstanceOf(McpToolSource.McpConnectionFailed)
+      if (error._tag === "@batonfx/mcp/McpConnectionFailed") expect(error.server).toBe("broken")
     }),
   )
 })

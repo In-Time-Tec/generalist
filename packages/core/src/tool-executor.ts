@@ -73,14 +73,19 @@ export class FrameworkFailure extends Schema.TaggedErrorClass<FrameworkFailure>(
 }) {}
 
 /** @experimental An idempotent remote route supplied an invalid or unstable operation key or retry bound. */
-export class RemoteRetryError extends Schema.TaggedErrorClass<RemoteRetryError>()("@batonfx/core/RemoteRetryError", {
-  reason: Schema.Literals(["invalid-max-retries", "missing-operation-key", "changed-operation-key"]),
-  message: Schema.String,
-}) {}
+export class RemoteRetryMisconfigured extends Schema.TaggedErrorClass<RemoteRetryMisconfigured>()(
+  "@batonfx/core/RemoteRetryMisconfigured",
+  {
+    reason: Schema.Literals(["invalid-max-retries", "missing-operation-key", "changed-operation-key"]),
+    message: Schema.String,
+  },
+) {}
 
 /** @experimental */
 export interface Interface {
-  readonly execute: (request: Request) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryError, ToolContext>
+  readonly execute: (
+    request: Request,
+  ) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured, ToolContext>
 }
 
 /** @experimental */
@@ -251,7 +256,7 @@ const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
           return effect
         }),
         Effect.mapError((error) =>
-          Schema.is(FrameworkFailure)(error) || Schema.is(RemoteRetryError)(error)
+          Schema.is(FrameworkFailure)(error) || Schema.is(RemoteRetryMisconfigured)(error)
             ? error
             : toolResultCodec.frameworkFailure("placement", request.call.name, error),
         ),
@@ -261,10 +266,10 @@ const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
   })
 }
 
-const remoteRetryError = (reason: RemoteRetryError["reason"], message: string): RemoteRetryError =>
-  RemoteRetryError.make({ reason, message })
+const remoteRetryError = (reason: RemoteRetryMisconfigured["reason"], message: string): RemoteRetryMisconfigured =>
+  RemoteRetryMisconfigured.make({ reason, message })
 
-const validateOperationKey = (operationKey: unknown): Effect.Effect<string, RemoteRetryError> =>
+const validateOperationKey = (operationKey: unknown): Effect.Effect<string, RemoteRetryMisconfigured> =>
   typeof operationKey !== "string" || operationKey.trim().length === 0
     ? Effect.fail(remoteRetryError("missing-operation-key", "Remote retry operation key must be non-empty"))
     : Effect.succeed(operationKey)
@@ -272,7 +277,7 @@ const validateOperationKey = (operationKey: unknown): Effect.Effect<string, Remo
 const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
   options: RemoteRouteIdempotentOptions<Tools, E>,
   request: PlacementRequest,
-): Effect.Effect<PlacementResponse, E | RemoteRetryError, ToolContext> =>
+): Effect.Effect<PlacementResponse, E | RemoteRetryMisconfigured, ToolContext> =>
   Effect.suspend(() => {
     if (!Number.isFinite(options.maxRetries) || !Number.isInteger(options.maxRetries) || options.maxRetries < 0) {
       return Effect.fail(
@@ -283,17 +288,17 @@ const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
     return validateOperationKey(operationKey).pipe(
       Effect.flatMap((stableKey) => {
         let attempt = 0
-        const executeAttempt: Effect.Effect<PlacementResponse | RemoteRetryError, E, ToolContext> = Effect.suspend(
-          () => {
+        const executeAttempt: Effect.Effect<PlacementResponse | RemoteRetryMisconfigured, E, ToolContext> =
+          Effect.suspend(() => {
             const currentKey = attempt === 0 ? stableKey : options.operationKey(request)
             attempt += 1
             return validateOperationKey(currentKey).pipe(
               Effect.match({
-                onFailure: (error): string | RemoteRetryError => error,
-                onSuccess: (validatedKey): string | RemoteRetryError => validatedKey,
+                onFailure: (error): string | RemoteRetryMisconfigured => error,
+                onSuccess: (validatedKey): string | RemoteRetryMisconfigured => validatedKey,
               }),
               Effect.flatMap(
-                (validatedKey): Effect.Effect<PlacementResponse | RemoteRetryError, E, ToolContext> =>
+                (validatedKey): Effect.Effect<PlacementResponse | RemoteRetryMisconfigured, E, ToolContext> =>
                   typeof validatedKey !== "string"
                     ? Effect.succeed(validatedKey)
                     : validatedKey === stableKey
@@ -306,17 +311,18 @@ const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
                         ),
               ),
             )
-          },
-        )
+          })
         return Effect.retry(executeAttempt, {
           schedule: options.schedule,
           times: options.maxRetries,
           while: (error: E) =>
-            !Schema.is(AgentError)(error) && !Schema.is(FrameworkFailure)(error) && !Schema.is(RemoteRetryError)(error),
+            !Schema.is(AgentError)(error) &&
+            !Schema.is(FrameworkFailure)(error) &&
+            !Schema.is(RemoteRetryMisconfigured)(error),
         }).pipe(
           Effect.flatMap(
-            (result): Effect.Effect<PlacementResponse, RemoteRetryError> =>
-              Schema.is(RemoteRetryError)(result) ? Effect.fail(result) : Effect.succeed(result),
+            (result): Effect.Effect<PlacementResponse, RemoteRetryMisconfigured> =>
+              Schema.is(RemoteRetryMisconfigured)(result) ? Effect.fail(result) : Effect.succeed(result),
           ),
         )
       }),

@@ -89,7 +89,7 @@ export function handle<T extends ToolkitInput>(input: T | Capability<T>): Handle
     const writeFrame = (frame: LooseServerFrameType) =>
       wireCodec.encodeServer(frame).pipe(
         Effect.flatMap(writer),
-        Effect.catchTag("@batonfx/transport/WireEncodeError", (error) =>
+        Effect.catchTag("@batonfx/transport/WireEncodeFailed", (error) =>
           close(1011, "wire encoding failed").pipe(Effect.andThen(Effect.fail(error))),
         ),
       )
@@ -105,7 +105,7 @@ export function handle<T extends ToolkitInput>(input: T | Capability<T>): Handle
         return registry.attach(sessionId, afterSeq).pipe(
           Stream.runForEach(writeFrame),
           Effect.catchTags({
-            "@batonfx/transport/WireEncodeError": () => Effect.void,
+            "@batonfx/transport/WireEncodeFailed": () => Effect.void,
             "@batonfx/transport/SubscriberLagged": () => close(4000, "lagged"),
             "@batonfx/transport/SessionError": (error) => close(1011, error.message),
           }),

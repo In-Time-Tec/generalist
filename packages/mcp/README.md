@@ -69,7 +69,7 @@ Run `bun examples/package-composition-guides/src/mcp.ts`.
 
 ## Errors, requirements, and resources
 
-This fully provided deterministic program is `Effect<void, never, never>`. Production acquisition fails with schema-backed `McpConnectionError`, and production `callTool` fails with schema-backed `McpToolCallError`. `McpToolSource.layer` is scoped internally by its layer, so releasing the layer closes the MCP connection. The example has no detached fibers or unbounded concurrency/buffering.
+This fully provided deterministic program is `Effect<void, never, never>`. Production acquisition fails with schema-backed `McpConnectionFailed`, and production `callTool` fails with schema-backed `McpToolCallFailed`. `McpToolSource.layer` is scoped internally by its layer, so releasing the layer closes the MCP connection. The example has no detached fibers or unbounded concurrency/buffering.
 
 ## More
 

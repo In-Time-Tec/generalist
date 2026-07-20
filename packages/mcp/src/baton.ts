@@ -6,14 +6,14 @@ import {
   fromTransport,
   type Interface,
   type JsonValue,
-  McpConnectionError,
+  McpConnectionFailed,
   type McpAiTool,
   type McpToolFailure,
   McpToolSource,
   type McpTransport,
   layer,
 } from "./mcp-tool-source.js"
-import type { OAuthPendingError, OAuthProviderError } from "./oauth.js"
+import type { OAuthPending, OAuthProviderError } from "./oauth.js"
 
 /** @experimental */
 export interface Options {
@@ -38,7 +38,7 @@ export const toolkit = (source: Interface): Effect.Effect<Toolkit.Toolkit<Record
   source.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools) as Toolkit.Toolkit<Record<string, McpAiTool>>))
 
 const toolFailure = (server: string, tool: string, message: string): McpToolFailure => ({
-  _tag: "McpToolCallError",
+  _tag: "@batonfx/mcp/McpToolCallFailed",
   server,
   tool,
   message,
@@ -82,7 +82,7 @@ const isTransport = (transport: McpTransport | Transport): transport is Transpor
 
 const acquire = (
   options: Options,
-): Effect.Effect<Interface, McpConnectionError | OAuthPendingError | OAuthProviderError, Scope.Scope> =>
+): Effect.Effect<Interface, McpConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> =>
   isTransport(options.transport)
     ? fromTransport(
         options.name,
@@ -104,7 +104,7 @@ const acquire = (
  */
 export const route = (
   options: Options,
-): Effect.Effect<BatonTools, McpConnectionError | OAuthPendingError | OAuthProviderError, Scope.Scope> =>
+): Effect.Effect<BatonTools, McpConnectionFailed | OAuthPending | OAuthProviderError, Scope.Scope> =>
   Effect.gen(function* () {
     const source = yield* acquire(options)
     const mcpToolkit = yield* toolkit(source)

@@ -156,11 +156,11 @@ describe("OAuth", () => {
   })
 
   it("exposes typed denied, expired, pending, and provider errors", () => {
-    expect(OAuth.OAuthDeniedError.make({ reason: "access_denied" })._tag).toBe("OAuthDeniedError")
-    expect(OAuth.OAuthExpiredError.make({ server: "server" })._tag).toBe("OAuthExpiredError")
-    expect(OAuth.OAuthPendingError.make({ authorizationUrl: "https://auth.example" })._tag).toBe("OAuthPendingError")
+    expect(OAuth.OAuthDenied.make({ reason: "access_denied" })._tag).toBe("@batonfx/mcp/OAuthDenied")
+    expect(OAuth.OAuthExpired.make({ server: "server" })._tag).toBe("@batonfx/mcp/OAuthExpired")
+    expect(OAuth.OAuthPending.make({ authorizationUrl: "https://auth.example" })._tag).toBe("@batonfx/mcp/OAuthPending")
     const provider = OAuth.OAuthProviderError.make({ server: "server", operation: "refresh", message: "failed" })
-    expect(provider._tag).toBe("OAuthProviderError")
+    expect(provider._tag).toBe("@batonfx/mcp/OAuthProviderError")
     expect(Schema.encodeSync(Schema.UnknownFromJsonString)(provider)).not.toContain("access_token")
   })
 
@@ -345,7 +345,7 @@ describe("OAuth", () => {
         .callback("https://app.example/oauth/callback?error=access_denied&state=unsolicited")
         .pipe(Effect.flip)
 
-      expect(error).toBeInstanceOf(OAuth.OAuthExpiredError)
+      expect(error).toBeInstanceOf(OAuth.OAuthExpired)
     }),
   )
 
@@ -363,7 +363,7 @@ describe("OAuth", () => {
       const replay = yield* oauth
         .callback(`https://app.example/oauth/callback?code=replayed&state=${authorization.state}`)
         .pipe(Effect.flip)
-      expect(replay).toBeInstanceOf(OAuth.OAuthExpiredError)
+      expect(replay).toBeInstanceOf(OAuth.OAuthExpired)
     }),
   )
 
@@ -407,14 +407,14 @@ describe("OAuth", () => {
       const malformed = yield* oauth
         .callback(`https://app.example/oauth/callback?state=${authorization.state}`)
         .pipe(Effect.flip)
-      expect(malformed).toBeInstanceOf(OAuth.OAuthDeniedError)
+      expect(malformed).toBeInstanceOf(OAuth.OAuthDenied)
       expect(Option.isNone(yield* oauth.pending)).toBe(true)
       expect((yield* sdkCallback(oauth.provider.codeVerifier).pipe(Effect.exit))._tag).toBe("Failure")
 
       const replay = yield* oauth
         .callback(`https://app.example/oauth/callback?code=replayed&state=${authorization.state}`)
         .pipe(Effect.flip)
-      expect(replay).toBeInstanceOf(OAuth.OAuthExpiredError)
+      expect(replay).toBeInstanceOf(OAuth.OAuthExpired)
     }),
   )
 
@@ -434,7 +434,7 @@ describe("OAuth", () => {
       expect(outcomes.filter((outcome) => outcome._tag === "Success")).toHaveLength(1)
       expect(
         outcomes.filter(
-          (outcome) => outcome._tag === "Failure" && Schema.is(OAuth.OAuthExpiredError)(Cause.squash(outcome.cause)),
+          (outcome) => outcome._tag === "Failure" && Schema.is(OAuth.OAuthExpired)(Cause.squash(outcome.cause)),
         ),
       ).toHaveLength(1)
       expect(Option.isNone(yield* oauth.pending)).toBe(true)
@@ -451,7 +451,7 @@ describe("OAuth", () => {
       const url = new URL(`https://auth.example/authorize?state=${state}`)
       yield* sdkCallback(() => oauth.provider.redirectToAuthorization(url))
       const pending = Option.getOrThrow(yield* oauth.pending)
-      const error = OAuth.OAuthPendingError.make({ authorizationUrl: pending.url })
+      const error = OAuth.OAuthPending.make({ authorizationUrl: pending.url })
 
       expect(pending).toEqual({ url: url.toString(), state })
       expect(error.authorizationUrl).toBe(url.toString())
@@ -675,7 +675,7 @@ describe("OAuth", () => {
         const callback = yield* oauth
           .callback(`https://app.example/oauth/callback?code=replay&state=${state}`)
           .pipe(Effect.flip)
-        expect(callback).toBeInstanceOf(OAuth.OAuthExpiredError)
+        expect(callback).toBeInstanceOf(OAuth.OAuthExpired)
       }),
     ),
   )
@@ -691,11 +691,11 @@ describe("OAuth", () => {
         }),
       ).pipe(Effect.flip)
 
-      expect(error).toBeInstanceOf(McpToolSource.McpConnectionError)
+      expect(error).toBeInstanceOf(McpToolSource.McpConnectionFailed)
     }).pipe(Effect.scoped),
   )
 
-  it.effect("preserves newly captured transport authorization as OAuthPendingError", () =>
+  it.effect("preserves newly captured transport authorization as OAuthPending", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const reads = yield* Ref.make(0)
@@ -724,8 +724,8 @@ describe("OAuth", () => {
           }),
         ).pipe(Effect.flip)
 
-        expect(error).toBeInstanceOf(OAuth.OAuthPendingError)
-        if (error._tag === "OAuthPendingError") expect(error.authorizationUrl).toBe(authorization.url)
+        expect(error).toBeInstanceOf(OAuth.OAuthPending)
+        if (error._tag === "@batonfx/mcp/OAuthPending") expect(error.authorizationUrl).toBe(authorization.url)
       }),
     ),
   )
@@ -738,11 +738,11 @@ describe("OAuth", () => {
       const denied = yield* oauth
         .callback(`https://app.example/oauth/callback?error=access_denied&state=${deniedAuthorization.state}`)
         .pipe(Effect.flip)
-      expect(denied).toBeInstanceOf(OAuth.OAuthDeniedError)
+      expect(denied).toBeInstanceOf(OAuth.OAuthDenied)
       const deniedReplay = yield* oauth
         .callback(`https://app.example/oauth/callback?error=access_denied&state=${deniedAuthorization.state}`)
         .pipe(Effect.flip)
-      expect(deniedReplay).toBeInstanceOf(OAuth.OAuthExpiredError)
+      expect(deniedReplay).toBeInstanceOf(OAuth.OAuthExpired)
 
       const failedAuthorization = yield* oauth.authorize
       const failed = yield* oauth
@@ -753,7 +753,7 @@ describe("OAuth", () => {
       const failedReplay = yield* oauth
         .callback(`https://app.example/oauth/callback?code=replayed&state=${failedAuthorization.state}`)
         .pipe(Effect.flip)
-      expect(failedReplay).toBeInstanceOf(OAuth.OAuthExpiredError)
+      expect(failedReplay).toBeInstanceOf(OAuth.OAuthExpired)
     }),
   )
 

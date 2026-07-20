@@ -347,7 +347,7 @@ const routeOptions: McpRouteOptions = {
 }
 const routed: Effect.Effect<
   BatonTools,
-  McpToolSource.McpConnectionError | OAuth.OAuthPendingError | OAuth.OAuthProviderError,
+  McpToolSource.McpConnectionFailed | OAuth.OAuthPending | OAuth.OAuthProviderError,
   Scope.Scope
 > = mcpRoute(routeOptions)
 void routed

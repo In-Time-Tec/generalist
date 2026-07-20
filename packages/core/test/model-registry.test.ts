@@ -59,8 +59,8 @@ describe("ModelRegistry", () => {
             ModelRegistry.operate({ provider: "missing", model: "none" }, Effect.succeed("unused")),
           )
 
-          expect(failure._tag).toBe("LanguageModelNotRegistered")
-          if (failure._tag === "LanguageModelNotRegistered") {
+          expect(failure._tag).toBe("@batonfx/core/LanguageModelNotRegistered")
+          if (failure._tag === "@batonfx/core/LanguageModelNotRegistered") {
             expect(failure.provider).toBe("missing")
             expect(failure.model).toBe("none")
           }
@@ -79,7 +79,7 @@ describe("ModelRegistry", () => {
             ModelRegistry.stream({ provider: "missing", model: "none" }, Stream.make("unused")).pipe(Stream.runDrain),
           )
 
-          expect(failure._tag).toBe("LanguageModelNotRegistered")
+          expect(failure._tag).toBe("@batonfx/core/LanguageModelNotRegistered")
         }),
       ] as const,
   )

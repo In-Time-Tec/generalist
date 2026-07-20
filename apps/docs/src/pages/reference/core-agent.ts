@@ -179,7 +179,7 @@ export const coreAgentReference = definePage({
     p(
       "The error channel of every run function is the union ",
       code(
-        "AgentError | AgentSuspended | ResumeMismatch | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflowError | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure",
+        "AgentError | AgentSuspended | ResumeMismatch | TurnPolicyError | TurnPolicyStopped | TurnLimitExceeded | MiddlewareViolation | DuplicateToolCallId | ProgressOverflow | ToolNameCollision | AiError | LanguageModelNotRegistered | FrameworkFailure",
       ),
       ". Field shapes are tabulated in ",
       link("/docs/reference/core-events", "AgentEvent and errors"),

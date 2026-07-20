@@ -1,7 +1,7 @@
 import { Effect, Schema, SchemaTransformation } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentEvent, ToolExecutor, TurnPolicy } from "@batonfx/core"
-import { WireEncodeError } from "./errors.js"
+import { WireEncodeFailed } from "./errors.js"
 
 /** @experimental Canonical transport frame sequence and replay cursor schema. */
 export const Sequence = Schema.Int.check(
@@ -260,11 +260,11 @@ export type Capability<
 
 /** @experimental Lazy JSON encoders for transport client and server frames. */
 export interface WireCodec<in Frame = ServerFrameType> {
-  readonly encodeServer: (frame: Frame) => Effect.Effect<string, WireEncodeError>
-  readonly encodeClient: (frame: ClientFrameType) => Effect.Effect<string, WireEncodeError>
+  readonly encodeServer: (frame: Frame) => Effect.Effect<string, WireEncodeFailed>
+  readonly encodeClient: (frame: ClientFrameType) => Effect.Effect<string, WireEncodeFailed>
 }
 
-const encodeError = (error: Schema.SchemaError): WireEncodeError => WireEncodeError.make({ message: String(error) })
+const encodeError = (error: Schema.SchemaError): WireEncodeFailed => WireEncodeFailed.make({ message: String(error) })
 
 const makeCodec = <Frame>(serverFrame: Schema.Codec<unknown, unknown, never, never>): WireCodec<Frame> => ({
   encodeServer: (frame) =>

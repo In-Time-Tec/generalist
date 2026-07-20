@@ -591,8 +591,8 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           const emptyError = yield* Effect.flip(empty.execute(request("lookup", {})))
           const changingError = yield* Effect.flip(changing.execute(request("lookup", {})))
 
-          expect(Schema.is(ToolExecutor.RemoteRetryError)(emptyError)).toBe(true)
-          expect(Schema.is(ToolExecutor.RemoteRetryError)(changingError)).toBe(true)
+          expect(Schema.is(ToolExecutor.RemoteRetryMisconfigured)(emptyError)).toBe(true)
+          expect(Schema.is(ToolExecutor.RemoteRetryMisconfigured)(changingError)).toBe(true)
           expect(emptyAttempts).toBe(0)
           expect(changingAttempts).toBe(1)
         }),
@@ -630,7 +630,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         yield* TestClock.adjust("1 hour")
         const error = yield* Fiber.join(fiber).pipe(Effect.flip)
 
-        expect(Schema.is(ToolExecutor.RemoteRetryError)(error)).toBe(true)
+        expect(Schema.is(ToolExecutor.RemoteRetryMisconfigured)(error)).toBe(true)
         expect(attempts).toBe(1)
       }),
     ] as const
@@ -676,8 +676,8 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         expect(outcome).toMatchObject({ stage: "placement", tool: "lookup" })
         expect(keyEvaluations).toBe(1)
         expect(attempts).toBe(1)
-        expect(Schema.is(ToolExecutor.RemoteRetryError)(error)).toBe(true)
-        expect(Schema.is(ToolExecutor.RemoteRetryError)(error) && error.reason).toBe("invalid-max-retries")
+        expect(Schema.is(ToolExecutor.RemoteRetryMisconfigured)(error)).toBe(true)
+        expect(Schema.is(ToolExecutor.RemoteRetryMisconfigured)(error) && error.reason).toBe("invalid-max-retries")
       }),
     ] as const
   })

@@ -2096,8 +2096,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const failure = yield* Fiber.join(fiber)
         yield* Deferred.await(executionFinalized)
 
-        expect(failure).toBeInstanceOf(AgentEvent.ProgressOverflowError)
-        if (Schema.is(AgentEvent.ProgressOverflowError)(failure)) {
+        expect(failure).toBeInstanceOf(AgentEvent.ProgressOverflow)
+        if (Schema.is(AgentEvent.ProgressOverflow)(failure)) {
           expect(failure.turn).toBe(0)
           expect(failure.toolCallId).toBe("tool-call-fail-progress")
           expect(failure.capacity).toBe(1)

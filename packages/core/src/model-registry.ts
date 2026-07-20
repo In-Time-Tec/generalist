@@ -49,7 +49,7 @@ const attachFailureClassifier = (registration: Registration, context: Context.Co
 
 /** @experimental */
 export class LanguageModelNotRegistered extends Schema.TaggedErrorClass<LanguageModelNotRegistered>()(
-  "LanguageModelNotRegistered",
+  "@batonfx/core/LanguageModelNotRegistered",
   {
     provider: Schema.String,
     model: Schema.String,

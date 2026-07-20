@@ -165,7 +165,7 @@ export const makeFixtureWith = (options?: {
   readonly rejectClose?: boolean
 }): Effect.Effect<
   Fixture,
-  FixtureSetupError | McpToolSource.McpConnectionError | OAuth.OAuthProviderError,
+  FixtureSetupError | McpToolSource.McpConnectionFailed | OAuth.OAuthProviderError,
   Scope.Scope
 > =>
   Effect.gen(function* () {
@@ -176,6 +176,6 @@ export const makeFixtureWith = (options?: {
 
 export const makeFixture: Effect.Effect<
   Fixture,
-  FixtureSetupError | McpToolSource.McpConnectionError | OAuth.OAuthProviderError,
+  FixtureSetupError | McpToolSource.McpConnectionFailed | OAuth.OAuthProviderError,
   Scope.Scope
 > = makeFixtureWith()

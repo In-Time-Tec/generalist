@@ -25,7 +25,7 @@ describe("McpToolSource", () => {
       }
       const error = yield* McpToolSource.fromTransport("custom", transport).pipe(Effect.flip, Effect.scoped)
 
-      expect(error).toBeInstanceOf(McpToolSource.McpConnectionError)
+      expect(error).toBeInstanceOf(McpToolSource.McpConnectionFailed)
       expect(error.message).toContain("custom transport unavailable")
       expect(state.open).toBe(false)
       expect(state.closes).toBe(1)
@@ -148,8 +148,8 @@ describe("McpToolSource", () => {
         const closes = { count: 0 }
         const error = yield* Effect.scoped(Effect.flip(makeFixtureWith({ malformedDiscoverySchema, closes })))
 
-        expect(error).toBeInstanceOf(McpToolSource.McpConnectionError)
-        expect(error._tag).toBe("McpConnectionError")
+        expect(error).toBeInstanceOf(McpToolSource.McpConnectionFailed)
+        expect(error._tag).toBe("@batonfx/mcp/McpConnectionFailed")
         expect(error.server).toBe("calc")
         expect(error.message).toContain("default")
         expect(closes.count).toBeGreaterThanOrEqual(1)
@@ -167,8 +167,8 @@ describe("McpToolSource", () => {
         )
 
         for (const error of errors) {
-          expect(error).toBeInstanceOf(McpToolSource.McpToolCallError)
-          expect(error._tag).toBe("McpToolCallError")
+          expect(error).toBeInstanceOf(McpToolSource.McpToolCallFailed)
+          expect(error._tag).toBe("@batonfx/mcp/McpToolCallFailed")
           expect(error.server).toBe("calc")
           expect(error.tool).toBe("stats")
           expect(error.message).toContain("invalid")
@@ -183,8 +183,8 @@ describe("McpToolSource", () => {
         const { source } = yield* makeFixture
         const error = yield* Effect.flip(source.callTool("boom", {}))
 
-        expect(error).toBeInstanceOf(McpToolSource.McpToolCallError)
-        expect(error._tag).toBe("McpToolCallError")
+        expect(error).toBeInstanceOf(McpToolSource.McpToolCallFailed)
+        expect(error._tag).toBe("@batonfx/mcp/McpToolCallFailed")
         expect(error.server).toBe("calc")
         expect(error.tool).toBe("boom")
         expect(error.message).toContain("boom failed")
@@ -240,7 +240,7 @@ describe("McpToolSource", () => {
 
         expect(Option.isSome(outcome)).toBe(true)
         if (Option.isSome(outcome)) {
-          expect(outcome.value._tag).toBe("McpToolCallError")
+          expect(outcome.value._tag).toBe("@batonfx/mcp/McpToolCallFailed")
           expect(outcome.value.server).toBe("calc")
           expect(outcome.value.tool).toBe("hang")
           expect(outcome.value.message).toContain("timed out")

@@ -65,7 +65,7 @@ export const mcp = definePage({
         "An optional ",
         code("callTimeout"),
         " bounds each call; on expiry the call fails with ",
-        code("McpToolCallError"),
+        code("McpToolCallFailed"),
         " and the loop continues.",
       ],
     ),

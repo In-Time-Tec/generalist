@@ -8,7 +8,7 @@ import {
   DuplicateToolCallId,
   type Event,
   MiddlewareViolation,
-  ProgressOverflowError,
+  ProgressOverflow,
   ResumeMismatch,
   ToolNameCollision,
   type ToolOrigin,
@@ -240,7 +240,7 @@ export type RunError =
   | TurnLimitExceeded
   | MiddlewareViolation
   | DuplicateToolCallId
-  | ProgressOverflowError
+  | ProgressOverflow
   | ToolNameCollision
   | AiError.AiError
   | LanguageModelNotRegistered

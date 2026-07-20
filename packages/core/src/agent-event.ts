@@ -193,14 +193,11 @@ export class DuplicateToolCallId extends Schema.TaggedErrorClass<DuplicateToolCa
 ) {}
 
 /** @experimental An explicitly failing tool progress queue reached capacity. */
-export class ProgressOverflowError extends Schema.TaggedErrorClass<ProgressOverflowError>()(
-  "@batonfx/core/ProgressOverflowError",
-  {
-    turn: Schema.Finite,
-    toolCallId: Schema.String,
-    capacity: Schema.Finite,
-  },
-) {}
+export class ProgressOverflow extends Schema.TaggedErrorClass<ProgressOverflow>()("@batonfx/core/ProgressOverflow", {
+  turn: Schema.Finite,
+  toolCallId: Schema.String,
+  capacity: Schema.Finite,
+}) {}
 
 /** @experimental The origin of one tool declaration in an Agent run. */
 export const ToolOrigin = Schema.Union([
