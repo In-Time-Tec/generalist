@@ -1,6 +1,6 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai"
 import { ModelRegistry } from "@batonfx/core"
-import { Config, Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
+import { Config, Effect, Function, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
 import type { Credential, ServiceInterface } from "./openai-account-auth.js"
 import {
@@ -9,7 +9,7 @@ import {
   HttpClient,
   HttpClientError,
   HttpClientRequest,
-  type HttpClientResponse,
+  HttpClientResponse,
 } from "effect/unstable/http"
 
 const openAiAccountApiUrl = "https://chatgpt.com/backend-api/codex"
@@ -72,10 +72,92 @@ export const layer = (input: LayerOptions) =>
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     }),
-  ]).pipe(Layer.provide(OpenAiClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
+  ]).pipe(Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
+
+const stringifyJson = Schema.encodeSync(Schema.UnknownFromJsonString)
+const parseJsonOption = Schema.decodeUnknownOption(Schema.UnknownFromJsonString)
+const dataLinePrefix = /^data: ?/
+const frameSeparator = /(\r?\n\r?\n)/
+const lineSeparator = /(\r?\n)/
+
+const isResponsesUrl = (url: string) => url.split(/[?#]/)[0]!.replace(/\/+$/, "").endsWith("/responses")
+
+const flattenErrorPayload = (payload: string): string | undefined => {
+  const decoded = parseJsonOption(payload)
+  if (Option.isNone(decoded) || typeof decoded.value !== "object" || decoded.value === null) return undefined
+  const record = decoded.value as Record<string, unknown>
+  if (record.type !== "error" || record.message !== undefined) return undefined
+  const details = record.error
+  if (typeof details !== "object" || details === null || Array.isArray(details)) return undefined
+  const nested = details as Record<string, unknown>
+  return stringifyJson({
+    type: "error",
+    code: typeof nested.code === "string" ? nested.code : null,
+    message: typeof nested.message === "string" ? nested.message : stringifyJson(nested),
+    param: typeof nested.param === "string" ? nested.param : null,
+    sequence_number: typeof record.sequence_number === "number" ? record.sequence_number : 0,
+  })
+}
+
+const rewriteFrame = (frame: string): string => {
+  const segments = frame.split(lineSeparator)
+  const dataIndexes: Array<number> = []
+  for (let index = 0; index < segments.length; index += 2) {
+    if (dataLinePrefix.test(segments[index] ?? "")) dataIndexes.push(index)
+  }
+  if (dataIndexes.length !== 1) return frame
+  const line = segments[dataIndexes[0]!]!
+  const prefix = line.match(dataLinePrefix)![0]
+  const flattened = flattenErrorPayload(line.slice(prefix.length))
+  if (flattened === undefined) return frame
+  segments[dataIndexes[0]!] = `${prefix}${flattened}`
+  return segments.join("")
+}
+
+const normalizeSseErrorFrames = <E>(body: Stream.Stream<Uint8Array, E>): Stream.Stream<Uint8Array, E> =>
+  body.pipe(
+    Stream.decodeText(),
+    Stream.mapAccum(
+      () => "",
+      (buffer: string, chunk: string) => {
+        const pieces = (buffer + chunk).split(frameSeparator)
+        const tail = pieces.length % 2 === 1 ? pieces.pop()! : ""
+        const output: Array<string> = []
+        for (let index = 0; index < pieces.length; index += 2) {
+          output.push(rewriteFrame(pieces[index]!) + pieces[index + 1]!)
+        }
+        return [tail, output] as const
+      },
+      { onHalt: (buffer) => (buffer.length === 0 ? [] : [rewriteFrame(buffer)]) },
+    ),
+    Stream.encodeText,
+  )
 
 /** @experimental */
-export const layerConfig = OpenAiClient.layerConfig
+export const normalizeResponsesSse = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
+  HttpClient.transformResponse(client, (effect) =>
+    Effect.map(effect, (response) => {
+      const contentType = String(response.headers["content-type"] ?? "")
+      if (!contentType.includes("text/event-stream") || !isResponsesUrl(response.request.url)) return response
+      return HttpClientResponse.fromWeb(
+        response.request,
+        new Response(Stream.toReadableStream(normalizeSseErrorFrames(response.stream)), {
+          status: response.status,
+          headers: { "content-type": contentType },
+        }),
+      )
+    }),
+  )
+
+/** @experimental */
+export const layerConfig = (options?: Parameters<typeof OpenAiClient.layerConfig>[0]) =>
+  OpenAiClient.layerConfig({
+    ...options,
+    transformClient: (client) =>
+      options?.transformClient === undefined
+        ? normalizeResponsesSse(client)
+        : client.pipe(normalizeResponsesSse, options.transformClient),
+  })
 
 /** @experimental */
 export interface OpenAiAccountCredential {
@@ -203,7 +285,7 @@ const openAiAccountClientLayer = (credentials: OpenAiAccountCredentials) =>
     OpenAiClient.OpenAiClient,
     OpenAiClient.make({
       apiUrl: openAiAccountApiUrl,
-      transformClient: accountClientTransform(credentials),
+      transformClient: (client) => client.pipe(normalizeResponsesSse, accountClientTransform(credentials)),
     }).pipe(
       Effect.map((client) =>
         OpenAiClient.OpenAiClient.of({

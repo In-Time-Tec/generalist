@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+- Normalize nested OpenAI Responses SSE `error` frames to the flat shape the Effect AI stream schema expects, for both API-key and account registrations. Transient provider server errors now surface as decoded error parts carrying the provider message and request id instead of failing the stream with an `InvalidOutputError` decode error. `OpenAi.normalizeResponsesSse` is exported for custom clients.
+
 ## 0.6.0
 
 - Default the turn policy to the new first-class `TurnPolicy.forever`, which carries a distinct portable `Forever` snapshot. Policy-free `Agent.make` no longer caps follow-up turns at eight; a run still completes naturally when a turn leaves no pending tool results. Consumers relying on the old implicit cap must opt into `TurnPolicy.recurs(8)`, and exhaustive `Snapshot` matches must add `Forever`.
