@@ -1,6 +1,7 @@
 import { Context, Effect, Function, Layer, Option, Schema } from "effect"
 import { LanguageModel, Prompt, Tokenizer, Toolkit } from "effect/unstable/ai"
 import { type Entry, type EntryId, buildContext } from "./session.js"
+import { makeSummaryModelProvider } from "./summary-model.js"
 import { type Success } from "./tool-executor.js"
 import { bound } from "./tool-output.js"
 /** @experimental Default headroom kept for the next model response. */
@@ -288,39 +289,39 @@ const safeCutIndex = (entries: ReadonlyArray<Entry>, keepRecentTokens: number): 
 }
 
 /** @experimental The default two-stage compaction strategy. */
-export const defaultStrategy = (options: DefaultOptions = {}): Strategy => ({
-  shouldCompact: (usage) =>
-    Number.isFinite(usage.contextWindow) && usage.contextTokens > usage.contextWindow - usage.reserveTokens,
-  cut: (entries, keepRecentTokens) => {
-    const index = safeCutIndex(entries, keepRecentTokens)
-    if (index <= 0 || index >= entries.length) return Option.none()
-    const recent = entries.slice(index)
-    const first = recent[0]
-    return first === undefined
-      ? Option.none()
-      : Option.some({ firstKeptEntryId: first.id, head: entries.slice(0, index), recent })
-  },
-  summarize: (plan, request) => {
-    const effect = Effect.gen(function* () {
-      const head = buildContext(plan.head)
-      const [compactedHead] =
-        request.toolOutputMaxBytes === undefined
-          ? ([head, false] as const)
-          : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
-      const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
-      const model = yield* LanguageModel.LanguageModel
-      return yield* model.generateText({ prompt, toolkit: Toolkit.empty, toolChoice: "none" }).pipe(
-        Effect.map((response) => response.text),
-        Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
-      )
-    })
-    return options.summaryModel === undefined
-      ? effect
-      : Effect.scoped(
-          Layer.build(options.summaryModel).pipe(Effect.flatMap((context) => effect.pipe(Effect.provide(context)))),
+export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
+  const provideSummaryModel =
+    options.summaryModel === undefined ? undefined : makeSummaryModelProvider(options.summaryModel)
+  return {
+    shouldCompact: (usage) =>
+      Number.isFinite(usage.contextWindow) && usage.contextTokens > usage.contextWindow - usage.reserveTokens,
+    cut: (entries, keepRecentTokens) => {
+      const index = safeCutIndex(entries, keepRecentTokens)
+      if (index <= 0 || index >= entries.length) return Option.none()
+      const recent = entries.slice(index)
+      const first = recent[0]
+      return first === undefined
+        ? Option.none()
+        : Option.some({ firstKeptEntryId: first.id, head: entries.slice(0, index), recent })
+    },
+    summarize: (plan, request) => {
+      const effect = Effect.gen(function* () {
+        const head = buildContext(plan.head)
+        const [compactedHead] =
+          request.toolOutputMaxBytes === undefined
+            ? ([head, false] as const)
+            : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
+        const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
+        const model = yield* LanguageModel.LanguageModel
+        return yield* model.generateText({ prompt, toolkit: Toolkit.empty, toolChoice: "none" }).pipe(
+          Effect.map((response) => response.text),
+          Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
         )
-  },
-})
+      })
+      return provideSummaryModel === undefined ? effect : provideSummaryModel(effect)
+    },
+  }
+}
 
 /** @experimental Compile ordered strategy parts onto a complete strategy. */
 export const strategy: {
@@ -360,35 +361,35 @@ export const keepRecent = (options: KeepRecentOptions): StrategyPart => ({
 })
 
 /** @experimental Summarize through Effect AI structured output and render a string checkpoint. */
-export const structuredSummary = (options: StructuredSummaryOptions = {}): StrategyPart => ({
-  summarize: (plan, request) => {
-    const effect = Effect.gen(function* () {
-      const head = buildContext(plan.head)
-      const [compactedHead] =
-        request.toolOutputMaxBytes === undefined
-          ? ([head, false] as const)
-          : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
-      const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
-      const model = yield* LanguageModel.LanguageModel
-      return yield* model
-        .generateObject({
-          prompt,
-          schema: AgentSummary,
-          objectName: options.objectName ?? "AgentSummary",
-          toolChoice: "none",
-        })
-        .pipe(
-          Effect.map((response) => renderAgentSummary(response.value)),
-          Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
-        )
-    })
-    return options.summaryModel === undefined
-      ? effect
-      : Effect.scoped(
-          Layer.build(options.summaryModel).pipe(Effect.flatMap((context) => effect.pipe(Effect.provide(context)))),
-        )
-  },
-})
+export const structuredSummary = (options: StructuredSummaryOptions = {}): StrategyPart => {
+  const provideSummaryModel =
+    options.summaryModel === undefined ? undefined : makeSummaryModelProvider(options.summaryModel)
+  return {
+    summarize: (plan, request) => {
+      const effect = Effect.gen(function* () {
+        const head = buildContext(plan.head)
+        const [compactedHead] =
+          request.toolOutputMaxBytes === undefined
+            ? ([head, false] as const)
+            : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
+        const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
+        const model = yield* LanguageModel.LanguageModel
+        return yield* model
+          .generateObject({
+            prompt,
+            schema: AgentSummary,
+            objectName: options.objectName ?? "AgentSummary",
+            toolChoice: "none",
+          })
+          .pipe(
+            Effect.map((response) => renderAgentSummary(response.value)),
+            Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
+          )
+      })
+      return provideSummaryModel === undefined ? effect : provideSummaryModel(effect)
+    },
+  }
+}
 
 /** @experimental Build a compaction service from a strategy. */
 export const make: {

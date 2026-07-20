@@ -1,8 +1,8 @@
 # Providers
 
-Core selects models through provider-agnostic `ModelRegistry` registrations. A missing registration fails typed.
+Core selects models through provider-agnostic `ModelRegistry` registrations. Registrations use one canonical provider, model, and optional registration-key identity in an immutable hash map. A missing registration fails typed.
 
-`operate` retains a selected model layer and optional semaphore permit for the whole Effect. `stream` retains both through stream consumption, including failure, interruption, and early downstream termination. Per-run model layers bypass registry selection.
+The registry builds each selected model layer once in its own scope and reuses it for the registry lifetime. `operate` retains an optional semaphore permit for the whole Effect. `stream` retains its permit through stream consumption, including failure, interruption, and early downstream termination. Per-run model layers bypass registry selection.
 
 `@batonfx/providers` adapts upstream Effect AI providers, embeddings, deterministic models, and optional static model metadata. Core never imports provider SDKs.
 

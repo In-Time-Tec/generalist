@@ -1009,8 +1009,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(result.text).toBe("normal answer")
         expect(result.value).toEqual({ ok: true })
         expect(competitorEntered).toBe(true)
-        expect(acquired).toBe(3)
-        expect(released).toBe(3)
+        expect(acquired).toBe(1)
+        expect(released).toBe(0)
       }),
     ] as const
   })

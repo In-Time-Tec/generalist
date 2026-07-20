@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Json } from "./json"
-import { Effect, Layer, Option, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { Compaction, Session, ToolOutput } from "../src/index"
 import { ItLayer } from "./it-layer"
@@ -232,6 +232,178 @@ describe("Compaction", () => {
       }),
     ] as const
   })
+
+  ItLayer.make(it, "builds a dedicated summary model once across compaction calls", () => {
+    let builds = 0
+    let calls = 0
+    const summaryModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      Effect.sync(() => {
+        builds += 1
+      }).pipe(
+        Effect.andThen(
+          LanguageModel.make({
+            generateText: () => {
+              calls += 1
+              return Effect.succeed([{ type: "text", text: "checkpoint summary" }])
+            },
+            streamText: () => Stream.empty,
+          }),
+        ),
+      ),
+    )
+
+    return [
+      Session.layerMemory,
+      Effect.gen(function* () {
+        const fallbackModel = yield* LanguageModel.make({
+          generateText: () => Effect.die("ambient model should not summarize"),
+          streamText: () => Stream.empty,
+        })
+        const service = Compaction.make(Compaction.defaultStrategy({ summaryModel }), {
+          contextWindow: 10,
+          reserveTokens: 1,
+          keepRecentTokens: 1,
+        })
+        const request = {
+          agentName: "summary-agent",
+          sessionId: "session",
+          turn: 1,
+          history: Prompt.empty,
+          prompt: Prompt.make("continue"),
+          path: [entry("0", user("old goal")), entry("1", user("recent tail"))],
+          usage: { contextTokens: 100, contextWindow: 10, reserveTokens: 1 },
+          overflow: false,
+        } as const
+
+        yield* service.maybeCompact(request).pipe(Effect.provideService(LanguageModel.LanguageModel, fallbackModel))
+        yield* service.maybeCompact(request).pipe(Effect.provideService(LanguageModel.LanguageModel, fallbackModel))
+
+        expect(builds).toBe(1)
+        expect(calls).toBe(2)
+      }),
+    ] as const
+  })
+
+  it("uses a scoped summary-model fallback when only a MemoMap is ambient", () => {
+    let acquisitions = 0
+    let releases = 0
+    const summaryModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          acquisitions += 1
+        }).pipe(
+          Effect.andThen(
+            LanguageModel.make({
+              generateText: () => Effect.succeed([{ type: "text", text: "standalone summary" }]),
+              streamText: () => Stream.empty,
+            }),
+          ),
+        ),
+        () =>
+          Effect.sync(() => {
+            releases += 1
+          }),
+      ),
+    )
+    const service = Compaction.make(Compaction.defaultStrategy({ summaryModel }), {
+      contextWindow: 10,
+      reserveTokens: 1,
+      keepRecentTokens: 1,
+    })
+    const request = {
+      agentName: "standalone-summary-agent",
+      sessionId: "session",
+      turn: 1,
+      history: Prompt.empty,
+      prompt: Prompt.make("continue"),
+      path: [entry("0", user("old goal")), entry("1", user("recent tail"))],
+      usage: { contextTokens: 100, contextWindow: 10, reserveTokens: 1 },
+      overflow: false,
+    } as const
+    const program = Effect.gen(function* () {
+      const fallbackModel = yield* LanguageModel.make({
+        generateText: () => Effect.die("ambient model should not summarize"),
+        streamText: () => Stream.empty,
+      })
+      yield* service.maybeCompact(request).pipe(Effect.provideService(LanguageModel.LanguageModel, fallbackModel))
+    }).pipe(
+      Effect.provideService(Layer.CurrentMemoMap, Layer.makeMemoMapUnsafe()),
+      Effect.andThen(
+        Effect.sync(() => {
+          expect(acquisitions).toBe(1)
+          expect(releases).toBe(1)
+        }),
+      ),
+    )
+
+    return Effect.runPromise(program)
+  })
+
+  it.effect("keeps a shared summary build alive when its first compaction is interrupted", () =>
+    Effect.gen(function* () {
+      const releases = yield* Ref.make(0)
+      const started = yield* Deferred.make<void>()
+      const gate = yield* Deferred.make<void>()
+      const summaryModel = Layer.effect(
+        LanguageModel.LanguageModel,
+        Deferred.succeed(started, undefined).pipe(
+          Effect.andThen(Deferred.await(gate)),
+          Effect.andThen(
+            Effect.acquireRelease(
+              LanguageModel.make({
+                generateText: () => Effect.succeed([{ type: "text", text: "recovered summary" }]),
+                streamText: () => Stream.empty,
+              }),
+              () => Ref.update(releases, (count) => count + 1),
+            ),
+          ),
+        ),
+      )
+      const service = Compaction.make(Compaction.defaultStrategy({ summaryModel }), {
+        contextWindow: 10,
+        reserveTokens: 1,
+        keepRecentTokens: 1,
+      })
+      const request = {
+        agentName: "interrupted-summary-agent",
+        sessionId: "session",
+        turn: 1,
+        history: Prompt.empty,
+        prompt: Prompt.make("continue"),
+        path: [entry("0", user("old goal")), entry("1", user("recent tail"))],
+        usage: { contextTokens: 100, contextWindow: 10, reserveTokens: 1 },
+        overflow: false,
+      } as const
+      const fallbackModel = yield* LanguageModel.make({
+        generateText: () => Effect.die("ambient model should not summarize"),
+        streamText: () => Stream.empty,
+      })
+      const memoMap = yield* Layer.makeMemoMap
+      const run = service
+        .maybeCompact(request)
+        .pipe(
+          Effect.provideService(LanguageModel.LanguageModel, fallbackModel),
+          Effect.provideService(Layer.CurrentMemoMap, memoMap),
+        )
+
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const first = yield* Effect.forkChild(run)
+          yield* Deferred.await(started)
+          yield* Fiber.interrupt(first)
+
+          const second = yield* Effect.forkChild(run)
+          yield* Deferred.succeed(gate, undefined)
+          const result = yield* Fiber.join(second)
+          expect(Option.isSome(result)).toBe(true)
+        }),
+      )
+
+      expect(yield* Ref.get(releases)).toBe(1)
+    }),
+  )
 
   ItLayer.make(
     it,

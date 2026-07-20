@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Cause, Deferred, Effect, Exit, Fiber, Layer, Ref, Stream } from "effect"
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Ref, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { ModelRegistry } from "../src/index"
 import { ItLayer } from "./it-layer"
@@ -8,14 +8,13 @@ type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false
 type Assert<Value extends true> = Value
 
+const modelLayerOptions = (delta: string) => ({
+  generateText: () => Effect.succeed([{ type: "text" as const, text: delta }]),
+  streamText: () => Stream.make(Response.makePart("text-delta", { id: "text", delta })),
+})
+
 const modelLayer = (delta: string) =>
-  Layer.effect(
-    LanguageModel.LanguageModel,
-    LanguageModel.make({
-      generateText: () => Effect.succeed([{ type: "text", text: delta }]),
-      streamText: () => Stream.make(Response.makePart("text-delta", { id: "text", delta })),
-    }),
-  )
+  Layer.effect(LanguageModel.LanguageModel, LanguageModel.make(modelLayerOptions(delta)))
 
 describe("ModelRegistry", () => {
   it("infers requirement-free data-first, data-last, and empty registry layers", () => {
@@ -109,6 +108,118 @@ describe("ModelRegistry", () => {
       ] as const,
   )
 
+  ItLayer.make(it, "builds a repeatedly selected model layer once for the registry lifetime", () => {
+    let builds = 0
+    const selection = { provider: "test", model: "memoized" }
+    const registered = Layer.effect(
+      LanguageModel.LanguageModel,
+      Effect.sync(() => {
+        builds += 1
+      }).pipe(
+        Effect.andThen(
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "memoized" }]),
+            streamText: () => Stream.empty,
+          }),
+        ),
+      ),
+    )
+
+    return [
+      ModelRegistry.layer([ModelRegistry.registration({ ...selection, layer: registered })]),
+      Effect.gen(function* () {
+        yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "first" }))
+        yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "second" }))
+
+        expect(builds).toBe(1)
+      }),
+    ] as const
+  })
+
+  it.effect("shares a concurrent first build and releases it once with the registry scope", () =>
+    Effect.gen(function* () {
+      const acquisitions = yield* Ref.make(0)
+      const releases = yield* Ref.make(0)
+      const started = yield* Deferred.make<void>()
+      const gate = yield* Deferred.make<void>()
+      const selection = { provider: "test", model: "concurrent" }
+      const registered = Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.acquireRelease(
+          Ref.updateAndGet(acquisitions, (count) => count + 1).pipe(
+            Effect.tap((count) => (count === 1 ? Deferred.succeed(started, undefined) : Effect.void)),
+            Effect.andThen(Deferred.await(gate)),
+            Effect.andThen(
+              LanguageModel.make({
+                generateText: () => Effect.succeed([{ type: "text", text: "concurrent" }]),
+                streamText: () => Stream.empty,
+              }),
+            ),
+          ),
+          () => Ref.update(releases, (count) => count + 1),
+        ),
+      )
+      const registryLayer = ModelRegistry.layer([ModelRegistry.registration({ ...selection, layer: registered })])
+
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const context = yield* Layer.build(registryLayer)
+          const registry = Context.get(context, ModelRegistry.ModelRegistry)
+          const calls = yield* Effect.all([
+            Effect.forkChild(registry.operate(selection, Effect.void)),
+            Effect.forkChild(registry.operate(selection, Effect.void)),
+          ])
+          yield* Deferred.await(started)
+          yield* Effect.yieldNow
+          expect(yield* Ref.get(acquisitions)).toBe(1)
+          yield* Deferred.succeed(gate, undefined)
+          yield* Effect.forEach(calls, Fiber.join)
+        }),
+      )
+
+      expect(yield* Ref.get(releases)).toBe(1)
+    }),
+  )
+
+  it.effect("keeps a shared first build alive when its first selector is interrupted", () =>
+    Effect.gen(function* () {
+      const releases = yield* Ref.make(0)
+      const started = yield* Deferred.make<void>()
+      const gate = yield* Deferred.make<void>()
+      const selection = { provider: "test", model: "interrupted-selector" }
+      const registered = Layer.effect(
+        LanguageModel.LanguageModel,
+        Deferred.succeed(started, undefined).pipe(
+          Effect.andThen(Deferred.await(gate)),
+          Effect.andThen(
+            Effect.acquireRelease(LanguageModel.make(modelLayerOptions("recovered")), () =>
+              Ref.update(releases, (count) => count + 1),
+            ),
+          ),
+        ),
+      )
+      const registryLayer = ModelRegistry.layer([ModelRegistry.registration({ ...selection, layer: registered })])
+
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const context = yield* Layer.build(registryLayer)
+          const registry = Context.get(context, ModelRegistry.ModelRegistry)
+          const first = yield* Effect.forkChild(registry.operate(selection, Effect.void))
+          yield* Deferred.await(started)
+          yield* Fiber.interrupt(first)
+
+          const second = yield* Effect.forkChild(
+            registry.operate(selection, LanguageModel.generateText({ prompt: "recover" })),
+          )
+          yield* Deferred.succeed(gate, undefined)
+          expect((yield* Fiber.join(second)).text).toBe("recovered")
+        }),
+      )
+
+      expect(yield* Ref.get(releases)).toBe(1)
+    }),
+  )
+
   ItLayer.make(
     it,
     "upserts registrations by provider, model, and registrationKey",
@@ -152,6 +263,54 @@ describe("ModelRegistry", () => {
         }),
       ] as const,
   )
+
+  ItLayer.make(it, "uses a replacement layer after the original selection was memoized", () => {
+    let firstBuilds = 0
+    let secondBuilds = 0
+    const selection = { provider: "test", model: "replaceable" }
+    const countedLayer = (value: string, count: () => void) =>
+      Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.sync(count).pipe(Effect.andThen(LanguageModel.make(modelLayerOptions(value)))),
+      )
+
+    return [
+      ModelRegistry.layerMemory(),
+      Effect.gen(function* () {
+        const first = yield* ModelRegistry.registration({
+          ...selection,
+          layer: countedLayer("first", () => {
+            firstBuilds += 1
+          }),
+        })
+        const other = yield* ModelRegistry.registration({
+          provider: "test",
+          model: "other",
+          layer: modelLayer("other"),
+        })
+        yield* ModelRegistry.register({ registration: first })
+        yield* ModelRegistry.register({ registration: other })
+        expect((yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "first" }))).text).toBe(
+          "first",
+        )
+
+        const second = yield* ModelRegistry.registration({
+          ...selection,
+          layer: countedLayer("second", () => {
+            secondBuilds += 1
+          }),
+        })
+        yield* ModelRegistry.register({ registration: second })
+        yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "second" }))
+        const response = yield* ModelRegistry.operate(selection, LanguageModel.generateText({ prompt: "repeat" }))
+        const registrations = yield* ModelRegistry.registrations()
+
+        expect(response.text).toBe("second")
+        expect([firstBuilds, secondBuilds]).toEqual([1, 1])
+        expect(registrations.map((registration) => registration.model)).toEqual(["replaceable", "other"])
+      }),
+    ] as const
+  })
 
   ItLayer.make(
     it,
@@ -338,7 +497,7 @@ describe("ModelRegistry", () => {
         expect(result.some((part) => part.type === "text-delta")).toBe(true)
         expect(acquired).toBe(1)
         expect(pulls).toBe(1)
-        expect(released).toBe(1)
+        expect(released).toBe(0)
       }),
     ] as const
   })
@@ -458,8 +617,8 @@ describe("ModelRegistry", () => {
         yield* Fiber.interrupt(fiber)
 
         yield* ModelRegistry.stream(selected, Stream.make(3)).pipe(Stream.runDrain)
-        expect(acquired).toBe(3)
-        expect(released).toBe(3)
+        expect(acquired).toBe(1)
+        expect(released).toBe(0)
       }),
     ] as const
   })
@@ -493,13 +652,13 @@ describe("ModelRegistry", () => {
           ModelRegistry.stream(selected, Stream.fail("model-failure")).pipe(Stream.runDrain),
         )
         expect(typed).toBe("model-failure")
-        expect([acquired, released]).toEqual([1, 1])
+        expect([acquired, released]).toEqual([1, 0])
 
         const defect = yield* Effect.exit(
           ModelRegistry.stream(selected, Stream.die("model-defect")).pipe(Stream.runDrain),
         )
         expect(Exit.isFailure(defect) && Cause.hasDies(defect.cause)).toBe(true)
-        expect([acquired, released]).toEqual([2, 2])
+        expect([acquired, released]).toEqual([1, 0])
 
         const started = yield* Deferred.make<void>()
         const fiber = yield* Effect.forkChild(
@@ -512,10 +671,10 @@ describe("ModelRegistry", () => {
         yield* Fiber.interrupt(fiber)
         const interrupted = yield* Fiber.await(fiber)
         expect(Exit.isFailure(interrupted) && Cause.hasInterrupts(interrupted.cause)).toBe(true)
-        expect([acquired, released]).toEqual([3, 3])
+        expect([acquired, released]).toEqual([1, 0])
 
         yield* ModelRegistry.stream(selected, Stream.make("after exits")).pipe(Stream.runDrain)
-        expect([acquired, released]).toEqual([4, 4])
+        expect([acquired, released]).toEqual([1, 0])
       }),
     ] as const
   })
