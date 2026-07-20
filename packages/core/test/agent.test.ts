@@ -36,6 +36,13 @@ type StreamRequirements<Value> =
   Value extends Stream.Stream<unknown, unknown, infer Requirements> ? Requirements : never
 type IsAssignable<Source, Target> = Source extends Target ? true : false
 
+void (() => {
+  // @ts-expect-error Agent.make only accepts an options object.
+  Agent.make("x")
+  // @ts-expect-error Agent.make requires a name.
+  Agent.make({})
+})
+
 const plainRequiredAgent = Agent.make({ name: "plain-required" })
 const selectedRequiredAgent = Agent.make({ name: "selected-required", model: { provider: "test", model: "test" } })
 const memoryRequiredAgent = Agent.make({
@@ -427,9 +434,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
   it("carries tool execution policy through Agent.make", () => {
     const toolExecution = { concurrency: 3 }
 
-    expect(Agent.make({ name: "direct-agent", toolExecution }).toolExecution).toBe(toolExecution)
-    expect(Agent.make({ name: "object-agent", toolExecution }).toolExecution).toBe(toolExecution)
-    expect(Agent.make({ name: "curried-agent", toolExecution }).toolExecution).toBe(toolExecution)
+    expect(Agent.make({ name: "tool-execution-agent", toolExecution }).toolExecution).toBe(toolExecution)
   })
 
   it("constructs AgentError without a cause", () => {
