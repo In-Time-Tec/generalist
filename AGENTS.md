@@ -24,8 +24,11 @@ BatonFX is a standalone, non-durable, Effect-native agent framework over `effect
 
 - Baton depends on `effect` only. Never import `@relayfx/*`; ast-grep enforces this.
 - Use Effect AI `Prompt`, `Response`, `Tool`, and `Toolkit` directly. Do not add a second payload or tool format.
+- Follow the construction-verb canon: `make` constructs an in-memory value, `register` records it for later lookup, and `start` is reserved for beginning a durable host `Execution`. Do not use `create` as a synonym for `make` or `register`.
+- Name Layer constructors `layer` or with a noun after `layer` (`layerMemory`, `layerNoop`, `layerIdentity`, `layerConfig`). Put parameters in `layer(options)`; do not add Layer aliases or flag-in-a-name variants.
+- Model boundary failures with `Schema.TaggedErrorClass`, tag them `@<scope>/<package>/<Name>`, and name the class for the failure condition without forcing an `Error` suffix.
 - Every exported symbol carries `@experimental` while Effect AI is unstable.
-- Public modules use intentional package-root namespaces. Services expose `Interface`, `Context.Service`, explicit Layers, schema-backed boundary errors, and a `testLayer` or memory layer for behavior-bearing seams.
+- Public modules use intentional package-root namespaces. Services expose `Interface`, `Context.Service`, explicit Layers, schema-backed boundary errors, and a `layerTest` or `layerMemory` for behavior-bearing seams.
 - Prefer direct imports. Do not add wrapper files, catch-all `utils`/`helpers`/`common`/`lib` directories, or namespace imports.
 - Keep each package `src` file under 500 lines; `oxlint`'s `max-lines` rule enforces it. A few cohesive engine files are recorded exceptions in `.oxlintrc.json`; split a file rather than adding to that list.
 - Do not put rationale in code comments. Put stable behavior in types, tests, `CONTEXT.md`, feature docs, decision docs, tradeoff docs, or package READMEs.
