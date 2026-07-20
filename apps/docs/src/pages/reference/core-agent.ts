@@ -72,26 +72,13 @@ export const coreAgentReference = definePage({
       [
         [
           [code("Agent.stream")],
-          [
-            code(
-              "(agent: Agent<Tools, R>, options: O) => Stream<AgentEvent.Event, RunError, R | OperationRequirements<O>>",
-            ),
-          ],
-          "Streams text or schema-validated output; persistence and schema are selected by options",
+          [code("(agent: Agent<Tools, R>, options: O) => Stream<AgentEvent.Event, RunError, RunRequirements<R, O>>")],
+          "Streams text or schema-validated output; persistence and output are selected by options",
         ],
         [
           [code("Agent.generate")],
-          [code("(agent: Agent<Tools, R>, options: O) => Effect<Result, RunError, R | OperationRequirements<O>>")],
-          [code("stream"), " folded to its ", code("Completed"), " event"],
-        ],
-        [
-          [code("Agent.generate")],
-          [
-            code(
-              '(agent: Agent<Tools, R>, options: O) => Effect<ObjectResult<O["schema"]["Type"]>, RunError, R | OperationRequirements<O> | O["schema"]["DecodingServices"]>',
-            ),
-          ],
-          "Folds the same run to its terminal result; schema returns ObjectResult and persistence adds Chat.Persistence",
+          [code("(agent: Agent<Tools, R>, options: O) => Effect<RunResult<O>, RunError, RunRequirements<R, O>>")],
+          "Folds the same run; required output returns ObjectResult, while optional or union output produces the corresponding result union",
         ],
       ],
     ),
@@ -141,15 +128,14 @@ export const coreAgentReference = definePage({
           "Runs on a persisted chat",
         ],
         [
-          [code("schema")],
-          [code("S extends Schema.Codec"), " (optional)"],
-          "Adds one terminal structured-output turn and returns a typed object result from generate",
-        ],
-        [[code("objectName")], [code("string"), " (optional)"], ["Defaults to ", code('"output"')]],
-        [
-          [code("objectPrompt")],
-          [code("Ai.Prompt.RawInput"), " (optional)"],
-          ["Defaults to ", code("Agent.defaultObjectPrompt")],
+          [code("output")],
+          [code("{ schema: S; name?: string; prompt?: Ai.Prompt.RawInput }"), " (optional)"],
+          [
+            "Adds one terminal structured-output turn; name defaults to ",
+            code('"output"'),
+            " and prompt defaults to ",
+            code("Agent.defaultObjectPrompt"),
+          ],
         ],
       ],
     ),
@@ -177,6 +163,7 @@ export const coreAgentReference = definePage({
         [[code("Ai.Tool.HandlersFor<Tools>")], ["When local toolkit handlers execute in-process"]],
         [[code("Memory.Memory")], ["When agent or run configuration selects a memory key"]],
         [[code("Ai.Chat.Persistence")], ["When RunOptions.persistence is set"]],
+        [[code('S["DecodingServices"]')], ["When RunOptions.output.schema is set"]],
         [[code("ToolExecutor.ToolExecutor")], ["Optional override for remote, client, MCP, sandbox, or durable tools"]],
         [[code("Approvals.Approvals")], ["Ambient optional approval behavior"]],
         [[code("ModelMiddleware.ModelMiddleware")], ["Ambient optional model input/output middleware"]],

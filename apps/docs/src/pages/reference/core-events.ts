@@ -72,7 +72,7 @@ export const coreEventsReference = definePage({
           [code("StructuredOutput")],
           [code("turn"), ", ", code("value"), ", ", code("content")],
           "The terminal structured turn produces a schema-validated value",
-          ["Only when ", code("RunOptions.schema"), " is set"],
+          ["Only when ", code("RunOptions.output"), " is set"],
         ],
         [
           [code("Completed")],

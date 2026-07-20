@@ -9,7 +9,7 @@ export const structuredOutput = definePage({
   navTitle: "Structured output",
   group: "Guides",
   description:
-    "End a run with a typed value: generate and stream accept a schema for one terminal structured-output turn validated by Effect Schema.",
+    "End a run with a typed value: generate and stream accept an output option for one terminal turn validated by Effect Schema.",
   content: [
     p(
       "When the caller needs a typed value instead of prose, run the agent with ",
@@ -23,7 +23,7 @@ export const structuredOutput = definePage({
       "Pass any Effect ",
       code("Schema"),
       " struct codec as ",
-      code("schema"),
+      code("output.schema"),
       ". ",
       code("generate"),
       " folds the stream and returns ",
@@ -54,12 +54,14 @@ export const structuredOutput = definePage({
     codeBlock({ label: "stream-object.ts", source: streamObject, expectedOutput: streamObjectExpected }),
     h2("name-and-prompt", "3. Name the output and tune the terminal prompt"),
     p(
-      "Two options shape the terminal turn. ",
-      code("objectName"),
+      "Two fields in ",
+      code("output"),
+      " shape the terminal turn. ",
+      code("name"),
       " names the output structure for the provider (default ",
       code('"output"'),
       "); ",
-      code("objectPrompt"),
+      code("prompt"),
       " replaces the default instruction (",
       code('"Return the final structured output for the task above."'),
       ") when your schema needs more guidance.",

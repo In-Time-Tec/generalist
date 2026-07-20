@@ -32,6 +32,7 @@ type Equal<Left, Right> =
 type Assert<Value extends true> = Value
 type EffectRequirements<Value> =
   Value extends Effect.Effect<unknown, unknown, infer Requirements> ? Requirements : never
+type EffectSuccess<Value> = Value extends Effect.Effect<infer Success, unknown, unknown> ? Success : never
 type StreamRequirements<Value> =
   Value extends Stream.Stream<unknown, unknown, infer Requirements> ? Requirements : never
 type IsAssignable<Source, Target> = Source extends Target ? true : false
@@ -72,13 +73,57 @@ const generatedPersistedRequired = Agent.generate(plainRequiredAgent, {
 const persistedObjectRequired = Agent.stream(plainRequiredAgent, {
   prompt: "hello",
   persistence: { chatId: "chat" },
-  schema: Schema.Struct({ value: Schema.String }),
+  output: { schema: Schema.Struct({ value: Schema.String }) },
 })
 const generatedPersistedObjectRequired = Agent.generate(plainRequiredAgent, {
   prompt: "hello",
   persistence: { chatId: "chat" },
-  schema: Schema.Struct({ value: Schema.String }),
+  output: { schema: Schema.Struct({ value: Schema.String }) },
 })
+
+class SchemaDependency extends Context.Service<SchemaDependency, { readonly value: string }>()(
+  "@batonfx/core/test/agent.test/SchemaDependency",
+) {}
+
+const dependentObjectSchema = Schema.Struct({ value: Schema.String }) as Schema.Codec<
+  { readonly value: string },
+  { readonly value: string },
+  SchemaDependency
+>
+const plainStreamRequired = Agent.stream(plainRequiredAgent, { prompt: "hello" })
+const plainGenerateRequired = Agent.generate(plainRequiredAgent, { prompt: "hello" })
+const decodingRequired = Agent.stream(plainRequiredAgent, {
+  prompt: "hello",
+  output: { schema: dependentObjectSchema },
+})
+const decodingGenerated = Agent.generate(plainRequiredAgent, {
+  prompt: "hello",
+  output: { schema: dependentObjectSchema },
+})
+const optionalPersistenceOptions: Pick<Agent.RunOptions, "prompt" | "persistence"> = {
+  prompt: "hello",
+  persistence: { chatId: "chat" },
+}
+const optionalOutputOptions: {
+  readonly prompt: string
+  readonly output?: { readonly schema: typeof dependentObjectSchema }
+} = {
+  prompt: "hello",
+  output: { schema: dependentObjectSchema },
+}
+const optionalPersistenceRequired = Agent.stream(plainRequiredAgent, optionalPersistenceOptions)
+const optionalOutputRequired = Agent.stream(plainRequiredAgent, optionalOutputOptions)
+const optionalOutputGenerated = Agent.generate(plainRequiredAgent, optionalOutputOptions)
+type TextOrOutputOptions =
+  | { readonly prompt: string }
+  | { readonly prompt: string; readonly output: { readonly schema: typeof dependentObjectSchema } }
+const generateTextOrOutput = (options: TextOrOutputOptions) => Agent.generate(plainRequiredAgent, options)
+const curriedPersistenceRequired = Agent.stream({ prompt: "hello", persistence: { chatId: "chat" } })(
+  plainRequiredAgent,
+)
+const curriedOutputRequired = Agent.generate({ prompt: "hello", output: { schema: dependentObjectSchema } })(
+  plainRequiredAgent,
+)
 
 class ModelDependency extends Context.Service<ModelDependency, { readonly value: string }>()(
   "@batonfx/core/test/agent.test/ModelDependency",
@@ -120,6 +165,9 @@ const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<
     Equal<EffectRequirements<typeof runMemoryRequired>, LanguageModel.LanguageModel | Memory.Memory>
   >,
+  true satisfies Assert<Equal<StreamRequirements<typeof plainStreamRequired>, LanguageModel.LanguageModel>>,
+  true satisfies Assert<Equal<EffectRequirements<typeof plainGenerateRequired>, LanguageModel.LanguageModel>>,
+  true satisfies Assert<Equal<EffectSuccess<typeof plainGenerateRequired>, Agent.Result>>,
   true satisfies Assert<
     Equal<StreamRequirements<typeof persistedRequired>, LanguageModel.LanguageModel | Chat.Persistence>
   >,
@@ -133,6 +181,40 @@ const agentRequirementProofs: ReadonlyArray<true> = [
     Equal<EffectRequirements<typeof generatedPersistedObjectRequired>, LanguageModel.LanguageModel | Chat.Persistence>
   >,
   true satisfies Assert<Equal<StreamRequirements<typeof runBoundaryModelProvided>, Memory.Memory | ModelDependency>>,
+  true satisfies Assert<
+    Equal<StreamRequirements<typeof decodingRequired>, LanguageModel.LanguageModel | SchemaDependency>
+  >,
+  true satisfies Assert<
+    Equal<EffectRequirements<typeof decodingGenerated>, LanguageModel.LanguageModel | SchemaDependency>
+  >,
+  true satisfies Assert<Equal<EffectSuccess<typeof decodingGenerated>, Agent.ObjectResult<{ readonly value: string }>>>,
+  true satisfies Assert<
+    Equal<StreamRequirements<typeof optionalPersistenceRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+  >,
+  true satisfies Assert<
+    Equal<StreamRequirements<typeof optionalOutputRequired>, LanguageModel.LanguageModel | SchemaDependency>
+  >,
+  true satisfies Assert<
+    Equal<EffectRequirements<typeof optionalOutputGenerated>, LanguageModel.LanguageModel | SchemaDependency>
+  >,
+  true satisfies Assert<
+    Equal<EffectSuccess<typeof optionalOutputGenerated>, Agent.Result | Agent.ObjectResult<{ readonly value: string }>>
+  >,
+  true satisfies Assert<
+    Equal<
+      EffectSuccess<ReturnType<typeof generateTextOrOutput>>,
+      Agent.Result | Agent.ObjectResult<{ readonly value: string }>
+    >
+  >,
+  true satisfies Assert<
+    Equal<StreamRequirements<typeof curriedPersistenceRequired>, LanguageModel.LanguageModel | Chat.Persistence>
+  >,
+  true satisfies Assert<
+    Equal<EffectRequirements<typeof curriedOutputRequired>, LanguageModel.LanguageModel | SchemaDependency>
+  >,
+  true satisfies Assert<
+    Equal<EffectSuccess<typeof curriedOutputRequired>, Agent.ObjectResult<{ readonly value: string }>>
+  >,
   true satisfies Assert<
     Equal<
       IsAssignable<
@@ -665,6 +747,62 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "rejects history combined with persistence before model calls", () => {
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("unexpected"))
+        }),
+        unusedExecutor,
+        Approvals.autoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const run = Agent.stream(Agent.make({ name: "history-persistence-agent" }), {
+          prompt: "hello",
+          history: "prior history",
+          persistence: { chatId: "chat" },
+        })
+        const failure = yield* Stream.runDrain(run).pipe(
+          Effect.provide(Context.makeUnsafe<Chat.Persistence>(new Map())),
+          Effect.flip,
+        )
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
+          "RunOptions.history and RunOptions.persistence are mutually exclusive",
+        )
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed when persistence is set without Chat.Persistence", () => [
+    Layer.mergeAll(
+      modelLayer(() => Stream.make(textDelta("unexpected"))),
+      unusedExecutor,
+      Approvals.autoApprove,
+      ModelMiddleware.layerIdentity,
+    ),
+    Effect.gen(function* () {
+      const run = Agent.stream(Agent.make({ name: "missing-persistence-agent" }), {
+        prompt: "hello",
+        persistence: { chatId: "chat" },
+      })
+      const failure = yield* Stream.runDrain(run).pipe(
+        Effect.provide(Context.makeUnsafe<Chat.Persistence>(new Map())),
+        Effect.flip,
+      )
+
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
+        "RunOptions.persistence requires Chat.Persistence in context",
+      )
+    }),
+  ])
+
   ItLayer.make(
     it,
     "runs an agent turn and emits loop events",
@@ -805,7 +943,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "scoped-structured-agent", model: selection })
         const agentFiber = yield* Effect.forkChild(
-          Agent.generate(agent, { prompt: "make object", schema: objectSchema }),
+          Agent.generate(agent, { prompt: "make object", output: { schema: objectSchema } }),
         )
         yield* Deferred.await(structuredEntered)
 
@@ -3542,7 +3680,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         yield* steering.followUp({ prompt: "follow before object" })
         const agent = Agent.make({ name: "follow-up-structured-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "start", schema: objectSchema }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, { prompt: "start", output: { schema: objectSchema } }),
+        )
 
         expect(calls).toBe(2)
         expect(events.filter((event) => event._tag === "TurnStarted")).toHaveLength(2)
@@ -4204,7 +4344,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "make object", schema: objectSchema }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, { prompt: "make object", output: { schema: objectSchema } }),
+        )
 
         expect(events.map((event) => event._tag)).toEqual([
           "TurnStarted",
@@ -4252,7 +4394,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "structured-span-agent" })
 
         const events = yield* Stream.runCollect(
-          Agent.stream(agent, { prompt: "make object", schema: objectSchema }),
+          Agent.stream(agent, { prompt: "make object", output: { schema: objectSchema } }),
         ).pipe(Effect.withTracer(tracer))
 
         const runSpan = spans.find((span) => span.name === "Baton.Agent.run")
@@ -4304,7 +4446,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-lazy-span-agent" })
 
-        const events = yield* Agent.stream(agent, { prompt: "make object", schema: objectSchema }).pipe(
+        const events = yield* Agent.stream(agent, { prompt: "make object", output: { schema: objectSchema } }).pipe(
           Stream.take(4),
           Stream.runCollect,
           Effect.withTracer(tracer),
@@ -4336,7 +4478,10 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         Effect.gen(function* () {
           const agent = Agent.make({ name: "generate-object-agent" })
 
-          const result = yield* Agent.generate(agent, { prompt: "make typed object", schema: objectSchema })
+          const result = yield* Agent.generate(agent, {
+            prompt: "make typed object",
+            output: { schema: objectSchema },
+          })
 
           expect(result.text).toBe("normal answer")
           expect(result.turns).toBe(2)
@@ -4371,9 +4516,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "structured-tool-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool", schema: objectSchema })).pipe(
-          Effect.withTracer(tracer),
-        )
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, { prompt: "use tool", output: { schema: objectSchema } }),
+        ).pipe(Effect.withTracer(tracer))
 
         expect(streamCalls).toBe(2)
         expect(structuredPrompt).toContain("from model")
@@ -4425,7 +4570,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "structured-decode-agent" })
 
         const failure = yield* Effect.flip(
-          Stream.runCollect(Agent.stream(agent, { prompt: "bad object", schema: objectSchema })).pipe(
+          Stream.runCollect(Agent.stream(agent, { prompt: "bad object", output: { schema: objectSchema } })).pipe(
             Effect.withTracer(tracer),
           ),
         )
@@ -4465,7 +4610,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "structured-defect-agent" })
 
         const exit = yield* Stream.runDrain(
-          Agent.stream(agent, { prompt: "defect object", schema: objectSchema }),
+          Agent.stream(agent, { prompt: "defect object", output: { schema: objectSchema } }),
         ).pipe(Effect.withTracer(tracer), Effect.exit)
 
         expect(Exit.isFailure(exit)).toBe(true)
@@ -4504,7 +4649,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         structuredStarted = yield* Deferred.make<void>()
         const agent = Agent.make({ name: "structured-interrupt-agent" })
         const fiber = yield* Stream.runDrain(
-          Agent.stream(agent, { prompt: "interrupt object", schema: objectSchema }),
+          Agent.stream(agent, { prompt: "interrupt object", output: { schema: objectSchema } }),
         ).pipe(Effect.withTracer(tracer), Effect.forkChild)
 
         yield* Deferred.await(structuredStarted)
@@ -4577,7 +4722,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             prompt: "ignored",
             history: checkpoint,
             resume: { suspension },
-            schema: objectSchema,
+            output: { schema: objectSchema },
           }),
         ).pipe(Effect.withTracer(tracer))
 
@@ -4630,7 +4775,9 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
       Effect.gen(function* () {
         const agent = Agent.make({ name: "resilient-structured-agent" })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "retry object", schema: objectSchema }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, { prompt: "retry object", output: { schema: objectSchema } }),
+        )
 
         expect(structuredCalls).toBe(2)
         const structured = events.find((event) => event._tag === "StructuredOutput")
@@ -4660,7 +4807,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const agent = Agent.make({ name: "terminal-structured-overflow-agent", model: overflowSelection })
 
         const failure = yield* Effect.flip(
-          Stream.runCollect(Agent.stream(agent, { prompt: "large object", schema: objectSchema })),
+          Stream.runCollect(Agent.stream(agent, { prompt: "large object", output: { schema: objectSchema } })),
         )
 
         expect(structuredCalls).toBe(1)

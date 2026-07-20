@@ -15,9 +15,11 @@ const modelLayer = Layer.effect(
 
 const program = Agent.stream(agent, {
   prompt: "Invoice total is 42 USD.",
-  schema: invoiceSchema,
-  objectName: "invoice",
-  objectPrompt: "Return the invoice as JSON matching the schema.",
+  output: {
+    schema: invoiceSchema,
+    name: "invoice",
+    prompt: "Return the invoice as JSON matching the schema.",
+  },
 }).pipe(
   Stream.runForEach((event) =>
     event._tag === "StructuredOutput"

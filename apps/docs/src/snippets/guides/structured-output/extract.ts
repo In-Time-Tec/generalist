@@ -16,7 +16,7 @@ const modelLayer = Layer.effect(
 const program = Effect.gen(function* () {
   const result = yield* Agent.generate(agent, {
     prompt: "Invoice total is 42 USD.",
-    schema: invoiceSchema,
+    output: { schema: invoiceSchema },
   })
   yield* Console.log(`${result.value.total} ${result.value.currency}`)
 }).pipe(

@@ -1,0 +1,25 @@
+id: no-removed-agent-entrypoints
+language: TypeScript
+severity: error
+message: Agent.stream and Agent.generate are the only run entrypoints; use persistence and output options.
+rule:
+  any:
+    - pattern: Agent.persisted($$$ARGS)
+    - pattern: Agent.streamObject($$$ARGS)
+    - pattern: Agent.persistedObject($$$ARGS)
+    - pattern: Agent.generatePersisted($$$ARGS)
+    - pattern: Agent.generateObject($$$ARGS)
+    - pattern: Agent.generatePersistedObject($$$ARGS)
+files:
+  - "packages/**/*.ts"
+  - "packages/**/*.tsx"
+  - "apps/**/*.ts"
+  - "apps/**/*.tsx"
+  - "examples/**/*.ts"
+  - "examples/**/*.tsx"
+  - "scripts/**/*.ts"
+  - "scripts/**/*.tsx"
+ignores:
+  - "**/dist/**"
+  - "**/coverage/**"
+  - "node_modules/**"

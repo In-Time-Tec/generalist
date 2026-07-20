@@ -8,7 +8,7 @@
 - Framework tool calls run serially by default. `Agent.make({ toolExecution: { concurrency: n } })` allows at most `n` calls from one model turn to execute together while events, results, and checkpoints stay in provider call order. Provider-executed calls are never run locally.
 - Declared tool failures remain schema-valid domain results. Routing, schema, handler-boundary, placement, and authorization failures terminate through typed `FrameworkFailure` values.
 - A policy stop with pending results is typed. It never silently drops results.
-- `Agent.stream` and `Agent.generate` cover every run; `schema` selects structured output and `persistence` requires Effect AI `Chat.Persistence`.
+- `Agent.stream` and `Agent.generate` cover every run; `output` selects structured output and `persistence` requires Effect AI `Chat.Persistence`.
 - An agent's only default model is its visible `model` selection, resolved through `ModelRegistry` at run time. A registry-free agent retains `LanguageModel` in its requirements and receives a concrete model layer at the run boundary.
 - Agent requirements remain visible through model selection, the direct-model requirement channel, memory, tool handlers, policies, handoffs, and transport composition.
 

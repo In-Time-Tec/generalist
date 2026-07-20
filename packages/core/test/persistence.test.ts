@@ -179,7 +179,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
           const result = yield* Agent.generate(agent, {
             prompt: "persist a structured answer",
             persistence: { chatId: "structured" },
-            schema: Schema.Struct({ value: Schema.String }),
+            output: { schema: Schema.Struct({ value: Schema.String }) },
           })
 
           expect(result.value).toEqual({ value: "persisted" })
@@ -285,7 +285,7 @@ layer(unusedToolHandlerLayer)("Agent persistence", (it) => {
         const failure = yield* Agent.generate(Agent.make({ name: "structured-failure-agent" }), {
           prompt: "structured failure",
           persistence: { chatId: "structured-failure" },
-          schema: Schema.Struct({ value: Schema.String }),
+          output: { schema: Schema.Struct({ value: Schema.String }) },
         }).pipe(Effect.flip)
         const transcript = yield* historyText("structured-failure")
 

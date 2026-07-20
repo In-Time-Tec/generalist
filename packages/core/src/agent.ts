@@ -91,6 +91,7 @@ export interface MakeToolsOptions<
 }
 
 type OptionValue<O, K extends PropertyKey> = K extends keyof O ? O[K] : never
+type PresentOption<O, K extends PropertyKey> = O extends unknown ? Exclude<OptionValue<O, K>, undefined> : never
 type ModelRequirement<O> = [Exclude<OptionValue<O, "model">, undefined>] extends [never]
   ? LanguageModel.LanguageModel
   : undefined extends OptionValue<O, "model">
@@ -180,7 +181,7 @@ export type ProgressOverflowPolicy =
   | { readonly _tag: "Sliding"; readonly capacity: number }
   | { readonly _tag: "Fail"; readonly capacity: number }
 
-/** @experimental Options for an agent run. Set `schema` for a structured-output run; set `persistence` for a persisted run. */
+/** @experimental Options for an agent run. Set `output` for structured output; set `persistence` for persisted chat. */
 export interface RunOptions {
   /** User input for the first turn. Ignored when `resume` is set. */
   readonly prompt: Prompt.RawInput
@@ -211,14 +212,17 @@ export interface RunOptions {
     readonly chatId: string
     readonly timeToLive?: Duration.Input
   }
-  readonly schema?: ObjectSchema
-  readonly objectName?: string
-  readonly objectPrompt?: Prompt.RawInput
+  readonly output?: {
+    readonly schema: ObjectSchema
+    readonly name?: string
+    readonly prompt?: Prompt.RawInput
+  }
 }
 
-type OperationRequirements<O> = [Exclude<OptionValue<O, "memory">, undefined>] extends [never] ? never : Memory
+type OperationRequirements<O> = [PresentOption<O, "memory">] extends [never] ? never : Memory
 
 type ObjectSchema = Schema.Codec<unknown, Record<string, any>, unknown, unknown>
+type NoOutputSchema = Schema.Codec<unknown, Record<string, any>, never, never>
 
 /** @experimental Default prompt for the terminal structured-output turn. */
 export const defaultObjectPrompt = "Return the final structured output for the task above."
@@ -251,17 +255,22 @@ export interface ObjectResult<A> extends Result {
   readonly value: A
 }
 
-type SchemaOf<O> = O extends { readonly schema: infer S extends ObjectSchema } ? S : never
+type SchemaFromOutput<Output> = Output extends { readonly schema: infer S extends ObjectSchema } ? S : never
+type SchemaOf<O> = SchemaFromOutput<PresentOption<O, "output">>
+type PersistenceRequirement<O> = [PresentOption<O, "persistence">] extends [never] ? never : Chat.Persistence
+type OutputRequirement<O> = [SchemaOf<O>] extends [never] ? never : SchemaOf<O>["DecodingServices"]
 
-type RunRequirements<R, O> =
-  | R
-  | OperationRequirements<O>
-  | (O extends { readonly persistence: object } ? Chat.Persistence : never)
-  | ([SchemaOf<O>] extends [never] ? never : SchemaOf<O>["DecodingServices"])
+type RunRequirements<R, O> = R | OperationRequirements<O> | PersistenceRequirement<O> | OutputRequirement<O>
 
-type RunResult<O> = [SchemaOf<O>] extends [never] ? Result : ObjectResult<SchemaOf<O>["Type"]>
+type RunResult<O> = O extends unknown
+  ? O extends { readonly output: { readonly schema: infer S extends ObjectSchema } }
+    ? ObjectResult<S["Type"]>
+    : [SchemaOf<O>] extends [never]
+      ? Result
+      : Result | ObjectResult<SchemaOf<O>["Type"]>
+  : never
 
-/** @experimental Stream an agent run as Events. Set options.schema for structured output; set options.persistence for a persisted run. */
+/** @experimental Stream an agent run as Events. Set options.output for structured output; set options.persistence for persisted chat. */
 export const stream: {
   <O extends RunOptions>(
     options: O,
@@ -276,18 +285,18 @@ export const stream: {
   streamInternal(
     agent,
     options,
-    options.schema === undefined
+    options.output === undefined
       ? undefined
       : {
-          schema: options.schema,
-          objectName: options.objectName ?? "output",
-          objectPrompt: options.objectPrompt ?? defaultObjectPrompt,
+          schema: options.output.schema,
+          objectName: options.output.name ?? "output",
+          objectPrompt: options.output.prompt ?? defaultObjectPrompt,
         },
   ),
 )
 
 const generateText = <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-  Stream.runLast(stream(agent, options)).pipe(
+  Stream.runLast(streamInternal<Tools, R, NoOutputSchema>(agent, options, undefined)).pipe(
     Effect.flatMap(
       Option.match({
         onNone: () => Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),
@@ -299,9 +308,17 @@ const generateText = <Tools extends Record<string, Tool.Any>, R>(agent: Agent<To
     ),
   )
 
-const generateObjectResult = <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
+const generateObjectResult = <Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema>(
+  agent: Agent<Tools, R>,
+  options: RunOptions,
+  structured: {
+    readonly schema: S
+    readonly objectName: string
+    readonly objectPrompt: Prompt.RawInput
+  },
+) =>
   Stream.runFold(
-    stream(agent, options),
+    streamInternal(agent, options, structured),
     () => ({ value: Option.none<unknown>(), completed: Option.none<Completed>() }),
     (acc, event) =>
       event._tag === "StructuredOutput"
@@ -332,7 +349,7 @@ const generateObjectResult = <Tools extends Record<string, Tool.Any>, R>(agent: 
     ),
   )
 
-/** @experimental Run an agent to completion. Returns ObjectResult when options.schema is set, otherwise Result. */
+/** @experimental Run an agent to completion. Returns ObjectResult when options.output is set, otherwise Result. */
 export const generate: {
   <O extends RunOptions>(
     options: O,
@@ -346,5 +363,11 @@ export const generate: {
 } = dual(
   2,
   <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-    (options.schema === undefined ? generateText(agent, options) : generateObjectResult(agent, options)) as any,
+    (options.output === undefined
+      ? generateText(agent, options)
+      : generateObjectResult(agent, options, {
+          schema: options.output.schema,
+          objectName: options.output.name ?? "output",
+          objectPrompt: options.output.prompt ?? defaultObjectPrompt,
+        })) as any,
 )
