@@ -9,12 +9,14 @@ import {
   OpenAiAccountCredentialError,
   type OpenAiAccountCredentials,
   classifyFailure,
+  credentialsFromAccountAuth,
   openAi,
   openAiAccount,
   withOpenAi,
   withOpenAiAccount,
   withOpenAiAccountFetch,
 } from "@batonfx/providers/openai"
+import type { ServiceInterface } from "@batonfx/providers/openai-account-auth"
 
 const endpoint = "https://chatgpt.com/backend-api/codex/responses"
 const credential = (generation: string, suffix = generation): OpenAiAccountCredential => ({
@@ -256,6 +258,37 @@ describe("OpenAI account Responses registration", () => {
       )
 
       expect(rejected).toEqual(["stale", "stale"])
+    })
+  })
+
+  it.effect("never sends or replays credentials from a different profile fingerprint", () => {
+    const requests: Array<CapturedRequest> = []
+    const authCredential = (fingerprint: string, suffix: string) => ({
+      accessToken: Redacted.make(`token-${suffix}`),
+      idToken: Redacted.make(`id-${suffix}`),
+      refreshToken: Redacted.make(`refresh-${suffix}`),
+      accountId: Redacted.make(`account-${suffix}`),
+      fingerprint,
+      generation: `${fingerprint}.${suffix}`,
+      expiresAt: 1,
+      refreshedAt: 1,
+    })
+    const auth = {
+      acquire: Effect.succeed(authCredential("profile-a", "old")),
+      refreshRejected: () => Effect.succeed(authCredential("profile-b", "new")),
+    } as unknown as ServiceInterface
+    const accountCredentials = credentialsFromAccountAuth(auth, "profile-a")
+
+    return Effect.gen(function* () {
+      yield* Effect.flip(generate(accountCredentials, mockClient([401], requests)))
+      expect(requests.map(({ headers }) => headers.authorization)).toEqual(["Bearer token-old"])
+
+      const replaced = credentialsFromAccountAuth(
+        { ...auth, acquire: Effect.succeed(authCredential("profile-b", "replacement")) },
+        "profile-a",
+      )
+      yield* Effect.flip(generate(replaced, mockClient([], requests)))
+      expect(requests).toHaveLength(1)
     })
   })
 

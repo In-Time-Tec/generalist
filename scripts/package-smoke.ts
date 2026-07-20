@@ -31,6 +31,8 @@ const exports = [
   "@batonfx/providers",
   "@batonfx/providers/catalog",
   "@batonfx/providers/openai",
+  "@batonfx/providers/openai-account-auth",
+  "@batonfx/providers/openai-account-auth-http",
   "@batonfx/providers/anthropic",
   "@batonfx/providers/openrouter",
   "@batonfx/providers/openai-compat",
@@ -258,6 +260,12 @@ type ProviderRoot = typeof import("@batonfx/providers")
 type TransportRoot = typeof import("@batonfx/transport")
 type ProviderCatalogSubpath = Assert<Equal<ProviderRoot["Catalog"], typeof import("@batonfx/providers/catalog")>>
 type ProviderOpenAiSubpath = Assert<Equal<ProviderRoot["OpenAi"], typeof import("@batonfx/providers/openai")>>
+type ProviderOpenAiAccountAuthSubpath = Assert<
+  Equal<ProviderRoot["OpenAiAccountAuth"], typeof import("@batonfx/providers/openai-account-auth")>
+>
+type ProviderOpenAiAccountAuthHttpSubpath = Assert<
+  Equal<ProviderRoot["OpenAiAccountAuthHttp"], typeof import("@batonfx/providers/openai-account-auth-http")>
+>
 type ProviderAnthropicSubpath = Assert<Equal<ProviderRoot["Anthropic"], typeof import("@batonfx/providers/anthropic")>>
 type ProviderOpenRouterSubpath = Assert<Equal<ProviderRoot["OpenRouter"], typeof import("@batonfx/providers/openrouter")>>
 type ProviderOpenAiCompatibleSubpath = Assert<

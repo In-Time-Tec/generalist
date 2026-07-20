@@ -1,7 +1,8 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai"
 import { ModelRegistry } from "@batonfx/core"
-import { Config, Effect, Layer, Redacted, Schema, Stream } from "effect"
+import { Config, Effect, Function, Layer, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
+import type { Credential, ServiceInterface } from "./openai-account-auth.js"
 import {
   FetchHttpClient,
   Headers,
@@ -104,6 +105,36 @@ export interface OpenAiAccountCredentials {
   readonly acquire: Effect.Effect<OpenAiAccountCredential, OpenAiAccountCredentialError>
   readonly refreshRejected: (generation: string) => Effect.Effect<OpenAiAccountCredential, OpenAiAccountCredentialError>
 }
+
+/** @experimental */
+const credentialsFromAccountAuthImpl = (
+  service: ServiceInterface,
+  expectedFingerprint: string,
+): OpenAiAccountCredentials => {
+  const mapCredential = (operation: OpenAiAccountCredentialError["operation"]) =>
+    Effect.mapError(() => OpenAiAccountCredentialError.make({ operation }))
+  const accountCredential = (operation: OpenAiAccountCredentialError["operation"]) =>
+    Effect.flatMap((credential: Credential) =>
+      credential.fingerprint === expectedFingerprint
+        ? Effect.succeed({
+            accessToken: credential.accessToken,
+            accountId: Redacted.value(credential.accountId),
+            generation: credential.generation,
+          })
+        : Effect.fail(OpenAiAccountCredentialError.make({ operation })),
+    )
+  return {
+    acquire: service.acquire.pipe(accountCredential("acquire"), mapCredential("acquire")),
+    refreshRejected: (generation) =>
+      service.refreshRejected(generation).pipe(accountCredential("refreshRejected"), mapCredential("refreshRejected")),
+  }
+}
+
+/** @experimental */
+export const credentialsFromAccountAuth: {
+  (service: ServiceInterface, expectedFingerprint: string): OpenAiAccountCredentials
+  (expectedFingerprint: string): (service: ServiceInterface) => OpenAiAccountCredentials
+} = Function.dual(2, credentialsFromAccountAuthImpl)
 
 /** @experimental */
 export interface OpenAiAccountInput extends RegistrationOptions {

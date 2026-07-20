@@ -17,6 +17,14 @@
       "types": "./dist/openai.d.ts",
       "import": "./dist/openai.js"
     },
+    "./openai-account-auth": {
+      "types": "./dist/openai-account-auth.d.ts",
+      "import": "./dist/openai-account-auth.js"
+    },
+    "./openai-account-auth-http": {
+      "types": "./dist/openai-account-auth-http.d.ts",
+      "import": "./dist/openai-account-auth-http.js"
+    },
     "./anthropic": {
       "types": "./dist/anthropic.d.ts",
       "import": "./dist/anthropic.js"
