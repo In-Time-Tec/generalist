@@ -63,7 +63,7 @@ Baton seams are Effect services. You pay only for the seams you provide: a model
 Define tools once with `Tool.make` and `Toolkit.make`. Ordinary in-process calls run through `toolkit.toLayer(...)`; hosts that need placement can route the same toolkit with `ToolExecutor.client`, `ToolExecutor.remote`, `ToolExecutor.mcp`, or `ToolExecutor.sandbox` without redefining schemas or wrapping tools.
 
 ```ts
-const clientTools = ToolExecutor.router([
+const clientTools = ToolExecutor.layerRouter([
   ToolExecutor.client({
     toolkit,
     execute: ({ call }) => desktopClient.callTool(call.name, call.params),

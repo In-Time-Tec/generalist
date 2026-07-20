@@ -46,7 +46,7 @@ const messageText = (message: Prompt.Message): string => {
     .join("")
 }
 
-const unusedExecutor = ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool execution") })
+const unusedExecutor = ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool execution") })
 
 layer(unusedToolHandlerLayer)("Memory", (it) => {
   it("accepts only user-message parts as recalled item content", () => {
@@ -129,7 +129,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([
           {
             transformPrompt: (prompt) => {
@@ -138,7 +138,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             },
           },
         ]),
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () =>
             Effect.succeed([
               { id: "item-empty", content: [] },
@@ -183,9 +183,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "item-empty", content: [] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -213,7 +213,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           }),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([
           {
             transformPrompt: (prompt) =>
@@ -226,7 +226,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               ),
           },
         ]),
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () =>
             Effect.sync(() => {
@@ -258,7 +258,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           }),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([
           {
             transformPrompt: (prompt) => {
@@ -280,7 +280,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             },
           },
         ]),
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () =>
             Effect.sync(() => {
@@ -311,7 +311,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           }),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([
           {
             transformPrompt: (prompt) =>
@@ -327,7 +327,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               }),
           },
         ]),
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -353,9 +353,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([Guardrail.redactInput({ pattern: /secret/g, replacement: "MASK" })]),
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled secret")] }]),
           remember: (input) =>
             Effect.sync(() => {
@@ -386,12 +386,12 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           calls += 1
           return call === 0 ? Stream.make(toolCallPart("call-1", "lookup", {})) : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () =>
             Effect.sync(() => {
               recalls += 1
@@ -429,7 +429,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             ? Stream.make(toolCallPart("call-resume", "lookup", {}))
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executions += 1
             return executions === 1
@@ -437,9 +437,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               : Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" })
           },
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () =>
             Effect.sync(() => {
               recalls += 1
@@ -490,10 +490,10 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("call-1", "wait", {}))),
-        ToolExecutor.testLayer({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
-        Approvals.autoApprove,
+        ToolExecutor.layerTest({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([]),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
@@ -520,7 +520,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           modelCalls += 1
           return modelCalls === 1 ? Stream.make(toolCallPart("call-wait", "wait", {})) : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executions += 1
             return Effect.succeed(
@@ -530,11 +530,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             )
           },
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Compaction.layer({}),
         Session.layerMemory,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled before wait")] }]),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
@@ -586,12 +586,12 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             ? Stream.make(toolCallPart("call-compact", "lookup", {}))
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => Effect.succeed({ _tag: "Success", result: "tool value", encodedResult: "tool value" }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) => {
             if (request.turn === 0) return Effect.succeedNone
             const firstKept = request.path?.at(-1)
@@ -614,7 +614,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         }),
         Session.layerMemory,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
@@ -652,9 +652,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           }),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.succeed(
               Option.some({
@@ -669,7 +669,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             ),
         }),
         Session.layerMemory,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () =>
             Effect.sync(() => {
@@ -700,9 +700,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           }),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.sync(() => {
               const recalled = request.prompt.content.find((message) => messageText(message) === "recalled context")
@@ -715,7 +715,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             }),
         }),
         Session.layerMemory,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -750,9 +750,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.sync(() => {
               const recalled = request.prompt.content.find((message) => messageText(message) === "recalled context")
@@ -774,7 +774,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             }),
         }),
         Session.layerMemory,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context"), bytes, url] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -809,7 +809,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             ? Stream.make(toolCallPart("call-history", "lookup", { nested: { value: "original params" } }))
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () =>
             Effect.succeed({
               _tag: "Success",
@@ -817,9 +817,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               encodedResult: { nested: { value: "original result" } },
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) => {
             if (request.turn === 0) return Effect.succeedNone
             return Effect.sync(() => {
@@ -851,7 +851,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         }),
         Session.layerMemory,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -894,7 +894,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           terminalPrompt = request.prompt
           return Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () =>
             Effect.succeed({
               _tag: "Success",
@@ -902,9 +902,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
               encodedResult: { nested: { value: "original result" } },
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.sync(() => {
               if (request.turn === 0) return Option.none()
@@ -923,7 +923,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             }),
         }),
         Session.layerMemory,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -966,12 +966,12 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             ? Stream.make(toolCallPart("call-existing-session", "lookup", {}))
             : Stream.make(textDelta(modelCalls === 2 ? "first done" : "second done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => Effect.succeed({ _tag: "Success", result: "tool value", encodedResult: "tool value" }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) => {
             if (request.turn === 0) return Effect.succeedNone
             const firstKept = request.path?.at(-1)
@@ -994,7 +994,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           },
         }),
         Session.layerMemory,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([{ id: "recalled", content: [textPart("recalled context")] }]),
           remember: (input) => Effect.sync(() => remembers.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
@@ -1041,11 +1041,11 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("done"))),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Compaction.layer({}),
         Session.layerMemory,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([]),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -1082,9 +1082,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
           }),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.fail(memoryError),
           remember: () => Effect.void,
           forget: () => Effect.void,
@@ -1112,9 +1112,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("done"))),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([]),
           remember: () => Effect.fail(memoryError),
           forget: () => Effect.void,
@@ -1180,10 +1180,10 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     })
   })
 
-  ItLayer.make(it, "testLayer exposes forget", () => {
+  ItLayer.make(it, "layerTest exposes forget", () => {
     let forgotten: Memory.ForgetInput | undefined
     return [
-      Memory.testLayer({
+      Memory.layerTest({
         recall: () => Effect.succeed([]),
         remember: () => Effect.void,
         forget: (input) =>

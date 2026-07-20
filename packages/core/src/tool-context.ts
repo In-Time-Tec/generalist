@@ -27,5 +27,5 @@ export const layerDefault: Layer.Layer<ToolContext> = Layer.sync(ToolContext, ()
 )
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<ToolContext> =>
+export const layerTest = (implementation: Interface): Layer.Layer<ToolContext> =>
   Layer.succeed(ToolContext, ToolContext.of(implementation))

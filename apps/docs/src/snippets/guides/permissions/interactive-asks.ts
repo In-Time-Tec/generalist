@@ -2,14 +2,14 @@ import { Console, Effect, Layer } from "effect"
 import { Approvals, Permissions } from "@batonfx/core"
 
 export const policyLayer = Layer.mergeAll(
-  Permissions.fromRuleset({
+  Permissions.layerRuleset({
     rules: [
       { pattern: "read_*", level: "allow" },
       { pattern: "deploy_*", level: "ask" },
     ],
     fallback: "ask",
   }),
-  Approvals.testLayer({
+  Approvals.layerTest({
     resolve: (pending) =>
       Console.log(`Allow ${pending.call.name} with ${JSON.stringify(pending.call.params)}? [y/N/always]`).pipe(
         Effect.as<Approvals.Resolution>({
@@ -18,5 +18,5 @@ export const policyLayer = Layer.mergeAll(
         }),
       ),
   }),
-  Permissions.ruleStoreMemory([{ pattern: "read_*", level: "allow" }]),
+  Permissions.layerRuleStoreMemory([{ pattern: "read_*", level: "allow" }]),
 )

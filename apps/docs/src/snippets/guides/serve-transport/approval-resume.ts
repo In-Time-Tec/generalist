@@ -40,7 +40,7 @@ const registryLayer = SessionRegistry.layerMemory({ agent }).pipe(
     Layer.mergeAll(
       modelLayer,
       toolkit.toLayer({ deploy: () => Effect.succeed("deployed") }),
-      Approvals.testLayer({
+      Approvals.layerTest({
         resolve: (pending) => Effect.succeed({ ...pending, token: "deploy-token-1" }),
       }),
       ModelMiddleware.layerIdentity,

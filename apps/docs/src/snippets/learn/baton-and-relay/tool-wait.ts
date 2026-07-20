@@ -41,7 +41,7 @@ const modelLayer = Layer.effect(
   }),
 )
 
-const durableHostExecutor = ToolExecutor.testLayer({
+const durableHostExecutor = ToolExecutor.layerTest({
   execute: (request) => Effect.succeed({ _tag: "Suspend", token: `wait:tool:${request.call.id}` }),
 })
 
@@ -61,7 +61,13 @@ const program = Agent.stream(agent, { prompt: "Fetch the quarterly report." }).p
       ),
   ),
   Effect.provide(
-    Layer.mergeAll(modelLayer, toolkitLayer, durableHostExecutor, Approvals.autoApprove, ModelMiddleware.layerIdentity),
+    Layer.mergeAll(
+      modelLayer,
+      toolkitLayer,
+      durableHostExecutor,
+      Approvals.layerAutoApprove,
+      ModelMiddleware.layerIdentity,
+    ),
   ),
 )
 

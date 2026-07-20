@@ -52,10 +52,10 @@ const program = Effect.gen(function* () {
   Effect.provide(
     Layer.mergeAll(
       modelLayer,
-      ToolExecutor.testLayer({ execute: () => Effect.die("activate_skill is handled by the loop, not the executor") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("activate_skill is handled by the loop, not the executor") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
-      SkillSource.fromSkills([releaseNotesSkill]),
+      SkillSource.layerSkills([releaseNotesSkill]),
     ),
   ),
 )

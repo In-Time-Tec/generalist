@@ -73,14 +73,14 @@ export const routesLayer = HttpRouter.use((router) =>
   }),
 )
 
-export const approvalsLayer = Approvals.testLayer({
+export const approvalsLayer = Approvals.layerTest({
   resolve: (request) => Effect.succeed({ ...request, token: `approve-${request.call.id}` }),
 })
 
 export const toolExecutorLayer = Layer.unwrap(
   Effect.gen(function* () {
     const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitLayer))
-    return ToolExecutor.fromToolkit(handledToolkit)
+    return ToolExecutor.layerToolkit(handledToolkit)
   }),
 ).pipe(Layer.provide(cannedLayer))
 

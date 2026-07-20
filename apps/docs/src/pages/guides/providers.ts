@@ -69,7 +69,7 @@ export const providers = definePage({
       " layer installs its own fresh registry under the same service tag, so ",
       code("Layer.mergeAll"),
       " keeps only one provider's registrations. Combine registries with ",
-      code("ModelRegistry.combine"),
+      code("ModelRegistry.layerCombined"),
       " instead; on identical identity the later layer wins.",
     ),
     codeBlock({ label: "combine-providers.ts", source: combineProviders }),

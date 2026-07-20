@@ -291,7 +291,7 @@ export const providersReference = definePage({
       " is a hand-maintained snapshot of six entries; ",
       code("layer(overrides?)"),
       " merges overrides over it, ",
-      code("testLayer(entries)"),
+      code("layerTest(entries)"),
       " uses exactly the given entries.",
     ),
     h2("embedding", "Embedding"),

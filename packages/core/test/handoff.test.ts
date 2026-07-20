@@ -158,10 +158,10 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
             ? Stream.make(toolCallPart("call-transfer", "transfer_to_math", { prompt: "math child task" }))
             : Stream.make(textDelta("supervisor got 42"))
         }),
-        ToolExecutor.fromToolkit(
+        ToolExecutor.layerToolkit(
           Handoff.supervisor({ name: "supervisor", specialists: [Agent.make({ name: "math" })] }).toolkit,
         ),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -241,8 +241,8 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
             }),
           ),
         ),
-        ToolExecutor.testLayer({ execute: () => Effect.die("fanOut children should not execute tools") }),
-        Approvals.autoApprove,
+        ToolExecutor.layerTest({ execute: () => Effect.die("fanOut children should not execute tools") }),
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -271,8 +271,8 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.fail(modelError)),
-        ToolExecutor.testLayer({ execute: () => Effect.die("fanOut failure should not execute tools") }),
-        Approvals.autoApprove,
+        ToolExecutor.layerTest({ execute: () => Effect.die("fanOut failure should not execute tools") }),
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {

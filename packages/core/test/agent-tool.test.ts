@@ -75,7 +75,7 @@ class AuthorizationDependency extends Context.Service<AuthorizationDependency, s
 layer(unusedToolHandlerLayer)("AgentTool", (it) => {
   expect(agentToolRequirementProof).toBe(true)
 
-  ItLayer.make(it, "ToolExecutor.fromToolkit preserves decoded and encoded declared failures", () => {
+  ItLayer.make(it, "ToolExecutor.layerToolkit preserves decoded and encoded declared failures", () => {
     const failingTool = Tool.make("failing", {
       parameters: Schema.Struct({}),
       success: Schema.String,
@@ -87,7 +87,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     return [
       Layer.mergeAll(
         handlers,
-        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
         ToolContext.layerDefault,
       ),
       Effect.gen(function* () {
@@ -102,7 +102,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "ToolExecutor.fromToolkit uses the failure encoding when decoded schemas overlap", () => {
+  ItLayer.make(it, "ToolExecutor.layerToolkit uses the failure encoding when decoded schemas overlap", () => {
     const overlappingTool = Tool.make("overlapping_failure", {
       parameters: Schema.Struct({}),
       success: Schema.FiniteFromString,
@@ -114,7 +114,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     return [
       Layer.mergeAll(
         handlers,
-        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
         ToolContext.layerDefault,
       ),
       Effect.gen(function* () {
@@ -127,7 +127,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "ToolExecutor.fromToolkit preserves error-mode declared failures", () => {
+  ItLayer.make(it, "ToolExecutor.layerToolkit preserves error-mode declared failures", () => {
     const failingTool = Tool.make("failing_error_mode", {
       parameters: Schema.Struct({}),
       success: Schema.String,
@@ -138,7 +138,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     return [
       Layer.mergeAll(
         handlers,
-        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
         ToolContext.layerDefault,
       ),
       Effect.gen(function* () {
@@ -171,7 +171,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     return [
       Layer.mergeAll(
         handlers,
-        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
         ToolContext.layerDefault,
       ),
       Effect.gen(function* () {
@@ -209,7 +209,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     return [
       Layer.mergeAll(
         handlers,
-        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
         ToolContext.layerDefault,
       ),
       Effect.gen(function* () {
@@ -222,7 +222,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "ToolExecutor.fromToolkit preserves handler interruptions", () => {
+  ItLayer.make(it, "ToolExecutor.layerToolkit preserves handler interruptions", () => {
     const interruptingTool = Tool.make("interrupting", {
       parameters: Schema.Struct({}),
       success: Schema.String,
@@ -232,7 +232,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     return [
       Layer.mergeAll(
         handlers,
-        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
         ToolContext.layerDefault,
       ),
       Effect.gen(function* () {
@@ -245,7 +245,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "ToolExecutor.fromToolkit preserves handler defects", () => {
+  ItLayer.make(it, "ToolExecutor.layerToolkit preserves handler defects", () => {
     const defectiveTool = Tool.make("defective", {
       parameters: Schema.Struct({}),
       success: Schema.String,
@@ -255,7 +255,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     return [
       Layer.mergeAll(
         handlers,
-        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
         ToolContext.layerDefault,
       ),
       Effect.gen(function* () {
@@ -268,7 +268,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "ToolExecutor.router dispatches named routes without redefining tools", () => {
+  ItLayer.make(it, "ToolExecutor.layerRouter dispatches named routes without redefining tools", () => {
     const lookupTool = Tool.make("lookup", {
       parameters: Schema.Struct({ id: Schema.String }),
       success: Schema.Struct({ source: Schema.String, id: Schema.String }),
@@ -277,7 +277,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
-        ToolExecutor.router([
+        ToolExecutor.layerRouter([
           ToolExecutor.routeToolkit(toolkit),
           ToolExecutor.route({
             tools: ["remote"],
@@ -325,7 +325,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
-        ToolExecutor.router([
+        ToolExecutor.layerRouter([
           ToolExecutor.client({
             toolkit,
             execute: ({ call }) =>
@@ -365,7 +365,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     })
     return [
       Layer.mergeAll(
-        ToolExecutor.router([
+        ToolExecutor.layerRouter([
           ToolExecutor.client({
             toolkit: Toolkit.make(deploy),
             execute: () => Effect.succeed({ _tag: "DomainFailure", failure: { code: "invalid" } }),
@@ -391,7 +391,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     let calls = 0
     return [
       Layer.mergeAll(
-        ToolExecutor.router([
+        ToolExecutor.layerRouter([
           ToolExecutor.client({
             toolkit: Toolkit.make(deploy),
             execute: () => {
@@ -424,7 +424,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
-        ToolExecutor.router([
+        ToolExecutor.layerRouter([
           ToolExecutor.remote({
             toolkit,
             idempotent: true,
@@ -481,7 +481,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
-        ToolExecutor.router([
+        ToolExecutor.layerRouter([
           ToolExecutor.remote({
             toolkit,
             schedule: Schedule.recurs(1),
@@ -515,7 +515,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
-        ToolExecutor.router([
+        ToolExecutor.layerRouter([
           ToolExecutor.remote({
             toolkit,
             idempotent: true,
@@ -745,7 +745,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     return [
       Layer.mergeAll(
-        ToolExecutor.router([
+        ToolExecutor.layerRouter([
           ToolExecutor.mcp({
             toolkit: Toolkit.make(githubSearch),
             execute: () => Effect.succeed({ _tag: "Success", result: { source: "mcp" } }),
@@ -778,7 +778,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     () =>
       [
         Layer.mergeAll(
-          ToolExecutor.testLayer({
+          ToolExecutor.layerTest({
             execute: (input) =>
               Effect.succeed(
                 input.call.name === "first"
@@ -825,7 +825,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           followUp = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("handled failure"))
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -862,8 +862,8 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             ? Stream.make(toolCallPart("call-child", "ask_child", { prompt: "child task" }))
             : Stream.make(textDelta("parent saw child answer"))
         }),
-        ToolExecutor.fromToolkit(AgentTool.asTool(Agent.make({ name: "child" }), { name: "ask_child" })),
-        Approvals.autoApprove,
+        ToolExecutor.layerToolkit(AgentTool.asTool(Agent.make({ name: "child" }), { name: "ask_child" })),
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -909,7 +909,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             ? Stream.make(toolCallPart("authorized-call", "gated", { text: "run" }))
             : Stream.make(textDelta("authorized child answer"))
         }),
-        ToolExecutor.router([ToolExecutor.routeToolkit(childTool), ToolExecutor.routeToolkit(toolkit)]).pipe(
+        ToolExecutor.layerRouter([ToolExecutor.routeToolkit(childTool), ToolExecutor.routeToolkit(toolkit)]).pipe(
           Layer.provide(toolkit.toLayer({ gated: ({ text }) => Effect.succeed(text) })),
         ),
         ToolContext.layerDefault,
@@ -944,12 +944,12 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             ? Stream.make(toolCallPart("call-reviewer", "ask_reviewer", { prompt: "child approval task" }))
             : Stream.make(textDelta("parent saw reviewer failure"))
         }),
-        ToolExecutor.fromToolkit(
+        ToolExecutor.layerToolkit(
           AgentTool.asTool(Agent.make({ name: "reviewer", toolkit: Toolkit.make(gatedTool) }), {
             name: "ask_reviewer",
           }),
         ),
-        Approvals.testLayer({ resolve: (pending) => Effect.succeed({ ...pending, token: "approval-1" }) }),
+        Approvals.layerTest({ resolve: (pending) => Effect.succeed({ ...pending, token: "approval-1" }) }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -985,7 +985,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             ? Stream.make(toolCallPart("call-custom", "ask_custom", { question: "custom prompt" }))
             : Stream.make(textDelta("parent done"))
         }),
-        ToolExecutor.fromToolkit(
+        ToolExecutor.layerToolkit(
           AgentTool.asTool(Agent.make({ name: "custom-child" }), {
             name: "ask_custom",
             parameters: Schema.Struct({ question: Schema.String }),
@@ -994,7 +994,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             fromResult: (result) => ({ answer: result.text }),
           }),
         ),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {

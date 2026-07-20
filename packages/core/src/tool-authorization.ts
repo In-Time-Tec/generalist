@@ -135,5 +135,5 @@ export const make = (options: Options): ToolAuthorizer => ({
 })
 
 /** @experimental Provide an exact authorizer for tests or run-layer composition. */
-export const testLayer = (authorizer: ToolAuthorizer): Layer.Layer<ToolAuthorizerService> =>
+export const layerTest = (authorizer: ToolAuthorizer): Layer.Layer<ToolAuthorizerService> =>
   Layer.succeed(ToolAuthorizerService, ToolAuthorizerService.of(authorizer))

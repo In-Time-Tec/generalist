@@ -29,7 +29,7 @@ export interface BatonTools {
 }
 
 /**
- * Discovered MCP tools as a Baton toolkit. Pair with {@link toolkitLayer}
+ * Discovered MCP tools as a Baton toolkit. Pair with {@link layerToolkit}
  * so tool calls are proxied to the MCP server through Effect AI handlers.
  *
  * @experimental
@@ -49,7 +49,7 @@ const toolFailure = (server: string, tool: string, message: string): McpToolFail
  *
  * @experimental
  */
-export const toolkitLayer = (source: Interface): Layer.Layer<Tool.Handler<string>> =>
+export const layerToolkit = (source: Interface): Layer.Layer<Tool.Handler<string>> =>
   Layer.unwrap(
     Effect.gen(function* () {
       const mcpToolkit = yield* toolkit(source)
@@ -108,9 +108,9 @@ export const route = (
   Effect.gen(function* () {
     const source = yield* acquire(options)
     const mcpToolkit = yield* toolkit(source)
-    const handlers = toolkitLayer(source)
+    const handlers = layerToolkit(source)
     return {
       toolkit: mcpToolkit,
-      executorLayer: ToolExecutor.fromToolkit(mcpToolkit).pipe(Layer.provideMerge(handlers)),
+      executorLayer: ToolExecutor.layerToolkit(mcpToolkit).pipe(Layer.provideMerge(handlers)),
     }
   })

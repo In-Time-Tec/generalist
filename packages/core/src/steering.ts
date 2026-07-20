@@ -115,5 +115,5 @@ export const layer = (options: MakeOptions = {}): Layer.Layer<Steering> =>
   )
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<Steering> =>
+export const layerTest = (implementation: Interface): Layer.Layer<Steering> =>
   Layer.succeed(Steering, Steering.of(implementation))

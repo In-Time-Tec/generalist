@@ -116,7 +116,7 @@ const statusIncoming = (status: Client.ConnectionStatus): Option.Option<Incoming
 }
 
 /** @experimental */
-export const testLayer = (implementation: Interface | LegacyInterface): Layer.Layer<AgentConnection> => {
+export const layerTest = (implementation: Interface | LegacyInterface): Layer.Layer<AgentConnection> => {
   const session =
     "session" in implementation
       ? implementation.session

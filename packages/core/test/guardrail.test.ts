@@ -23,7 +23,7 @@ const echoTool = Tool.make("echo", {
   success: Schema.Unknown,
 })
 
-const echoExecutor = ToolExecutor.testLayer({
+const echoExecutor = ToolExecutor.layerTest({
   execute: (request) =>
     Effect.succeed({
       _tag: "Success",
@@ -32,7 +32,7 @@ const echoExecutor = ToolExecutor.testLayer({
     }),
 })
 
-const unusedExecutor = ToolExecutor.testLayer({
+const unusedExecutor = ToolExecutor.layerTest({
   execute: () => Effect.die("unexpected tool execution"),
 })
 
@@ -52,7 +52,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
           return Stream.make(textDelta("ok"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([
           Guardrail.validateInput((_prompt, context) => {
             seenContext = context
@@ -81,7 +81,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
           return Stream.make(textDelta("should not run"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([Guardrail.validateInput(() => Effect.succeed(Option.some("blocked by policy")))]),
       ),
       Effect.gen(function* () {
@@ -108,7 +108,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
           return Stream.make(textDelta("ok"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([Guardrail.redactInput({ pattern: /\d{3}-\d{2}-\d{4}/g })]),
       ),
       Effect.gen(function* () {
@@ -198,7 +198,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("token secret"))),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layer([Guardrail.redactOutput({ pattern: /secret/g })]),
         ),
         Effect.gen(function* () {
@@ -222,7 +222,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
       Layer.mergeAll(
         modelLayer(() => Stream.fromIterable([textDelta("keep"), textDelta("drop")])),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([
           Guardrail.filterOutput((part, context) => {
             contexts.push(context)
@@ -258,7 +258,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
             : Stream.make(textDelta("hidden"))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([Guardrail.filterOutput(() => false)]),
       ),
       Effect.gen(function* () {
@@ -282,7 +282,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
           return Stream.make(textDelta("ok"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([
           Guardrail.redactInput({ pattern: /secret/g, replacement: "safe" }),
           Guardrail.validateInput((prompt) =>

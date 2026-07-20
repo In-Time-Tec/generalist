@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "@batonfx/core"
 import { McpToolSource } from "@batonfx/mcp"
-import { toolkit, toolkitLayer } from "@batonfx/mcp/baton"
+import { layerToolkit, toolkit } from "@batonfx/mcp/baton"
 const source: McpToolSource.Interface = {
   server: "local",
   tools: Effect.succeed([
@@ -52,7 +52,7 @@ const program = Effect.gen(function* () {
   const agent = Agent.make({ name: "mcp-agent", toolkit: mcpToolkit })
   const result = yield* Agent.generate(agent, { prompt: "Find the setup docs" }).pipe(
     Effect.provide(
-      Layer.mergeAll(modelLayer, toolkitLayer(source), Approvals.autoApprove, ModelMiddleware.layerIdentity),
+      Layer.mergeAll(modelLayer, layerToolkit(source), Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
     ),
   )
   yield* Console.log(result.text)

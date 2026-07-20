@@ -47,7 +47,7 @@ export const permissions = definePage({
     ),
     h2("provide-the-layer", "2. Provide the layer and watch a denial"),
     p(
-      code("Permissions.fromRuleset"),
+      code("Permissions.layerRuleset"),
       " turns the ruleset into a static policy layer. A denied call never reaches the executor: the host receives your ",
       code("reason"),
       " in a typed ",
@@ -75,7 +75,7 @@ export const permissions = definePage({
     ),
     codeBlock({ label: "interactive-asks.ts", source: interactiveAsks }),
     p(
-      code("Permissions.ruleStoreMemory"),
+      code("Permissions.layerRuleStoreMemory"),
       " keeps remembered rules for the process lifetime; durable hosts implement ",
       code("RuleStore.remember"),
       " over their own storage.",

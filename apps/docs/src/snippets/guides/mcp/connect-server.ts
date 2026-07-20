@@ -25,7 +25,7 @@ const program = Effect.gen(function* () {
           apiKey: Config.redacted("OPENROUTER_API_KEY"),
         }),
         tools.executorLayer,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
     ),

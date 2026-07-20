@@ -10,7 +10,7 @@ const dropTableTool = Tool.make("drop_table", {
 const toolkit = Toolkit.make(dropTableTool)
 const agent = Agent.make({ name: "db-assistant", toolkit })
 
-const permissionsLayer = Permissions.fromRuleset({
+const permissionsLayer = Permissions.layerRuleset({
   rules: [{ pattern: "drop_*", level: "deny", reason: "Schema changes require a migration" }],
   fallback: "allow",
 })
@@ -42,7 +42,7 @@ const program = Effect.gen(function* () {
     Layer.mergeAll(
       modelLayer,
       toolkit.toLayer({ drop_table: () => Effect.die("denied calls never reach the handler") }),
-      Approvals.autoApprove,
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
       permissionsLayer,
     ),

@@ -37,7 +37,7 @@ export const skills = definePage({
       "For skills defined in code, build ",
       code("SkillSource.Skill"),
       " values and provide ",
-      code("SkillSource.fromSkills"),
+      code("SkillSource.layerSkills"),
       ". The loop appends the listings to the system message, advertises ",
       code("activate_skill"),
       ", handles the activation call itself (it never reaches your executor), and returns ",

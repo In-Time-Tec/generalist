@@ -9,11 +9,11 @@ export const testingEvals = definePage({
   navTitle: "Test agents and run evals",
   group: "Guides",
   description:
-    "Pin loop behavior with scripted models and testLayers, then gate CI on a deterministic eval, with no API keys anywhere.",
+    "Pin loop behavior with scripted models and layerTests, then gate CI on a deterministic eval, with no API keys anywhere.",
   content: [
     p(
       "Every behavior-bearing seam in Baton is an Effect service with an in-memory ",
-      code("testLayer"),
+      code("layerTest"),
       ", so a full tool-calling loop runs in CI with zero credentials (",
       link("/docs/learn/seams-as-services", "Seams as services"),
       "). Keep the primary pass/fail deterministic; add LLM-judge jobs outside the default CI path if you want them.",
@@ -40,20 +40,20 @@ export const testingEvals = definePage({
       code("expect"),
       ".",
     ),
-    h2("swap-any-seam", "2. Swap any seam with its testLayer"),
+    h2("swap-any-seam", "2. Swap any seam with its layerTest"),
     table(
       ["Seam", "Test construction"],
       [
         [[code("Ai.LanguageModel")], [code("TestModel.layer"), " or a stateful ", code("TestModel.make"), " fixture"]],
-        [[code("ToolExecutor")], [code("ToolExecutor.testLayer({ execute })")]],
+        [[code("ToolExecutor")], [code("ToolExecutor.layerTest({ execute })")]],
         [
           [code("Approvals")],
           [
-            code("Approvals.autoApprove"),
+            code("Approvals.layerAutoApprove"),
             ", ",
-            code("Approvals.denyAll"),
+            code("Approvals.layerDenyAll"),
             ", or ",
-            code("Approvals.testLayer"),
+            code("Approvals.layerTest"),
             " returning ",
             code("Pending"),
             " tokens",
@@ -63,7 +63,7 @@ export const testingEvals = definePage({
         [[code("ModelRegistry")], [code("Deterministic.withDeterministic"), " registration"]],
         [
           [code("Steering"), ", ", code("ModelResilience"), ", ", code("Connection"), ", …"],
-          ["every optional seam ships its own ", code("testLayer(implementation)")],
+          ["every optional seam ships its own ", code("layerTest(implementation)")],
         ],
       ],
     ),

@@ -321,7 +321,7 @@ const tokenStore: OAuth.TokenStoreInterface = {
   save: (_server, tokens) => Effect.sync(() => void Redacted.value(tokens)),
   remove: () => Effect.void,
 }
-const storeLayer: Layer.Layer<OAuth.TokenStore> = OAuth.tokenStoreTestLayer(tokenStore)
+const storeLayer: Layer.Layer<OAuth.TokenStore> = OAuth.layerTokenStoreTest(tokenStore)
 const cryptoLayer = Layer.succeed(
   Crypto.Crypto,
   Crypto.make({

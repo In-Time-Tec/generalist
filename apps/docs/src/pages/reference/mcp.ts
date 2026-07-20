@@ -24,7 +24,7 @@ export const mcpReference = definePage({
         [[code(".")], ["Namespace ", code("McpToolSource")]],
         [
           [code("./baton")],
-          [code("route(options)"), ", ", code("toolkit(source)"), " and ", code("toolkitLayer(source)")],
+          [code("route(options)"), ", ", code("toolkit(source)"), " and ", code("layerToolkit(source)")],
         ],
       ],
     ),
@@ -89,7 +89,7 @@ export const mcpReference = definePage({
         ],
         [[code("toolkit(source)")], ["Discovered MCP tools as an ", code("Ai.Toolkit"), " for ", code("Agent.make")]],
         [
-          [code("toolkitLayer(source)")],
+          [code("layerToolkit(source)")],
           [
             "Lower-level Effect AI handlers for an already acquired source. Structured MCP failures retain their tag, server, tool, and message fields",
           ],

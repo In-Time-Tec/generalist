@@ -51,8 +51,8 @@ describe("Permissions", () => {
     expect(Permissions.evaluate({ rules: [], fallback: "allow" }, "write", {})).toBe("allow")
   })
 
-  ItLayer.make(it, "fromRuleset provides an evaluate-only policy", () => [
-    Permissions.fromRuleset({
+  ItLayer.make(it, "layerRuleset provides an evaluate-only policy", () => [
+    Permissions.layerRuleset({
       rules: [
         { pattern: "bash", level: "allow" },
         { pattern: "bash:*ls*", level: "deny" },
@@ -64,8 +64,8 @@ describe("Permissions", () => {
     }),
   ])
 
-  ItLayer.make(it, "allowAll provides an evaluate-only allow policy", () => [
-    Permissions.allowAll,
+  ItLayer.make(it, "layerAllowAll provides an evaluate-only allow policy", () => [
+    Permissions.layerAllowAll,
     Effect.gen(function* () {
       const policy = yield* Permissions.Permissions
       expect((yield* policy.evaluate(request))._tag).toBe("Allow")
@@ -111,8 +111,8 @@ describe("Permissions", () => {
     }),
   )
 
-  ItLayer.make(it, "ruleStoreMemory retains concurrent writes and replaces an identical pattern", () => [
-    Permissions.ruleStoreMemory(),
+  ItLayer.make(it, "layerRuleStoreMemory retains concurrent writes and replaces an identical pattern", () => [
+    Permissions.layerRuleStoreMemory(),
     Effect.gen(function* () {
       const store = yield* Permissions.RuleStore
       const rules = Array.from({ length: 32 }, (_, index) => ({

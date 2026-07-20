@@ -10,6 +10,6 @@ export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.Lang
   toolOutputMaxBytes: 16_384,
 }).pipe(
   Effect.provide(
-    Layer.mergeAll(docsToolLayer, Approvals.autoApprove, ModelMiddleware.layerIdentity, ToolOutput.layerMemory),
+    Layer.mergeAll(docsToolLayer, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, ToolOutput.layerMemory),
   ),
 )

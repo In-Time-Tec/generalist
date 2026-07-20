@@ -68,7 +68,7 @@ Before provisioning, the program requires `Memory.Memory` and can fail with sche
 
 - Current behavior: [Memory](../../docs/features/memory.md)
 - Deeper example: [memory chat](../../examples/memory-chat/)
-- `VectorStore.layerMemory` provides the non-durable in-memory vector store; `combinedLayer` is unchanged.
+- `VectorStore.layerMemory` provides the non-durable in-memory vector store; `layerCombined` is unchanged.
 
 ### Working-memory summaries
 
@@ -81,7 +81,7 @@ import { WorkingMemory } from "@batonfx/memory"
 const memoryLayer = WorkingMemory.layer({
   maxMessages: 20,
   summarize: {},
-}).pipe(Layer.provide(WorkingMemory.summaryModelLayer.pipe(Layer.provide(modelLayer))))
+}).pipe(Layer.provide(WorkingMemory.layerSummaryModel.pipe(Layer.provide(modelLayer))))
 ```
 
-The summary model is acquired once in the memory layer's owning scope and reused across overflows. It is composed through `summaryModelLayer` as shown above.
+The summary model is acquired once in the memory layer's owning scope and reused across overflows. It is composed through `layerSummaryModel` as shown above.

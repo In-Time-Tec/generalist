@@ -50,13 +50,18 @@ const toolkitLayer = toolkit.toLayer({
 const pendingLayers = Layer.mergeAll(
   modelLayer,
   toolkitLayer,
-  Approvals.testLayer({
+  Approvals.layerTest({
     resolve: (request) => Effect.succeed({ ...request, token: `approval:${request.call.id}` }),
   }),
   ModelMiddleware.layerIdentity,
 )
 
-const approvedLayers = Layer.mergeAll(modelLayer, toolkitLayer, Approvals.autoApprove, ModelMiddleware.layerIdentity)
+const approvedLayers = Layer.mergeAll(
+  modelLayer,
+  toolkitLayer,
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+)
 
 const prompt = "Deploy the api service."
 

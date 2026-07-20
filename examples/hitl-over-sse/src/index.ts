@@ -63,7 +63,7 @@ const program = Effect.gen(function* () {
             ),
           ),
           toolkitLayer,
-          Approvals.testLayer({
+          Approvals.layerTest({
             resolve: (pending) => Effect.succeed({ ...pending, token: "approve-deploy-1" }),
           }),
           ModelMiddleware.layerIdentity,

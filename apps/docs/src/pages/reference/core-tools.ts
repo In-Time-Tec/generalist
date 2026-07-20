@@ -47,7 +47,7 @@ export const coreToolsReference = definePage({
       ["Constructor", "Notes"],
       [
         [
-          [code("ToolExecutor.fromToolkit(toolkit)")],
+          [code("ToolExecutor.layerToolkit(toolkit)")],
           [
             "Executes via a handled ",
             code("Ai.Toolkit.WithHandler"),
@@ -59,7 +59,7 @@ export const coreToolsReference = definePage({
         ],
         [[code("ToolExecutor.route({ tools?, matches?, execute })")], "Manual route for custom dispatch"],
         [[code("ToolExecutor.routeToolkit(toolkit)")], "Route that delegates to Effect AI toolkit handlers"],
-        [[code("ToolExecutor.router(routes)")], "Layer that tries routes in order and fails unmatched names"],
+        [[code("ToolExecutor.layerRouter(routes)")], "Layer that tries routes in order and fails unmatched names"],
         [[code("ToolExecutor.client({ toolkit, execute })")], "Route toolkit calls to a user/browser/desktop client"],
         [
           [code("ToolExecutor.remote({ toolkit, idempotent?, execute, ... })")],
@@ -67,7 +67,7 @@ export const coreToolsReference = definePage({
         ],
         [[code("ToolExecutor.mcp({ toolkit, execute })")], "Route toolkit calls through an MCP adapter"],
         [[code("ToolExecutor.sandbox({ toolkit, execute })")], "Route toolkit calls to a workspace or sandbox runtime"],
-        [[code("ToolExecutor.testLayer(implementation)")], "Layer from an explicit interface"],
+        [[code("ToolExecutor.layerTest(implementation)")], "Layer from an explicit interface"],
       ],
     ),
     p(
@@ -129,7 +129,7 @@ export const coreToolsReference = definePage({
       ", and sessionId ",
       code('"local"'),
       ". ",
-      code("ToolContext.testLayer(implementation)"),
+      code("ToolContext.layerTest(implementation)"),
       " provides an explicit one.",
     ),
     h2("tool-output", "ToolOutput and ToolOutputStore"),
@@ -156,7 +156,7 @@ export const coreToolsReference = definePage({
         ],
         [[code("ToolOutput.layerNoop")], ["Store that always declines (", code("Option.none"), ")"]],
         [[code("ToolOutput.layerMemory")], ["In-memory store issuing ", code("mem:tool-output-<n>"), " paths"]],
-        [[code("ToolOutput.testLayer(implementation)")], "Layer from an explicit store interface"],
+        [[code("ToolOutput.layerTest(implementation)")], "Layer from an explicit store interface"],
         [[code("ToolOutputError")], ["Tagged error with ", code("message")]],
       ],
     ),

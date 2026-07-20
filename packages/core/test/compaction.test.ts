@@ -103,7 +103,7 @@ describe("Compaction", () => {
     const padding = "pad ".repeat(300)
     return [
       Layer.mergeAll(
-        ToolOutput.testLayer({ put: () => Effect.succeed(Option.some("mem:large")) }),
+        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:large")) }),
         modelLayer(() => {
           summaryCalls += 1
           return Effect.succeed([{ type: "text", text: "unexpected summary" }])
@@ -140,7 +140,7 @@ describe("Compaction", () => {
     const large = "abcdef".repeat(40)
     return [
       Layer.mergeAll(
-        ToolOutput.testLayer({ put: () => Effect.succeed(Option.some("mem:large")) }),
+        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:large")) }),
         modelLayer(() => {
           summaryCalls += 1
           return Effect.succeed([{ type: "text", text: "unexpected summary" }])
@@ -470,7 +470,7 @@ describe("Compaction", () => {
     const large = "tool-output".repeat(60)
     return [
       Layer.mergeAll(
-        ToolOutput.testLayer({ put: () => Effect.succeed(Option.some("mem:head")) }),
+        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:head")) }),
         modelLayer((options) => {
           summaryPrompt = Json.stringify(options.prompt.content)
           return Effect.succeed([{ type: "text", text: "summary" }])
@@ -561,7 +561,7 @@ describe("Compaction", () => {
     })
     return [
       Layer.mergeAll(
-        ToolOutput.testLayer({ put: () => Effect.succeed(Option.some("mem:composed-bound")) }),
+        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:composed-bound")) }),
         modelLayer(() => {
           summaryCalls += 1
           return Effect.succeed([{ type: "text", text: "unexpected summary" }])
@@ -603,7 +603,7 @@ describe("Compaction", () => {
     const service = Compaction.make(composed, { contextWindow: 1, reserveTokens: 0 })
     return [
       Layer.mergeAll(
-        ToolOutput.testLayer({
+        ToolOutput.layerTest({
           put: () => {
             stores += 1
             return Effect.succeed(Option.some("mem:retained-tool"))

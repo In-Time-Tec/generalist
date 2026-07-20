@@ -1,4 +1,4 @@
 import { Layer } from "effect"
 import { Compaction } from "@batonfx/core"
 
-export const truncateLayer: Layer.Layer<Compaction.Compaction> = Compaction.testLayer(Compaction.truncate(100_000))
+export const truncateLayer: Layer.Layer<Compaction.Compaction> = Compaction.layerTest(Compaction.truncate(100_000))

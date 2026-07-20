@@ -91,12 +91,12 @@ const openSocket = (sockets: Array<FakeWebSocket>, index: number): Effect.Effect
 
 describe("Connection", () => {
   layer(
-    Connection.testLayer({
+    Connection.layerTest({
       frames: () => Stream.fromIterable([Connection.ConnectionOpened()]),
       send: () => Effect.void,
     }),
   )((methods) => {
-    methods.effect("testLayer provides AgentConnection frames and send", () =>
+    methods.effect("layerTest provides AgentConnection frames and send", () =>
       Effect.gen(function* () {
         const incoming = Connection.ConnectionOpened()
         const frames = yield* Connection.AgentConnection.use((connection) =>
@@ -294,7 +294,7 @@ describe("Connection", () => {
       ),
     ).pipe(
       provideTestLayer(
-        Connection.testLayer({
+        Connection.layerTest({
           frames: () => Stream.die("frame defect"),
           send: () => Effect.void,
         }),
@@ -309,7 +309,7 @@ describe("Connection", () => {
       ),
     ).pipe(
       provideTestLayer(
-        Connection.testLayer({
+        Connection.layerTest({
           frames: () => Stream.fromEffect(Effect.interrupt),
           send: () => Effect.void,
         }),

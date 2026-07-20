@@ -20,8 +20,8 @@ const program = ModelRegistry.operate(
   Effect.provide(
     Layer.mergeAll(
       providerLayer,
-      ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

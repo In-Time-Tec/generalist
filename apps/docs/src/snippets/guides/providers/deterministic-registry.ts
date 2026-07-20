@@ -12,8 +12,8 @@ const program = ModelRegistry.operate(
   Effect.provide(
     Layer.mergeAll(
       Deterministic.withDeterministic({ model: "local" }),
-      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

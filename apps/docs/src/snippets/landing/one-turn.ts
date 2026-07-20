@@ -50,7 +50,7 @@ const program = Effect.gen(function* () {
     Layer.mergeAll(
       scriptedModel,
       toolkit.toLayer({ get_weather: ({ city }) => Effect.succeed(`sunny and 72°F in ${city}`) }),
-      Approvals.autoApprove,
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

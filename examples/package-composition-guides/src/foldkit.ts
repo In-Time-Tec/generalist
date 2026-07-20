@@ -1,7 +1,7 @@
 import { Console, Effect, Stream } from "effect"
 import { Connection } from "@batonfx/foldkit"
 
-const connectionLayer = Connection.testLayer({
+const connectionLayer = Connection.layerTest({
   frames: () => Stream.make(Connection.ConnectionOpened()),
   send: () => Effect.void,
 })

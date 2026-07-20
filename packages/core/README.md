@@ -116,7 +116,7 @@ const agent = Agent.make({
 import { Effect, Schedule } from "effect"
 import { ToolExecutor } from "@batonfx/core"
 
-const executorLayer = ToolExecutor.router([
+const executorLayer = ToolExecutor.layerRouter([
   ToolExecutor.remote({
     toolkit,
     idempotent: true,

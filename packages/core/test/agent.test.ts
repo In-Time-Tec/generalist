@@ -343,7 +343,7 @@ const testSkill = (
   }
 }
 
-const echoExecutor = ToolExecutor.testLayer({
+const echoExecutor = ToolExecutor.layerTest({
   execute: (request) =>
     Effect.succeed({
       _tag: "Success",
@@ -352,7 +352,7 @@ const echoExecutor = ToolExecutor.testLayer({
     }),
 })
 
-const unusedExecutor = ToolExecutor.testLayer({
+const unusedExecutor = ToolExecutor.layerTest({
   execute: () => Effect.die("unexpected tool execution"),
 })
 
@@ -590,7 +590,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart("prototype-call", "__proto__", {}))
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executorCalls += 1
             return Effect.succeed({ _tag: "Success", result: "safe", encodedResult: "safe" })
@@ -648,7 +648,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           modelCalls += 1
           return Stream.make(textDelta("unexpected"))
         }),
-        SkillSource.fromSkills([testSkill("review", "Review code", "Review carefully")]),
+        SkillSource.layerSkills([testSkill("review", "Review code", "Review carefully")]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reserved-agent", tools: [reserved] })
@@ -679,7 +679,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("unexpected"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -710,7 +710,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("unexpected"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -741,7 +741,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("unexpected"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -769,7 +769,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("unexpected"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -799,7 +799,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("unexpected"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -826,7 +826,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     Layer.mergeAll(
       modelLayer(() => Stream.make(textDelta("unexpected"))),
       unusedExecutor,
-      Approvals.autoApprove,
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
     Effect.gen(function* () {
@@ -863,7 +863,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ),
           ),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
@@ -977,7 +977,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             Layer.mergeAll(
               ModelRegistry.layerMemory([Effect.succeed(registration)], { maxConcurrentModelCalls: 1 }),
               unusedExecutor,
-              Approvals.autoApprove,
+              Approvals.layerAutoApprove,
               ModelMiddleware.layerIdentity,
             ),
           ),
@@ -1027,7 +1027,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             textDelta(Json.stringify(options.prompt.content).includes("stored fact") ? "saw memory" : "missing memory"),
           ),
         ),
-        Memory.testLayer({
+        Memory.layerTest({
           recall: (input) =>
             Effect.sync(() => {
               recalled = input.key.agent === key.agent && input.key.subject === key.subject
@@ -1154,7 +1154,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               return { marker: "handled by toolkit" }
             }),
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () =>
             Effect.sync(() => {
               executorCalls += 1
@@ -1220,7 +1220,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Instructions.layer([
           Instructions.staticSource("first", "first"),
@@ -1246,7 +1246,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Instructions.layer([Instructions.staticSource("registry", "registry")]),
       ),
@@ -1271,7 +1271,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Instructions.layer([Instructions.staticSource("registry", "registry")]),
       ),
@@ -1304,7 +1304,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Instructions.layer([Instructions.staticSource("empty", "")]),
       ),
@@ -1361,9 +1361,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("used review"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
-        SkillSource.fromSkills([review, deploy]),
+        SkillSource.layerSkills([review, deploy]),
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "skill-agent", instructions: "base instructions" })
@@ -1415,8 +1415,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           modelCalls += 1
           return Stream.make(toolCallPart("activate-collision", "activate_skill", { name: "collision" }))
         }),
-        SkillSource.fromSkills([collidingSkill]),
-        ToolExecutor.testLayer({
+        SkillSource.layerSkills([collidingSkill]),
+        ToolExecutor.layerTest({
           execute: () => {
             executorCalls += 1
             return Effect.die("collision candidate must not execute")
@@ -1468,7 +1468,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             toolCallPart(`activate-${modelCalls}`, "activate_skill", { name: modelCalls === 1 ? "first" : "second" }),
           )
         }),
-        SkillSource.fromSkills([first, second]),
+        SkillSource.layerSkills([first, second]),
         unusedExecutor,
       ),
       Effect.gen(function* () {
@@ -1513,7 +1513,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart("activate-isolated", "activate_skill", { name: "isolated" }))
             : Stream.make(textDelta("activated"))
         }),
-        SkillSource.fromSkills([skill]),
+        SkillSource.layerSkills([skill]),
         unusedExecutor,
       ),
       Effect.gen(function* () {
@@ -1551,8 +1551,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               ])
             : Stream.make(textDelta("done"))
         }),
-        SkillSource.fromSkills([skill]),
-        ToolExecutor.testLayer({
+        SkillSource.layerSkills([skill]),
+        ToolExecutor.layerTest({
           execute: () => {
             executorCalls += 1
             return Effect.succeed({ _tag: "Success", result: "unexpected", encodedResult: "unexpected" })
@@ -1595,8 +1595,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           if (modelCalls === 2) return Stream.make(toolCallPart("resumable-call", "resumable_skill_tool", {}))
           return Stream.make(textDelta("resumed"))
         }),
-        SkillSource.fromSkills([skill]),
-        ToolExecutor.testLayer({
+        SkillSource.layerSkills([skill]),
+        ToolExecutor.layerTest({
           execute: () => {
             executorCalls += 1
             return executorCalls === 1
@@ -1648,7 +1648,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -1674,7 +1674,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -1696,7 +1696,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.fromIterable([textDelta("done"), finishPart("stop", reportedUsage)])),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -1740,7 +1740,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("after tool"))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -1806,7 +1806,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart("tool-call-context", "echo", { text: "from model" }))
             : Stream.make(textDelta("after context"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) =>
             Effect.gen(function* () {
               requestSessionId = request.sessionId
@@ -1821,7 +1821,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               return { _tag: "Success", result: { ok: true }, encodedResult: { ok: true } }
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -1866,7 +1866,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                 ? Stream.make(toolCallPart("tool-call-backpressure", "echo", { text: "from model" }))
                 : Stream.make(textDelta("after progress"))
             }),
-            ToolExecutor.testLayer({
+            ToolExecutor.layerTest({
               execute: () =>
                 Effect.gen(function* () {
                   const context = yield* ToolContext.ToolContext
@@ -1878,7 +1878,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                   return { _tag: "Success", result: { ok: true }, encodedResult: { ok: true } }
                 }),
             }),
-            Approvals.autoApprove,
+            Approvals.layerAutoApprove,
             ModelMiddleware.layerIdentity,
           )
         }),
@@ -1929,7 +1929,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                 ? Stream.make(toolCallPart("tool-call-default-progress", "echo", { text: "from model" }))
                 : Stream.make(textDelta("after progress"))
             }),
-            ToolExecutor.testLayer({
+            ToolExecutor.layerTest({
               execute: () =>
                 Effect.gen(function* () {
                   const context = yield* ToolContext.ToolContext
@@ -1942,7 +1942,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                   return { _tag: "Success", result: { ok: true }, encodedResult: { ok: true } }
                 }),
             }),
-            Approvals.autoApprove,
+            Approvals.layerAutoApprove,
             ModelMiddleware.layerIdentity,
           )
         }),
@@ -1983,7 +1983,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart(`tool-call-lossy-${calls}`, "echo", { text: "from model" }))
             : Stream.make(textDelta("after progress"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) =>
             Effect.gen(function* () {
               const context = yield* ToolContext.ToolContext
@@ -1995,7 +1995,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               return { _tag: "Success", result: { ok: true }, encodedResult: { ok: true } }
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2053,7 +2053,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                 ? Stream.make(toolCallPart("tool-call-fail-progress", "echo", { text: "from model" }))
                 : Stream.make(textDelta("unexpected"))
             }),
-            ToolExecutor.testLayer({
+            ToolExecutor.layerTest({
               execute: () =>
                 Effect.gen(function* () {
                   const context = yield* ToolContext.ToolContext
@@ -2066,7 +2066,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                   return yield* Effect.never
                 }).pipe(Effect.ensuring(Deferred.succeed(executionFinalized, undefined))),
             }),
-            Approvals.autoApprove,
+            Approvals.layerAutoApprove,
             ModelMiddleware.layerIdentity,
           )
         }),
@@ -2120,7 +2120,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart("tool-call-progress-failure", "echo", { text: "from model" }))
             : Stream.make(textDelta("after failure"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () =>
             Effect.gen(function* () {
               const context = yield* ToolContext.ToolContext
@@ -2128,7 +2128,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               return { _tag: "DomainFailure", failure: "tool failed", encodedFailure: "tool failed" }
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2168,7 +2168,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               calls += 1
               return Stream.make(toolCallPart("tool-call-abandoned-progress", "echo", { text: "from model" }))
             }),
-            ToolExecutor.testLayer({
+            ToolExecutor.layerTest({
               execute: () =>
                 Effect.gen(function* () {
                   const context = yield* ToolContext.ToolContext
@@ -2187,7 +2187,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                   } satisfies ToolExecutor.Outcome
                 }).pipe(Effect.ensuring(Deferred.succeed(executionFinalized, undefined))),
             }),
-            Approvals.autoApprove,
+            Approvals.layerAutoApprove,
             ModelMiddleware.layerIdentity,
           )
         }),
@@ -2238,14 +2238,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     return [
       Layer.mergeAll(
         handlers,
-        ToolExecutor.fromToolkit(toolkit).pipe(Layer.provide(handlers)),
+        ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
         modelLayer(() => {
           calls += 1
           return calls === 1
             ? Stream.make(toolCallPart("tool-call-handled-context", "handled-context", { text: "from model" }))
             : Stream.make(textDelta("after handler"))
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2274,7 +2274,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             : Stream.make(textDelta("after denial"))
         }),
         unusedExecutor,
-        Approvals.testLayer({
+        Approvals.layerTest({
           resolve: (request) => {
             approvalSessionId = request.sessionId ?? ""
             return Effect.succeed({ _tag: "Denied" })
@@ -2307,7 +2307,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             : Stream.make(textDelta("after blocking approval"))
         }),
         unusedExecutor,
-        Approvals.testLayer({
+        Approvals.layerTest({
           resolve: () => (approval === undefined ? Effect.die("missing approval Deferred") : Deferred.await(approval)),
         }),
         ModelMiddleware.layerIdentity,
@@ -2340,9 +2340,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           }
           return Stream.make(textDelta("saw denied permission"))
         }),
-        ToolExecutor.testLayer({ execute: () => Effect.die("permission-denied call must not execute") }),
-        Approvals.testLayer({ resolve: () => Effect.die("permission-denied call must not ask approvals") }),
-        Permissions.fromRuleset({ rules: [{ pattern: "gated", level: "deny" }] }),
+        ToolExecutor.layerTest({ execute: () => Effect.die("permission-denied call must not execute") }),
+        Approvals.layerTest({ resolve: () => Effect.die("permission-denied call must not ask approvals") }),
+        Permissions.layerRuleset({ rules: [{ pattern: "gated", level: "deny" }] }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2375,9 +2375,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           }
           return Stream.make(textDelta("saw approval denial"))
         }),
-        ToolExecutor.testLayer({ execute: () => Effect.die("approval-denied call must not execute") }),
-        Approvals.denyAll,
-        Permissions.allowAll,
+        ToolExecutor.layerTest({ execute: () => Effect.die("approval-denied call must not execute") }),
+        Approvals.layerDenyAll,
+        Permissions.layerAllowAll,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2404,9 +2404,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("tool-call-permission-ask", "gated", { text: "ask" }))),
-        ToolExecutor.testLayer({ execute: () => Effect.die("permission ask must not execute") }),
-        Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
-        Permissions.fromRuleset({ rules: [], fallback: "ask" }),
+        ToolExecutor.layerTest({ execute: () => Effect.die("permission ask must not execute") }),
+        Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
+        Permissions.layerRuleset({ rules: [], fallback: "ask" }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2447,11 +2447,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart("tool-call-permission-approved", "gated", { text: "approved" }))
             : Stream.make(textDelta("after approved permission"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => Effect.succeed({ _tag: "Success", result: "approved", encodedResult: "approved" }),
         }),
-        Approvals.denyAll,
-        Permissions.allowAll,
+        Approvals.layerDenyAll,
+        Permissions.layerAllowAll,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2483,14 +2483,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart("tool-call-permission-always", "gated", { text: "always" }))
             : Stream.make(textDelta("after always"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => Effect.succeed({ _tag: "Success", result: "approved", encodedResult: "approved" }),
         }),
-        Approvals.testLayer({
+        Approvals.layerTest({
           resolve: () => Effect.succeed({ _tag: "Approved", remember: { pattern: "gated", level: "allow" } }),
         }),
-        Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-        Permissions.ruleStoreTestLayer({
+        Permissions.layerRuleset({ rules: [], fallback: "ask" }),
+        Permissions.layerRuleStoreTest({
           remember: (rule) =>
             Effect.sync(() => {
               remembered.push(rule)
@@ -2530,7 +2530,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               ])
             : Stream.make(textDelta("after remembered permission"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) => {
             executions += 1
             return Effect.succeed({
@@ -2540,8 +2540,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             })
           },
         }),
-        Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-        Approvals.testLayer({
+        Permissions.layerRuleset({ rules: [], fallback: "ask" }),
+        Approvals.layerTest({
           resolve: () => {
             asks += 1
             return Effect.succeed({
@@ -2550,7 +2550,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             })
           },
         }),
-        Permissions.ruleStoreMemory(),
+        Permissions.layerRuleStoreMemory(),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2580,7 +2580,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               ])
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) => {
             executions += 1
             return Effect.succeed({
@@ -2590,8 +2590,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             })
           },
         }),
-        Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-        Approvals.testLayer({
+        Permissions.layerRuleset({ rules: [], fallback: "ask" }),
+        Approvals.layerTest({
           resolve: () => {
             resolutions += 1
             return Effect.succeed({
@@ -2628,7 +2628,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           if (modelCalls === 2) return Stream.make(toolCallPart("excluded-static", "echo", { text: "blocked" }))
           return Stream.make(textDelta("after excluded tool"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) => {
             if (request.call.name === "gated") gatedExecutions += 1
             return Effect.succeed({
@@ -2638,7 +2638,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             })
           },
         }),
-        Approvals.testLayer({ resolve: () => Effect.die("excluded tool must not request approval") }),
+        Approvals.layerTest({ resolve: () => Effect.die("excluded tool must not request approval") }),
         ModelMiddleware.layer([
           {
             transformPart: (part) =>
@@ -2699,8 +2699,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               ? Stream.make(textDelta("invalid skill call"))
               : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({ execute: () => Effect.die("excluded skill tool must not execute") }),
-        SkillSource.fromSkills([review]),
+        ToolExecutor.layerTest({ execute: () => Effect.die("excluded skill tool must not execute") }),
+        SkillSource.layerSkills([review]),
         ModelMiddleware.layer([
           {
             transformPart: (part, context) =>
@@ -2742,7 +2742,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("done"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2766,7 +2766,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         }),
         Session.layerMemory,
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2792,9 +2792,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("done"))
         }),
         Session.layerMemory,
-        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2825,7 +2825,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           prompt = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("done"))
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.succeed(
               Option.some({
@@ -2836,7 +2836,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ),
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2871,7 +2871,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           secondPrompt = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () =>
             Effect.succeed({
               _tag: "Success",
@@ -2879,7 +2879,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               encodedResult: "x".repeat(800),
             }),
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.sync(() => {
               measuredTokens.push(request.usage.contextTokens)
@@ -2892,7 +2892,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                 : Option.none()
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2926,7 +2926,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             : Stream.make(textDelta("done"))
         }),
         echoExecutor,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.sync(() => {
               measuredTokens.push(request.usage.contextTokens)
@@ -2936,7 +2936,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             }),
         }),
         characterTokenizerLayer,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -2979,7 +2979,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           },
         ),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         Session.layerMemory,
         Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
         ModelMiddleware.layerIdentity,
@@ -3022,7 +3022,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           () => Effect.succeed([{ type: "text", text: "checkpoint summary" }]),
         ),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         Session.layerMemory,
         Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
         ModelMiddleware.layerIdentity,
@@ -3062,7 +3062,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         }),
         echoExecutor,
         Session.layerMemory,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.sync(() => {
               compactions += 1
@@ -3085,7 +3085,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               )
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3123,10 +3123,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("truncated"))),
         Session.layerMemory,
-        Compaction.testLayer(Compaction.truncate(1)),
+        Compaction.layerTest(Compaction.truncate(1)),
         tokenizer,
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3169,7 +3169,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.die("invalid projection must fail before the model")),
         Session.layerMemory,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.succeed(
               Option.some({
@@ -3180,7 +3180,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ),
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3223,7 +3223,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.die("invalid projection must fail before the model")),
         Session.layerMemory,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.succeed(
               Option.some({
@@ -3234,7 +3234,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ),
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3281,7 +3281,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.empty),
         Session.layerMemory,
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.succeed(
               Option.some({
@@ -3292,7 +3292,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ),
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3328,9 +3328,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.empty),
         Session.layerMemory,
-        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3377,7 +3377,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           },
         ),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         Session.layerMemory,
         Compaction.layer({ contextWindow: 20_000, reserveTokens: 1, keepRecentTokens: 1 }),
         ModelMiddleware.layerIdentity,
@@ -3408,7 +3408,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           retriedPrompt = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("recovered"))
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.sync(() => {
               if (request.overflow) {
@@ -3424,7 +3424,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         }),
         Session.layerMemory,
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3453,7 +3453,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           calls += 1
           return Stream.fail(contextOverflowError("context window overflow"))
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.succeed(
               Option.some({
@@ -3464,7 +3464,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ),
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3489,12 +3489,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             Stream.fail(contextOverflowError("context length exceeded")),
           )
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.succeed(Option.some({ _tag: "Microcompact", history: Prompt.empty, prompt: Prompt.make("retry") })),
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3520,18 +3520,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             providerToolCallPart("provider-before-overflow", "echo", { text: "provider" }),
           ]).pipe(Stream.concat(Stream.fail(contextOverflowError("context length exceeded"))))
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.succeed(Option.some({ _tag: "Microcompact", history: Prompt.empty, prompt: Prompt.make("retry") })),
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () =>
             Effect.sync(() => {
               executions += 1
               return { _tag: "Success" as const, result: "done", encodedResult: "done" }
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3558,12 +3558,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           calls += 1
           return Stream.fail(overflow)
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.succeed(Option.some({ _tag: "Microcompact", history: request.history, prompt: request.prompt })),
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3586,12 +3586,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           calls += 1
           return Stream.fail(contextOverflowError("context length exceeded"))
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () => Effect.succeed(Option.none()),
         }),
         ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3618,7 +3618,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("after steering"))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         Steering.layer({ steering: { mode: "all" } }),
         ModelMiddleware.layerIdentity,
       ),
@@ -3668,7 +3668,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("after first steering"))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         Steering.layer({ steering: { mode: "one-at-a-time" } }),
         ModelMiddleware.layerIdentity,
       ),
@@ -3699,7 +3699,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta(`turn ${calls}`))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         Steering.layer(),
         ModelMiddleware.layerIdentity,
       ),
@@ -3733,7 +3733,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta(`turn ${calls}`))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         Steering.layer({ followUp: { mode: "all" } }),
         ModelMiddleware.layerIdentity,
       ),
@@ -3766,7 +3766,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         Steering.layer(),
         ModelMiddleware.layerIdentity,
       ),
@@ -3799,7 +3799,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           ).pipe(Stream.drain, Stream.concat(Stream.never)),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         Steering.layer(),
         ModelMiddleware.layerIdentity,
       ),
@@ -3839,7 +3839,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("tool-call-waiting-approval", "waiting-approval", { text: "wait" }))),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3872,7 +3872,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           ).pipe(Stream.drain, Stream.concat(Stream.never)),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3911,7 +3911,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           Stream.make(toolCallPart("tool-call-interrupt-approval", "interruptible-approval", { text: "wait" })),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3943,7 +3943,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           ).pipe(Stream.drain, Stream.concat(Stream.fromEffect(Effect.interrupt))),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -3976,7 +3976,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                 calls += 1
                 return Stream.make(toolCallPart("tool-call-abort", "echo", { text: "from model" }))
               }),
-              ToolExecutor.testLayer({
+              ToolExecutor.layerTest({
                 execute: () =>
                   Effect.gen(function* () {
                     const context = yield* ToolContext.ToolContext
@@ -3987,7 +3987,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                     return yield* Effect.never
                   }),
               }),
-              Approvals.autoApprove,
+              Approvals.layerAutoApprove,
               ModelMiddleware.layerIdentity,
             )
           }),
@@ -4021,16 +4021,16 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           secondPrompt = Json.stringify(options.prompt.content)
           return Stream.make(textDelta("after spill"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => Effect.succeed({ _tag: "Success", result: largeOutput, encodedResult: largeOutput }),
         }),
-        ToolOutput.testLayer({
+        ToolOutput.layerTest({
           put: (toolCallId, content) => {
             stored = { toolCallId, content }
             return Effect.succeed(Option.some(`mem:${toolCallId}`))
           },
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4089,7 +4089,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           nextModelPrompt = options.prompt
           return Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) =>
             Effect.succeed({
               _tag: "Success",
@@ -4097,7 +4097,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               encodedResult: `${String((request.call.params as { readonly text: string }).text)}-result-marker`,
             }),
         }),
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([]),
           remember: (input) =>
             Effect.sync(() => {
@@ -4106,8 +4106,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           forget: () => Effect.void,
         }),
         Session.layerMemory,
-        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
-        Approvals.autoApprove,
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4157,7 +4157,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               )
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) =>
             Effect.acquireUseRelease(
               Effect.sync(() => {
@@ -4171,7 +4171,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               () => Effect.sync(() => active--),
             ),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4207,7 +4207,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               )
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) =>
             Effect.acquireUseRelease(
               Effect.gen(function* () {
@@ -4230,7 +4230,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               () => Effect.sync(() => active--),
             ),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4331,7 +4331,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("checkpoint-save", "echo", { text: "persist" }))),
         echoExecutor,
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([]),
           remember: () =>
             Effect.sync(() => {
@@ -4339,7 +4339,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             }),
           forget: () => Effect.void,
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         persistence,
       ),
@@ -4395,7 +4395,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             : Stream.fromIterable([textDelta("after tool"), finishPart("stop", secondUsage)])
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4431,9 +4431,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           () => Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)]),
         ),
         Session.layerMemory,
-        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4482,7 +4482,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           () => Effect.succeed([{ type: "text", text: '{"ok":true}' }, finishPart("stop", structuredUsage)]),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4535,7 +4535,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           },
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4567,7 +4567,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
           ),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
@@ -4605,7 +4605,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           },
         ),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4658,7 +4658,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           () => Effect.succeed([{ type: "text", text: '{"ok":"nope"}' }]),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4698,7 +4698,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           () => Effect.die("structured defect"),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4737,7 +4737,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               : Deferred.succeed(structuredStarted, undefined).pipe(Effect.andThen(Effect.never)),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4786,7 +4786,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           },
           () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
         ),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executions += 1
             return executions === 1
@@ -4794,7 +4794,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               : Effect.succeed({ _tag: "Success", result: "resumed", encodedResult: "resumed" })
           },
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4863,7 +4863,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           },
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         retryTransientModelError,
         ModelMiddleware.layerIdentity,
       ),
@@ -4894,7 +4894,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           },
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
         ModelMiddleware.layerIdentity,
       ),
@@ -4920,7 +4920,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           Stream.fromIterable([textDelta("partial"), Response.makePart("error", { error: streamError })]),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4946,7 +4946,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.fail(streamFailure)))),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4967,7 +4967,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(cause)))),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -4993,7 +4993,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.fromIterable([textDelta("partial"), textDelta("terminal")])),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([
           {
             transformPart: (part) => {
@@ -5027,7 +5027,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.fail(transientModelError)
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5051,7 +5051,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return calls === 1 ? Stream.fail(transientModelError) : Stream.make(textDelta("after retry"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         retryTransientModelError,
         ModelMiddleware.layerIdentity,
       ),
@@ -5077,7 +5077,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.fail(transientModelError)
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelResilience.layer({
           retrySchedule: Schedule.recurs(3),
           classify: () => {
@@ -5109,7 +5109,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.fail(transientModelError)))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
         ModelMiddleware.layerIdentity,
       ),
@@ -5135,7 +5135,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(Response.makePart("error", { error: transientModelError }))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelResilience.layer({
           retrySchedule: Schedule.recurs(3),
           classify: () => {
@@ -5173,14 +5173,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           ambientCalls += 1
           return Stream.make(toolCallPart("tool-call-override-model", "echo", { text: "from model" }))
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) => {
             if (request.overflow) overflowCompactions += 1
             return Effect.succeed(Option.none())
           },
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelResilience.layer({
           retrySchedule: Schedule.recurs(1),
           classify: (error) => (error === overrideOverflow ? "transient" : "terminal"),
@@ -5215,7 +5215,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(toolCallPart(`tool-call-${calls}`, "echo", { text: `call ${calls}` }))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5247,7 +5247,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ),
       ),
       echoExecutor,
-      Approvals.autoApprove,
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
     Effect.gen(function* () {
@@ -5279,7 +5279,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             : Stream.make(textDelta("done after twelve follow-ups"))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5311,7 +5311,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("plain answer"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5339,7 +5339,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           ).pipe(Stream.drain, Stream.concat(Stream.make(toolCallPart(`tool-call-${calls}`, "echo", { text: "go" }))))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5371,7 +5371,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(toolCallPart(`tool-call-${calls}`, "echo", { text: `call ${calls}` }))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         budgetLayer,
       ),
@@ -5410,7 +5410,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(toolCallPart(`tool-call-stop-${calls}`, "echo", { text: `call ${calls}` }))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5443,7 +5443,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("tool-call-policy-failure", "echo", { text: "call" }))),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5468,7 +5468,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("tool-call-stale-policy", "echo", { text: "call" }))),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5496,7 +5496,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("after override"))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5529,7 +5529,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart(`active-tool-${modelCalls}`, "echo", { text: "hidden" }))
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executorCalls += 1
             return Effect.succeed({ _tag: "Success", result: "echoed", encodedResult: "echoed" })
@@ -5560,8 +5560,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       [
         Layer.mergeAll(
           modelLayer(() => Stream.make(toolCallPart("tool-call-wait", "echo", { text: "hold" }))),
-          ToolExecutor.testLayer({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
-          Approvals.autoApprove,
+          ToolExecutor.layerTest({ execute: () => Effect.succeed({ _tag: "Suspend", token: "wait-1" }) }),
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
@@ -5613,7 +5613,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       }
       expect(resultIds).toEqual(expectedResultIds)
     }
-    const executor = ToolExecutor.testLayer({
+    const executor = ToolExecutor.layerTest({
       execute: (request) => {
         if (request.call.id === "tool-call-ordinary") {
           ordinaryExecutions += 1
@@ -5657,7 +5657,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("completed after resume"))
         }),
         executor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5714,7 +5714,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
   ItLayer.make(it, "rejects a resume token that differs from the authoritative suspension checkpoint", () => {
     let checkpoint: Prompt.Prompt | undefined
     let executions = 0
-    const executor = ToolExecutor.testLayer({
+    const executor = ToolExecutor.layerTest({
       execute: () => {
         executions += 1
         return executions === 1
@@ -5726,7 +5726,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("bound-resume", "echo", { text: "original" }))),
         executor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5771,16 +5771,16 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart("authorization-resume", "gated", { text: "resume" }))
             : Stream.make(textDelta("after authorization resume"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executions += 1
             return Effect.succeed({ _tag: "Success", result: "resumed", encodedResult: "resumed" })
           },
         }),
-        Permissions.testLayer({
+        Permissions.layerTest({
           evaluate: () => Effect.succeed({ _tag: "Ask", token: "authorization-token" }),
         }),
-        Approvals.testLayer({
+        Approvals.layerTest({
           resolve: (pending) => {
             approvalResolutions += 1
             return Effect.succeed(approvalResolutions === 1 ? pending : { _tag: "Approved" as const })
@@ -5829,13 +5829,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           modelCalls += 1
           return Stream.make(toolCallPart("authoritative-call", "echo", { text: "original" }))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executorCalls += 1
             return Effect.succeed({ _tag: "Suspend", token: "authoritative-token" })
           },
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5892,7 +5892,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           modelCalls += 1
           return Stream.make(textDelta("must not run"))
         }),
-        ToolExecutor.testLayer({ execute: () => Effect.die("missing checkpoint must not execute") }),
+        ToolExecutor.layerTest({ execute: () => Effect.die("missing checkpoint must not execute") }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5937,7 +5937,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("actual-call", "gated", { text: "actual" }))),
-        ToolExecutor.testLayer({ execute: () => Effect.die("suspended call must not execute") }),
+        ToolExecutor.layerTest({ execute: () => Effect.die("suspended call must not execute") }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -5966,9 +5966,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.make(toolCallPart("bound-call", "gated", { text: "original" }))),
-        ToolExecutor.testLayer({ execute: () => Effect.die("substituted params must not execute") }),
-        Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-        Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
+        ToolExecutor.layerTest({ execute: () => Effect.die("substituted params must not execute") }),
+        Permissions.layerRuleset({ rules: [], fallback: "ask" }),
+        Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -6035,19 +6035,19 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           }
           return Stream.make(textDelta("after resumed skill"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executions += 1
             return Effect.succeed({ _tag: "Success", result: "reviewed", encodedResult: "reviewed" })
           },
         }),
-        Approvals.testLayer({
+        Approvals.layerTest({
           resolve: (pending) => {
             approvalChecks += 1
             return Effect.succeed(approvalChecks === 1 ? { ...pending, token: "skill-approval" } : { _tag: "Approved" })
           },
         }),
-        SkillSource.fromSkills([review]),
+        SkillSource.layerSkills([review]),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -6086,7 +6086,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         Layer.mergeAll(
           modelLayer(() => Stream.make(providerToolCallPart("provider-call", "gated", { text: "done upstream" }))),
           unusedExecutor,
-          Approvals.testLayer({ resolve: () => Effect.die("approvals must not be consulted") }),
+          Approvals.layerTest({ resolve: () => Effect.die("approvals must not be consulted") }),
           ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
@@ -6125,13 +6125,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           }
           return Stream.make(textDelta("resumed"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executions += 1
             return Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" })
           },
         }),
-        Approvals.testLayer({
+        Approvals.layerTest({
           resolve: (pending) => {
             approvalChecks += 1
             return Effect.succeed(
@@ -6214,13 +6214,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             ? Stream.make(toolCallPart("tool-call-dynamic-safe", "dynamic", { amount: 10 }))
             : Stream.make(textDelta("safe executed"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executed += 1
             return Effect.succeed({ _tag: "Success", result: { ok: true }, encodedResult: { ok: true } })
           },
         }),
-        Approvals.testLayer({ resolve: () => Effect.die("approvals must not be consulted") }),
+        Approvals.layerTest({ resolve: () => Effect.die("approvals must not be consulted") }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -6257,7 +6257,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             : Stream.make(textDelta("saw denial"))
         }),
         unusedExecutor,
-        Approvals.testLayer({
+        Approvals.layerTest({
           resolve: () => {
             approvals += 1
             return Effect.succeed({ _tag: "Denied" })
@@ -6317,7 +6317,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             : Stream.make(textDelta("saw denied dynamic approvals"))
         }),
         unusedExecutor,
-        Approvals.testLayer({
+        Approvals.layerTest({
           resolve: () => {
             approvals += 1
             return Effect.succeed({ _tag: "Denied" })
@@ -6358,7 +6358,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             : Stream.make(textDelta("after approval"))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -6388,7 +6388,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return Stream.make(textDelta("saw denial"))
         }),
         unusedExecutor,
-        Approvals.denyAll,
+        Approvals.layerDenyAll,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -6421,7 +6421,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         Layer.mergeAll(
           modelLayer(() => Stream.make(toolCallPart("tool-call-pending", "gated", { text: "please" }))),
           unusedExecutor,
-          Approvals.testLayer({
+          Approvals.layerTest({
             resolve: (pending) => Effect.succeed({ ...pending, token: "approval-1" }),
           }),
           ModelMiddleware.layerIdentity,
@@ -6455,7 +6455,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             : Stream.make(textDelta("done"))
         }),
         echoExecutor,
-        Approvals.testLayer({ resolve: () => Effect.die("approvals must not be consulted") }),
+        Approvals.layerTest({ resolve: () => Effect.die("approvals must not be consulted") }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {

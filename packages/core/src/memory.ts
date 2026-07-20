@@ -136,5 +136,5 @@ export const merge: {
 export const layerNoop: Layer.Layer<Memory> = Layer.succeed(Memory, Memory.of(noop))
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<Memory> =>
+export const layerTest = (implementation: Interface): Layer.Layer<Memory> =>
   Layer.succeed(Memory, Memory.of(implementation))

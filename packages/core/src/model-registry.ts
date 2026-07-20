@@ -248,7 +248,7 @@ export const layer: {
 )
 
 /** @experimental */
-export const combine: {
+export const layerCombined: {
   <E = never, R = never>(
     options?: GovernanceOptions,
   ): (registries: ReadonlyArray<Layer.Layer<ModelRegistry, E, R>>) => Layer.Layer<ModelRegistry, E, R>
@@ -273,7 +273,7 @@ export const combine: {
 export const layerMemory: typeof layer = layer
 
 /** @experimental */
-export const testLayer = (implementation: Interface) => Layer.succeed(ModelRegistry, ModelRegistry.of(implementation))
+export const layerTest = (implementation: Interface) => Layer.succeed(ModelRegistry, ModelRegistry.of(implementation))
 
 /** @experimental */
 export const register = Effect.fn("ModelRegistry.register.call")(function* (input: RegisterInput) {

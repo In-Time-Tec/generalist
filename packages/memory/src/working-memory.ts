@@ -19,7 +19,7 @@ export class SummaryModel extends Context.Service<SummaryModel, LanguageModel.Se
 ) {}
 
 /** @experimental */
-export const summaryModelLayer: Layer.Layer<SummaryModel, never, LanguageModel.LanguageModel> = Layer.effect(
+export const layerSummaryModel: Layer.Layer<SummaryModel, never, LanguageModel.LanguageModel> = Layer.effect(
   SummaryModel,
   LanguageModel.LanguageModel,
 )

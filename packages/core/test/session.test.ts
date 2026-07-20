@@ -423,10 +423,10 @@ describe("Session", () => {
 
   ItLayer.make(
     it,
-    "testLayer provides an exact implementation",
+    "layerTest provides an exact implementation",
     () =>
       [
-        Session.testLayer({
+        Session.layerTest({
           reserveEntryId: Effect.succeed("reserved"),
           append: () => Effect.die("unused"),
           appendCheckpoint: () => Effect.die("unused"),

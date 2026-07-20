@@ -47,7 +47,7 @@ describe("ToolOutput", () => {
   )
 
   ItLayer.make(it, "recovers a typed store failure as bounded inline success", () => [
-    ToolOutput.testLayer({
+    ToolOutput.layerTest({
       put: () => Effect.fail(ToolOutput.ToolOutputError.make({ message: "store unavailable" })),
     }),
     Effect.gen(function* () {
@@ -65,7 +65,7 @@ describe("ToolOutput", () => {
   ])
 
   ItLayer.make(it, "preserves store interruption", () => [
-    ToolOutput.testLayer({ put: () => Effect.interrupt }),
+    ToolOutput.layerTest({ put: () => Effect.interrupt }),
     Effect.gen(function* () {
       const exit = yield* ToolOutput.bound(success("x".repeat(100)), {
         toolCallId: "tool-call-interrupted",
@@ -78,7 +78,7 @@ describe("ToolOutput", () => {
   ])
 
   ItLayer.make(it, "preserves interruption combined with a typed store failure", () => [
-    ToolOutput.testLayer({
+    ToolOutput.layerTest({
       put: () =>
         Effect.failCause(
           Cause.combine(
@@ -126,7 +126,7 @@ describe("ToolOutput", () => {
   ItLayer.make(it, "leaves outputs unchanged when encoded size is within the max", () => {
     let stores = 0
     return [
-      ToolOutput.testLayer({
+      ToolOutput.layerTest({
         put: () => {
           stores += 1
           return Effect.succeed(Option.some("mem:unexpected"))
@@ -149,7 +149,7 @@ describe("ToolOutput", () => {
     let stores = 0
     let stored: unknown
     return [
-      ToolOutput.testLayer({
+      ToolOutput.layerTest({
         put: (_toolCallId, content) => {
           stores += 1
           stored = content
@@ -180,7 +180,7 @@ describe("ToolOutput", () => {
   ItLayer.make(it, "tightens existing ToolOutput values without storing or changing their paths", () => {
     let stores = 0
     return [
-      ToolOutput.testLayer({
+      ToolOutput.layerTest({
         put: () => {
           stores += 1
           return Effect.succeed(Option.some("mem:unexpected"))
@@ -208,7 +208,7 @@ describe("ToolOutput", () => {
   ItLayer.make(it, "does not mistake domain values for canonical ToolOutput values", () => {
     let stores = 0
     return [
-      ToolOutput.testLayer({
+      ToolOutput.layerTest({
         put: () => {
           stores += 1
           return Effect.succeed(Option.some("mem:actual-value"))
@@ -228,7 +228,7 @@ describe("ToolOutput", () => {
   ItLayer.make(it, "recognizes canonical ToolOutput values with omitted optional paths", () => {
     let stores = 0
     return [
-      ToolOutput.testLayer({
+      ToolOutput.layerTest({
         put: () => {
           stores += 1
           return Effect.succeed(Option.some("mem:unexpected"))

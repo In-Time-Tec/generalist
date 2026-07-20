@@ -27,7 +27,7 @@ const echoTool = Tool.make("echo", {
   success: Schema.Unknown,
 })
 
-const unusedExecutor = ToolExecutor.testLayer({
+const unusedExecutor = ToolExecutor.layerTest({
   execute: () => Effect.die("unexpected tool execution"),
 })
 
@@ -82,7 +82,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
             })
           })(),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
           persistenceLayer,
         ),
@@ -108,7 +108,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("ok"))),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
           persistenceLayer,
         ),
@@ -137,7 +137,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("ok"))),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
           persistenceLayer,
         ),
@@ -168,10 +168,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
             () => Effect.succeed([{ type: "text", text: '{"value":"persisted"}' }]),
           ),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
           Session.layerMemory,
-          Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+          Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
           persistenceLayer,
         ),
         Effect.gen(function* () {
@@ -204,7 +204,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           return Stream.make(textDelta("must not run"))
         }),
         unusedExecutor,
-        Approvals.testLayer({ resolve: () => Effect.die("authorization must not run") }),
+        Approvals.layerTest({ resolve: () => Effect.die("authorization must not run") }),
         ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
@@ -274,10 +274,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           () => assistantText("structured-failure-text", "normal answer"),
           () => Effect.succeed([{ type: "text", text: '{"value":"must not persist"}' }]),
         ),
-        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         sessionLayer,
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
@@ -321,7 +321,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
               content.includes("please wait") && content.includes("ordinary complete") && content.includes("echoed")
             return Stream.make(textDelta("done after resume"))
           }),
-          ToolExecutor.testLayer({
+          ToolExecutor.layerTest({
             execute: (request) => {
               if (request.call.id === "tool-call-ordinary") {
                 return Effect.succeed({
@@ -340,9 +340,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
                   })
             },
           }),
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
-          Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+          Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
           Session.layerMemory,
           persistenceLayer,
         ),
@@ -423,7 +423,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
             ? Stream.make(toolCallPart("re-suspend-call", "echo", { text: "wait" }))
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: () => {
             executions += 1
             return executions < 3
@@ -431,9 +431,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
               : Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" })
           },
         }),
-        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         Session.layerMemory,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
@@ -477,10 +477,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           modelCalls += 1
           return Stream.make(textDelta("must not run"))
         }),
-        Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         Session.layerMemory,
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
@@ -584,7 +584,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.die("model must not run after checkpoint failure")),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.succeed(
               Option.some({
@@ -598,7 +598,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         }),
         sessionLayer,
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         failedCheckpointPersistence,
       ),
@@ -630,12 +630,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
               toolCallPart("duplicate-persisted", "echo", { text: "second" }),
             ),
           ),
-          Compaction.testLayer({ maybeCompact: () => Effect.succeed(Option.none()) }),
+          Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
           Session.layerMemory,
-          ToolExecutor.testLayer({
+          ToolExecutor.layerTest({
             execute: () => Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" }),
           }),
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
           persistenceLayer,
         ),
@@ -667,7 +667,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.empty),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.gen(function* () {
               calls += 1
@@ -695,7 +695,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         }),
         Session.layerMemory,
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
@@ -742,7 +742,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.empty),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.gen(function* () {
               calls += 1
@@ -755,7 +755,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
             }),
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
@@ -783,7 +783,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.empty),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.gen(function* () {
               calls += 1
@@ -798,7 +798,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
             }),
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),
@@ -885,7 +885,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     return [
       Layer.mergeAll(
         modelLayer(() => Stream.empty),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: () =>
             Effect.sync(() => {
               compactionCalls += 1
@@ -900,7 +900,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         }),
         sessionLayer,
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         persistenceLayer,
       ),

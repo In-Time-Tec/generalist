@@ -1,0 +1,38 @@
+id: no-misnamed-layer-exports
+language: TypeScript
+severity: error
+message: Exported Layer constructors and values must be named layer or layer<Noun>.
+rule:
+  any:
+    - pattern: "export const $NAME: Layer.Layer<$$$OUTPUT> = $VALUE"
+    - pattern: "export const $NAME: typeof $SOURCE = $VALUE"
+    - pattern: "export const $NAME = ($$$PARAMS): Layer.Layer<$$$OUTPUT> => $BODY"
+    - pattern: "export const $NAME = <$$$GENERICS>($$$PARAMS): Layer.Layer<$$$OUTPUT> => $BODY"
+    - pattern: "export function $NAME($$$PARAMS): Layer.Layer<$$$OUTPUT> { $$$BODY }"
+    - pattern: "export function $NAME<$$$GENERICS>($$$PARAMS): Layer.Layer<$$$OUTPUT> { $$$BODY }"
+    - pattern: "export const $NAME = Layer.$METHOD($$$ARGS)"
+    - pattern: "export const $NAME = ($$$PARAMS) => Layer.$METHOD($$$ARGS)"
+    - pattern: "export const $NAME = <$$$GENERICS>($$$PARAMS) => Layer.$METHOD($$$ARGS)"
+    - pattern: "export const $NAME = Layer.$MEMBER"
+    - pattern: "export const $NAME = $SOURCE"
+    - pattern: "export const $NAME: $TYPE = $VALUE"
+    - pattern: "export { $SOURCE as $NAME }"
+constraints:
+  NAME:
+    all:
+      - not:
+          regex: ^(?:withOpenAiEmbedding|withOpenAiCompatibleEmbedding|withOpenAiOrDeterministic)$
+      - any:
+          - not:
+              regex: ^layer(?:[A-Z][A-Za-z0-9]*)?$
+          - regex: ^layer(?:With|Without)
+  SOURCE:
+    regex: ^layer(?:[A-Z][A-Za-z0-9]*)?$
+  METHOD:
+    regex: ^(?:effect|succeed|sync|unwrap)$
+  MEMBER:
+    regex: ^empty$
+  TYPE:
+    regex: \)\s*:\s*Layer\.Layer
+files:
+  - "packages/*/src/**/*.ts"

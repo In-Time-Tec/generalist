@@ -96,10 +96,10 @@ describe("Steering", () => {
       ] as const,
   )
 
-  ItLayer.make(it, "testLayer provides an exact implementation", () => {
+  ItLayer.make(it, "layerTest provides an exact implementation", () => {
     const recorded: Array<string> = []
     return [
-      Steering.testLayer({
+      Steering.layerTest({
         steer: (item) => Effect.sync(() => recorded.push(String(item.prompt))),
         followUp: (item) => Effect.sync(() => recorded.push(String(item.prompt))),
         takeSteering: Effect.succeed([input("test steer")]),

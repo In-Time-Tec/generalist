@@ -59,7 +59,7 @@ export const makeListing: {
 )
 
 /** @experimental A source built from in-memory skills. */
-export const fromSkills = (skills: ReadonlyArray<Skill>): Layer.Layer<SkillSource> => {
+export const layerSkills = (skills: ReadonlyArray<Skill>): Layer.Layer<SkillSource> => {
   const all = [...skills]
   const byName = new Map(all.map((skill) => [skill.frontmatter.name, skill]))
   return Layer.succeed(
@@ -72,10 +72,10 @@ export const fromSkills = (skills: ReadonlyArray<Skill>): Layer.Layer<SkillSourc
 }
 
 /** @experimental Empty skill source. */
-export const empty: Layer.Layer<SkillSource> = fromSkills([])
+export const layerEmpty: Layer.Layer<SkillSource> = layerSkills([])
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<SkillSource> =>
+export const layerTest = (implementation: Interface): Layer.Layer<SkillSource> =>
   Layer.succeed(SkillSource, SkillSource.of(implementation))
 
 const emptySource: Interface = {

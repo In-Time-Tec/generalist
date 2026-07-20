@@ -487,5 +487,5 @@ export const layerMemory: Layer.Layer<SessionStore> = Layer.effect(
 )
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<SessionStore> =>
+export const layerTest = (implementation: Interface): Layer.Layer<SessionStore> =>
   Layer.succeed(SessionStore, SessionStore.of(implementation))

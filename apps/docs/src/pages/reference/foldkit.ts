@@ -60,7 +60,7 @@ export const foldkitReference = definePage({
           ],
         ],
         [
-          [code("testLayer(implementation)")],
+          [code("layerTest(implementation)")],
           "Layer from an explicit interface; legacy frames/send-only test implementations remain supported",
         ],
       ],
@@ -68,7 +68,7 @@ export const foldkitReference = definePage({
     callout(
       "info",
       "Custom connection provider migration",
-      "Callers of frames and send require no changes. Custom providers typed as AgentConnection.Interface or built with AgentConnection.of must implement scoped session acquisition; testLayer can temporarily adapt a frames/send-only implementation.",
+      "Callers of frames and send require no changes. Custom providers typed as AgentConnection.Interface or built with AgentConnection.of must implement scoped session acquisition; layerTest can temporarily adapt a frames/send-only implementation.",
     ),
     h2("chat-model", "Chat.Model"),
     table(

@@ -207,8 +207,8 @@ describe("providers", () => {
   testLayer(
     Layer.mergeAll(
       Deterministic.withDeterministic({ model: "local" }),
-      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
       unexpectedToolLayer,
     ),
@@ -331,12 +331,12 @@ describe("providers", () => {
 
   testLayer(
     Layer.mergeAll(
-      ModelRegistry.combine([
+      ModelRegistry.layerCombined([
         Deterministic.withDeterministic({ provider: "det-a", model: "model-a" }),
         Deterministic.withDeterministic({ provider: "det-b", model: "model-b" }),
       ]),
-      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
       unexpectedToolLayer,
     ),
@@ -365,7 +365,7 @@ describe("providers", () => {
   })
 
   testLayer(
-    ModelRegistry.combine([
+    ModelRegistry.layerCombined([
       withAnthropicFetch({ model: "claude-test", apiKey }),
       withOpenRouterFetch({ model: "openrouter-test", apiKey }),
     ]),

@@ -220,7 +220,7 @@ describe("Chat", () => {
       expect(Schema.is(Chat.Action)(action)).toBe(true)
     }).pipe(
       provideTestLayer(
-        Connection.testLayer({
+        Connection.layerTest({
           frames: () => Stream.empty,
           send: () => Effect.fail(error),
         }),
@@ -236,7 +236,7 @@ describe("Chat", () => {
       expect(action).toEqual(Chat.FailedAgentCommand({ operation: "send", error, reason: "socket closed" }))
     }).pipe(
       provideTestLayer(
-        Connection.testLayer({
+        Connection.layerTest({
           frames: () => Stream.empty,
           send: () => Effect.fail(error),
         }),
@@ -259,7 +259,7 @@ describe("Chat", () => {
       )
     }).pipe(
       provideTestLayer(
-        Connection.testLayer({
+        Connection.layerTest({
           frames: () => Stream.empty,
           send: () => Effect.fail(error),
         }),
@@ -271,7 +271,7 @@ describe("Chat", () => {
     const commandExit = (send: Connection.Interface["send"]) =>
       Chat.CancelRun({ sessionId: "s-chat" }).effect.pipe(
         provideTestLayer(
-          Connection.testLayer({
+          Connection.layerTest({
             frames: () => Stream.empty,
             send,
           }),
@@ -298,7 +298,7 @@ describe("Chat", () => {
       expect(Exit.isFailure(exit) && Cause.hasFails(exit.cause)).toBe(false)
     }).pipe(
       provideTestLayer(
-        Connection.testLayer({
+        Connection.layerTest({
           frames: () => Stream.empty,
           send: () => Effect.failCause(cause),
         }),

@@ -44,7 +44,7 @@ export const memory = definePage({
       code("summarize: {}"),
       " to ",
       code("WorkingMemory.layer"),
-      " and provide `WorkingMemory.summaryModelLayer` with a language model. Messages that fall out of the window are folded into a running summary instead of being dropped.",
+      " and provide `WorkingMemory.layerSummaryModel` with a language model. Messages that fall out of the window are folded into a running summary instead of being dropped.",
     ),
     h2("semantic-recall", "2. Add semantic recall for long-lived subjects"),
     p(
@@ -64,7 +64,7 @@ export const memory = definePage({
     codeBlock({ label: "semantic-recall.ts", source: semanticRecall }),
     p(
       "To run both kinds of memory on one key, use ",
-      code("combinedLayer"),
+      code("layerCombined"),
       " from ",
       code("@batonfx/memory"),
       ": recall merges items from both, remember writes to both.",

@@ -111,7 +111,7 @@ export const sessionRegistryLayer = SessionRegistry.layerMemory({ agent }).pipe(
     Layer.mergeAll(
       modelLayer,
       toolkitHandlersLayer,
-      Approvals.autoApprove,
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
       persistenceLayer,
     ),

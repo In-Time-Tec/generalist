@@ -151,7 +151,7 @@ export const layer = (overrides: ReadonlyArray<ModelMetadata> = []): Layer.Layer
   Layer.succeed(ModelCatalog, ModelCatalog.of(make(mergeEntries(bundled, overrides))))
 
 /** @experimental */
-export const testLayer = (entries: ReadonlyArray<ModelMetadata>): Layer.Layer<ModelCatalog> =>
+export const layerTest = (entries: ReadonlyArray<ModelMetadata>): Layer.Layer<ModelCatalog> =>
   Layer.succeed(ModelCatalog, ModelCatalog.of(make(entries)))
 
 /** @experimental */

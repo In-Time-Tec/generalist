@@ -29,8 +29,8 @@ const program = Agent.stream(agent, {
   Effect.provide(
     Layer.mergeAll(
       modelLayer,
-      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

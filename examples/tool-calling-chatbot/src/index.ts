@@ -50,7 +50,7 @@ const program = Effect.gen(function* () {
           : Stream.make(textDelta("Boise is sunny and 72°F; no jacket needed."))
       }),
       toolkitLayer,
-      Approvals.autoApprove,
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

@@ -4,7 +4,7 @@ import { Anthropic, OpenRouter } from "@batonfx/providers"
 
 const agent = Agent.make({ name: "router" })
 
-const registryLayer = ModelRegistry.combine([
+const registryLayer = ModelRegistry.layerCombined([
   Anthropic.withAnthropicFetch({ model: "claude-sonnet-4-5", apiKey: Config.redacted("ANTHROPIC_API_KEY") }),
   OpenRouter.withOpenRouterFetch({ model: "openai/gpt-4o-mini", apiKey: Config.redacted("OPENROUTER_API_KEY") }),
 ])
@@ -17,8 +17,8 @@ const program = runWith({ provider: "anthropic", model: "claude-sonnet-4-5" }).p
   Effect.provide(
     Layer.mergeAll(
       registryLayer,
-      ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

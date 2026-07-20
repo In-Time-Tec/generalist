@@ -113,10 +113,10 @@ const sessionRegistryLayer = SessionRegistry.layerMemory({ agent }).pipe(
   Layer.provide(
     Layer.mergeAll(
       modelLayer,
-      ToolExecutor.testLayer({
+      ToolExecutor.layerTest({
         execute: () => Effect.succeed({ _tag: "Success", result: "results", encodedResult: "results" }),
       }),
-      Approvals.autoApprove,
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
       Chat.layerPersisted({ storeId: "research-agent" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
     ),

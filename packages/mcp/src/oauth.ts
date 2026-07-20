@@ -73,11 +73,11 @@ export interface TokenStoreInterface {
 export class TokenStore extends Context.Service<TokenStore, TokenStoreInterface>()("@batonfx/mcp/TokenStore") {}
 
 /** @experimental */
-export const tokenStoreTestLayer = (implementation: TokenStoreInterface): Layer.Layer<TokenStore> =>
+export const layerTokenStoreTest = (implementation: TokenStoreInterface): Layer.Layer<TokenStore> =>
   Layer.succeed(TokenStore, TokenStore.of(implementation))
 
 /** @experimental */
-export const tokenStoreMemoryLayer: Layer.Layer<TokenStore> = Layer.effect(
+export const layerTokenStoreMemory: Layer.Layer<TokenStore> = Layer.effect(
   TokenStore,
   Effect.gen(function* () {
     const values = yield* Ref.make(new Map<string, Redacted.Redacted<string>>())
@@ -392,5 +392,5 @@ export const layer = (configuration: Configuration): Layer.Layer<OAuth, never, T
   )
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<OAuth> =>
+export const layerTest = (implementation: Interface): Layer.Layer<OAuth> =>
   Layer.succeed(OAuth, OAuth.of(implementation))

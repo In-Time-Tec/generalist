@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "@batonfx/core"
 import { McpToolSource } from "@batonfx/mcp"
-import { toolkit, toolkitLayer } from "@batonfx/mcp/baton"
+import { layerToolkit, toolkit } from "@batonfx/mcp/baton"
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const source: McpToolSource.Interface = {
@@ -57,8 +57,8 @@ const program = Effect.gen(function* () {
               )
             : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Found local setup docs." }))
         }),
-        toolkitLayer(source),
-        Approvals.autoApprove,
+        layerToolkit(source),
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
     ),

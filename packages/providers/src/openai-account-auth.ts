@@ -441,17 +441,17 @@ export const layer = (options: TimingOptions = {}) =>
   )
 
 /** @experimental */
-export const hostTestLayer = (implementation: HostInterface): Layer.Layer<OpenAiAccountAuthHost> =>
+export const layerHostTest = (implementation: HostInterface): Layer.Layer<OpenAiAccountAuthHost> =>
   Layer.succeed(OpenAiAccountAuthHost, OpenAiAccountAuthHost.of(implementation))
 
 /** @experimental */
-export const presenterTestLayer = (implementation: PresenterInterface): Layer.Layer<OpenAiAccountDevicePresenter> =>
+export const layerPresenterTest = (implementation: PresenterInterface): Layer.Layer<OpenAiAccountDevicePresenter> =>
   Layer.succeed(OpenAiAccountDevicePresenter, OpenAiAccountDevicePresenter.of(implementation))
 
 /** @experimental */
-export const httpTestLayer = (implementation: HttpInterface): Layer.Layer<OpenAiAccountAuthHttp> =>
+export const layerHttpTest = (implementation: HttpInterface): Layer.Layer<OpenAiAccountAuthHttp> =>
   Layer.succeed(OpenAiAccountAuthHttp, OpenAiAccountAuthHttp.of(implementation))
 
 /** @experimental */
-export const storeTestLayer = (implementation: StoreInterface): Layer.Layer<OpenAiAccountCredentialStore> =>
+export const layerStoreTest = (implementation: StoreInterface): Layer.Layer<OpenAiAccountCredentialStore> =>
   Layer.succeed(OpenAiAccountCredentialStore, OpenAiAccountCredentialStore.of(implementation))

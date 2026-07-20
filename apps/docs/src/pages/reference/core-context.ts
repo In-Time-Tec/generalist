@@ -24,7 +24,7 @@ export const coreContextReference = definePage({
         [[code("staticSource(id, text)")], "A static baseline source; empty text renders nothing"],
         [[code("openEpoch(instructions, context)")], "Renders every source once and returns the joined baseline"],
         [
-          [code("layer(sources)"), " / ", code("testLayer(implementation)")],
+          [code("layer(sources)"), " / ", code("layerTest(implementation)")],
           "Explicit ordered registry; layer from an interface",
         ],
       ],
@@ -79,7 +79,7 @@ export const coreContextReference = definePage({
           ],
         ],
         [
-          [code("fromSkills(skills)"), " / ", code("empty"), " / ", code("testLayer")],
+          [code("layerSkills(skills)"), " / ", code("layerEmpty"), " / ", code("layerTest")],
           "In-memory source, empty source, layer from an interface",
         ],
         [[code("SkillSourceError")], [code("{ source, message, cause? }")]],
@@ -106,7 +106,7 @@ export const coreContextReference = definePage({
       [
         [[code("merge(first, second)")], "Concatenates recalls, fans out remembers"],
         [[code("layerNoop")], "Recalls nothing, remembers nothing"],
-        [[code("testLayer(implementation)")], "Layer from an explicit interface"],
+        [[code("layerTest(implementation)")], "Layer from an explicit interface"],
         [[code("MemoryError")], [code("{ message }")]],
       ],
     ),
@@ -152,7 +152,7 @@ export const coreContextReference = definePage({
       ". ",
       code("Session.layerMemory"),
       " is the Ref-backed non-durable store; ",
-      code("testLayer"),
+      code("layerTest"),
       " wraps an explicit interface. Store failures are ",
       code("SessionStoreError{ message }"),
       "; stale leaves and reused checkpoint identities fail with ",
@@ -219,7 +219,7 @@ export const coreContextReference = definePage({
           ["Truncate-only implementation over an ", code("Ai.Tokenizer"), " when one is provided"],
         ],
         [
-          [code("make(strategy, options?)"), " / ", code("testLayer")],
+          [code("make(strategy, options?)"), " / ", code("layerTest")],
           "Interface from a strategy; layer from an interface",
         ],
       ],
@@ -265,7 +265,7 @@ export const coreContextReference = definePage({
             code("Input = { prompt }"),
           ],
         ],
-        [[code("testLayer(implementation)")], "Layer from an explicit interface"],
+        [[code("layerTest(implementation)")], "Layer from an explicit interface"],
       ],
     ),
     h2("handoff", "Handoff"),

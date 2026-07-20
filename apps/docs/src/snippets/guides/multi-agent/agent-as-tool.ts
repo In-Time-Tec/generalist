@@ -70,8 +70,8 @@ const program = Agent.generate(parent, { prompt: "Summarize the intro document."
     Layer.mergeAll(
       modelLayer,
       parentToolkit.toLayer({ summarize: () => Effect.die("agent tool bridge handles summarize") }),
-      ToolExecutor.fromToolkit(summarizeToolkit),
-      Approvals.autoApprove,
+      ToolExecutor.layerToolkit(summarizeToolkit),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

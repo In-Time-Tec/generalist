@@ -55,5 +55,5 @@ export const layer = (sources: ReadonlyArray<ContextSource>): Layer.Layer<Instru
   Layer.succeed(Instructions, Instructions.of({ sources: [...sources] }))
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<Instructions> =>
+export const layerTest = (implementation: Interface): Layer.Layer<Instructions> =>
   Layer.succeed(Instructions, Instructions.of(implementation))

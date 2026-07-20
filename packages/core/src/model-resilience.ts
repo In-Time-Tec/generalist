@@ -30,7 +30,7 @@ export const layer = (input?: Partial<Interface>): Layer.Layer<ModelResilience> 
   Layer.succeed(ModelResilience, ModelResilience.of(make(input)))
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<ModelResilience> =>
+export const layerTest = (implementation: Interface): Layer.Layer<ModelResilience> =>
   Layer.succeed(ModelResilience, ModelResilience.of(implementation))
 
 const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: Interface): Effect.Effect<A, E, R> =>

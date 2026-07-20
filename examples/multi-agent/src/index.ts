@@ -25,8 +25,8 @@ const program = Handoff.fanOut(children, { concurrency: 2 }).pipe(
   Effect.provide(
     Layer.mergeAll(
       modelLayer,
-      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

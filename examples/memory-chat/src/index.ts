@@ -28,8 +28,8 @@ const program = Effect.gen(function* () {
         const text = content.includes("Ada likes Effect") ? "I remember that Ada likes Effect." : "Stored that fact."
         return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: text }))
       }),
-      ToolExecutor.testLayer({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
       WorkingMemory.layer({ maxMessages: 4 }),
     ),

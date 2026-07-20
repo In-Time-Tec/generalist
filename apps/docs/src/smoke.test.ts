@@ -224,8 +224,8 @@ test("multi-agent guide preserves the two-channel child-run contract", () => {
     '"local"',
     "fresh chat",
     "Effect.provide",
-    "ToolExecutor.fromToolkit",
-    "Approvals.autoApprove",
+    "ToolExecutor.layerToolkit",
+    "Approvals.layerAutoApprove",
     "ModelMiddleware.layerIdentity",
   ]) {
     expect(multiAgent.markdown, marker).toContain(marker)

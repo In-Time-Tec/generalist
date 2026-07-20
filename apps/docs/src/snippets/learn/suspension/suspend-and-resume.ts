@@ -53,7 +53,7 @@ let approvalChecks = 0
 const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ deploy: () => Effect.succeed("deployed api") }),
-  Approvals.testLayer({
+  Approvals.layerTest({
     resolve: (pending) => {
       approvalChecks += 1
       return Effect.succeed<Approvals.Resolution>(

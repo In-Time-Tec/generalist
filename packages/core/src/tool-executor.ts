@@ -201,13 +201,13 @@ export function executeToolkit<Tools extends Record<string, Tool.Any>>(
 }
 
 /** @experimental */
-export function fromToolkit<Tools extends Record<string, Tool.Any>>(
+export function layerToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
 ): Layer.Layer<ToolExecutor>
-export function fromToolkit<Tools extends Record<string, Tool.Any>>(
+export function layerToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.Toolkit<Tools>,
 ): Layer.Layer<ToolExecutor, never, Tool.HandlersFor<Tools>>
-export function fromToolkit<Tools extends Record<string, Tool.Any>>(
+export function layerToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: ToolkitInput<Tools>,
 ): Layer.Layer<ToolExecutor, never, Tool.HandlersFor<Tools>> {
   return Layer.effect(
@@ -376,9 +376,9 @@ const routeInputEffect = <R>(input: RouteInput<R>): Effect.Effect<Route, never, 
   Effect.isEffect(input) ? input : Effect.succeed(input)
 
 /** @experimental */
-export function router(routes: Iterable<Route>): Layer.Layer<ToolExecutor>
-export function router<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R>
-export function router<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R> {
+export function layerRouter(routes: Iterable<Route>): Layer.Layer<ToolExecutor>
+export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R>
+export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R> {
   return Layer.effect(
     ToolExecutor,
     Effect.all(Array.from(routes, routeInputEffect)).pipe(
@@ -403,5 +403,5 @@ export function router<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExec
 }
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<ToolExecutor> =>
+export const layerTest = (implementation: Interface): Layer.Layer<ToolExecutor> =>
   Layer.succeed(ToolExecutor, ToolExecutor.of(implementation))

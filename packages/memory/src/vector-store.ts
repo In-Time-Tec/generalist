@@ -126,5 +126,5 @@ const make = Ref.make(HashMap.empty<string, Embedded>()).pipe(
 export const layerMemory: Layer.Layer<VectorStore> = Layer.effect(VectorStore, make.pipe(Effect.map(VectorStore.of)))
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<VectorStore> =>
+export const layerTest = (implementation: Interface): Layer.Layer<VectorStore> =>
   Layer.succeed(VectorStore, VectorStore.of(implementation))

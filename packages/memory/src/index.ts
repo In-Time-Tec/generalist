@@ -20,7 +20,7 @@ type WithoutSummaryCombinedOptions = CombinedOptions & {
 }
 
 /** @experimental */
-export function combinedLayer(
+export function layerCombined(
   options: CombinedOptions & {
     readonly working: import("./working-memory.js").Options & {
       readonly summarize: import("./working-memory.js").SummarizeOptions
@@ -28,14 +28,14 @@ export function combinedLayer(
   },
 ): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel>
 /** @experimental */
-export function combinedLayer(
+export function layerCombined(
   options?: WithoutSummaryCombinedOptions,
 ): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel>
 /** @experimental */
-export function combinedLayer(
+export function layerCombined(
   options: CombinedOptions,
 ): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel>
-export function combinedLayer(
+export function layerCombined(
   options: CombinedOptions = {},
 ): Layer.Layer<Memory.Memory, never, VectorStore | EmbeddingModel.EmbeddingModel | SummaryModel> {
   return Layer.effect(

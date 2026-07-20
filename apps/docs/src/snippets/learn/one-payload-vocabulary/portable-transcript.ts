@@ -44,7 +44,7 @@ const modelLayer = Layer.effect(
 const layers = Layer.mergeAll(
   modelLayer,
   toolkit.toLayer({ get_weather: () => Effect.succeed("sunny and 72°F") }),
-  Approvals.autoApprove,
+  Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,
 )
 

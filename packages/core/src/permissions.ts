@@ -204,7 +204,7 @@ export const evaluateWithRules: {
 )
 
 /** @experimental Policy from a static ruleset. */
-export const fromRuleset = (ruleset: Ruleset): Layer.Layer<Permissions> =>
+export const layerRuleset = (ruleset: Ruleset): Layer.Layer<Permissions> =>
   Layer.succeed(
     Permissions,
     Permissions.of({
@@ -213,7 +213,7 @@ export const fromRuleset = (ruleset: Ruleset): Layer.Layer<Permissions> =>
   )
 
 /** @experimental Permission policy that allows every call. */
-export const allowAll: Layer.Layer<Permissions> = Layer.succeed(
+export const layerAllowAll: Layer.Layer<Permissions> = Layer.succeed(
   Permissions,
   Permissions.of({
     evaluate: () => Effect.succeed({ _tag: "Allow" }),
@@ -221,7 +221,7 @@ export const allowAll: Layer.Layer<Permissions> = Layer.succeed(
 )
 
 /** @experimental Non-durable in-memory remembered-rule store. */
-export const ruleStoreMemory = (initialRules: ReadonlyArray<Rule> = []): Layer.Layer<RuleStore> =>
+export const layerRuleStoreMemory = (initialRules: ReadonlyArray<Rule> = []): Layer.Layer<RuleStore> =>
   Layer.effect(
     RuleStore,
     Ref.make<ReadonlyArray<Rule>>(initialRules).pipe(
@@ -236,9 +236,9 @@ export const ruleStoreMemory = (initialRules: ReadonlyArray<Rule> = []): Layer.L
   )
 
 /** @experimental */
-export const ruleStoreTestLayer = (implementation: RuleStoreInterface): Layer.Layer<RuleStore> =>
+export const layerRuleStoreTest = (implementation: RuleStoreInterface): Layer.Layer<RuleStore> =>
   Layer.succeed(RuleStore, RuleStore.of(implementation))
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<Permissions> =>
+export const layerTest = (implementation: Interface): Layer.Layer<Permissions> =>
   Layer.succeed(Permissions, Permissions.of(implementation))

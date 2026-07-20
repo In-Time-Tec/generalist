@@ -50,11 +50,11 @@ const cryptoTestLayer = Layer.sync(Crypto.Crypto, () => {
 })
 
 const oauthLayer = OAuth.layer(configuration).pipe(
-  Layer.provide(Layer.merge(OAuth.tokenStoreMemoryLayer, cryptoTestLayer)),
+  Layer.provide(Layer.merge(OAuth.layerTokenStoreMemory, cryptoTestLayer)),
 )
 
 const dynamicOAuthLayer = OAuth.layer(dynamicConfiguration).pipe(
-  Layer.provide(Layer.merge(OAuth.tokenStoreMemoryLayer, cryptoTestLayer)),
+  Layer.provide(Layer.merge(OAuth.layerTokenStoreMemory, cryptoTestLayer)),
 )
 
 interface AsyncProvider {
@@ -139,7 +139,7 @@ describe("OAuth", () => {
     )
   })
 
-  layer(OAuth.tokenStoreMemoryLayer)((methods) => {
+  layer(OAuth.layerTokenStoreMemory)((methods) => {
     methods.effect("stores, loads, and removes redacted tokens in memory", () =>
       Effect.gen(function* () {
         const store = yield* OAuth.TokenStore
@@ -168,7 +168,7 @@ describe("OAuth", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const stored = yield* Ref.make(Option.none<Redacted.Redacted<string>>())
-        const storeLayer = OAuth.tokenStoreTestLayer({
+        const storeLayer = OAuth.layerTokenStoreTest({
           load: () => Ref.get(stored),
           save: (_server, value) => Ref.set(stored, Option.some(value)),
           remove: () => Ref.set(stored, Option.none()),
@@ -222,7 +222,7 @@ describe("OAuth", () => {
         )
         const stored = yield* Ref.make(legacy)
         const saves = yield* Ref.make(0)
-        const storeLayer = OAuth.tokenStoreTestLayer({
+        const storeLayer = OAuth.layerTokenStoreTest({
           load: () => Ref.get(stored).pipe(Effect.map(Option.some)),
           save: (_server, value) =>
             Ref.set(stored, value).pipe(Effect.andThen(Ref.update(saves, (count) => count + 1))),
@@ -274,7 +274,7 @@ describe("OAuth", () => {
 
         yield* Effect.forEach(documents, (document) =>
           Effect.gen(function* () {
-            const storeLayer = OAuth.tokenStoreTestLayer({
+            const storeLayer = OAuth.layerTokenStoreTest({
               load: () => Effect.succeed(Option.some(Redacted.make(document))),
               save: () => Effect.void,
               remove: () => Effect.void,
@@ -306,7 +306,7 @@ describe("OAuth", () => {
   it.effect("fails a legacy migration write through a sanitized typed error", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const storeLayer = OAuth.tokenStoreTestLayer({
+        const storeLayer = OAuth.layerTokenStoreTest({
           load: () =>
             Effect.succeed(Option.some(Redacted.make('{"access_token":"migration-secret","token_type":"Bearer"}'))),
           save: () =>
@@ -567,7 +567,7 @@ describe("OAuth", () => {
           },
         })
         const refreshRequests = yield* Ref.make(0)
-        const storeLayer = OAuth.tokenStoreTestLayer({
+        const storeLayer = OAuth.layerTokenStoreTest({
           load: () => Effect.succeed(Option.some(Redacted.make(storedTokens))),
           save: () =>
             Effect.fail(
@@ -634,7 +634,7 @@ describe("OAuth", () => {
   it.effect("clears local authorization state when token removal fails", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const storeLayer = OAuth.tokenStoreTestLayer({
+        const storeLayer = OAuth.layerTokenStoreTest({
           load: () => Effect.succeed(Option.none()),
           save: () => Effect.void,
           remove: () =>
@@ -761,7 +761,7 @@ describe("OAuth", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const values = yield* Ref.make(new Map<string, Redacted.Redacted<string>>())
-        const storeLayer = OAuth.tokenStoreTestLayer({
+        const storeLayer = OAuth.layerTokenStoreTest({
           load: (server) => Ref.get(values).pipe(Effect.map((entries) => Option.fromUndefinedOr(entries.get(server)))),
           save: (server, tokens) => Ref.update(values, (entries) => new Map(entries).set(server, tokens)),
           remove: (server) =>
@@ -805,7 +805,7 @@ describe("OAuth", () => {
           operation: "load",
           message: "store leaked refresh-token-secret",
         })
-        const storeLayer = OAuth.tokenStoreTestLayer({
+        const storeLayer = OAuth.layerTokenStoreTest({
           load: () => Effect.fail(storeError),
           save: () => Effect.void,
           remove: () => Effect.void,

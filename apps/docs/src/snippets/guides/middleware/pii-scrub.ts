@@ -46,8 +46,8 @@ const program = Agent.generate(agent, { prompt: "My SSN is 123-45-6789, please u
   Effect.provide(
     Layer.mergeAll(
       modelLayer,
-      ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+      Approvals.layerAutoApprove,
       middlewareLayer,
     ),
   ),

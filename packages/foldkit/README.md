@@ -19,13 +19,13 @@ import { Connection } from "@batonfx/foldkit"
 ## Layer graph
 
 ```text
-Connection.testLayer
+Connection.layerTest
 └─ provides Connection.AgentConnection
    └─ session acquisition requires Scope
       └─ program closes it with Effect.scoped
 ```
 
-`testLayer` is a deterministic adapter for examples and tests. Production applications provide an `AgentConnection` backed by a Baton transport client; they do not use this synthetic frame stream.
+`layerTest` is a deterministic adapter for examples and tests. Production applications provide an `AgentConnection` backed by a Baton transport client; they do not use this synthetic frame stream.
 
 ## Runnable program
 
@@ -35,7 +35,7 @@ Checked source: [`../../examples/package-composition-guides/src/foldkit.ts`](../
 import { Console, Effect, Stream } from "effect"
 import { Connection } from "@batonfx/foldkit"
 
-const connectionLayer = Connection.testLayer({
+const connectionLayer = Connection.layerTest({
   frames: () => Stream.make(Connection.ConnectionOpened()),
   send: () => Effect.void,
 })
@@ -63,4 +63,4 @@ The fully provided program has type-level result `Effect<void, never, never>` an
 
 - Current behavior: [FoldKit adapter](../../docs/features/foldkit.md)
 - Deeper example: [deep research agent](../../examples/deep-research-agent/)
-- Existing custom `AgentConnection` providers must implement the scoped `session` acquisition; `testLayer` remains a compatibility adapter for legacy test implementations.
+- Existing custom `AgentConnection` providers must implement the scoped `session` acquisition; `layerTest` remains a compatibility adapter for legacy test implementations.

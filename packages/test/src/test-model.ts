@@ -383,7 +383,7 @@ export const layer: {
 )
 
 /** @experimental */
-export const registryLayer: {
+export const layerRegistry: {
   (
     governance?: ModelRegistry.GovernanceOptions,
   ): (fixtures: ReadonlyArray<Fixture>) => Layer.Layer<ModelRegistry.ModelRegistry>

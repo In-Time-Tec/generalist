@@ -20,11 +20,11 @@ const skill = (
 const listingTokens = (listing: string) => Math.ceil(listing.length / 4)
 
 describe("SkillSource", () => {
-  ItLayer.make(it, "fromSkills returns copied skills and resolves duplicate names with later wins", () => {
+  ItLayer.make(it, "layerSkills returns copied skills and resolves duplicate names with later wins", () => {
     const first = skill("review", "first")
     const second = skill("review", "second")
     return [
-      SkillSource.fromSkills([first, second]),
+      SkillSource.layerSkills([first, second]),
       Effect.gen(function* () {
         const source = yield* SkillSource.SkillSource
 
@@ -41,10 +41,10 @@ describe("SkillSource", () => {
 
   ItLayer.make(
     it,
-    "empty provides no skills",
+    "layerEmpty provides no skills",
     () =>
       [
-        SkillSource.empty,
+        SkillSource.layerEmpty,
         Effect.gen(function* () {
           const source = yield* SkillSource.SkillSource
 
@@ -90,10 +90,10 @@ describe("SkillSource", () => {
 
   ItLayer.make(
     it,
-    "testLayer provides an exact implementation",
+    "layerTest provides an exact implementation",
     () =>
       [
-        SkillSource.testLayer({
+        SkillSource.layerTest({
           all: Effect.succeed([]),
           get: () => Effect.void.pipe(Effect.map(() => undefined as SkillSource.Skill | undefined)),
         }),

@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Agent, Approvals, ModelMiddleware, Response, ToolContext, ToolExecutor } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
-import { route, toolkit, toolkitLayer } from "../src/baton"
+import { layerToolkit, route, toolkit } from "../src/baton"
 import { McpToolSource } from "../src/index"
 import { makeFixture, makeTransportFixture } from "./fixture"
 
@@ -31,7 +31,7 @@ describe("baton adapter", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { source } = yield* makeFixture
-        const handlers = yield* Layer.build(toolkitLayer(source))
+        const handlers = yield* Layer.build(layerToolkit(source))
         expect(handlers).toBeDefined()
         expect(yield* source.callTool("add", { a: 40, b: 2 })).toBe("42")
       }),
@@ -42,7 +42,7 @@ describe("baton adapter", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { source } = yield* makeFixture
-        const handlers = yield* Layer.build(toolkitLayer(source))
+        const handlers = yield* Layer.build(layerToolkit(source))
         expect(handlers).toBeDefined()
         const error = yield* Effect.flip(source.callTool("boom", {}))
         expect(error.message).toContain("boom failed")
@@ -62,7 +62,7 @@ describe("baton adapter", () => {
           ])
           const agent = Agent.make({ name: "mcp-agent", toolkit: tools.toolkit })
           const services = yield* Layer.build(
-            Layer.mergeAll(model.layer, tools.executorLayer, Approvals.autoApprove, ModelMiddleware.layerIdentity),
+            Layer.mergeAll(model.layer, tools.executorLayer, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
           )
           const result = yield* Agent.generate(agent, { prompt: "add the numbers" }).pipe(Effect.provide(services))
           const prompts = yield* model.prompts
@@ -88,7 +88,7 @@ describe("baton adapter", () => {
         ])
         const agent = Agent.make({ name: "mcp-agent", toolkit: tools.toolkit })
         const services = yield* Layer.build(
-          Layer.mergeAll(model.layer, tools.executorLayer, Approvals.autoApprove, ModelMiddleware.layerIdentity),
+          Layer.mergeAll(model.layer, tools.executorLayer, Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
         )
         const events = yield* Agent.stream(agent, { prompt: "call boom" }).pipe(
           Stream.runCollect,

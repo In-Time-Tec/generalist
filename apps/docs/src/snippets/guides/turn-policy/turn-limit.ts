@@ -57,7 +57,7 @@ const program = Effect.gen(function* () {
     Layer.mergeAll(
       modelLayer,
       toolkit.toLayer({ lookup: ({ topic }) => Effect.succeed(`found ${topic}`) }),
-      Approvals.autoApprove,
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

@@ -21,8 +21,8 @@ const registryLayer = SessionRegistry.layerMemory({ agent }).pipe(
   Layer.provide(
     Layer.mergeAll(
       modelLayer,
-      ToolExecutor.testLayer({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
       persistenceLayer,
     ),

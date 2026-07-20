@@ -31,7 +31,7 @@ const gatedEchoTool = Tool.make("gated-echo", {
   needsApproval: true,
 })
 
-const echoExecutor = ToolExecutor.testLayer({
+const echoExecutor = ToolExecutor.layerTest({
   execute: (request) =>
     Effect.succeed({
       _tag: "Success",
@@ -40,7 +40,7 @@ const echoExecutor = ToolExecutor.testLayer({
     }),
 })
 
-const unusedExecutor = ToolExecutor.testLayer({
+const unusedExecutor = ToolExecutor.layerTest({
   execute: () => Effect.die("unexpected tool execution"),
 })
 
@@ -97,7 +97,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("plain output"))),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layerIdentity,
         ),
         Effect.gen(function* () {
@@ -123,7 +123,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
             : Stream.make(textDelta("done"))
         }),
         echoExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([appendMarker("scan")]),
       ),
       Effect.gen(function* () {
@@ -147,7 +147,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("hello world"))),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layer([uppercaseDeltas]),
         ),
         Effect.gen(function* () {
@@ -202,21 +202,21 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
           }
           return assistantText("final", "done")
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) =>
             Effect.sync(() => {
               dispatched.push(request.call.id)
               return { _tag: "Success", result: "result", encodedResult: "result" } as const
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([authorityMiddleware]),
-        Memory.testLayer({
+        Memory.layerTest({
           recall: () => Effect.succeed([]),
           remember: (input) => Effect.sync(() => remembered.push(input)).pipe(Effect.asVoid),
           forget: () => Effect.void,
         }),
-        Compaction.testLayer({
+        Compaction.layerTest({
           maybeCompact: (request) => Effect.sync(() => compactionRequests.push(request)).pipe(Effect.as(Option.none())),
         }),
         Session.layerMemory,
@@ -292,7 +292,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
               )
             : Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) =>
             Effect.sync(() => {
               dispatched.push(request.call.id)
@@ -303,7 +303,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
               } as const
             }),
         }),
-        Approvals.testLayer({
+        Approvals.layerTest({
           resolve: () =>
             Effect.sync(() => {
               approvalChecks += 1
@@ -377,14 +377,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
             toolCallPart("later", "gated-echo", { text: "later" }),
           ),
         ),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) =>
             Effect.sync(() => {
               dispatched.push(request.call.id)
               return { _tag: "Success", result: "result", encodedResult: "result" } as const
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -438,7 +438,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
               return params.text
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
@@ -484,14 +484,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
           }
           return Stream.make(textDelta("done"))
         }),
-        ToolExecutor.testLayer({
+        ToolExecutor.layerTest({
           execute: (request) =>
             Effect.sync(() => {
               dispatched.push(request.call.id)
               return { _tag: "Success", result: "result", encodedResult: "result" } as const
             }),
         }),
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([uniqueReplacement]),
       ),
       Effect.gen(function* () {
@@ -551,7 +551,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
           ),
         ),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([exitMiddleware]),
         persistenceLayer,
       ),
@@ -606,7 +606,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         Layer.mergeAll(
           modelLayer(() => Stream.make(textDelta("hidden"))),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layer([dropDeltas]),
         ),
         Effect.gen(function* () {
@@ -631,7 +631,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
           return Stream.make(textDelta("ok"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([appendMarker("first"), appendMarker("second")]),
       ),
       Effect.gen(function* () {
@@ -655,7 +655,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         Layer.mergeAll(
           modelLayer(() => Stream.make(toolCallPart("tool-call-guard", "echo", { text: "hi" }))),
           unusedExecutor,
-          Approvals.autoApprove,
+          Approvals.layerAutoApprove,
           ModelMiddleware.layer([dropToolCalls]),
         ),
         Effect.gen(function* () {
@@ -681,7 +681,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
           return Stream.make(textDelta("should not run"))
         }),
         unusedExecutor,
-        Approvals.autoApprove,
+        Approvals.layerAutoApprove,
         ModelMiddleware.layer([failingPrompt]),
       ),
       Effect.gen(function* () {

@@ -46,7 +46,7 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "transport-test" }).pipe
 )
 
 const dependencies = (streamText: ModelParams["streamText"]) =>
-  Layer.mergeAll(modelLayer(streamText), Approvals.autoApprove, ModelMiddleware.layerIdentity, persistenceLayer)
+  Layer.mergeAll(modelLayer(streamText), Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, persistenceLayer)
 
 const baseLayers = <Tools extends Record<string, Tool.Any>>(
   agent: Agent.Agent<Tools, LanguageModel.LanguageModel>,
@@ -191,7 +191,12 @@ describe("SessionRegistry.layerMemory", () => {
             onConcurrentMessage: "enqueue",
           }).pipe(
             Layer.provide(
-              Layer.mergeAll(fixture.layer, Approvals.autoApprove, ModelMiddleware.layerIdentity, persistenceLayer),
+              Layer.mergeAll(
+                fixture.layer,
+                Approvals.layerAutoApprove,
+                ModelMiddleware.layerIdentity,
+                persistenceLayer,
+              ),
             ),
           ),
         ),
@@ -748,7 +753,7 @@ describe("SessionRegistry.layerMemory", () => {
                     return "approved"
                   }),
               }),
-              Approvals.testLayer({
+              Approvals.layerTest({
                 resolve: (pending) => Effect.succeed({ ...pending, token: "approval-token" }),
               }),
               ModelMiddleware.layerIdentity,
@@ -803,8 +808,8 @@ describe("SessionRegistry.layerMemory", () => {
                     return "approved"
                   }),
               }),
-              Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
+              Permissions.layerRuleset({ rules: [], fallback: "ask" }),
+              Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -880,8 +885,8 @@ describe("SessionRegistry.layerMemory", () => {
                     return "executed"
                   }),
               }),
-              Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
+              Permissions.layerRuleset({ rules: [], fallback: "ask" }),
+              Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -943,8 +948,8 @@ describe("SessionRegistry.layerMemory", () => {
                     return "executed"
                   }),
               }),
-              Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
+              Permissions.layerRuleset({ rules: [], fallback: "ask" }),
+              Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -998,7 +1003,7 @@ describe("SessionRegistry.layerMemory", () => {
                     return "executed"
                   }),
               }),
-              Permissions.testLayer({
+              Permissions.layerTest({
                 evaluate: () =>
                   Effect.sync(() =>
                     ++evaluations === 2
@@ -1006,7 +1011,7 @@ describe("SessionRegistry.layerMemory", () => {
                       : ({ _tag: "Ask", token: "original-token" } as const),
                   ),
               }),
-              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
+              Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -1070,8 +1075,8 @@ describe("SessionRegistry.layerMemory", () => {
                     return "approved"
                   }),
               }),
-              Permissions.fromRuleset({ rules: [], fallback: "ask" }),
-              Approvals.testLayer({
+              Permissions.layerRuleset({ rules: [], fallback: "ask" }),
+              Approvals.layerTest({
                 resolve: (pending) => {
                   resolutions += 1
                   return Effect.succeed({ ...pending, token: "dynamic-approval" })
@@ -1127,11 +1132,11 @@ describe("SessionRegistry.layerMemory", () => {
                     return "approved"
                   }),
               }),
-              Permissions.ruleStoreTestLayer({
+              Permissions.layerRuleStoreTest({
                 remember: () => Effect.void,
                 rules: Effect.succeed([{ pattern: "remembered_ask", level: "ask" }]),
               }),
-              Approvals.testLayer({ resolve: (pending) => Effect.succeed(pending) }),
+              Approvals.layerTest({ resolve: (pending) => Effect.succeed(pending) }),
               ModelMiddleware.layerIdentity,
               persistenceLayer,
             ),
@@ -1207,7 +1212,7 @@ describe("SessionRegistry.layerMemory", () => {
                     return "approved"
                   }),
               }),
-              Approvals.testLayer({
+              Approvals.layerTest({
                 resolve: (pending) => Effect.succeed({ ...pending, token: "approval-token" }),
               }),
               ModelMiddleware.layerIdentity,
@@ -1258,7 +1263,7 @@ describe("SessionRegistry.layerMemory", () => {
                 return assistantText("reply", "done")
               }),
               toolkit.toLayer({ gated: () => Effect.succeed("approved") }),
-              Approvals.testLayer({
+              Approvals.layerTest({
                 resolve: (pending) =>
                   Effect.sync(() => {
                     approvalChecks += 1

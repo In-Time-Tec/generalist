@@ -19,8 +19,8 @@ export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.Lang
 }).pipe(
   Effect.provide(
     Layer.mergeAll(
-      ToolExecutor.testLayer({ execute: () => Effect.die("no tools in this example") }),
-      Approvals.autoApprove,
+      ToolExecutor.layerTest({ execute: () => Effect.die("no tools in this example") }),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
       compactionLayer,
       ToolOutput.layerMemory,

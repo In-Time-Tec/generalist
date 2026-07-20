@@ -48,8 +48,8 @@ const program = Agent.generate(supervisor.agent, { prompt: "I want a refund for 
     Layer.mergeAll(
       modelLayer,
       supervisorToolkitLayer,
-      ToolExecutor.fromToolkit(supervisor.toolkit),
-      Approvals.autoApprove,
+      ToolExecutor.layerToolkit(supervisor.toolkit),
+      Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),
   ),

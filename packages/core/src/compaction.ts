@@ -480,5 +480,5 @@ export const truncate = (maxTokens: number): Interface => ({
 })
 
 /** @experimental */
-export const testLayer = (implementation: Interface): Layer.Layer<Compaction> =>
+export const layerTest = (implementation: Interface): Layer.Layer<Compaction> =>
   Layer.succeed(Compaction, Compaction.of(implementation))

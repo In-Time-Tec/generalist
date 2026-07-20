@@ -59,7 +59,7 @@ describe("Catalog", () => {
 
   it("exports the catalog namespace and subpath", () => {
     expect(typeof Catalog.layer).toBe("function")
-    expect(typeof Catalog.testLayer).toBe("function")
+    expect(typeof Catalog.layerTest).toBe("function")
     expect(typeof layer).toBe("function")
     expect(ModelCatalog).toBeDefined()
   })

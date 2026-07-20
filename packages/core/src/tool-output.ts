@@ -49,7 +49,7 @@ export const layerMemory: Layer.Layer<ToolOutputStore> = Layer.effect(
 )
 
 /** @experimental */
-export const testLayer = (implementation: StoreInterface): Layer.Layer<ToolOutputStore> =>
+export const layerTest = (implementation: StoreInterface): Layer.Layer<ToolOutputStore> =>
   Layer.succeed(ToolOutputStore, ToolOutputStore.of(implementation))
 
 const encoder = new TextEncoder()
