@@ -107,13 +107,14 @@ export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError
 
 /** @experimental Session append conflict with the active path or checkpoint identity. */
 export class SessionConflict extends Schema.TaggedErrorClass<SessionConflict>()("@batonfx/core/SessionConflict", {
-  reason: Schema.Literals(["stale-leaf", "checkpoint-id-reused", "checkpoint-not-on-active-path"]),
+  reason: Schema.Literals(["stale-leaf", "checkpoint-id-reused", "checkpoint-not-on-active-path", "fenced"]),
   message: Schema.String,
 }) {}
 
-/** @experimental Expected active leaf for a normal Session append. */
+/** @experimental Expected active leaf and host write-ownership token for a normal Session append. */
 export interface AppendOptions {
   readonly expectedLeafId?: EntryId | null
+  readonly ownerToken?: string
 }
 
 /** @experimental Stable exact projection prepared for idempotent append. */
@@ -122,6 +123,7 @@ export interface PreparedCheckpoint {
   readonly parentId: EntryId | null
   readonly projectedHistory: Prompt.Prompt
   readonly summary?: string
+  readonly ownerToken?: string
 }
 
 /** @experimental Authoritative result of an idempotent checkpoint append. */

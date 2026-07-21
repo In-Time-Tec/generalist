@@ -34,6 +34,7 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import { Approvals } from "./approvals.js"
+import { diagnose as diagnoseSessionSync } from "./session-sync.js"
 import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "./compaction.js"
 import { Instructions, openEpoch } from "./instructions.js"
 import { type Item, type Key, Memory, type MemoryError, messageFromRecall, projectTranscript } from "./memory.js"
@@ -338,6 +339,9 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       }
 
       const sessionId = options.sessionId ?? "local"
+      const sessionOwnerToken = options.sessionOwnerToken
+      const sessionAppendOptions = (expectedLeafId: string | null) =>
+        sessionOwnerToken === undefined ? { expectedLeafId } : { expectedLeafId, ownerToken: sessionOwnerToken }
 
       const instructionsService = yield* Effect.serviceOption(Instructions)
       const skillSourceService = yield* Effect.serviceOption(SkillSource)
@@ -711,11 +715,21 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                 return yield* AgentError.make({
                   message: "Session projection is not a prefix of authoritative Chat history",
                   turn,
+                  diagnostics: diagnoseSessionSync({
+                    sessionId,
+                    ...(sessionOwnerToken === undefined ? {} : { ownerToken: sessionOwnerToken }),
+                    durableEntryTags: path.map((entry) => entry._tag),
+                    projection: projection.content,
+                    transcript: transcript.content,
+                  }),
                 })
               }
               let expectedLeafId = path.at(-1)?.id ?? null
               for (const message of transcript.content.slice(cursor.value)) {
-                const appended = yield* session.append({ _tag: "Message", message }, { expectedLeafId })
+                const appended = yield* session.append(
+                  { _tag: "Message", message },
+                  sessionAppendOptions(expectedLeafId),
+                )
                 expectedLeafId = appended.id
               }
               if (expectedLeafId !== (path.at(-1)?.id ?? null)) path = yield* session.path()
@@ -812,6 +826,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                     parentId,
                     projectedHistory: result.history,
                     ...(result._tag === "Summarize" ? { summary: result.summary } : {}),
+                    ...(sessionOwnerToken === undefined ? {} : { ownerToken: sessionOwnerToken }),
                   }),
                 ).pipe(
                   Effect.flatMap((appended) => restore(session.path(appended.leafId))),
