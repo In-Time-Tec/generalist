@@ -11,7 +11,7 @@ bun add effect @batonfx/core @batonfx/providers
 ## Imports
 
 ```ts
-import { Anthropic, Catalog, Deterministic, OpenAi } from "@batonfx/providers"
+import { AmazonBedrock, Anthropic, Catalog, Deterministic, OpenAi } from "@batonfx/providers"
 ```
 
 ## Layer graph
@@ -47,6 +47,26 @@ await Effect.runPromise(program)
 ```
 
 Run `bun examples/package-composition-guides/src/providers.ts`.
+
+## Amazon Bedrock
+
+`AmazonBedrock.layer` registers any Bedrock foundation-model ID, inference-profile ID, or inference-profile ARN and implements Bedrock Runtime `Converse` and `ConverseStream` directly against Effect v4:
+
+```ts
+const providers = AmazonBedrock.layer({
+  model: "us.anthropic.claude-sonnet-4-20250514-v1:0",
+  client: {
+    region: "us-east-1",
+    profile: "production",
+    authMode: "default",
+    recovery: { recover: (_generation) => runConfiguredAwsLogin },
+  },
+})
+```
+
+With no authentication override, the pinned AWS SDK selects its standard Node credential chain or `AWS_BEARER_TOKEN_BEDROCK` where Bedrock bearer authentication is available. `authMode: "default"` selects the named refreshable default-chain adapter; it supports environment/session keys, shared profiles, IAM Identity Center and AWS CLI login caches, assume-role/chained profiles, `credential_process`, web identity, ECS, and IMDS. `authMode: "bearer"` selects bearer authentication and reads the AWS bearer environment variable unless a redacted `bearerToken` is supplied.
+
+Credentials are resolved for each request. An optional secret-free recovery hook is coalesced by rejected credential generation and can run the host's configured login command after an explicit expired-token rejection; Baton then force-refreshes credentials and retries once. Access denial, validation, throttling, quotas, network/TLS errors, 5xx responses, signature mismatch, and arbitrary 403 responses never trigger recovery. Stream failures are never replayed after output is observable. Tests should provide explicit credentials and an in-process request handler or client fixture rather than ambient AWS state.
 
 ## Errors, requirements, and resources
 

@@ -1,4 +1,5 @@
 export * as Anthropic from "./anthropic.js"
+export * as AmazonBedrock from "./amazon-bedrock.js"
 export * as Catalog from "./catalog.js"
 export * as Deterministic from "./deterministic.js"
 export * as Embedding from "./embedding.js"

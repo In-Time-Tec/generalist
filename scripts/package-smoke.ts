@@ -22,6 +22,11 @@ const packedEffectDependencies: Record<(typeof packages)[number], ReadonlyArray<
   transport: ["effect"],
   foldkit: [],
 }
+const packedProviderDependencies = {
+  "@aws-sdk/client-bedrock-runtime": "3.859.0",
+  "@aws-sdk/credential-provider-node": "3.859.0",
+  "@smithy/types": "4.3.1",
+} as const
 
 const exports = [
   "@batonfx/core",
@@ -34,6 +39,7 @@ const exports = [
   "@batonfx/providers/openai-account-auth",
   "@batonfx/providers/openai-account-auth-http",
   "@batonfx/providers/anthropic",
+  "@batonfx/providers/amazon-bedrock",
   "@batonfx/providers/openrouter",
   "@batonfx/providers/openai-compat",
   "@batonfx/providers/deterministic",
@@ -116,6 +122,17 @@ const program = Effect.gen(function* () {
         )
       }
     }
+    if (packageName === "providers") {
+      for (const [dependency, version] of Object.entries(packedProviderDependencies)) {
+        if (manifest.dependencies?.[dependency] !== version) {
+          return yield* Effect.fail(
+            new Error(
+              `@batonfx/providers must pin ${dependency}@${version}; packed ${String(manifest.dependencies?.[dependency])}`,
+            ),
+          )
+        }
+      }
+    }
     if (JSON.stringify(manifest).includes("4.0.0-beta.93")) {
       return yield* Effect.fail(new Error(`@batonfx/${packageName} packed manifest contains Effect beta.93`))
     }
@@ -159,7 +176,7 @@ import { VectorStore } from "@batonfx/memory"
 import { OAuth, McpToolSource } from "@batonfx/mcp"
 import { route as mcpRoute, type BatonTools, type Options as McpRouteOptions } from "@batonfx/mcp/baton"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "@batonfx/skills"
-import { Catalog, OpenAi } from "@batonfx/providers"
+import { AmazonBedrock, Catalog, OpenAi } from "@batonfx/providers"
 import { TestModel } from "@batonfx/test"
 import { SessionRegistry, Sse, Wire, Ws } from "@batonfx/transport"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
@@ -241,12 +258,17 @@ const packageSmokeTool = Tool.make("package_smoke_tool", {
 })
 const packageSmokeToolAgent = Agent.make({ name: "tool-package-smoke", toolkit: Toolkit.make(packageSmokeTool) })
 const providerLayer = OpenAi.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") })
+const bedrockProviderLayer = AmazonBedrock.layer({ model: "us.example.model" })
 const providerCatalogLayer: Layer.Layer<Catalog.ModelCatalog> = Catalog.layer()
 const testModelLayer: Layer.Layer<LanguageModel.LanguageModel> = TestModel.layer([TestModel.text("identity")])
 type ProviderLayerRequirements = Assert<Equal<Layer.Services<typeof providerLayer>, HttpClient.HttpClient>>
 type ProviderLayerFailure = Assert<Equal<Layer.Error<typeof providerLayer>, Config.ConfigError>>
 type ProviderLayerSuccess = Assert<Equal<Layer.Success<typeof providerLayer>, ModelRegistry.ModelRegistry>>
+type BedrockProviderLayerRequirements = Assert<Equal<Layer.Services<typeof bedrockProviderLayer>, never>>
+type BedrockProviderLayerFailure = Assert<Equal<Layer.Error<typeof bedrockProviderLayer>, never>>
+type BedrockProviderLayerSuccess = Assert<Equal<Layer.Success<typeof bedrockProviderLayer>, ModelRegistry.ModelRegistry>>
 void providerLayer
+void bedrockProviderLayer
 void providerCatalogLayer
 void testModelLayer
 const toolFanOut = Handoff.fanOut([{ agent: packageSmokeToolAgent, prompt: "tool" }])
@@ -267,6 +289,9 @@ type ProviderOpenAiAccountAuthHttpSubpath = Assert<
   Equal<ProviderRoot["OpenAiAccountAuthHttp"], typeof import("@batonfx/providers/openai-account-auth-http")>
 >
 type ProviderAnthropicSubpath = Assert<Equal<ProviderRoot["Anthropic"], typeof import("@batonfx/providers/anthropic")>>
+type ProviderAmazonBedrockSubpath = Assert<
+  Equal<ProviderRoot["AmazonBedrock"], typeof import("@batonfx/providers/amazon-bedrock")>
+>
 type ProviderOpenRouterSubpath = Assert<Equal<ProviderRoot["OpenRouter"], typeof import("@batonfx/providers/openrouter")>>
 type ProviderOpenAiCompatibleSubpath = Assert<
   Equal<ProviderRoot["OpenAiCompatible"], typeof import("@batonfx/providers/openai-compat")>

@@ -29,6 +29,10 @@
       "types": "./dist/anthropic.d.ts",
       "import": "./dist/anthropic.js"
     },
+    "./amazon-bedrock": {
+      "types": "./dist/amazon-bedrock.d.ts",
+      "import": "./dist/amazon-bedrock.js"
+    },
     "./openrouter": {
       "types": "./dist/openrouter.d.ts",
       "import": "./dist/openrouter.js"
@@ -57,11 +61,14 @@
     "typecheck": "bun tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "catalog:",
+    "@aws-sdk/credential-provider-node": "catalog:",
     "@batonfx/core": "workspace:*",
     "@effect/ai-anthropic": "catalog:",
     "@effect/ai-openai": "catalog:",
     "@effect/ai-openai-compat": "catalog:",
     "@effect/ai-openrouter": "catalog:",
+    "@smithy/types": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
