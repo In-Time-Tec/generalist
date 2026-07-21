@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0
+
+- Add the Effect v4 Amazon Bedrock provider with Converse and ConverseStream, tool and structured-output support, signed and redacted reasoning, AWS default-chain and bearer authentication, refreshable per-request credentials, and narrowly gated coalesced expired-credential recovery. Import it as `AmazonBedrock` from `@batonfx/providers` or from `@batonfx/providers/amazon-bedrock`.
+
 ## 0.7.1
 
 - Normalize nested OpenAI Responses SSE `error` frames to the flat shape the Effect AI stream schema expects, for both API-key and account registrations. Transient provider server errors now surface as decoded error parts carrying the provider message and request id instead of failing the stream with an `InvalidOutputError` decode error. `OpenAi.normalizeResponsesSse` is exported for custom clients.
