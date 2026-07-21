@@ -59,6 +59,11 @@ const historyText = (chatId: string) =>
     return Json.stringify(history.content)
   })
 
+const toolResultIds = (prompt: Prompt.Prompt) =>
+  prompt.content.flatMap((message) =>
+    message.role === "tool" ? message.content.flatMap((part) => (part.type === "tool-result" ? [part.id] : [])) : [],
+  )
+
 const systemMessageCount = (chatId: string) =>
   Effect.gen(function* () {
     const persistence = yield* Chat.Persistence
@@ -297,120 +302,122 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     ] as const
   })
 
-  ItLayer.make(
-    it,
-    "suspend/save: a suspended run persists the pending tool call and resumes from stored context",
-    () => {
-      let calls = 0
-      let suspendedExecutions = 0
-      let resumeSawStoredContext = false
-      return [
-        Layer.mergeAll(
-          modelLayer((options) => {
-            calls += 1
-            if (calls === 1) {
-              return Stream.fromIterable([
-                toolCallPart("tool-call-ordinary", "echo", { text: "ordinary" }),
-                toolCallPart("tool-call-suspend", "echo", { text: "hold" }),
-              ])
-            }
-            // After resume, the model turn runs on the persisted chat and must
-            // see the earlier user message from stored context.
-            const content = Json.stringify(options.prompt.content)
-            resumeSawStoredContext =
-              content.includes("please wait") && content.includes("ordinary complete") && content.includes("echoed")
-            return Stream.make(textDelta("done after resume"))
-          }),
-          ToolExecutor.layerTest({
-            execute: (request) => {
-              if (request.call.id === "tool-call-ordinary") {
-                return Effect.succeed({
-                  _tag: "Success",
-                  result: { text: "ordinary complete" },
-                  encodedResult: { text: "ordinary complete" },
-                })
+  ItLayer.make(it, "checkpoints concurrent sibling results before suspension and resumes only unresolved calls", () => {
+    const callIds = [
+      "tool-call-suspend",
+      "tool-call-ordinary-1",
+      "tool-call-ordinary-2",
+      "tool-call-ordinary-3",
+      "tool-call-ordinary-4",
+      "tool-call-ordinary-5",
+      "tool-call-ordinary-6",
+    ] as const
+    const resultOrder = [
+      "tool-call-ordinary-1",
+      "tool-call-ordinary-2",
+      "tool-call-ordinary-3",
+      "tool-call-suspend",
+      "tool-call-ordinary-4",
+      "tool-call-ordinary-5",
+      "tool-call-ordinary-6",
+    ] as const
+    const executions = new Map<string, number>()
+    const starts: Array<string> = []
+    const interruptions: Array<string> = []
+    let earlyCompleted: Deferred.Deferred<void> | undefined
+    let earlyCompletions = 0
+    let resuming = false
+    let modelCalls = 0
+    let nextModelResultIds: ReadonlyArray<string> = []
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.fromIterable(callIds.map((id) => toolCallPart(id, "echo", { text: id })))
+          }
+          nextModelResultIds = toolResultIds(options.prompt)
+          return Stream.make(textDelta("done after resume"))
+        }),
+        ToolExecutor.layerTest({
+          execute: (request) =>
+            Effect.gen(function* () {
+              const id = request.call.id
+              const attempt = (executions.get(id) ?? 0) + 1
+              executions.set(id, attempt)
+              starts.push(id)
+              if (id === "tool-call-suspend" && attempt === 1) {
+                if (earlyCompleted === undefined) return yield* Effect.die("missing execution barrier")
+                yield* Deferred.await(earlyCompleted)
+                yield* Effect.yieldNow
+                yield* Effect.yieldNow
+                return { _tag: "Suspend" as const, token: "wait-token" }
               }
-              suspendedExecutions += 1
-              return suspendedExecutions === 1
-                ? Effect.succeed({ _tag: "Suspend", token: "wait-token" })
-                : Effect.succeed({
-                    _tag: "Success",
-                    result: { echoed: request.call.params },
-                    encodedResult: { echoed: request.call.params },
-                  })
-            },
-          }),
-          Approvals.layerAutoApprove,
-          ModelMiddleware.layerIdentity,
-          Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
-          Session.layerMemory,
-          persistenceLayer,
-        ),
-        Effect.gen(function* () {
-          const agent = Agent.make({
-            name: "suspend-agent",
-            instructions: "system",
-            toolkit: Toolkit.make(echoTool),
-          })
-
-          const failure = yield* Effect.flip(
-            Stream.runDrain(Agent.stream(agent, { prompt: "please wait", persistence: { chatId: "s1" } })),
-          )
-
-          expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
-          if (failure._tag !== "@batonfx/core/AgentSuspended") return expect.unreachable()
-          const suspendedTranscript = yield* historyText("s1")
-          // The assistant turn carrying the pending tool call survived to the store.
-          expect(suspendedTranscript).toContain("tool-call-suspend")
-          expect(suspendedTranscript).toContain("tool-call-ordinary")
-          expect(suspendedTranscript).toContain("ordinary complete")
-          const persistence = yield* Chat.Persistence
-          const suspendedChat = yield* persistence.get("s1")
-          const suspendedHistory = yield* Ref.get(suspendedChat.history)
-          const session = yield* Session.SessionStore
-          expect(Session.buildContext(yield* session.path()).content).toEqual(suspendedHistory.content)
-
-          const mismatch = yield* Agent.stream(agent, {
-            prompt: "ignored",
-            persistence: { chatId: "s1" },
-            resume: {
-              suspension: AgentEvent.AgentSuspended.make({ ...failure, token: "stale-token" }),
-            },
-          }).pipe(Stream.runDrain, Effect.flip)
-
-          expect(mismatch._tag).toBe("@batonfx/core/ResumeMismatch")
-          expect(yield* historyText("s1")).toBe(suspendedTranscript)
-          expect(suspendedExecutions).toBe(1)
-
-          const events = yield* Stream.runCollect(
-            Agent.stream(agent, {
-              prompt: "ignored",
-              persistence: { chatId: "s1" },
-              resume: { suspension: failure },
+              if (["tool-call-ordinary-1", "tool-call-ordinary-2", "tool-call-ordinary-3"].includes(id)) {
+                earlyCompletions += 1
+                if (earlyCompletions === 3 && earlyCompleted !== undefined) {
+                  yield* Deferred.succeed(earlyCompleted, undefined)
+                }
+              } else if (!resuming) {
+                return yield* Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(() => interruptions.push(id))))
+              }
+              return { _tag: "Success" as const, result: id, encodedResult: id }
             }),
-          )
+        }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Session.layerMemory,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        earlyCompleted = yield* Deferred.make<void>()
+        const agent = Agent.make({
+          name: "suspend-agent",
+          instructions: "system",
+          toolkit: Toolkit.make(echoTool),
+          toolExecution: { concurrency: 4 },
+        })
 
-          expect(events.at(-1)?._tag).toBe("Completed")
-          expect(resumeSawStoredContext).toBe(true)
-          const completedTranscript = yield* historyText("s1")
-          const duplicate = yield* Agent.stream(agent, {
+        const failure = yield* Effect.flip(
+          Stream.runDrain(Agent.stream(agent, { prompt: "please wait", persistence: { chatId: "s1" } })),
+        )
+
+        expect(failure._tag).toBe("@batonfx/core/AgentSuspended")
+        if (failure._tag !== "@batonfx/core/AgentSuspended") return expect.unreachable()
+        resuming = true
+        const persistence = yield* Chat.Persistence
+        const suspendedChat = yield* persistence.get("s1")
+        const suspendedHistory = yield* Ref.get(suspendedChat.history)
+        const session = yield* Session.SessionStore
+        expect(starts).toEqual(callIds.slice(0, 4))
+        expect(interruptions).toEqual([])
+        expect(toolResultIds(suspendedHistory)).toEqual([
+          "tool-call-ordinary-1",
+          "tool-call-ordinary-2",
+          "tool-call-ordinary-3",
+        ])
+        expect(Session.buildContext(yield* session.path()).content).toEqual(suspendedHistory.content)
+
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, {
             prompt: "ignored",
             persistence: { chatId: "s1" },
             resume: { suspension: failure },
-          }).pipe(Stream.runDrain, Effect.flip)
+          }),
+        )
 
-          expect(duplicate).toMatchObject({
-            _tag: "@batonfx/core/ResumeMismatch",
-            reason: "checkpoint-not-found",
-            received: failure,
-          })
-          expect(yield* historyText("s1")).toBe(completedTranscript)
-          expect(suspendedExecutions).toBe(2)
-          expect(calls).toBe(2)
-        }),
-      ] as const
-    },
-  )
+        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(nextModelResultIds).toEqual(resultOrder)
+        expect(executions).toEqual(new Map(callIds.map((id) => [id, id === "tool-call-suspend" ? 2 : 1])))
+        const completedChat = yield* persistence.get("s1")
+        const completedHistory = yield* Ref.get(completedChat.history)
+        expect(toolResultIds(completedHistory)).toEqual(resultOrder)
+        expect(Session.buildContext(yield* session.path()).content).toEqual(completedHistory.content)
+        expect(modelCalls).toBe(2)
+      }),
+    ] as const
+  })
 
   ItLayer.make(it, "checkpoints a changed token when a persisted call re-suspends", () => {
     let executions = 0
