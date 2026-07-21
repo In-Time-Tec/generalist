@@ -9,6 +9,7 @@ export interface SuspensionCheckpoint {
   readonly call: Prompt.ToolCallPart
   readonly messages: ReadonlyArray<Prompt.Message>
   readonly suspension: AgentSuspended
+  readonly unresolvedToolCallIndexes: ReadonlyArray<number>
 }
 
 export const suspensionCheckpointOption = "@batonfx/core/suspension" as const
@@ -32,6 +33,7 @@ export const unresolvedToolCall = (
       readonly messageIndex: number
       readonly partIndex: number
       readonly toolCallBatch: ReadonlyArray<AnyToolCall>
+      readonly unresolvedToolCallIndexes: ReadonlyArray<number>
     }
   | undefined => {
   interface Occurrence {
@@ -72,6 +74,9 @@ export const unresolvedToolCall = (
         )
       : unresolved.find(({ call }) => call.id === toolCallId)
   const pendingMessage = pending === undefined ? undefined : messages[pending.messageIndex]
+  const unresolvedParts = new Set(
+    unresolved.filter(({ messageIndex }) => messageIndex === pending?.messageIndex).map(({ partIndex }) => partIndex),
+  )
   const toolCallBatch =
     pendingMessage?.role === "assistant"
       ? pendingMessage.content.flatMap((part) =>
@@ -87,6 +92,19 @@ export const unresolvedToolCall = (
             : [],
         )
       : []
+  const unresolvedToolCallIndexes =
+    pendingMessage?.role === "assistant"
+      ? (() => {
+          const indexes: Array<number> = []
+          let toolCallIndex = 0
+          for (const [partIndex, part] of pendingMessage.content.entries()) {
+            if (part.type !== "tool-call" || part.providerExecuted) continue
+            if (unresolvedParts.has(partIndex)) indexes.push(toolCallIndex)
+            toolCallIndex += 1
+          }
+          return indexes
+        })()
+      : []
   return pending !== undefined
     ? {
         call: pending.call,
@@ -94,6 +112,7 @@ export const unresolvedToolCall = (
         messageIndex: pending.messageIndex,
         partIndex: pending.partIndex,
         toolCallBatch,
+        unresolvedToolCallIndexes,
       }
     : undefined
 }
@@ -113,6 +132,7 @@ export const suspensionCheckpoint = (messages: ReadonlyArray<Prompt.Message>): S
   return {
     call: unresolved.call,
     messages: unresolved.messages,
+    unresolvedToolCallIndexes: unresolved.unresolvedToolCallIndexes,
     suspension: AgentSuspended.make({
       ...metadata.value,
       tool_call_batch: unresolved.toolCallBatch,

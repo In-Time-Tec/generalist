@@ -5711,6 +5711,112 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "starts concurrent suspending sibling calls and completes them across resume", () => {
+    const callIds = ["delegation-first", "delegation-second", "delegation-third"] as const
+    const executions = new Map<string, number>()
+    let allStarted: Deferred.Deferred<void> | undefined
+    let checkpoint: Prompt.Prompt | undefined
+    let modelCalls = 0
+    let phase = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.fromIterable(callIds.map((id) => toolCallPart(id, "echo", { text: id })))
+            : Stream.make(textDelta("all delegations completed"))
+        }),
+        ToolExecutor.layerTest({
+          execute: (request) =>
+            Effect.gen(function* () {
+              const id = request.call.id
+              executions.set(id, (executions.get(id) ?? 0) + 1)
+              if (phase === 0) {
+                if (executions.size === callIds.length && allStarted !== undefined) {
+                  yield* Deferred.succeed(allStarted, undefined)
+                }
+                if (allStarted === undefined) return yield* Effect.die("missing delegation barrier")
+                yield* Deferred.await(allStarted)
+                return { _tag: "Suspend" as const, token: `wait-${id}` }
+              }
+              if (phase === 1 && id !== "delegation-first") {
+                return { _tag: "Suspend" as const, token: `wait-again-${id}` }
+              }
+              return { _tag: "Success" as const, result: id, encodedResult: id }
+            }),
+        }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        Session.layerMemory,
+      ),
+      Effect.gen(function* () {
+        allStarted = yield* Deferred.make<void>()
+        const agent = Agent.make({
+          name: "concurrent-suspending-delegations",
+          toolkit: Toolkit.make(echoTool),
+          toolExecution: { concurrency: 3 },
+        })
+        const suspension = yield* Agent.stream(agent, { prompt: "delegate concurrently" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (suspension._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing concurrent suspension checkpoint")
+        }
+        expect([...executions.keys()]).toEqual(callIds)
+
+        phase = 1
+        let secondCheckpoint: Prompt.Prompt | undefined
+        const secondSuspension = yield* Agent.stream(agent, {
+          prompt: "ignored",
+          history: checkpoint,
+          resume: { suspension },
+        }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") secondCheckpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (secondSuspension._tag !== "@batonfx/core/AgentSuspended" || secondCheckpoint === undefined) {
+          return yield* Effect.die("missing second concurrent suspension checkpoint")
+        }
+        expect(secondSuspension.tool_call_id).toBe("delegation-second")
+
+        phase = 2
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, {
+            prompt: "ignored",
+            history: secondCheckpoint,
+            resume: { suspension: secondSuspension },
+          }),
+        )
+
+        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(executions).toEqual(
+          new Map([
+            ["delegation-first", 2],
+            ["delegation-second", 3],
+            ["delegation-third", 2],
+          ]),
+        )
+        const completed = events.at(-1)
+        if (completed?._tag !== "Completed") return yield* Effect.die("missing completed transcript")
+        const session = yield* Session.SessionStore
+        expect(Session.buildContext(yield* session.path()).content).toEqual(completed.transcript.content)
+        expect(modelCalls).toBe(2)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "rejects a resume token that differs from the authoritative suspension checkpoint", () => {
     let checkpoint: Prompt.Prompt | undefined
     let executions = 0

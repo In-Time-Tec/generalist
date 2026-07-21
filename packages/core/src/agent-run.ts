@@ -508,20 +508,23 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             ...(suspension.activated_skills === undefined ? {} : { activated_skills: suspension.activated_skills }),
           }
           const messages = withPending.content.map((message, messageIndex): Prompt.Message => {
-            if (messageIndex !== unresolved.messageIndex || message.role !== "assistant") return message
+            if (message.role !== "assistant") return message
             return Prompt.makeMessage("assistant", {
-              content: message.content.map(
-                (part, partIndex): Prompt.AssistantMessagePart =>
-                  partIndex === unresolved.partIndex && part.type === "tool-call"
-                    ? Prompt.makePart("tool-call", {
-                        id: part.id,
-                        name: part.name,
-                        params: part.params,
-                        providerExecuted: part.providerExecuted,
-                        options: { ...part.options, [suspensionCheckpointOption]: metadata },
-                      })
-                    : part,
-              ),
+              content: message.content.map((part, partIndex): Prompt.AssistantMessagePart => {
+                if (part.type !== "tool-call") return part
+                const partOptions = { ...part.options }
+                delete partOptions[suspensionCheckpointOption]
+                if (messageIndex === unresolved.messageIndex && partIndex === unresolved.partIndex) {
+                  partOptions[suspensionCheckpointOption] = metadata
+                }
+                return Prompt.makePart("tool-call", {
+                  id: part.id,
+                  name: part.name,
+                  params: part.params,
+                  providerExecuted: part.providerExecuted,
+                  options: partOptions,
+                })
+              }),
               options: message.options,
             })
           })
@@ -543,21 +546,16 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
         appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint)))
 
-      const failSuspended = (
-        call: AnyToolCall,
-        toolCallBatch: Request["toolCallBatch"],
-        toolCallIndex: number,
-        token: string,
-        reason: "tool-wait" | "approval",
-      ) => Stream.fail<RunError>(suspended(call, toolCallBatch, toolCallIndex, token, reason))
-
       const state = {
         text: "",
         turn: 0,
-        pending: [] as Array<PendingToolResult>,
+        pending: new Map<number, PendingToolResult>(),
         finish: undefined as { readonly usage: Response.Usage; readonly reason: Response.FinishReason } | undefined,
         usage: undefined as Response.Usage | undefined,
       }
+
+      const pendingResults = (): ReadonlyArray<PendingToolResult> =>
+        [...state.pending.entries()].toSorted(([left], [right]) => left - right).map(([, result]) => result)
 
       const toolState = yield* Ref.make({
         registry: initialRegistry,
@@ -905,7 +903,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               Effect.map((bounded) => successResult(call, bounded)),
             )
 
-      const outcomeEvents = (
+      const outcomeEvent = (
         turn: number,
         toolCallBatch: Request["toolCallBatch"],
         toolCallIndex: number,
@@ -913,27 +911,24 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         outcome: Outcome,
         droppedProgress: number,
         registry: Registry,
-      ): Effect.Effect<Stream.Stream<Event, RunError>, AgentError> => {
+      ): Effect.Effect<Event, RunError> => {
         const metadata = droppedProgress === 0 ? {} : { metadata: { toolProgress: { dropped: droppedProgress } } }
+        const completed = (result: PendingToolResult): Effect.Effect<Event> =>
+          Effect.sync(() => {
+            state.pending.set(toolCallIndex, result)
+            return { _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }
+          })
         switch (outcome._tag) {
           case "Success":
             return (
               isSkillActivationCall(call, registry)
                 ? Effect.succeed(successResult(call, outcome))
                 : boundedSuccessResult(call, outcome)
-            ).pipe(
-              Effect.map((result) =>
-                Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }]),
-              ),
-            )
-          case "DomainFailure": {
-            const result = domainFailureResult(call, outcome)
-            return Effect.succeed(
-              Stream.fromIterable<Event>([{ _tag: "ToolExecutionCompleted", turn, call, result, ...metadata }]),
-            )
-          }
+            ).pipe(Effect.flatMap(completed))
+          case "DomainFailure":
+            return completed(domainFailureResult(call, outcome))
           case "Suspend":
-            return Effect.succeed(failSuspended(call, toolCallBatch, toolCallIndex, outcome.token, "tool-wait"))
+            return Effect.fail(suspended(call, toolCallBatch, toolCallIndex, outcome.token, "tool-wait"))
         }
       }
 
@@ -1044,33 +1039,29 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                             : error,
                         ),
                       )
-              const fiber = yield* execution.pipe(
-                Effect.provideService(ToolContext, context),
-                Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
-                Effect.forkScoped({ startImmediately: true }),
-              )
-              return Stream.concat(
-                Stream.fromQueue(progressQueue),
-                Stream.fromEffect(Fiber.join(fiber)).pipe(
-                  Stream.flatMap((outcome) =>
-                    Stream.unwrap(
-                      Ref.get(droppedProgress).pipe(
-                        Effect.flatMap((dropped) =>
-                          outcomeEvents(
-                            turn,
-                            request.toolCallBatch,
-                            request.toolCallIndex,
-                            call,
-                            outcome,
-                            dropped,
-                            registry,
-                          ),
+              const fiber = yield* Effect.uninterruptibleMask((restore) =>
+                restore(execution.pipe(Effect.provideService(ToolContext, context))).pipe(
+                  Effect.flatMap((outcome) =>
+                    Ref.get(droppedProgress).pipe(
+                      Effect.flatMap((dropped) =>
+                        outcomeEvent(
+                          turn,
+                          request.toolCallBatch,
+                          request.toolCallIndex,
+                          call,
+                          outcome,
+                          dropped,
+                          registry,
                         ),
                       ),
                     ),
                   ),
                 ),
+              ).pipe(
+                Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
+                Effect.forkScoped({ startImmediately: true }),
               )
+              return Stream.concat(Stream.fromQueue(progressQueue), Stream.fromEffect(Fiber.join(fiber)))
             }),
           ),
         )
@@ -1316,11 +1307,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         return modelPart
       }
 
-      const recordPending = (event: Event): Effect.Effect<void> =>
-        Effect.sync(() => {
-          if (event._tag === "ToolExecutionCompleted") state.pending.push(event.result)
-        })
-
       const transformPart = (
         turn: number,
         part: Response.StreamPart<any>,
@@ -1528,7 +1514,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                         Stream.flatMap(({ call, messages, toolCallIndex }) =>
                           toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
                         ),
-                        Stream.tap(recordPending),
                       )
                     : executionStreams.pipe(
                         Stream.mapEffect(
@@ -1539,7 +1524,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                           { concurrency },
                         ),
                         Stream.flatMap(Stream.fromIterable),
-                        Stream.tap(recordPending),
                       )
                 }),
               )
@@ -1678,7 +1662,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         R
       > =>
         Effect.gen(function* () {
-          const pending = state.pending
+          const pending = pendingResults()
           const transcript = yield* checkpointPending(turn, pending)
           const path = yield* syncSession(turn, transcript)
           yield* rememberTurn(turn, transcript, pending.length === 0, path)
@@ -1738,7 +1722,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               ),
             }
           }
-          state.pending = []
+          state.pending.clear()
           const steering = yield* takeSteering()
           const basePrompt = steering.length === 0 ? Prompt.empty : promptFromSteeringInputs(steering)
           const prompt =
@@ -1833,14 +1817,17 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                     }),
                   )
                   const toolCallBatch: Request["toolCallBatch"] = { calls }
-                  const startIndex = suspension.tool_call_index ?? 0
-                  if (calls[startIndex] === undefined) {
+                  const suspendedIndex = suspension.tool_call_index ?? 0
+                  if (calls[suspendedIndex] === undefined) {
                     return Stream.fail(
                       AgentError.make({ message: "Suspension tool call index is outside its batch", turn: 0 }),
                     )
                   }
                   const executions = Stream.fromIterable(
-                    calls.slice(startIndex).map((call, offset) => ({ call, toolCallIndex: startIndex + offset })),
+                    checkpoint.unresolvedToolCallIndexes.map((toolCallIndex) => ({
+                      call: calls[toolCallIndex] as AnyToolCall,
+                      toolCallIndex,
+                    })),
                   )
                   const execute = ({
                     call,
@@ -1851,11 +1838,10 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                   }) => toolCallEvents(0, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
                   const concurrency = agent.toolExecution?.concurrency ?? 1
                   return concurrency === 1
-                    ? executions.pipe(Stream.flatMap(execute), Stream.tap(recordPending))
+                    ? executions.pipe(Stream.flatMap(execute))
                     : executions.pipe(
                         Stream.mapEffect((execution) => Stream.runCollect(execute(execution)), { concurrency }),
                         Stream.flatMap(Stream.fromIterable),
-                        Stream.tap(recordPending),
                       )
                 }),
               ),
@@ -1889,14 +1875,14 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
           if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(DuplicateToolCallId)(reason.error)) {
             return Stream.unwrap(
-              checkpointPending(state.turn, state.pending).pipe(Effect.map(() => Stream.failCause<RunError>(cause))),
+              checkpointPending(state.turn, pendingResults()).pipe(Effect.map(() => Stream.failCause<RunError>(cause))),
             )
           }
           if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(AgentSuspended)(reason.error)) {
             const suspension = reason.error
             return Stream.unwrap(
               Effect.gen(function* () {
-                const checkpoint = yield* checkpointSuspended(state.turn, state.pending, suspension)
+                const checkpoint = yield* checkpointSuspended(state.turn, pendingResults(), suspension)
                 yield* syncSession(state.turn, checkpoint)
                 return Stream.concat(
                   Stream.fromIterable<Event>([turnCompletedEvent(state.turn, checkpoint)]),
