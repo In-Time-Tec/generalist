@@ -1,13 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "batonfx",
+  "version": "0.10.1",
   "description": "Standalone, non-durable, Effect-native agent framework",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.3.14",
   "scripts": {
     "build": "bun turbo build",
-    "check": "prettier --cache --check . && oxlint packages apps examples scripts && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck && bun run test && bun run build && bun run package",
+    "check": "prettier --cache --check . && oxlint packages apps examples scripts test && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck && bun run test && bun run package",
     "dev": "bun --cwd apps/docs dev",
     "format": "prettier --write .",
     "package": "bun scripts/package-smoke.ts",

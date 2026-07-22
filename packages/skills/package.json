@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@batonfx/skills",
-  "version": "0.0.0",
+  "version": "0.10.1",
   "private": false,
   "type": "module",
   "exports": {
@@ -17,11 +17,14 @@
     "typecheck": "bun tsc --noEmit"
   },
   "dependencies": {
-    "@batonfx/core": "workspace:*",
-    "effect": "catalog:"
+    "@batonfx/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-beta.98"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
+    "effect": "catalog:",
     "@types/bun": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

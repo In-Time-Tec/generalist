@@ -1,164 +1,128 @@
-name: publish
+name: GitHub release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Release version to publish
-        required: true
-        type: string
-        default: 0.1.0
-      dry_run:
-        description: Run publish validation without publishing or tagging
-        required: true
-        type: boolean
-        default: true
+  push:
+    tags: ["v*"]
 
-permissions:
-  contents: write
-
-concurrency:
-  group: publish
-  cancel-in-progress: false
+permissions: {}
 
 jobs:
-  publish:
-    name: publish
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+  produce:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
           submodules: true
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.3.14
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-
-      - name: Cache Bun downloads
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Make Effect TypeScript binary executable
-        run: find node_modules/.bun -path '*/@effect/tsgo-linux-*/lib/tsc' -exec chmod +x {} +
-
-      - name: Check release workflow
-        run: bun run check
-
-      - name: Rewrite package manifests
-        env:
-          VERSION: ${{ inputs.version }}
+          node-version: 22.0.0
+      - run: bun install --frozen-lockfile
+      - name: Validate release identity
+        shell: bash
         run: |
-          node <<'NODE'
-          const { readFileSync, writeFileSync } = require("node:fs")
-
-          const version = process.env.VERSION
-          if (!version || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z-.]+)?$/.test(version)) {
-            throw new Error(`Invalid release version: ${version}`)
-          }
-
-          const packageDirs = [
-            "packages/core",
-            "packages/test",
-            "packages/skills",
-            "packages/memory",
-            "packages/providers",
-            "packages/mcp",
-            "packages/transport",
-            "packages/foldkit",
-          ]
-          const dependencySections = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]
-          const root = JSON.parse(readFileSync("package.json", "utf8"))
-          const catalog = root.workspaces?.catalog ?? {}
-
-          for (const dir of packageDirs) {
-            const path = `${dir}/package.json`
-            const manifest = JSON.parse(readFileSync(path, "utf8"))
-            manifest.version = version
-
-            for (const section of dependencySections) {
-              const dependencies = manifest[section]
-              if (dependencies === undefined) continue
-
-              for (const [name, range] of Object.entries(dependencies)) {
-                if (typeof range !== "string") continue
-                if (name.startsWith("@batonfx/") && range.startsWith("workspace:")) {
-                  dependencies[name] = version
-                  continue
-                }
-                if (range.startsWith("catalog:")) {
-                  const catalogVersion = catalog[name]
-                  if (typeof catalogVersion !== "string") {
-                    throw new Error(`${path} references missing catalog dependency ${name}`)
-                  }
-                  dependencies[name] = catalogVersion
-                }
-              }
-            }
-
-            writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`)
-          }
-          NODE
-
-      - name: Validate publish manifests
-        run: |
-          if grep -R --line-number --include package.json -E '"(workspace|catalog):' packages/core packages/test packages/skills packages/memory packages/providers packages/mcp packages/transport packages/foldkit; then
-            echo "workspace: or catalog: protocol remains in a publish manifest" >&2
-            exit 1
-          fi
-
-      - name: Verify repository
-        run: bun run check
-
-      - name: Verify packed packages
-        env:
-          PACKAGE_ARTIFACT_DIR: ${{ github.workspace }}/release-artifacts
-        run: bun run package
-
-      - name: Dry-run publish verified packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          for tarball in release-artifacts/core.tgz release-artifacts/test.tgz release-artifacts/skills.tgz release-artifacts/memory.tgz release-artifacts/providers.tgz release-artifacts/mcp.tgz release-artifacts/transport.tgz release-artifacts/foldkit.tgz; do
-            echo "--- npm publish --dry-run ${tarball}"
-            npm publish --access public --dry-run "./$tarball"
+          set -euo pipefail
+          version=$(bun -e 'console.log(require("./package.json").version)')
+          [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          for manifest in package.json packages/{core,test,skills,memory,providers,mcp,transport,foldkit}/package.json; do
+            [[ "$(bun -e "console.log(require('./$manifest').version)")" == "$version" ]]
           done
-
-      - name: Upload verified packages
-        uses: actions/upload-artifact@v4
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            [[ "$GITHUB_REF" == "refs/tags/v$version" ]]
+            [[ "$(git rev-list -n1 "v$version^{commit}")" == "$GITHUB_SHA" ]]
+          fi
+      - name: Build and verify release assets
+        env:
+          PACKAGE_ARTIFACT_DIR: ${{ github.workspace }}/release
+        run: bun run package
+      - uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
-          name: npm-packages-${{ inputs.version }}
-          path: release-artifacts/*.tgz
+          subject-path: release/*
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-assets
+          path: release/*
+          compression-level: 0
           if-no-files-found: error
 
-      - name: Publish verified packages
-        if: ${{ inputs.dry_run == false }}
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: produce
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: github-release-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-assets
+          path: release
+      - name: Verify and publish draft
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
         run: |
-          for tarball in release-artifacts/core.tgz release-artifacts/test.tgz release-artifacts/skills.tgz release-artifacts/memory.tgz release-artifacts/providers.tgz release-artifacts/mcp.tgz release-artifacts/transport.tgz release-artifacts/foldkit.tgz; do
-            echo "--- npm publish ${tarball}"
-            npm publish --access public "./$tarball"
-          done
-
-      - name: Tag release
-        if: ${{ inputs.dry_run == false }}
-        run: |
-          version="${{ inputs.version }}"
-          git tag "v${version}"
-          git push origin "v${version}"
+          set -euo pipefail
+          cd release
+          version="${GITHUB_REF_NAME#v}"
+          package_assets=(
+            "batonfx-core-${version}.tgz"
+            "batonfx-foldkit-${version}.tgz"
+            "batonfx-mcp-${version}.tgz"
+            "batonfx-memory-${version}.tgz"
+            "batonfx-providers-${version}.tgz"
+            "batonfx-skills-${version}.tgz"
+            "batonfx-test-${version}.tgz"
+            "batonfx-transport-${version}.tgz"
+          )
+          mapfile -t package_assets < <(printf '%s\n' "${package_assets[@]}" | sort)
+          expected=(SHA256SUMS "${package_assets[@]}" release-evidence.json)
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | sort)
+          mapfile -t assets < <(find . -maxdepth 1 -type f -printf '%f\n' | sort)
+          [[ "${assets[*]}" == "${expected[*]}" ]]
+          expected_checksums=("${package_assets[@]}" release-evidence.json)
+          mapfile -t expected_checksums < <(printf '%s\n' "${expected_checksums[@]}" | sort)
+          mapfile -t checksum_names < <(awk '{ print $2 }' SHA256SUMS | sort)
+          [[ "${checksum_names[*]}" == "${expected_checksums[*]}" ]]
+          sha256sum --check SHA256SUMS
+          jq -e --arg commit "$GITHUB_SHA" --arg version "$version" '
+            .schemaVersion == 1 and
+            .sourceCommit == $commit and
+            (.packages | length) == 8 and
+            all(.packages[]; .version == $version)
+          ' release-evidence.json >/dev/null
+          mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
+          [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
+          mapfile -t expected_packages < <(printf '@batonfx/%s\n' core foldkit mcp memory providers skills test transport)
+          mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
+          [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
+          while IFS=$'\t' read -r filename digest; do
+            grep -Fxq "${digest}  ${filename}" SHA256SUMS
+          done < <(jq -r '.packages[] | [.filename, .sha256] | @tsv' release-evidence.json)
+          [[ "$(gh api "repos/$GH_REPO/commits/$GITHUB_REF_NAME" --jq .sha)" == "$GITHUB_SHA" ]]
+          if gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft >/tmp/is-draft 2>/dev/null; then
+            [[ "$(cat /tmp/is-draft)" == true ]] || { echo "release is already published"; exit 1; }
+            gh release delete "$GITHUB_REF_NAME" --yes
+          fi
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes --title "$GITHUB_REF_NAME" "${assets[@]}"
+          mapfile -t uploaded < <(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name' | sort)
+          [[ "${uploaded[*]}" == "${expected[*]}" ]]
+          verify=$(mktemp -d)
+          gh release download "$GITHUB_REF_NAME" --dir "$verify"
+          mapfile -t downloaded < <(find "$verify" -maxdepth 1 -type f -printf '%f\n' | sort)
+          [[ "${downloaded[*]}" == "${expected[*]}" ]]
+          (cd "$verify" && sha256sum --check SHA256SUMS)
+          [[ "$(gh api "repos/$GH_REPO/commits/$GITHUB_REF_NAME" --jq .sha)" == "$GITHUB_SHA" ]]
+          gh release edit "$GITHUB_REF_NAME" --draft=false

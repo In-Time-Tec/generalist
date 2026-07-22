@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.1
+
+- Modernize the eight-package release contract around committed lockstep versions, exact Effect peers, build-once npm-compatible tarballs, clean Bun and Node consumer proofs, checksums, provenance evidence, and tag-gated GitHub releases without npm publication.
+
 ## 0.10.0
 
 - Add the public `ModelTelemetry` contract: typed model-call, attempt, retry, and compaction lifecycle events in the agent event stream. A stable `modelCallId` joins one prepared input across provider attempts, `modelAttemptId` plus a 0-based `attempt` ordinal name each provider invocation, and every `ModelPart` now carries all three (a breaking `ModelPart` and transport wire change; update fixtures and exhaustive event matches). Timestamps are sampled from the Effect Clock at real operation boundaries, usage and provider metadata stay optional (absent means unknown), failures map onto bounded provider-neutral categories, `ModelResilience` retries emit `ModelRetryScheduled` with classification and accepted backoff, and compaction passes emit started/completed/failed events linking summary work through `compactionId` and `summaryModelCallId`. Telemetry never carries prompts, model bodies, credentials, headers, or arbitrary provider error payloads.
