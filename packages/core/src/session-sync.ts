@@ -43,6 +43,39 @@ const digest = (value: string): string => {
 const partTypes = (message: Prompt.Message): ReadonlyArray<string> =>
   typeof message.content === "string" ? ["text"] : message.content.map((part) => part.type)
 
+const sameOptions = (left: Prompt.Part, right: Prompt.Part): boolean =>
+  JSON.stringify(left.options ?? {}) === JSON.stringify(right.options ?? {})
+
+const coalesceParts = (parts: ReadonlyArray<Prompt.Part>): ReadonlyArray<Prompt.Part> => {
+  const merged: Array<Prompt.Part> = []
+  for (const part of parts) {
+    const previous = merged[merged.length - 1]
+    if (part.type === "text" && previous !== undefined && previous.type === "text" && sameOptions(previous, part)) {
+      merged[merged.length - 1] = { ...previous, text: previous.text + part.text }
+      continue
+    }
+    merged.push(part)
+  }
+  return merged
+}
+
+/**
+ * @experimental Merge consecutive text parts that share options within each message.
+ *
+ * The provider-agnostic Chat export encodes a user message whose content is a
+ * multi-text-part array by keeping only the first text part, silently dropping the
+ * rest. Coalescing adjacent text parts into one before that encoding is lossless —
+ * providers already concatenate adjacent text — and keeps the persisted Chat history
+ * a faithful prefix of the durable session projection. It also canonicalizes a
+ * message for structural comparison so a representation-only difference between the
+ * durable projection and the authoritative Chat history never reads as divergence.
+ */
+export const coalesceAdjacentText = (message: Prompt.Message): Prompt.Message => {
+  if (typeof message.content === "string" || message.content.length < 2) return message
+  const coalesced = coalesceParts(message.content)
+  return coalesced.length === message.content.length ? message : ({ ...message, content: coalesced } as Prompt.Message)
+}
+
 const messageDigest = (message: Prompt.Message): string => digest(JSON.stringify(message))
 
 /** @experimental Computes bounded divergence diagnostics for a failed Session synchronization. */

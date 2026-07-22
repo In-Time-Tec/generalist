@@ -1,10 +1,14 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Prompt } from "effect/unstable/ai"
+import { Effect, Ref, Schema } from "effect"
+import { Chat, Prompt } from "effect/unstable/ai"
 import { SessionSync } from "../src/index"
 import { Json } from "./json"
 
 const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 const system = (text: string) => Prompt.makeMessage("system", { content: text })
+const multiUser = (...texts: ReadonlyArray<string>) =>
+  Prompt.makeMessage("user", { content: texts.map((text) => Prompt.makePart("text", { text })) })
+const messageEquivalence = Schema.toEquivalence(Prompt.Message)
 
 describe("SessionSync.diagnose", () => {
   it("reports full structural counts for a divergent projection", () => {
@@ -70,3 +74,61 @@ describe("SessionSync.diagnose", () => {
     expect(diagnostics.firstDivergence?.authoritativeRole).toBe("user")
   })
 })
+
+describe("SessionSync.coalesceAdjacentText", () => {
+  it("merges consecutive same-options text parts into one", () => {
+    const coalesced = SessionSync.coalesceAdjacentText(multiUser("PROMPT", "\n\nCONTEXT"))
+    expect(Array.isArray(coalesced.content)).toBe(true)
+    expect((coalesced.content as ReadonlyArray<Prompt.Part>).length).toBe(1)
+    expect((coalesced.content as ReadonlyArray<Prompt.TextPart>)[0]?.text).toBe("PROMPT\n\nCONTEXT")
+  })
+
+  it("leaves non-adjacent text parts separated by other parts untouched", () => {
+    const message = Prompt.makeMessage("user", {
+      content: [
+        Prompt.makePart("text", { text: "a" }),
+        Prompt.makePart("file", { mediaType: "image/png", data: new Uint8Array([1]) }),
+        Prompt.makePart("text", { text: "b" }),
+      ],
+    })
+    const coalesced = SessionSync.coalesceAdjacentText(message)
+    expect((coalesced.content as ReadonlyArray<Prompt.Part>).map((part) => part.type)).toEqual(["text", "file", "text"])
+  })
+
+  it("survives the provider-agnostic Chat export round-trip without dropping text", () =>
+    Effect.gen(function* () {
+      const original = multiUser("PROMPT", "\n\n<resolved-context>\nguidance\n</resolved-context>")
+      const raw = yield* roundTrip(original)
+      // The unmerged message loses every text part after the first through the lossy string export.
+      expect(textOf(raw)).toBe("PROMPT")
+      const coalesced = yield* roundTrip(SessionSync.coalesceAdjacentText(original))
+      expect(textOf(coalesced)).toBe("PROMPT\n\n<resolved-context>\nguidance\n</resolved-context>")
+    }).pipe(Effect.runPromise))
+})
+
+describe("SessionSync coalesced equivalence", () => {
+  it("equates a multi-text-part message with its coalesced single-text form", () => {
+    const multi = multiUser("a", "b")
+    const merged = user("ab")
+    expect(messageEquivalence(multi, merged)).toBe(false)
+    expect(messageEquivalence(SessionSync.coalesceAdjacentText(multi), SessionSync.coalesceAdjacentText(merged))).toBe(
+      true,
+    )
+  })
+})
+
+const roundTrip = (message: Prompt.Message) =>
+  Chat.fromPrompt(Prompt.make([message])).pipe(
+    Effect.flatMap((chat) => chat.export),
+    Effect.flatMap(Chat.fromExport),
+    Effect.flatMap((chat) => Ref.get(chat.history)),
+    Effect.map((history) => history.content[0] as Prompt.Message),
+  )
+
+const textOf = (message: Prompt.Message): string =>
+  typeof message.content === "string"
+    ? message.content
+    : message.content
+        .filter((part): part is Prompt.TextPart => part.type === "text")
+        .map((part) => part.text)
+        .join("")

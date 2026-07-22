@@ -34,7 +34,7 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import { Approvals } from "./approvals.js"
-import { diagnose as diagnoseSessionSync } from "./session-sync.js"
+import { coalesceAdjacentText, diagnose as diagnoseSessionSync } from "./session-sync.js"
 import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "./compaction.js"
 import { Instructions, openEpoch } from "./instructions.js"
 import { classify as classifyContextOverflow } from "./context-overflow.js"
@@ -724,6 +724,8 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
 
       const messageEquivalence = Schema.toEquivalence(Prompt.Message)
       const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
+      const canonicalEquivalence = (left: Prompt.Message, right: Prompt.Message): boolean =>
+        messageEquivalence(coalesceAdjacentText(left), coalesceAdjacentText(right))
       const sessionTranscriptCursor = (
         projection: ReadonlyArray<Prompt.Message>,
         transcript: ReadonlyArray<Prompt.Message>,
@@ -734,7 +736,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           if (
             transcript.slice(0, start).every((message) => message.role === "system") &&
             projection.every((message, index) =>
-              messageEquivalence(message, transcript[start + index] as Prompt.Message),
+              canonicalEquivalence(message, transcript[start + index] as Prompt.Message),
             )
           ) {
             matches.push(start + projection.length)
@@ -1555,7 +1557,12 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                     if (compactOverflow && !prepared.changed && overflowCause !== undefined) {
                       return yield* Effect.failCause(overflowCause)
                     }
-                    const preparedPrompt = prepared.prompt
+                    const coalescedContent = prepared.prompt.content.map(coalesceAdjacentText)
+                    const preparedPrompt = coalescedContent.some(
+                      (message, index) => message !== prepared.prompt.content[index],
+                    )
+                      ? Prompt.fromMessages(coalescedContent)
+                      : prepared.prompt
                     const history = yield* Ref.get(chat.history)
                     preparedState = { history, preparedPrompt }
                     const responsePrompt = Prompt.concat(history, preparedPrompt)

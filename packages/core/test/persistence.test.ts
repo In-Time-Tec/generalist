@@ -200,6 +200,52 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
       ] as const,
   )
 
+  ItLayer.make(
+    it,
+    "multi-text-part input keeps the persisted chat a faithful prefix of the session",
+    () =>
+      [
+        Layer.mergeAll(
+          modelLayer(() => Stream.make(textDelta("ok"))),
+          unusedExecutor,
+          Approvals.layerAutoApprove,
+          ModelMiddleware.layerIdentity,
+          Session.layerMemory,
+          Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
+          persistenceLayer,
+        ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "multipart-agent", instructions: "system" })
+          yield* Stream.runDrain(
+            Agent.stream(agent, {
+              prompt: [
+                Prompt.makeMessage("user", {
+                  content: [
+                    Prompt.makePart("text", { text: "PROMPT" }),
+                    Prompt.makePart("text", { text: "\n\n<resolved-context>\nguidance\n</resolved-context>" }),
+                  ],
+                }),
+              ],
+              persistence: { chatId: "multipart" },
+            }),
+          )
+          const transcript = yield* historyText("multipart")
+          expect(transcript).toContain("PROMPT")
+          expect(transcript).toContain("resolved-context")
+
+          const persistence = yield* Chat.Persistence
+          const chat = yield* persistence.get("multipart")
+          const history = yield* Ref.get(chat.history)
+          const session = yield* Session.SessionStore
+          expect(Session.buildContext(yield* session.path()).content).toEqual(history.content)
+
+          // A second turn must not fail the session prefix invariant.
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "follow up", persistence: { chatId: "multipart" } }))
+          expect(yield* historyText("multipart")).toContain("follow up")
+        }),
+      ] as const,
+  )
+
   ItLayer.make(it, "does not create a persisted chat when its resume checkpoint is missing", () => {
     let modelCalls = 0
     return [
