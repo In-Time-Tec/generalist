@@ -5,21 +5,25 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 
 const packages = ["core", "test", "skills", "memory", "providers", "mcp", "transport", "foldkit"] as const
 const effectVersion = "4.0.0-beta.98"
+const compressedSizeLimits: Record<(typeof packages)[number], number> = {
+  core: 85_000,
+  test: 8_000,
+  skills: 13_000,
+  memory: 10_000,
+  providers: 35_000,
+  mcp: 12_000,
+  transport: 30_000,
+  foldkit: 16_000,
+}
 
 const packedEffectDependencies: Record<(typeof packages)[number], ReadonlyArray<string>> = {
-  core: ["effect"],
-  test: ["effect"],
-  skills: ["effect"],
-  memory: ["effect"],
-  providers: [
-    "effect",
-    "@effect/ai-anthropic",
-    "@effect/ai-openai",
-    "@effect/ai-openai-compat",
-    "@effect/ai-openrouter",
-  ],
-  mcp: ["effect"],
-  transport: ["effect"],
+  core: [],
+  test: [],
+  skills: [],
+  memory: [],
+  providers: ["@effect/ai-anthropic", "@effect/ai-openai", "@effect/ai-openai-compat", "@effect/ai-openrouter"],
+  mcp: [],
+  transport: [],
   foldkit: [],
 }
 const packedProviderDependencies = {
@@ -27,6 +31,9 @@ const packedProviderDependencies = {
   "@aws-sdk/credential-provider-node": "3.859.0",
   "@smithy/types": "4.3.1",
 } as const
+
+const sortRecord = (value: Record<string, string> | undefined): Record<string, string> =>
+  Object.fromEntries(Object.entries(value ?? {}).toSorted(([left], [right]) => left.localeCompare(right)))
 
 const exports = [
   "@batonfx/core",
@@ -78,6 +85,33 @@ const program = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const root = path.resolve(".")
+  const rootManifest = JSON.parse(yield* fileSystem.readFileString(path.join(root, "package.json")))
+  const version = rootManifest.version as string
+  if (!/^\d+\.\d+\.\d+$/.test(version)) {
+    return yield* Effect.fail(new Error(`root version must be canonical semver: ${version}`))
+  }
+  const discovered = (yield* fileSystem.readDirectory(path.join(root, "packages"))).toSorted()
+  if (JSON.stringify(discovered) !== JSON.stringify(packages.toSorted())) {
+    return yield* Effect.fail(new Error(`public package set mismatch: ${discovered.join(", ")}`))
+  }
+  const sourceManifests = new Map<string, string>()
+  for (const packageName of packages) {
+    const manifestPath = path.join(root, "packages", packageName, "package.json")
+    const source = yield* fileSystem.readFileString(manifestPath)
+    const manifest = JSON.parse(source)
+    if (manifest.name !== `@batonfx/${packageName}` || manifest.version !== version) {
+      return yield* Effect.fail(new Error(`${manifestPath} does not match canonical name/version`))
+    }
+    if (
+      manifest.private !== false ||
+      manifest.type !== "module" ||
+      manifest.sideEffects !== false ||
+      JSON.stringify(manifest.files) !== JSON.stringify(["dist", "README.md"])
+    ) {
+      return yield* Effect.fail(new Error(`${manifestPath} does not match the public ESM package contract`))
+    }
+    sourceManifests.set(manifestPath, source)
+  }
   const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "baton-package-smoke-" })
   const configuredArtifactDirectory = yield* Config.option(Config.string("PACKAGE_ARTIFACT_DIR"))
   const tarballDirectory = Option.match(configuredArtifactDirectory, {
@@ -91,28 +125,113 @@ const program = Effect.gen(function* () {
   yield* run("bun", ["run", "build"], root)
 
   const tarballs: Record<string, string> = {}
+  const packedManifests: Record<string, Record<string, unknown>> = {}
   for (const packageName of packages) {
     const packageDirectory = path.join(root, "packages", packageName)
-    const tarball = path.join(tarballDirectory, `${packageName}.tgz`)
+    const tarball = path.join(tarballDirectory, `batonfx-${packageName}-${version}.tgz`)
     yield* run("bun", ["pm", "pack", "--filename", tarball, "--quiet"], packageDirectory)
     const archive = yield* fileSystem.readFile(tarball)
-    if (archive.byteLength > 1_500_000) {
-      return yield* Effect.fail(new Error(`@batonfx/${packageName} tarball exceeds 1.5 MB: ${archive.byteLength}`))
+    if (archive.byteLength > compressedSizeLimits[packageName]) {
+      return yield* Effect.fail(
+        new Error(
+          `@batonfx/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
+        ),
+      )
     }
     const listing = yield* run("tar", ["-tzf", tarball], root)
-    const unexpected = listing
-      .split("\n")
-      .filter((entry) => entry.length > 0)
-      .filter(
-        (entry) =>
-          entry !== "package/package.json" && entry !== "package/README.md" && !entry.startsWith("package/dist/"),
-      )
+    const entries = listing.split("\n").filter((entry) => entry.length > 0)
+    const unexpected = entries.filter(
+      (entry) =>
+        entry !== "package/" &&
+        entry !== "package/package.json" &&
+        entry !== "package/README.md" &&
+        entry !== "package/dist/" &&
+        !/^package\/dist\/.+\.(?:js|d\.ts)$/.test(entry),
+    )
     if (unexpected.length > 0) {
       return yield* Effect.fail(
         new Error(`@batonfx/${packageName} contains unexpected files: ${unexpected.join(", ")}`),
       )
     }
+    if (entries.some((entry) => entry.startsWith("/") || entry.split("/").includes(".."))) {
+      return yield* Effect.fail(new Error(`@batonfx/${packageName} contains an unsafe path`))
+    }
+    const verboseListing = yield* run("tar", ["-tvzf", tarball], root)
+    const unsafeTypes = verboseListing
+      .split("\n")
+      .filter((entry) => entry.length > 0 && entry[0] !== "-" && entry[0] !== "d")
+    if (unsafeTypes.length > 0) {
+      return yield* Effect.fail(new Error(`@batonfx/${packageName} contains a non-regular entry`))
+    }
     const manifest = JSON.parse(yield* run("tar", ["-xOzf", tarball, "package/package.json"], root))
+    if (manifest.name !== `@batonfx/${packageName}` || manifest.version !== version) {
+      return yield* Effect.fail(new Error(`packed identity mismatch for ${packageName}`))
+    }
+    if (manifest.peerDependencies?.effect !== effectVersion || manifest.dependencies?.effect !== undefined) {
+      return yield* Effect.fail(new Error(`@batonfx/${packageName} must expose Effect only as exact peer`))
+    }
+    if (/workspace:|catalog:/.test(JSON.stringify(manifest))) {
+      return yield* Effect.fail(new Error(`@batonfx/${packageName} contains an unresolved protocol`))
+    }
+    for (const lifecycle of ["preinstall", "install", "postinstall", "prepare"]) {
+      if (manifest.scripts?.[lifecycle] !== undefined) {
+        return yield* Effect.fail(new Error(`@batonfx/${packageName} contains the ${lifecycle} lifecycle hook`))
+      }
+    }
+    const sourceManifest = JSON.parse(sourceManifests.get(path.join(packageDirectory, "package.json"))!)
+    for (const field of ["description", "type", "sideEffects", "files", "engines", "repository", "homepage", "bugs"]) {
+      if (JSON.stringify(manifest[field]) !== JSON.stringify(sourceManifest[field])) {
+        return yield* Effect.fail(new Error(`@batonfx/${packageName} changed its packed ${field} metadata`))
+      }
+    }
+    if (JSON.stringify(manifest.exports) !== JSON.stringify(sourceManifest.exports)) {
+      return yield* Effect.fail(new Error(`@batonfx/${packageName} changed its public exports`))
+    }
+    for (const [specifier, target] of Object.entries(manifest.exports) as ReadonlyArray<
+      readonly [string, { readonly types?: string; readonly import?: string }]
+    >) {
+      if (JSON.stringify(Object.keys(target)) !== JSON.stringify(["types", "import"])) {
+        return yield* Effect.fail(new Error(`@batonfx/${packageName}${specifier} must list types before import`))
+      }
+      for (const [condition, value] of Object.entries(target)) {
+        const expectedExtension = condition === "types" ? ".d.ts" : ".js"
+        if (!value.startsWith("./dist/") || !value.endsWith(expectedExtension)) {
+          return yield* Effect.fail(new Error(`@batonfx/${packageName}${specifier} has invalid ${condition} target`))
+        }
+        if (!entries.includes(`package/${value.slice(2)}`)) {
+          return yield* Effect.fail(new Error(`@batonfx/${packageName}${specifier} is missing ${value}`))
+        }
+      }
+    }
+    for (const section of ["dependencies", "optionalDependencies", "peerDependencies"] as const) {
+      const expected = Object.fromEntries(
+        Object.entries(sourceManifest[section] ?? {}).map(([dependency, dependencyVersion]) => {
+          if (typeof dependencyVersion !== "string") return [dependency, dependencyVersion]
+          if (dependencyVersion.startsWith("workspace:")) return [dependency, version]
+          if (dependencyVersion.startsWith("catalog:")) {
+            const catalogVersion = rootManifest.workspaces.catalog[dependency]
+            if (typeof catalogVersion !== "string") {
+              throw new Error(`${sourceManifest.name} references missing catalog dependency ${dependency}`)
+            }
+            return [dependency, catalogVersion]
+          }
+          return [dependency, dependencyVersion]
+        }),
+      )
+      if (JSON.stringify(sortRecord(manifest[section])) !== JSON.stringify(sortRecord(expected))) {
+        return yield* Effect.fail(new Error(`@batonfx/${packageName} changed its packed ${section}`))
+      }
+      for (const [dependency, dependencyVersion] of Object.entries(manifest[section] ?? {})) {
+        if (dependency.startsWith("@batonfx/") && dependencyVersion !== version) {
+          return yield* Effect.fail(
+            new Error(`@batonfx/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`),
+          )
+        }
+      }
+    }
+    if (manifest.bundledDependencies !== undefined || manifest.bundleDependencies !== undefined) {
+      return yield* Effect.fail(new Error(`@batonfx/${packageName} must not bundle dependencies`))
+    }
     for (const dependency of packedEffectDependencies[packageName]) {
       if (manifest.dependencies?.[dependency] !== effectVersion) {
         return yield* Effect.fail(
@@ -123,11 +242,11 @@ const program = Effect.gen(function* () {
       }
     }
     if (packageName === "providers") {
-      for (const [dependency, version] of Object.entries(packedProviderDependencies)) {
-        if (manifest.dependencies?.[dependency] !== version) {
+      for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
+        if (manifest.dependencies?.[dependency] !== dependencyVersion) {
           return yield* Effect.fail(
             new Error(
-              `@batonfx/providers must pin ${dependency}@${version}; packed ${String(manifest.dependencies?.[dependency])}`,
+              `@batonfx/providers must pin ${dependency}@${dependencyVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
             ),
           )
         }
@@ -136,7 +255,14 @@ const program = Effect.gen(function* () {
     if (JSON.stringify(manifest).includes("4.0.0-beta.93")) {
       return yield* Effect.fail(new Error(`@batonfx/${packageName} packed manifest contains Effect beta.93`))
     }
+    packedManifests[manifest.name] = manifest
     tarballs[`@batonfx/${packageName}`] = `file:${tarball}`
+  }
+
+  for (const [manifestPath, source] of sourceManifests) {
+    if ((yield* fileSystem.readFileString(manifestPath)) !== source) {
+      return yield* Effect.fail(new Error(`packing mutated ${manifestPath}`))
+    }
   }
 
   yield* fileSystem.writeFileString(
@@ -149,11 +275,60 @@ const program = Effect.gen(function* () {
         ...tarballs,
         effect: effectVersion,
         foldkit: "0.122.0",
-        typescript: "5.8.2",
+        typescript: rootManifest.workspaces.catalog.typescript,
       },
-      overrides: tarballs,
     }),
   )
+  const registryDirectory = path.join(directory, "registry")
+  yield* fileSystem.makeDirectory(registryDirectory)
+  yield* fileSystem.writeFileString(
+    path.join(registryDirectory, "data.json"),
+    JSON.stringify({ version, tarballDirectory, manifests: packedManifests }),
+  )
+  yield* fileSystem.writeFileString(
+    path.join(registryDirectory, "server.mjs"),
+    `import { createReadStream, readFileSync, statSync } from "node:fs"
+import { createServer } from "node:http"
+import { basename, join } from "node:path"
+const { manifests, tarballDirectory, version } = JSON.parse(readFileSync(new URL("./data.json", import.meta.url)))
+const server = createServer((request, response) => {
+  const pathname = decodeURIComponent(new URL(request.url, "http://registry").pathname)
+  if (pathname.startsWith("/tarballs/")) {
+    const file = join(tarballDirectory, basename(pathname))
+    response.writeHead(200, { "content-type": "application/octet-stream", "content-length": statSync(file).size })
+    createReadStream(file).pipe(response)
+    return
+  }
+  const name = pathname.slice(1)
+  const manifest = manifests[name]
+  if (manifest === undefined) {
+    response.writeHead(404).end("not found")
+    return
+  }
+  const filename = \`batonfx-\${name.slice("@batonfx/".length)}-\${version}.tgz\`
+  const body = JSON.stringify({
+    name,
+    "dist-tags": { latest: version },
+    versions: { [version]: { ...manifest, dist: { tarball: \`\${origin}/tarballs/\${filename}\` } } },
+  })
+  response.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(body) }).end(body)
+})
+let origin
+server.listen(0, "127.0.0.1", () => {
+  origin = \`http://127.0.0.1:\${server.address().port}\`
+  console.log(origin)
+})
+`,
+  )
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+  const registry = yield* spawner.spawn(ChildProcess.make("node", ["server.mjs"], { cwd: registryDirectory }))
+  yield* Effect.addFinalizer(() => registry.kill())
+  const registryOrigin = yield* Stream.runHead(Stream.splitLines(Stream.decodeText(registry.stdout))).pipe(
+    Effect.flatMap(
+      Option.match({ onNone: () => Effect.fail(new Error("local registry did not start")), onSome: Effect.succeed }),
+    ),
+  )
+  yield* fileSystem.writeFileString(path.join(consumerDirectory, ".npmrc"), `@batonfx:registry=${registryOrigin}\n`)
   yield* fileSystem.writeFileString(
     path.join(consumerDirectory, "tsconfig.json"),
     JSON.stringify({
@@ -411,7 +586,7 @@ console.log(\`imported \${specifiers.length} Baton exports\`)
 `,
   )
 
-  yield* run("bun", ["install"], consumerDirectory)
+  yield* run("bun", ["install", "--linker=isolated"], consumerDirectory)
   const installedEffects = (yield* run(
     "find",
     ["node_modules", "-path", "*/effect/package.json", "-print"],
@@ -426,8 +601,83 @@ console.log(\`imported \${specifiers.length} Baton exports\`)
     )
   }
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
-  yield* run("node", ["runtime.mjs"], consumerDirectory)
-  yield* run("bun", ["runtime.mjs"], consumerDirectory)
+  yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], consumerDirectory)
+  yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "bun", "runtime.mjs"], consumerDirectory)
+  if ((yield* fileSystem.readFileString(path.join(consumerDirectory, "bun.lock"))).includes("npmjs.org/@batonfx")) {
+    return yield* Effect.fail(new Error("Bun consumer resolved a Baton package from npm"))
+  }
+
+  const npmConsumerDirectory = path.join(directory, "npm-consumer")
+  yield* fileSystem.makeDirectory(npmConsumerDirectory)
+  for (const filename of ["package.json", "tsconfig.json", "typecheck.ts", "runtime.mjs", ".npmrc"]) {
+    yield* fileSystem.copyFile(path.join(consumerDirectory, filename), path.join(npmConsumerDirectory, filename))
+  }
+  yield* run("npm", ["install", "--ignore-scripts", "--legacy-peer-deps"], npmConsumerDirectory)
+  const npmEffects = (yield* run(
+    "find",
+    ["node_modules", "-path", "*/effect/package.json", "-print"],
+    npmConsumerDirectory,
+  ))
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+  if (npmEffects.length !== 1) {
+    return yield* Effect.fail(new Error(`npm consumer installed ${npmEffects.length} Effect copies`))
+  }
+  yield* run("npx", ["tsc", "--noEmit"], npmConsumerDirectory)
+  yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], npmConsumerDirectory)
+  if (
+    (yield* fileSystem.readFileString(path.join(npmConsumerDirectory, "package-lock.json"))).includes(
+      "npmjs.org/@batonfx",
+    )
+  ) {
+    return yield* Effect.fail(new Error("npm consumer resolved a Baton package from npm"))
+  }
+
+  const evidencePackages = []
+  for (const packageName of packages) {
+    const filename = `batonfx-${packageName}-${version}.tgz`
+    const archive = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
+    const manifest = JSON.parse(
+      yield* run("tar", ["-xOzf", path.join(tarballDirectory, filename), "package/package.json"], root),
+    )
+    evidencePackages.push({
+      name: manifest.name,
+      version,
+      filename,
+      compressedBytes: archive.byteLength,
+      unpackedBytes: Number(
+        (yield* run("tar", ["-tvzf", path.join(tarballDirectory, filename)], root))
+          .split("\n")
+          .filter(Boolean)
+          .reduce((total, entry) => total + Number(entry.trim().split(/\s+/)[2]), 0),
+      ),
+      sha256: new Bun.CryptoHasher("sha256").update(archive).digest("hex"),
+      dependencies: manifest.dependencies ?? {},
+      peerDependencies: manifest.peerDependencies ?? {},
+      exports: manifest.exports,
+    })
+  }
+  const evidence = {
+    schemaVersion: 1,
+    sourceCommit: (yield* run("git", ["rev-parse", "HEAD"], root)).trim(),
+    tools: {
+      bun: Bun.version,
+      node: (yield* run("node", ["--version"], root)).trim(),
+      typescript: rootManifest.workspaces.catalog.typescript,
+    },
+    packages: evidencePackages.toSorted((left, right) => left.name.localeCompare(right.name)),
+  }
+  const evidencePath = path.join(tarballDirectory, "release-evidence.json")
+  yield* fileSystem.writeFileString(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`)
+  const checksumFiles = [...evidencePackages.map(({ filename }) => filename), "release-evidence.json"].toSorted()
+  const checksums = []
+  for (const filename of checksumFiles) {
+    const bytes = yield* fileSystem.readFile(path.join(tarballDirectory, filename))
+    checksums.push(`${new Bun.CryptoHasher("sha256").update(bytes).digest("hex")}  ${filename}`)
+  }
+  yield* fileSystem.writeFileString(path.join(tarballDirectory, "SHA256SUMS"), `${checksums.join("\n")}\n`)
+  for (const item of evidencePackages) console.log(`${item.name}: ${item.compressedBytes} compressed bytes`)
 }).pipe(Effect.scoped, Effect.provide(layer))
 
 runMain(program)

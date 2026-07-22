@@ -12,6 +12,7 @@ export default defineConfig({
       "packages/**/test/**/*.test.ts",
       "examples/deep-research-agent/server/test/**/*.test.ts",
       "examples/deep-research-agent/web/src/**/*.test.ts",
+      "test/scripts/**/*.test.ts",
     ],
     coverage: {
       enabled: false,

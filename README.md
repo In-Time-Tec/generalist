@@ -39,7 +39,7 @@ bun add @batonfx/providers @batonfx/mcp @batonfx/skills @batonfx/memory
 bun add @batonfx/transport @batonfx/foldkit @batonfx/test
 ```
 
-The published packages contain compiled ESM and declarations and support Node 22+ and Bun 1.3+; use the equivalent `npm install` commands in a Node project.
+GitHub releases contain versioned package tarballs with compiled ESM and declarations for Node 22+ and Bun 1.3+. Baton does not publish to npm; install the desired release tarballs directly with Bun or npm.
 
 ## Capability matrix
 
@@ -75,7 +75,7 @@ const clientTools = ToolExecutor.layerRouter([
 
 | Baton release | Tested Effect range                               | Notes                                                                               |
 | ------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `0.6.x`       | `effect@4.0.0-beta.98` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| `0.10.x`      | `effect@4.0.0-beta.98` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 
 ## Start here
 
@@ -111,6 +111,10 @@ bun install
 bun run check
 bun run package
 ```
+
+`bun run package` builds once, verifies clean Bun and npm consumers, and writes eight tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification; manual workflow runs only produce and attest artifacts.
+
+The npm smoke uses `--legacy-peer-deps` only because the currently pinned external `foldkit@0.122.0` declares `effect@4.0.0-beta.88` while Baton uses beta.98. The installed graph is still checked for one physical Effect package; Bun installation and both runtimes use beta.98.
 
 ## Provenance
 
