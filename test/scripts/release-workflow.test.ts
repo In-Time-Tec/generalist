@@ -13,7 +13,7 @@ const pins = new Set([
 ])
 
 describe("release workflows", () => {
-  it("keeps release production singular, immutable, and least-privileged", () => {
+  it("keeps release recovery immutable, authenticated, and least-privileged", () => {
     const source = readFileSync(".github/workflows/publish.yml", "utf8")
     const workflow = JSON.parse(
       execFileSync("bun", ["-e", "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))"], {
@@ -21,34 +21,46 @@ describe("release workflows", () => {
         encoding: "utf8",
       }),
     ) as any
-    expect(workflow.on.workflow_dispatch).toEqual(null)
+    expect(workflow.on.workflow_dispatch.inputs).toEqual({
+      tag: expect.objectContaining({ required: true, type: "string" }),
+      expected_commit: expect.objectContaining({ required: true, type: "string" }),
+    })
     expect(workflow.on.push.tags).toEqual(["v*"])
     expect(workflow.permissions).toEqual({})
-    expect(workflow.jobs.produce.permissions).toEqual({ contents: "read", "id-token": "write", attestations: "write" })
-    expect(workflow.jobs.release.permissions).toEqual({ contents: "write" })
-    expect(workflow.jobs.release.if).toContain("github.event_name == 'push'")
-    expect(workflow.jobs.release.concurrency).toEqual({
-      group: "github-release-${{ github.ref }}",
+    expect(workflow.concurrency).toEqual({
+      group: "release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}",
       "cancel-in-progress": false,
     })
+    expect(workflow.jobs.produce.permissions).toEqual({ contents: "read", "id-token": "write", attestations: "write" })
+    expect(workflow.jobs.release.permissions).toEqual({ contents: "write" })
+    expect(workflow.jobs.publish.permissions).toEqual({ contents: "read", "id-token": "write" })
     expect(source.match(/bun run package/g)).toHaveLength(1)
     expect(source).toContain("subject-path: release/*")
+    expect(source).toContain("github.event.repository.private == false || github.event.enterprise != null")
     expect(source).toContain("sha256sum --check SHA256SUMS")
     expect(source).toContain("--draft --verify-tag")
     expect(source).toContain("persist-credentials: false")
-    expect(source).toContain('"$(git rev-list -n1 "v$version^{commit}")" == "$GITHUB_SHA"')
-    expect(source.match(/repos\/\$GH_REPO\/commits\/\$GITHUB_REF_NAME/g)).toHaveLength(2)
-    for (const packageName of ["core", "foldkit", "mcp", "memory", "providers", "skills", "test", "transport"]) {
-      expect(source).toContain(`batonfx-${packageName}-\${version}.tgz`)
-    }
-    expect(source).not.toMatch(
-      /npm publish|bun publish|NPM_TOKEN|NODE_AUTH_TOKEN|registry-url|Rewrite package manifests/,
+    expect(source).toContain('"$(git rev-list -n1 "refs/tags/$tag^{commit}")" == "$source_commit"')
+    expect(source).toContain('git merge-base --is-ancestor "$source_commit" origin/main')
+    expect(source).toContain('git merge-base --is-ancestor "$source_commit" origin/release')
+    expect(source).toContain("gh auth setup-git")
+    expect(source.indexOf("Validate immutable release identity")).toBeLessThan(
+      source.indexOf("bun install --frozen-lockfile"),
     )
+    expect(source.match(/repos\/\$GH_REPO\/commits\/\$TAG/g)).toHaveLength(2)
+    expect(source).toContain("NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}")
+    expect(source).toContain('npm publish "$filename" "${publish_args[@]}"')
+    expect(source).toContain('[[ "$registry_integrity" == "$local_integrity" ]]')
+    expect(source.match(/'\.packages\[\] \| \.name'/g)).toHaveLength(2)
+    for (const packageName of ["core", "foldkit", "mcp", "memory", "providers", "skills", "test", "transport"]) {
+      expect(source).toContain(`batonfx-${packageName}-\${VERSION}.tgz`)
+    }
+    expect(source).not.toMatch(/bun publish|Rewrite package manifests/)
     for (const workflowFile of [".github/workflows/ci.yml", ".github/workflows/publish.yml"]) {
       const uses = [...readFileSync(workflowFile, "utf8").matchAll(/uses:\s*(\S+)/g)].map((match) => match[1])
       expect(uses.every((use) => pins.has(use!))).toBe(true)
     }
-    const downstream = source.split("  release:")[1]!
-    expect(downstream).not.toMatch(/checkout|bun install|npm install|bun run (?:build|package)|pm pack/)
+    const release = source.split("  release:")[1]!.split("  publish:")[0]!
+    expect(release).not.toMatch(/checkout|bun install|npm install|bun run (?:build|package)|pm pack/)
   })
 })
