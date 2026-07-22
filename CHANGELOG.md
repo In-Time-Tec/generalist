@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1
+
+- Classify provider context-window overflow by semantic evidence instead of error shape. A shared `ContextOverflow` module owns detection; `ModelRegistry.classifyFailure` falls back to it for every registration, so overflow errors that fail stream-schema decoding, arrive with unexpected framing, or come from providers without a classifier still trigger reactive compaction. Responses SSE normalization now applies regardless of response content-type, joins multi-`data:`-line frames, and flattens nested errors that carry a top-level message.
+
 ## 0.11.0
 
 - Add stable per-run telemetry delivery IDs, an optional ordered host delivery sink, and atomic Session checkpoint telemetry outboxes with compaction commitments. Structured output events now carry the final successful model call and attempt identity. These are breaking pre-1.0 checkpoint, compaction request, telemetry event, and transport contracts.
