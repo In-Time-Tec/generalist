@@ -148,6 +148,7 @@ export const makeRequest = Effect.fnUntraced(function* (input: Input, options: L
         if (message.role !== "assistant" || text.length > 0) content.push({ text })
         if (hasCachePoint(part.options)) content.push({ cachePoint: { type: "default" } })
       } else if (part.type === "file") {
+        if (message.role === "assistant") return yield* fail("Bedrock Converse accepts files only in user messages")
         content.push(
           yield* fileBlock({
             mediaType: part.mediaType,

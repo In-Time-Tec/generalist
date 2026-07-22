@@ -1,9 +1,9 @@
-import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai"
+import { OpenAiClient } from "@effect/ai-openai"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Effect, Layer, Option, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
-import { classifyFailure, type LayerOptions, type RegistrationOptions } from "./openai.js"
+import { registration as registerOpenAi, type LayerOptions, type RegistrationOptions } from "./openai.js"
 
 const deterministicModelLayer = Layer.effect(
   LanguageModel.LanguageModel,
@@ -57,14 +57,9 @@ export const layerOpenAi = (options: OpenAiFallbackOptions) =>
             }),
           ).pipe(
             Effect.flatMap((context) =>
-              ModelRegistry.registration({
-                provider: "openai",
+              registerOpenAi({
                 model: options.model,
-                layer: OpenAiLanguageModel.layer({
-                  model: options.model,
-                  ...(options.config === undefined ? {} : { config: options.config }),
-                }),
-                classifyFailure,
+                ...(options.config === undefined ? {} : { config: options.config }),
                 ...(options.registrationKey === undefined ? {} : { registrationKey: options.registrationKey }),
                 ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
               }).pipe(Effect.provide(context)),

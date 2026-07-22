@@ -2,6 +2,7 @@ import { OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
 import { AiError } from "effect/unstable/ai"
+import { layerImageSources } from "./image-source.js"
 import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
@@ -46,10 +47,12 @@ export const layer = (input: LayerOptions) =>
     ModelRegistry.registration({
       provider: "openrouter",
       model: input.model,
-      layer: OpenRouterLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }),
+      layer: layerImageSources(
+        OpenRouterLanguageModel.layer({
+          model: input.model,
+          ...(input.config === undefined ? {} : { config: input.config }),
+        }),
+      ),
       classifyFailure,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
