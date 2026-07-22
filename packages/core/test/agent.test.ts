@@ -3486,6 +3486,56 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "reactively compacts a decode-failure overflow from a model without a classifier", () => {
+    let calls = 0
+    let overflowRequests = 0
+    const decodeFailure = AiError.make({
+      module: "OpenAiClient",
+      method: "createResponseStream",
+      reason: AiError.InvalidOutputError.make({
+        description:
+          'Invalid output: Missing key\n  at [0]["data"]["code"]\nExpected UnknownResponseStreamEvent, got {"type":"error","error":{"type":"invalid_request_error","code":"context_length_exceeded","message":"Your input exceeds the context window of this model.","param":"input"},"sequence_number":2}',
+      }),
+    })
+    return [
+      Layer.mergeAll(
+        Layer.unwrap(
+          ModelRegistry.registration({
+            ...overflowSelection,
+            layer: modelLayer(() => {
+              calls += 1
+              return calls === 1 ? Stream.fail(decodeFailure) : Stream.make(textDelta("recovered"))
+            }),
+          }).pipe(Effect.map((registration) => ModelRegistry.layerMemory([Effect.succeed(registration)]))),
+        ),
+        Compaction.layerTest({
+          maybeCompact: (request) =>
+            Effect.sync(() => {
+              if (request.overflow) overflowRequests += 1
+              return Option.some({
+                _tag: "Microcompact" as const,
+                history: Prompt.empty,
+                prompt: Prompt.make(request.overflow ? "compacted after overflow" : "proactive projection"),
+              })
+            }).pipe(Compaction.withLifecycle(request)),
+        }),
+        Session.layerMemory,
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "fallback-overflow-agent", model: overflowSelection })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "too large" }))
+
+        expect(calls).toBe(2)
+        expect(overflowRequests).toBe(1)
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "reactively compacts an overflow delivered as a model error part", () => {
     let calls = 0
     let overflowRequests = 0
@@ -5317,10 +5367,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     let ambientCalls = 0
     let overrideCalls = 0
     let overflowCompactions = 0
-    const overrideOverflow = contextOverflowError("context length exceeded")
+    const overrideFailure = contextOverflowError("upstream connection reset")
     const overrideModel = modelLayer(() => {
       overrideCalls += 1
-      return overrideCalls === 1 ? Stream.fail(overrideOverflow) : Stream.make(textDelta("override ok"))
+      return overrideCalls === 1 ? Stream.fail(overrideFailure) : Stream.make(textDelta("override ok"))
     })
     return [
       Layer.mergeAll(
@@ -5338,7 +5388,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         Approvals.layerAutoApprove,
         ModelResilience.layer({
           retrySchedule: Schedule.recurs(1),
-          classify: (error) => (error === overrideOverflow ? "transient" : "terminal"),
+          classify: (error) => (error === overrideFailure ? "transient" : "terminal"),
         }),
         ModelMiddleware.layerIdentity,
       ),

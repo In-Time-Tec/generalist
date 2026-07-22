@@ -80,21 +80,32 @@ describe("normalizeResponsesSse", () => {
     }),
   )
 
-  it.effect("passes through already-flat errors, comments, and multi-data frames unchanged", () =>
+  it.effect("passes through already-flat errors, comments, and non-JSON data unchanged", () =>
+    Effect.gen(function* () {
+      const body = [`: keep-alive`, ``, `data: ${flatError}`, ``, `data: not json`, ``].join("\n")
+      const output = yield* readThrough([body], responsesUrl)
+      expect(output).toBe(body)
+    }),
+  )
+
+  it.effect("flattens a nested error split across multiple data lines into one flat data line", () =>
     Effect.gen(function* () {
       const body = [
-        `: keep-alive`,
-        ``,
-        `data: ${flatError}`,
-        ``,
         `data: {"type":"error",`,
-        `data: "error":{}}`,
+        `data: "error":{"code":"context_length_exceeded","message":"too long"},"sequence_number":2}`,
         ``,
-        `data: not json`,
         ``,
       ].join("\n")
       const output = yield* readThrough([body], responsesUrl)
-      expect(output).toBe(body)
+      expect(output).toBe(
+        `data: ${stringify({
+          type: "error",
+          code: "context_length_exceeded",
+          message: "too long",
+          param: null,
+          sequence_number: 2,
+        })}\n\n`,
+      )
     }),
   )
 
@@ -111,6 +122,35 @@ describe("normalizeResponsesSse", () => {
       const body = stringify({ type: "error", error: { message: "boom" } })
       const output = yield* readThrough([body], responsesUrl, "application/json")
       expect(output).toBe(body)
+    }),
+  )
+
+  it.effect("flattens SSE error frames even when the response is not labeled text/event-stream", () =>
+    Effect.gen(function* () {
+      const body = `event: error\ndata: ${nestedError}\n\n`
+      const output = yield* readThrough([body], responsesUrl, "application/json")
+      expect(output).toBe(`event: error\ndata: ${flatError}\n\n`)
+    }),
+  )
+
+  it.effect("flattens a nested error that also carries a top-level message", () =>
+    Effect.gen(function* () {
+      const withTopLevelMessage = stringify({
+        type: "error",
+        message: "request failed",
+        error: { type: "invalid_request_error", code: "context_length_exceeded", message: "too long", param: "input" },
+        sequence_number: 7,
+      })
+      const output = yield* readThrough([`data: ${withTopLevelMessage}\n\n`], responsesUrl)
+      expect(output).toBe(
+        `data: ${stringify({
+          type: "error",
+          code: "context_length_exceeded",
+          message: "too long",
+          param: "input",
+          sequence_number: 7,
+        })}\n\n`,
+      )
     }),
   )
 })

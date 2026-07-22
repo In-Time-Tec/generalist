@@ -1,5 +1,5 @@
 import type { ConverseCommandInput } from "@aws-sdk/client-bedrock-runtime"
-import { ModelRegistry } from "@batonfx/core"
+import { ContextOverflow, ModelRegistry } from "@batonfx/core"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { AiError, LanguageModel } from "effect/unstable/ai"
 import type { RegistrationOptions } from "./openai.js"
@@ -124,14 +124,7 @@ export const make = Effect.fnUntraced(function* (input: Input) {
 /** @experimental */
 export const layerLanguageModel = (input: Input) => Layer.effect(LanguageModel.LanguageModel, make(input))
 /** @experimental */
-export const classifyFailure: ModelRegistry.FailureClassifier = (error) =>
-  AiError.isAiError(error) &&
-  error.reason._tag === "InvalidRequestError" &&
-  /maximum context length|context (?:window|length) (?:was )?exceeded|input (?:is )?too (?:long|large)/i.test(
-    error.reason.description ?? "",
-  )
-    ? "context-overflow"
-    : "other"
+export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 /** @experimental */
 export const layer = (input: Input & { readonly client?: Options }) =>
   ModelRegistry.layer([

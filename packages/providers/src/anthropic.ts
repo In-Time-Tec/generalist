@@ -1,7 +1,6 @@
 import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic"
-import { ModelRegistry } from "@batonfx/core"
+import { ContextOverflow, ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
-import { AiError } from "effect/unstable/ai"
 import { layerImageSources } from "./image-source.js"
 import type { RegistrationOptions } from "./openai.js"
 
@@ -12,14 +11,7 @@ export interface AnthropicInput extends RegistrationOptions {
 }
 
 /** @experimental */
-export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
-  if (!AiError.isAiError(error) || error.reason._tag !== "InvalidRequestError") return "other"
-  const metadata = error.reason.metadata.anthropic
-  return metadata?.errorType === "invalid_request_error" &&
-    /\bprompt is too long\b/i.test(error.reason.description ?? "")
-    ? "context-overflow"
-    : "other"
-}
+export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 
 /** @experimental */
 export interface LayerOptions extends AnthropicInput {

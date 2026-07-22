@@ -1,7 +1,6 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai"
-import { ModelRegistry } from "@batonfx/core"
+import { ContextOverflow, ModelRegistry } from "@batonfx/core"
 import { Config, Effect, Function, Layer, Option, Redacted, Schema, Stream } from "effect"
-import { AiError } from "effect/unstable/ai"
 import type { Credential, ServiceInterface } from "./openai-account-auth.js"
 import { layerImageSources } from "./image-source.js"
 import {
@@ -29,42 +28,8 @@ export interface OpenAiInput extends RegistrationOptions {
   readonly config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">
 }
 
-const contextOverflowCodes = new Set(["context_length_exceeded", "context_window_exceeded", "input_too_long"])
-
-const responseErrorCode = (error: unknown): string | undefined => {
-  if (typeof error !== "object" || error === null || Array.isArray(error)) return undefined
-  const event = error as Record<string, unknown>
-  if (event.type !== "error") return undefined
-  if (typeof event.code === "string") return event.code
-  const details = event.error
-  if (typeof details !== "object" || details === null || Array.isArray(details)) return undefined
-  const code = (details as Record<string, unknown>).code
-  return typeof code === "string" ? code : undefined
-}
-
 /** @experimental */
-export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
-  const eventCode = responseErrorCode(error)
-  if (eventCode !== undefined && contextOverflowCodes.has(eventCode)) return "context-overflow"
-  if (!AiError.isAiError(error)) return "other"
-  const reason = error.reason
-  if (reason._tag !== "InvalidRequestError" && reason._tag !== "UnknownError") return "other"
-  const metadata = reason.metadata.openai
-  if (metadata !== null && metadata !== undefined) {
-    if (
-      (metadata.errorCode !== null && contextOverflowCodes.has(metadata.errorCode)) ||
-      (metadata.errorType !== null && contextOverflowCodes.has(metadata.errorType))
-    ) {
-      return "context-overflow"
-    }
-  }
-  return reason._tag === "InvalidRequestError" &&
-    /maximum context length|context length exceeded|input exceeds (?:the )?context window/i.test(
-      reason.description ?? "",
-    )
-    ? "context-overflow"
-    : "other"
-}
+export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 
 /** @experimental */
 export interface LayerOptions extends OpenAiInput {
@@ -118,14 +83,16 @@ const flattenErrorPayload = (payload: string): string | undefined => {
   const decoded = parseJsonOption(payload)
   if (Option.isNone(decoded) || typeof decoded.value !== "object" || decoded.value === null) return undefined
   const record = decoded.value as Record<string, unknown>
-  if (record.type !== "error" || record.message !== undefined) return undefined
+  if (record.type !== "error") return undefined
+  if (typeof record.message === "string" && "code" in record) return undefined
   const details = record.error
   if (typeof details !== "object" || details === null || Array.isArray(details)) return undefined
   const nested = details as Record<string, unknown>
+  const message = typeof nested.message === "string" ? nested.message : record.message
   return stringifyJson({
     type: "error",
     code: typeof nested.code === "string" ? nested.code : null,
-    message: typeof nested.message === "string" ? nested.message : stringifyJson(nested),
+    message: typeof message === "string" ? message : stringifyJson(nested),
     param: typeof nested.param === "string" ? nested.param : null,
     sequence_number: typeof record.sequence_number === "number" ? record.sequence_number : 0,
   })
@@ -137,13 +104,18 @@ const rewriteFrame = (frame: string): string => {
   for (let index = 0; index < segments.length; index += 2) {
     if (dataLinePrefix.test(segments[index] ?? "")) dataIndexes.push(index)
   }
-  if (dataIndexes.length !== 1) return frame
-  const line = segments[dataIndexes[0]!]!
-  const prefix = line.match(dataLinePrefix)![0]
-  const flattened = flattenErrorPayload(line.slice(prefix.length))
+  if (dataIndexes.length === 0) return frame
+  const payload = dataIndexes.map((index) => segments[index]!.replace(dataLinePrefix, "")).join("\n")
+  const flattened = flattenErrorPayload(payload)
   if (flattened === undefined) return frame
-  segments[dataIndexes[0]!] = `${prefix}${flattened}`
-  return segments.join("")
+  const prefix = segments[dataIndexes[0]!]!.match(dataLinePrefix)![0]
+  const separator = segments[1] ?? "\n"
+  const rewritten: Array<string> = []
+  for (let index = 0; index < segments.length; index += 2) {
+    if (index === dataIndexes[0]) rewritten.push(`${prefix}${flattened}`)
+    else if (!dataLinePrefix.test(segments[index] ?? "")) rewritten.push(segments[index]!)
+  }
+  return rewritten.join(separator)
 }
 
 const normalizeSseErrorFrames = <E>(body: Stream.Stream<Uint8Array, E>): Stream.Stream<Uint8Array, E> =>
@@ -169,13 +141,12 @@ const normalizeSseErrorFrames = <E>(body: Stream.Stream<Uint8Array, E>): Stream.
 export const normalizeResponsesSse = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
   HttpClient.transformResponse(client, (effect) =>
     Effect.map(effect, (response) => {
-      const contentType = String(response.headers["content-type"] ?? "")
-      if (!contentType.includes("text/event-stream") || !isResponsesUrl(response.request.url)) return response
+      if (!isResponsesUrl(response.request.url)) return response
       return HttpClientResponse.fromWeb(
         response.request,
         new Response(Stream.toReadableStream(normalizeSseErrorFrames(response.stream)), {
           status: response.status,
-          headers: { "content-type": contentType },
+          headers: { ...response.headers },
         }),
       )
     }),

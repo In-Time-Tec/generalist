@@ -37,6 +37,7 @@ import { Approvals } from "./approvals.js"
 import { diagnose as diagnoseSessionSync } from "./session-sync.js"
 import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "./compaction.js"
 import { Instructions, openEpoch } from "./instructions.js"
+import { classify as classifyContextOverflow } from "./context-overflow.js"
 import { type Item, type Key, Memory, type MemoryError, messageFromRecall, projectTranscript } from "./memory.js"
 import { ModelMiddleware } from "./model-middleware.js"
 import {
@@ -122,7 +123,7 @@ import {
   type ToolCallIdState,
 } from "./agent-tool-result.js"
 type CompactionResult = import("./compaction.js").Result
-const classifyOtherFailure: FailureClassifier = () => "other"
+const classifyOtherFailure: FailureClassifier = (error) => classifyContextOverflow(error)
 const defaultProgressOverflowPolicy: ProgressOverflowPolicy = { _tag: "Backpressure", capacity: 64 }
 const progressCapacitySchema = Schema.Finite.pipe(Schema.check(Schema.isInt(), Schema.isGreaterThan(0)))
 const progressOverflowPolicySchema = Schema.Union([

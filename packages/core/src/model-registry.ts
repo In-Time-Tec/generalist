@@ -1,5 +1,6 @@
 import { Context, Effect, Fiber, Function, HashMap, Layer, Option, Ref, Schema, Scope, Semaphore, Stream } from "effect"
 import { LanguageModel, Model } from "effect/unstable/ai"
+import { classify as classifyContextOverflow } from "./context-overflow.js"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
 
@@ -27,15 +28,14 @@ type ClassifiedLanguageModel = LanguageModel.Service & {
   readonly [FailureClassifierTypeId]?: FailureClassifier
 }
 
-/** @experimental Classify a failure using semantics attached to the active registered model. */
+/** @experimental Classify a failure using semantics attached to the active registered model, falling back to provider-agnostic context-overflow evidence. */
 export const classifyFailure: {
   (error: unknown): (model: LanguageModel.Service) => FailureClassification
   (model: LanguageModel.Service, error: unknown): FailureClassification
-} = Function.dual(
-  2,
-  (model: LanguageModel.Service, error: unknown): FailureClassification =>
-    (model as ClassifiedLanguageModel)[FailureClassifierTypeId]?.(error) ?? "other",
-)
+} = Function.dual(2, (model: LanguageModel.Service, error: unknown): FailureClassification => {
+  const classified = (model as ClassifiedLanguageModel)[FailureClassifierTypeId]?.(error)
+  return classified !== undefined && classified !== "other" ? classified : classifyContextOverflow(error)
+})
 
 const attachFailureClassifier = (registration: Registration, context: Context.Context<ModelEnvironment>) => {
   if (registration.classifyFailure === undefined) return context

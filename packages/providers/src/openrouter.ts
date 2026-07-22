@@ -1,7 +1,6 @@
 import { OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter"
-import { ModelRegistry } from "@batonfx/core"
+import { ContextOverflow, ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
-import { AiError } from "effect/unstable/ai"
 import { layerImageSources } from "./image-source.js"
 import type { RegistrationOptions } from "./openai.js"
 
@@ -11,29 +10,8 @@ export interface OpenRouterInput extends RegistrationOptions {
   readonly config?: Omit<typeof OpenRouterLanguageModel.Config.Service, "model">
 }
 
-const contextOverflowCodes = new Set(["context_length_exceeded", "context_window_exceeded", "input_too_long"])
-
 /** @experimental */
-export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
-  if (!AiError.isAiError(error)) return "other"
-  const reason = error.reason
-  if (reason._tag !== "InvalidRequestError" && reason._tag !== "UnknownError") return "other"
-  const metadata = reason.metadata.openrouter
-  if (metadata !== null && metadata !== undefined) {
-    if (
-      (typeof metadata.errorCode === "string" && contextOverflowCodes.has(metadata.errorCode)) ||
-      (metadata.errorType !== null && contextOverflowCodes.has(metadata.errorType))
-    ) {
-      return "context-overflow"
-    }
-  }
-  return reason._tag === "InvalidRequestError" &&
-    /maximum context length|context length exceeded|input exceeds (?:the )?context window|prompt is too long/i.test(
-      reason.description ?? "",
-    )
-    ? "context-overflow"
-    : "other"
-}
+export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 
 /** @experimental */
 export interface LayerOptions extends OpenRouterInput {
