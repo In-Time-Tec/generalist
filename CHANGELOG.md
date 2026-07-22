@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.3
+
+- Coalesce adjacent same-options text parts of a user message before it enters the persisted Chat history, and compare the durable session projection against the authoritative Chat history on coalesced messages. The provider-agnostic Chat export encodes a multi-text-part user message by keeping only the first text part, silently dropping the rest; a caller that submits a prompt plus a resolved-context block as two text parts therefore persisted a Chat history that was no longer a prefix of the session projection, failing `syncSession` with "Session projection is not a prefix of authoritative Chat history" and poisoning every later turn in the thread. Coalescing is lossless — providers already concatenate adjacent text — and keeps the persisted Chat history a faithful prefix of the session.
+
 ## 0.11.2
 
 - Classify provider context-window overflow by semantic evidence instead of error shape. A shared `ContextOverflow` module owns detection; `ModelRegistry.classifyFailure` falls back to it for every registration, so overflow errors that fail stream-schema decoding, arrive with unexpected framing, or come from providers without a classifier still trigger reactive compaction. Responses SSE normalization now applies regardless of response content-type, joins multi-`data:`-line frames, and flattens nested errors that carry a top-level message. Also isolates the package-smoke consumer install cache so a freshly packed tarball is never masked by a same-version cache entry.
