@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.11.1
+## 0.11.2
 
-- Classify provider context-window overflow by semantic evidence instead of error shape. A shared `ContextOverflow` module owns detection; `ModelRegistry.classifyFailure` falls back to it for every registration, so overflow errors that fail stream-schema decoding, arrive with unexpected framing, or come from providers without a classifier still trigger reactive compaction. Responses SSE normalization now applies regardless of response content-type, joins multi-`data:`-line frames, and flattens nested errors that carry a top-level message.
+- Classify provider context-window overflow by semantic evidence instead of error shape. A shared `ContextOverflow` module owns detection; `ModelRegistry.classifyFailure` falls back to it for every registration, so overflow errors that fail stream-schema decoding, arrive with unexpected framing, or come from providers without a classifier still trigger reactive compaction. Responses SSE normalization now applies regardless of response content-type, joins multi-`data:`-line frames, and flattens nested errors that carry a top-level message. Also isolates the package-smoke consumer install cache so a freshly packed tarball is never masked by a same-version cache entry.
 
 ## 0.11.0
 
