@@ -12,6 +12,7 @@ import {
   ModelRegistry,
   ModelResilience,
   ModelMiddleware,
+  ModelTelemetry,
   Permissions,
   Session,
   SkillSource,
@@ -874,7 +875,17 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
           const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "relay input" }))
 
-          expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "TurnCompleted", "Completed"])
+          expect(events.map((event) => event._tag)).toEqual([
+            "TurnStarted",
+            "ModelCallStarted",
+            "ModelAttemptStarted",
+            "ModelAttemptFirstOutput",
+            "ModelPart",
+            "ModelAttemptCompleted",
+            "ModelCallCompleted",
+            "TurnCompleted",
+            "Completed",
+          ])
           const completed = events.at(-1)
           expect(completed?._tag).toBe("Completed")
           if (completed?._tag === "Completed") {
@@ -882,7 +893,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             expect(completed.turns).toBe(1)
             expect("usage" in completed).toBe(false)
           }
-          const modelPart = events[1]
+          const modelPart = events.find((event) => event._tag === "ModelPart")
           if (modelPart?._tag === "ModelPart") {
             expect(modelPart.part.type).toBe("text-delta")
           }
@@ -1706,8 +1717,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
         expect(events.map((event) => event._tag)).toEqual([
           "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
           "ModelPart",
           "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "TurnCompleted",
           "Completed",
         ])
@@ -2422,7 +2438,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
         expect(events.map((event) => event._tag)).toEqual([
           "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
           "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "ApprovalRequested",
           "TurnCompleted",
         ])
@@ -2751,7 +2772,17 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "complete" }))
 
         expect(calls).toBe(1)
-        expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "TurnCompleted", "Completed"])
+        expect(events.map((event) => event._tag)).toEqual([
+          "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
+          "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
+          "TurnCompleted",
+          "Completed",
+        ])
       }),
     ] as const
   })
@@ -2776,7 +2807,17 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const session = yield* Session.SessionStore
 
         expect(calls).toBe(1)
-        expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "TurnCompleted", "Completed"])
+        expect(events.map((event) => event._tag)).toEqual([
+          "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
+          "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
+          "TurnCompleted",
+          "Completed",
+        ])
         expect(yield* session.path()).toEqual([])
       }),
     ] as const
@@ -4488,8 +4529,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
         expect(events.map((event) => event._tag)).toEqual([
           "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
           "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "TurnCompleted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "StructuredOutput",
           "Completed",
         ])
@@ -4550,9 +4601,19 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(turnSpans.every((span) => span.status._tag === "Ended" && Exit.isSuccess(span.status.exit))).toBe(true)
         expect(events.map((event) => event._tag)).toEqual([
           "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
           "ModelPart",
           "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "TurnCompleted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "StructuredOutput",
           "Completed",
         ])
@@ -4585,12 +4646,22 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const agent = Agent.make({ name: "structured-lazy-span-agent" })
 
         const events = yield* Agent.stream(agent, { prompt: "make object", output: { schema: objectSchema } }).pipe(
-          Stream.take(4),
+          Stream.take(9),
           Stream.runCollect,
           Effect.withTracer(tracer),
         )
 
-        expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "ModelPart", "TurnCompleted"])
+        expect(events.map((event) => event._tag)).toEqual([
+          "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
+          "ModelPart",
+          "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
+          "TurnCompleted",
+        ])
         expect(structuredCalled).toBe(false)
         const turnSpans = spans.filter((span) => span.name === "Baton.Agent.turn")
         expect(turnSpans.map((span) => span.attributes.get("baton.turn"))).toEqual([0])
@@ -4662,13 +4733,28 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(structuredPrompt).toContain("from model")
         expect(events.map((event) => event._tag)).toEqual([
           "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
           "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "ToolExecutionStarted",
           "ToolExecutionCompleted",
           "TurnCompleted",
           "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
           "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "TurnCompleted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "StructuredOutput",
           "Completed",
         ])
@@ -4871,8 +4957,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ToolExecutionCompleted",
           "TurnCompleted",
           "TurnStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
           "ModelPart",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "TurnCompleted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptFirstOutput",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
           "StructuredOutput",
           "Completed",
         ])
@@ -6247,7 +6343,17 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
           const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "provider already handled it" }))
 
-          expect(events.map((event) => event._tag)).toEqual(["TurnStarted", "ModelPart", "TurnCompleted", "Completed"])
+          expect(events.map((event) => event._tag)).toEqual([
+            "TurnStarted",
+            "ModelCallStarted",
+            "ModelAttemptStarted",
+            "ModelAttemptFirstOutput",
+            "ModelPart",
+            "ModelAttemptCompleted",
+            "ModelCallCompleted",
+            "TurnCompleted",
+            "Completed",
+          ])
           expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(false)
           expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(false)
           const modelPart = events.find((event) => event._tag === "ModelPart")
@@ -6620,4 +6726,326 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       }),
     ] as const
   })
+
+  ItLayer.make(it, "joins model telemetry and ModelPart identity across a tool-call run", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(
+                toolCallPart("tool-call-telemetry", "echo", { text: "observe" }),
+                finishPart("tool-calls", usage({ total: 10 }, { total: 2 })),
+              )
+            : Stream.make(textDelta("done"), finishPart("stop", usage({ total: 12 }, { total: 3 })))
+        }),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "telemetry-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+
+        const callsStarted = events.filter((event) => event._tag === "ModelCallStarted")
+        const attemptsStarted = events.filter((event) => event._tag === "ModelAttemptStarted")
+        const callsCompleted = events.filter((event) => event._tag === "ModelCallCompleted")
+        const modelParts = events.filter((event) => event._tag === "ModelPart")
+
+        expect(callsStarted.map((event) => event.turn)).toEqual([0, 1])
+        expect(callsStarted.every((event) => event.purpose === "conversation")).toBe(true)
+        expect(new Set(callsStarted.map((event) => event.modelCallId)).size).toBe(2)
+        expect(callsCompleted.map((event) => event.attempts)).toEqual([1, 1])
+        expect(callsCompleted.map((event) => event.usage?.outputTokens.total)).toEqual([2, 3])
+        expect(modelParts.length).toBeGreaterThan(0)
+        for (const part of modelParts) {
+          const call = callsStarted.find((event) => event.turn === part.turn)
+          const attempt = attemptsStarted.find((event) => event.turn === part.turn)
+          expect(part.modelCallId).toBe(call?.modelCallId)
+          expect(part.modelAttemptId).toBe(attempt?.modelAttemptId)
+          expect(part.attempt).toBe(0)
+        }
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "streams the retry lifecycle and stamps parts with the retried attempt", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1 ? Stream.fail(transientModelError) : Stream.make(textDelta("recovered"))
+        }),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        retryTransientModelError,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "retry-telemetry-agent" })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "retry stream" }))
+
+        const attemptsStarted = events.filter((event) => event._tag === "ModelAttemptStarted")
+        const attemptFailed = events.filter((event) => event._tag === "ModelAttemptFailed")
+        const retries = events.filter((event) => event._tag === "ModelRetryScheduled")
+        const modelParts = events.filter((event) => event._tag === "ModelPart")
+
+        expect(calls).toBe(2)
+        expect(attemptsStarted.map((event) => event.attempt)).toEqual([0, 1])
+        expect(attemptFailed.map((event) => event.category)).toEqual(["rate-limit"])
+        expect(attemptFailed.map((event) => event.classification)).toEqual(["transient"])
+        expect(retries.map((event) => event.attempt)).toEqual([0])
+        expect(retries.map((event) => event.reason)).toEqual(["provider-resilience"])
+        expect(modelParts.every((event) => event.attempt === 1)).toBe(true)
+        expect(modelParts.every((event) => event.modelAttemptId === attemptsStarted[1]?.modelAttemptId)).toBe(true)
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(
+    it,
+    "marks the terminal structured turn as a structured-output call",
+    () =>
+      [
+        Layer.mergeAll(
+          modelLayer(
+            () => Stream.make(textDelta("normal answer")),
+            () => Effect.succeed([{ type: "text", text: '{"ok":true}' }]),
+          ),
+          unusedExecutor,
+          Approvals.layerAutoApprove,
+          ModelMiddleware.layerIdentity,
+        ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "structured-telemetry-agent" })
+
+          const events = yield* Stream.runCollect(
+            Agent.stream(agent, { prompt: "object", output: { schema: objectSchema } }),
+          )
+
+          const purposes = events
+            .filter((event) => event._tag === "ModelCallStarted")
+            .map((event) => [event.turn, event.purpose])
+          expect(purposes).toEqual([
+            [0, "conversation"],
+            [1, "structured-output"],
+          ])
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(it, "surfaces run failure after emitting the failed call telemetry", () => {
+    const terminalStreamError = AiError.make({
+      module: "AgentTestLanguageModel",
+      method: "streamText",
+      reason: AiError.AuthenticationError.make({ kind: "InvalidKey" }),
+    })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.fail(terminalStreamError)),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "failing-telemetry-agent" })
+        const seen: Array<AgentEvent.Event> = []
+
+        const failure = yield* Effect.flip(
+          Stream.runDrain(
+            Agent.stream(agent, { prompt: "fail" }).pipe(
+              Stream.tap((event) =>
+                Effect.sync(() => {
+                  seen.push(event)
+                }),
+              ),
+            ),
+          ),
+        )
+
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        const attemptFailed = seen.filter((event) => event._tag === "ModelAttemptFailed")
+        const callFailed = seen.filter((event) => event._tag === "ModelCallFailed")
+        expect(attemptFailed.map((event) => event.category)).toEqual(["authentication"])
+        expect(callFailed.map((event) => event.category)).toEqual(["authentication"])
+      }),
+    ] as const
+  })
+
+  it.effect("interrupts a hanging instrumented model stream immediately", () =>
+    Effect.gen(function* () {
+      const sawPart = yield* Deferred.make<void>()
+      const providedModelLayer = Layer.effect(
+        LanguageModel.LanguageModel,
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: () => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.never)),
+        }),
+      )
+      const agent = Agent.make({ name: "telemetry-interrupt-agent" })
+      const seen: Array<AgentEvent.Event> = []
+      const run = Agent.stream(agent, { prompt: "hang" }).pipe(
+        Stream.provide(providedModelLayer),
+        Stream.tap((event) =>
+          Effect.sync(() => {
+            seen.push(event)
+          }).pipe(Effect.andThen(event._tag === "ModelPart" ? Deferred.succeed(sawPart, undefined) : Effect.void)),
+        ),
+        Stream.runDrain,
+      )
+
+      const fiber = yield* run.pipe(Effect.forkChild({ startImmediately: true }))
+      yield* Deferred.await(sawPart)
+      yield* Fiber.interrupt(fiber)
+      const exit = yield* Fiber.await(fiber)
+
+      expect(Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause)).toBe(true)
+      expect(seen.map((event) => event._tag)).toEqual([
+        "TurnStarted",
+        "ModelCallStarted",
+        "ModelAttemptStarted",
+        "ModelAttemptFirstOutput",
+        "ModelPart",
+      ])
+    }),
+  )
+
+  ItLayer.make(it, "links compaction lifecycle to the summary model call", () => {
+    let streamCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => {
+            streamCalls += 1
+            return streamCalls === 1
+              ? Stream.make(
+                  toolCallPart("tool-call-compaction-telemetry", "echo", { text: "needs summary" }),
+                  finishPart("stop", usage({ total: 100 }, { total: 1 })),
+                )
+              : Stream.make(textDelta("after compaction"))
+          },
+          () => Effect.succeed([{ type: "text", text: "checkpoint summary" }]),
+        ),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        Session.layerMemory,
+        Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "compaction-telemetry-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context" }))
+
+        const compactionStarted = events.filter((event) => event._tag === "CompactionStarted")
+        const compactionCompleted = events.filter((event) => event._tag === "CompactionCompleted")
+        const summaryCalls = events.filter(
+          (event) => event._tag === "ModelCallStarted" && event.purpose === "compaction-summary",
+        )
+
+        expect(compactionStarted).toHaveLength(2)
+        expect(compactionStarted.every((event) => event.trigger === "threshold")).toBe(true)
+        expect(compactionStarted.every((event) => (event.contextTokensBefore ?? 0) > 0)).toBe(true)
+        expect(compactionCompleted.map((event) => event.kind)).toEqual(["unchanged", "summarize"])
+        expect(compactionCompleted.map((event) => event.compactionId)).toEqual(
+          compactionStarted.map((event) => event.compactionId),
+        )
+        const summarize = compactionCompleted[1]
+        expect(summaryCalls).toHaveLength(1)
+        expect(summaryCalls[0]?._tag === "ModelCallStarted" && summaryCalls[0].compactionId).toBe(
+          summarize?.compactionId,
+        )
+        expect(summarize?._tag === "CompactionCompleted" && summarize.summaryModelCallId).toBe(
+          summaryCalls[0]?._tag === "ModelCallStarted" ? summaryCalls[0].modelCallId : undefined,
+        )
+        expect(
+          compactionCompleted[0]?._tag === "CompactionCompleted" && "summaryModelCallId" in compactionCompleted[0],
+        ).toBe(false)
+        const summaryCompleted = events.find(
+          (event) =>
+            event._tag === "ModelCallCompleted" &&
+            summaryCalls[0]?._tag === "ModelCallStarted" &&
+            event.modelCallId === summaryCalls[0].modelCallId,
+        )
+        expect(summaryCompleted?._tag).toBe("ModelCallCompleted")
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "keeps tool-owned model calls out of run telemetry", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("tool-call-tool-owned", "echo", { text: "ask the model" }))
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.layerTest({
+          execute: () =>
+            Effect.gen(function* () {
+              const model = yield* Effect.serviceOption(LanguageModel.LanguageModel)
+              expect(Option.isSome(model)).toBe(true)
+              if (Option.isSome(model)) {
+                yield* Stream.runDrain(model.value.streamText({ prompt: "tool-owned model call" })).pipe(Effect.orDie)
+              }
+              return {
+                _tag: "Success",
+                result: { echoed: true },
+                encodedResult: { echoed: true },
+              }
+            }),
+        }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "tool-owned-model-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+
+        const callsStarted = events.filter((event) => event._tag === "ModelCallStarted")
+        const attemptsStarted = events.filter((event) => event._tag === "ModelAttemptStarted")
+        expect(callsStarted.map((event) => event.turn)).toEqual([0, 1])
+        expect(attemptsStarted.map((event) => event.turn)).toEqual([0, 1])
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "resets inherited compaction telemetry context at the run boundary", () => [
+    Layer.mergeAll(
+      modelLayer(() => Stream.make(textDelta("plain"))),
+      unusedExecutor,
+      Approvals.layerAutoApprove,
+      ModelMiddleware.layerIdentity,
+    ),
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "reset-telemetry-agent" })
+      const outerCell: ModelTelemetry.SummaryCallCell = { current: undefined }
+
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, { prompt: "nested run inside a summarizer" }).pipe(
+          Stream.provideService(ModelTelemetry.CurrentPurpose, "compaction-summary"),
+          Stream.provideService(ModelTelemetry.CurrentCompactionId, "outer-compaction"),
+          Stream.provideService(ModelTelemetry.CurrentSummaryCall, outerCell),
+        ),
+      )
+
+      const started = events.filter((event) => event._tag === "ModelCallStarted")
+      expect(started).toHaveLength(1)
+      expect(started[0]?.purpose).toBe("conversation")
+      expect(started[0]?.compactionId).toBeUndefined()
+      expect(outerCell.current).toBeUndefined()
+      expect(events.at(-1)?._tag).toBe("Completed")
+    }),
+  ])
 })

@@ -45,7 +45,16 @@ import {
   type LanguageModelNotRegistered,
   ModelRegistry,
 } from "./model-registry.js"
-import { ModelResilience, apply } from "./model-resilience.js"
+import { instrument, makeIdentityCell } from "./model-instrumentation.js"
+import { ModelResilience } from "./model-resilience.js"
+import {
+  CurrentCompactionId,
+  CurrentInstrumentation,
+  CurrentPurpose,
+  CurrentSummaryCall,
+  type Event as ModelTelemetryEvent,
+  type ModelCallPurpose,
+} from "./model-telemetry.js"
 import { Permissions, RuleStore } from "./permissions.js"
 import {
   type Entry,
@@ -388,6 +397,20 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       )
 
       const resilienceService = yield* Effect.serviceOption(ModelResilience)
+      const pendingTelemetry: Array<ModelTelemetryEvent> = []
+      const emitTelemetry = (event: ModelTelemetryEvent): Effect.Effect<void> =>
+        Effect.sync(() => {
+          pendingTelemetry.push(event)
+        })
+      const flushTelemetry = (): ReadonlyArray<Event> => pendingTelemetry.splice(0, pendingTelemetry.length)
+      const telemetryIdentity = makeIdentityCell()
+      const instrumentModel = (model: LanguageModel.Service, turn: number): LanguageModel.Service =>
+        instrument(model, {
+          emit: emitTelemetry,
+          turn,
+          identity: telemetryIdentity,
+          ...(Option.isSome(resilienceService) ? { resilience: resilienceService.value } : {}),
+        })
       const modelRegistryService = yield* Effect.serviceOption(ModelRegistry)
       const permissionsService = yield* Effect.serviceOption(Permissions)
       const ruleStoreService = yield* Effect.serviceOption(RuleStore)
@@ -1262,25 +1285,15 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           }
         }).pipe(Effect.orDie)
 
-      const withModelResilience = <A, E, R2>(effect: Effect.Effect<A, E, R2>) =>
-        Option.match(resilienceService, {
-          onNone: () => effect,
-          onSome: (resilience) =>
-            Effect.flatMap(LanguageModel.LanguageModel, (model) =>
-              effect.pipe(
-                Effect.provideService(
-                  LanguageModel.LanguageModel,
-                  apply(model, {
-                    ...resilience,
-                    classify: (error) =>
-                      classifyModelFailure(model, error) === "context-overflow"
-                        ? "terminal"
-                        : resilience.classify(error),
-                  }),
-                ),
-              ),
+      const withModelTelemetry =
+        (turn: number, purpose: ModelCallPurpose) =>
+        <A, E, R2>(effect: Effect.Effect<A, E, R2>) =>
+          Effect.flatMap(LanguageModel.LanguageModel, (model) =>
+            effect.pipe(
+              Effect.provideService(LanguageModel.LanguageModel, instrumentModel(model, turn)),
+              Effect.provideService(CurrentPurpose, purpose),
             ),
-        })
+          )
 
       const withAgentModel = <A, E, R2>(
         effect: Effect.Effect<A, E, R2>,
@@ -1312,7 +1325,20 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           if (isToolNameCollision(part.error)) return Stream.fail(part.error)
           return Stream.fail(AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }))
         }
-        const modelPart = Stream.fromIterable<Event>([{ _tag: "ModelPart", turn, part }])
+        const identity = telemetryIdentity.current
+        if (identity === undefined) {
+          return Stream.fromEffect(Effect.die(new Error("ModelPart produced outside an instrumented model attempt")))
+        }
+        const modelPart = Stream.fromIterable<Event>([
+          {
+            _tag: "ModelPart",
+            turn,
+            modelCallId: identity.modelCallId,
+            modelAttemptId: identity.modelAttemptId,
+            attempt: identity.attempt,
+            part,
+          },
+        ])
         if (part.type === "text-delta") {
           state.text = `${state.text}${part.delta}`
         }
@@ -1374,6 +1400,22 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
 
       const modelTurn = (turn: number, prompt: Prompt.RawInput, registry: Registry, overrides?: TurnOverrides) => {
         const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
+        const instrumentTurnStream = <A, E>(
+          stream: Stream.Stream<A, E, LanguageModel.LanguageModel>,
+        ): Stream.Stream<A, E, LanguageModel.LanguageModel> =>
+          Stream.unwrap(
+            LanguageModel.LanguageModel.pipe(
+              Effect.map((model) =>
+                stream.pipe(
+                  Stream.provideService(LanguageModel.LanguageModel, instrumentModel(model, turn)),
+                  Stream.provideService(CurrentInstrumentation, {
+                    emit: emitTelemetry,
+                    wrap: (summaryModel) => instrumentModel(summaryModel, turn),
+                  }),
+                ),
+              ),
+            ),
+          )
         const attempt = (
           activePrompt: Prompt.Prompt,
           retryOverflow: boolean,
@@ -1519,7 +1561,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                 readonly toolCallIndex: number
               }>()
               const toolCallBatch: Request["toolCallBatch"] = { calls }
-              const accepted = attempt(transformedPrompt, true).pipe(
+              const accepted = instrumentTurnStream(attempt(transformedPrompt, true)).pipe(
                 Stream.mapEffect(({ accept, part, messages }) => accept.pipe(Effect.as({ part, messages }))),
                 Stream.map(({ part, messages }) => {
                   const toolCallIndex = nextToolCallIndex
@@ -1561,31 +1603,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             }),
           ),
         )
-        const resilientParts = Option.match(resilienceService, {
-          onNone: () => parts,
-          onSome: (resilience) =>
-            Stream.unwrap(
-              LanguageModel.LanguageModel.pipe(
-                Effect.map((model) =>
-                  parts.pipe(
-                    Stream.provideService(
-                      LanguageModel.LanguageModel,
-                      apply(model, {
-                        ...resilience,
-                        classify: (error) =>
-                          classifyModelFailure(model, error) === "context-overflow"
-                            ? "terminal"
-                            : resilience.classify(error),
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        })
-        return overrides?.model === undefined
-          ? provideAgentModel(resilientParts)
-          : resilientParts.pipe(Stream.provide(overrides.model))
+        return overrides?.model === undefined ? provideAgentModel(parts) : parts.pipe(Stream.provide(overrides.model))
       }
 
       const turnCompletedEvent = (turn: number, transcript: Prompt.Prompt): TurnCompleted => ({
@@ -1620,7 +1638,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               objectName: config.objectName,
               toolChoice: "none",
             }).pipe(
-              withModelResilience,
+              withModelTelemetry(structuredTurn, "structured-output"),
               withAgentModel,
               Effect.catchCause(
                 (cause): Effect.Effect<never, AgentError | AiError.AiError | LanguageModelNotRegistered> => {
@@ -1901,7 +1919,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       const initialPrompt =
         options.resume === undefined ? yield* recallInitialPrompt(baseInitialPrompt) : baseInitialPrompt
       const runStream = validatedResume === undefined ? runTurn(0, initialPrompt) : resumeStream(validatedResume)
-      return runStream.pipe(
+      const guardedStream = runStream.pipe(
         Stream.catchCause((cause) => {
           const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
           if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(DuplicateToolCallId)(reason.error)) {
@@ -1924,6 +1942,18 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           }
           return Stream.failCause<RunError>(cause)
         }),
+      )
+      return guardedStream.pipe(
+        Stream.provideService(CurrentInstrumentation, undefined),
+        Stream.provideService(CurrentPurpose, "conversation"),
+        Stream.provideService(CurrentCompactionId, undefined),
+        Stream.provideService(CurrentSummaryCall, undefined),
+        Stream.map((event): ReadonlyArray<Event> => [...flushTelemetry(), event]),
+        Stream.flattenIterable,
+        Stream.concat(Stream.suspend(() => Stream.fromIterable(flushTelemetry()))),
+        Stream.catchCause((cause) =>
+          Stream.concat(Stream.fromIterable(flushTelemetry()), Stream.failCause<RunError>(cause)),
+        ),
       )
     }),
   ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } }))

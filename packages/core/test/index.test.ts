@@ -21,6 +21,7 @@ import {
   IdGenerator,
   LanguageModel,
   Model,
+  ModelTelemetry,
   Prompt,
   Response,
   ResponseIdTracker,
@@ -45,5 +46,29 @@ describe("@batonfx/core public surface", () => {
     expect(Model).toBe(EffectModel)
     expect(ResponseIdTracker).toBe(EffectResponseIdTracker)
     expect(Telemetry).toBe(EffectTelemetry)
+  })
+
+  it("exports the model telemetry contract", () => {
+    expect(ModelTelemetry.Event).toBeDefined()
+    expect(ModelTelemetry.ModelCallStarted).toBeDefined()
+    expect(ModelTelemetry.ModelAttemptStarted).toBeDefined()
+    expect(ModelTelemetry.ModelAttemptFirstOutput).toBeDefined()
+    expect(ModelTelemetry.ModelAttemptCompleted).toBeDefined()
+    expect(ModelTelemetry.ModelAttemptFailed).toBeDefined()
+    expect(ModelTelemetry.ModelRetryScheduled).toBeDefined()
+    expect(ModelTelemetry.ModelCallCompleted).toBeDefined()
+    expect(ModelTelemetry.ModelCallFailed).toBeDefined()
+    expect(ModelTelemetry.CompactionStarted).toBeDefined()
+    expect(ModelTelemetry.CompactionCompleted).toBeDefined()
+    expect(ModelTelemetry.CompactionFailed).toBeDefined()
+    expect(ModelTelemetry.ModelCallPurpose).toBeDefined()
+    expect(ModelTelemetry.ModelFailureCategory).toBeDefined()
+    expect(ModelTelemetry.ModelFailureClassification).toBeDefined()
+    expect(ModelTelemetry.ModelRetryReason).toBeDefined()
+    expect(ModelTelemetry.ModelFirstOutputKind).toBeDefined()
+    expect(ModelTelemetry.ModelCost).toBeDefined()
+    expect(ModelTelemetry.CompactionTrigger).toBeDefined()
+    expect(ModelTelemetry.CompactionKind).toBeDefined()
+    expect(ModelTelemetry.classifyFailureCategory).toBeTypeOf("function")
   })
 })

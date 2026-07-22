@@ -37,7 +37,14 @@ const toolResult = Response.makePart("tool-result", {
 
 const frames: ReadonlyArray<Wire.LooseServerFrameType> = [
   eventFrame(0, { _tag: "TurnStarted", turn: 0 }),
-  eventFrame(1, { _tag: "ModelPart", turn: 0, part: toolCall }),
+  eventFrame(1, {
+    _tag: "ModelPart",
+    turn: 0,
+    modelCallId: "model-call-0",
+    modelAttemptId: "model-attempt-0",
+    attempt: 0,
+    part: toolCall,
+  }),
   eventFrame(2, { _tag: "ToolExecutionStarted", turn: 0, call: toolCall }),
   eventFrame(3, { _tag: "ToolProgress", turn: 0, toolCallId: "lookup-1", message: "looking up" }),
   eventFrame(4, { _tag: "ToolExecutionCompleted", turn: 0, call: toolCall, result: toolResult }),
@@ -46,11 +53,17 @@ const frames: ReadonlyArray<Wire.LooseServerFrameType> = [
   eventFrame(7, {
     _tag: "ModelPart",
     turn: 1,
+    modelCallId: "model-call-1",
+    modelAttemptId: "model-attempt-1",
+    attempt: 0,
     part: Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Check the transport stream." }),
   }),
   eventFrame(8, {
     _tag: "ModelPart",
     turn: 1,
+    modelCallId: "model-call-1",
+    modelAttemptId: "model-attempt-1",
+    attempt: 0,
     part: Response.makePart("text-delta", { id: "answer-1", delta: "Final answer" }),
   }),
   eventFrame(9, { _tag: "TurnCompleted", turn: 1 }),

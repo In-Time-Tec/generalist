@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+
+- Add the public `ModelTelemetry` contract: typed model-call, attempt, retry, and compaction lifecycle events in the agent event stream. A stable `modelCallId` joins one prepared input across provider attempts, `modelAttemptId` plus a 0-based `attempt` ordinal name each provider invocation, and every `ModelPart` now carries all three (a breaking `ModelPart` and transport wire change; update fixtures and exhaustive event matches). Timestamps are sampled from the Effect Clock at real operation boundaries, usage and provider metadata stay optional (absent means unknown), failures map onto bounded provider-neutral categories, `ModelResilience` retries emit `ModelRetryScheduled` with classification and accepted backoff, and compaction passes emit started/completed/failed events linking summary work through `compactionId` and `summaryModelCallId`. Telemetry never carries prompts, model bodies, credentials, headers, or arbitrary provider error payloads.
+
 ## 0.8.0
 
 - Add the Effect v4 Amazon Bedrock provider with Converse and ConverseStream, tool and structured-output support, signed and redacted reasoning, AWS default-chain and bearer authentication, refreshable per-request credentials, and narrowly gated coalesced expired-credential recovery. Import it as `AmazonBedrock` from `@batonfx/providers` or from `@batonfx/providers/amazon-bedrock`.

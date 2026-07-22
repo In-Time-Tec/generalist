@@ -28,6 +28,9 @@ describe("Chat", () => {
       eventFrame(1, {
         _tag: "ModelPart",
         turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
         part: Response.makePart("text-delta", { id: "text-1", delta: "Hello " }),
       }),
     )
@@ -36,6 +39,9 @@ describe("Chat", () => {
       eventFrame(2, {
         _tag: "ModelPart",
         turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
         part: Response.makePart("text-delta", { id: "text-1", delta: "world" }),
       }),
     )
@@ -46,7 +52,17 @@ describe("Chat", () => {
       params: { q: "baton" },
       providerExecuted: false,
     })
-    ;[model] = updateWith(model, eventFrame(3, { _tag: "ModelPart", turn: 0, part: call }))
+    ;[model] = updateWith(
+      model,
+      eventFrame(3, {
+        _tag: "ModelPart",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
+        part: call,
+      }),
+    )
     expect(model.entries).toEqual([
       {
         _tag: "ToolEntry",
@@ -86,6 +102,97 @@ describe("Chat", () => {
     ;[model, , output] = updateWith(model, eventFrame(6, { _tag: "Completed", turns: 1, text: "Done" }))
     expect(model.run).toEqual({ _tag: "Idle" })
     expect(Option.getOrUndefined(output)).toEqual({ _tag: "RunCompleted", text: "Done" })
+  })
+
+  it("advances past model telemetry events without changing display state", () => {
+    let model = Chat.initialModel("s-chat")
+    ;[model] = updateWith(model, eventFrame(0, { _tag: "TurnStarted", turn: 0 }))
+    const afterTurnStarted = model
+
+    const telemetryEvents: ReadonlyArray<Wire.EventType> = [
+      {
+        _tag: "ModelCallStarted",
+        turn: 0,
+        modelCallId: "model-call-0",
+        purpose: "conversation",
+        startedAt: 1,
+      },
+      {
+        _tag: "ModelAttemptStarted",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
+        startedAt: 2,
+      },
+      {
+        _tag: "ModelAttemptFirstOutput",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
+        kind: "text",
+        at: 3,
+      },
+      {
+        _tag: "ModelAttemptFailed",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
+        failedAt: 4,
+        category: "rate-limit",
+        classification: "transient",
+      },
+      {
+        _tag: "ModelRetryScheduled",
+        turn: 0,
+        modelCallId: "model-call-0",
+        attempt: 0,
+        reason: "provider-resilience",
+        category: "rate-limit",
+        delayMillis: 100,
+        at: 5,
+      },
+      {
+        _tag: "ModelAttemptCompleted",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-1",
+        attempt: 1,
+        completedAt: 6,
+      },
+      {
+        _tag: "ModelCallCompleted",
+        turn: 0,
+        modelCallId: "model-call-0",
+        purpose: "conversation",
+        attempts: 2,
+        completedAt: 7,
+      },
+      {
+        _tag: "ModelCallFailed",
+        turn: 0,
+        modelCallId: "model-call-1",
+        purpose: "structured-output",
+        attempts: 1,
+        failedAt: 8,
+        category: "authentication",
+      },
+      { _tag: "CompactionStarted", turn: 0, compactionId: "compaction-0", trigger: "threshold", startedAt: 9 },
+      { _tag: "CompactionCompleted", turn: 0, compactionId: "compaction-0", kind: "summarize", completedAt: 10 },
+      { _tag: "CompactionFailed", turn: 0, compactionId: "compaction-1", failedAt: 11 },
+    ]
+
+    let seq = 1
+    for (const event of telemetryEvents) {
+      const [next, commands, output] = updateWith(model, eventFrame(seq, event))
+      expect(commands).toEqual([])
+      expect(Option.isNone(output)).toBe(true)
+      expect(next).toEqual({ ...afterTurnStarted, lastSeq: seq })
+      model = next
+      seq += 1
+    }
   })
 
   it("drops replayed frames whose seq is not newer than lastSeq", () => {

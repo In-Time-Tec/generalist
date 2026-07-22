@@ -1,0 +1,461 @@
+import { Cause, Clock, Duration, Effect, Exit, Function, Option, Schedule, Stream } from "effect"
+import { AiError, LanguageModel, Model, Response } from "effect/unstable/ai"
+import { classifyFailure } from "./model-registry.js"
+import { type Classification, type Interface as Resilience, apply } from "./model-resilience.js"
+import {
+  CurrentCompactionId,
+  CurrentPurpose,
+  CurrentSummaryCall,
+  type Event,
+  type ModelCallPurpose,
+  type ModelFailureCategory,
+  type ModelFirstOutputKind,
+  classifyFailureCategory,
+  generateId,
+} from "./model-telemetry.js"
+
+/** @experimental Identity of the provider attempt that produced the current stream part. */
+export interface Identity {
+  readonly modelCallId: string
+  readonly modelAttemptId: string
+  readonly attempt: number
+}
+
+/** @experimental Mutable cell tracking the active attempt identity within one run. */
+export interface IdentityCell {
+  current: Identity | undefined
+}
+
+/** @experimental */
+export const makeIdentityCell = (): IdentityCell => ({ current: undefined })
+
+/** @experimental Options for instrumenting one loop-owned model service. */
+export interface InstrumentOptions {
+  readonly emit: (event: Event) => Effect.Effect<void>
+  readonly turn: number
+  readonly identity?: IdentityCell
+  readonly resilience?: Resilience
+}
+
+const InstrumentedTypeId = Symbol.for("@batonfx/core/model-instrumentation/Instrumented")
+
+interface InstrumentedMarker {
+  readonly emit: InstrumentOptions["emit"]
+  readonly base: LanguageModel.Service
+}
+
+interface CallState {
+  attempts: number
+  usage: Response.Usage | undefined
+  finishReason: Response.FinishReason | undefined
+  errorCategory: ModelFailureCategory | undefined
+}
+
+interface CallContext {
+  readonly options: InstrumentOptions
+  readonly modelCallId: string
+  readonly purpose: ModelCallPurpose
+  readonly categorize: (error: unknown) => ModelFailureCategory
+  readonly classify: (error: unknown) => Classification
+  readonly state: CallState
+}
+
+interface AttemptState {
+  firstOutputs: Set<ModelFirstOutputKind>
+  usage: Response.Usage | undefined
+  usageAt: number | undefined
+  finishReason: Response.FinishReason | undefined
+  requestId: string | undefined
+  responseModel: string | undefined
+  errorCategory: ModelFailureCategory | undefined
+}
+
+interface AttemptContext {
+  readonly modelAttemptId: string
+  readonly attempt: number
+  readonly state: AttemptState
+}
+
+const memoized = <Result>(compute: (error: unknown) => Result): ((error: unknown) => Result) => {
+  const cache = new Map<unknown, Result>()
+  return (error: unknown): Result => {
+    const cached = cache.get(error)
+    if (cached !== undefined) return cached
+    const result = compute(error)
+    cache.set(error, result)
+    return result
+  }
+}
+
+const singleFailure = (cause: Cause.Cause<unknown>): Option.Option<unknown> => {
+  const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+  return reason !== undefined && Cause.isFailReason(reason) ? Option.some(reason.error) : Option.none()
+}
+
+const firstOutputKind = (part: Response.AnyPart): ModelFirstOutputKind | undefined => {
+  switch (part.type) {
+    case "reasoning-start":
+    case "reasoning-delta":
+    case "reasoning":
+      return "reasoning"
+    case "text-start":
+    case "text-delta":
+    case "text":
+      return "text"
+    case "tool-params-start":
+    case "tool-call":
+      return "tool-call"
+    default:
+      return undefined
+  }
+}
+
+const recordResponsePart = (context: CallContext, attempt: AttemptContext, part: Response.AnyPart): void => {
+  if (part.type === "response-metadata") {
+    attempt.state.requestId = part.id
+    attempt.state.responseModel = part.modelId
+  }
+  if (part.type === "finish") {
+    attempt.state.usage = part.usage
+    attempt.state.finishReason = part.reason
+  }
+  if (part.type === "error") {
+    attempt.state.errorCategory = context.categorize(part.error)
+  }
+}
+
+const observeStreamPart = (
+  context: CallContext,
+  attempt: AttemptContext,
+  part: Response.AnyPart,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    recordResponsePart(context, attempt, part)
+    if (part.type === "finish") {
+      attempt.state.usageAt = yield* Clock.currentTimeMillis
+    }
+    const kind = firstOutputKind(part)
+    if (kind === undefined || attempt.state.firstOutputs.has(kind)) return
+    attempt.state.firstOutputs.add(kind)
+    const at = yield* Clock.currentTimeMillis
+    yield* context.options.emit({
+      _tag: "ModelAttemptFirstOutput",
+      turn: context.options.turn,
+      modelCallId: context.modelCallId,
+      modelAttemptId: attempt.modelAttemptId,
+      attempt: attempt.attempt,
+      kind,
+      at,
+    })
+  })
+
+const attemptCompleted = (context: CallContext, attempt: AttemptContext): Effect.Effect<void> =>
+  Effect.flatMap(Clock.currentTimeMillis, (completedAt) =>
+    context.options.emit({
+      _tag: "ModelAttemptCompleted",
+      turn: context.options.turn,
+      modelCallId: context.modelCallId,
+      modelAttemptId: attempt.modelAttemptId,
+      attempt: attempt.attempt,
+      completedAt,
+      ...(attempt.state.usage === undefined ? {} : { usage: attempt.state.usage }),
+      ...(attempt.state.usageAt === undefined ? {} : { usageAt: attempt.state.usageAt }),
+      ...(attempt.state.finishReason === undefined ? {} : { finishReason: attempt.state.finishReason }),
+      ...(attempt.state.requestId === undefined ? {} : { requestId: attempt.state.requestId }),
+      ...(attempt.state.responseModel === undefined ? {} : { responseModel: attempt.state.responseModel }),
+    }),
+  )
+
+const attemptFailed = (
+  context: CallContext,
+  attempt: AttemptContext,
+  category: ModelFailureCategory,
+  classification: Classification,
+): Effect.Effect<void> =>
+  Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
+    context.options.emit({
+      _tag: "ModelAttemptFailed",
+      turn: context.options.turn,
+      modelCallId: context.modelCallId,
+      modelAttemptId: attempt.modelAttemptId,
+      attempt: attempt.attempt,
+      failedAt,
+      category,
+      classification,
+    }),
+  )
+
+const attemptExit = (
+  context: CallContext,
+  attempt: AttemptContext,
+  exit: Exit.Exit<unknown, unknown>,
+): Effect.Effect<void> => {
+  if (attempt.state.errorCategory !== undefined) {
+    return attemptFailed(context, attempt, attempt.state.errorCategory, "terminal")
+  }
+  if (Exit.isSuccess(exit)) {
+    context.state.usage = attempt.state.usage ?? context.state.usage
+    context.state.finishReason = attempt.state.finishReason ?? context.state.finishReason
+    return attemptCompleted(context, attempt)
+  }
+  if (Cause.hasInterrupts(exit.cause)) return attemptFailed(context, attempt, "cancellation", "terminal")
+  const failure = singleFailure(exit.cause)
+  if (Option.isNone(failure)) return attemptFailed(context, attempt, "unknown", "terminal")
+  return attemptFailed(context, attempt, context.categorize(failure.value), context.classify(failure.value))
+}
+
+const beginAttempt = (context: CallContext): Effect.Effect<AttemptContext> =>
+  Effect.gen(function* () {
+    const attempt = context.state.attempts
+    context.state.attempts += 1
+    const modelAttemptId = yield* generateId
+    if (context.options.identity !== undefined) {
+      context.options.identity.current = { modelCallId: context.modelCallId, modelAttemptId, attempt }
+    }
+    const startedAt = yield* Clock.currentTimeMillis
+    yield* context.options.emit({
+      _tag: "ModelAttemptStarted",
+      turn: context.options.turn,
+      modelCallId: context.modelCallId,
+      modelAttemptId,
+      attempt,
+      startedAt,
+    })
+    return {
+      modelAttemptId,
+      attempt,
+      state: {
+        firstOutputs: new Set(),
+        usage: undefined,
+        usageAt: undefined,
+        finishReason: undefined,
+        requestId: undefined,
+        responseModel: undefined,
+        errorCategory: undefined,
+      },
+    }
+  })
+
+interface AnyResponse {
+  readonly content: ReadonlyArray<Response.AnyPart>
+}
+
+const attemptEffect = <A extends AnyResponse, E, R>(
+  context: CallContext,
+  run: () => Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> =>
+  Effect.flatMap(beginAttempt(context), (attempt) =>
+    run().pipe(
+      Effect.tap((response) =>
+        Effect.forEach(response.content, (part) => observeStreamPart(context, attempt, part), { discard: true }),
+      ),
+      Effect.onExit((exit) => attemptExit(context, attempt, exit)),
+    ),
+  )
+
+const attemptStream = <A extends Response.AnyPart, E, R>(
+  context: CallContext,
+  run: () => Stream.Stream<A, E, R>,
+): Stream.Stream<A, E, R> =>
+  Stream.unwrap(
+    Effect.map(beginAttempt(context), (attempt) =>
+      run().pipe(
+        Stream.tap((part) => observeStreamPart(context, attempt, part)),
+        Stream.onExit((exit) => attemptExit(context, attempt, exit)),
+      ),
+    ),
+  )
+
+const attemptModel = (model: LanguageModel.Service, context: CallContext): LanguageModel.Service =>
+  ({
+    ...model,
+    generateText: ((options: never) =>
+      attemptEffect(context, () => model.generateText(options))) as unknown as LanguageModel.Service["generateText"],
+    generateObject: ((options: never) =>
+      attemptEffect(context, () =>
+        (model.generateObject as unknown as (options: never) => Effect.Effect<AnyResponse, AiError.AiError>)(options),
+      )) as unknown as LanguageModel.Service["generateObject"],
+    streamText: ((options: never) =>
+      attemptStream(context, () => model.streamText(options))) as unknown as LanguageModel.Service["streamText"],
+  }) as LanguageModel.Service
+
+const tappedResilience = (context: CallContext, resilience: Resilience): Resilience => ({
+  classify: context.classify,
+  retrySchedule: (resilience.retrySchedule as Schedule.Schedule<unknown, unknown>).pipe(
+    Schedule.while(({ input }) => context.classify(input) === "transient"),
+    Schedule.tap((metadata) =>
+      Effect.flatMap(Clock.currentTimeMillis, (at) =>
+        context.options.emit({
+          _tag: "ModelRetryScheduled",
+          turn: context.options.turn,
+          modelCallId: context.modelCallId,
+          attempt: context.state.attempts - 1,
+          reason: "provider-resilience",
+          category: context.categorize(metadata.input),
+          delayMillis: Duration.toMillis(metadata.duration),
+          at,
+        }),
+      ),
+    ),
+  ) as Schedule.Schedule<unknown>,
+})
+
+const beginCall = (
+  model: LanguageModel.Service,
+  options: InstrumentOptions,
+): Effect.Effect<{ readonly context: CallContext; readonly stack: LanguageModel.Service }> =>
+  Effect.gen(function* () {
+    const modelCallId = yield* generateId
+    const purpose = yield* CurrentPurpose
+    const compactionId = yield* CurrentCompactionId
+    const provider = yield* Effect.serviceOption(Model.ProviderName)
+    const modelName = yield* Effect.serviceOption(Model.ModelName)
+    const startedAt = yield* Clock.currentTimeMillis
+    yield* options.emit({
+      _tag: "ModelCallStarted",
+      turn: options.turn,
+      modelCallId,
+      purpose,
+      ...(Option.isSome(provider) ? { provider: provider.value } : {}),
+      ...(Option.isSome(modelName) ? { model: modelName.value } : {}),
+      ...(compactionId === undefined ? {} : { compactionId }),
+      startedAt,
+    })
+    if (compactionId !== undefined) {
+      const summaryCell = yield* CurrentSummaryCall
+      if (summaryCell !== undefined) summaryCell.current = modelCallId
+    }
+    const providerClassification = memoized((error) => classifyFailure(model, error))
+    const context: CallContext = {
+      options,
+      modelCallId,
+      purpose,
+      categorize: memoized((error) =>
+        providerClassification(error) === "context-overflow" ? "context-overflow" : classifyFailureCategory(error),
+      ),
+      classify: memoized((error) =>
+        providerClassification(error) === "context-overflow"
+          ? "terminal"
+          : options.resilience === undefined
+            ? "terminal"
+            : options.resilience.classify(error),
+      ),
+      state: { attempts: 0, usage: undefined, finishReason: undefined, errorCategory: undefined },
+    }
+    const attempts = attemptModel(model, context)
+    const stack =
+      options.resilience === undefined ? attempts : apply(attempts, tappedResilience(context, options.resilience))
+    return { context, stack }
+  })
+
+const observeCallPart = (context: CallContext, part: Response.AnyPart): void => {
+  if (part.type === "finish") {
+    context.state.usage = part.usage
+    context.state.finishReason = part.reason
+  }
+  if (part.type === "error") {
+    context.state.errorCategory = context.categorize(part.error)
+  }
+}
+
+const callCompleted = (context: CallContext): Effect.Effect<void> =>
+  Effect.flatMap(Clock.currentTimeMillis, (completedAt) =>
+    context.options.emit({
+      _tag: "ModelCallCompleted",
+      turn: context.options.turn,
+      modelCallId: context.modelCallId,
+      purpose: context.purpose,
+      attempts: context.state.attempts,
+      completedAt,
+      ...(context.state.usage === undefined ? {} : { usage: context.state.usage }),
+      ...(context.state.finishReason === undefined ? {} : { finishReason: context.state.finishReason }),
+    }),
+  )
+
+const callFailed = (context: CallContext, category: ModelFailureCategory): Effect.Effect<void> =>
+  Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
+    context.options.emit({
+      _tag: "ModelCallFailed",
+      turn: context.options.turn,
+      modelCallId: context.modelCallId,
+      purpose: context.purpose,
+      attempts: context.state.attempts,
+      failedAt,
+      category,
+    }),
+  )
+
+const callExit = (context: CallContext, exit: Exit.Exit<unknown, unknown>): Effect.Effect<void> => {
+  if (context.state.errorCategory !== undefined) return callFailed(context, context.state.errorCategory)
+  if (Exit.isSuccess(exit)) return callCompleted(context)
+  if (Cause.hasInterrupts(exit.cause)) return callFailed(context, "cancellation")
+  const failure = singleFailure(exit.cause)
+  return callFailed(context, Option.isNone(failure) ? "unknown" : context.categorize(failure.value))
+}
+
+const callEffect = <A extends AnyResponse, E, R>(
+  model: LanguageModel.Service,
+  options: InstrumentOptions,
+  invoke: (stack: LanguageModel.Service) => Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> =>
+  Effect.flatMap(beginCall(model, options), ({ context, stack }) =>
+    invoke(stack).pipe(
+      Effect.tap((response) =>
+        Effect.sync(() => {
+          for (const part of response.content) observeCallPart(context, part)
+        }),
+      ),
+      Effect.onExit((exit) => callExit(context, exit)),
+    ),
+  ) as Effect.Effect<A, E, R>
+
+const callStream = <A extends Response.AnyPart, E, R>(
+  model: LanguageModel.Service,
+  options: InstrumentOptions,
+  invoke: (stack: LanguageModel.Service) => Stream.Stream<A, E, R>,
+): Stream.Stream<A, E, R> =>
+  Stream.unwrap(
+    Effect.map(beginCall(model, options), ({ context, stack }) =>
+      invoke(stack).pipe(
+        Stream.tap((part) => Effect.sync(() => observeCallPart(context, part))),
+        Stream.onExit((exit) => callExit(context, exit)),
+      ),
+    ),
+  ) as Stream.Stream<A, E, R>
+
+/**
+ * @experimental Wrap a model with call, attempt, and retry telemetry emission
+ * plus the caller's resilience policy. Idempotent per run: a model already
+ * instrumented with the same emit target is returned unchanged, while a
+ * nested run re-wraps the underlying model with its own instrumentation so
+ * one provider invocation never emits into two runs.
+ */
+export const instrument: {
+  (options: InstrumentOptions): (model: LanguageModel.Service) => LanguageModel.Service
+  (model: LanguageModel.Service, options: InstrumentOptions): LanguageModel.Service
+} = Function.dual(2, (model: LanguageModel.Service, options: InstrumentOptions): LanguageModel.Service => {
+  const marker = (model as unknown as Record<PropertyKey, unknown>)[InstrumentedTypeId] as
+    | InstrumentedMarker
+    | undefined
+  if (marker !== undefined) {
+    return marker.emit === options.emit ? model : instrument(marker.base, options)
+  }
+  return {
+    ...model,
+    [InstrumentedTypeId]: { emit: options.emit, base: model } satisfies InstrumentedMarker,
+    generateText: ((generateOptions: never) =>
+      callEffect(model, options, (stack) =>
+        stack.generateText(generateOptions),
+      )) as unknown as LanguageModel.Service["generateText"],
+    generateObject: ((generateOptions: never) =>
+      callEffect(model, options, (stack) =>
+        (stack.generateObject as unknown as (options: never) => Effect.Effect<AnyResponse, AiError.AiError>)(
+          generateOptions,
+        ),
+      )) as unknown as LanguageModel.Service["generateObject"],
+    streamText: ((streamOptions: never) =>
+      callStream(model, options, (stack) =>
+        stack.streamText(streamOptions),
+      )) as unknown as LanguageModel.Service["streamText"],
+  } as LanguageModel.Service
+})

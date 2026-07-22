@@ -1,6 +1,6 @@
 import { Effect, Schema, SchemaTransformation } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentEvent, ToolExecutor, TurnPolicy } from "@batonfx/core"
+import { AgentEvent, ModelTelemetry, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import { WireEncodeFailed } from "./errors.js"
 
 /** @experimental Canonical transport frame sequence and replay cursor schema. */
@@ -129,7 +129,16 @@ const EventSchemaWith = <
 ) =>
   Schema.Union([
     Schema.Struct({ _tag: Schema.tag("TurnStarted"), turn: Schema.Finite, metadata: OptionalMetadata }),
-    Schema.Struct({ _tag: Schema.tag("ModelPart"), turn: Schema.Finite, part: streamPart, metadata: OptionalMetadata }),
+    Schema.Struct({
+      _tag: Schema.tag("ModelPart"),
+      turn: Schema.Finite,
+      modelCallId: Schema.String,
+      modelAttemptId: Schema.String,
+      attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+      part: streamPart,
+      metadata: OptionalMetadata,
+    }),
+    ModelTelemetry.Event,
     Schema.Struct({
       _tag: Schema.tag("ToolExecutionStarted"),
       turn: Schema.Finite,
@@ -213,6 +222,7 @@ export type LooseEventType = typeof LooseEventSchema.Type
 export type EventType =
   | AgentEvent.TurnStarted
   | AgentEvent.ModelPart
+  | ModelTelemetry.Event
   | AgentEvent.ToolExecutionStarted
   | AgentEvent.ToolProgress
   | AgentEvent.ToolExecutionCompleted

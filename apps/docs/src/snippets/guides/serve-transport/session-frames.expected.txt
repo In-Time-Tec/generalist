@@ -1,2 +1,2 @@
-live:   0:SessionStatus 1:SessionStatus 2:Event 3:Event 4:Event 5:Event 6:SessionStatus 7:Ended
-replay: 3:Event 4:Event 5:Event 6:SessionStatus 7:Ended
+live:   0:SessionStatus 1:SessionStatus 2:Event 3:Event 4:Event 5:Event 6:Event 7:Event 8:Event 9:Event 10:Event 11:SessionStatus 12:Ended
+replay: 3:Event 4:Event 5:Event 6:Event 7:Event 8:Event 9:Event 10:Event 11:SessionStatus 12:Ended

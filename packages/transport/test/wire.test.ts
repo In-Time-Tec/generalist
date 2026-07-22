@@ -54,7 +54,18 @@ const transcript = Prompt.fromMessages([
 
 const eventFrames = (): ReadonlyArray<Wire.ServerFrameType> => [
   { _tag: "Event", seq: 0, event: { _tag: "TurnStarted", turn: 0, metadata: { source: "test" } } },
-  { _tag: "Event", seq: 1, event: { _tag: "ModelPart", turn: 0, part: textDelta } },
+  {
+    _tag: "Event",
+    seq: 1,
+    event: {
+      _tag: "ModelPart",
+      turn: 0,
+      modelCallId: "model-call-0",
+      modelAttemptId: "model-attempt-0",
+      attempt: 0,
+      part: textDelta,
+    },
+  },
   { _tag: "Event", seq: 2, event: { _tag: "ToolExecutionStarted", turn: 0, call: toolCall } },
   {
     _tag: "Event",
@@ -71,6 +82,144 @@ const eventFrames = (): ReadonlyArray<Wire.ServerFrameType> => [
   { _tag: "Event", seq: 7, event: { _tag: "SteeringDrained", turn: 0, queue: "steering", count: 2 } },
   { _tag: "Event", seq: 8, event: { _tag: "StructuredOutput", turn: 1, value: { ok: true }, content: [textPart] } },
   { _tag: "Event", seq: 9, event: { _tag: "Completed", turns: 1, text: "hello", transcript, usage } },
+  ...telemetryFrames(),
+]
+
+const telemetryFrames = (): ReadonlyArray<Wire.ServerFrameType> => [
+  {
+    _tag: "Event",
+    seq: 10,
+    event: {
+      _tag: "ModelCallStarted",
+      turn: 0,
+      modelCallId: "model-call-0",
+      purpose: "conversation",
+      provider: "test-provider",
+      model: "test-model",
+      startedAt: 1,
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 11,
+    event: {
+      _tag: "ModelAttemptStarted",
+      turn: 0,
+      modelCallId: "model-call-0",
+      modelAttemptId: "model-attempt-0",
+      attempt: 0,
+      startedAt: 2,
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 12,
+    event: {
+      _tag: "ModelAttemptFirstOutput",
+      turn: 0,
+      modelCallId: "model-call-0",
+      modelAttemptId: "model-attempt-0",
+      attempt: 0,
+      kind: "text",
+      at: 3,
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 13,
+    event: {
+      _tag: "ModelAttemptFailed",
+      turn: 0,
+      modelCallId: "model-call-0",
+      modelAttemptId: "model-attempt-0",
+      attempt: 0,
+      failedAt: 4,
+      category: "rate-limit",
+      classification: "transient",
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 14,
+    event: {
+      _tag: "ModelRetryScheduled",
+      turn: 0,
+      modelCallId: "model-call-0",
+      attempt: 0,
+      reason: "provider-resilience",
+      category: "rate-limit",
+      delayMillis: 250,
+      at: 5,
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 15,
+    event: {
+      _tag: "ModelAttemptCompleted",
+      turn: 0,
+      modelCallId: "model-call-0",
+      modelAttemptId: "model-attempt-1",
+      attempt: 1,
+      completedAt: 6,
+      usage,
+      finishReason: "stop",
+      requestId: "req-1",
+      responseModel: "returned-model",
+      serviceTier: "default",
+      cost: { amount: 0.25, currency: "USD" },
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 16,
+    event: {
+      _tag: "ModelCallCompleted",
+      turn: 0,
+      modelCallId: "model-call-0",
+      purpose: "conversation",
+      attempts: 2,
+      completedAt: 7,
+      usage,
+      finishReason: "stop",
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 17,
+    event: {
+      _tag: "ModelCallFailed",
+      turn: 0,
+      modelCallId: "model-call-1",
+      purpose: "structured-output",
+      attempts: 1,
+      failedAt: 8,
+      category: "authentication",
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 18,
+    event: {
+      _tag: "CompactionStarted",
+      turn: 1,
+      compactionId: "compaction-0",
+      trigger: "threshold",
+      startedAt: 9,
+      contextTokensBefore: 120,
+      entriesBefore: 4,
+    },
+  },
+  {
+    _tag: "Event",
+    seq: 19,
+    event: { _tag: "CompactionCompleted", turn: 1, compactionId: "compaction-0", kind: "summarize", completedAt: 10 },
+  },
+  {
+    _tag: "Event",
+    seq: 20,
+    event: { _tag: "CompactionFailed", turn: 1, compactionId: "compaction-1", failedAt: 11 },
+  },
 ]
 
 describe("Wire", () => {
@@ -144,6 +293,42 @@ describe("Wire", () => {
         expect(decoded._tag).toBe(frame._tag)
         expect(decoded.seq).toBe(frame.seq)
       }
+    }),
+  )
+
+  it.effect("model telemetry events round-trip losslessly on strict and loose frames", () =>
+    Effect.gen(function* () {
+      const schemas = [Wire.ServerFrame(toolkit), Wire.LooseServerFrame] as const
+      for (const schema of schemas) {
+        for (const frame of telemetryFrames()) {
+          const encoded = yield* Schema.encodeUnknownEffect(schema)(frame)
+          const decoded = yield* Schema.decodeUnknownEffect(schema)(encoded)
+          expect(decoded).toEqual(frame)
+        }
+      }
+    }),
+  )
+
+  it.effect("model telemetry events keep absent optional metadata absent across the wire", () =>
+    Effect.gen(function* () {
+      const schema = Wire.ServerFrame(toolkit)
+      const frame: Wire.ServerFrameType = {
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ModelAttemptCompleted",
+          turn: 0,
+          modelCallId: "model-call-0",
+          modelAttemptId: "model-attempt-0",
+          attempt: 0,
+          completedAt: 1,
+        },
+      }
+      const encoded = yield* Schema.encodeUnknownEffect(schema)(frame)
+      const decoded = yield* Schema.decodeUnknownEffect(schema)(encoded)
+      expect(decoded).toEqual(frame)
+      expect(decoded._tag === "Event" && "usage" in decoded.event).toBe(false)
+      expect(decoded._tag === "Event" && "cost" in decoded.event).toBe(false)
     }),
   )
 
@@ -264,6 +449,9 @@ describe("Wire", () => {
       event: {
         _tag: "ModelPart",
         turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
         part: { type: "tool-call", id: "unknown-1", name: "missing", params: { x: 1 }, providerExecuted: false },
       },
     }
