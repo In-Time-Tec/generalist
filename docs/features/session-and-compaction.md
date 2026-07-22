@@ -6,4 +6,6 @@ Compaction is optional. With Session enabled, every changed projection commits t
 
 A dedicated summary-model layer is built through the owning scope's memo map and reused across compaction calls in that scope.
 
-Session entry identity, not projected message count, tracks sync progress. Divergence or ambiguous alignment fails typed rather than guessing. Without Compaction, transcript behavior is unchanged.
+Session entry identity, not projected message count, tracks sync progress. Divergence or ambiguous alignment fails typed rather than guessing, and the failure carries bounded `SessionSync.Diagnostics`: identifiers, entry and message counts, alignment count, longest common prefix, and the first divergent roles, part types, and digests — never raw prompt, message, or tool payload text. Without Compaction, transcript behavior is unchanged.
+
+Hosts that need write fencing pass `RunOptions.sessionOwnerToken`. Baton forwards the token verbatim on every Session append and compaction checkpoint (`AppendOptions.ownerToken`, `PreparedCheckpoint.ownerToken`). A durable store that no longer recognizes the token rejects the write with `SessionConflict` reason `fenced`, which fails the run typed instead of letting a stale writer advance the session.

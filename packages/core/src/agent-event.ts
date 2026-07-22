@@ -1,5 +1,6 @@
 import { Function, Schema } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
+import { Diagnostics as SessionSyncDiagnostics } from "./session-sync.js"
 import { StopReason } from "./turn-policy.js"
 /** @experimental Escape-hatch metadata carried by loop events. */
 export type Metadata = Readonly<Record<string, unknown>>
@@ -147,6 +148,7 @@ export class AgentError extends Schema.TaggedErrorClass<AgentError>()("@batonfx/
   message: Schema.String,
   turn: Schema.Finite,
   cause: Schema.optionalKey(Schema.Defect()),
+  diagnostics: Schema.optionalKey(SessionSyncDiagnostics),
 }) {}
 
 /** @experimental The turn policy declined another turn while tool results were still pending. */

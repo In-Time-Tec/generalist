@@ -42,5 +42,19 @@ export const layer = (input: LayerOptions) =>
     }),
   ]).pipe(Layer.provide(AnthropicClient.layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
 
+/** @experimental Bare registration effect; the consumer provides the Anthropic client (see layerConfig). */
+export const registration = (input: AnthropicInput) =>
+  ModelRegistry.registration({
+    provider: "anthropic",
+    model: input.model,
+    layer: AnthropicLanguageModel.layer({
+      model: input.model,
+      ...(input.config === undefined ? {} : { config: input.config }),
+    }),
+    classifyFailure,
+    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
+    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+  })
+
 /** @experimental */
 export const layerConfig = AnthropicClient.layerConfig

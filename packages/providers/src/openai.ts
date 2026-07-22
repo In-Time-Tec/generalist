@@ -74,6 +74,20 @@ export const layer = (input: LayerOptions) =>
     }),
   ]).pipe(Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
 
+/** @experimental Bare registration effect; the consumer provides the OpenAi client (see layerConfig). */
+export const registration = (input: OpenAiInput) =>
+  ModelRegistry.registration({
+    provider: "openai",
+    model: input.model,
+    layer: OpenAiLanguageModel.layer({
+      model: input.model,
+      ...(input.config === undefined ? {} : { config: input.config }),
+    }),
+    classifyFailure,
+    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
+    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+  })
+
 const stringifyJson = Schema.encodeSync(Schema.UnknownFromJsonString)
 const parseJsonOption = Schema.decodeUnknownOption(Schema.UnknownFromJsonString)
 const dataLinePrefix = /^data: ?/
@@ -312,17 +326,18 @@ const openAiAccountClientLayer = (credentials: OpenAiAccountCredentials) =>
   )
 
 /** @experimental */
-export const layerAccount = (input: OpenAiAccountInput) =>
-  ModelRegistry.layer([
-    ModelRegistry.registration({
-      provider: "openai",
+/** @experimental Bare registration effect with the account-credential client bundled into the model layer. */
+export const registrationAccount = (input: OpenAiAccountInput) =>
+  ModelRegistry.registration({
+    provider: "openai",
+    model: input.model,
+    layer: OpenAiLanguageModel.layer({
       model: input.model,
-      layer: OpenAiLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
-      classifyFailure,
-      ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
-      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-    }),
-  ])
+      ...(input.config === undefined ? {} : { config: input.config }),
+    }).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
+    classifyFailure,
+    ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
+    ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+  })
+
+export const layerAccount = (input: OpenAiAccountInput) => ModelRegistry.layer([registrationAccount(input)])
