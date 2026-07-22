@@ -3,6 +3,7 @@ import { ModelRegistry } from "@batonfx/core"
 import { Config, Effect, Function, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { AiError } from "effect/unstable/ai"
 import type { Credential, ServiceInterface } from "./openai-account-auth.js"
+import { layerImageSources } from "./image-source.js"
 import {
   FetchHttpClient,
   Headers,
@@ -77,10 +78,12 @@ export const layer = (input: LayerOptions) =>
     ModelRegistry.registration({
       provider: "openai",
       model: input.model,
-      layer: OpenAiLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }),
+      layer: layerImageSources(
+        OpenAiLanguageModel.layer({
+          model: input.model,
+          ...(input.config === undefined ? {} : { config: input.config }),
+        }),
+      ),
       classifyFailure,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
@@ -92,10 +95,12 @@ export const registration = (input: OpenAiInput) =>
   ModelRegistry.registration({
     provider: "openai",
     model: input.model,
-    layer: OpenAiLanguageModel.layer({
-      model: input.model,
-      ...(input.config === undefined ? {} : { config: input.config }),
-    }),
+    layer: layerImageSources(
+      OpenAiLanguageModel.layer({
+        model: input.model,
+        ...(input.config === undefined ? {} : { config: input.config }),
+      }),
+    ),
     classifyFailure,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
@@ -344,10 +349,12 @@ export const registrationAccount = (input: OpenAiAccountInput) =>
   ModelRegistry.registration({
     provider: "openai",
     model: input.model,
-    layer: OpenAiLanguageModel.layer({
-      model: input.model,
-      ...(input.config === undefined ? {} : { config: input.config }),
-    }).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
+    layer: layerImageSources(
+      OpenAiLanguageModel.layer({
+        model: input.model,
+        ...(input.config === undefined ? {} : { config: input.config }),
+      }),
+    ).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
     classifyFailure,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),

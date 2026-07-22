@@ -189,8 +189,12 @@ describe("AmazonBedrock", () => {
           {
             role: "user",
             content: [
+              { type: "text", text: "before" },
+              { type: "file", mediaType: "image/png", data: new TextEncoder().encode("image") },
               { type: "file", mediaType: "image/png", data: "aW1hZ2U=" },
+              { type: "file", mediaType: "image/png", data: "data:image/png;base64,aW1hZ2U=" },
               { type: "file", mediaType: "application/pdf", fileName: "report.pdf", data: "ZG9j" },
+              { type: "text", text: "after" },
             ],
           },
           {
@@ -204,15 +208,21 @@ describe("AmazonBedrock", () => {
       })
 
       expect(request?.system).toEqual([{ text: "rules" }, { cachePoint: { type: "default" } }])
-      expect(request?.messages?.[0]?.content?.[0]).toMatchObject({ image: { format: "png" } })
-      expect(request?.messages?.[0]?.content?.[1]).toMatchObject({
+      expect(request?.messages?.[0]?.content?.slice(0, 4)).toEqual([
+        { text: "before" },
+        { image: { format: "png", source: { bytes: new TextEncoder().encode("image") } } },
+        { image: { format: "png", source: { bytes: new TextEncoder().encode("image") } } },
+        { image: { format: "png", source: { bytes: new TextEncoder().encode("image") } } },
+      ])
+      expect(request?.messages?.[0]?.content?.[4]).toMatchObject({
         document: { format: "pdf", name: "report-pdf" },
       })
+      expect(request?.messages?.[0]?.content?.[5]).toEqual({ text: "after" })
       expect(request?.messages?.[1]?.content).toEqual([{ text: "unsigned prior reasoning" }, { text: "prefill" }])
     })
   })
 
-  it.effect("rejects late system messages and URL file sources before transport", () =>
+  it.effect("rejects invalid messages and unsupported image sources before transport", () =>
     Effect.gen(function* () {
       let requests = 0
       const model = yield* make({ model: "validation-model" }).pipe(
@@ -236,9 +246,42 @@ describe("AmazonBedrock", () => {
           ],
         })
         .pipe(Effect.flip)
+      const malformedImage = yield* model
+        .generateText({
+          prompt: [
+            {
+              role: "user",
+              content: [{ type: "file", mediaType: "image/png", data: "not base64" }],
+            },
+          ],
+        })
+        .pipe(Effect.flip)
+      const unsupportedImage = yield* model
+        .generateText({
+          prompt: [
+            {
+              role: "user",
+              content: [{ type: "file", mediaType: "image/svg+xml", data: new Uint8Array([1]) }],
+            },
+          ],
+        })
+        .pipe(Effect.flip)
+      const assistantDocument = yield* model
+        .generateText({
+          prompt: [
+            {
+              role: "assistant",
+              content: [{ type: "file", mediaType: "application/pdf", data: new Uint8Array([1]) }],
+            },
+          ],
+        })
+        .pipe(Effect.flip)
 
       expect(AiError.isAiError(lateSystem)).toBe(true)
       expect(AiError.isAiError(urlFile)).toBe(true)
+      expect(AiError.isAiError(malformedImage)).toBe(true)
+      expect(AiError.isAiError(unsupportedImage)).toBe(true)
+      expect(AiError.isAiError(assistantDocument)).toBe(true)
       expect(requests).toBe(0)
     }),
   )

@@ -1,6 +1,7 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
+import { layerImageSources } from "./image-source.js"
 import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
@@ -24,10 +25,12 @@ export const layer = (input: LayerOptions) =>
     ModelRegistry.registration({
       provider: input.provider ?? "openai-compatible",
       model: input.model,
-      layer: OpenAiLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }),
+      layer: layerImageSources(
+        OpenAiLanguageModel.layer({
+          model: input.model,
+          ...(input.config === undefined ? {} : { config: input.config }),
+        }),
+      ),
       ...(input.classifyFailure === undefined ? {} : { classifyFailure: input.classifyFailure }),
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),

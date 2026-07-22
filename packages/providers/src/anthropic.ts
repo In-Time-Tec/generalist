@@ -2,6 +2,7 @@ import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic"
 import { ModelRegistry } from "@batonfx/core"
 import { Config, Layer, Redacted } from "effect"
 import { AiError } from "effect/unstable/ai"
+import { layerImageSources } from "./image-source.js"
 import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
@@ -32,10 +33,12 @@ export const layer = (input: LayerOptions) =>
     ModelRegistry.registration({
       provider: "anthropic",
       model: input.model,
-      layer: AnthropicLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }),
+      layer: layerImageSources(
+        AnthropicLanguageModel.layer({
+          model: input.model,
+          ...(input.config === undefined ? {} : { config: input.config }),
+        }),
+      ),
       classifyFailure,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
@@ -47,10 +50,12 @@ export const registration = (input: AnthropicInput) =>
   ModelRegistry.registration({
     provider: "anthropic",
     model: input.model,
-    layer: AnthropicLanguageModel.layer({
-      model: input.model,
-      ...(input.config === undefined ? {} : { config: input.config }),
-    }),
+    layer: layerImageSources(
+      AnthropicLanguageModel.layer({
+        model: input.model,
+        ...(input.config === undefined ? {} : { config: input.config }),
+      }),
+    ),
     classifyFailure,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),

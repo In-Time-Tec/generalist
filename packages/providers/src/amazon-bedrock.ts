@@ -4,6 +4,7 @@ import { Effect, Layer, Schema, Stream } from "effect"
 import { AiError, LanguageModel } from "effect/unstable/ai"
 import type { RegistrationOptions } from "./openai.js"
 import { Client, ClientFailure, layerClient, type Options } from "./amazon-bedrock-client.js"
+import { conformImageSourceModel } from "./image-source.js"
 import { makeRequest } from "./amazon-bedrock-request.js"
 import { responseParts, streamParts } from "./amazon-bedrock-response.js"
 export * from "./amazon-bedrock-client.js"
@@ -83,7 +84,7 @@ const streamFailure = (description: string) =>
 /** @experimental */
 export const make = Effect.fnUntraced(function* (input: Input) {
   const client = yield* Client
-  return yield* LanguageModel.make({
+  const model = yield* LanguageModel.make({
     generateText: (options) =>
       makeRequest(input, options).pipe(
         Effect.flatMap(client.converse),
@@ -117,6 +118,7 @@ export const make = Effect.fnUntraced(function* (input: Input) {
         Stream.mapError((error) => (AiError.isAiError(error) ? error : failure("converseStream", error))),
       ),
   })
+  return conformImageSourceModel(model)
 })
 
 /** @experimental */
