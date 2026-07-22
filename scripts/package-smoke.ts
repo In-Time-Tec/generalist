@@ -64,9 +64,16 @@ const exports = [
   "@batonfx/foldkit",
 ] as const
 
-const run = Effect.fn("PackageSmoke.run")(function* (command: string, args: ReadonlyArray<string>, cwd: string) {
+const run = Effect.fn("PackageSmoke.run")(function* (
+  command: string,
+  args: ReadonlyArray<string>,
+  cwd: string,
+  env?: Record<string, string>,
+) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-  const handle = yield* spawner.spawn(ChildProcess.make(command, args, { cwd }))
+  const handle = yield* spawner.spawn(
+    ChildProcess.make(command, args, { cwd, ...(env === undefined ? {} : { env, extendEnv: true }) }),
+  )
   const [stdout, stderr, exitCode] = yield* Effect.all(
     [
       Stream.mkString(Stream.decodeText(handle.stdout)),
@@ -586,7 +593,9 @@ console.log(\`imported \${specifiers.length} Baton exports\`)
 `,
   )
 
-  yield* run("bun", ["install", "--linker=isolated"], consumerDirectory)
+  yield* run("bun", ["install", "--linker=isolated"], consumerDirectory, {
+    BUN_INSTALL_CACHE_DIR: path.join(directory, "bun-install-cache"),
+  })
   const installedEffects = (yield* run(
     "find",
     ["node_modules", "-path", "*/effect/package.json", "-print"],
