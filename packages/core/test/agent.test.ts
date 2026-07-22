@@ -3445,6 +3445,49 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "reactively compacts an overflow delivered as a model error part", () => {
+    let calls = 0
+    let overflowRequests = 0
+    return [
+      Layer.mergeAll(
+        overflowModelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(
+                Response.makePart("error", {
+                  error: contextOverflowError("input exceeds the context window"),
+                }),
+              )
+            : Stream.make(textDelta("recovered"))
+        }),
+        Compaction.layerTest({
+          maybeCompact: (request) =>
+            Effect.sync(() => {
+              if (request.overflow) overflowRequests += 1
+              return Option.some({
+                _tag: "Microcompact",
+                history: Prompt.empty,
+                prompt: Prompt.make(request.overflow ? "after overflow" : "proactive projection"),
+              })
+            }),
+        }),
+        Session.layerMemory,
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "error-part-overflow-agent", model: overflowSelection })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "too large" }))
+
+        expect(calls).toBe(2)
+        expect(overflowRequests).toBe(1)
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "fails after one reactive compaction retry", () => {
     let calls = 0
     return [

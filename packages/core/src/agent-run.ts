@@ -1398,12 +1398,16 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           }
           const retryableOverflow = (cause: Cause.Cause<unknown>, hasEmitted: boolean): boolean => {
             const failure = singleFailure(cause)
+            if (Option.isNone(failure)) return false
+            const classifiedFailure =
+              Schema.is(AgentError)(failure.value) && failure.value.cause !== undefined
+                ? failure.value.cause
+                : failure.value
             return (
               retryOverflow &&
               !hasEmitted &&
-              Option.isSome(failure) &&
-              classifyFailure(failure.value) === "context-overflow" &&
-              Option.isSome(compactionService)
+              Option.isSome(compactionService) &&
+              classifyFailure(classifiedFailure) === "context-overflow"
             )
           }
           return Stream.fromChannel(
@@ -1431,6 +1435,15 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                       toolkit: activeRegistry.toolkit,
                       disableToolCallResolution: true,
                     }).pipe(
+                      Stream.mapEffect((part) =>
+                        part.type === "error"
+                          ? Effect.fail(
+                              isToolNameCollision(part.error)
+                                ? part.error
+                                : AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }),
+                            )
+                          : Effect.succeed(part),
+                      ),
                       Stream.tap(() =>
                         Effect.sync(() => {
                           emitted = true
@@ -1441,6 +1454,9 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                         if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
                         const error = singleFailure(cause)
                         if (Option.isNone(error)) return Stream.failCause(cause)
+                        if (Schema.is(AgentError)(error.value) || isToolNameCollision(error.value)) {
+                          return Stream.fail(error.value)
+                        }
                         return Stream.make(Response.makePart("error", { error: error.value }))
                       }),
                     )

@@ -2,7 +2,7 @@
 
 Core `Session` is an append-only conversation-entry log with a current leaf. Context is projected from a root-to-leaf path; durable storage belongs to hosts.
 
-Compaction is optional. With Session enabled, every changed projection commits through one versioned checkpoint containing a stable id, expected parent leaf, and exact projected Chat history. The store validates the parent and handles identical checkpoint retries idempotently. Baton appends the checkpoint before applying its projection to Chat, so a definite store failure leaves Chat unchanged.
+Compaction is optional. With Session enabled, every changed projection commits through one versioned checkpoint containing a stable id, expected parent leaf, and exact projected Chat history. The store validates the parent and handles identical checkpoint retries idempotently. Baton appends the checkpoint before applying its projection to Chat, so a definite store failure leaves Chat unchanged. A selected model's classified pre-output context overflow, including a decoded model error part, forces one compacted replay; a second overflow fails the run.
 
 A dedicated summary-model layer is built through the owning scope's memo map and reused across compaction calls in that scope.
 
