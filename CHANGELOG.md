@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0
+
+- Add stable per-run telemetry delivery IDs, an optional ordered host delivery sink, and atomic Session checkpoint telemetry outboxes with compaction commitments. Structured output events now carry the final successful model call and attempt identity. These are breaking pre-1.0 checkpoint, compaction request, telemetry event, and transport contracts.
+
 ## 0.10.1
 
 - Modernize the eight-package release contract around committed lockstep versions, exact Effect peers, build-once npm-compatible tarballs, clean Bun and Node consumer proofs, checksums, provenance evidence, and tag-gated GitHub releases without npm publication.

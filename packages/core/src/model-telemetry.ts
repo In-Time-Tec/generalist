@@ -1,4 +1,4 @@
-import { Cause, Context, Effect, Option, Schema } from "effect"
+import { Cause, Context, Effect, Layer, Option, Schema } from "effect"
 import { AiError, IdGenerator, LanguageModel, Response } from "effect/unstable/ai"
 
 /** @experimental Bounded purpose of one model call issued by the loop. */
@@ -77,6 +77,7 @@ const attemptOrdinal = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
  */
 export const ModelCallStarted = Schema.Struct({
   _tag: Schema.tag("ModelCallStarted"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   purpose: ModelCallPurpose,
@@ -92,6 +93,7 @@ export type ModelCallStarted = typeof ModelCallStarted.Type
 /** @experimental One provider invocation within a model call began. `attempt` is 0-based. */
 export const ModelAttemptStarted = Schema.Struct({
   _tag: Schema.tag("ModelAttemptStarted"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   modelAttemptId: Schema.String,
@@ -105,6 +107,7 @@ export type ModelAttemptStarted = typeof ModelAttemptStarted.Type
 /** @experimental The first reasoning, text, or tool-call output of one attempt; at most one event per kind. */
 export const ModelAttemptFirstOutput = Schema.Struct({
   _tag: Schema.tag("ModelAttemptFirstOutput"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   modelAttemptId: Schema.String,
@@ -124,6 +127,7 @@ export type ModelAttemptFirstOutput = typeof ModelAttemptFirstOutput.Type
  */
 export const ModelAttemptCompleted = Schema.Struct({
   _tag: Schema.tag("ModelAttemptCompleted"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   modelAttemptId: Schema.String,
@@ -144,6 +148,7 @@ export type ModelAttemptCompleted = typeof ModelAttemptCompleted.Type
 /** @experimental A provider invocation failed with a bounded category. */
 export const ModelAttemptFailed = Schema.Struct({
   _tag: Schema.tag("ModelAttemptFailed"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   modelAttemptId: Schema.String,
@@ -163,6 +168,7 @@ export type ModelAttemptFailed = typeof ModelAttemptFailed.Type
  */
 export const ModelRetryScheduled = Schema.Struct({
   _tag: Schema.tag("ModelRetryScheduled"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   attempt: attemptOrdinal,
@@ -178,6 +184,7 @@ export type ModelRetryScheduled = typeof ModelRetryScheduled.Type
 /** @experimental The model call reached a successful terminal outcome. */
 export const ModelCallCompleted = Schema.Struct({
   _tag: Schema.tag("ModelCallCompleted"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   purpose: ModelCallPurpose,
@@ -193,6 +200,7 @@ export type ModelCallCompleted = typeof ModelCallCompleted.Type
 /** @experimental The model call reached a failed terminal outcome. */
 export const ModelCallFailed = Schema.Struct({
   _tag: Schema.tag("ModelCallFailed"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   modelCallId: Schema.String,
   purpose: ModelCallPurpose,
@@ -207,6 +215,7 @@ export type ModelCallFailed = typeof ModelCallFailed.Type
 /** @experimental A compaction pass that decided to do work began. */
 export const CompactionStarted = Schema.Struct({
   _tag: Schema.tag("CompactionStarted"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   compactionId: Schema.String,
   trigger: CompactionTrigger,
@@ -226,6 +235,7 @@ export type CompactionStarted = typeof CompactionStarted.Type
  */
 export const CompactionCompleted = Schema.Struct({
   _tag: Schema.tag("CompactionCompleted"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   compactionId: Schema.String,
   kind: CompactionKind,
@@ -239,6 +249,7 @@ export type CompactionCompleted = typeof CompactionCompleted.Type
 /** @experimental A compaction pass failed or was interrupted after work began. */
 export const CompactionFailed = Schema.Struct({
   _tag: Schema.tag("CompactionFailed"),
+  deliveryId: Schema.String,
   turn: Schema.Finite,
   compactionId: Schema.String,
   failedAt: Schema.Finite,
@@ -269,6 +280,51 @@ export const Event = Schema.Union([
 
 /** @experimental */
 export type Event = typeof Event.Type
+
+/** @experimental One ordered telemetry delivery batch scoped to its agent session. */
+export const DeliveryBatch = Schema.Struct({
+  sessionId: Schema.String,
+  events: Schema.Array(Event),
+})
+
+/** @experimental */
+export type DeliveryBatch = typeof DeliveryBatch.Type
+
+type WithoutDeliveryId<T> = T extends Event ? Omit<T, "deliveryId"> : never
+
+/** @experimental Lifecycle payload before the run assigns its stable delivery identifier. */
+export type EventPayload = WithoutDeliveryId<Event>
+
+/** @experimental Atomic checkpoint record joining a compaction pass to its telemetry and projection. */
+export const CompactionCommit = Schema.Struct({
+  compactionId: Schema.String,
+  checkpointId: Schema.String,
+  summaryModelCallId: Schema.optionalKey(Schema.String),
+  contextTokensBefore: Schema.optionalKey(Schema.Finite),
+  contextTokensAfter: Schema.optionalKey(Schema.Finite),
+  entriesBefore: Schema.optionalKey(Schema.Finite),
+  entriesAfter: Schema.optionalKey(Schema.Finite),
+})
+
+/** @experimental */
+export type CompactionCommit = typeof CompactionCommit.Type
+
+/** @experimental Host telemetry delivery failure. A remote failure can be ambiguous; reconcile with the sink. */
+export class DeliveryFailed extends Schema.TaggedErrorClass<DeliveryFailed>()("@batonfx/core/DeliveryFailed", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
+
+/** @experimental Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessionId, deliveryId)`. */
+export interface DeliveryInterface {
+  readonly deliver: (batch: DeliveryBatch) => Effect.Effect<void, DeliveryFailed>
+}
+
+/** @experimental */
+export class Delivery extends Context.Service<Delivery, DeliveryInterface>()("@batonfx/core/Delivery") {}
+
+/** @experimental No-op host delivery sink. */
+export const layerNoop: Layer.Layer<Delivery> = Layer.succeed(Delivery, Delivery.of({ deliver: () => Effect.void }))
 
 /** @experimental Map a model failure onto the bounded cross-provider category. */
 export const classifyFailureCategory = (error: unknown): ModelFailureCategory => {
@@ -306,7 +362,7 @@ export const classifyFailureCategory = (error: unknown): ModelFailureCategory =>
 
 /** @experimental The active loop's model-call telemetry seam. */
 export interface Instrumentation {
-  readonly emit: (event: Event) => Effect.Effect<void>
+  readonly emit: (event: EventPayload) => Effect.Effect<void>
   readonly wrap: (model: LanguageModel.Service) => LanguageModel.Service
 }
 

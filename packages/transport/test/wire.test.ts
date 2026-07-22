@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentEvent, ToolExecutor, TurnPolicy } from "@batonfx/core"
+import { AgentEvent, ModelTelemetry, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import { Wire } from "../src/index"
 
 const echoTool = Tool.make("echo", {
@@ -80,147 +80,180 @@ const eventFrames = (): ReadonlyArray<Wire.ServerFrameType> => [
     event: { _tag: "TurnCompleted", turn: 0, transcript, usage, finishReason: "stop" },
   },
   { _tag: "Event", seq: 7, event: { _tag: "SteeringDrained", turn: 0, queue: "steering", count: 2 } },
-  { _tag: "Event", seq: 8, event: { _tag: "StructuredOutput", turn: 1, value: { ok: true }, content: [textPart] } },
+  {
+    _tag: "Event",
+    seq: 8,
+    event: {
+      _tag: "StructuredOutput",
+      turn: 1,
+      modelCallId: "model-call-1",
+      modelAttemptId: "model-attempt-1",
+      attempt: 0,
+      value: { ok: true },
+      content: [textPart],
+    },
+  },
   { _tag: "Event", seq: 9, event: { _tag: "Completed", turns: 1, text: "hello", transcript, usage } },
   ...telemetryFrames(),
 ]
 
-const telemetryFrames = (): ReadonlyArray<Wire.ServerFrameType> => [
-  {
-    _tag: "Event",
-    seq: 10,
-    event: {
-      _tag: "ModelCallStarted",
-      turn: 0,
-      modelCallId: "model-call-0",
-      purpose: "conversation",
-      provider: "test-provider",
-      model: "test-model",
-      startedAt: 1,
+const withDeliveryId = <Event extends ModelTelemetry.EventPayload>(
+  event: Event,
+  deliveryId: string,
+): Event & { readonly deliveryId: string } => ({ ...event, deliveryId })
+
+const telemetryFrames = (): ReadonlyArray<Wire.ServerFrameType> => {
+  const frames = [
+    {
+      _tag: "Event",
+      seq: 10,
+      event: {
+        _tag: "ModelCallStarted",
+        turn: 0,
+        modelCallId: "model-call-0",
+        purpose: "conversation",
+        provider: "test-provider",
+        model: "test-model",
+        startedAt: 1,
+      },
     },
-  },
-  {
-    _tag: "Event",
-    seq: 11,
-    event: {
-      _tag: "ModelAttemptStarted",
-      turn: 0,
-      modelCallId: "model-call-0",
-      modelAttemptId: "model-attempt-0",
-      attempt: 0,
-      startedAt: 2,
+    {
+      _tag: "Event",
+      seq: 11,
+      event: {
+        _tag: "ModelAttemptStarted",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
+        startedAt: 2,
+      },
     },
-  },
-  {
-    _tag: "Event",
-    seq: 12,
-    event: {
-      _tag: "ModelAttemptFirstOutput",
-      turn: 0,
-      modelCallId: "model-call-0",
-      modelAttemptId: "model-attempt-0",
-      attempt: 0,
-      kind: "text",
-      at: 3,
+    {
+      _tag: "Event",
+      seq: 12,
+      event: {
+        _tag: "ModelAttemptFirstOutput",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
+        kind: "text",
+        at: 3,
+      },
     },
-  },
-  {
-    _tag: "Event",
-    seq: 13,
-    event: {
-      _tag: "ModelAttemptFailed",
-      turn: 0,
-      modelCallId: "model-call-0",
-      modelAttemptId: "model-attempt-0",
-      attempt: 0,
-      failedAt: 4,
-      category: "rate-limit",
-      classification: "transient",
+    {
+      _tag: "Event",
+      seq: 13,
+      event: {
+        _tag: "ModelAttemptFailed",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
+        failedAt: 4,
+        category: "rate-limit",
+        classification: "transient",
+      },
     },
-  },
-  {
-    _tag: "Event",
-    seq: 14,
-    event: {
-      _tag: "ModelRetryScheduled",
-      turn: 0,
-      modelCallId: "model-call-0",
-      attempt: 0,
-      reason: "provider-resilience",
-      category: "rate-limit",
-      delayMillis: 250,
-      at: 5,
+    {
+      _tag: "Event",
+      seq: 14,
+      event: {
+        _tag: "ModelRetryScheduled",
+        turn: 0,
+        modelCallId: "model-call-0",
+        attempt: 0,
+        reason: "provider-resilience",
+        category: "rate-limit",
+        delayMillis: 250,
+        at: 5,
+      },
     },
-  },
-  {
-    _tag: "Event",
-    seq: 15,
-    event: {
-      _tag: "ModelAttemptCompleted",
-      turn: 0,
-      modelCallId: "model-call-0",
-      modelAttemptId: "model-attempt-1",
-      attempt: 1,
-      completedAt: 6,
-      usage,
-      finishReason: "stop",
-      requestId: "req-1",
-      responseModel: "returned-model",
-      serviceTier: "default",
-      cost: { amount: 0.25, currency: "USD" },
+    {
+      _tag: "Event",
+      seq: 15,
+      event: {
+        _tag: "ModelAttemptCompleted",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-1",
+        attempt: 1,
+        completedAt: 6,
+        usage,
+        finishReason: "stop",
+        requestId: "req-1",
+        responseModel: "returned-model",
+        serviceTier: "default",
+        cost: { amount: 0.25, currency: "USD" },
+      },
     },
-  },
-  {
-    _tag: "Event",
-    seq: 16,
-    event: {
-      _tag: "ModelCallCompleted",
-      turn: 0,
-      modelCallId: "model-call-0",
-      purpose: "conversation",
-      attempts: 2,
-      completedAt: 7,
-      usage,
-      finishReason: "stop",
+    {
+      _tag: "Event",
+      seq: 16,
+      event: {
+        _tag: "ModelCallCompleted",
+        turn: 0,
+        modelCallId: "model-call-0",
+        purpose: "conversation",
+        attempts: 2,
+        completedAt: 7,
+        usage,
+        finishReason: "stop",
+      },
     },
-  },
-  {
-    _tag: "Event",
-    seq: 17,
-    event: {
-      _tag: "ModelCallFailed",
-      turn: 0,
-      modelCallId: "model-call-1",
-      purpose: "structured-output",
-      attempts: 1,
-      failedAt: 8,
-      category: "authentication",
+    {
+      _tag: "Event",
+      seq: 17,
+      event: {
+        _tag: "ModelCallFailed",
+        turn: 0,
+        modelCallId: "model-call-1",
+        purpose: "structured-output",
+        attempts: 1,
+        failedAt: 8,
+        category: "authentication",
+      },
     },
-  },
-  {
-    _tag: "Event",
-    seq: 18,
-    event: {
-      _tag: "CompactionStarted",
-      turn: 1,
-      compactionId: "compaction-0",
-      trigger: "threshold",
-      startedAt: 9,
-      contextTokensBefore: 120,
-      entriesBefore: 4,
+    {
+      _tag: "Event",
+      seq: 18,
+      event: {
+        _tag: "CompactionStarted",
+        turn: 1,
+        compactionId: "compaction-0",
+        trigger: "threshold",
+        startedAt: 9,
+        contextTokensBefore: 120,
+        entriesBefore: 4,
+      },
     },
-  },
-  {
-    _tag: "Event",
-    seq: 19,
-    event: { _tag: "CompactionCompleted", turn: 1, compactionId: "compaction-0", kind: "summarize", completedAt: 10 },
-  },
-  {
-    _tag: "Event",
-    seq: 20,
-    event: { _tag: "CompactionFailed", turn: 1, compactionId: "compaction-1", failedAt: 11 },
-  },
-]
+    {
+      _tag: "Event",
+      seq: 19,
+      event: {
+        _tag: "CompactionCompleted",
+        turn: 1,
+        compactionId: "compaction-0",
+        kind: "summarize",
+        completedAt: 10,
+      },
+    },
+    {
+      _tag: "Event",
+      seq: 20,
+      event: { _tag: "CompactionFailed", turn: 1, compactionId: "compaction-1", failedAt: 11 },
+    },
+  ] satisfies ReadonlyArray<{
+    readonly _tag: "Event"
+    readonly seq: number
+    readonly event: ModelTelemetry.EventPayload
+  }>
+  return Array.from(frames, (frame, index) => ({
+    ...frame,
+    event: withDeliveryId(frame.event, `run:${index}`),
+  }))
+}
 
 describe("Wire", () => {
   const invalidSequences = [-1, 1.5, Number.POSITIVE_INFINITY, Number.NaN, Number.MAX_SAFE_INTEGER + 1]
@@ -317,6 +350,7 @@ describe("Wire", () => {
         seq: 0,
         event: {
           _tag: "ModelAttemptCompleted",
+          deliveryId: "run:0",
           turn: 0,
           modelCallId: "model-call-0",
           modelAttemptId: "model-attempt-0",

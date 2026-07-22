@@ -6,7 +6,7 @@ import {
   CurrentCompactionId,
   CurrentPurpose,
   CurrentSummaryCall,
-  type Event,
+  type EventPayload,
   type ModelCallPurpose,
   type ModelFailureCategory,
   type ModelFirstOutputKind,
@@ -31,7 +31,7 @@ export const makeIdentityCell = (): IdentityCell => ({ current: undefined })
 
 /** @experimental Options for instrumenting one loop-owned model service. */
 export interface InstrumentOptions {
-  readonly emit: (event: Event) => Effect.Effect<void>
+  readonly emit: (event: EventPayload) => Effect.Effect<void>
   readonly turn: number
   readonly identity?: IdentityCell
   readonly resilience?: Resilience
@@ -323,7 +323,11 @@ const beginCall = (
     })
     if (compactionId !== undefined) {
       const summaryCell = yield* CurrentSummaryCall
-      if (summaryCell !== undefined) summaryCell.current = modelCallId
+      if (summaryCell !== undefined) {
+        if (summaryCell.current !== undefined)
+          return yield* Effect.die(new Error("A compaction pass issued multiple summary model calls"))
+        summaryCell.current = modelCallId
+      }
     }
     const providerClassification = memoized((error) => classifyFailure(model, error))
     const context: CallContext = {

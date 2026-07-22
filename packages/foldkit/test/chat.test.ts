@@ -112,6 +112,7 @@ describe("Chat", () => {
     const telemetryEvents: ReadonlyArray<Wire.EventType> = [
       {
         _tag: "ModelCallStarted",
+        deliveryId: "delivery-0",
         turn: 0,
         modelCallId: "model-call-0",
         purpose: "conversation",
@@ -119,6 +120,7 @@ describe("Chat", () => {
       },
       {
         _tag: "ModelAttemptStarted",
+        deliveryId: "delivery-1",
         turn: 0,
         modelCallId: "model-call-0",
         modelAttemptId: "model-attempt-0",
@@ -127,6 +129,7 @@ describe("Chat", () => {
       },
       {
         _tag: "ModelAttemptFirstOutput",
+        deliveryId: "delivery-2",
         turn: 0,
         modelCallId: "model-call-0",
         modelAttemptId: "model-attempt-0",
@@ -136,6 +139,7 @@ describe("Chat", () => {
       },
       {
         _tag: "ModelAttemptFailed",
+        deliveryId: "delivery-3",
         turn: 0,
         modelCallId: "model-call-0",
         modelAttemptId: "model-attempt-0",
@@ -146,6 +150,7 @@ describe("Chat", () => {
       },
       {
         _tag: "ModelRetryScheduled",
+        deliveryId: "delivery-4",
         turn: 0,
         modelCallId: "model-call-0",
         attempt: 0,
@@ -156,6 +161,7 @@ describe("Chat", () => {
       },
       {
         _tag: "ModelAttemptCompleted",
+        deliveryId: "delivery-5",
         turn: 0,
         modelCallId: "model-call-0",
         modelAttemptId: "model-attempt-1",
@@ -164,6 +170,7 @@ describe("Chat", () => {
       },
       {
         _tag: "ModelCallCompleted",
+        deliveryId: "delivery-6",
         turn: 0,
         modelCallId: "model-call-0",
         purpose: "conversation",
@@ -172,6 +179,7 @@ describe("Chat", () => {
       },
       {
         _tag: "ModelCallFailed",
+        deliveryId: "delivery-7",
         turn: 0,
         modelCallId: "model-call-1",
         purpose: "structured-output",
@@ -179,9 +187,29 @@ describe("Chat", () => {
         failedAt: 8,
         category: "authentication",
       },
-      { _tag: "CompactionStarted", turn: 0, compactionId: "compaction-0", trigger: "threshold", startedAt: 9 },
-      { _tag: "CompactionCompleted", turn: 0, compactionId: "compaction-0", kind: "summarize", completedAt: 10 },
-      { _tag: "CompactionFailed", turn: 0, compactionId: "compaction-1", failedAt: 11 },
+      {
+        _tag: "CompactionStarted",
+        deliveryId: "delivery-8",
+        turn: 0,
+        compactionId: "compaction-0",
+        trigger: "threshold",
+        startedAt: 9,
+      },
+      {
+        _tag: "CompactionCompleted",
+        deliveryId: "delivery-9",
+        turn: 0,
+        compactionId: "compaction-0",
+        kind: "summarize",
+        completedAt: 10,
+      },
+      {
+        _tag: "CompactionFailed",
+        deliveryId: "delivery-10",
+        turn: 0,
+        compactionId: "compaction-1",
+        failedAt: 11,
+      },
     ]
 
     let seq = 1

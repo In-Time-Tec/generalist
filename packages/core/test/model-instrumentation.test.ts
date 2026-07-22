@@ -33,21 +33,22 @@ const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel
   }) as LanguageModel.Service
 
 const makeCollector = () => {
-  const events: Array<ModelTelemetry.Event> = []
-  const emit = (event: ModelTelemetry.Event): Effect.Effect<void> =>
+  const events: Array<ModelTelemetry.EventPayload> = []
+  const emit = (event: ModelTelemetry.EventPayload): Effect.Effect<void> =>
     Effect.sync(() => {
       events.push(event)
     })
   return { events, emit }
 }
 
-const tags = (events: ReadonlyArray<ModelTelemetry.Event>): ReadonlyArray<string> => events.map((event) => event._tag)
+const tags = (events: ReadonlyArray<ModelTelemetry.EventPayload>): ReadonlyArray<string> =>
+  events.map((event) => event._tag)
 
-const byTag = <Tag extends ModelTelemetry.Event["_tag"]>(
-  events: ReadonlyArray<ModelTelemetry.Event>,
+const byTag = <Tag extends ModelTelemetry.EventPayload["_tag"]>(
+  events: ReadonlyArray<ModelTelemetry.EventPayload>,
   tag: Tag,
-): ReadonlyArray<Extract<ModelTelemetry.Event, { _tag: Tag }>> =>
-  events.filter((event): event is Extract<ModelTelemetry.Event, { _tag: Tag }> => event._tag === tag)
+): ReadonlyArray<Extract<ModelTelemetry.EventPayload, { _tag: Tag }>> =>
+  events.filter((event): event is Extract<ModelTelemetry.EventPayload, { _tag: Tag }> => event._tag === tag)
 
 describe("model instrumentation", () => {
   it.effect("joins one stream call across started, parts, first outputs, and completion", () =>

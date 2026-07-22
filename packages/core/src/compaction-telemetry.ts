@@ -8,7 +8,6 @@ import {
   CurrentPurpose,
   CurrentSummaryCall,
   type SummaryCallCell,
-  generateId,
 } from "./model-telemetry.js"
 
 const resultKind = (result: Option.Option<Result>): CompactionKind =>
@@ -36,7 +35,7 @@ export const withCompactionLifecycle: {
       const instrumentation = yield* CurrentInstrumentation
       if (instrumentation === undefined) return yield* work
       const turn = input.turn
-      const compactionId = yield* generateId
+      const compactionId = input.compactionId
       const startedAt = yield* Clock.currentTimeMillis
       yield* instrumentation.emit({
         _tag: "CompactionStarted",
@@ -45,7 +44,7 @@ export const withCompactionLifecycle: {
         trigger: input.overflow ? "overflow" : "threshold",
         startedAt,
         contextTokensBefore: usage.contextTokens,
-        ...(input.path === undefined ? {} : { entriesBefore: input.path.length }),
+        entriesBefore: input.history.content.length + input.prompt.content.length,
       })
       const summaryCell: SummaryCallCell = { current: undefined }
       return yield* work.pipe(

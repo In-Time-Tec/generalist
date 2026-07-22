@@ -1,5 +1,7 @@
 # Agent loop
 
+Model lifecycle events receive one stable delivery identifier from the run and retain it through checkpoint persistence and replay; IDs are never recomputed. An optional `ModelTelemetry.Delivery` sink receives immutable ordered `{ sessionId, events }` batches with backpressure before live stream emission. A successful callback acknowledges exactly that batch; typed failure does not acknowledge or emit it live, and interruption remains interruption. Delivery failure is ambiguous and is reconciled with the sink; Session is reconciled only when the exact batch was checkpointed. Hosts deduplicate within `(sessionId, deliveryId)`. Without Session, callback durability is only as strong as the host's sink implementation.
+
 `@batonfx/core` runs a non-durable model-turn loop over Effect AI `Prompt`, `Response`, `Chat`, tools, and language models. Turn zero always runs. Later turns run only while the turn policy continues with pending tool results. The default policy is `TurnPolicy.forever`: the loop continues until a turn leaves no pending tool results, and a follow-up cap is an explicit author choice via `TurnPolicy.recurs(n)`.
 
 - Middleware-transformed response parts are authoritative for events, history, tools, memory, sessions, and compaction.

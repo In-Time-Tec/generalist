@@ -7,10 +7,8 @@ import { type Success } from "./tool-executor.js"
 import { bound } from "./tool-output.js"
 /** @experimental Default headroom kept for the next model response. */
 export const DEFAULT_RESERVE_TOKENS = 16_384
-
 /** @experimental Default recent-session suffix target kept verbatim. */
 export const DEFAULT_KEEP_RECENT_TOKENS = 20_000
-
 /** @experimental Fixed prompt used for dedicated summary calls. */
 export const SUMMARY_TEMPLATE = `Summarize the conversation so another agent can continue seamlessly.
 
@@ -56,6 +54,7 @@ export interface Plan {
 
 /** @experimental Request passed to a compaction implementation. */
 export interface Request {
+  readonly compactionId: string
   readonly agentName: string
   readonly sessionId: string
   readonly turn: number
@@ -67,13 +66,17 @@ export interface Request {
   readonly toolOutputMaxBytes?: number
 }
 
+/** @experimental Wrap custom work after deciding to run; changed results must use this to join their lifecycle. */
+export const withLifecycle =
+  (request: Request) =>
+  <A extends Result, E, R>(work: Effect.Effect<Option.Option<A>, E, R>): Effect.Effect<Option.Option<Result>, E, R> =>
+    withCompactionLifecycle(work as Effect.Effect<Option.Option<Result>, E, R>, request, request.usage)
 /** @experimental Result from tool-output microcompaction. */
 export interface MicrocompactResult {
   readonly _tag: "Microcompact"
   readonly history: Prompt.Prompt
   readonly prompt: Prompt.Prompt
 }
-
 /** @experimental Result from summary checkpointing. */
 export interface SummarizeResult {
   readonly _tag: "Summarize"
@@ -82,10 +85,8 @@ export interface SummarizeResult {
   readonly summary: string
   readonly firstKeptEntryId: EntryId
 }
-
 /** @experimental Compaction result applied by the agent loop. */
 export type Result = MicrocompactResult | SummarizeResult
-
 /** @experimental Compaction strategy: decide, cut, summarize. */
 export interface Strategy {
   readonly shouldCompact: (usage: Usage) => boolean

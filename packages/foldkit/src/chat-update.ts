@@ -191,6 +191,8 @@ const failureMessage = (failure: Wire.RunFailure): string => {
         : "Resume checkpoint not found"
     case "@batonfx/core/FrameworkFailure":
       return `${failure.tool} ${failure.stage}: ${failure.message}`
+    case "@batonfx/core/DeliveryFailed":
+      return failure.message
   }
 }
 

@@ -80,14 +80,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
         modelLayer(() => Stream.make(textDelta("done"))),
         capturingSession,
         Compaction.layerTest({
-          maybeCompact: () =>
+          maybeCompact: (request) =>
             Effect.succeed(
               Option.some({
-                _tag: "Microcompact",
+                _tag: "Microcompact" as const,
                 history: Prompt.make("compacted history"),
                 prompt: Prompt.make("compacted prompt"),
               }),
-            ),
+            ).pipe(Compaction.withLifecycle(request)),
         }),
         unusedExecutor,
         Approvals.layerAutoApprove,

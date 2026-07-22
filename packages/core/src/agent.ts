@@ -15,6 +15,7 @@ import {
   TurnLimitExceeded,
   TurnPolicyStopped,
 } from "./agent-event.js"
+import type { DeliveryFailed } from "./model-telemetry.js"
 import { type Key, Memory } from "./memory.js"
 import { type LanguageModelNotRegistered, type ModelSelection, ModelRegistry } from "./model-registry.js"
 import type { ToolAuthorizer } from "./tool-authorization.js"
@@ -234,6 +235,7 @@ export const defaultObjectPrompt = "Return the final structured output for the t
 
 /** @experimental The error channel of `stream` and `generate`. */
 export type RunError =
+  | DeliveryFailed
   | AgentError
   | AgentSuspended
   | ResumeMismatch
