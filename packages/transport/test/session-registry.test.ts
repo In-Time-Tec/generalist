@@ -333,6 +333,9 @@ describe("SessionRegistry.layerMemory", () => {
         yield* Effect.yieldNow
         yield* Deferred.succeed(releaseSlow, undefined)
         const slowError = yield* Fiber.join(slowFiber)
+        yield* SessionRegistry.SessionRegistry.use((registry) => registry.info("s-lag")).pipe(
+          Effect.repeat({ until: (info) => info.status._tag === "Idle" }),
+        )
         const replay = yield* collectThroughEnded("s-lag")
 
         expect(replay.at(-1)?._tag).toBe("Ended")

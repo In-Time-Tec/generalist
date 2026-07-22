@@ -1,5 +1,6 @@
 import { Context, Effect, Function, Layer, Option, Schema } from "effect"
 import { LanguageModel, Prompt, Tokenizer, Toolkit } from "effect/unstable/ai"
+import { summaryLanguageModel, withCompactionLifecycle } from "./compaction-telemetry.js"
 import { type Entry, type EntryId, buildContext } from "./session.js"
 import { makeSummaryModelProvider } from "./summary-model.js"
 import { type Success } from "./tool-executor.js"
@@ -312,7 +313,7 @@ export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
             ? ([head, false] as const)
             : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
         const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
-        const model = yield* LanguageModel.LanguageModel
+        const model = yield* summaryLanguageModel
         return yield* model.generateText({ prompt, toolkit: Toolkit.empty, toolChoice: "none" }).pipe(
           Effect.map((response) => response.text),
           Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
@@ -373,7 +374,7 @@ export const structuredSummary = (options: StructuredSummaryOptions = {}): Strat
             ? ([head, false] as const)
             : yield* microcompactPrompt(head, request.toolOutputMaxBytes)
         const prompt = summaryPrompt(options.summaryPrompt ?? SUMMARY_TEMPLATE, compactedHead)
-        const model = yield* LanguageModel.LanguageModel
+        const model = yield* summaryLanguageModel
         return yield* model
           .generateObject({
             prompt,
@@ -399,53 +400,62 @@ export const make: {
   (args) => args.length !== 1 || "shouldCompact" in args[0],
   (compactionStrategy: Strategy, options: DefaultOptions = {}): Interface => ({
     maybeCompact: (input) =>
-      Effect.gen(function* () {
+      Effect.suspend(() => {
         const usage = normalizeUsage(input.usage, options)
         const shouldCompact = input.overflow || compactionStrategy.shouldCompact(usage)
-        if (!shouldCompact) return Option.none<Result>()
-
-        let history = input.history
-        let prompt = input.prompt
-        let changed = false
-        const toolOutputMaxBytes = input.toolOutputMaxBytes ?? compactionStrategy.toolOutputMaxBytes
-
-        if (toolOutputMaxBytes !== undefined) {
-          const [compactedHistoryPrompt, historyChanged] = yield* microcompactPrompt(history, toolOutputMaxBytes)
-          const [compactedPrompt, promptChanged] = yield* microcompactPrompt(prompt, toolOutputMaxBytes)
-          history = compactedHistoryPrompt
-          prompt = compactedPrompt
-          changed = historyChanged || promptChanged
-          if (changed && fits(history, prompt, usage)) return Option.some(makeMicrocompact(history, prompt))
-        }
-
-        const plan = compactionStrategy.cut(
-          input.path ?? [],
-          compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? DEFAULT_KEEP_RECENT_TOKENS,
-        )
-        if (Option.isNone(plan)) return changed ? Option.some(makeMicrocompact(history, prompt)) : Option.none<Result>()
-
-        const summary = yield* compactionStrategy.summarize(plan.value, {
-          ...input,
-          history,
-          prompt,
-          usage,
-          ...(toolOutputMaxBytes === undefined ? {} : { toolOutputMaxBytes }),
-        })
-        const recent = buildContext(plan.value.recent)
-        const [compactedRecent] =
-          toolOutputMaxBytes === undefined
-            ? ([recent, false] as const)
-            : yield* microcompactPrompt(recent, toolOutputMaxBytes)
-        return Option.some<Result>({
-          _tag: "Summarize",
-          history: compactedHistory(summary, plan.value.head, compactedRecent),
-          prompt,
-          summary,
-          firstKeptEntryId: plan.value.firstKeptEntryId,
-        })
+        if (!shouldCompact) return Effect.succeed(Option.none<Result>())
+        return withCompactionLifecycle(compact(compactionStrategy, input, usage, options), input, usage)
       }),
   }),
 )
+
+const compact = (
+  compactionStrategy: Strategy,
+  input: Request,
+  usage: Usage,
+  options: DefaultOptions,
+): Effect.Effect<Option.Option<Result>, CompactionError, LanguageModel.LanguageModel> =>
+  Effect.gen(function* () {
+    let history = input.history
+    let prompt = input.prompt
+    let changed = false
+    const toolOutputMaxBytes = input.toolOutputMaxBytes ?? compactionStrategy.toolOutputMaxBytes
+
+    if (toolOutputMaxBytes !== undefined) {
+      const [compactedHistoryPrompt, historyChanged] = yield* microcompactPrompt(history, toolOutputMaxBytes)
+      const [compactedPrompt, promptChanged] = yield* microcompactPrompt(prompt, toolOutputMaxBytes)
+      history = compactedHistoryPrompt
+      prompt = compactedPrompt
+      changed = historyChanged || promptChanged
+      if (changed && fits(history, prompt, usage)) return Option.some(makeMicrocompact(history, prompt))
+    }
+
+    const plan = compactionStrategy.cut(
+      input.path ?? [],
+      compactionStrategy.keepRecentTokens ?? options.keepRecentTokens ?? DEFAULT_KEEP_RECENT_TOKENS,
+    )
+    if (Option.isNone(plan)) return changed ? Option.some(makeMicrocompact(history, prompt)) : Option.none<Result>()
+
+    const summary = yield* compactionStrategy.summarize(plan.value, {
+      ...input,
+      history,
+      prompt,
+      usage,
+      ...(toolOutputMaxBytes === undefined ? {} : { toolOutputMaxBytes }),
+    })
+    const recent = buildContext(plan.value.recent)
+    const [compactedRecent] =
+      toolOutputMaxBytes === undefined
+        ? ([recent, false] as const)
+        : yield* microcompactPrompt(recent, toolOutputMaxBytes)
+    return Option.some<Result>({
+      _tag: "Summarize",
+      history: compactedHistory(summary, plan.value.head, compactedRecent),
+      prompt,
+      summary,
+      firstKeptEntryId: plan.value.firstKeptEntryId,
+    })
+  })
 
 /** @experimental Layer wiring the default or provided strategy. */
 export const layer: {
@@ -472,10 +482,11 @@ export const truncate = (maxTokens: number): Interface => ({
       }
       const tokenizer = yield* Effect.serviceOption(Tokenizer.Tokenizer)
       if (Option.isNone(tokenizer)) return Option.none<Result>()
-      const prompt = yield* tokenizer.value
-        .truncate(Prompt.concat(input.history, input.prompt), maxTokens)
-        .pipe(Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })))
-      return Option.some<Result>(makeMicrocompact(Prompt.empty, prompt))
+      return yield* tokenizer.value.truncate(Prompt.concat(input.history, input.prompt), maxTokens).pipe(
+        Effect.map((prompt) => Option.some<Result>(makeMicrocompact(Prompt.empty, prompt))),
+        Effect.mapError((error) => CompactionError.make({ message: String(error), cause: error })),
+        withCompactionLifecycle(input, usage),
+      )
     }),
 })
 

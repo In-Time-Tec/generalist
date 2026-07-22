@@ -61,6 +61,9 @@ const chatFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
     event: {
       _tag: "ModelPart",
       turn: 0,
+      modelCallId: "model-call-0",
+      modelAttemptId: "model-attempt-0",
+      attempt: 0,
       part: Response.makePart("text-delta", { id: "assistant", delta: "deterministic response" }),
     },
   },

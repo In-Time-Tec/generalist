@@ -877,6 +877,18 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.result).toBe("child answer")
         const completed = events.at(-1)
         expect(completed?._tag === "Completed" && completed.text).toBe("parent saw child answer")
+        const parentCallsStarted = events.filter((event) => event._tag === "ModelCallStarted")
+        const parentCallsCompleted = events.filter((event) => event._tag === "ModelCallCompleted")
+        expect(parentCallsStarted).toHaveLength(2)
+        expect(parentCallsCompleted).toHaveLength(2)
+        const parentParts = events.filter((event) => event._tag === "ModelPart")
+        expect(
+          parentParts.every((part) =>
+            parentCallsStarted.some(
+              (call) => call._tag === "ModelCallStarted" && call.modelCallId === part.modelCallId,
+            ),
+          ),
+        ).toBe(true)
       }),
     ] as const
   })

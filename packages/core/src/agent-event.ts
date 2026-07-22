@@ -1,5 +1,6 @@
 import { Function, Schema } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
+import { type Event as ModelTelemetryEvent } from "./model-telemetry.js"
 import { Diagnostics as SessionSyncDiagnostics } from "./session-sync.js"
 import { StopReason } from "./turn-policy.js"
 /** @experimental Escape-hatch metadata carried by loop events. */
@@ -12,10 +13,17 @@ export interface TurnStarted {
   readonly metadata?: Metadata
 }
 
-/** @experimental A raw model stream part, passed through unchanged. */
+/**
+ * @experimental A raw model stream part, passed through unchanged.
+ * `modelCallId`, `modelAttemptId`, and 0-based `attempt` join the part to its
+ * model-call and attempt lifecycle events.
+ */
 export interface ModelPart {
   readonly _tag: "ModelPart"
   readonly turn: number
+  readonly modelCallId: string
+  readonly modelAttemptId: string
+  readonly attempt: number
   readonly part: Response.StreamPart<Record<string, Tool.Any>>
   readonly metadata?: Metadata
 }
@@ -142,6 +150,7 @@ export type Event =
   | TurnCompleted
   | StructuredOutput
   | Completed
+  | ModelTelemetryEvent
 
 /** @experimental The loop failed. `turn` is the 0-based turn that failed. */
 export class AgentError extends Schema.TaggedErrorClass<AgentError>()("@batonfx/core/AgentError", {

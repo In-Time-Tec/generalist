@@ -53,7 +53,14 @@ const toolResult = Response.makePart("tool-result", {
 
 const completionFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
   eventFrame(0, { _tag: "TurnStarted", turn: 0 }),
-  eventFrame(1, { _tag: "ModelPart", turn: 0, part: toolCall }),
+  eventFrame(1, {
+    _tag: "ModelPart",
+    turn: 0,
+    modelCallId: "model-call-0",
+    modelAttemptId: "model-attempt-0",
+    attempt: 0,
+    part: toolCall,
+  }),
   eventFrame(2, { _tag: "ToolExecutionStarted", turn: 0, call: toolCall }),
   eventFrame(3, { _tag: "ToolExecutionCompleted", turn: 0, call: toolCall, result: toolResult }),
   eventFrame(4, { _tag: "TurnCompleted", turn: 0 }),
@@ -61,11 +68,17 @@ const completionFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
   eventFrame(6, {
     _tag: "ModelPart",
     turn: 1,
+    modelCallId: "model-call-1",
+    modelAttemptId: "model-attempt-1",
+    attempt: 0,
     part: Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Compare transport frames." }),
   }),
   eventFrame(7, {
     _tag: "ModelPart",
     turn: 1,
+    modelCallId: "model-call-1",
+    modelAttemptId: "model-attempt-1",
+    attempt: 0,
     part: Response.makePart("text-delta", { id: "assistant", delta: "Final cited answer" }),
   }),
   eventFrame(8, { _tag: "TurnCompleted", turn: 1 }),

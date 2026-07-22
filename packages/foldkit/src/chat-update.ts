@@ -269,6 +269,18 @@ const applyEvent = (model: Model, event: Wire.LooseEventType): readonly [Model, 
       ]
     case "SteeringDrained":
       return [model, Option.none()]
+    case "ModelCallStarted":
+    case "ModelAttemptStarted":
+    case "ModelAttemptFirstOutput":
+    case "ModelAttemptCompleted":
+    case "ModelAttemptFailed":
+    case "ModelRetryScheduled":
+    case "ModelCallCompleted":
+    case "ModelCallFailed":
+    case "CompactionStarted":
+    case "CompactionCompleted":
+    case "CompactionFailed":
+      return [model, Option.none()]
     case "TurnCompleted":
       return [flushStreaming(model), Option.none()]
     case "StructuredOutput":
