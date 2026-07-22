@@ -30,8 +30,21 @@ export interface OpenAiInput extends RegistrationOptions {
 
 const contextOverflowCodes = new Set(["context_length_exceeded", "context_window_exceeded", "input_too_long"])
 
+const responseErrorCode = (error: unknown): string | undefined => {
+  if (typeof error !== "object" || error === null || Array.isArray(error)) return undefined
+  const event = error as Record<string, unknown>
+  if (event.type !== "error") return undefined
+  if (typeof event.code === "string") return event.code
+  const details = event.error
+  if (typeof details !== "object" || details === null || Array.isArray(details)) return undefined
+  const code = (details as Record<string, unknown>).code
+  return typeof code === "string" ? code : undefined
+}
+
 /** @experimental */
 export const classifyFailure: ModelRegistry.FailureClassifier = (error) => {
+  const eventCode = responseErrorCode(error)
+  if (eventCode !== undefined && contextOverflowCodes.has(eventCode)) return "context-overflow"
   if (!AiError.isAiError(error)) return "other"
   const reason = error.reason
   if (reason._tag !== "InvalidRequestError" && reason._tag !== "UnknownError") return "other"

@@ -56,6 +56,16 @@ describe("providers", () => {
       method: "stream",
       reason: AiError.InvalidRequestError.make({ description: "This model's maximum context length is 128000 tokens" }),
     })
+    const openAiResponseEvent = {
+      type: "error",
+      error: {
+        type: "invalid_request_error",
+        code: "context_length_exceeded",
+        message: "Your input exceeds the context window of this model.",
+        param: "input",
+      },
+      sequence_number: 3,
+    }
     const anthropicPrompt = AiError.make({
       module: "AnthropicClient",
       method: "stream",
@@ -85,6 +95,7 @@ describe("providers", () => {
 
     expect(classifyOpenAiFailure(openAiStructured)).toBe("context-overflow")
     expect(classifyOpenAiFailure(openAiMessage)).toBe("context-overflow")
+    expect(classifyOpenAiFailure(openAiResponseEvent)).toBe("context-overflow")
     expect(classifyAnthropicFailure(anthropicPrompt)).toBe("context-overflow")
     expect(classifyOpenRouterFailure(openRouterUpstream)).toBe("context-overflow")
     expect(classifyOpenRouterFailure(openRouterAnthropicUpstream)).toBe("context-overflow")
