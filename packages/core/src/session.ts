@@ -1,63 +1,55 @@
 import { Context, Effect, HashMap, Layer, Option, Ref, Schema } from "effect"
+import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 import { projectTranscript } from "./memory.js"
+import { CompactionCommit, Event as ModelTelemetryEvent } from "./model-telemetry.js"
 /** @experimental Opaque session entry id. */
 export type EntryId = string
-
 /** @experimental Host-defined metadata carried by session entries. */
 export type Metadata = Readonly<Record<string, unknown>>
-
 /** @experimental Common fields for session entries. */
 export interface BaseEntry {
   readonly id: EntryId
   readonly parentId: EntryId | null
   readonly metadata?: Metadata
 }
-
 /** @experimental A verbatim conversation message. */
 export interface MessageEntry extends BaseEntry {
   readonly _tag: "Message"
   readonly message: Prompt.Message
 }
-
 /** @experimental A model-requested tool call. */
 export interface ToolCallEntry extends BaseEntry {
   readonly _tag: "ToolCall"
   readonly part: Prompt.ToolCallPart
 }
-
 /** @experimental A tool execution result. */
 export interface ToolResultEntry extends BaseEntry {
   readonly _tag: "ToolResult"
   readonly part: Prompt.ToolResultPart
 }
-
 /** @experimental Recalled or persisted memory context. */
 export interface MemoryEntry extends BaseEntry {
   readonly _tag: "Memory"
   readonly items: ReadonlyArray<string>
 }
-
 /** @experimental An activated skill body. */
 export interface SkillEntry extends BaseEntry {
   readonly _tag: "Skill"
   readonly name: string
   readonly body: string
 }
-
 /** @experimental Live steering input preserved as a prompt message. */
 export interface SteeringEntry extends BaseEntry {
   readonly _tag: "Steering"
   readonly message: Prompt.Message
 }
-
 /** @experimental A handoff context note. */
 export interface HandoffEntry extends BaseEntry {
   readonly _tag: "Handoff"
   readonly target: string
   readonly summary: string
 }
-
 /** @experimental A legacy summary compaction boundary for prompt projection. */
 export interface LegacyCompactionEntry extends BaseEntry {
   readonly _tag: "Compaction"
@@ -65,24 +57,22 @@ export interface LegacyCompactionEntry extends BaseEntry {
   readonly summary: string
   readonly firstKeptEntryId: EntryId
 }
-
 /** @experimental An exact point-in-time compaction projection. */
 export interface CheckpointEntry extends BaseEntry {
   readonly _tag: "Compaction"
   readonly version: 2
   readonly projectedHistory: Prompt.Prompt
+  readonly telemetry: ReadonlyArray<ModelTelemetryEvent>
+  readonly compactionCommit?: CompactionCommit
   readonly summary?: string
 }
-
 /** @experimental A legacy or exact compaction boundary. */
 export type CompactionEntry = LegacyCompactionEntry | CheckpointEntry
-
 /** @experimental A summary of an abandoned branch. */
 export interface BranchSummaryEntry extends BaseEntry {
   readonly _tag: "BranchSummary"
   readonly summary: string
 }
-
 /** @experimental Closed union of session entries. */
 export type Entry =
   | MessageEntry
@@ -94,45 +84,39 @@ export type Entry =
   | HandoffEntry
   | CompactionEntry
   | BranchSummaryEntry
-
 type AppendEntryInput<Item extends Entry> = Item extends CheckpointEntry ? never : Omit<Item, "id" | "parentId">
-
 /** @experimental Session entry input appended by a store implementation. */
 export type AppendInput = AppendEntryInput<Entry>
-
 /** @experimental Session store operation failure. */
 export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError>()("@batonfx/core/SessionStoreError", {
   message: Schema.String,
 }) {}
-
 /** @experimental Session append conflict with the active path or checkpoint identity. */
 export class SessionConflict extends Schema.TaggedErrorClass<SessionConflict>()("@batonfx/core/SessionConflict", {
   reason: Schema.Literals(["stale-leaf", "checkpoint-id-reused", "checkpoint-not-on-active-path", "fenced"]),
   message: Schema.String,
 }) {}
-
 /** @experimental Expected active leaf and host write-ownership token for a normal Session append. */
 export interface AppendOptions {
   readonly expectedLeafId?: EntryId | null
   readonly ownerToken?: string
 }
-
-/** @experimental Stable exact projection prepared for idempotent append. */
+/** @experimental Exact idempotent projection. Atomically persist projection, telemetry, and commit; remote failure is ambiguous. */
 export interface PreparedCheckpoint {
   readonly id: EntryId
   readonly parentId: EntryId | null
   readonly projectedHistory: Prompt.Prompt
+  readonly telemetry: ReadonlyArray<ModelTelemetryEvent>
+  readonly compactionCommit?: CompactionCommit
   readonly summary?: string
   readonly ownerToken?: string
 }
-
 /** @experimental Authoritative result of an idempotent checkpoint append. */
 export interface CheckpointAppend {
   readonly _tag: "Appended" | "AlreadyPresent"
   readonly checkpoint: CheckpointEntry
   readonly leafId: EntryId
 }
-
 /** @experimental Session event-log service boundary. */
 export interface Interface {
   readonly reserveEntryId: Effect.Effect<EntryId, SessionStoreError>
@@ -140,6 +124,7 @@ export interface Interface {
     entry: AppendInput,
     options?: AppendOptions,
   ) => Effect.Effect<Entry, SessionStoreError | SessionConflict>
+  /** @experimental Atomically persists projection, telemetry, and commit. Remote failure is ambiguous; retry exactly. */
   readonly appendCheckpoint: (
     checkpoint: PreparedCheckpoint,
   ) => Effect.Effect<CheckpointAppend, SessionStoreError | SessionConflict>
@@ -147,17 +132,14 @@ export interface Interface {
   readonly setLeaf: (id: EntryId | null) => Effect.Effect<void, SessionStoreError>
   readonly leaf: Effect.Effect<EntryId | null>
 }
-
 /** @experimental */
 export class SessionStore extends Context.Service<SessionStore, Interface>()("@batonfx/core/SessionStore") {}
-
 interface State {
   readonly entries: HashMap.HashMap<EntryId, Entry>
   readonly order: ReadonlyArray<EntryId>
   readonly leaf: EntryId | null
   readonly counter: number
 }
-
 interface Success<A> {
   readonly _tag: "Success"
   readonly value: A
@@ -167,7 +149,6 @@ interface Failure {
   readonly _tag: "Failure"
   readonly error: SessionStoreError
 }
-
 type Result<A> = Success<A> | Failure
 
 const initialState: State = {
@@ -279,16 +260,40 @@ const appendState = (
 }
 
 const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
+const telemetryEquivalence = Schema.toEquivalence(Schema.Array(ModelTelemetryEvent))
+const commitEquivalence = Schema.toEquivalence(CompactionCommit)
 
-const checkpointMatches = (entry: CheckpointEntry, prepared: PreparedCheckpoint): boolean =>
-  entry.parentId === prepared.parentId &&
-  entry.summary === prepared.summary &&
-  promptEquivalence(entry.projectedHistory, prepared.projectedHistory)
+/** @experimental Canonical exact checkpoint equivalence, excluding the write-owner token. */
+export const checkpointMatches: {
+  (prepared: PreparedCheckpoint): (entry: CheckpointEntry) => boolean
+  (entry: CheckpointEntry, prepared: PreparedCheckpoint): boolean
+} = dual(
+  2,
+  (entry: CheckpointEntry, prepared: PreparedCheckpoint): boolean =>
+    entry.id === prepared.id &&
+    entry.parentId === prepared.parentId &&
+    entry.summary === prepared.summary &&
+    promptEquivalence(entry.projectedHistory, prepared.projectedHistory) &&
+    telemetryEquivalence(entry.telemetry, prepared.telemetry) &&
+    (entry.compactionCommit === undefined
+      ? prepared.compactionCommit === undefined
+      : prepared.compactionCommit !== undefined &&
+        commitEquivalence(entry.compactionCommit, prepared.compactionCommit)),
+)
 
 const appendCheckpointState = (
   state: State,
   prepared: PreparedCheckpoint,
 ): readonly [CheckpointAppend | SessionConflict, State] => {
+  if (prepared.compactionCommit !== undefined && prepared.compactionCommit.checkpointId !== prepared.id) {
+    return [
+      SessionConflict.make({
+        reason: "checkpoint-id-reused",
+        message: `Compaction commit checkpoint id ${prepared.compactionCommit.checkpointId} does not match ${prepared.id}`,
+      }),
+      state,
+    ]
+  }
   const existing = HashMap.get(state.entries, prepared.id)
   if (Option.isSome(existing)) {
     const entry = existing.value
@@ -334,6 +339,8 @@ const appendCheckpointState = (
     id: prepared.id,
     parentId: prepared.parentId,
     projectedHistory: prepared.projectedHistory,
+    telemetry: prepared.telemetry,
+    ...(prepared.compactionCommit === undefined ? {} : { compactionCommit: prepared.compactionCommit }),
     ...(prepared.summary === undefined ? {} : { summary: prepared.summary }),
   }
   return [

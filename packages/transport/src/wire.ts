@@ -21,6 +21,7 @@ const SnapshotSequence = Schema.Union([Schema.Literals([-1]), Sequence])
 
 /** @experimental A run failure that is not an approval/tool-wait suspension. */
 export const RunFailure = Schema.Union([
+  ModelTelemetry.DeliveryFailed,
   AgentEvent.AgentError,
   AgentEvent.ResumeMismatch,
   TurnPolicy.TurnPolicyError,
@@ -184,6 +185,9 @@ const EventSchemaWith = <
     Schema.Struct({
       _tag: Schema.tag("StructuredOutput"),
       turn: Schema.Finite,
+      modelCallId: Schema.String,
+      modelAttemptId: Schema.String,
+      attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
       value: Schema.Unknown,
       content: Schema.Array(responsePart),
       metadata: OptionalMetadata,

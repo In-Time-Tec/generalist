@@ -598,7 +598,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             if (firstKept === undefined) return Effect.succeedNone
             return Effect.succeed(
               Option.some({
-                _tag: "Summarize",
+                _tag: "Summarize" as const,
                 history: Prompt.fromMessages([
                   Prompt.makeMessage("user", {
                     content: [
@@ -610,7 +610,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 summary: "recall-derived summary",
                 firstKeptEntryId: firstKept.id,
               }),
-            )
+            ).pipe(Compaction.withLifecycle(request))
           },
         }),
         Session.layerMemory,
@@ -847,7 +847,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 history: Prompt.fromMessages([]),
                 prompt: request.prompt,
               })
-            })
+            }).pipe(Compaction.withLifecycle(request))
           },
         }),
         Session.layerMemory,
@@ -979,7 +979,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
             if (firstKept === undefined || system === undefined) return Effect.succeedNone
             return Effect.succeed(
               Option.some({
-                _tag: "Summarize",
+                _tag: "Summarize" as const,
                 history: Prompt.fromMessages([
                   system,
                   Prompt.makeMessage("user", {
@@ -990,7 +990,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 summary: "summary",
                 firstKeptEntryId: firstKept.id,
               }),
-            )
+            ).pipe(Compaction.withLifecycle(request))
           },
         }),
         Session.layerMemory,

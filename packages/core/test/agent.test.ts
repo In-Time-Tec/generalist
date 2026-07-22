@@ -3104,7 +3104,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         echoExecutor,
         Session.layerMemory,
         Compaction.layerTest({
-          maybeCompact: () =>
+          maybeCompact: (request) =>
             Effect.sync(() => {
               compactions += 1
               const history = Prompt.fromMessages([
@@ -3115,16 +3115,16 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               ])
               return Option.some(
                 compactions % 2 === 0
-                  ? { _tag: "Microcompact", history, prompt: Prompt.empty }
+                  ? { _tag: "Microcompact" as const, history, prompt: Prompt.empty }
                   : {
-                      _tag: "Summarize",
+                      _tag: "Summarize" as const,
                       history,
                       prompt: Prompt.empty,
                       summary: `summary-${compactions}`,
                       firstKeptEntryId: "legacy-field-is-not-projection-authority",
                     },
               )
-            }),
+            }).pipe(Compaction.withLifecycle(request)),
         }),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
@@ -3211,14 +3211,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         modelLayer(() => Stream.die("invalid projection must fail before the model")),
         Session.layerMemory,
         Compaction.layerTest({
-          maybeCompact: () =>
+          maybeCompact: (request) =>
             Effect.succeed(
               Option.some({
-                _tag: "Microcompact",
+                _tag: "Microcompact" as const,
                 history: Prompt.fromMessages([orphan]),
                 prompt: Prompt.empty,
               }),
-            ),
+            ).pipe(Compaction.withLifecycle(request)),
         }),
         unusedExecutor,
         Approvals.layerAutoApprove,
@@ -3323,14 +3323,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         modelLayer(() => Stream.empty),
         Session.layerMemory,
         Compaction.layerTest({
-          maybeCompact: () =>
+          maybeCompact: (request) =>
             Effect.succeed(
               Option.some({
-                _tag: "Microcompact",
+                _tag: "Microcompact" as const,
                 history: projected,
                 prompt: Prompt.empty,
               }),
-            ),
+            ).pipe(Compaction.withLifecycle(request)),
         }),
         unusedExecutor,
         Approvals.layerAutoApprove,
@@ -3457,11 +3457,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                 reactiveInput = Json.stringify(request.prompt.content)
               }
               return Option.some({
-                _tag: "Microcompact",
+                _tag: "Microcompact" as const,
                 history: Prompt.empty,
                 prompt: Prompt.make(request.overflow ? "after overflow" : "proactive projection"),
               })
-            }),
+            }).pipe(Compaction.withLifecycle(request)),
         }),
         Session.layerMemory,
         unusedExecutor,
@@ -3506,11 +3506,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             Effect.sync(() => {
               if (request.overflow) overflowRequests += 1
               return Option.some({
-                _tag: "Microcompact",
+                _tag: "Microcompact" as const,
                 history: Prompt.empty,
                 prompt: Prompt.make(request.overflow ? "after overflow" : "proactive projection"),
               })
-            }),
+            }).pipe(Compaction.withLifecycle(request)),
         }),
         Session.layerMemory,
         unusedExecutor,
@@ -5015,7 +5015,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
         expect(structuredCalls).toBe(2)
         const structured = events.find((event) => event._tag === "StructuredOutput")
-        if (structured?._tag === "StructuredOutput") expect(structured.value).toEqual({ ok: true })
+        if (structured?._tag === "StructuredOutput") {
+          expect(structured.value).toEqual({ ok: true })
+          const successfulAttempt = events.findLast((event) => event._tag === "ModelAttemptCompleted")
+          const structuredCall = events.findLast((event) => event._tag === "ModelCallStarted")
+          expect(structured.modelCallId).toBe(
+            successfulAttempt?._tag === "ModelAttemptCompleted" ? successfulAttempt.modelCallId : undefined,
+          )
+          expect(structured.modelAttemptId).toBe(
+            successfulAttempt?._tag === "ModelAttemptCompleted" ? successfulAttempt.modelAttemptId : undefined,
+          )
+          expect(structuredCall?._tag === "ModelCallStarted" && structuredCall.purpose).toBe("structured-output")
+        }
       }),
     ] as const
   })
@@ -5039,14 +5050,19 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "terminal-structured-overflow-agent", model: overflowSelection })
+        const seen: Array<AgentEvent.Event> = []
 
         const failure = yield* Effect.flip(
-          Stream.runCollect(Agent.stream(agent, { prompt: "large object", output: { schema: objectSchema } })),
+          Agent.stream(agent, { prompt: "large object", output: { schema: objectSchema } }).pipe(
+            Stream.tap((event) => Effect.sync(() => seen.push(event))),
+            Stream.runDrain,
+          ),
         )
 
         expect(structuredCalls).toBe(1)
         expect(failure._tag).toBe("@batonfx/core/AgentError")
         if (failure._tag === "@batonfx/core/AgentError") expect(failure.cause).toBe(overflow)
+        expect(seen.some((event) => event._tag === "StructuredOutput")).toBe(false)
       }),
     ] as const
   })
@@ -6772,6 +6788,120 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "delivers durable telemetry in ordered immutable batches matching live delivery IDs", () => {
+    const batches: Array<ReadonlyArray<ModelTelemetry.Event>> = []
+    const delivery = Layer.succeed(
+      ModelTelemetry.Delivery,
+      ModelTelemetry.Delivery.of({
+        deliver: (batch) =>
+          Effect.sync(() => {
+            expect(batch.sessionId).toBe("delivery-session")
+            batches.push(batch.events)
+          }),
+      }),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(textDelta("done"), finishPart("stop", usage({ total: 2 }, { total: 1 })))),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        delivery,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "delivery-agent" }), { prompt: "go", sessionId: "delivery-session" }),
+        )
+        const live = events.filter((event): event is ModelTelemetry.Event => "deliveryId" in event)
+        const delivered = batches.flat()
+
+        expect(batches.length).toBeGreaterThan(0)
+        expect(batches.every(Object.isFrozen)).toBe(true)
+        expect(() => (batches[0] as Array<ModelTelemetry.Event>).push(delivered[0]!)).toThrow()
+        expect(delivered.map((event) => event.deliveryId)).toEqual(live.map((event) => event.deliveryId))
+        expect(new Set(delivered.map((event) => event.deliveryId)).size).toBe(delivered.length)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed when durable telemetry delivery rejects an exact stable batch", () => {
+    const attempted: Array<ReadonlyArray<ModelTelemetry.Event>> = []
+    const delivery = Layer.succeed(
+      ModelTelemetry.Delivery,
+      ModelTelemetry.Delivery.of({
+        deliver: (batch) => {
+          attempted.push(batch.events)
+          return Effect.fail(ModelTelemetry.DeliveryFailed.make({ message: "sink unavailable" }))
+        },
+      }),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(textDelta("not visible"))),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        delivery,
+      ),
+      Effect.gen(function* () {
+        const seen: Array<AgentEvent.Event> = []
+        const failure = yield* Effect.flip(
+          Stream.runDrain(
+            Agent.stream(Agent.make({ name: "delivery-failure-agent" }), { prompt: "go" }).pipe(
+              Stream.tap((event) => Effect.sync(() => seen.push(event))),
+            ),
+          ),
+        )
+
+        expect(failure._tag).toBe("@batonfx/core/DeliveryFailed")
+        expect(attempted).toHaveLength(1)
+        expect(Object.isFrozen(attempted[0])).toBe(true)
+        const attemptedIds = attempted[0]!.map((event) => event.deliveryId)
+        expect(attemptedIds).toEqual([...attemptedIds])
+        expect(seen.filter((event) => "deliveryId" in event)).toEqual([])
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "interrupts hanging durable telemetry delivery without emitting the in-flight batch", () => {
+    const entered = Deferred.makeUnsafe<void>()
+    const attempted: Array<ReadonlyArray<ModelTelemetry.Event>> = []
+    const delivery = Layer.succeed(
+      ModelTelemetry.Delivery,
+      ModelTelemetry.Delivery.of({
+        deliver: (batch) =>
+          Effect.sync(() => attempted.push(batch.events)).pipe(
+            Effect.andThen(Deferred.succeed(entered, undefined)),
+            Effect.andThen(Effect.never),
+          ),
+      }),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(textDelta("not visible"))),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        delivery,
+      ),
+      Effect.gen(function* () {
+        const seen: Array<AgentEvent.Event> = []
+        const fiber = yield* Stream.runDrain(
+          Agent.stream(Agent.make({ name: "hanging-delivery-agent" }), { prompt: "go" }).pipe(
+            Stream.tap((event) => Effect.sync(() => seen.push(event))),
+          ),
+        ).pipe(Effect.forkChild)
+        yield* Deferred.await(entered)
+        yield* Fiber.interrupt(fiber)
+        const exit = yield* Fiber.await(fiber)
+
+        expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(true)
+        expect(attempted).toHaveLength(1)
+        expect(seen.filter((event) => "deliveryId" in event)).toEqual([])
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "streams the retry lifecycle and stamps parts with the retried attempt", () => {
     let calls = 0
     return [
@@ -6975,6 +7105,211 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         )
         expect(summaryCompleted?._tag).toBe("ModelCallCompleted")
         expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "atomically checkpoints durable telemetry and compaction commitment before live flush", () => {
+    let streamCalls = 0
+    const prepared: Array<Session.PreparedCheckpoint> = []
+    const recordingSession = Layer.effect(
+      Session.SessionStore,
+      Session.SessionStore.pipe(
+        Effect.map((delegate) =>
+          Session.SessionStore.of({
+            ...delegate,
+            appendCheckpoint: (checkpoint) =>
+              Effect.sync(() => prepared.push(checkpoint)).pipe(Effect.andThen(delegate.appendCheckpoint(checkpoint))),
+          }),
+        ),
+      ),
+    ).pipe(Layer.provide(Session.layerMemory))
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => {
+            streamCalls += 1
+            return streamCalls === 1
+              ? Stream.make(
+                  toolCallPart("tool-call-durable-compaction", "echo", { text: "needs summary" }),
+                  finishPart("stop", usage({ total: 100 }, { total: 1 })),
+                )
+              : Stream.make(textDelta("after compaction"))
+          },
+          () => Effect.succeed([{ type: "text", text: "durable checkpoint summary" }]),
+        ),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        recordingSession,
+        Compaction.layer({ contextWindow: 10, reserveTokens: 1, keepRecentTokens: 1 }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "durable-compaction-agent", toolkit: Toolkit.make(echoTool) }), {
+            prompt: "old context",
+          }),
+        )
+        const checkpoint = prepared.find((item) => item.compactionCommit?.summaryModelCallId !== undefined)
+        expect(checkpoint).toBeDefined()
+        if (checkpoint === undefined || checkpoint.compactionCommit === undefined) return
+        const tags = checkpoint.telemetry
+          .filter(
+            (event) =>
+              ("compactionId" in event && event.compactionId === checkpoint.compactionCommit?.compactionId) ||
+              ("modelCallId" in event && event.modelCallId === checkpoint.compactionCommit?.summaryModelCallId),
+          )
+          .map((event) => event._tag)
+          .filter((tag) => tag !== "ModelAttemptFirstOutput")
+        expect(tags).toEqual([
+          "CompactionStarted",
+          "ModelCallStarted",
+          "ModelAttemptStarted",
+          "ModelAttemptCompleted",
+          "ModelCallCompleted",
+          "CompactionCompleted",
+        ])
+        for (const durable of checkpoint.telemetry) {
+          expect(events.find((event) => "deliveryId" in event && event.deliveryId === durable.deliveryId)).toEqual(
+            durable,
+          )
+        }
+        const commit = checkpoint.compactionCommit
+        const started = checkpoint.telemetry.find(
+          (event) => event._tag === "CompactionStarted" && event.compactionId === commit.compactionId,
+        )
+        const summaryStarted = checkpoint.telemetry.find(
+          (event) => event._tag === "ModelCallStarted" && event.modelCallId === commit.summaryModelCallId,
+        )
+        const completed = checkpoint.telemetry.find(
+          (event) => event._tag === "CompactionCompleted" && event.compactionId === commit.compactionId,
+        )
+        expect(commit.compactionId).toBe(started?._tag === "CompactionStarted" ? started.compactionId : undefined)
+        expect(commit.compactionId).toBe(completed?._tag === "CompactionCompleted" ? completed.compactionId : undefined)
+        expect(commit.compactionId).toBe(
+          summaryStarted?._tag === "ModelCallStarted" ? summaryStarted.compactionId : undefined,
+        )
+        expect(commit.summaryModelCallId).toBe(
+          summaryStarted?._tag === "ModelCallStarted" ? summaryStarted.modelCallId : undefined,
+        )
+        expect(commit.checkpointId).toBe(checkpoint.id)
+        for (const measurement of [
+          commit.contextTokensBefore,
+          commit.contextTokensAfter,
+          commit.entriesBefore,
+          commit.entriesAfter,
+        ]) {
+          expect(measurement).toBeDefined()
+          expect(measurement).toBeGreaterThanOrEqual(0)
+        }
+        expect(commit.entriesAfter).toBe(checkpoint.projectedHistory.content.length)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "commits changed compaction without a summary model call", () => {
+    let calls = 0
+    const prepared: Array<Session.PreparedCheckpoint> = []
+    const recordingSession = Layer.effect(
+      Session.SessionStore,
+      Session.SessionStore.pipe(
+        Effect.map((delegate) =>
+          Session.SessionStore.of({
+            ...delegate,
+            appendCheckpoint: (checkpoint) =>
+              Effect.sync(() => prepared.push(checkpoint)).pipe(Effect.andThen(delegate.appendCheckpoint(checkpoint))),
+          }),
+        ),
+      ),
+    ).pipe(Layer.provide(Session.layerMemory))
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("tool-call-microcompact", "echo", { text: "x".repeat(200) }))
+            : Stream.make(textDelta("done"))
+        }),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        recordingSession,
+        Compaction.layer({
+          strategy: Compaction.strategy([Compaction.toolOutputBound({ maxBytes: 8 })]),
+          contextWindow: 1,
+          reserveTokens: 0,
+        }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "microcompact-commit-agent", toolkit: Toolkit.make(echoTool) }), {
+            prompt: "compact",
+          }),
+        )
+        const checkpoint = prepared.find((item) => item.compactionCommit !== undefined)
+        expect(checkpoint).toBeDefined()
+        if (checkpoint?.compactionCommit === undefined) return
+        expect(checkpoint.compactionCommit.summaryModelCallId).toBeUndefined()
+        expect(checkpoint.compactionCommit.contextTokensBefore).toBeGreaterThanOrEqual(0)
+        expect(checkpoint.compactionCommit.contextTokensAfter).toBeGreaterThanOrEqual(0)
+        expect(checkpoint.compactionCommit.entriesBefore).toBeGreaterThanOrEqual(0)
+        expect(checkpoint.compactionCommit.entriesAfter).toBe(checkpoint.projectedHistory.content.length)
+        const completed = events.find(
+          (event) =>
+            event._tag === "CompactionCompleted" && event.compactionId === checkpoint.compactionCommit?.compactionId,
+        )
+        expect(completed?._tag === "CompactionCompleted" && completed.kind).toBe("microcompact")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "keeps CompactionCompleted distinct when checkpoint append fails", () => {
+    let calls = 0
+    let successfulCheckpoints = 0
+    const failingSession = Layer.effect(
+      Session.SessionStore,
+      Session.SessionStore.pipe(
+        Effect.map((delegate) =>
+          Session.SessionStore.of({
+            ...delegate,
+            appendCheckpoint: () => Effect.fail(Session.SessionStoreError.make({ message: "checkpoint failed" })),
+          }),
+        ),
+      ),
+    ).pipe(Layer.provide(Session.layerMemory))
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("tool-call-failed-checkpoint", "echo", { text: "x".repeat(200) }))
+            : Stream.make(textDelta("unreachable"))
+        }),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        failingSession,
+        Compaction.layer({
+          strategy: Compaction.strategy([Compaction.toolOutputBound({ maxBytes: 8 })]),
+          contextWindow: 1,
+          reserveTokens: 0,
+        }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const seen: Array<AgentEvent.Event> = []
+        const failure = yield* Agent.stream(
+          Agent.make({ name: "failed-compaction-checkpoint-agent", toolkit: Toolkit.make(echoTool) }),
+          { prompt: "compact" },
+        ).pipe(
+          Stream.tap((event) => Effect.sync(() => seen.push(event))),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        expect(failure._tag).toBe("@batonfx/core/AgentError")
+        const completedIndex = seen.findIndex((event) => event._tag === "CompactionCompleted")
+        expect(completedIndex).toBeGreaterThanOrEqual(0)
+        expect(seen.slice(completedIndex + 1).some((event) => event._tag === "CompactionFailed")).toBe(false)
+        expect(successfulCheckpoints).toBe(0)
       }),
     ] as const
   })

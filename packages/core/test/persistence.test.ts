@@ -512,6 +512,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           id: yield* session.reserveEntryId,
           parentId: null,
           projectedHistory: Prompt.fromMessages([Prompt.makeMessage("assistant", { content: [call] })]),
+          telemetry: [],
         })
         const received = AgentEvent.AgentSuspended.make({
           token: "stale-token",
@@ -592,16 +593,16 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
       Layer.mergeAll(
         modelLayer(() => Stream.die("model must not run after checkpoint failure")),
         Compaction.layerTest({
-          maybeCompact: () =>
+          maybeCompact: (request) =>
             Effect.succeed(
               Option.some({
-                _tag: "Summarize",
+                _tag: "Summarize" as const,
                 history: Prompt.make("committed too early"),
                 prompt: Prompt.make("retry prompt"),
                 summary: "summary",
                 firstKeptEntryId: "0",
               }),
-            ),
+            ).pipe(Compaction.withLifecycle(request)),
         }),
         sessionLayer,
         unusedExecutor,
@@ -698,6 +699,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
                   active -= 1
                 }),
               ),
+              Compaction.withLifecycle(request),
             ),
         }),
         Session.layerMemory,
@@ -838,6 +840,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     let pathEntered: Deferred.Deferred<void> | undefined
     let blockCheckpointPath = true
     let compactionCalls = 0
+    let committedCheckpoint: Session.CheckpointEntry | undefined
     const sessionLayer = Layer.effect(
       Session.SessionStore,
       Ref.make<ReadonlyArray<Session.Entry>>([]).pipe(
@@ -867,6 +870,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
                   version: 2,
                   ...prepared,
                 }
+                committedCheckpoint = checkpoint
                 return [
                   { _tag: "Appended", checkpoint, leafId: checkpoint.id } as const,
                   [...path, checkpoint],
@@ -893,7 +897,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
       Layer.mergeAll(
         modelLayer(() => Stream.empty),
         Compaction.layerTest({
-          maybeCompact: () =>
+          maybeCompact: (request) =>
             Effect.sync(() => {
               compactionCalls += 1
               return compactionCalls === 1
@@ -903,7 +907,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
                     prompt: Prompt.empty,
                   })
                 : Option.none()
-            }),
+            }).pipe(Compaction.withLifecycle(request)),
         }),
         sessionLayer,
         unusedExecutor,
@@ -933,7 +937,15 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const history = yield* Ref.get(chat.history)
         const session = yield* Session.SessionStore
         const path = yield* session.path()
-        expect(path.filter((entry) => entry._tag === "Compaction")).toHaveLength(1)
+        const checkpoints = path.filter(
+          (entry): entry is Session.CheckpointEntry => entry._tag === "Compaction" && entry.version === 2,
+        )
+        expect(checkpoints).toHaveLength(1)
+        expect(committedCheckpoint).toBeDefined()
+        expect(checkpoints[0]?.telemetry.map((event) => event.deliveryId)).toEqual(
+          committedCheckpoint?.telemetry.map((event) => event.deliveryId),
+        )
+        expect(checkpoints[0]?.compactionCommit).toEqual(committedCheckpoint?.compactionCommit)
         expect(Session.buildContext(path).content).toEqual(history.content)
       }),
     ] as const

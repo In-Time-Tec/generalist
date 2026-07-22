@@ -320,6 +320,7 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
       const service = Compaction.make(strategy, { contextWindow: 10, reserveTokens: 0 })
       const compacted = yield* service
         .maybeCompact({
+          compactionId: "compaction-test-model",
           agentName: "compact",
           sessionId: "session",
           turn: 2,

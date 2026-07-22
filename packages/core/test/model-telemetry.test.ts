@@ -33,7 +33,7 @@ describe("ModelTelemetry", () => {
 
   it("decodes every lifecycle event through the closed Event union", () => {
     const decode = Schema.decodeUnknownSync(ModelTelemetry.Event)
-    const events: ReadonlyArray<ModelTelemetry.Event> = [
+    const payloads: ReadonlyArray<ModelTelemetry.EventPayload> = [
       {
         _tag: "ModelCallStarted",
         turn: 0,
@@ -128,7 +128,8 @@ describe("ModelTelemetry", () => {
       { _tag: "CompactionFailed", turn: 3, compactionId: "compaction-2", failedAt: 9 },
     ]
 
-    for (const event of events) {
+    for (const [index, payload] of payloads.entries()) {
+      const event: ModelTelemetry.Event = { ...payload, deliveryId: `run:${index}` }
       expect(decode(event)).toEqual(event)
     }
   })
@@ -137,6 +138,7 @@ describe("ModelTelemetry", () => {
     const decode = Schema.decodeUnknownSync(ModelTelemetry.Event)
     const decoded = decode({
       _tag: "ModelAttemptCompleted",
+      deliveryId: "run:0",
       turn: 0,
       modelCallId: "call-1",
       modelAttemptId: "attempt-1",

@@ -52,17 +52,22 @@ import {
   CurrentInstrumentation,
   CurrentPurpose,
   CurrentSummaryCall,
+  Delivery,
+  DeliveryFailed,
   type Event as ModelTelemetryEvent,
+  type EventPayload as ModelTelemetryEventPayload,
   type ModelCallPurpose,
+  generateId,
 } from "./model-telemetry.js"
 import { Permissions, RuleStore } from "./permissions.js"
 import {
   type Entry,
   SessionStore,
-  type SessionConflict,
+  SessionConflict,
   type SessionStoreError,
   buildContext,
   buildMemoryContext,
+  checkpointMatches,
 } from "./session.js"
 import { SkillSource, type SkillSourceError, selectListings } from "./skill-source.js"
 import { type Input, Steering } from "./steering.js"
@@ -397,12 +402,34 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       )
 
       const resilienceService = yield* Effect.serviceOption(ModelResilience)
+      const deliveryService = yield* Effect.serviceOption(Delivery)
+      const telemetryRunId = yield* generateId
+      let telemetrySequence = 0
       const pendingTelemetry: Array<ModelTelemetryEvent> = []
-      const emitTelemetry = (event: ModelTelemetryEvent): Effect.Effect<void> =>
+      const undeliveredTelemetry: Array<ModelTelemetryEvent> = []
+      const emitTelemetry = (payload: ModelTelemetryEventPayload): Effect.Effect<void> =>
         Effect.sync(() => {
+          const event = { ...payload, deliveryId: `${telemetryRunId}:${telemetrySequence++}` } as ModelTelemetryEvent
           pendingTelemetry.push(event)
+          undeliveredTelemetry.push(event)
         })
       const flushTelemetry = (): ReadonlyArray<Event> => pendingTelemetry.splice(0, pendingTelemetry.length)
+      const deliverPending = (): Effect.Effect<void, import("./model-telemetry.js").DeliveryFailed> => {
+        if (Option.isNone(deliveryService) || undeliveredTelemetry.length === 0) return Effect.void
+        const snapshot = Object.freeze([...undeliveredTelemetry])
+        return deliveryService.value.deliver({ sessionId, events: snapshot }).pipe(
+          Effect.onError(() =>
+            Effect.sync(() => {
+              pendingTelemetry.splice(0, pendingTelemetry.length)
+            }),
+          ),
+          Effect.tap(() =>
+            Effect.sync(() => {
+              undeliveredTelemetry.splice(0, snapshot.length)
+            }),
+          ),
+        )
+      }
       const telemetryIdentity = makeIdentityCell()
       const instrumentModel = (model: LanguageModel.Service, turn: number): LanguageModel.Service =>
         instrument(model, {
@@ -511,7 +538,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
         suspension: AgentSuspended,
-      ): Effect.Effect<Prompt.Prompt, AgentError> =>
+      ): Effect.Effect<Prompt.Prompt, RunError> =>
         Effect.gen(function* () {
           const withPending = yield* appendPending(turn, pending)
           const unresolved = unresolvedToolCall(withPending.content, suspension.tool_call_id)
@@ -836,22 +863,72 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         turn: number,
         result: CompactionResult,
         parentId: string | null,
-      ): Effect.Effect<void, AgentError> =>
+        commitData?: Omit<import("./model-telemetry.js").CompactionCommit, "checkpointId" | "summaryModelCallId">,
+      ): Effect.Effect<void, RunError> =>
         Option.match(activeSession, {
-          onNone: () => Ref.set(chat.history, result.history),
+          onNone: () => deliverPending().pipe(Effect.andThen(Ref.set(chat.history, result.history))),
           onSome: (session) =>
             Effect.gen(function* () {
               const id = yield* session.reserveEntryId
+              const telemetry = Object.freeze([...undeliveredTelemetry])
+              const completed: Extract<ModelTelemetryEvent, { readonly _tag: "CompactionCompleted" }> | undefined =
+                commitData === undefined
+                  ? undefined
+                  : (telemetry.findLast(
+                      (event) => event._tag === "CompactionCompleted" && event.compactionId === commitData.compactionId,
+                    ) as Extract<ModelTelemetryEvent, { readonly _tag: "CompactionCompleted" }> | undefined)
+              if (commitData !== undefined && completed === undefined) {
+                return yield* AgentError.make({
+                  message: `Changed custom compaction ${commitData.compactionId} did not emit CompactionCompleted`,
+                  turn,
+                })
+              }
+              const compactionCommit =
+                commitData === undefined
+                  ? undefined
+                  : {
+                      ...commitData,
+                      checkpointId: id,
+                      ...(completed?.summaryModelCallId === undefined
+                        ? {}
+                        : { summaryModelCallId: completed.summaryModelCallId }),
+                    }
               yield* Effect.uninterruptibleMask((restore) =>
                 restore(
-                  session.appendCheckpoint({
-                    id,
-                    parentId,
-                    projectedHistory: result.history,
-                    ...(result._tag === "Summarize" ? { summary: result.summary } : {}),
-                    ...(sessionOwnerToken === undefined ? {} : { ownerToken: sessionOwnerToken }),
-                  }),
+                  session
+                    .appendCheckpoint({
+                      id,
+                      parentId,
+                      projectedHistory: result.history,
+                      telemetry,
+                      ...(compactionCommit === undefined ? {} : { compactionCommit }),
+                      ...(result._tag === "Summarize" ? { summary: result.summary } : {}),
+                      ...(sessionOwnerToken === undefined ? {} : { ownerToken: sessionOwnerToken }),
+                    })
+                    .pipe(
+                      Effect.filterOrFail(
+                        (appended) =>
+                          checkpointMatches(appended.checkpoint, {
+                            id,
+                            parentId,
+                            projectedHistory: result.history,
+                            telemetry,
+                            ...(compactionCommit === undefined ? {} : { compactionCommit }),
+                            ...(result._tag === "Summarize" ? { summary: result.summary } : {}),
+                          }),
+                        () =>
+                          SessionConflict.make({
+                            reason: "checkpoint-id-reused",
+                            message: `Session returned a non-matching checkpoint ${id}`,
+                          }),
+                      ),
+                    ),
                 ).pipe(
+                  Effect.tap(() =>
+                    Effect.sync(() => {
+                      undeliveredTelemetry.splice(0, telemetry.length)
+                    }),
+                  ),
                   Effect.flatMap((appended) => restore(session.path(appended.leafId))),
                   Effect.map(buildContext),
                   Effect.tap((projection) => Ref.set(chat.history, projection)),
@@ -867,7 +944,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         overflow: boolean,
       ): Effect.Effect<
         { readonly prompt: Prompt.Prompt; readonly changed: boolean },
-        AgentError | MiddlewareViolation,
+        RunError,
         LanguageModel.LanguageModel
       > =>
         Option.match(compactionService, {
@@ -894,8 +971,10 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               const detachedPath = yield* Effect.forEach(path, detachEntry).pipe(
                 Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
               )
-              const compacted = yield* compaction
-                .maybeCompact({
+              const compactionId = yield* generateId
+              const compacted = yield* Effect.scoped(
+                compaction.maybeCompact({
+                  compactionId,
                   agentName: agent.name,
                   sessionId,
                   turn,
@@ -907,8 +986,8 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                   ...(options.toolOutputMaxBytes === undefined
                     ? {}
                     : { toolOutputMaxBytes: options.toolOutputMaxBytes }),
-                })
-                .pipe(Effect.mapError((error) => compactionError(turn, error)))
+                }),
+              ).pipe(Effect.mapError((error) => compactionError(turn, error)))
               if (Option.isNone(compacted)) return { prompt, changed: false }
               const changed =
                 !Equal.equals(originalHistory.content, compacted.value.history.content) ||
@@ -929,7 +1008,15 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                 })
               }
               yield* validateCompactionProjection(turn, compacted.value)
-              yield* applyCompactionResult(turn, compacted.value, path.at(-1)?.id ?? null)
+              const after = Prompt.concat(compacted.value.history, compacted.value.prompt)
+              const contextTokensAfter = yield* Effect.option(countTokens(turn, after))
+              yield* applyCompactionResult(turn, compacted.value, path.at(-1)?.id ?? null, {
+                compactionId,
+                contextTokensBefore: usage.contextTokens,
+                ...(Option.isSome(contextTokensAfter) ? { contextTokensAfter: contextTokensAfter.value } : {}),
+                entriesBefore: Prompt.concat(history, prompt).content.length,
+                entriesAfter: after.content.length,
+              })
               return { prompt: compacted.value.prompt, changed: true }
             }),
         })
@@ -1656,6 +1743,10 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               ),
             )
             yield* captureStructuredUsage(response.content)
+            const structuredIdentity = telemetryIdentity.current
+            if (structuredIdentity === undefined) {
+              return yield* Effect.die(new Error("Structured output model attempt identity is missing"))
+            }
             const transcript = Prompt.concat(
               Prompt.concat(history, transformedPrompt),
               Prompt.fromResponseParts(response.content),
@@ -1670,6 +1761,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             const structuredOutput: StructuredOutput = {
               _tag: "StructuredOutput",
               turn: structuredTurn,
+              ...structuredIdentity,
               value: response.value,
               content: response.content as ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
             }
@@ -1948,12 +2040,24 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         Stream.provideService(CurrentPurpose, "conversation"),
         Stream.provideService(CurrentCompactionId, undefined),
         Stream.provideService(CurrentSummaryCall, undefined),
-        Stream.map((event): ReadonlyArray<Event> => [...flushTelemetry(), event]),
-        Stream.flattenIterable,
-        Stream.concat(Stream.suspend(() => Stream.fromIterable(flushTelemetry()))),
-        Stream.catchCause((cause) =>
-          Stream.concat(Stream.fromIterable(flushTelemetry()), Stream.failCause<RunError>(cause)),
+        Stream.mapEffect(
+          (event): Effect.Effect<ReadonlyArray<Event>, RunError> =>
+            deliverPending().pipe(Effect.map(() => [...flushTelemetry(), event])),
         ),
+        Stream.flattenIterable,
+        Stream.concat(Stream.unwrap(deliverPending().pipe(Effect.map(() => Stream.fromIterable(flushTelemetry()))))),
+        Stream.catchCause((cause) => {
+          if (Cause.hasInterrupts(cause)) return Stream.failCause<RunError>(cause)
+          const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+          if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(DeliveryFailed)(reason.error)) {
+            return Stream.failCause<RunError>(cause)
+          }
+          return Stream.unwrap(
+            deliverPending().pipe(
+              Effect.map(() => Stream.concat(Stream.fromIterable(flushTelemetry()), Stream.failCause<RunError>(cause))),
+            ),
+          )
+        }),
       )
     }),
   ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } }))

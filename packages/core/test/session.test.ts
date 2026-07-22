@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Memory, Session } from "../src/index"
+import { Memory, ModelTelemetry, Session } from "../src/index"
 import { ItLayer } from "./it-layer"
 
 const user = (text: string): Prompt.Message =>
@@ -281,6 +281,7 @@ describe("Session", () => {
             id,
             parentId: source.id,
             projectedHistory: Prompt.fromMessages([user("exact projection")]),
+            telemetry: [],
           }
 
           const appended = yield* store.appendCheckpoint(prepared)
@@ -294,6 +295,7 @@ describe("Session", () => {
               id: staleId,
               parentId: source.id,
               projectedHistory: Prompt.fromMessages([user("stale")]),
+              telemetry: [],
             }),
           )
 
@@ -311,6 +313,95 @@ describe("Session", () => {
 
   ItLayer.make(
     it,
+    "persists durable telemetry delivery identity and rejects every changed checkpoint identity field",
+    () =>
+      [
+        Session.layerMemory,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const id = yield* store.reserveEntryId
+          const telemetry: ReadonlyArray<ModelTelemetry.Event> = [
+            {
+              _tag: "ModelCallStarted",
+              deliveryId: "delivery-0",
+              turn: 1,
+              modelCallId: "summary-call",
+              purpose: "compaction-summary",
+              compactionId: "compaction-1",
+              startedAt: 10,
+            },
+            {
+              _tag: "ModelCallCompleted",
+              deliveryId: "delivery-1",
+              turn: 1,
+              modelCallId: "summary-call",
+              purpose: "compaction-summary",
+              attempts: 1,
+              completedAt: 20,
+            },
+          ]
+          const compactionCommit: ModelTelemetry.CompactionCommit = {
+            compactionId: "compaction-1",
+            checkpointId: id,
+            summaryModelCallId: "summary-call",
+            contextTokensBefore: 100,
+            contextTokensAfter: 40,
+            entriesBefore: 8,
+            entriesAfter: 3,
+          }
+          const prepared: Session.PreparedCheckpoint = {
+            id,
+            parentId: source.id,
+            projectedHistory: Prompt.fromMessages([user("durable")]),
+            telemetry,
+            compactionCommit,
+          }
+
+          const appended = yield* store.appendCheckpoint(prepared)
+          const replayed = yield* store.appendCheckpoint(prepared)
+          expect(appended.checkpoint.telemetry).toEqual(telemetry)
+          expect(appended.checkpoint.compactionCommit).toEqual(compactionCommit)
+          expect(replayed._tag).toBe("AlreadyPresent")
+
+          const changed: ReadonlyArray<Session.PreparedCheckpoint> = [
+            { ...prepared, telemetry: [{ ...telemetry[0]!, deliveryId: "changed" }, telemetry[1]!] },
+            { ...prepared, telemetry: [telemetry[1]!, telemetry[0]!] },
+            {
+              ...prepared,
+              telemetry: [
+                telemetry[0]!,
+                {
+                  _tag: "ModelCallCompleted",
+                  deliveryId: "delivery-1",
+                  turn: 1,
+                  modelCallId: "summary-call",
+                  purpose: "compaction-summary",
+                  attempts: 1,
+                  completedAt: 21,
+                },
+              ],
+            },
+            { ...prepared, compactionCommit: { ...compactionCommit, summaryModelCallId: "other-call" } },
+            { ...prepared, compactionCommit: { ...compactionCommit, contextTokensBefore: 101 } },
+            { ...prepared, compactionCommit: { ...compactionCommit, contextTokensAfter: 41 } },
+            { ...prepared, compactionCommit: { ...compactionCommit, entriesBefore: 9 } },
+            { ...prepared, compactionCommit: { ...compactionCommit, entriesAfter: 4 } },
+            { ...prepared, compactionCommit: { ...compactionCommit, checkpointId: "wrong-checkpoint" } },
+          ]
+          for (const candidate of changed) {
+            const failure = yield* Effect.flip(store.appendCheckpoint(candidate))
+            expect(failure._tag).toBe("@batonfx/core/SessionConflict")
+            if (failure._tag === "@batonfx/core/SessionConflict") {
+              expect(failure.reason).toBe("checkpoint-id-reused")
+            }
+          }
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
     "retries an ambiguously interrupted checkpoint append without duplication",
     () =>
       [
@@ -322,6 +413,7 @@ describe("Session", () => {
             id: yield* store.reserveEntryId,
             parentId: source.id,
             projectedHistory: Prompt.fromMessages([user("committed projection")]),
+            telemetry: [],
           }
           const committed = yield* Deferred.make<void>()
           const append = store.appendCheckpoint(prepared).pipe(
@@ -367,6 +459,7 @@ describe("Session", () => {
             id: yield* store.reserveEntryId,
             parentId: source.id,
             projectedHistory: toolProjection({ first: 1, second: 2 }),
+            telemetry: [],
           }
           yield* store.appendCheckpoint(prepared)
 
@@ -393,6 +486,7 @@ describe("Session", () => {
             id: yield* store.reserveEntryId,
             parentId: source.id,
             projectedHistory: Prompt.fromMessages([user("checkpoint")]),
+            telemetry: [],
           }
           yield* store.appendCheckpoint(prepared)
           const descendant = yield* store.append(

@@ -98,6 +98,9 @@ export interface TurnCompleted {
 export interface StructuredOutput {
   readonly _tag: "StructuredOutput"
   readonly turn: number
+  readonly modelCallId: string
+  readonly modelAttemptId: string
+  readonly attempt: number
   readonly value: unknown
   readonly content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>
   readonly metadata?: Metadata

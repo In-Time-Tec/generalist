@@ -50,6 +50,14 @@ const modelLayer = (generateText: ModelParams["generateText"]): Layer.Layer<Lang
   )
 
 describe("Compaction", () => {
+  it("requires lifecycle work to produce a compaction result", () => {
+    const invalidLifecycleWork = (request: Compaction.Request) =>
+      // @ts-expect-error Lifecycle work must preserve the public Compaction.Result contract.
+      Compaction.withLifecycle(request)(Effect.succeed(Option.some({ invalid: true })))
+
+    expect(invalidLifecycleWork).toBeTypeOf("function")
+  })
+
   it("uses strict reserve-token boundary math", () => {
     const strategy = Compaction.defaultStrategy()
 
@@ -117,6 +125,7 @@ describe("Compaction", () => {
         })
 
         const compacted = yield* service.maybeCompact({
+          compactionId: "compaction-token-budget",
           agentName: "token-budget-agent",
           sessionId: "session",
           turn: 1,
@@ -154,6 +163,7 @@ describe("Compaction", () => {
         })
 
         const compacted = yield* service.maybeCompact({
+          compactionId: "compaction-compact",
           agentName: "compact-agent",
           sessionId: "session",
           turn: 1,
@@ -202,6 +212,7 @@ describe("Compaction", () => {
         })
 
         const compacted = yield* service.maybeCompact({
+          compactionId: "compaction-summary",
           agentName: "summary-agent",
           sessionId: "session",
           turn: 2,
@@ -266,6 +277,7 @@ describe("Compaction", () => {
           keepRecentTokens: 1,
         })
         const request = {
+          compactionId: "compaction-summary-reuse",
           agentName: "summary-agent",
           sessionId: "session",
           turn: 1,
@@ -313,6 +325,7 @@ describe("Compaction", () => {
       keepRecentTokens: 1,
     })
     const request = {
+      compactionId: "compaction-standalone",
       agentName: "standalone-summary-agent",
       sessionId: "session",
       turn: 1,
@@ -367,6 +380,7 @@ describe("Compaction", () => {
         keepRecentTokens: 1,
       })
       const request = {
+        compactionId: "compaction-interrupted",
         agentName: "interrupted-summary-agent",
         sessionId: "session",
         turn: 1,
@@ -430,6 +444,7 @@ describe("Compaction", () => {
           })
 
           const compacted = yield* service.maybeCompact({
+            compactionId: "compaction-system-summary",
             agentName: "system-summary-agent",
             sessionId: "session",
             turn: 2,
@@ -456,6 +471,7 @@ describe("Compaction", () => {
                 id: checkpointId,
                 parentId: yield* store.leaf,
                 projectedHistory: value.history,
+                telemetry: [],
                 summary: value.summary,
               })
               expect(Json.stringify(Session.buildContext(yield* store.path()).content)).toBe(history)
@@ -484,6 +500,7 @@ describe("Compaction", () => {
         })
 
         const compacted = yield* service.maybeCompact({
+          compactionId: "compaction-summary-head",
           agentName: "summary-head-agent",
           sessionId: "session",
           turn: 2,
@@ -517,6 +534,7 @@ describe("Compaction", () => {
       ),
       Effect.gen(function* () {
         const compacted = yield* service.maybeCompact({
+          compactionId: "compaction-truncate",
           agentName: "truncate-agent",
           sessionId: "session",
           turn: 0,
@@ -569,6 +587,7 @@ describe("Compaction", () => {
       ),
       Effect.gen(function* () {
         const compacted = yield* service.maybeCompact({
+          compactionId: "compaction-composed-tool",
           agentName: "composed-tool-bound-agent",
           sessionId: "session",
           turn: 1,
@@ -613,6 +632,7 @@ describe("Compaction", () => {
       ),
       Effect.gen(function* () {
         const request: Compaction.Request = {
+          compactionId: "compaction-retained-tool",
           agentName: "retained-tool-bound-agent",
           sessionId: "session",
           turn: 2,
@@ -684,6 +704,7 @@ describe("Compaction", () => {
       }),
       Effect.gen(function* () {
         const compacted = yield* service.maybeCompact({
+          compactionId: "compaction-structured-summary",
           agentName: "structured-summary-agent",
           sessionId: "session",
           turn: 2,
