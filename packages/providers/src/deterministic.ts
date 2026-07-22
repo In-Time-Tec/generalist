@@ -20,7 +20,7 @@ export interface DeterministicInput extends RegistrationOptions {
 }
 
 /** @experimental */
-const registration = (input: DeterministicInput = {}) =>
+export const registration = (input: DeterministicInput = {}) =>
   ModelRegistry.registration({
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",
