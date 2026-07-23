@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.6
+
+- Commit model responses to authoritative chat history only after the transformed stream is fully consumed, preventing interrupted, failed, or partially consumed response prefixes from conflicting with durable replay.
+
 ## 0.11.5
 
 - Compare durable session messages by canonical content so equivalent file data representations, including a URL object and its string value, remain aligned with authoritative Chat history.
