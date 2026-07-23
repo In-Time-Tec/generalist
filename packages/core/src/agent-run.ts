@@ -335,10 +335,11 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
 
       if (
         agent.toolExecution !== undefined &&
+        agent.toolExecution.concurrency !== "unbounded" &&
         (!Number.isSafeInteger(agent.toolExecution.concurrency) || agent.toolExecution.concurrency <= 0)
       ) {
         return yield* AgentError.make({
-          message: "Agent.toolExecution.concurrency must be a positive safe integer",
+          message: 'Agent.toolExecution.concurrency must be a positive safe integer or "unbounded"',
           turn: 0,
         })
       }

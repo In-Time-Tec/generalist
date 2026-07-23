@@ -49,7 +49,7 @@ export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = Language
 
 /** @experimental Policy for framework-executed tool calls emitted by one model turn. */
 export interface ToolExecutionPolicy {
-  readonly concurrency: number
+  readonly concurrency: number | "unbounded"
 }
 
 /** @experimental One origin-preserving static or Handoff tool declaration. */

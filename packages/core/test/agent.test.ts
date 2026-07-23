@@ -752,7 +752,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
           expect(failure._tag).toBe("@batonfx/core/AgentError")
           expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
-            "Agent.toolExecution.concurrency must be a positive safe integer",
+            'Agent.toolExecution.concurrency must be a positive safe integer or "unbounded"',
           )
         }
         expect(modelCalls).toBe(0)
@@ -4425,6 +4425,69 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             "concurrent-fourth",
           ])
         }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "runs every sibling tool call concurrently when concurrency is unbounded", () => {
+    let active = 0
+    let maximum = 0
+    let modelCalls = 0
+    let allStarted: Deferred.Deferred<void> | undefined
+    let release: Deferred.Deferred<void> | undefined
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(
+                toolCallPart("unbounded-first", "echo", { text: "first" }),
+                toolCallPart("unbounded-second", "echo", { text: "second" }),
+                toolCallPart("unbounded-third", "echo", { text: "third" }),
+                toolCallPart("unbounded-fourth", "echo", { text: "fourth" }),
+                toolCallPart("unbounded-fifth", "echo", { text: "fifth" }),
+              )
+            : Stream.make(textDelta("done"))
+        }),
+        ToolExecutor.layerTest({
+          execute: (request) =>
+            Effect.acquireUseRelease(
+              Effect.gen(function* () {
+                active += 1
+                maximum = Math.max(maximum, active)
+                if (active === 5 && allStarted !== undefined) yield* Deferred.succeed(allStarted, undefined)
+              }),
+              () =>
+                Deferred.await(release!).pipe(
+                  Effect.as({ _tag: "Success" as const, result: request.call.id, encodedResult: request.call.id }),
+                ),
+              () => Effect.sync(() => active--),
+            ),
+        }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        allStarted = yield* Deferred.make<void>()
+        release = yield* Deferred.make<void>()
+        const agent = Agent.make({
+          name: "unbounded-concurrent-tools",
+          toolkit: Toolkit.make(echoTool),
+          toolExecution: { concurrency: "unbounded" },
+        })
+        const fiber = yield* Stream.runCollect(Agent.stream(agent, { prompt: "run" })).pipe(Effect.forkChild)
+        const startedTogether = yield* Deferred.await(allStarted).pipe(
+          Effect.as(true),
+          Effect.timeoutOrElse({ duration: "5 seconds", orElse: () => Effect.succeed(false) }),
+        )
+        const observedMaximum = maximum
+        yield* Deferred.succeed(release, undefined)
+        const events = yield* Fiber.join(fiber)
+        expect(startedTogether).toBe(true)
+        expect(observedMaximum).toBe(5)
+        expect(events.filter((event) => event._tag === "ToolExecutionCompleted").map((event) => event.call.id)).toEqual(
+          ["unbounded-first", "unbounded-second", "unbounded-third", "unbounded-fourth", "unbounded-fifth"],
+        )
       }),
     ] as const
   })
