@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.4
+
+- Allow agent tool execution policies to select explicit `"unbounded"` concurrency so independent tool calls emitted by one model turn can all start together without an arbitrary numeric cap. Missing policies remain serial by default, and positive integer policies retain bounded execution.
+
 ## 0.11.3
 
 - Coalesce adjacent same-options text parts of a user message before it enters the persisted Chat history, and compare the durable session projection against the authoritative Chat history on coalesced messages. The provider-agnostic Chat export encodes a multi-text-part user message by keeping only the first text part, silently dropping the rest; a caller that submits a prompt plus a resolved-context block as two text parts therefore persisted a Chat history that was no longer a prefix of the session projection, failing `syncSession` with "Session projection is not a prefix of authoritative Chat history" and poisoning every later turn in the thread. Coalescing is lossless — providers already concatenate adjacent text — and keeps the persisted Chat history a faithful prefix of the session.
