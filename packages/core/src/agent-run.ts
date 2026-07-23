@@ -1580,10 +1580,12 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                             )
                           : Effect.succeed(part),
                       ),
-                      Stream.tap(() =>
-                        Effect.sync(() => {
-                          emitted = true
-                        }),
+                      Stream.tap((part) =>
+                        part.type === "response-metadata"
+                          ? Effect.void
+                          : Effect.sync(() => {
+                              emitted = true
+                            }),
                       ),
                       Stream.catchCause((cause) => {
                         if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
