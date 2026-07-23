@@ -115,6 +115,19 @@ describe("SessionSync coalesced equivalence", () => {
       true,
     )
   })
+
+  it("equates file data represented by a URL or its string value", () => {
+    const value = "data:image/png;base64,AQID"
+    const withUrl = Prompt.makeMessage("user", {
+      content: [Prompt.makePart("file", { mediaType: "image/png", data: new URL(value) })],
+    })
+    const withString = Prompt.makeMessage("user", {
+      content: [Prompt.makePart("file", { mediaType: "image/png", data: value })],
+    })
+
+    expect(messageEquivalence(withUrl, withString)).toBe(false)
+    expect(SessionSync.equivalentMessages(withUrl, withString)).toBe(true)
+  })
 })
 
 const roundTrip = (message: Prompt.Message) =>

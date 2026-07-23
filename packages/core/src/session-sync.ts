@@ -1,4 +1,5 @@
-import { Schema } from "effect"
+import { Equal, Schema } from "effect"
+import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 
 /** @experimental First structurally divergent position between the durable projection and the authoritative Chat history. */
@@ -76,6 +77,29 @@ export const coalesceAdjacentText = (message: Prompt.Message): Prompt.Message =>
   return coalesced.length === message.content.length ? message : ({ ...message, content: coalesced } as Prompt.Message)
 }
 
+const canonicalValue = (value: unknown): unknown => {
+  if (Object.prototype.toString.call(value) === "[object URL]") return String(value)
+  if (value instanceof Uint8Array) return Array.from(value)
+  if (Array.isArray(value)) return value.map(canonicalValue)
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, item]) => item !== undefined)
+        .toSorted(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalValue(item)]),
+    )
+  }
+  return value
+}
+
+/** @experimental Compares prompt messages by canonical content across equivalent runtime representations. */
+export const equivalentMessages: {
+  (right: Prompt.Message): (left: Prompt.Message) => boolean
+  (left: Prompt.Message, right: Prompt.Message): boolean
+} = dual(2, (left: Prompt.Message, right: Prompt.Message): boolean =>
+  Equal.equals(canonicalValue(coalesceAdjacentText(left)), canonicalValue(coalesceAdjacentText(right))),
+)
+
 const messageDigest = (message: Prompt.Message): string => digest(JSON.stringify(message))
 
 /** @experimental Computes bounded divergence diagnostics for a failed Session synchronization. */
@@ -86,14 +110,15 @@ export const diagnose = (input: {
   readonly projection: ReadonlyArray<Prompt.Message>
   readonly transcript: ReadonlyArray<Prompt.Message>
 }): Diagnostics => {
-  const equals = Schema.toEquivalence(Prompt.Message)
   let alignmentCount = 0
   if (input.projection.length === 0) alignmentCount = 1
   else
     for (let start = 0; start <= input.transcript.length - input.projection.length; start += 1) {
       if (
         input.transcript.slice(0, start).every((message) => message.role === "system") &&
-        input.projection.every((message, index) => equals(message, input.transcript[start + index] as Prompt.Message))
+        input.projection.every((message, index) =>
+          equivalentMessages(message, input.transcript[start + index] as Prompt.Message),
+        )
       )
         alignmentCount += 1
     }
@@ -101,7 +126,7 @@ export const diagnose = (input: {
   while (
     commonPrefixLength < input.projection.length &&
     commonPrefixLength < input.transcript.length &&
-    equals(
+    equivalentMessages(
       input.projection[commonPrefixLength] as Prompt.Message,
       input.transcript[commonPrefixLength] as Prompt.Message,
     )

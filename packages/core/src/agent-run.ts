@@ -34,7 +34,7 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import { Approvals } from "./approvals.js"
-import { coalesceAdjacentText, diagnose as diagnoseSessionSync } from "./session-sync.js"
+import { coalesceAdjacentText, diagnose as diagnoseSessionSync, equivalentMessages } from "./session-sync.js"
 import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "./compaction.js"
 import { Instructions, openEpoch } from "./instructions.js"
 import { classify as classifyContextOverflow } from "./context-overflow.js"
@@ -723,10 +723,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               })
               .pipe(Effect.mapError((error) => memoryError(turn, error)))
 
-      const messageEquivalence = Schema.toEquivalence(Prompt.Message)
       const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
-      const canonicalEquivalence = (left: Prompt.Message, right: Prompt.Message): boolean =>
-        messageEquivalence(coalesceAdjacentText(left), coalesceAdjacentText(right))
       const sessionTranscriptCursor = (
         projection: ReadonlyArray<Prompt.Message>,
         transcript: ReadonlyArray<Prompt.Message>,
@@ -737,7 +734,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           if (
             transcript.slice(0, start).every((message) => message.role === "system") &&
             projection.every((message, index) =>
-              canonicalEquivalence(message, transcript[start + index] as Prompt.Message),
+              equivalentMessages(message, transcript[start + index] as Prompt.Message),
             )
           ) {
             matches.push(start + projection.length)
