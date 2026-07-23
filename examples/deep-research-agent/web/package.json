@@ -11,18 +11,18 @@
   "dependencies": {
     "@batonfx/foldkit": "workspace:*",
     "@batonfx/transport": "workspace:*",
-    "@foldkit/ui": "0.122.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
+    "@foldkit/ui": "catalog:",
+    "class-variance-authority": "catalog:",
+    "clsx": "catalog:",
     "effect": "catalog:",
     "foldkit": "catalog:",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "catalog:"
   },
   "devDependencies": {
-    "@foldkit/vite-plugin": "0.10.0",
-    "@tailwindcss/vite": "4.3.2",
-    "tailwindcss": "4.3.2",
+    "@foldkit/vite-plugin": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "8.1.3"
+    "vite": "catalog:"
   }
 }

@@ -56,6 +56,11 @@
       "typescript": "7.0.2",
       "vite": "8.1.3",
       "vitest": "4.0.16"
+    },
+    "catalogs": {
+      "peer": {
+        "foldkit": ">=0.122.0 <1"
+      }
     }
   },
   "dependencies": {

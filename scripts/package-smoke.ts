@@ -4,7 +4,6 @@ import { Config, Effect, FileSystem, Option, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 
 const packages = ["core", "test", "skills", "memory", "providers", "mcp", "transport", "foldkit"] as const
-const effectVersion = "4.0.0-beta.98"
 const compressedSizeLimits: Record<(typeof packages)[number], number> = {
   core: 85_000,
   test: 8_000,
@@ -34,6 +33,22 @@ const packedProviderDependencies = {
 
 const sortRecord = (value: Record<string, string> | undefined): Record<string, string> =>
   Object.fromEntries(Object.entries(value ?? {}).toSorted(([left], [right]) => left.localeCompare(right)))
+
+const catalogVersion = (
+  rootManifest: {
+    readonly workspaces: {
+      readonly catalog: Readonly<Record<string, string>>
+      readonly catalogs?: Readonly<Record<string, Readonly<Record<string, string>>>>
+    }
+  },
+  dependency: string,
+  reference: string,
+): string | undefined => {
+  const catalogName = reference.slice("catalog:".length)
+  const catalog =
+    catalogName.length === 0 ? rootManifest.workspaces.catalog : rootManifest.workspaces.catalogs?.[catalogName]
+  return catalog?.[dependency]
+}
 
 const exports = [
   "@batonfx/core",
@@ -94,6 +109,10 @@ const program = Effect.gen(function* () {
   const root = path.resolve(".")
   const rootManifest = JSON.parse(yield* fileSystem.readFileString(path.join(root, "package.json")))
   const version = rootManifest.version as string
+  const effectVersion = catalogVersion(rootManifest, "effect", "catalog:")
+  if (effectVersion === undefined) {
+    return yield* Effect.fail(new Error("root catalog must define effect"))
+  }
   if (!/^\d+\.\d+\.\d+$/.test(version)) {
     return yield* Effect.fail(new Error(`root version must be canonical semver: ${version}`))
   }
@@ -216,11 +235,11 @@ const program = Effect.gen(function* () {
           if (typeof dependencyVersion !== "string") return [dependency, dependencyVersion]
           if (dependencyVersion.startsWith("workspace:")) return [dependency, version]
           if (dependencyVersion.startsWith("catalog:")) {
-            const catalogVersion = rootManifest.workspaces.catalog[dependency]
-            if (typeof catalogVersion !== "string") {
+            const resolvedVersion = catalogVersion(rootManifest, dependency, dependencyVersion)
+            if (resolvedVersion === undefined) {
               throw new Error(`${sourceManifest.name} references missing catalog dependency ${dependency}`)
             }
-            return [dependency, catalogVersion]
+            return [dependency, resolvedVersion]
           }
           return [dependency, dependencyVersion]
         }),

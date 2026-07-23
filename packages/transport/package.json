@@ -44,7 +44,7 @@
     "@batonfx/core": "workspace:*"
   },
   "peerDependencies": {
-    "effect": "4.0.0-beta.98"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@batonfx/test": "workspace:*",
