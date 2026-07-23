@@ -7,7 +7,7 @@ Model lifecycle events receive one stable delivery identifier from the run and r
 - Middleware-transformed response parts are authoritative for events, history, tools, memory, sessions, and compaction.
 - Transformed tool-call ids must be unique within one model response. A duplicate fails before that call starts work.
 - Framework tool results enter Chat once, in call order, before session sync, memory retention, policy evaluation, persistence, and `TurnCompleted`.
-- Framework tool calls run serially by default. `Agent.make({ toolExecution: { concurrency: n } })` allows at most `n` calls from one model turn to execute together while events, results, and checkpoints stay in provider call order. Provider-executed calls are never run locally.
+- Framework tool calls run serially by default. `Agent.make({ toolExecution: { concurrency: n } })` allows at most `n` calls from one model turn to execute together, while `concurrency: "unbounded"` starts every call in the turn without an application-level bound. Events, results, and checkpoints stay in provider call order. Provider-executed calls are never run locally.
 - Declared tool failures remain schema-valid domain results. Routing, schema, handler-boundary, placement, and authorization failures terminate through typed `FrameworkFailure` values.
 - A policy stop with pending results is typed. It never silently drops results.
 - `Agent.stream` and `Agent.generate` cover every run; `output` selects structured output and `persistence` requires Effect AI `Chat.Persistence` plus an application-scoped `Agent.Runtime`.

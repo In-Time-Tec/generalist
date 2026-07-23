@@ -102,7 +102,7 @@ Recalled items enter Chat as one user message carrying structural `memoryRecall`
 
 Baton uses Effect AI `Tool` and `Toolkit` values directly. For ordinary in-process tools, provide the handler layer from `toolkit.toLayer(...)` and no `ToolExecutor` is required. `ToolExecutor` is the optional override seam for durable waits and external placement. Its route helpers keep placement explicit while reusing the same toolkit definitions:
 
-Sibling framework tool calls execute serially unless the agent opts into bounded concurrency. Even when handlers finish out of order, Baton emits their buffered events and checkpoints their results in provider call order:
+Sibling framework tool calls execute serially unless the agent opts into concurrent execution. Even when handlers finish out of order, Baton emits their buffered events and checkpoints their results in provider call order:
 
 ```ts
 const agent = Agent.make({
@@ -111,6 +111,8 @@ const agent = Agent.make({
   toolExecution: { concurrency: 3 },
 })
 ```
+
+Use `toolExecution: { concurrency: "unbounded" }` when every framework tool call in a model turn should start without an application-level bound.
 
 ```ts
 import { Effect, Schedule } from "effect"
