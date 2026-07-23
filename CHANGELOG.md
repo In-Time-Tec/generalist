@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.5
+
+- Compare durable session messages by canonical content so equivalent file data representations, including a URL object and its string value, remain aligned with authoritative Chat history.
+
 ## 0.11.4
 
 - Allow agent tool execution policies to select explicit `"unbounded"` concurrency so independent tool calls emitted by one model turn can all start together without an arbitrary numeric cap. Missing policies remain serial by default, and positive integer policies retain bounded execution.
