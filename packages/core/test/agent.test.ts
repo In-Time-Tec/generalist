@@ -3536,7 +3536,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "reactively compacts an overflow delivered as a model error part", () => {
+  ItLayer.make(it, "reactively compacts an overflow delivered after response metadata", () => {
     let calls = 0
     let overflowRequests = 0
     return [
@@ -3545,6 +3545,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           calls += 1
           return calls === 1
             ? Stream.make(
+                Schema.encodeSync(Response.ResponseMetadataPart)(
+                  Response.makePart("response-metadata", {
+                    id: "overflow-response",
+                    modelId: "overflow-model",
+                    timestamp: undefined,
+                    request: undefined,
+                  }),
+                ),
                 Response.makePart("error", {
                   error: contextOverflowError("input exceeds the context window"),
                 }),
