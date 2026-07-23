@@ -1629,7 +1629,9 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                       chat.history,
                       Prompt.concat(
                         Prompt.concat(preparedState.history, preparedState.preparedPrompt),
-                        Prompt.fromResponseParts(transformedParts),
+                        Prompt.fromMessages(
+                          Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText),
+                        ),
                       ),
                     ).pipe(
                       Effect.andThen(persisted === undefined ? Effect.void : persisted.save),

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.7
+
+- Coalesce adjacent completed response text before committing authoritative chat history so persistence encoders and durable session entries retain the full response during replay.
+
 ## 0.11.6
 
 - Commit model responses to authoritative chat history only after the transformed stream is fully consumed, preventing interrupted, failed, or partially consumed response prefixes from conflicting with durable replay.

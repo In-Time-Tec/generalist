@@ -598,6 +598,31 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
     ] as const
   })
 
+  ItLayer.make(it, "coalesces adjacent completed response text before persisting history", () => {
+    const persistenceLayer = Chat.layerPersisted({ storeId: "response-authority" }).pipe(
+      Layer.provide(Persistence.layerBackingMemory),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.concat(assistantText("first", "."), assistantText("second", "answer"))),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        persistenceLayer,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "response-authority-agent" })
+        const persistence = yield* Chat.Persistence
+        yield* Stream.runDrain(Agent.stream(agent, { prompt: "complete", persistence: { chatId: "complete" } }))
+        const persisted = yield* persistence.get("complete")
+        const history = yield* Ref.get(persisted.history)
+        const response = history.content.at(-1)
+        expect(response?.role).toBe("assistant")
+        expect(response?.content).toEqual([expect.objectContaining({ type: "text", text: ".answer" })])
+      }),
+    ] as const
+  })
+
   ItLayer.make(
     it,
     "part drop: dropped text-deltas yield empty text and no delta events",
