@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.8
+
+- Retry reactive context-overflow compaction when a provider emits response metadata before its terminal error, while still refusing to replay after assistant text or tool calls escape.
+
 ## 0.11.7
 
 - Coalesce adjacent completed response text before committing authoritative chat history so persistence encoders and durable session entries retain the full response during replay.
