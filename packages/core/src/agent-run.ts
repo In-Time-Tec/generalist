@@ -1519,6 +1519,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           LanguageModel.LanguageModel
         > => {
           let emitted = false
+          let completed = false
           let classifyFailure = classifyOtherFailure
           const transformedParts = new Array<Response.StreamPart<any>>()
           let preparedState: { readonly history: Prompt.Prompt; readonly preparedPrompt: Prompt.Prompt } | undefined
@@ -1609,11 +1610,20 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                           ),
                         ),
                       })),
+                      Stream.concat(
+                        Stream.fromEffect(
+                          Effect.sync(() => {
+                            completed = true
+                          }),
+                        ).pipe(Stream.drain),
+                      ),
                     )
                   }),
                 ).pipe(Stream.toChannel),
               (_, exit) =>
-                preparedState === undefined || (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
+                preparedState === undefined ||
+                !completed ||
+                (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
                   ? Effect.void
                   : Ref.set(
                       chat.history,

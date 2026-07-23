@@ -344,7 +344,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         expect(Json.stringify(events)).toContain("first")
         expect(Json.stringify(events)).not.toContain("second")
         expect(Json.stringify(events)).not.toContain("third")
-        expect(history).toContain("first")
+        expect(history).not.toContain("first")
         expect(history.match(/"type":"tool-result"/g)).toBeNull()
         expect(history).not.toContain("first-result-marker")
         expect(history).not.toContain("second")
@@ -505,7 +505,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
     ] as const
   })
 
-  ItLayer.make(it, "commits only transformed partial responses on every stream exit", () => {
+  ItLayer.make(it, "does not commit partial responses from incomplete stream exits", () => {
     let exitMode: "typed" | "defect" | "interrupt" | "early" = "typed"
     const safeToolCall = Response.makePart("tool-call", {
       id: "raw-exit",
@@ -558,11 +558,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
       Effect.gen(function* () {
         const agent = Agent.make({ name: "exit-authority-agent", toolkit: Toolkit.make(echoTool) })
         const persistence = yield* Chat.Persistence
-        const assertStored = (chatId: string) =>
+        const assertNotStored = (chatId: string) =>
           Effect.gen(function* () {
             const persisted = yield* persistence.get(chatId)
             const serialized = Json.stringify((yield* Ref.get(persisted.history)).content)
-            expect(serialized).toContain("safe-exit")
+            expect(serialized).not.toContain("safe-exit")
             expect(serialized).not.toContain("raw-exit")
           })
 
@@ -571,21 +571,21 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
           Stream.runDrain(Agent.stream(agent, { prompt: "typed", persistence: { chatId: "typed" } })),
         )
         expect(typed._tag).toBe("@batonfx/core/AgentError")
-        yield* assertStored("typed")
+        yield* assertNotStored("typed")
 
         exitMode = "defect"
         const defect = yield* Effect.exit(
           Stream.runDrain(Agent.stream(agent, { prompt: "defect", persistence: { chatId: "defect" } })),
         )
         expect(Exit.hasDies(defect)).toBe(true)
-        yield* assertStored("defect")
+        yield* assertNotStored("defect")
 
         exitMode = "interrupt"
         const interrupt = yield* Effect.exit(
           Stream.runDrain(Agent.stream(agent, { prompt: "interrupt", persistence: { chatId: "interrupt" } })),
         )
         expect(Exit.hasInterrupts(interrupt)).toBe(true)
-        yield* assertStored("interrupt")
+        yield* assertNotStored("interrupt")
 
         exitMode = "early"
         yield* Agent.stream(agent, { prompt: "early", persistence: { chatId: "early" } }).pipe(
@@ -593,7 +593,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
           Stream.take(1),
           Stream.runDrain,
         )
-        yield* assertStored("early")
+        yield* assertNotStored("early")
       }),
     ] as const
   })
