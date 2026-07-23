@@ -415,7 +415,7 @@ describe("SessionRegistry.layerMemory", () => {
     ),
   )
 
-  it.effect("failed runs snapshot the accepted prompt and emitted response at the terminal boundary", () =>
+  it.effect("failed runs exclude the incomplete turn from terminal snapshots", () =>
     Effect.gen(function* () {
       yield* SessionRegistry.SessionRegistry.use((registry) => registry.open({ sessionId: "s-failed-snapshot" }))
       const ended = yield* collectThroughEnded("s-failed-snapshot").pipe(Effect.forkChild)
@@ -430,8 +430,8 @@ describe("SessionRegistry.layerMemory", () => {
         replay[0]?._tag === "Snapshot"
           ? yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(replay[0].transcript.content)
           : ""
-      expect(content).toContain("failed prompt")
-      expect(content).toContain("partial response")
+      expect(content).not.toContain("failed prompt")
+      expect(content).not.toContain("partial response")
     }).pipe(
       provideTestLayer(
         SessionRegistry.layerMemory({
