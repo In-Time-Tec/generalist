@@ -59,10 +59,21 @@ const synthesizeAnswer = (result: WebSearchSuccess): string => {
  * the prompt (rather than a call counter) keeps the script correct across
  * multiple questions asked in the same server process.
  */
+const scriptedUsage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
+const scriptedFinish = (reason: Response.FinishReason) =>
+  Response.makePart("finish", { reason, usage: scriptedUsage, response: { status: 200, headers: {} } })
+
 const scriptedStreamText: StreamText = (options) => {
   const priorResult = findWebSearchResult(options.prompt)
   if (priorResult !== undefined) {
-    return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: synthesizeAnswer(priorResult) }))
+    return Stream.make(
+      Response.makePart("text-delta", { id: "assistant", delta: synthesizeAnswer(priorResult) }),
+      scriptedFinish("stop"),
+    )
   }
   const query = latestUserQuestion(options.prompt)
   return Stream.make(
@@ -72,6 +83,7 @@ const scriptedStreamText: StreamText = (options) => {
       params: { query },
       providerExecuted: false,
     }),
+    scriptedFinish("tool-calls"),
   )
 }
 
@@ -79,7 +91,11 @@ const scriptedStreamText: StreamText = (options) => {
 const scriptedDeterministicModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
-    generateText: () => Effect.succeed([{ type: "text", text: "deterministic response" }]),
+    generateText: () =>
+      Effect.succeed([
+        { type: "text", text: "deterministic response" },
+        { type: "finish", reason: "stop", usage: scriptedUsage, response: undefined },
+      ]),
     streamText: scriptedStreamText,
   }),
 )

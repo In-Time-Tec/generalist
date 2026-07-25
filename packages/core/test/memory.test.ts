@@ -5,6 +5,7 @@ import { expectTypeOf } from "vitest"
 import { Agent, Approvals, Compaction, Guardrail, Memory, ModelMiddleware, Session, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
+import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -15,7 +16,7 @@ const modelLayer = (streamText: ModelParams["streamText"]) =>
     LanguageModel.LanguageModel,
     LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-      streamText,
+      streamText: (options) => withProviderFinish(streamText(options)),
     }),
   )
 

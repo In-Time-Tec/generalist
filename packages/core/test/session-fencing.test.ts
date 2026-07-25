@@ -5,6 +5,7 @@ import { Agent, AgentEvent, Approvals, Compaction, ModelMiddleware, Session, Too
 import { ItLayer } from "./it-layer"
 import { Json } from "./json"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
+import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -13,7 +14,7 @@ const modelLayer = (streamText: ModelParams["streamText"]) =>
     LanguageModel.LanguageModel,
     LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-      streamText,
+      streamText: (options) => withProviderFinish(streamText(options)),
     }),
   )
 

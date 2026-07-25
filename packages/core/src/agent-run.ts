@@ -1901,6 +1901,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       const resetTurnState = (turn: number) =>
         Stream.sync(() => {
           state.turn = turn
+          state.text = ""
           state.finish = undefined
         }).pipe(Stream.drain)
 

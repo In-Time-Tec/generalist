@@ -181,6 +181,7 @@ const telemetryFrames = (): ReadonlyArray<Wire.ServerFrameType> => {
         attempt: 1,
         completedAt: 6,
         usage,
+        usageAt: 6,
         finishReason: "stop",
         requestId: "req-1",
         responseModel: "returned-model",
@@ -356,12 +357,15 @@ describe("Wire", () => {
           modelAttemptId: "model-attempt-0",
           attempt: 0,
           completedAt: 1,
+          usage,
+          usageAt: 1,
+          finishReason: "stop",
         },
       }
       const encoded = yield* Schema.encodeUnknownEffect(schema)(frame)
       const decoded = yield* Schema.decodeUnknownEffect(schema)(encoded)
       expect(decoded).toEqual(frame)
-      expect(decoded._tag === "Event" && "usage" in decoded.event).toBe(false)
+      expect(decoded._tag === "Event" && "requestId" in decoded.event).toBe(false)
       expect(decoded._tag === "Event" && "cost" in decoded.event).toBe(false)
     }),
   )

@@ -5,11 +5,30 @@ import { LanguageModel, Response } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 import { registration as registerOpenAi, type LayerOptions, type RegistrationOptions } from "./openai.js"
 
+const deterministicUsage = Response.Usage.make({
+  inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
+  outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+})
+
+const deterministicFinish = Response.makePart("finish", {
+  reason: "stop",
+  usage: deterministicUsage,
+  response: undefined,
+})
+
 const deterministicModelLayer = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
-    generateText: () => Effect.succeed([{ type: "text", text: "deterministic response" }]),
-    streamText: () => Stream.make(Response.makePart("text-delta", { id: "text", delta: "deterministic response" })),
+    generateText: () =>
+      Effect.succeed([
+        { type: "text", text: "deterministic response" },
+        { type: "finish", reason: "stop", usage: deterministicUsage, response: undefined },
+      ]),
+    streamText: () =>
+      Stream.make(
+        Response.makePart("text-delta", { id: "text", delta: "deterministic response" }),
+        deterministicFinish,
+      ),
   }),
 )
 

@@ -48,6 +48,7 @@ describe("DeepResearchAgent model", () => {
           params: { query: "What makes Baton standalone?" },
           providerExecuted: false,
         },
+        { type: "finish", reason: "tool-calls" },
       ])
     }).pipe(Effect.provide(modelLayer), Effect.provide(withEnv({}))),
   )
@@ -64,6 +65,7 @@ describe("DeepResearchAgent model", () => {
           params: { query: "the topic" },
           providerExecuted: false,
         },
+        { type: "finish", reason: "tool-calls" },
       ])
     }).pipe(Effect.provide(modelLayer), Effect.provide(withEnv({}))),
   )
@@ -102,7 +104,8 @@ describe("DeepResearchAgent model", () => {
         },
       ])
 
-      expect(parts).toHaveLength(1)
+      expect(parts).toHaveLength(2)
+      expect(parts[1]?.type).toBe("finish")
       expect(parts[0]?.type).toBe("text-delta")
       if (parts[0]?.type === "text-delta") {
         expect(parts[0].delta).toContain("Based on 2 sources")
@@ -138,6 +141,7 @@ describe("DeepResearchAgent model", () => {
           type: "text-delta",
           delta: "I could not find any relevant sources for this question.",
         },
+        { type: "finish", reason: "stop" },
       ])
     }).pipe(Effect.provide(modelLayer), Effect.provide(withEnv({}))),
   )

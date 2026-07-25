@@ -5,6 +5,7 @@ import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/
 import { Agent, Approvals, Guardrail, ModelMiddleware, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
+import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -13,7 +14,7 @@ const modelLayer = (streamText: ModelParams["streamText"]) =>
     LanguageModel.LanguageModel,
     LanguageModel.make({
       generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-      streamText,
+      streamText: (options) => withProviderFinish(streamText(options)),
     }),
   )
 
@@ -240,6 +241,7 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
         const completed = events.at(-1)
         expect(completed?._tag === "Completed" && completed.text).toBe("keep")
         expect(contexts).toEqual([
+          { agentName: "filter-agent", turn: 0 },
           { agentName: "filter-agent", turn: 0 },
           { agentName: "filter-agent", turn: 0 },
         ])

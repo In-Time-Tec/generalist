@@ -24,6 +24,7 @@ import {
 } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
+import { withProviderFinish, withProviderFinishContent } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 type StreamServices<T> = T extends Stream.Stream<unknown, unknown, infer R> ? R : never
@@ -136,7 +137,8 @@ const dependentModelLayer = Layer.effect(
     Effect.flatMap(() =>
       LanguageModel.make({
         generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-        streamText: () => Stream.make(Response.makePart("text-delta", { id: "text", delta: "provided" })),
+        streamText: () =>
+          withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "text", delta: "provided" }))),
       }),
     ),
   ),
@@ -286,8 +288,8 @@ const modelLayer = (
   Layer.effect(
     LanguageModel.LanguageModel,
     LanguageModel.make({
-      generateText,
-      streamText,
+      generateText: (options) => withProviderFinishContent(generateText(options)),
+      streamText: (options) => withProviderFinish(streamText(options)),
     }),
   )
 
@@ -881,6 +883,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             "ModelAttemptStarted",
             "ModelAttemptFirstOutput",
             "ModelPart",
+            "ModelPart",
             "ModelAttemptCompleted",
             "ModelCallCompleted",
             "TurnCompleted",
@@ -891,7 +894,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           if (completed?._tag === "Completed") {
             expect(completed.text).toBe("saw system and input")
             expect(completed.turns).toBe(1)
-            expect("usage" in completed).toBe(false)
+            expect("usage" in completed).toBe(true)
           }
           const modelPart = events.find((event) => event._tag === "ModelPart")
           if (modelPart?._tag === "ModelPart") {
@@ -899,8 +902,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           }
           const turnCompleted = events.find((event) => event._tag === "TurnCompleted")
           if (turnCompleted?._tag === "TurnCompleted") {
-            expect("usage" in turnCompleted).toBe(false)
-            expect("finishReason" in turnCompleted).toBe(false)
+            expect("usage" in turnCompleted).toBe(true)
+            expect(turnCompleted._tag === "TurnCompleted" && turnCompleted.finishReason).toBe("stop")
           }
         }),
       ] as const,
@@ -963,7 +966,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             if (lifetime.finalized) return yield* Effect.die("selected model used after layer release")
           })
           const model = yield* LanguageModel.make({
-            streamText: () => Stream.fromEffect(assertLive).pipe(Stream.map(() => textDelta("normal answer"))),
+            streamText: () =>
+              withProviderFinish(Stream.fromEffect(assertLive).pipe(Stream.map(() => textDelta("normal answer")))),
             generateText: () =>
               assertLive.pipe(
                 Effect.andThen(Deferred.succeed(structuredEntered, undefined)),
@@ -1781,6 +1785,39 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "reports only the final turn's answer, not every turn's narration", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.fromIterable([
+                textDelta("I'll check the workspace first."),
+                toolCallPart("tool-call-narrated", "echo", { text: "looking" }),
+              ])
+            : Stream.make(textDelta("The workspace has two packages."))
+        }),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "narration-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "explore" }))
+
+        expect(calls).toBe(2)
+        const completed = events.at(-1)
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag === "Completed") {
+          expect(completed.text).toBe("The workspace has two packages.")
+          expect(completed.text).not.toContain("I'll check the workspace first.")
+        }
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "preserves custom authorizer requirements in the run type", () => {
     let calls = 0
     return [
@@ -2442,6 +2479,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelAttemptStarted",
           "ModelAttemptFirstOutput",
           "ModelPart",
+          "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
           "ApprovalRequested",
@@ -2778,6 +2816,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelAttemptStarted",
           "ModelAttemptFirstOutput",
           "ModelPart",
+          "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
           "TurnCompleted",
@@ -2812,6 +2851,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelCallStarted",
           "ModelAttemptStarted",
           "ModelAttemptFirstOutput",
+          "ModelPart",
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
@@ -4654,6 +4694,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelAttemptStarted",
           "ModelAttemptFirstOutput",
           "ModelPart",
+          "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
           "TurnCompleted",
@@ -4858,6 +4899,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelAttemptStarted",
           "ModelAttemptFirstOutput",
           "ModelPart",
+          "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
           "ToolExecutionStarted",
@@ -4867,6 +4909,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelCallStarted",
           "ModelAttemptStarted",
           "ModelAttemptFirstOutput",
+          "ModelPart",
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
@@ -5081,6 +5124,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelCallStarted",
           "ModelAttemptStarted",
           "ModelAttemptFirstOutput",
+          "ModelPart",
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
@@ -6485,6 +6529,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             "ModelCallStarted",
             "ModelAttemptStarted",
             "ModelAttemptFirstOutput",
+            "ModelPart",
             "ModelPart",
             "ModelAttemptCompleted",
             "ModelCallCompleted",

@@ -23,15 +23,29 @@ const modelLayer = (streamText: ModelParams["streamText"]) =>
     }),
   )
 
+const providerFinish = (reason: Response.FinishReason) =>
+  Response.makePart("finish", {
+    reason,
+    usage: Response.Usage.make({
+      inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
+      outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+    }),
+    response: undefined,
+  })
+
 const assistantText = (id: string, text: string) =>
   Stream.fromIterable([
     Response.makePart("text-start", { id }),
     Response.makePart("text-delta", { id, delta: text }),
     Response.makePart("text-end", { id }),
+    providerFinish("stop"),
   ])
 
 const toolCallPart = (id: string, name: string, params: unknown) =>
   Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+
+const assistantToolCall = (part: ReturnType<typeof toolCallPart>) =>
+  Stream.fromIterable([part, providerFinish("tool-calls")])
 
 const collectThroughEnded = (sessionId: string, afterSeq?: number) =>
   SessionRegistry.SessionRegistry.use((registry) =>
@@ -746,7 +760,7 @@ describe("SessionRegistry.layerMemory", () => {
             Layer.mergeAll(
               modelLayer(() => {
                 calls += 1
-                if (calls === 1) return Stream.make(toolCallPart("call-approval", "gated", { text: "approved" }))
+                if (calls === 1) return assistantToolCall(toolCallPart("call-approval", "gated", { text: "approved" }))
                 return assistantText("reply", "approved done")
               }),
               toolkit.toLayer({
@@ -801,7 +815,7 @@ describe("SessionRegistry.layerMemory", () => {
               modelLayer(() => {
                 calls += 1
                 return calls === 1
-                  ? Stream.make(toolCallPart("call-permission", "permissioned", { text: "approved" }))
+                  ? assistantToolCall(toolCallPart("call-permission", "permissioned", { text: "approved" }))
                   : assistantText("reply", "permission done")
               }),
               toolkit.toLayer({
@@ -878,7 +892,7 @@ describe("SessionRegistry.layerMemory", () => {
             Layer.mergeAll(
               modelLayer(() =>
                 ++modelCalls <= 2
-                  ? Stream.make(toolCallPart("shared-call", "isolated_permission", {}))
+                  ? assistantToolCall(toolCallPart("shared-call", "isolated_permission", {}))
                   : assistantText("reply", "done"),
               ),
               toolkit.toLayer({
@@ -942,7 +956,7 @@ describe("SessionRegistry.layerMemory", () => {
             Layer.mergeAll(
               modelLayer(() => {
                 modelCalls += 1
-                return Stream.make(toolCallPart("stale-call", "stale_permission", {}))
+                return assistantToolCall(toolCallPart("stale-call", "stale_permission", {}))
               }),
               toolkit.toLayer({
                 stale_permission: () =>
@@ -996,7 +1010,7 @@ describe("SessionRegistry.layerMemory", () => {
             Layer.mergeAll(
               modelLayer(() =>
                 modelCalls++ < 2
-                  ? Stream.make(toolCallPart("call-drift", "policy_drift", {}))
+                  ? assistantToolCall(toolCallPart("call-drift", "policy_drift", {}))
                   : assistantText("reply", "done"),
               ),
               toolkit.toLayer({
@@ -1068,7 +1082,7 @@ describe("SessionRegistry.layerMemory", () => {
               modelLayer(() => {
                 calls += 1
                 return calls === 1
-                  ? Stream.make(toolCallPart("call-single-gate", "single_gate", { text: "approved" }))
+                  ? assistantToolCall(toolCallPart("call-single-gate", "single_gate", { text: "approved" }))
                   : assistantText("reply", "single-gate done")
               }),
               toolkit.toLayer({
@@ -1125,7 +1139,7 @@ describe("SessionRegistry.layerMemory", () => {
               modelLayer(() => {
                 calls += 1
                 return calls === 1
-                  ? Stream.make(toolCallPart("call-remembered", "remembered_ask", { text: "approved" }))
+                  ? assistantToolCall(toolCallPart("call-remembered", "remembered_ask", { text: "approved" }))
                   : assistantText("reply", "remembered done")
               }),
               toolkit.toLayer({
@@ -1204,7 +1218,8 @@ describe("SessionRegistry.layerMemory", () => {
             Layer.mergeAll(
               modelLayer(() => {
                 modelCalls += 1
-                if (modelCalls === 1) return Stream.make(toolCallPart("call-approval-queue", "gated", { text: "ok" }))
+                if (modelCalls === 1)
+                  return assistantToolCall(toolCallPart("call-approval-queue", "gated", { text: "ok" }))
                 if (modelCalls === 2) secondSawHandled = handled
                 return assistantText(`reply-${modelCalls}`, `run ${modelCalls} done`)
               }),
@@ -1261,8 +1276,8 @@ describe("SessionRegistry.layerMemory", () => {
             Layer.mergeAll(
               modelLayer(() => {
                 modelCalls += 1
-                if (modelCalls === 1) return Stream.make(toolCallPart("call-repeat", "gated", { text: "first" }))
-                if (modelCalls === 2) return Stream.make(toolCallPart("call-repeat", "gated", { text: "second" }))
+                if (modelCalls === 1) return assistantToolCall(toolCallPart("call-repeat", "gated", { text: "first" }))
+                if (modelCalls === 2) return assistantToolCall(toolCallPart("call-repeat", "gated", { text: "second" }))
                 return assistantText("reply", "done")
               }),
               toolkit.toLayer({ gated: () => Effect.succeed("approved") }),

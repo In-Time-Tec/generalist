@@ -104,6 +104,137 @@ layer(
   )
 })
 
+layer(Layer.empty)("TestModel: truncated scripts", (it) => {
+  const collect = (step: TestModel.Step) =>
+    Effect.gen(function* () {
+      const fixture = yield* TestModel.make([step])
+      const services = yield* Layer.build(fixture.layer)
+      return yield* LanguageModel.streamText({ prompt: "go" }).pipe(
+        Stream.runCollect,
+        Effect.provide(services),
+        Effect.map((parts) => [...parts]),
+      )
+    })
+
+  it.effect("never emits a finish part for a truncated step", () =>
+    Effect.gen(function* () {
+      const midText = yield* collect(
+        TestModel.truncated([TestModel.text("half a sentence")], { stopAfter: "text-delta" }),
+      )
+      const midReasoning = yield* collect(
+        TestModel.truncated([TestModel.reasoning("half a thought")], { stopAfter: "reasoning-delta" }),
+      )
+      const beforeContent = yield* collect(TestModel.truncated([], { stopAfter: "response-metadata" }))
+
+      expect(midText.some((part) => part.type === "finish")).toBe(false)
+      expect(midText.map((part) => part.type)).toEqual(["response-metadata", "text-start", "text-delta"])
+      expect(midReasoning.some((part) => part.type === "finish")).toBe(false)
+      expect(midReasoning.map((part) => part.type)).toEqual(["response-metadata", "reasoning-start", "reasoning-delta"])
+      expect(beforeContent.map((part) => part.type)).toEqual(["response-metadata"])
+    }),
+  )
+
+  it.effect("stops a truncated tool call after unclosed parameter JSON", () =>
+    Effect.gen(function* () {
+      const parts = yield* collect(
+        TestModel.truncated([TestModel.toolCall("write", { path: "plans/019-model-stream.md" }, { id: "write-1" })], {
+          stopAfter: "tool-params-delta",
+        }),
+      )
+
+      expect(parts.map((part) => part.type)).toEqual(["response-metadata", "tool-params-start", "tool-params-delta"])
+      expect(parts.some((part) => part.type === "finish")).toBe(false)
+      const delta = parts.find((part) => part.type === "tool-params-delta")
+      expect(delta?.type === "tool-params-delta" && delta.delta).toBe('{"path":"plans/019-model-stream.md"')
+      expect(() => JSON.parse(delta?.type === "tool-params-delta" ? delta.delta : "")).toThrow()
+    }),
+  )
+
+  it.effect("keeps earlier parts of a truncated turn intact", () =>
+    Effect.gen(function* () {
+      const parts = yield* collect(
+        TestModel.truncated([TestModel.reasoning("planning"), TestModel.text("answer begins")], {
+          stopAfter: "text-delta",
+        }),
+      )
+
+      expect(parts.map((part) => part.type)).toEqual([
+        "response-metadata",
+        "reasoning-start",
+        "reasoning-delta",
+        "reasoning-end",
+        "text-start",
+        "text-delta",
+      ])
+    }),
+  )
+})
+
+layer(Layer.empty)("Agent runs over a truncated provider stream", (it) => {
+  const runTruncated = (step: TestModel.Step) =>
+    Effect.gen(function* () {
+      const fixture = yield* TestModel.make([step])
+      const services = yield* Layer.build(
+        Layer.mergeAll(fixture.layer, echoToolkit.toLayer({ echo: ({ text }) => Effect.succeed(text) })),
+      )
+      const events: Array<unknown> = []
+      const exit = yield* Agent.stream(Agent.make({ name: "truncated-agent", toolkit: echoToolkit }), {
+        prompt: "go",
+      }).pipe(
+        Stream.tap((event) => Effect.sync(() => events.push(event))),
+        Stream.runDrain,
+        Effect.provide(services),
+        Effect.exit,
+      )
+      return { exit, events }
+    })
+
+  it.effect("fails the run when the stream is cut mid-text", () =>
+    Effect.gen(function* () {
+      const { exit, events } = yield* runTruncated(
+        TestModel.truncated([TestModel.text("half an answer")], { stopAfter: "text-delta" }),
+      )
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(events.some((event) => (event as { _tag: string })._tag === "Completed")).toBe(false)
+    }),
+  )
+
+  it.effect("fails the run when the stream is cut mid-reasoning", () =>
+    Effect.gen(function* () {
+      const { exit, events } = yield* runTruncated(
+        TestModel.truncated([TestModel.reasoning("still thinking")], { stopAfter: "reasoning-delta" }),
+      )
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(events.some((event) => (event as { _tag: string })._tag === "Completed")).toBe(false)
+    }),
+  )
+
+  it.effect("fails the run when a tool call is cut mid-parameters and never runs the tool", () =>
+    Effect.gen(function* () {
+      const { exit, events } = yield* runTruncated(
+        TestModel.truncated([TestModel.toolCall("echo", { text: "never runs" }, { id: "echo-cut" })], {
+          stopAfter: "tool-params-delta",
+        }),
+      )
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(events.some((event) => (event as { _tag: string })._tag === "ToolExecutionStarted")).toBe(false)
+      expect(events.some((event) => (event as { _tag: string })._tag === "Completed")).toBe(false)
+    }),
+  )
+
+  it.effect("never reports a completed run with empty output when the stream produced nothing", () =>
+    Effect.gen(function* () {
+      const { exit, events } = yield* runTruncated(TestModel.truncated([], { stopAfter: "response-metadata" }))
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(events.some((event) => (event as { _tag: string })._tag === "Completed")).toBe(false)
+    }),
+  )
+})
+
 layer(Layer.empty)("TestModel: remaining behavior", (it) => {
   it.effect("emits reasoning separately from assistant text and preserves it in the next prompt", () =>
     Effect.gen(function* () {

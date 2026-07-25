@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.9
+
+- Fail a model attempt whose provider stream ends without its terminal `finish` part instead of reporting it as a completed turn with no finish reason and no usage. A clean end with no `finish` now fails with `ModelStreamTruncated`, a stream that goes quiet past the liveness backstop fails with `ModelStreamStalled`, and both are classified `truncated-stream` so an attempt that emitted nothing retries.
+- Reset the accumulated turn text between turns. Every turn previously appended to the same buffer, so a run's final text was the concatenation of all its intermediate narration.
+- Add a truncating step to the test model so a stream that stops mid-reasoning, mid-text, or mid-tool-call can be scripted.
+
 ## 0.11.8
 
 - Retry reactive context-overflow compaction when a provider emits response metadata before its terminal error, while still refusing to replay after assistant text or tool calls escape.

@@ -1,5 +1,6 @@
 import { Cause, Context, Effect, Function, Layer, Result, Schedule, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Response, Tool } from "effect/unstable/ai"
+import { isTerminationFailure } from "./model-stream-termination.js"
 /** @experimental Classification of a model-call failure. */
 export type Classification = "transient" | "terminal"
 
@@ -12,9 +13,19 @@ export interface Interface {
 /** @experimental */
 export class ModelResilience extends Context.Service<ModelResilience, Interface>()("@batonfx/core/ModelResilience") {}
 
-/** @experimental */
+/**
+ * @experimental A stream that ended without its terminal event is retryable
+ * only while nothing a consumer would replay escaped downstream; retrying after
+ * that would duplicate the consumer's transcript.
+ */
 export const defaultClassify = (error: unknown): Classification =>
-  AiError.isAiError(error) && error.isRetryable ? "transient" : "terminal"
+  isTerminationFailure(error)
+    ? error.emitted._tag === "Nothing"
+      ? "transient"
+      : "terminal"
+    : AiError.isAiError(error) && error.isRetryable
+      ? "transient"
+      : "terminal"
 
 /** @experimental */
 export const none: Interface = { classify: () => "terminal", retrySchedule: Schedule.recurs(0) }
@@ -60,20 +71,21 @@ const retryStream = <A, E, R>(
   stream: () => Stream.Stream<A, E, R>,
   onEmittedFailure: (error: E) => A,
   resilience: Interface,
+  consumesReplay: (value: A) => boolean,
 ): Stream.Stream<A, E, R> =>
   Stream.suspend(() => {
-    let emitted = false
+    let consumed = false
     return stream().pipe(
-      Stream.map((value): Result.Result<A, Cause.Cause<E>> => Result.succeed(value)),
-      Stream.tap(() =>
+      Stream.tap((value) =>
         Effect.sync(() => {
-          emitted = true
+          if (consumesReplay(value)) consumed = true
         }),
       ),
+      Stream.map((value): Result.Result<A, Cause.Cause<E>> => Result.succeed(value)),
       Stream.catchCause((cause): Stream.Stream<Result.Result<A, Cause.Cause<E>>, E> => {
         const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
         if (reason === undefined || !Cause.isFailReason(reason)) return Stream.succeed(Result.fail(cause))
-        return emitted ? Stream.succeed(Result.succeed(onEmittedFailure(reason.error))) : Stream.fail(reason.error)
+        return consumed ? Stream.succeed(Result.succeed(onEmittedFailure(reason.error))) : Stream.fail(reason.error)
       }),
     )
   }).pipe(
@@ -110,6 +122,7 @@ export const apply: {
           () => model.streamText(options),
           (error) => Response.makePart("error", { error }),
           resilience,
+          (part: Response.StreamPart<never>) => part.type !== "response-metadata",
         )) as unknown as LanguageModel.Service["streamText"],
     }) as LanguageModel.Service,
 )

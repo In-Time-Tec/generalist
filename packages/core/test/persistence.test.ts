@@ -6,6 +6,7 @@ import { Persistence } from "effect/unstable/persistence"
 import { Agent, AgentEvent, Approvals, Compaction, ModelMiddleware, Session, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
+import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -17,7 +18,7 @@ const modelLayer = (
     LanguageModel.LanguageModel,
     LanguageModel.make({
       generateText,
-      streamText,
+      streamText: (options) => withProviderFinish(streamText(options)),
     }),
   )
 

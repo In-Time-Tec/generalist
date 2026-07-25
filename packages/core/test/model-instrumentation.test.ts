@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Fiber, Schedule, Stream } from "effect"
+import { Effect, Exit, Fiber, Function, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { AiError, LanguageModel, Model, Response } from "effect/unstable/ai"
-import { ModelResilience, ModelTelemetry } from "../src/index"
+import { ModelResilience, ModelStreamTermination, ModelTelemetry } from "../src/index"
 import { instrument, makeIdentityCell } from "../src/model-instrumentation"
 
 const transientError = AiError.make({
@@ -307,7 +307,7 @@ describe("model instrumentation", () => {
     }),
   )
 
-  it.effect("keeps usage unknown when the provider reports none", () =>
+  it.effect("fails an attempt whose stream ends without a provider finish", () =>
     Effect.gen(function* () {
       const { events, emit } = makeCollector()
       const wrapped = instrument(
@@ -317,16 +317,116 @@ describe("model instrumentation", () => {
         { emit, turn: 0 },
       )
 
-      yield* Stream.runDrain(wrapped.streamText({ prompt: "hello" }))
+      const error = yield* Stream.runDrain(wrapped.streamText({ prompt: "hello" })).pipe(Effect.flip)
 
-      const [attemptCompleted] = byTag(events, "ModelAttemptCompleted")
-      const [completed] = byTag(events, "ModelCallCompleted")
-      expect(attemptCompleted !== undefined && "usage" in attemptCompleted).toBe(false)
-      expect(attemptCompleted !== undefined && "finishReason" in attemptCompleted).toBe(false)
-      expect(attemptCompleted !== undefined && "requestId" in attemptCompleted).toBe(false)
-      expect(completed !== undefined && "usage" in completed).toBe(false)
+      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
+      expect(byTag(events, "ModelAttemptCompleted")).toEqual([])
+      const [attemptFailed] = byTag(events, "ModelAttemptFailed")
+      expect(attemptFailed?.category).toBe("truncated-stream")
+      expect(attemptFailed?.classification).toBe("terminal")
+      const [callFailed] = byTag(events, "ModelCallFailed")
+      expect(callFailed?.category).toBe("truncated-stream")
+      expect(byTag(events, "ModelCallCompleted")).toEqual([])
     }),
   )
+
+  it.effect("keeps a completed attempt's usage when a later attempt in the same call truncates", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      let calls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(finishPart)
+              : Stream.make(Response.makePart("text-delta", { id: "t1", delta: "cut" }))
+          },
+        }),
+        { emit, turn: 0 },
+      )
+
+      yield* Stream.runDrain(wrapped.streamText({ prompt: "first" }))
+      yield* Stream.runDrain(wrapped.streamText({ prompt: "second" })).pipe(Effect.flip)
+
+      const [firstCompleted] = byTag(events, "ModelAttemptCompleted")
+      expect(firstCompleted?.usage).toEqual(usage)
+      expect(firstCompleted?.finishReason).toBe("stop")
+      const [firstCall] = byTag(events, "ModelCallCompleted")
+      expect(firstCall?.usage).toEqual(usage)
+      expect(byTag(events, "ModelAttemptCompleted")).toHaveLength(1)
+      const [attemptFailed] = byTag(events, "ModelAttemptFailed")
+      expect(attemptFailed?.category).toBe("truncated-stream")
+    }),
+  )
+
+  it.effect("reports an open tool call in the truncation failure", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      const wrapped = instrument(
+        languageModel({
+          streamText: () =>
+            Stream.fromIterable([
+              Response.makePart("response-metadata", {
+                id: "req-1",
+                modelId: "scripted",
+                timestamp: undefined,
+                request: undefined,
+              }),
+              Response.makePart("tool-params-start", { id: "call-1", name: "write", providerExecuted: false }),
+              Response.makePart("tool-params-delta", { id: "call-1", delta: '{"path": "plans/019.md"' }),
+            ]),
+        }),
+        { emit, turn: 3 },
+      )
+
+      const error = yield* Stream.runDrain(wrapped.streamText({ prompt: "write" })).pipe(Effect.flip)
+
+      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
+      const truncated = error as unknown as ModelStreamTermination.ModelStreamTruncated
+      expect(truncated.turn).toBe(3)
+      expect(truncated.requestId).toBe("req-1")
+      expect(truncated.lastPart).toBe("tool-params-delta")
+      expect(truncated.emitted).toEqual({
+        _tag: "OpenToolCall",
+        toolCallId: "call-1",
+        toolName: "write",
+        characters: '{"path": "plans/019.md"'.length,
+      })
+      const [attemptFailed] = byTag(events, "ModelAttemptFailed")
+      expect(attemptFailed?.category).toBe("truncated-stream")
+    }),
+  )
+
+  it.effect("classifies a truncation with nothing emitted as transient and anything emitted as terminal", () => {
+    const origin = { turn: 0, provider: undefined, model: undefined }
+    return Effect.gen(function* () {
+      const nothing = yield* Stream.runDrain(
+        ModelStreamTermination.requireTerminal(
+          Stream.make(
+            Response.makePart("response-metadata", {
+              id: "req-1",
+              modelId: "m",
+              timestamp: undefined,
+              request: undefined,
+            }),
+          ),
+          { ...origin, toPart: Function.identity },
+        ),
+      ).pipe(Effect.flip)
+      const displayed = yield* Stream.runDrain(
+        ModelStreamTermination.requireTerminal(Stream.make(Response.makePart("text-delta", { id: "t", delta: "hi" })), {
+          ...origin,
+          toPart: Function.identity,
+        }),
+      ).pipe(Effect.flip)
+
+      expect(nothing.emitted).toEqual({ _tag: "Nothing" })
+      expect(ModelResilience.defaultClassify(nothing)).toBe("transient")
+      expect(displayed.emitted).toEqual({ _tag: "DisplayOnly", characters: 2 })
+      expect(ModelResilience.defaultClassify(displayed)).toBe("terminal")
+    })
+  })
 
   it.effect("stamps purpose, compaction id, provider, and model from the calling context", () =>
     Effect.gen(function* () {
@@ -392,7 +492,8 @@ describe("model instrumentation", () => {
     Effect.gen(function* () {
       const { events, emit } = makeCollector()
       const model = languageModel({
-        streamText: () => Stream.make(Response.makePart("text-delta", { id: "t1", delta: "once" })),
+        streamText: () =>
+          Stream.fromIterable([Response.makePart("text-delta", { id: "t1", delta: "once" }), finishPart]),
       })
       const once = instrument(model, { emit, turn: 0 })
       const twice = instrument(once, { emit, turn: 0 })
@@ -410,7 +511,8 @@ describe("model instrumentation", () => {
       const outer = makeCollector()
       const inner = makeCollector()
       const model = languageModel({
-        streamText: () => Stream.make(Response.makePart("text-delta", { id: "t1", delta: "child" })),
+        streamText: () =>
+          Stream.fromIterable([Response.makePart("text-delta", { id: "t1", delta: "child" }), finishPart]),
       })
       const outerInstrumented = instrument(model, { emit: outer.emit, turn: 0 })
       const innerInstrumented = instrument(outerInstrumented, { emit: inner.emit, turn: 0 })

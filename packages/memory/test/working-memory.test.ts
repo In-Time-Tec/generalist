@@ -8,6 +8,15 @@ import { WorkingMemory } from "../src/index"
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 const otherKey: Memory.Key = { agent: "memory-agent", subject: "subject-b" }
 
+const finishPart = Response.makePart("finish", {
+  reason: "stop",
+  usage: Response.Usage.make({
+    inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
+    outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+  }),
+  response: undefined,
+})
+
 const textPart = (text: string) => Prompt.makePart("text", { text })
 const user = (text: string) => Prompt.makeMessage("user", { content: [textPart(text)] })
 const assistant = (text: string) => Prompt.makeMessage("assistant", { content: [textPart(text)] })
@@ -69,6 +78,7 @@ layer(WorkingMemory.layer({ maxMessages: 2 }))("WorkingMemory", (it) => {
                 Response.makePart("text-start", { id: `text-${call}` }),
                 Response.makePart("text-delta", { id: `text-${call}`, delta: call === 1 ? "first" : "second" }),
                 Response.makePart("text-end", { id: `text-${call}` }),
+                finishPart,
               ]),
             ),
           ),
@@ -208,6 +218,7 @@ layer(
                   delta: call === 1 ? "first" : "second",
                 }),
                 Response.makePart("text-end", { id: `bounded-${call}` }),
+                finishPart,
               ]),
             ),
           ),

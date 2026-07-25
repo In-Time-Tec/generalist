@@ -1,5 +1,6 @@
 import { Cause, Context, Effect, Layer, Option, Schema } from "effect"
 import { AiError, IdGenerator, LanguageModel, Response } from "effect/unstable/ai"
+import { isTerminationFailure } from "./model-stream-termination.js"
 
 /** @experimental Bounded purpose of one model call issued by the loop. */
 export const ModelCallPurpose = Schema.Literals(["conversation", "structured-output", "compaction-summary"])
@@ -14,6 +15,7 @@ export const ModelFailureCategory = Schema.Literals([
   "transport",
   "provider-response",
   "stream-decode",
+  "truncated-stream",
   "context-overflow",
   "invalid-tool-call",
   "token-budget",
@@ -120,8 +122,11 @@ export const ModelAttemptFirstOutput = Schema.Struct({
 export type ModelAttemptFirstOutput = typeof ModelAttemptFirstOutput.Type
 
 /**
- * @experimental A provider invocation finished. Absent usage, finish, request
- * correlation, service tier, and cost fields mean unknown, never zero.
+ * @experimental A provider invocation finished. A completed attempt always
+ * carries the provider's terminal `finish` part, so usage, `usageAt`, and
+ * `finishReason` are required; an attempt whose stream ended without one is
+ * reported as `ModelAttemptFailed` with category `truncated-stream`. Absent
+ * request correlation, service tier, and cost fields mean unknown, never zero.
  * `usageAt` is sampled when provider-reported usage was received, which can
  * precede stream completion.
  */
@@ -133,9 +138,9 @@ export const ModelAttemptCompleted = Schema.Struct({
   modelAttemptId: Schema.String,
   attempt: attemptOrdinal,
   completedAt: Schema.Finite,
-  usage: Schema.optionalKey(Response.Usage),
-  usageAt: Schema.optionalKey(Schema.Finite),
-  finishReason: Schema.optionalKey(Response.FinishReason),
+  usage: Response.Usage,
+  usageAt: Schema.Finite,
+  finishReason: Response.FinishReason,
   requestId: Schema.optionalKey(Schema.String),
   responseModel: Schema.optionalKey(Schema.String),
   serviceTier: Schema.optionalKey(Schema.String),
@@ -328,6 +333,7 @@ export const layerNoop: Layer.Layer<Delivery> = Layer.succeed(Delivery, Delivery
 
 /** @experimental Map a model failure onto the bounded cross-provider category. */
 export const classifyFailureCategory = (error: unknown): ModelFailureCategory => {
+  if (isTerminationFailure(error)) return "truncated-stream"
   if (Cause.isTimeoutError(error)) return "timeout"
   if (!AiError.isAiError(error)) return "unknown"
   switch (error.reason._tag) {

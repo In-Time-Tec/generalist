@@ -1,10 +1,16 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Schema } from "effect"
-import { AiError } from "effect/unstable/ai"
-import { ModelTelemetry } from "../src/index"
+import { AiError, Response } from "effect/unstable/ai"
+import { ModelStreamTermination, ModelTelemetry } from "../src/index"
 
 const aiError = (reason: AiError.AiError["reason"]): AiError.AiError =>
   AiError.make({ module: "TestLanguageModel", method: "streamText", reason })
+
+const usage = (): Response.Usage =>
+  Response.Usage.make({
+    inputTokens: { uncached: 1, total: 1, cacheRead: undefined, cacheWrite: undefined },
+    outputTokens: { total: 2, text: 2, reasoning: undefined },
+  })
 
 describe("ModelTelemetry", () => {
   it("maps model failures onto the bounded cross-provider categories", () => {
@@ -29,6 +35,20 @@ describe("ModelTelemetry", () => {
     expect(ModelTelemetry.classifyFailureCategory(aiError(AiError.UnknownError.make({})))).toBe("unknown")
     expect(ModelTelemetry.classifyFailureCategory(new Cause.TimeoutError())).toBe("timeout")
     expect(ModelTelemetry.classifyFailureCategory(new Error("plain"))).toBe("unknown")
+    expect(
+      ModelTelemetry.classifyFailureCategory(
+        ModelStreamTermination.ModelStreamTruncated.make({ turn: 0, emitted: { _tag: "Nothing" } }),
+      ),
+    ).toBe("truncated-stream")
+    expect(
+      ModelTelemetry.classifyFailureCategory(
+        ModelStreamTermination.ModelStreamStalled.make({
+          turn: 0,
+          emitted: { _tag: "Nothing" },
+          idleMillis: 120_000,
+        }),
+      ),
+    ).toBe("truncated-stream")
   })
 
   it("decodes every lifecycle event through the closed Event union", () => {
@@ -87,7 +107,9 @@ describe("ModelTelemetry", () => {
         modelAttemptId: "attempt-2",
         attempt: 1,
         completedAt: 5,
+        usage: usage(),
         usageAt: 5,
+        finishReason: "stop",
         requestId: "req-1",
         responseModel: "returned-model",
       },
@@ -134,7 +156,7 @@ describe("ModelTelemetry", () => {
     }
   })
 
-  it("keeps absent usage, correlation, and provider fields absent instead of zero", () => {
+  it("keeps absent correlation and provider fields absent instead of zero", () => {
     const decode = Schema.decodeUnknownSync(ModelTelemetry.Event)
     const decoded = decode({
       _tag: "ModelAttemptCompleted",
@@ -144,15 +166,34 @@ describe("ModelTelemetry", () => {
       modelAttemptId: "attempt-1",
       attempt: 0,
       completedAt: 1,
+      usage: usage(),
+      usageAt: 1,
+      finishReason: "stop",
     })
 
-    expect("usage" in decoded).toBe(false)
-    expect("usageAt" in decoded).toBe(false)
-    expect("finishReason" in decoded).toBe(false)
     expect("requestId" in decoded).toBe(false)
     expect("responseModel" in decoded).toBe(false)
     expect("serviceTier" in decoded).toBe(false)
     expect("cost" in decoded).toBe(false)
+  })
+
+  it("rejects a completed attempt that carries no provider finish", () => {
+    const decode = Schema.decodeUnknownOption(ModelTelemetry.Event)
+    const withoutFinish = {
+      _tag: "ModelAttemptCompleted",
+      deliveryId: "run:0",
+      turn: 0,
+      modelCallId: "call-1",
+      modelAttemptId: "attempt-1",
+      attempt: 0,
+      completedAt: 1,
+    }
+
+    expect(decode(withoutFinish)._tag).toBe("None")
+    expect(decode({ ...withoutFinish, usage: usage(), usageAt: 1 })._tag).toBe("None")
+    expect(decode({ ...withoutFinish, usage: usage(), finishReason: "stop" })._tag).toBe("None")
+    expect(decode({ ...withoutFinish, usageAt: 1, finishReason: "stop" })._tag).toBe("None")
+    expect(decode({ ...withoutFinish, usage: usage(), usageAt: 1, finishReason: "stop" })._tag).toBe("Some")
   })
 
   it("rejects unbounded categories and negative attempt ordinals", () => {

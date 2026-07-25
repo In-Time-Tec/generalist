@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Cause, Effect, Exit, Schedule, Schema, Stream } from "effect"
+import { Cause, Effect, Exit, Function, Schedule, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Response } from "effect/unstable/ai"
-import { ModelResilience } from "../src/index"
+import { ModelResilience, ModelStreamTermination } from "../src/index"
 
 const transientError = AiError.make({
   module: "TestLanguageModel",
@@ -179,6 +179,91 @@ describe("ModelResilience", () => {
       expect(exit).toEqual(Exit.failCause(cause))
     })
   })
+
+  it.effect("does not let a lone response-metadata part consume replayability", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return calls === 1
+            ? Stream.concat(
+                Stream.make(
+                  Response.makePart("response-metadata", {
+                    id: "req-1",
+                    modelId: "m",
+                    timestamp: undefined,
+                    request: undefined,
+                  }),
+                ),
+                Stream.fail(transientError),
+              )
+            : Stream.make(textDelta("ok"))
+        },
+      }),
+      retryOnce,
+    )
+    return Effect.gen(function* () {
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "metadata then fail" }))
+
+      expect(calls).toBe(2)
+      expect(parts.map((part) => part.type)).toEqual(["response-metadata", "text-delta"])
+    })
+  })
+
+  it.effect("retries a truncation that emitted nothing and gives the retry a fresh attempt", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(
+                Response.makePart("response-metadata", {
+                  id: "req-1",
+                  modelId: "m",
+                  timestamp: undefined,
+                  request: undefined,
+                }),
+              )
+            : Stream.make(textDelta("recovered"))
+        },
+      }),
+      ModelResilience.make({ retrySchedule: Schedule.recurs(1) }),
+    )
+    const guarded = Stream.suspend(() =>
+      ModelStreamTermination.requireTerminal(wrapped.streamText({ prompt: "truncated" }), {
+        turn: 0,
+        provider: undefined,
+        model: undefined,
+        toPart: Function.identity,
+      }),
+    )
+    return Effect.gen(function* () {
+      const error = yield* Stream.runCollect(guarded).pipe(Effect.flip)
+
+      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
+      expect(ModelStreamTermination.isTerminationFailure(error) && error.emitted).toEqual({ _tag: "Nothing" })
+      expect(ModelResilience.defaultClassify(error)).toBe("transient")
+    })
+  })
+
+  it.effect("treats an open tool call as terminal so a retry cannot duplicate the transcript", () =>
+    Effect.gen(function* () {
+      const openToolCall = yield* Stream.runDrain(
+        ModelStreamTermination.requireTerminal(
+          Stream.fromIterable([
+            Response.makePart("tool-params-start", { id: "call-1", name: "write", providerExecuted: false }),
+            Response.makePart("tool-params-delta", { id: "call-1", delta: '{"path":"a.md"' }),
+          ]),
+          { turn: 0, provider: undefined, model: undefined, toPart: Function.identity },
+        ),
+      ).pipe(Effect.flip)
+
+      expect(openToolCall.emitted._tag).toBe("OpenToolCall")
+      expect(ModelResilience.defaultClassify(openToolCall)).toBe("terminal")
+    }),
+  )
 
   it.effect("retries streamText failures before any part is emitted", () => {
     let calls = 0

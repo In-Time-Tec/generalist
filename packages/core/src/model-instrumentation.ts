@@ -2,6 +2,7 @@ import { Cause, Clock, Duration, Effect, Exit, Function, Option, Schedule, Strea
 import { AiError, LanguageModel, Model, Response } from "effect/unstable/ai"
 import { classifyFailure } from "./model-registry.js"
 import { type Classification, type Interface as Resilience, apply } from "./model-resilience.js"
+import { type TerminationFailure, requireTerminal } from "./model-stream-termination.js"
 import {
   CurrentCompactionId,
   CurrentPurpose,
@@ -55,16 +56,27 @@ interface CallContext {
   readonly options: InstrumentOptions
   readonly modelCallId: string
   readonly purpose: ModelCallPurpose
+  readonly provider: string | undefined
+  readonly model: string | undefined
   readonly categorize: (error: unknown) => ModelFailureCategory
   readonly classify: (error: unknown) => Classification
   readonly state: CallState
 }
 
+interface Finished {
+  readonly _tag: "Finished"
+  readonly reason: Response.FinishReason
+  readonly usage: Response.Usage
+  readonly at: number
+}
+
+type Termination = { readonly _tag: "Open" } | Finished
+
+const open: Termination = { _tag: "Open" }
+
 interface AttemptState {
   firstOutputs: Set<ModelFirstOutputKind>
-  usage: Response.Usage | undefined
-  usageAt: number | undefined
-  finishReason: Response.FinishReason | undefined
+  termination: Termination
   requestId: string | undefined
   responseModel: string | undefined
   errorCategory: ModelFailureCategory | undefined
@@ -110,29 +122,22 @@ const firstOutputKind = (part: Response.AnyPart): ModelFirstOutputKind | undefin
   }
 }
 
-const recordResponsePart = (context: CallContext, attempt: AttemptContext, part: Response.AnyPart): void => {
-  if (part.type === "response-metadata") {
-    attempt.state.requestId = part.id
-    attempt.state.responseModel = part.modelId
-  }
-  if (part.type === "finish") {
-    attempt.state.usage = part.usage
-    attempt.state.finishReason = part.reason
-  }
-  if (part.type === "error") {
-    attempt.state.errorCategory = context.categorize(part.error)
-  }
-}
-
 const observeStreamPart = (
   context: CallContext,
   attempt: AttemptContext,
   part: Response.AnyPart,
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
-    recordResponsePart(context, attempt, part)
+    if (part.type === "response-metadata") {
+      attempt.state.requestId = part.id
+      attempt.state.responseModel = part.modelId
+    }
+    if (part.type === "error") {
+      attempt.state.errorCategory = context.categorize(part.error)
+    }
     if (part.type === "finish") {
-      attempt.state.usageAt = yield* Clock.currentTimeMillis
+      const at = yield* Clock.currentTimeMillis
+      attempt.state.termination = { _tag: "Finished", reason: part.reason, usage: part.usage, at }
     }
     const kind = firstOutputKind(part)
     if (kind === undefined || attempt.state.firstOutputs.has(kind)) return
@@ -149,7 +154,7 @@ const observeStreamPart = (
     })
   })
 
-const attemptCompleted = (context: CallContext, attempt: AttemptContext): Effect.Effect<void> =>
+const attemptCompleted = (context: CallContext, attempt: AttemptContext, finished: Finished): Effect.Effect<void> =>
   Effect.flatMap(Clock.currentTimeMillis, (completedAt) =>
     context.options.emit({
       _tag: "ModelAttemptCompleted",
@@ -158,9 +163,9 @@ const attemptCompleted = (context: CallContext, attempt: AttemptContext): Effect
       modelAttemptId: attempt.modelAttemptId,
       attempt: attempt.attempt,
       completedAt,
-      ...(attempt.state.usage === undefined ? {} : { usage: attempt.state.usage }),
-      ...(attempt.state.usageAt === undefined ? {} : { usageAt: attempt.state.usageAt }),
-      ...(attempt.state.finishReason === undefined ? {} : { finishReason: attempt.state.finishReason }),
+      usage: finished.usage,
+      usageAt: finished.at,
+      finishReason: finished.reason,
       ...(attempt.state.requestId === undefined ? {} : { requestId: attempt.state.requestId }),
       ...(attempt.state.responseModel === undefined ? {} : { responseModel: attempt.state.responseModel }),
     }),
@@ -194,9 +199,11 @@ const attemptExit = (
     return attemptFailed(context, attempt, attempt.state.errorCategory, "terminal")
   }
   if (Exit.isSuccess(exit)) {
-    context.state.usage = attempt.state.usage ?? context.state.usage
-    context.state.finishReason = attempt.state.finishReason ?? context.state.finishReason
-    return attemptCompleted(context, attempt)
+    const termination = attempt.state.termination
+    if (termination._tag === "Open") return attemptFailed(context, attempt, "truncated-stream", "terminal")
+    context.state.usage = termination.usage
+    context.state.finishReason = termination.reason
+    return attemptCompleted(context, attempt, termination)
   }
   if (Cause.hasInterrupts(exit.cause)) return attemptFailed(context, attempt, "cancellation", "terminal")
   const failure = singleFailure(exit.cause)
@@ -226,9 +233,7 @@ const beginAttempt = (context: CallContext): Effect.Effect<AttemptContext> =>
       attempt,
       state: {
         firstOutputs: new Set(),
-        usage: undefined,
-        usageAt: undefined,
-        finishReason: undefined,
+        termination: open,
         requestId: undefined,
         responseModel: undefined,
         errorCategory: undefined,
@@ -256,10 +261,15 @@ const attemptEffect = <A extends AnyResponse, E, R>(
 const attemptStream = <A extends Response.AnyPart, E, R>(
   context: CallContext,
   run: () => Stream.Stream<A, E, R>,
-): Stream.Stream<A, E, R> =>
+): Stream.Stream<A, E | TerminationFailure, R> =>
   Stream.unwrap(
     Effect.map(beginAttempt(context), (attempt) =>
-      run().pipe(
+      requireTerminal(run(), {
+        toPart: Function.identity,
+        turn: context.options.turn,
+        provider: context.provider,
+        model: context.model,
+      }).pipe(
         Stream.tap((part) => observeStreamPart(context, attempt, part)),
         Stream.onExit((exit) => attemptExit(context, attempt, exit)),
       ),
@@ -334,6 +344,8 @@ const beginCall = (
       options,
       modelCallId,
       purpose,
+      provider: Option.getOrUndefined(provider),
+      model: Option.getOrUndefined(modelName),
       categorize: memoized((error) =>
         providerClassification(error) === "context-overflow" ? "context-overflow" : classifyFailureCategory(error),
       ),

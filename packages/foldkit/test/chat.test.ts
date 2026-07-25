@@ -167,6 +167,12 @@ describe("Chat", () => {
         modelAttemptId: "model-attempt-1",
         attempt: 1,
         completedAt: 6,
+        usage: Response.Usage.make({
+          inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+        }),
+        usageAt: 6,
+        finishReason: "stop",
       },
       {
         _tag: "ModelCallCompleted",

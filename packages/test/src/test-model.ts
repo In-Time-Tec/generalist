@@ -38,6 +38,21 @@ export interface TurnStep extends StepOptions {
   readonly parts: ReadonlyArray<Part>
 }
 
+/**
+ * @experimental Where a truncated step stops emitting. The stream always ends
+ * without a `finish` part, reproducing a provider body that reached EOF without
+ * its terminal event.
+ */
+export type TruncationPoint = "reasoning-delta" | "text-delta" | "tool-params-delta" | "response-metadata"
+
+/** @experimental A provider stream that ends mid-content and never emits `finish`. */
+export interface TruncatedStep {
+  readonly _tag: "Truncated"
+  readonly parts: ReadonlyArray<Part>
+  readonly stopAfter: TruncationPoint
+  readonly delay?: Duration.Input
+}
+
 /** @experimental */
 export interface ObjectStep extends StepOptions {
   readonly _tag: "Object"
@@ -52,7 +67,7 @@ export interface FailureStep {
 }
 
 /** @experimental */
-export type Step = Part | TurnStep | ObjectStep | FailureStep
+export type Step = Part | TurnStep | ObjectStep | FailureStep | TruncatedStep
 
 /** @experimental */
 export interface ToolCallOptions {
@@ -100,8 +115,10 @@ interface State {
   readonly requests: ReadonlyArray<Request>
 }
 
+type ClaimedStep = TurnStep | ObjectStep | FailureStep | TruncatedStep
+
 interface Claimed {
-  readonly step: TurnStep | ObjectStep | FailureStep | undefined
+  readonly step: ClaimedStep | undefined
   readonly request: Request
 }
 
@@ -118,7 +135,7 @@ const invalidRequest = (method: Operation, description: string): AiError.AiError
     reason: AiError.InvalidRequestError.make({ description }),
   })
 
-const normalizeStep = (step: Step): TurnStep | ObjectStep | FailureStep =>
+const normalizeStep = (step: Step): ClaimedStep =>
   step._tag === "Text" || step._tag === "Reasoning" || step._tag === "ToolCall" ? { _tag: "Turn", parts: [step] } : step
 
 const operation = (method: "streamText" | "generateText", options: LanguageModel.ProviderOptions): Operation =>
@@ -191,7 +208,55 @@ const compileStream = (step: TurnStep, requestIndex: number): Array<Response.Str
   return output
 }
 
-const applyDelay = (step: TurnStep | ObjectStep | FailureStep): Effect.Effect<void> =>
+const truncationInvalid = (stopAfter: TruncationPoint, expected: string): AiError.AiError =>
+  invalidRequest("streamText", `Truncated step stopping after ${stopAfter} requires a final ${expected} part`)
+
+const compileTruncated = (
+  step: TruncatedStep,
+  requestIndex: number,
+): Array<Response.StreamPartEncoded> | AiError.AiError => {
+  const output: Array<Response.StreamPartEncoded> = [
+    {
+      type: "response-metadata",
+      id: `test-response-${requestIndex}`,
+      modelId: "scripted",
+      timestamp: undefined,
+      request: undefined,
+    },
+  ]
+  if (step.stopAfter === "response-metadata") return output
+  const lastIndex = step.parts.length - 1
+  const last = step.parts[lastIndex]
+  if (last === undefined) return truncationInvalid(step.stopAfter, "content")
+  for (let partIndex = 0; partIndex < lastIndex; partIndex += 1) {
+    const part = step.parts[partIndex] as Part
+    if (part._tag === "ToolCall") {
+      output.push(compileToolCall(part, requestIndex, partIndex))
+      continue
+    }
+    const kind = part._tag === "Text" ? "text" : "reasoning"
+    const id = `test-${kind}-${requestIndex}-${partIndex}`
+    output.push({ type: `${kind}-start`, id })
+    output.push({ type: `${kind}-delta`, id, delta: part.text })
+    output.push({ type: `${kind}-end`, id })
+  }
+  if (step.stopAfter === "tool-params-delta") {
+    if (last._tag !== "ToolCall") return truncationInvalid(step.stopAfter, "ToolCall")
+    const id = last.id ?? `test-call-${requestIndex}-${lastIndex}`
+    output.push({ type: "tool-params-start", id, name: last.name, providerExecuted: last.providerExecuted })
+    output.push({ type: "tool-params-delta", id, delta: JSON.stringify(last.params).slice(0, -1) })
+    return output
+  }
+  const kind = step.stopAfter === "text-delta" ? "text" : "reasoning"
+  const expected = kind === "text" ? "Text" : "Reasoning"
+  if (last._tag !== expected) return truncationInvalid(step.stopAfter, expected)
+  const id = `test-${kind}-${requestIndex}-${lastIndex}`
+  output.push({ type: `${kind}-start`, id })
+  output.push({ type: `${kind}-delta`, id, delta: last.text })
+  return output
+}
+
+const applyDelay = (step: ClaimedStep): Effect.Effect<void> =>
   step.delay === undefined ? Effect.void : Effect.sleep(step.delay)
 
 const claim = (
@@ -226,6 +291,9 @@ const executeGenerate = (
     }
     yield* applyDelay(step)
     if (step._tag === "Failure") return yield* step.error
+    if (step._tag === "Truncated") {
+      return yield* invalidRequest(claimed.request.operation, "Truncated step requires streamText")
+    }
     if (step._tag === "Object") {
       if (options.responseFormat.type !== "json") {
         return yield* invalidRequest(claimed.request.operation, "Object step requires generateObject")
@@ -256,6 +324,10 @@ const executeStream = (
     if (step._tag === "Failure") return yield* step.error
     if (step._tag === "Object") {
       return yield* invalidRequest(claimed.request.operation, "Object step requires generateObject")
+    }
+    if (step._tag === "Truncated") {
+      const compiled = compileTruncated(step, claimed.request.index)
+      return Array.isArray(compiled) ? compiled : yield* compiled
     }
     return compileStream(step, claimed.request.index)
   })
@@ -289,6 +361,29 @@ export const turn: {
   (args) => Array.isArray(args[0]),
   (parts: ReadonlyArray<Part>, options: StepOptions = {}) => ({
     _tag: "Turn",
+    parts,
+    ...options,
+  }),
+)
+
+/**
+ * @experimental A turn whose provider stream ends without a `finish` part.
+ * `stopAfter: "tool-params-delta"` emits `tool-params-start` and unclosed
+ * parameter JSON but never the closing `tool-call`.
+ */
+export const truncated: {
+  (options: {
+    readonly stopAfter: TruncationPoint
+    readonly delay?: Duration.Input
+  }): (parts: ReadonlyArray<Part>) => TruncatedStep
+  (
+    parts: ReadonlyArray<Part>,
+    options: { readonly stopAfter: TruncationPoint; readonly delay?: Duration.Input },
+  ): TruncatedStep
+} = Function.dual(
+  (args) => Array.isArray(args[0]),
+  (parts: ReadonlyArray<Part>, options: { readonly stopAfter: TruncationPoint; readonly delay?: Duration.Input }) => ({
+    _tag: "Truncated",
     parts,
     ...options,
   }),
