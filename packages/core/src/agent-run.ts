@@ -2,6 +2,7 @@
 import {
   Cause,
   Channel,
+  Duration,
   Effect,
   Equal,
   Exit,
@@ -38,6 +39,7 @@ import { coalesceAdjacentText, diagnose as diagnoseSessionSync, equivalentMessag
 import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "./compaction.js"
 import { Instructions, openEpoch } from "./instructions.js"
 import { classify as classifyContextOverflow } from "./context-overflow.js"
+import { isTerminationFailure } from "./model-stream-termination.js"
 import { type Item, type Key, Memory, type MemoryError, messageFromRecall, projectTranscript } from "./memory.js"
 import { ModelMiddleware } from "./model-middleware.js"
 import {
@@ -163,6 +165,9 @@ const steeringDrainedEvent = (
   queue,
   count: inputs.length,
 })
+
+const attemptText = (parts: ReadonlyArray<Response.StreamPart<any>>): string =>
+  parts.reduce((text, part) => (part.type === "text-delta" ? `${text}${part.delta}` : text), "")
 
 export const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
   agent: Agent<Tools, R>,
@@ -1429,9 +1434,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             part,
           },
         ])
-        if (part.type === "text-delta") {
-          state.text = `${state.text}${part.delta}`
-        }
         if (part.type === "finish") {
           return modelPart.pipe(Stream.tap(() => captureFinishPart(part)))
         }
@@ -1506,6 +1508,14 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               ),
             ),
           )
+        let streamRestarts = 0
+        const maxStreamRestarts = 2
+        const streamRestartBackoff = (restart: number) => Duration.seconds(restart === 1 ? 1 : 3)
+        const restartableMidStream = (classified: unknown): boolean => {
+          if (streamRestarts >= maxStreamRestarts) return false
+          if (Option.isNone(resilienceService) || resilienceService.value.restartConsumedStreams !== true) return false
+          return isTerminationFailure(classified) || resilienceService.value.classify(classified) === "transient"
+        }
         const attempt = (
           activePrompt: Prompt.Prompt,
           retryOverflow: boolean,
@@ -1629,15 +1639,18 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                 !completed ||
                 (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
                   ? Effect.void
-                  : Ref.set(
-                      chat.history,
-                      Prompt.concat(
-                        Prompt.concat(preparedState.history, preparedState.preparedPrompt),
-                        Prompt.fromMessages(
-                          Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText),
+                  : Effect.suspend(() => {
+                      state.text = `${state.text}${attemptText(transformedParts)}`
+                      return Ref.set(
+                        chat.history,
+                        Prompt.concat(
+                          Prompt.concat(preparedState!.history, preparedState!.preparedPrompt),
+                          Prompt.fromMessages(
+                            Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText),
+                          ),
                         ),
-                      ),
-                    ).pipe(
+                      )
+                    }).pipe(
                       Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
                       Effect.orDie,
                       Effect.asVoid,
@@ -1648,6 +1661,22 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
               if (retryableOverflow(cause, emitted)) {
                 return attempt(preparedState?.preparedPrompt ?? activePrompt, false, true, cause)
+              }
+              const failure = singleFailure(cause)
+              if (Option.isSome(failure)) {
+                const classified =
+                  Schema.is(AgentError)(failure.value) && failure.value.cause !== undefined
+                    ? failure.value.cause
+                    : failure.value
+                if (restartableMidStream(classified)) {
+                  streamRestarts += 1
+                  return Stream.fromEffect(Effect.sleep(streamRestartBackoff(streamRestarts))).pipe(
+                    Stream.drain,
+                    Stream.concat(
+                      Stream.suspend(() => attempt(preparedState?.preparedPrompt ?? activePrompt, retryOverflow)),
+                    ),
+                  )
+                }
               }
               return Stream.failCause(cause)
             }),

@@ -8,6 +8,7 @@ export type Classification = "transient" | "terminal"
 export interface Interface {
   readonly classify: (error: unknown) => Classification
   readonly retrySchedule: Schedule.Schedule<unknown>
+  readonly restartConsumedStreams?: boolean
 }
 
 /** @experimental */
@@ -34,6 +35,7 @@ export const none: Interface = { classify: () => "terminal", retrySchedule: Sche
 export const make = (input?: Partial<Interface>): Interface => ({
   classify: input?.classify ?? defaultClassify,
   retrySchedule: input?.retrySchedule ?? none.retrySchedule,
+  ...(input?.restartConsumedStreams === undefined ? {} : { restartConsumedStreams: input.restartConsumedStreams }),
 })
 
 /** @experimental */
