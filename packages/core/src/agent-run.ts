@@ -110,6 +110,7 @@ import {
   skillListingBudgetTokens,
 } from "./agent-skill-tool.js"
 import {
+  canonicalSuspensionCall,
   sameSuspension,
   suspended,
   suspensionCheckpoint,
@@ -1331,7 +1332,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                           tool_call_id: call.id,
                           tool_name: call.name,
                           tool_params: call.params,
-                          tool_call_batch: toolCallBatch.calls,
+                          tool_call_batch: toolCallBatch.calls.map(canonicalSuspensionCall),
                           active_tools: activeTools,
                           activated_skills: activatedSkills,
                         }),

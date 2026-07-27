@@ -23,6 +23,16 @@ export const suspensionMetadata = Schema.Struct({
   activated_skills: Schema.optional(Schema.Array(Schema.String)),
 })
 
+export const canonicalSuspensionCall = (
+  call: Pick<AnyToolCall, "id" | "name" | "params" | "providerExecuted">,
+): AnyToolCall =>
+  Response.makePart("tool-call", {
+    id: call.id,
+    name: call.name,
+    params: call.params,
+    providerExecuted: call.providerExecuted,
+  })
+
 export const unresolvedToolCall = (
   messages: ReadonlyArray<Prompt.Message>,
   toolCallId?: string,
@@ -80,16 +90,7 @@ export const unresolvedToolCall = (
   const toolCallBatch =
     pendingMessage?.role === "assistant"
       ? pendingMessage.content.flatMap((part) =>
-          part.type === "tool-call" && !part.providerExecuted
-            ? [
-                Response.makePart("tool-call", {
-                  id: part.id,
-                  name: part.name,
-                  params: part.params,
-                  providerExecuted: false,
-                }),
-              ]
-            : [],
+          part.type === "tool-call" && !part.providerExecuted ? [canonicalSuspensionCall(part)] : [],
         )
       : []
   const unresolvedToolCallIndexes =
@@ -168,5 +169,5 @@ export const suspended = (
     tool_call_id: call.id,
     tool_name: call.name,
     tool_params: call.params,
-    tool_call_batch: toolCallBatch.calls,
+    tool_call_batch: toolCallBatch.calls.map(canonicalSuspensionCall),
   })
