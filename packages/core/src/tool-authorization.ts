@@ -1,6 +1,7 @@
 import { Cause, Context, Effect, Layer, Schema } from "effect"
 import { type Prompt, type Response, type Tool } from "effect/unstable/ai"
 import { AgentSuspended } from "./agent-event.js"
+import { canonicalSuspensionCall } from "./agent-suspension.js"
 import { PermissionError, evaluateWithRules, type RuleStoreInterface } from "./permissions.js"
 
 type Approvals = import("./approvals.js").Interface
@@ -94,7 +95,7 @@ const suspend = (request: Request, token: string): Suspend => ({
     tool_call_id: request.call.id,
     tool_name: request.call.name,
     tool_params: request.call.params,
-    tool_call_batch: [request.call],
+    tool_call_batch: [canonicalSuspensionCall(request.call)],
     active_tools: request.activeTools,
     activated_skills: request.activatedSkills,
   }),

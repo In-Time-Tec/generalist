@@ -5904,6 +5904,68 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ] as const,
   )
 
+  ItLayer.make(it, "resumes a suspended tool call with provider metadata", () => {
+    let checkpoint: Prompt.Prompt | undefined
+    let executions = 0
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return modelCalls === 1
+            ? Stream.make(
+                Response.makePart("tool-call", {
+                  id: "provider-metadata-wait",
+                  name: "echo",
+                  params: { text: "wait" },
+                  providerExecuted: false,
+                  metadata: { openai: { itemId: "fc_provider_metadata_wait" } },
+                }),
+              )
+            : Stream.make(textDelta("resumed"))
+        }),
+        ToolExecutor.layerTest({
+          execute: () => {
+            executions += 1
+            return executions === 1
+              ? Effect.succeed({ _tag: "Suspend", token: "provider-metadata-token" })
+              : Effect.succeed({ _tag: "Success", result: "done", encodedResult: "done" })
+          },
+        }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "provider-metadata-resume-agent", toolkit: Toolkit.make(echoTool) })
+        const suspension = yield* Agent.stream(agent, { prompt: "wait" }).pipe(
+          Stream.tap((event) =>
+            Effect.sync(() => {
+              if (event._tag === "TurnCompleted") checkpoint = event.transcript
+            }),
+          ),
+          Stream.runDrain,
+          Effect.flip,
+        )
+        if (suspension._tag !== "@batonfx/core/AgentSuspended" || checkpoint === undefined) {
+          return yield* Effect.die("missing provider metadata suspension checkpoint")
+        }
+        expect(suspension.tool_call_batch[0]?.metadata).toEqual({})
+
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, {
+            prompt: "ignored",
+            history: checkpoint,
+            resume: { suspension },
+          }),
+        )
+
+        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(executions).toBe(2)
+        expect(modelCalls).toBe(2)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "checkpoints completed sibling tool results before suspension and preserves them on resume", () => {
     let suspendedTranscript: Prompt.Prompt | undefined
     let ordinaryExecutions = 0
@@ -6289,6 +6351,18 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           AgentEvent.AgentSuspended.make({ ...suspension, reason: "approval" }),
           AgentEvent.AgentSuspended.make({ ...suspension, active_tools: [] }),
           AgentEvent.AgentSuspended.make({ ...suspension, activated_skills: ["substituted-skill"] }),
+          AgentEvent.AgentSuspended.make({
+            ...suspension,
+            tool_call_batch: suspension.tool_call_batch.map((call) =>
+              Response.makePart("tool-call", {
+                id: call.id,
+                name: call.name,
+                params: call.params,
+                providerExecuted: call.providerExecuted,
+                metadata: { openai: { itemId: "fc_substituted" } },
+              }),
+            ),
+          }),
         ]
         for (const received of mismatches) {
           const failure = yield* Agent.stream(agent, {
