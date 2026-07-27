@@ -105,6 +105,23 @@ describe("Compaction", () => {
     }
   })
 
+  it("reports whether a compaction would run before any prompt work", () => {
+    const service = Compaction.make(Compaction.defaultStrategy(), {
+      contextWindow: 1_000,
+      reserveTokens: 200,
+      keepRecentTokens: 1,
+    })
+    expect(
+      service.willCompact?.({ usage: { contextTokens: 700, contextWindow: 1_000, reserveTokens: 0 }, overflow: false }),
+    ).toBe(false)
+    expect(
+      service.willCompact?.({ usage: { contextTokens: 900, contextWindow: 1_000, reserveTokens: 0 }, overflow: false }),
+    ).toBe(true)
+    expect(
+      service.willCompact?.({ usage: { contextTokens: 100, contextWindow: 1_000, reserveTokens: 0 }, overflow: true }),
+    ).toBe(true)
+  })
+
   ItLayer.make(it, "keeps microcompaction when the token estimate fits the budget", () => {
     let summaryCalls = 0
     const large = "abcdef".repeat(40)

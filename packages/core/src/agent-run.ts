@@ -955,6 +955,8 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               const history = yield* Ref.get(chat.history)
               const path = yield* syncSession(turn, history)
               const usage = yield* compactionUsage(turn, history, prompt)
+              if (compaction.willCompact !== undefined && !compaction.willCompact({ usage, overflow }))
+                return { prompt, changed: false }
               const historyRecalled = recalledMessages(history)
               const promptRecalled = recalledMessages(prompt)
               const detachedHistory = yield* detachPrompt(history).pipe(
