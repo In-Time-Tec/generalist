@@ -110,6 +110,7 @@ export interface StrategyPart {
 
 /** @experimental Compaction service boundary consulted by the loop. */
 export interface Interface {
+  readonly willCompact?: (input: { readonly usage: Usage; readonly overflow: boolean }) => boolean
   readonly maybeCompact: (
     request: Request,
   ) => Effect.Effect<Option.Option<Result>, CompactionError, LanguageModel.LanguageModel>
@@ -400,6 +401,7 @@ export const make: {
 } = Function.dual(
   (args) => args.length !== 1 || "shouldCompact" in args[0],
   (compactionStrategy: Strategy, options: DefaultOptions = {}): Interface => ({
+    willCompact: ({ usage, overflow }) => overflow || compactionStrategy.shouldCompact(normalizeUsage(usage, options)),
     maybeCompact: (input) =>
       Effect.suspend(() => {
         const usage = normalizeUsage(input.usage, options)
