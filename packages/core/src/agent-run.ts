@@ -166,6 +166,9 @@ const steeringDrainedEvent = (
   count: inputs.length,
 })
 
+const attemptText = (parts: ReadonlyArray<Response.StreamPart<any>>): string =>
+  parts.reduce((text, part) => (part.type === "text-delta" ? `${text}${part.delta}` : text), "")
+
 export const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
   agent: Agent<Tools, R>,
   options: RunOptions,
@@ -604,8 +607,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
         appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint)))
 
-      const attemptText = (parts: ReadonlyArray<Response.StreamPart<any>>): string =>
-        parts.reduce((text, part) => (part.type === "text-delta" ? `${text}${part.delta}` : text), "")
       const state = {
         text: "",
         turn: 0,
@@ -1638,20 +1639,18 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                 !completed ||
                 (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
                   ? Effect.void
-                  : Ref.set(
-                      chat.history,
-                      Prompt.concat(
-                        Prompt.concat(preparedState.history, preparedState.preparedPrompt),
-                        Prompt.fromMessages(
-                          Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText),
+                  : Effect.suspend(() => {
+                      state.text = `${state.text}${attemptText(transformedParts)}`
+                      return Ref.set(
+                        chat.history,
+                        Prompt.concat(
+                          Prompt.concat(preparedState!.history, preparedState!.preparedPrompt),
+                          Prompt.fromMessages(
+                            Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText),
+                          ),
                         ),
-                      ),
-                    ).pipe(
-                      Effect.andThen(
-                        Effect.sync(() => {
-                          state.text = `${state.text}${attemptText(transformedParts)}`
-                        }),
-                      ),
+                      )
+                    }).pipe(
                       Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
                       Effect.orDie,
                       Effect.asVoid,

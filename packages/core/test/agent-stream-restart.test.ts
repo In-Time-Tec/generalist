@@ -42,8 +42,10 @@ const restartPolicy = ModelResilience.layer({
 
 const agent = Agent.make({ name: "stream-restart-agent" })
 
-const runAgent = (model: Layer.Layer<LanguageModel.LanguageModel>, policy: Layer.Layer<ModelResilience.ModelResilience>) =>
-  Stream.runCollect(Agent.stream(agent, { prompt: "restart" }).pipe(Stream.provide(Layer.mergeAll(model, policy))))
+const runAgent = (
+  model: Layer.Layer<LanguageModel.LanguageModel>,
+  policy: Layer.Layer<ModelResilience.ModelResilience>,
+) => Stream.runCollect(Agent.stream(agent, { prompt: "restart" }).pipe(Stream.provide(Layer.mergeAll(model, policy))))
 
 describe("agent stream restart", () => {
   it.live("restarts a consumed stream after a retryable mid-stream failure", () =>
