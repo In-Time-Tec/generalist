@@ -193,10 +193,11 @@ export class TurnPolicyStopped extends Schema.TaggedErrorClass<TurnPolicyStopped
  * what the provider reported for that turn: `"unknown"` means the provider
  * never said why it stopped, and an absent reason means no terminal event was
  * observed at all. `providerTextCharacters` and `reasoningCharacters` count
- * what the provider streamed before middleware ran, so zero text with
- * reasoning is a provider that stopped after thinking, zero of both is a
- * provider that produced nothing, and non-zero text is a middleware chain that
- * removed the answer.
+ * what the provider streamed across every attempt of that turn, before
+ * middleware ran, so zero text with reasoning is a provider that stopped after
+ * thinking and zero of both is a provider that produced nothing. Non-zero text
+ * means text was streamed but never committed: a middleware chain removed it,
+ * or the attempt that streamed it was discarded before release.
  */
 export class RunEndedWithoutOutput extends Schema.TaggedErrorClass<RunEndedWithoutOutput>()(
   "@batonfx/core/RunEndedWithoutOutput",
