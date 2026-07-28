@@ -721,7 +721,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     let maxActive = 0
     return [
       Layer.mergeAll(
-        modelLayer(() => Stream.empty),
+        modelLayer(() => Stream.make(textDelta("done"))),
         Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.gen(function* () {
@@ -797,7 +797,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     let calls = 0
     return [
       Layer.mergeAll(
-        modelLayer(() => Stream.empty),
+        modelLayer(() => Stream.make(textDelta("done"))),
         Compaction.layerTest({
           maybeCompact: () =>
             Effect.gen(function* () {
@@ -838,7 +838,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     let calls = 0
     return [
       Layer.mergeAll(
-        modelLayer(() => Stream.empty),
+        modelLayer(() => Stream.make(textDelta("done"))),
         Compaction.layerTest({
           maybeCompact: () =>
             Effect.gen(function* () {
@@ -942,7 +942,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     )
     return [
       Layer.mergeAll(
-        modelLayer(() => Stream.empty),
+        modelLayer(() => Stream.make(textDelta("done"))),
         Compaction.layerTest({
           maybeCompact: (request) =>
             Effect.sync(() => {

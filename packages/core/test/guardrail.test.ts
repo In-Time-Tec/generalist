@@ -2,7 +2,7 @@ import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Guardrail, ModelMiddleware, ToolExecutor } from "../src/index"
+import { Agent, AgentEvent, Approvals, Guardrail, ModelMiddleware, ToolExecutor } from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 import { withProviderFinish } from "./provider-finish"
@@ -265,12 +265,23 @@ layer(unusedToolHandlerLayer)("Guardrail", (it) => {
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "filter-tool-agent", toolkit: Toolkit.make(echoTool) })
+        const events: Array<AgentEvent.Event> = []
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use tool" }))
+        const failure = yield* Agent.stream(agent, { prompt: "use tool" }).pipe(
+          Stream.tap((event) => Effect.sync(() => events.push(event))),
+          Stream.runDrain,
+          Effect.flip,
+        )
 
         expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
-        const completed = events.at(-1)
-        expect(completed?._tag === "Completed" && completed.text).toBe("")
+        expect(events.some((event) => event._tag === "Completed")).toBe(false)
+        expect(failure).toMatchObject({
+          _tag: "@batonfx/core/RunEndedWithoutOutput",
+          turn: 1,
+          finishReason: "stop",
+          providerTextCharacters: 6,
+          reasoningCharacters: 0,
+        })
       }),
     ] as const
   })

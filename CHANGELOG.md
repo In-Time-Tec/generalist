@@ -4,6 +4,7 @@
 
 - Fail a model attempt whose provider stream ends without its terminal `finish` part instead of reporting it as a completed turn with no finish reason and no usage. A clean end with no `finish` now fails with `ModelStreamTruncated`, a stream that goes quiet past the liveness backstop fails with `ModelStreamStalled`, and both are classified `truncated-stream` so an attempt that emitted nothing retries.
 - Reset the accumulated turn text between turns. Every turn previously appended to the same buffer, so a run's final text was the concatenation of all its intermediate narration.
+- Fail a run whose last turn leaves no assistant text with `RunEndedWithoutOutput` instead of completing it with an empty answer. A provider that ends a turn after reasoning, or reports `"unknown"` because it never said why it stopped, previously produced a successful run with nothing in it. The error carries the provider's finish reason for that turn plus the text and reasoning characters the provider streamed before middleware ran, so a provider that produced nothing is distinguishable from a middleware chain that removed the answer. Structured-output runs remain judged by their schema value.
 - Add a truncating step to the test model so a stream that stops mid-reasoning, mid-text, or mid-tool-call can be scripted.
 
 ## 0.11.8

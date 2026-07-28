@@ -626,7 +626,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
 
   ItLayer.make(
     it,
-    "part drop: dropped text-deltas yield empty text and no delta events",
+    "part drop: dropped text-deltas fail the run instead of completing it with empty text",
     () =>
       [
         Layer.mergeAll(
@@ -637,11 +637,20 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddlewa
         ),
         Effect.gen(function* () {
           const agent = Agent.make({ name: "drop-agent" })
+          const events: Array<AgentEvent.Event> = []
 
-          const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "hello" }))
+          const failure = yield* Agent.stream(agent, { prompt: "hello" }).pipe(
+            Stream.tap((event) => Effect.sync(() => events.push(event))),
+            Stream.runDrain,
+            Effect.flip,
+          )
 
-          const completed = events.at(-1)
-          expect(completed?._tag === "Completed" && completed.text).toBe("")
+          expect(events.some((event) => event._tag === "Completed")).toBe(false)
+          expect(failure).toMatchObject({
+            _tag: "@batonfx/core/RunEndedWithoutOutput",
+            turn: 0,
+            providerTextCharacters: 6,
+          })
           const hasDelta = events.some((event) => event._tag === "ModelPart" && event.part.type === "text-delta")
           expect(hasDelta).toBe(false)
         }),

@@ -26,6 +26,7 @@ import {
   MiddlewareViolation,
   ProgressOverflow,
   ResumeMismatch,
+  RunEndedWithoutOutput,
   type SteeringDrained,
   type StructuredOutput,
   type ToolProgress,
@@ -135,6 +136,11 @@ const progressOverflowPolicySchema = Schema.Union([
   Schema.TaggedStruct("Sliding", { capacity: progressCapacitySchema }),
   Schema.TaggedStruct("Fail", { capacity: progressCapacitySchema }),
 ])
+const providerOutputState = (): {
+  textCharacters: number
+  reasoningCharacters: number
+  finishReason: Response.FinishReason | undefined
+} => ({ textCharacters: 0, reasoningCharacters: 0, finishReason: undefined })
 type ObjectSchema = Schema.Codec<unknown, Record<string, any>, unknown, unknown>
 interface StructuredRunConfig<S extends ObjectSchema> {
   readonly schema: S
@@ -614,6 +620,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         pending: new Map<number, PendingToolResult>(),
         finish: undefined as { readonly usage: Response.Usage; readonly reason: Response.FinishReason } | undefined,
         usage: undefined as Response.Usage | undefined,
+        providerOutput: providerOutputState(),
       }
 
       const pendingResults = (): ReadonlyArray<PendingToolResult> =>
@@ -1345,6 +1352,12 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         )
       }
 
+      const captureProviderOutput = (part: Response.StreamPart<any>): void => {
+        if (part.type === "text-delta") state.providerOutput.textCharacters += part.delta.length
+        if (part.type === "reasoning-delta") state.providerOutput.reasoningCharacters += part.delta.length
+        if (part.type === "finish") state.providerOutput.finishReason = part.reason
+      }
+
       const captureFinishPart = (part: Response.FinishPart): Effect.Effect<void> =>
         Effect.gen(function* () {
           const span = yield* Effect.currentSpan
@@ -1598,6 +1611,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                           ? Effect.void
                           : Effect.sync(() => {
                               emitted = true
+                              captureProviderOutput(part)
                             }),
                       ),
                       Stream.catchCause((cause) => {
@@ -1874,6 +1888,23 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                 structuredTurn: turn + 1,
               }
             }
+            if (state.text.length === 0) {
+              return {
+                events: Stream.concat(
+                  Stream.fromIterable<Event>([completed]),
+                  Stream.fail(
+                    RunEndedWithoutOutput.make({
+                      turn,
+                      ...(state.providerOutput.finishReason === undefined
+                        ? {}
+                        : { finishReason: state.providerOutput.finishReason }),
+                      providerTextCharacters: state.providerOutput.textCharacters,
+                      reasoningCharacters: state.providerOutput.reasoningCharacters,
+                    }),
+                  ),
+                ),
+              }
+            }
             yield* savePersisted(turn)
             return {
               events: Stream.fromIterable<Event>([completed, terminalCompletedEvent(turn, transcript)]),
@@ -1935,6 +1966,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           state.turn = turn
           state.text = ""
           state.finish = undefined
+          state.providerOutput = providerOutputState()
         }).pipe(Stream.drain)
 
       const runTurn = (

@@ -10,6 +10,7 @@ import {
   MiddlewareViolation,
   ProgressOverflow,
   ResumeMismatch,
+  RunEndedWithoutOutput,
   ToolNameCollision,
   type ToolOrigin,
   TurnLimitExceeded,
@@ -242,6 +243,7 @@ export type RunError =
   | TurnPolicyError
   | TurnPolicyStopped
   | TurnLimitExceeded
+  | RunEndedWithoutOutput
   | MiddlewareViolation
   | DuplicateToolCallId
   | ProgressOverflow

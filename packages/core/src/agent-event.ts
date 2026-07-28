@@ -187,6 +187,27 @@ export class TurnPolicyStopped extends Schema.TaggedErrorClass<TurnPolicyStopped
   ),
 }) {}
 
+/**
+ * @experimental The turn that would have ended the run left no assistant text,
+ * so the run has no answer to report and never completes. `finishReason` is
+ * what the provider reported for that turn: `"unknown"` means the provider
+ * never said why it stopped, and an absent reason means no terminal event was
+ * observed at all. `providerTextCharacters` and `reasoningCharacters` count
+ * what the provider streamed before middleware ran, so zero text with
+ * reasoning is a provider that stopped after thinking, zero of both is a
+ * provider that produced nothing, and non-zero text is a middleware chain that
+ * removed the answer.
+ */
+export class RunEndedWithoutOutput extends Schema.TaggedErrorClass<RunEndedWithoutOutput>()(
+  "@batonfx/core/RunEndedWithoutOutput",
+  {
+    turn: Schema.Finite,
+    finishReason: Schema.optionalKey(Response.FinishReason),
+    providerTextCharacters: Schema.Finite,
+    reasoningCharacters: Schema.Finite,
+  },
+) {}
+
 /** @experimental A ModelMiddleware hook violated the loop contract. */
 export class MiddlewareViolation extends Schema.TaggedErrorClass<MiddlewareViolation>()(
   "@batonfx/core/MiddlewareViolation",

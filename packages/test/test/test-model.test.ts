@@ -233,6 +233,24 @@ layer(Layer.empty)("Agent runs over a truncated provider stream", (it) => {
       expect(events.some((event) => (event as { _tag: string })._tag === "Completed")).toBe(false)
     }),
   )
+
+  it.effect("fails a run whose final turn finished for an unknown reason without answering", () =>
+    Effect.gen(function* () {
+      const { exit, events } = yield* runTruncated(
+        TestModel.turn([TestModel.reasoning("planning the report")], { finishReason: "unknown" }),
+      )
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(events.some((event) => (event as { _tag: string })._tag === "Completed")).toBe(false)
+      expect(Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined).toMatchObject({
+        _tag: "@batonfx/core/RunEndedWithoutOutput",
+        turn: 0,
+        finishReason: "unknown",
+        providerTextCharacters: 0,
+        reasoningCharacters: "planning the report".length,
+      })
+    }),
+  )
 })
 
 layer(Layer.empty)("TestModel: remaining behavior", (it) => {

@@ -12,6 +12,7 @@ import {
   ModelRegistry,
   ModelResilience,
   ModelMiddleware,
+  ModelStreamTermination,
   ModelTelemetry,
   Permissions,
   Session,
@@ -366,6 +367,25 @@ const providerToolCallPart = (id: string, name: string, params: unknown) =>
   Response.makePart("tool-call", { id, name, params, providerExecuted: true })
 
 const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
+
+const reasoningDelta = (delta: string) => Response.makePart("reasoning-delta", { id: "reasoning", delta })
+
+const responseMetadataPart = (id: string): Response.StreamPartEncoded => ({
+  type: "response-metadata",
+  id,
+  modelId: "test",
+  timestamp: undefined,
+  request: undefined,
+})
+
+const unterminatedModelLayer = (streamText: ModelParams["streamText"]) =>
+  Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+      streamText,
+    }),
+  )
 
 const progressMessages = (events: Iterable<AgentEvent.Event>) =>
   [...events].filter((event) => event._tag === "ToolProgress").map((event) => event.message)
@@ -1814,6 +1834,198 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           expect(completed.text).toBe("The workspace has two packages.")
           expect(completed.text).not.toContain("I'll check the workspace first.")
         }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails a run whose last turn reported an unknown finish reason with no output", () => {
+    const cutReasoning = "The report should list both packages"
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("tool-call-cut-report", "echo", { text: "looking" }))
+            : Stream.fromIterable([
+                reasoningDelta(cutReasoning),
+                finishPart("unknown", usage({ total: 10 }, { total: 2 })),
+              ])
+        }),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "cut-report-agent", toolkit: Toolkit.make(echoTool) })
+        const events: Array<AgentEvent.Event> = []
+
+        const failure = yield* Agent.stream(agent, { prompt: "explore" }).pipe(
+          Stream.tap((event) => Effect.sync(() => events.push(event))),
+          Stream.runDrain,
+          Effect.flip,
+        )
+
+        expect(calls).toBe(2)
+        expect(events.some((event) => event._tag === "Completed")).toBe(false)
+        expect(events.some((event) => event._tag === "TurnCompleted" && event.turn === 1)).toBe(true)
+        expect(failure).toMatchObject({
+          _tag: "@batonfx/core/RunEndedWithoutOutput",
+          turn: 1,
+          finishReason: "unknown",
+          providerTextCharacters: 0,
+          reasoningCharacters: cutReasoning.length,
+        })
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "completes the same run when the last turn reasons and then answers", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("tool-call-answered-report", "echo", { text: "looking" }))
+            : Stream.fromIterable([
+                reasoningDelta("The report should list both packages"),
+                textDelta("The workspace has two packages."),
+                finishPart("stop", usage({ total: 10 }, { total: 2 })),
+              ])
+        }),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "answered-report-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "explore" }))
+
+        const completed = events.find((event) => event._tag === "Completed")
+        expect(completed?._tag).toBe("Completed")
+        if (completed?._tag === "Completed") {
+          expect(completed.text).toBe("The workspace has two packages.")
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "completes a run whose only text arrived in the last of several turns", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("tool-call-silent-first", "echo", { text: "looking" }))
+            : Stream.make(textDelta("done exploring"))
+        }),
+        echoExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "silent-first-turn-agent", toolkit: Toolkit.make(echoTool) })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "explore" }))
+
+        expect(calls).toBe(2)
+        const completed = events.find((event) => event._tag === "Completed")
+        expect(completed?._tag === "Completed" && completed.text).toBe("done exploring")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(
+    it,
+    "fails a run whose stream was cut before any output rather than completing it",
+    () =>
+      [
+        Layer.mergeAll(
+          unterminatedModelLayer(() => Stream.make(responseMetadataPart("req-cut-before-output"))),
+          unusedExecutor,
+          Approvals.layerAutoApprove,
+          ModelMiddleware.layerIdentity,
+        ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "cut-before-output-agent" })
+          const events: Array<AgentEvent.Event> = []
+
+          const failure = yield* Agent.stream(agent, { prompt: "answer" }).pipe(
+            Stream.tap((event) => Effect.sync(() => events.push(event))),
+            Stream.runDrain,
+            Effect.flip,
+          )
+
+          expect(events.some((event) => event._tag === "Completed")).toBe(false)
+          expect(failure).toMatchObject({ _tag: "@batonfx/core/AgentError", turn: 0 })
+          expect(
+            failure._tag === "@batonfx/core/AgentError" &&
+              Schema.is(ModelStreamTermination.ModelStreamTruncated)(failure.cause),
+          ).toBe(true)
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(it, "completes when a retried attempt answers after an earlier attempt was cut", () => {
+    let attempts = 0
+    return [
+      Layer.mergeAll(
+        unterminatedModelLayer(() => {
+          attempts += 1
+          return attempts === 1
+            ? Stream.make(responseMetadataPart("req-cut-first-attempt"))
+            : Stream.fromIterable([textDelta("the recovered answer"), finishPart("stop", usage({}, {}))])
+        }),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        ModelResilience.layer({ retrySchedule: Schedule.recurs(1) }),
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "retried-attempt-agent" })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "answer" }))
+
+        expect(attempts).toBe(2)
+        const completed = events.find((event) => event._tag === "Completed")
+        expect(completed?._tag === "Completed" && completed.text).toBe("the recovered answer")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "interrupting a turn that has produced no text stays interrupted", () => {
+    let started: Deferred.Deferred<void> | undefined
+    return [
+      Layer.mergeAll(
+        modelLayer(() =>
+          Stream.fromEffect(
+            started === undefined ? Effect.die("missing started Deferred") : Deferred.succeed(started, undefined),
+          ).pipe(Stream.drain, Stream.concat(Stream.never)),
+        ),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const currentStarted = yield* Deferred.make<void>()
+        started = currentStarted
+        const agent = Agent.make({ name: "interrupted-without-output-agent" })
+        const events: Array<AgentEvent.Event> = []
+        const fiber = yield* Agent.stream(agent, { prompt: "never answers" }).pipe(
+          Stream.tap((event) => Effect.sync(() => events.push(event))),
+          Stream.runDrain,
+          Effect.forkChild({ startImmediately: true }),
+        )
+
+        yield* Deferred.await(currentStarted)
+        yield* Fiber.interrupt(fiber)
+        const exit = yield* Fiber.await(fiber)
+
+        expect(Exit.hasInterrupts(exit)).toBe(true)
+        expect(events.some((event) => event._tag === "Completed")).toBe(false)
       }),
     ] as const
   })
@@ -3360,7 +3572,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ])
     return [
       Layer.mergeAll(
-        modelLayer(() => Stream.empty),
+        modelLayer(() => Stream.make(textDelta("done"))),
         Session.layerMemory,
         Compaction.layerTest({
           maybeCompact: (request) =>
@@ -3407,7 +3619,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       })
     return [
       Layer.mergeAll(
-        modelLayer(() => Stream.empty),
+        modelLayer(() => Stream.make(textDelta("done"))),
         Session.layerMemory,
         Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
         unusedExecutor,
@@ -6584,7 +6796,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     () =>
       [
         Layer.mergeAll(
-          modelLayer(() => Stream.make(providerToolCallPart("provider-call", "gated", { text: "done upstream" }))),
+          modelLayer(() =>
+            Stream.make(
+              providerToolCallPart("provider-call", "gated", { text: "done upstream" }),
+              textDelta("upstream handled it"),
+            ),
+          ),
           unusedExecutor,
           Approvals.layerTest({ resolve: () => Effect.die("approvals must not be consulted") }),
           ModelMiddleware.layerIdentity,
@@ -6602,6 +6819,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             "TurnStarted",
             "ModelCallStarted",
             "ModelAttemptStarted",
+            "ModelAttemptFirstOutput",
+            "ModelPart",
             "ModelAttemptFirstOutput",
             "ModelPart",
             "ModelPart",
@@ -6629,7 +6848,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         modelLayer(() => {
           modelCalls += 1
           if (modelCalls === 1) {
-            return Stream.make(providerToolCallPart("reused-call", "gated", { text: "provider" }))
+            return Stream.make(
+              providerToolCallPart("reused-call", "gated", { text: "provider" }),
+              textDelta("provider handled it"),
+            )
           }
           if (modelCalls === 2) {
             return Stream.make(toolCallPart("reused-call", "gated", { text: "framework" }))

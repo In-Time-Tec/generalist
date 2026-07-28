@@ -7,6 +7,7 @@ import {
   DuplicateToolCallId,
   MiddlewareViolation,
   ResumeMismatch,
+  RunEndedWithoutOutput,
   ToolNameCollision,
   TurnLimitExceeded,
   TurnPolicyStopped,
@@ -62,6 +63,10 @@ const errorMessage = (error: unknown): string => {
   }
   if (Schema.is(TurnLimitExceeded)(error)) {
     return `turn limit exceeded at turn ${error.turn}`
+  }
+  if (Schema.is(RunEndedWithoutOutput)(error)) {
+    const reason = error.finishReason ?? "no terminal event"
+    return `ended turn ${error.turn} without output (provider finish reason: ${reason})`
   }
   if (Schema.is(TurnPolicyStopped)(error)) {
     return `policy stopped at turn ${error.turn}: ${error.reason._tag}`
