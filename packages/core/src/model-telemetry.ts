@@ -202,7 +202,14 @@ export const ModelCallCompleted = Schema.Struct({
 /** @experimental */
 export type ModelCallCompleted = typeof ModelCallCompleted.Type
 
-/** @experimental The model call reached a failed terminal outcome. */
+/**
+ * @experimental The model call reached a failed terminal outcome. `category`
+ * and `classification` are decided the same way as on `ModelAttemptFailed`, so
+ * a consumer never has to infer retryability from an absent field. The two
+ * levels differ only when resilience refuses to replay a retryable failure
+ * because output already escaped: the attempt reports the failure's own
+ * classification while the call reports `terminal`.
+ */
 export const ModelCallFailed = Schema.Struct({
   _tag: Schema.tag("ModelCallFailed"),
   deliveryId: Schema.String,
@@ -212,6 +219,7 @@ export const ModelCallFailed = Schema.Struct({
   attempts: attemptOrdinal,
   failedAt: Schema.Finite,
   category: ModelFailureCategory,
+  classification: ModelFailureClassification,
 })
 
 /** @experimental */

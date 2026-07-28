@@ -214,6 +214,7 @@ const telemetryFrames = (): ReadonlyArray<Wire.ServerFrameType> => {
         attempts: 1,
         failedAt: 8,
         category: "authentication",
+        classification: "terminal",
       },
     },
     {

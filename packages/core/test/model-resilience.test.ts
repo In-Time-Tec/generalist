@@ -19,6 +19,9 @@ const textPart = (text: string) => Response.makePart("text", { text })
 
 const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
+const responseMetadata = (id: string) =>
+  Response.makePart("response-metadata", { id, modelId: "m", timestamp: undefined, request: undefined })
+
 const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel.Service =>
   ({
     generateText: () => Effect.succeed(new LanguageModel.GenerateTextResponse([])),
@@ -180,24 +183,14 @@ describe("ModelResilience", () => {
     })
   })
 
-  it.effect("does not let a lone response-metadata part consume replayability", () => {
+  it.effect("retries after a lone response-metadata part and drops the discarded attempt's metadata", () => {
     let calls = 0
     const wrapped = ModelResilience.apply(
       languageModel({
         streamText: () => {
           calls += 1
           return calls === 1
-            ? Stream.concat(
-                Stream.make(
-                  Response.makePart("response-metadata", {
-                    id: "req-1",
-                    modelId: "m",
-                    timestamp: undefined,
-                    request: undefined,
-                  }),
-                ),
-                Stream.fail(transientError),
-              )
+            ? Stream.concat(Stream.make(responseMetadata("req-1")), Stream.fail(transientError))
             : Stream.make(textDelta("ok"))
         },
       }),
@@ -207,7 +200,40 @@ describe("ModelResilience", () => {
       const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "metadata then fail" }))
 
       expect(calls).toBe(2)
-      expect(parts.map((part) => part.type)).toEqual(["response-metadata", "text-delta"])
+      expect(parts.map((part) => part.type)).toEqual(["text-delta"])
+    })
+  })
+
+  it.effect("keeps response metadata ahead of the output of the attempt that produced it", () => {
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => Stream.make(responseMetadata("req-1"), textDelta("ok"), responseMetadata("req-1-trailer")),
+      }),
+      retryOnce,
+    )
+    return Effect.gen(function* () {
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "metadata then text" }))
+
+      expect(parts.map((part) => part.type)).toEqual(["response-metadata", "text-delta", "response-metadata"])
+    })
+  })
+
+  it.effect("bounds retries when every attempt emits an unreplayable part before failing", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return Stream.concat(Stream.make(responseMetadata(`req-${calls}`)), Stream.fail(transientError))
+        },
+      }),
+      retryOnce,
+    )
+    return Effect.gen(function* () {
+      const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "always cut" })).pipe(Effect.flip)
+
+      expect(calls).toBe(2)
+      expect(failure).toBe(transientError)
     })
   })
 

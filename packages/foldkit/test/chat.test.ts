@@ -192,6 +192,7 @@ describe("Chat", () => {
         attempts: 1,
         failedAt: 8,
         category: "authentication",
+        classification: "terminal",
       },
       {
         _tag: "CompactionStarted",

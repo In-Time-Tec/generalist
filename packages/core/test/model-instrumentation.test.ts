@@ -230,7 +230,43 @@ describe("model instrumentation", () => {
       expect(attemptFailed?.category).toBe("authentication")
       expect(attemptFailed?.classification).toBe("terminal")
       expect(callFailed?.category).toBe("authentication")
+      expect(callFailed?.classification).toBe("terminal")
       expect(callFailed?.attempts).toBe(1)
+    }),
+  )
+
+  it.effect("reports the same category and classification on a call as on the attempt that ended it", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      const wrapped = instrument(
+        languageModel({
+          streamText: () =>
+            Stream.make(
+              Response.makePart("response-metadata", {
+                id: "req-1",
+                modelId: "returned-model",
+                timestamp: undefined,
+                request: undefined,
+              }),
+            ),
+        }),
+        {
+          emit,
+          turn: 0,
+          resilience: ModelResilience.make({ retrySchedule: Schedule.recurs(1) }),
+        },
+      )
+
+      const error = yield* Stream.runDrain(wrapped.streamText({ prompt: "cut" })).pipe(Effect.flip)
+
+      expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
+      const attemptFailures = byTag(events, "ModelAttemptFailed")
+      const [callFailed] = byTag(events, "ModelCallFailed")
+      expect(attemptFailures).toHaveLength(2)
+      expect(attemptFailures.map((event) => event.category)).toEqual(["truncated-stream", "truncated-stream"])
+      expect(attemptFailures.map((event) => event.classification)).toEqual(["transient", "transient"])
+      expect(callFailed?.category).toBe("truncated-stream")
+      expect(callFailed?.classification).toBe("transient")
     }),
   )
 
@@ -268,7 +304,9 @@ describe("model instrumentation", () => {
       const [attemptFailed] = byTag(events, "ModelAttemptFailed")
       const [callFailed] = byTag(events, "ModelCallFailed")
       expect(attemptFailed?.category).toBe("rate-limit")
+      expect(attemptFailed?.classification).toBe("transient")
       expect(callFailed?.category).toBe("rate-limit")
+      expect(callFailed?.classification).toBe("terminal")
       expect(byTag(events, "ModelRetryScheduled")).toHaveLength(0)
     }),
   )
@@ -303,7 +341,9 @@ describe("model instrumentation", () => {
       const [attemptFailed] = byTag(events, "ModelAttemptFailed")
       const [callFailed] = byTag(events, "ModelCallFailed")
       expect(attemptFailed?.category).toBe("cancellation")
+      expect(attemptFailed?.classification).toBe("terminal")
       expect(callFailed?.category).toBe("cancellation")
+      expect(callFailed?.classification).toBe("terminal")
     }),
   )
 
@@ -326,6 +366,7 @@ describe("model instrumentation", () => {
       expect(attemptFailed?.classification).toBe("terminal")
       const [callFailed] = byTag(events, "ModelCallFailed")
       expect(callFailed?.category).toBe("truncated-stream")
+      expect(callFailed?.classification).toBe("terminal")
       expect(byTag(events, "ModelCallCompleted")).toEqual([])
     }),
   )

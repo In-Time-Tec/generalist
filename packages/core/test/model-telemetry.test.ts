@@ -129,6 +129,7 @@ describe("ModelTelemetry", () => {
         attempts: 1,
         failedAt: 6,
         category: "authentication",
+        classification: "terminal",
       },
       {
         _tag: "CompactionStarted",
@@ -196,6 +197,23 @@ describe("ModelTelemetry", () => {
     expect(decode({ ...withoutFinish, usage: usage(), usageAt: 1, finishReason: "stop" })._tag).toBe("Some")
   })
 
+  it("rejects a failed call that carries no classification", () => {
+    const decode = Schema.decodeUnknownOption(ModelTelemetry.Event)
+    const withoutClassification = {
+      _tag: "ModelCallFailed",
+      deliveryId: "run:0",
+      turn: 0,
+      modelCallId: "call-1",
+      purpose: "conversation",
+      attempts: 1,
+      failedAt: 1,
+      category: "truncated-stream",
+    }
+
+    expect(decode(withoutClassification)._tag).toBe("None")
+    expect(decode({ ...withoutClassification, classification: "transient" })._tag).toBe("Some")
+  })
+
   it("rejects unbounded categories and negative attempt ordinals", () => {
     const decode = Schema.decodeUnknownOption(ModelTelemetry.Event)
     expect(
@@ -207,6 +225,7 @@ describe("ModelTelemetry", () => {
         attempts: 1,
         failedAt: 1,
         category: "provider-error-body",
+        classification: "terminal",
       })._tag,
     ).toBe("None")
     expect(

@@ -77,17 +77,28 @@ const retryStream = <A, E, R>(
 ): Stream.Stream<A, E, R> =>
   Stream.suspend(() => {
     let consumed = false
+    let held: Array<A> = []
+    const release = (): ReadonlyArray<A> => {
+      const pending = held
+      held = []
+      return pending
+    }
     return stream().pipe(
-      Stream.tap((value) =>
-        Effect.sync(() => {
-          if (consumesReplay(value)) consumed = true
-        }),
-      ),
+      Stream.flatMap((value): Stream.Stream<A> => {
+        if (!consumesReplay(value)) {
+          held.push(value)
+          return Stream.empty
+        }
+        consumed = true
+        return Stream.fromIterable([...release(), value])
+      }),
+      Stream.concat(Stream.suspend(() => Stream.fromIterable(release()))),
       Stream.map((value): Result.Result<A, Cause.Cause<E>> => Result.succeed(value)),
       Stream.catchCause((cause): Stream.Stream<Result.Result<A, Cause.Cause<E>>, E> => {
         const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
         if (reason === undefined || !Cause.isFailReason(reason)) return Stream.succeed(Result.fail(cause))
-        return consumed ? Stream.succeed(Result.succeed(onEmittedFailure(reason.error))) : Stream.fail(reason.error)
+        if (!consumed) return Stream.fail(reason.error)
+        return Stream.fromIterable([...release(), onEmittedFailure(reason.error)].map((value) => Result.succeed(value)))
       }),
     )
   }).pipe(

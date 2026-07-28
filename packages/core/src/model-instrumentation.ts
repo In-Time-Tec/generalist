@@ -388,7 +388,11 @@ const callCompleted = (context: CallContext): Effect.Effect<void> =>
     }),
   )
 
-const callFailed = (context: CallContext, category: ModelFailureCategory): Effect.Effect<void> =>
+const callFailed = (
+  context: CallContext,
+  category: ModelFailureCategory,
+  classification: Classification,
+): Effect.Effect<void> =>
   Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
     context.options.emit({
       _tag: "ModelCallFailed",
@@ -398,15 +402,19 @@ const callFailed = (context: CallContext, category: ModelFailureCategory): Effec
       attempts: context.state.attempts,
       failedAt,
       category,
+      classification,
     }),
   )
 
 const callExit = (context: CallContext, exit: Exit.Exit<unknown, unknown>): Effect.Effect<void> => {
-  if (context.state.errorCategory !== undefined) return callFailed(context, context.state.errorCategory)
+  if (context.state.errorCategory !== undefined) {
+    return callFailed(context, context.state.errorCategory, "terminal")
+  }
   if (Exit.isSuccess(exit)) return callCompleted(context)
-  if (Cause.hasInterrupts(exit.cause)) return callFailed(context, "cancellation")
+  if (Cause.hasInterrupts(exit.cause)) return callFailed(context, "cancellation", "terminal")
   const failure = singleFailure(exit.cause)
-  return callFailed(context, Option.isNone(failure) ? "unknown" : context.categorize(failure.value))
+  if (Option.isNone(failure)) return callFailed(context, "unknown", "terminal")
+  return callFailed(context, context.categorize(failure.value), context.classify(failure.value))
 }
 
 const callEffect = <A extends AnyResponse, E, R>(
