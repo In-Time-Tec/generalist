@@ -31,6 +31,11 @@ const partialThenFail = Stream.make(
   Response.makePart("text-delta", { id: "text", delta: "partial " }) as Response.StreamPartEncoded,
 ).pipe(Stream.concat(Stream.fail(rateLimit)))
 
+const partialThenErrorPart = Stream.make(
+  Response.makePart("text-delta", { id: "text", delta: "partial " }) as Response.StreamPartEncoded,
+  Response.makePart("error", { error: rateLimit }) as Response.StreamPartEncoded,
+)
+
 const healthy = withProviderFinish(
   Stream.make(Response.makePart("text-delta", { id: "text", delta: "recovered" }) as Response.StreamPartEncoded),
 )
@@ -51,6 +56,17 @@ describe("agent stream restart", () => {
   it.live("restarts a consumed stream after a retryable mid-stream failure", () =>
     Effect.gen(function* () {
       const model = scriptedModel([partialThenFail, healthy])
+      const events = yield* runAgent(model.layer, restartPolicy)
+      const completed = events.at(-1)
+
+      expect(model.attempts()).toBe(2)
+      expect(completed?._tag === "Completed" && completed.text).toBe("recovered")
+    }),
+  )
+
+  it.live("restarts a consumed stream after an in-band retryable failure", () =>
+    Effect.gen(function* () {
+      const model = scriptedModel([partialThenErrorPart, healthy])
       const events = yield* runAgent(model.layer, restartPolicy)
       const completed = events.at(-1)
 

@@ -1,8 +1,10 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai"
 import { ContextOverflow, ModelRegistry } from "@batonfx/core"
 import { Config, Effect, Function, Layer, Option, Redacted, Schema, Stream } from "effect"
+import { AiError } from "effect/unstable/ai"
 import type { Credential, ServiceInterface } from "./openai-account-auth.js"
 import { layerImageSources } from "./image-source.js"
+import { type FailureInput, layerModelFailures } from "./model-failure.js"
 import {
   FetchHttpClient,
   Headers,
@@ -28,6 +30,117 @@ export interface OpenAiInput extends RegistrationOptions {
   readonly config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">
 }
 
+const serverFailureCodes = new Set([
+  "internal_server_error",
+  "server_error",
+  "server_is_overloaded",
+  "service_unavailable",
+  "service_unavailable_error",
+  "vector_store_timeout",
+])
+const rateLimitCodes = new Set(["rate_limit_error", "rate_limit_exceeded", "requests_limit_exceeded"])
+const quotaCodes = new Set(["billing_hard_limit_reached", "insufficient_quota", "quota_exceeded"])
+const authenticationCodes = new Set(["authentication_error", "invalid_api_key", "invalid_api_key_error"])
+const permissionCodes = new Set(["insufficient_permissions", "permission_denied", "permission_error"])
+const contentPolicyCodes = new Set(["content_filter", "content_policy_violation", "image_content_policy_violation"])
+const invalidRequestCodes = new Set([
+  "empty_image_file",
+  "failed_to_download_image",
+  "image_file_not_found",
+  "image_file_too_large",
+  "image_parse_error",
+  "image_too_large",
+  "image_too_small",
+  "invalid_base64_image",
+  "invalid_image",
+  "invalid_image_format",
+  "invalid_image_mode",
+  "invalid_image_url",
+  "invalid_prompt",
+  "invalid_request_error",
+  "unsupported_image_media_type",
+])
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const boundedDescription = (value: unknown, fallback: string): string =>
+  typeof value === "string" && value.length > 0 ? value.slice(0, 2_048) : fallback
+
+const boundedMetadata = (value: unknown): string | null => (typeof value === "string" ? value.slice(0, 256) : null)
+
+const openAiRequestId = (metadata: FailureInput["metadata"]): string | null => {
+  const openai = metadata.openai
+  return isRecord(openai) ? boundedMetadata(openai.requestId) : null
+}
+
+const resolveOpenAiFailure = ({ error, metadata: partMetadata, method }: FailureInput): AiError.AiError => {
+  if (AiError.isAiError(error)) return error
+  const event = isRecord(error) ? error : undefined
+  const code = boundedMetadata(event?.code)
+  const message = boundedDescription(event?.message, "OpenAI response failed")
+  const parameter = boundedMetadata(event?.param)
+  const metadata = {
+    openai: {
+      errorCode: code,
+      errorType: event?.type === "error" ? null : boundedMetadata(event?.type),
+      requestId: openAiRequestId(partMetadata),
+    },
+  }
+  const make = (reason: AiError.AiErrorReason) => AiError.make({ module: "OpenAiLanguageModel", method, reason })
+  if (code !== null && serverFailureCodes.has(code)) {
+    return make(AiError.InternalProviderError.make({ description: message, metadata }))
+  }
+  if (code !== null && rateLimitCodes.has(code)) {
+    return make(
+      AiError.RateLimitError.make({
+        metadata: {
+          openai: {
+            ...metadata.openai,
+            limit: null,
+            remaining: null,
+            resetRequests: null,
+            resetTokens: null,
+          },
+        },
+      }),
+    )
+  }
+  if (code !== null && quotaCodes.has(code)) {
+    return make(AiError.QuotaExhaustedError.make({ metadata }))
+  }
+  if (code !== null && authenticationCodes.has(code)) {
+    return make(AiError.AuthenticationError.make({ kind: "InvalidKey", metadata }))
+  }
+  if (code !== null && permissionCodes.has(code)) {
+    return make(AiError.AuthenticationError.make({ kind: "InsufficientPermissions", metadata }))
+  }
+  if (code !== null && contentPolicyCodes.has(code)) {
+    return make(AiError.ContentPolicyError.make({ description: message, metadata }))
+  }
+  if (code === "context_length_exceeded" || (code !== null && invalidRequestCodes.has(code))) {
+    return make(
+      AiError.InvalidRequestError.make({
+        description: message,
+        ...(parameter === null ? {} : { parameter }),
+        metadata,
+      }),
+    )
+  }
+  return make(AiError.UnknownError.make({ description: message, metadata }))
+}
+
+const openAiLanguageModelLayer = (input: OpenAiInput) =>
+  layerModelFailures(
+    layerImageSources(
+      OpenAiLanguageModel.layer({
+        model: input.model,
+        ...(input.config === undefined ? {} : { config: input.config }),
+      }),
+    ),
+    resolveOpenAiFailure,
+  )
+
 /** @experimental */
 export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 
@@ -43,12 +156,7 @@ export const layer = (input: LayerOptions) =>
     ModelRegistry.registration({
       provider: "openai",
       model: input.model,
-      layer: layerImageSources(
-        OpenAiLanguageModel.layer({
-          model: input.model,
-          ...(input.config === undefined ? {} : { config: input.config }),
-        }),
-      ),
+      layer: openAiLanguageModelLayer(input),
       classifyFailure,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
@@ -60,12 +168,7 @@ export const registration = (input: OpenAiInput) =>
   ModelRegistry.registration({
     provider: "openai",
     model: input.model,
-    layer: layerImageSources(
-      OpenAiLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }),
-    ),
+    layer: openAiLanguageModelLayer(input),
     classifyFailure,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
@@ -81,19 +184,28 @@ const isResponsesUrl = (url: string) => url.split(/[?#]/)[0]!.replace(/\/+$/, ""
 
 const flattenErrorPayload = (payload: string): string | undefined => {
   const decoded = parseJsonOption(payload)
-  if (Option.isNone(decoded) || typeof decoded.value !== "object" || decoded.value === null) return undefined
-  const record = decoded.value as Record<string, unknown>
-  if (record.type !== "error") return undefined
-  if (typeof record.message === "string" && "code" in record) return undefined
-  const details = record.error
-  if (typeof details !== "object" || details === null || Array.isArray(details)) return undefined
-  const nested = details as Record<string, unknown>
-  const message = typeof nested.message === "string" ? nested.message : record.message
+  if (Option.isNone(decoded) || !isRecord(decoded.value)) return undefined
+  const record = decoded.value
+  if (record.type === "error" && typeof record.message === "string" && "code" in record) return undefined
+  const response = record.type === "response.failed" && isRecord(record.response) ? record.response : undefined
+  if (record.type !== "error" && response === undefined) return undefined
+  const details = response?.error ?? record.error
+  if (!isRecord(details)) {
+    if (response === undefined) return undefined
+    return stringifyJson({
+      type: "error",
+      code: null,
+      message: "OpenAI response failed",
+      param: null,
+      sequence_number: typeof record.sequence_number === "number" ? record.sequence_number : 0,
+    })
+  }
+  const message = typeof details.message === "string" ? details.message : record.message
   return stringifyJson({
     type: "error",
-    code: typeof nested.code === "string" ? nested.code : null,
-    message: typeof message === "string" ? message : stringifyJson(nested),
-    param: typeof nested.param === "string" ? nested.param : null,
+    code: boundedMetadata(details.code) ?? boundedMetadata(details.type),
+    message: boundedDescription(message, "OpenAI response failed"),
+    param: boundedMetadata(details.param),
     sequence_number: typeof record.sequence_number === "number" ? record.sequence_number : 0,
   })
 }
@@ -320,12 +432,7 @@ export const registrationAccount = (input: OpenAiAccountInput) =>
   ModelRegistry.registration({
     provider: "openai",
     model: input.model,
-    layer: layerImageSources(
-      OpenAiLanguageModel.layer({
-        model: input.model,
-        ...(input.config === undefined ? {} : { config: input.config }),
-      }),
-    ).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
+    layer: openAiLanguageModelLayer(input).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
     classifyFailure,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),

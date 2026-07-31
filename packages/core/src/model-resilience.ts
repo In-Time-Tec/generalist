@@ -1,12 +1,26 @@
 import { Cause, Context, Effect, Function, Layer, Result, Schedule, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Response, Tool } from "effect/unstable/ai"
+import {
+  type FailureResolver,
+  defaultResolveFailure,
+  promoteResponseFailure,
+  promoteStreamFailures,
+} from "./model-response-failure.js"
 import { isTerminationFailure } from "./model-stream-termination.js"
+
+/** @experimental */
+export { defaultResolveFailure }
+
+/** @experimental */
+export type { FailureInput, FailureResolver } from "./model-response-failure.js"
+
 /** @experimental Classification of a model-call failure. */
 export type Classification = "transient" | "terminal"
 
 /** @experimental Retry policy for model calls. */
 export interface Interface {
   readonly classify: (error: unknown) => Classification
+  readonly resolve: FailureResolver
   readonly retrySchedule: Schedule.Schedule<unknown>
   readonly restartConsumedStreams?: boolean
 }
@@ -29,11 +43,16 @@ export const defaultClassify = (error: unknown): Classification =>
       : "terminal"
 
 /** @experimental */
-export const none: Interface = { classify: () => "terminal", retrySchedule: Schedule.recurs(0) }
+export const none: Interface = {
+  classify: () => "terminal",
+  resolve: defaultResolveFailure,
+  retrySchedule: Schedule.recurs(0),
+}
 
 /** @experimental */
 export const make = (input?: Partial<Interface>): Interface => ({
   classify: input?.classify ?? defaultClassify,
+  resolve: input?.resolve ?? defaultResolveFailure,
   retrySchedule: input?.retrySchedule ?? none.retrySchedule,
   ...(input?.restartConsumedStreams === undefined ? {} : { restartConsumedStreams: input.restartConsumedStreams }),
 })
@@ -119,7 +138,13 @@ export const apply: {
     ({
       ...model,
       generateText: ((options: never) =>
-        retryEffect(() => model.generateText(options), resilience)) as unknown as LanguageModel.Service["generateText"],
+        retryEffect(
+          () =>
+            model
+              .generateText(options)
+              .pipe(Effect.flatMap((response) => promoteResponseFailure(response, "generateText", resilience.resolve))),
+          resilience,
+        )) as unknown as LanguageModel.Service["generateText"],
       generateObject: (<
         ObjectEncoded extends Record<string, unknown>,
         StructuredOutputSchema extends Schema.Codec<unknown, ObjectEncoded, unknown, unknown>,
@@ -128,11 +153,17 @@ export const apply: {
         options: LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
       ) => {
         const generate = model.generateObject
-        return retryEffect(() => generate(options), resilience)
+        return retryEffect(
+          () =>
+            generate(options).pipe(
+              Effect.flatMap((response) => promoteResponseFailure(response, "generateObject", resilience.resolve)),
+            ),
+          resilience,
+        )
       }) as unknown as LanguageModel.Service["generateObject"],
       streamText: ((options: never) =>
         retryStream(
-          () => model.streamText(options),
+          () => promoteStreamFailures(model.streamText(options), resilience.resolve),
           (error) => Response.makePart("error", { error }),
           resilience,
           (part: Response.StreamPart<never>) => part.type !== "response-metadata",
