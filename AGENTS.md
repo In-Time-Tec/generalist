@@ -50,9 +50,10 @@ bun run package
 
 Keep the core command set small and use no colon-named root scripts. Real package, release, migration, and install workflows may have plain names. Do not add aliases for Git, vendored repositories, Docker, status, logs, watch, coverage, or trivial underlying tool commands. Pass arguments to the supported command or invoke the tool directly.
 
-## Greenfield changes
+## GREENFIELD PROJECT — BREAKING CHANGES ARE WELCOME!!!
 
-- Baton is used only by repositories we control. Do not preserve legacy contracts solely for compatibility.
-- Change or remove a contract when the better design requires it, then update every caller, test, fixture, feature document, and example in the same change.
-- Do not add deprecation periods, compatibility layers, version negotiation, fallbacks, shims, dual read/write paths, or parallel old/new implementations unless a staged migration explicitly requires them.
-- Prefer one current contract and reset obsolete local state instead of supporting multiple generations.
+- THIS PROJECT HAS NO USERS!!! IT IS GREENFIELD!!!
+- DO NOT ASSUME THAT THE EXISTING FOUNDATION, ARCHITECTURE, OR IMPLEMENTATION IS CORRECT!!! BE SKEPTICAL, INVESTIGATE THE REAL PROBLEM, AND VERIFY THE BEST APPROACH!!!
+- CHANGE THE UNDERLYING FOUNDATION OR ARCHITECTURE WHEN EVIDENCE SHOWS THAT A DIFFERENT DESIGN IS BETTER!!! LARGE REFACTORS ARE ENCOURAGED WHEN THEY PRODUCE THE RIGHT LONG-TERM SYSTEM!!!
+- IMPLEMENT THE RIGHT FIX THAT WILL SCALE LONG TERM, NOT THE SMALLEST PATCH!!! DO NOT PAPER OVER A DESIGN PROBLEM WITH A LOCAL WORKAROUND!!!
+- BREAKING CHANGES ARE WELCOME!!! DO NOT PRESERVE LEGACY CODE OR BACKWARD COMPATIBILITY!!! REMOVE REPLACED CODE, OBSOLETE PATHS, AND TRANSITIONAL SHIMS!!!
