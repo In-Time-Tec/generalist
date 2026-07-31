@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Duration, Effect, Exit, Fiber, Function, Schema, Stream } from "effect"
+import { Effect, Exit, Fiber, Function, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Response } from "effect/unstable/ai"
 import { ModelStreamTermination } from "../src/index"
@@ -148,13 +148,17 @@ describe("ModelStreamTermination.requireTerminal", () => {
     }),
   )
 
-  it.live("fails a stalled stream as stalled, not truncated", () =>
+  it.effect("fails an explicitly bounded idle stream as timed out, not truncated", () =>
     Effect.gen(function* () {
-      const error = yield* Stream.runDrain(guard(Stream.make(metadataPart).pipe(Stream.concat(Stream.never)), 10)).pipe(
+      const fiber = yield* Stream.runDrain(guard(Stream.make(metadataPart).pipe(Stream.concat(Stream.never)), 10)).pipe(
         Effect.flip,
+        Effect.forkChild,
       )
+      yield* Effect.yieldNow
+      yield* TestClock.adjust("10 millis")
+      const error = yield* Fiber.join(fiber)
 
-      expect(Schema.is(ModelStreamTermination.ModelStreamStalled)(error)).toBe(true)
+      expect(Schema.is(ModelStreamTermination.ModelStreamTimeout)(error)).toBe(true)
       expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(false)
       expect(error.requestId).toBe("req-1")
       expect(error.emitted).toEqual({ _tag: "Nothing" })
@@ -171,7 +175,16 @@ describe("ModelStreamTermination.requireTerminal", () => {
     }),
   )
 
-  it("applies the liveness backstop at 120 seconds by default", () => {
-    expect(Duration.toMillis(ModelStreamTermination.idleTimeout)).toBe(120_000)
-  })
+  it.effect("does not impose a hidden idle deadline", () =>
+    Effect.gen(function* () {
+      const fiber = yield* Stream.runDrain(guard(Stream.never as Stream.Stream<Response.AnyPart>)).pipe(
+        Effect.forkChild,
+      )
+      yield* Effect.yieldNow
+      yield* TestClock.adjust("1 day")
+
+      expect(fiber.pollUnsafe()).toBeUndefined()
+      yield* Fiber.interrupt(fiber)
+    }),
+  )
 })

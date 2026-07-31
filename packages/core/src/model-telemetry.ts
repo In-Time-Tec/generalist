@@ -1,6 +1,6 @@
 import { Cause, Context, Effect, Layer, Option, Schema } from "effect"
 import { AiError, IdGenerator, LanguageModel, Response } from "effect/unstable/ai"
-import { isTerminationFailure } from "./model-stream-termination.js"
+import { isModelStreamTimeout, isTerminationFailure } from "./model-stream-termination.js"
 
 /** @experimental Bounded purpose of one model call issued by the loop. */
 export const ModelCallPurpose = Schema.Literals(["conversation", "structured-output", "compaction-summary"])
@@ -34,9 +34,7 @@ export const ModelFailureClassification = Schema.Literals(["transient", "termina
 export type ModelFailureClassification = typeof ModelFailureClassification.Type
 
 /**
- * @experimental Bounded reason a model attempt retry was scheduled. Baton
- * currently emits only `provider-resilience`; `invalid-tool-call-correction`
- * is reserved for a retry path that changes the request before retrying.
+ * @experimental Bounded reason a model attempt retry was scheduled.
  */
 export const ModelRetryReason = Schema.Literals(["provider-resilience", "invalid-tool-call-correction"])
 
@@ -341,8 +339,8 @@ export const layerNoop: Layer.Layer<Delivery> = Layer.succeed(Delivery, Delivery
 
 /** @experimental Map a model failure onto the bounded cross-provider category. */
 export const classifyFailureCategory = (error: unknown): ModelFailureCategory => {
+  if (isModelStreamTimeout(error) || Cause.isTimeoutError(error)) return "timeout"
   if (isTerminationFailure(error)) return "truncated-stream"
-  if (Cause.isTimeoutError(error)) return "timeout"
   if (!AiError.isAiError(error)) return "unknown"
   switch (error.reason._tag) {
     case "AuthenticationError":

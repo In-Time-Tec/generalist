@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Make one instrumented model call the sole owner of provider retries and invalid-tool-call correction. Consumer-visible reasoning, text, or tool-call output is an absolute replay barrier; the separate whole-Agent consumed-stream restart path is removed.
+- Replace the hidden model-stream liveness backstop with optional `ModelResilience.streamIdleTimeout`. An explicit idle deadline fails with typed `ModelStreamTimeout`, retries only before output, and reports the `timeout` telemetry category.
+
 ## 0.11.14
 
 - Resolve provider `error` parts to typed failures before telemetry and replay accounting. Transient failures now retry when only withheld response metadata preceded them, while reasoning, text, and tool-call output remain strict replay barriers. Unknown custom payloads become bounded terminal `UnknownError` values unless `ModelResilience.resolve` maps them explicitly. The same rule covers malformed non-streaming responses, preserves bounded consumed-stream restart, and keeps discarded metadata and errors out of the successful attempt.

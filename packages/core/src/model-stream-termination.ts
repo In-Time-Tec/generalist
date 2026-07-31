@@ -39,28 +39,24 @@ export class ModelStreamTruncated extends Schema.TaggedErrorClass<ModelStreamTru
   terminationFields,
 ) {}
 
-/** @experimental A provider part stream produced no part within the liveness backstop. */
-export class ModelStreamStalled extends Schema.TaggedErrorClass<ModelStreamStalled>()(
-  "@batonfx/core/ModelStreamStalled",
+/** @experimental A provider part stream exceeded its configured idle deadline. */
+export class ModelStreamTimeout extends Schema.TaggedErrorClass<ModelStreamTimeout>()(
+  "@batonfx/core/ModelStreamTimeout",
   { ...terminationFields, idleMillis: Schema.Finite },
 ) {}
 
-/** @experimental A model part stream ended without a provider-reported terminal event. */
-export type TerminationFailure = ModelStreamTruncated | ModelStreamStalled
+/** @experimental A model part stream did not reach a provider-reported terminal event. */
+export type TerminationFailure = ModelStreamTruncated | ModelStreamTimeout
 
 const isTruncated = Schema.is(ModelStreamTruncated)
-const isStalled = Schema.is(ModelStreamStalled)
+const isTimeout = Schema.is(ModelStreamTimeout)
 
-/** @experimental Whether a failure means the stream ended without its terminal event. */
+/** @experimental Whether a failure means the stream did not reach its terminal event. */
 export const isTerminationFailure = (error: unknown): error is TerminationFailure =>
-  isTruncated(error) || isStalled(error)
+  isTruncated(error) || isTimeout(error)
 
-/**
- * @experimental The liveness backstop applied to every instrumented provider
- * part stream. `requireTerminal` is the primary detector; this bound only ends
- * a stream that stopped producing parts entirely.
- */
-export const idleTimeout: Duration.Duration = Duration.seconds(120)
+/** @experimental Whether a model stream exceeded its configured idle deadline. */
+export const isModelStreamTimeout = (error: unknown): error is ModelStreamTimeout => isTimeout(error)
 
 interface Observation {
   lastPart: string | undefined
@@ -140,13 +136,9 @@ const originFields = (origin: Origin, observation: Observation) => ({
 
 /**
  * @experimental Fail a provider part stream that ended without its terminal
- * `finish` part. A clean end with no `finish` fails with `ModelStreamTruncated`;
- * a stream that produced no part within `idleTimeout` fails with
- * `ModelStreamStalled`.
- *
- * The backstop is applied upstream of the terminal requirement because
- * `Stream.onEnd` runs only on the clean done signal, so a stalled stream must
- * reach the consumer as its own typed failure rather than a truncation.
+ * `finish` part. A clean end with no `finish` fails with `ModelStreamTruncated`.
+ * When `idleTimeout` is present, a pull that exceeds it fails with
+ * `ModelStreamTimeout`; absence applies no idle deadline.
  */
 export const requireTerminal: {
   <A>(
@@ -167,16 +159,26 @@ export const requireTerminal: {
   ): Stream.Stream<A, E | TerminationFailure, R> =>
     Stream.suspend(() => {
       const observation = makeObservation()
-      const idle = Duration.fromInputUnsafe(options.idleTimeout ?? idleTimeout)
-      return self.pipe(
-        Stream.tap((value) => Effect.sync(() => observe(observation, options.toPart(value)))),
-        Stream.timeoutOrElse({
-          duration: idle,
-          orElse: () =>
-            Stream.fail(
-              ModelStreamStalled.make({ ...originFields(options, observation), idleMillis: Duration.toMillis(idle) }),
-            ),
-        }),
+      const observed = self.pipe(Stream.tap((value) => Effect.sync(() => observe(observation, options.toPart(value)))))
+      const idleInput = options.idleTimeout
+      const guarded =
+        idleInput === undefined
+          ? observed
+          : observed.pipe(
+              Stream.timeoutOrElse({
+                duration: idleInput,
+                orElse: () => {
+                  const idle = Duration.fromInputUnsafe(idleInput)
+                  return Stream.fail(
+                    ModelStreamTimeout.make({
+                      ...originFields(options, observation),
+                      idleMillis: Duration.toMillis(idle),
+                    }),
+                  )
+                },
+              }),
+            )
+      return guarded.pipe(
         Stream.onEnd(
           Effect.suspend(() =>
             observation.finished

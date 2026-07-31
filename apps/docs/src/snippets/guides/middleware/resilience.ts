@@ -8,6 +8,8 @@ const agent = Agent.make({ name: "assistant" })
 const resilienceLayer = ModelResilience.layer({
   classify: ModelResilience.defaultClassify,
   retrySchedule: Schedule.recurs(3),
+  invalidToolCallCorrectionLimit: 2,
+  streamIdleTimeout: "2 minutes",
 })
 
 const program = ModelRegistry.operate(

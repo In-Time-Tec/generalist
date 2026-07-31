@@ -1,5 +1,12 @@
 import { Cause, Clock, Duration, Effect, Exit, Function, Option, Schedule, Stream } from "effect"
 import { AiError, LanguageModel, Model, Response } from "effect/unstable/ai"
+import {
+  correct as correctInvalidToolCall,
+  isInvalidToolCallOutput,
+  type StreamTextOptions,
+  type StreamTextPart,
+} from "./model-call-correction.js"
+import type { IdentityCell } from "./model-attempt-identity.js"
 import { classifyFailure } from "./model-registry.js"
 import { defaultResolveFailure, promoteResponseFailure, promoteStreamFailures } from "./model-response-failure.js"
 import { type Classification, type Interface as Resilience, apply } from "./model-resilience.js"
@@ -16,20 +23,7 @@ import {
   generateId,
 } from "./model-telemetry.js"
 
-/** @experimental Identity of the provider attempt that produced the current stream part. */
-export interface Identity {
-  readonly modelCallId: string
-  readonly modelAttemptId: string
-  readonly attempt: number
-}
-
-/** @experimental Mutable cell tracking the active attempt identity within one run. */
-export interface IdentityCell {
-  current: Identity | undefined
-}
-
-/** @experimental */
-export const makeIdentityCell = (): IdentityCell => ({ current: undefined })
+export { type Identity, type IdentityCell, makeIdentityCell } from "./model-attempt-identity.js"
 
 /** @experimental Options for instrumenting one loop-owned model service. */
 export interface InstrumentOptions {
@@ -266,6 +260,9 @@ const attemptStream = <A extends Response.AnyPart, E, R>(
         turn: context.options.turn,
         provider: context.provider,
         model: context.model,
+        ...(context.options.resilience?.streamIdleTimeout === undefined
+          ? {}
+          : { idleTimeout: context.options.resilience.streamIdleTimeout }),
       }).pipe(
         Stream.tap((part) => observeStreamPart(context, attempt, part)),
         Stream.onExit((exit) => attemptExit(context, attempt, exit)),
@@ -291,6 +288,8 @@ const attemptModel = (model: LanguageModel.Service, context: CallContext): Langu
 const tappedResilience = (context: CallContext, resilience: Resilience): Resilience => ({
   classify: context.classify,
   resolve: resilience.resolve,
+  invalidToolCallCorrectionLimit: resilience.invalidToolCallCorrectionLimit,
+  ...(resilience.streamIdleTimeout === undefined ? {} : { streamIdleTimeout: resilience.streamIdleTimeout }),
   retrySchedule: (resilience.retrySchedule as Schedule.Schedule<unknown, unknown>).pipe(
     Schedule.while(({ input }) => context.classify(input) === "transient"),
     Schedule.tap((metadata) =>
@@ -350,7 +349,7 @@ const beginCall = (
         providerClassification(error) === "context-overflow" ? "context-overflow" : classifyFailureCategory(error),
       ),
       classify: memoized((error) =>
-        providerClassification(error) === "context-overflow"
+        providerClassification(error) === "context-overflow" || isInvalidToolCallOutput(error)
           ? "terminal"
           : options.resilience === undefined
             ? "terminal"
@@ -433,19 +432,30 @@ const callEffect = <A extends AnyResponse, E, R>(
     ),
   ) as Effect.Effect<A, E, R>
 
-const callStream = <A extends Response.AnyPart, E, R>(
+const callStream = (
   model: LanguageModel.Service,
   options: InstrumentOptions,
-  invoke: (stack: LanguageModel.Service) => Stream.Stream<A, E, R>,
-): Stream.Stream<A, E, R> =>
+  streamOptions: StreamTextOptions,
+): Stream.Stream<StreamTextPart, AiError.AiError | TerminationFailure, any> =>
   Stream.unwrap(
     Effect.map(beginCall(model, options), ({ context, stack }) =>
-      invoke(stack).pipe(
+      correctInvalidToolCall({
+        context: {
+          modelCallId: context.modelCallId,
+          turn: context.options.turn,
+          correctionLimit: context.options.resilience?.invalidToolCallCorrectionLimit ?? 0,
+          attempt: () => context.state.attempts - 1,
+          categorize: context.categorize,
+          emit: context.options.emit,
+        },
+        model: stack,
+        options: streamOptions,
+      }).pipe(
         Stream.tap((part) => Effect.sync(() => observeCallPart(context, part))),
         Stream.onExit((exit) => callExit(context, exit)),
       ),
     ),
-  ) as Stream.Stream<A, E, R>
+  )
 
 /**
  * @experimental Wrap a model with call, attempt, and retry telemetry emission
@@ -477,9 +487,7 @@ export const instrument: {
           generateOptions,
         ),
       )) as unknown as LanguageModel.Service["generateObject"],
-    streamText: ((streamOptions: never) =>
-      callStream(model, options, (stack) =>
-        stack.streamText(streamOptions),
-      )) as unknown as LanguageModel.Service["streamText"],
+    streamText: ((streamOptions: StreamTextOptions) =>
+      callStream(model, options, streamOptions)) as unknown as LanguageModel.Service["streamText"],
   } as LanguageModel.Service
 })

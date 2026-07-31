@@ -110,7 +110,7 @@ export const coreModelsReference = definePage({
     p(
       "An optional seam wrapping model calls with retries. The interface is ",
       code(
-        '{ resolve: (input) => AiError; classify: (error) => "transient" | "terminal"; retrySchedule: Schedule; restartConsumedStreams?: boolean }',
+        '{ resolve: (input) => AiError; classify: (error) => "transient" | "terminal"; retrySchedule: Schedule; invalidToolCallCorrectionLimit: number; streamIdleTimeout?: Duration.Input }',
       ),
       "; only transient-classified errors retry.",
     ),
@@ -141,7 +141,7 @@ export const coreModelsReference = definePage({
             code("LanguageModel.Service"),
             "; provider error parts retry before replayable output, while later failures become one ",
             code("error"),
-            " part unless bounded consumed-stream restart is enabled",
+            " part; consumer-visible reasoning, text, or tool-call output is an absolute retry barrier",
           ],
         ],
         [[code("layerTest(implementation)")], "Layer from an explicit interface"],

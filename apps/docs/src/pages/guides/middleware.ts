@@ -95,7 +95,9 @@ export const middleware = definePage({
     codeBlock({ label: "resilience.ts", source: resilience }),
     bullets(
       [
-        "Streaming retries stop as soon as any part has been emitted, so a half-consumed stream is never silently replayed into the same turn.",
+        "Response metadata is withheld while a retry is possible. Reasoning, text, and tool-call output are absolute retry barriers, so a consumed stream is never replayed.",
+        "Set streamIdleTimeout only when the host wants an explicit model-silence deadline; Baton has no hidden timeout.",
+        "Set invalidToolCallCorrectionLimit to allow bounded, instrumented correction attempts under the same logical model call.",
       ],
       ["Without the layer the default is ", code("ModelResilience.none"), ": every failure is terminal."],
     ),

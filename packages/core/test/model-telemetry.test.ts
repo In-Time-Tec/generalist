@@ -42,13 +42,13 @@ describe("ModelTelemetry", () => {
     ).toBe("truncated-stream")
     expect(
       ModelTelemetry.classifyFailureCategory(
-        ModelStreamTermination.ModelStreamStalled.make({
+        ModelStreamTermination.ModelStreamTimeout.make({
           turn: 0,
           emitted: { _tag: "Nothing" },
           idleMillis: 120_000,
         }),
       ),
-    ).toBe("truncated-stream")
+    ).toBe("timeout")
   })
 
   it("decodes every lifecycle event through the closed Event union", () => {

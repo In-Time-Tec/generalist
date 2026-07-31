@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Exit, Fiber, Function, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { AiError, LanguageModel, Model, Response } from "effect/unstable/ai"
+import { AiError, LanguageModel, Model, Prompt, Response } from "effect/unstable/ai"
 import { ModelResilience, ModelStreamTermination, ModelTelemetry } from "../src/index"
 import { instrument, makeIdentityCell } from "../src/model-instrumentation"
 
@@ -110,6 +110,142 @@ describe("model instrumentation", () => {
         modelAttemptId: attemptStarted?.modelAttemptId,
         attempt: 0,
       })
+    }),
+  )
+
+  it.effect("corrects invalid tool output inside one logical call with visible attempt telemetry", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      const invalidToolCall = AiError.make({
+        module: "TestLanguageModel",
+        method: "streamText",
+        reason: AiError.InvalidOutputError.make({ description: "tool arguments were not valid JSON" }),
+      })
+      const prompts: Array<Prompt.Prompt> = []
+      let calls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: ((options: LanguageModel.GenerateTextOptions<Record<string, never>>) => {
+            prompts.push(Prompt.make(options.prompt))
+            calls += 1
+            return calls === 1
+              ? Stream.make(
+                  Response.makePart("response-metadata", {
+                    id: "discarded-request",
+                    modelId: "scripted",
+                    timestamp: undefined,
+                    request: undefined,
+                  }),
+                ).pipe(Stream.concat(Stream.fail(invalidToolCall)))
+              : Stream.make(Response.makePart("text-delta", { id: "t1", delta: "recovered" }), finishPart)
+          }) as LanguageModel.Service["streamText"],
+        }),
+        {
+          emit,
+          turn: 2,
+          resilience: ModelResilience.make({
+            retrySchedule: Schedule.recurs(0),
+            invalidToolCallCorrectionLimit: 1,
+          }),
+        },
+      )
+
+      yield* Stream.runDrain(wrapped.streamText({ prompt: "use the tool" }))
+
+      const [callStarted] = byTag(events, "ModelCallStarted")
+      const attempts = byTag(events, "ModelAttemptStarted")
+      const [retry] = byTag(events, "ModelRetryScheduled")
+      expect(calls).toBe(2)
+      expect(attempts.map((attempt) => attempt.attempt)).toEqual([0, 1])
+      expect(attempts.every((attempt) => attempt.modelCallId === callStarted?.modelCallId)).toBe(true)
+      expect(retry?.reason).toBe("invalid-tool-call-correction")
+      expect(retry?.attempt).toBe(0)
+      const correction = Prompt.make(prompts[1]!).content.at(-1)
+      expect(correction?.role).toBe("user")
+      expect(
+        correction?.role === "user" &&
+          correction.content.some((part) => part.type === "text" && part.text.includes("invalid tool call")),
+      ).toBe(true)
+      expect(byTag(events, "ModelCallFailed")).toHaveLength(0)
+      expect(byTag(events, "ModelCallCompleted")).toHaveLength(1)
+    }),
+  )
+
+  it.effect("fails one logical call after its invalid-tool correction limit is exhausted", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      const invalidToolCall = AiError.make({
+        module: "TestLanguageModel",
+        method: "streamText",
+        reason: AiError.InvalidOutputError.make({ description: "bad tool arguments" }),
+      })
+      let calls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () =>
+            Stream.suspend(() => {
+              calls += 1
+              return Stream.fail(invalidToolCall)
+            }),
+        }),
+        {
+          emit,
+          turn: 0,
+          resilience: ModelResilience.make({
+            retrySchedule: Schedule.recurs(0),
+            invalidToolCallCorrectionLimit: 2,
+          }),
+        },
+      )
+
+      const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "use the tool" })).pipe(Effect.flip)
+
+      expect(failure).toBe(invalidToolCall)
+      expect(calls).toBe(3)
+      expect(byTag(events, "ModelAttemptStarted")).toHaveLength(3)
+      expect(byTag(events, "ModelRetryScheduled").map((event) => event.reason)).toEqual([
+        "invalid-tool-call-correction",
+        "invalid-tool-call-correction",
+      ])
+      expect(byTag(events, "ModelCallFailed")).toHaveLength(1)
+      expect(byTag(events, "ModelCallCompleted")).toHaveLength(0)
+    }),
+  )
+
+  it.effect("never corrects invalid tool output after text escaped", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      const invalidToolCall = AiError.make({
+        module: "TestLanguageModel",
+        method: "streamText",
+        reason: AiError.InvalidOutputError.make({ description: "bad tool arguments" }),
+      })
+      let calls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () => {
+            calls += 1
+            return Stream.make(Response.makePart("text-delta", { id: "t1", delta: "partial" })).pipe(
+              Stream.concat(Stream.fail(invalidToolCall)),
+            )
+          },
+        }),
+        {
+          emit,
+          turn: 0,
+          resilience: ModelResilience.make({
+            retrySchedule: Schedule.recurs(0),
+            invalidToolCallCorrectionLimit: 2,
+          }),
+        },
+      )
+
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "use the tool" }))
+
+      expect(calls).toBe(1)
+      expect(parts.map((part) => part.type)).toEqual(["text-delta", "error"])
+      expect(byTag(events, "ModelRetryScheduled")).toHaveLength(0)
+      expect(byTag(events, "ModelCallFailed")).toHaveLength(1)
     }),
   )
 
@@ -433,6 +569,85 @@ describe("model instrumentation", () => {
       expect(callFailed?.category).toBe("truncated-stream")
       expect(callFailed?.classification).toBe("terminal")
       expect(byTag(events, "ModelCallCompleted")).toEqual([])
+    }),
+  )
+
+  it.effect("retries an explicit pre-output stream timeout inside the same call", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      let calls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () => {
+            calls += 1
+            return calls === 1
+              ? Stream.never
+              : Stream.make(Response.makePart("text-delta", { id: "t1", delta: "ok" }), finishPart)
+          },
+        }),
+        {
+          emit,
+          turn: 0,
+          resilience: ModelResilience.make({
+            retrySchedule: Schedule.recurs(1),
+            streamIdleTimeout: "10 millis",
+          }),
+        },
+      )
+
+      const fiber = yield* Stream.runDrain(wrapped.streamText({ prompt: "wait" })).pipe(Effect.forkChild)
+      yield* Effect.yieldNow
+      yield* TestClock.adjust("10 millis")
+      yield* Fiber.join(fiber)
+
+      const attempts = byTag(events, "ModelAttemptStarted")
+      const [failed] = byTag(events, "ModelAttemptFailed")
+      const [retry] = byTag(events, "ModelRetryScheduled")
+      expect(calls).toBe(2)
+      expect(attempts).toHaveLength(2)
+      expect(new Set(attempts.map((attempt) => attempt.modelCallId)).size).toBe(1)
+      expect(failed?.category).toBe("timeout")
+      expect(failed?.classification).toBe("transient")
+      expect(retry?.reason).toBe("provider-resilience")
+      expect(retry?.category).toBe("timeout")
+      expect(byTag(events, "ModelCallCompleted")).toHaveLength(1)
+    }),
+  )
+
+  it.effect("never retries an explicit stream timeout after text escaped", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      let calls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () => {
+            calls += 1
+            return Stream.make(Response.makePart("text-delta", { id: "t1", delta: "partial" })).pipe(
+              Stream.concat(Stream.never),
+            )
+          },
+        }),
+        {
+          emit,
+          turn: 0,
+          resilience: ModelResilience.make({
+            retrySchedule: Schedule.recurs(2),
+            streamIdleTimeout: "10 millis",
+          }),
+        },
+      )
+
+      const fiber = yield* Stream.runCollect(wrapped.streamText({ prompt: "wait" })).pipe(Effect.forkChild)
+      yield* Effect.yieldNow
+      yield* TestClock.adjust("10 millis")
+      const parts = yield* Fiber.join(fiber)
+
+      expect(calls).toBe(1)
+      expect(parts.map((part) => part.type)).toEqual(["text-delta", "error"])
+      expect(byTag(events, "ModelRetryScheduled")).toHaveLength(0)
+      expect(byTag(events, "ModelAttemptFailed")[0]?.category).toBe("timeout")
+      expect(byTag(events, "ModelCallFailed")[0]?.category).toBe("timeout")
+      expect(byTag(events, "ModelCallFailed")[0]?.classification).toBe("terminal")
     }),
   )
 
