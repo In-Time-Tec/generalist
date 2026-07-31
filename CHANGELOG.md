@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.14
+
+- Resolve provider `error` parts to typed failures before telemetry and replay accounting. Transient failures now retry when only withheld response metadata preceded them, while reasoning, text, and tool-call output remain strict replay barriers. Unknown custom payloads become bounded terminal `UnknownError` values unless `ModelResilience.resolve` maps them explicitly. The same rule covers malformed non-streaming responses, preserves bounded consumed-stream restart, and keeps discarded metadata and errors out of the successful attempt.
+- Normalize OpenAI, Anthropic, and OpenRouter stream failures to typed `AiError` values. Known overload, timeout, and rate-limit failures use the default retry policy; request, authentication, permission, content-policy, quota, and unknown failures remain terminal. OpenAI Responses `response.failed` payloads now take the same failure path instead of appearing as successful finish events.
+
 ## 0.11.13
 
 - Fail a run whose last turn leaves no assistant text with `RunEndedWithoutOutput` instead of completing it with an empty answer. A provider that ends a turn after reasoning, or reports `"unknown"` because it never said why it stopped, previously produced a successful run with nothing in it. The error carries the provider's finish reason for that turn plus the text and reasoning characters the provider streamed, so a provider that produced nothing is distinguishable from text that was streamed but never committed. Structured-output runs remain judged by their schema value.

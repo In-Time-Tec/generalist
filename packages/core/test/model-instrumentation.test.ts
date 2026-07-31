@@ -209,6 +209,71 @@ describe("model instrumentation", () => {
     }),
   )
 
+  it.effect("retries an in-band transient failure with consistent attempt telemetry", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      let calls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(
+                  Response.makePart("response-metadata", {
+                    id: "discarded-request",
+                    modelId: "returned-model",
+                    timestamp: undefined,
+                    request: undefined,
+                  }),
+                  Response.makePart("error", { error: transientError }),
+                )
+              : Stream.make(
+                  Response.makePart("response-metadata", {
+                    id: "recovered-request",
+                    modelId: "returned-model",
+                    timestamp: undefined,
+                    request: undefined,
+                  }),
+                  Response.makePart("text-delta", { id: "text", delta: "recovered" }),
+                  finishPart,
+                )
+          },
+        }),
+        {
+          emit,
+          turn: 2,
+          resilience: ModelResilience.make({
+            retrySchedule: Schedule.recurs(1),
+            classify: (error) => (error === transientError ? "transient" : "terminal"),
+          }),
+        },
+      )
+
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "retry in-band" }))
+
+      expect(calls).toBe(2)
+      expect(parts.map((part) => part.type)).toEqual(["response-metadata", "text-delta", "finish"])
+      expect(parts[0]?.type === "response-metadata" && parts[0].id).toBe("recovered-request")
+      expect(tags(events)).toEqual([
+        "ModelCallStarted",
+        "ModelAttemptStarted",
+        "ModelAttemptFailed",
+        "ModelRetryScheduled",
+        "ModelAttemptStarted",
+        "ModelAttemptFirstOutput",
+        "ModelAttemptCompleted",
+        "ModelCallCompleted",
+      ])
+      const [failed] = byTag(events, "ModelAttemptFailed")
+      const [retry] = byTag(events, "ModelRetryScheduled")
+      const [completed] = byTag(events, "ModelCallCompleted")
+      expect(failed?.category).toBe("rate-limit")
+      expect(failed?.classification).toBe("transient")
+      expect(retry?.attempt).toBe(0)
+      expect(completed?.attempts).toBe(2)
+    }),
+  )
+
   it.effect("fails the call on terminal classification without scheduling retries", () =>
     Effect.gen(function* () {
       const { events, emit } = makeCollector()

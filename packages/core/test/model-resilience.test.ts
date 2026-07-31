@@ -82,6 +82,29 @@ describe("ModelResilience", () => {
     })
   })
 
+  it.effect("retries transient generateText error responses", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        generateText: () => {
+          calls += 1
+          return Effect.succeed(
+            new LanguageModel.GenerateTextResponse(
+              calls === 1 ? [Response.makePart("error", { error: transientError }) as never] : [textPart("recovered")],
+            ),
+          )
+        },
+      }),
+      retryOnce,
+    )
+    return Effect.gen(function* () {
+      const response = yield* wrapped.generateText({ prompt: "retry error response" })
+
+      expect(calls).toBe(2)
+      expect(response.text).toBe("recovered")
+    })
+  })
+
   it.effect("preserves and does not classify a mixed generateText Cause", () => {
     const cause = Cause.combine(Cause.fail(transientError), Cause.die(new Error("model defect")))
     let calls = 0
@@ -145,6 +168,34 @@ describe("ModelResilience", () => {
     return Effect.gen(function* () {
       const response = yield* wrapped.generateObject({
         prompt: "retry object",
+        schema: Schema.Struct({ ok: Schema.Boolean }),
+      })
+
+      expect(calls).toBe(2)
+      expect(response.value).toEqual({ ok: true })
+    })
+  })
+
+  it.effect("retries transient generateObject error responses", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        generateObject: (() => {
+          calls += 1
+          return Effect.succeed(
+            calls === 1
+              ? new LanguageModel.GenerateObjectResponse({}, [
+                  Response.makePart("error", { error: transientError }) as never,
+                ])
+              : new LanguageModel.GenerateObjectResponse({ ok: true }, [textPart('{"ok":true}')]),
+          )
+        }) as unknown as LanguageModel.Service["generateObject"],
+      }),
+      retryOnce,
+    )
+    return Effect.gen(function* () {
+      const response = yield* wrapped.generateObject({
+        prompt: "retry object error response",
         schema: Schema.Struct({ ok: Schema.Boolean }),
       })
 
@@ -479,9 +530,82 @@ describe("ModelResilience", () => {
     })
   })
 
-  it.effect("does not classify or retry in-band error parts", () => {
+  it.effect("retries transient in-band error parts before replayable output", () => {
     let calls = 0
-    let classifications = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(responseMetadata("discarded-request"), Response.makePart("error", { error: transientError }))
+            : Stream.make(responseMetadata("recovered-request"), textDelta("recovered"))
+        },
+      }),
+      retryOnce,
+    )
+    return Effect.gen(function* () {
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "in-band retry" }))
+
+      expect(calls).toBe(2)
+      expect(parts.map((part) => part.type)).toEqual(["response-metadata", "text-delta"])
+      expect(parts[0]?.type === "response-metadata" && parts[0].id).toBe("recovered-request")
+    })
+  })
+
+  it.effect("normalizes an unknown in-band error to a terminal AiError", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return Stream.make(Response.makePart("error", { error: { code: "provider_specific_terminal" } }))
+        },
+      }),
+      ModelResilience.make({ retrySchedule: Schedule.recurs(3) }),
+    )
+    return Effect.gen(function* () {
+      const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "unknown in-band error" })).pipe(Effect.flip)
+
+      expect(calls).toBe(1)
+      expect(AiError.isAiError(failure) && failure.reason._tag).toBe("UnknownError")
+      expect(String(failure)).toContain("provider_specific_terminal")
+    })
+  })
+
+  it.effect("uses an explicit resolver before classifying a custom in-band error", () => {
+    const custom = { code: "custom_transient" }
+    let calls = 0
+    let resolutions = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(Response.makePart("error", { error: custom }))
+            : Stream.make(textDelta("resolved"))
+        },
+      }),
+      ModelResilience.make({
+        retrySchedule: Schedule.recurs(1),
+        resolve: ({ error, method }) => {
+          resolutions += 1
+          expect(error).toBe(custom)
+          expect(method).toBe("streamText")
+          return transientError
+        },
+      }),
+    )
+    return Effect.gen(function* () {
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "custom in-band error" }))
+
+      expect(calls).toBe(2)
+      expect(resolutions).toBe(1)
+      expect(parts.map((part) => part.type)).toEqual(["text-delta"])
+    })
+  })
+
+  it.effect("fails with the original in-band error when transient retries are exhausted", () => {
+    let calls = 0
     const wrapped = ModelResilience.apply(
       languageModel({
         streamText: () => {
@@ -489,20 +613,56 @@ describe("ModelResilience", () => {
           return Stream.make(Response.makePart("error", { error: transientError }))
         },
       }),
-      ModelResilience.make({
-        retrySchedule: Schedule.recurs(3),
-        classify: () => {
-          classifications += 1
-          return "transient"
-        },
-      }),
+      retryOnce,
     )
     return Effect.gen(function* () {
-      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "in band error" }))
+      const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "in-band exhaustion" })).pipe(Effect.flip)
+
+      expect(calls).toBe(2)
+      expect(failure).toBe(transientError)
+    })
+  })
+
+  it.effect("does not retry an in-band error after replayable output", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return Stream.make(textDelta("partial"), Response.makePart("error", { error: transientError }))
+        },
+      }),
+      ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+    )
+    return Effect.gen(function* () {
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "in-band partial" }))
 
       expect(calls).toBe(1)
-      expect(classifications).toBe(0)
-      expect(parts.map((part) => part.type)).toEqual(["error"])
+      expect(parts.map((part) => part.type)).toEqual(["text-delta", "error"])
+      const errorPart = parts[1]
+      if (errorPart?.type === "error") expect(errorPart.error).toBe(transientError)
+    })
+  })
+
+  it.effect("does not retry an in-band error after a tool call starts", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return Stream.make(
+            Response.makePart("tool-params-start", { id: "call-1", name: "write", providerExecuted: false }),
+            Response.makePart("error", { error: transientError }),
+          )
+        },
+      }),
+      ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+    )
+    return Effect.gen(function* () {
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "in-band tool failure" }))
+
+      expect(calls).toBe(1)
+      expect(parts.map((part) => part.type)).toEqual(["tool-params-start", "error"])
     })
   })
 })

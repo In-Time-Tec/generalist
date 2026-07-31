@@ -39,7 +39,7 @@ bun add @batonfx/providers @batonfx/mcp @batonfx/skills @batonfx/memory
 bun add @batonfx/transport @batonfx/foldkit @batonfx/test
 ```
 
-GitHub releases contain versioned package tarballs with compiled ESM and declarations for Node 22+ and Bun 1.3+. Baton does not publish to npm; install the desired release tarballs directly with Bun or npm.
+GitHub releases and npm contain the same versioned package tarballs with compiled ESM and declarations for Node 22+ and Bun 1.3+.
 
 ## Capability matrix
 

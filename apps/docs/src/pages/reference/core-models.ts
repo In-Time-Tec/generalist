@@ -109,14 +109,27 @@ export const coreModelsReference = definePage({
     h2("model-resilience", "ModelResilience"),
     p(
       "An optional seam wrapping model calls with retries. The interface is ",
-      code('{ classify: (error) => "transient" | "terminal"; retrySchedule: Schedule }'),
+      code(
+        '{ resolve: (input) => AiError; classify: (error) => "transient" | "terminal"; retrySchedule: Schedule; restartConsumedStreams?: boolean }',
+      ),
       "; only transient-classified errors retry.",
     ),
     table(
       ["Export", "Notes"],
       [
-        [[code("defaultClassify")], ["Transient when ", code("Ai.AiError.isAiError(error) && error.isRetryable")]],
-        [[code("none")], ["Classify everything terminal, ", code("Schedule.recurs(0)")]],
+        [
+          [code("defaultClassify")],
+          ["Transient for retryable ", code("AiError"), " values and pre-output stream termination failures"],
+        ],
+        [
+          [code("defaultResolveFailure")],
+          [
+            "Keeps typed ",
+            code("AiError"),
+            " values and bounds unknown error-part payloads as terminal unknown errors",
+          ],
+        ],
+        [[code("none")], ["Resolve unknown parts safely, classify everything terminal, ", code("Schedule.recurs(0)")]],
         [
           [code("make(input?)"), " / ", code("layer(input?)")],
           ["Fill defaults from ", code("defaultClassify"), " and ", code("none")],
@@ -126,9 +139,9 @@ export const coreModelsReference = definePage({
           [
             "Wraps a ",
             code("LanguageModel.Service"),
-            "; streams that already emitted parts convert later failures into an ",
+            "; provider error parts retry before replayable output, while later failures become one ",
             code("error"),
-            " part instead of retrying",
+            " part unless bounded consumed-stream restart is enabled",
           ],
         ],
         [[code("layerTest(implementation)")], "Layer from an explicit interface"],

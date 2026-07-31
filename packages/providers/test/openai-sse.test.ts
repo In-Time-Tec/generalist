@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Config, Effect, Layer, Redacted, Schema, Stream } from "effect"
-import { LanguageModel } from "effect/unstable/ai"
+import { Config, Effect, Layer, Redacted, Schedule, Schema, Stream } from "effect"
+import { AiError, LanguageModel } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
-import { ModelRegistry } from "@batonfx/core"
-import { layer, normalizeResponsesSse } from "@batonfx/providers/openai"
+import { ModelRegistry, ModelResilience } from "@batonfx/core"
+import { classifyFailure, layer, normalizeResponsesSse } from "@batonfx/providers/openai"
 
 const stringify = Schema.encodeSync(Schema.UnknownFromJsonString)
 const encoder = new TextEncoder()
@@ -19,6 +19,40 @@ const flatError = stringify({
   message: "boom",
   param: null,
   sequence_number: 159,
+})
+const nestedOverload = stringify({
+  type: "error",
+  error: {
+    type: "server_error",
+    code: "server_is_overloaded",
+    message: "Our servers are currently overloaded. Please try again later.",
+    param: null,
+  },
+  sequence_number: 2,
+})
+const failedOverload = stringify({
+  type: "response.failed",
+  response: {
+    id: "response-failed",
+    object: "response",
+    model: "gpt-test",
+    created_at: 1,
+    output: [],
+    error: {
+      type: "server_error",
+      code: "server_is_overloaded",
+      message: "Our servers are currently overloaded. Please try again later.",
+      param: null,
+    },
+  },
+  sequence_number: 2,
+})
+const flatOverload = stringify({
+  type: "error",
+  code: "server_is_overloaded",
+  message: "Our servers are currently overloaded. Please try again later.",
+  param: null,
+  sequence_number: 2,
 })
 const deltaFrame = 'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"hi"}\n\n'
 const completed = stringify({
@@ -133,6 +167,28 @@ describe("normalizeResponsesSse", () => {
     }),
   )
 
+  it.effect("does not copy an arbitrary malformed error payload into the normalized message", () =>
+    Effect.gen(function* () {
+      const malformed = stringify({
+        type: "error",
+        error: { type: "server_error", secret: "must-not-escape" },
+        sequence_number: 2,
+      })
+      const output = yield* readThrough([`event: error\ndata: ${malformed}\n\n`], responsesUrl)
+
+      expect(output).toContain("OpenAI response failed")
+      expect(output).not.toContain("must-not-escape")
+    }),
+  )
+
+  it.effect("turns response.failed into a decodable provider failure", () =>
+    Effect.gen(function* () {
+      const output = yield* readThrough([`event: response.failed\ndata: ${failedOverload}\n\n`], responsesUrl)
+
+      expect(output).toBe(`event: response.failed\ndata: ${flatOverload}\n\n`)
+    }),
+  )
+
   it.effect("flattens a nested error that also carries a top-level message", () =>
     Effect.gen(function* () {
       const withTopLevelMessage = stringify({
@@ -156,10 +212,10 @@ describe("normalizeResponsesSse", () => {
 })
 
 describe("OpenAI layer stream error normalization", () => {
-  it.effect("surfaces a nested server_error as a decoded error part instead of a schema failure", () =>
+  it.effect("fails with a retryable AiError when Responses reports server overload", () =>
     Effect.gen(function* () {
-      const body = `event: error\ndata: ${nestedError}\n\nevent: response.completed\ndata: ${completed}\n\n`
-      const parts = yield* ModelRegistry.stream(
+      const body = `event: response.failed\ndata: ${failedOverload}\n\n`
+      const failure = yield* ModelRegistry.stream(
         { provider: "openai", model: "gpt-test" },
         LanguageModel.streamText({ prompt: "hello" }),
       ).pipe(
@@ -168,11 +224,141 @@ describe("OpenAI layer stream error normalization", () => {
             Layer.provide(Layer.succeed(HttpClient.HttpClient, stubClient([body]))),
           ),
         ),
-        Stream.runCollect,
+        Stream.runDrain,
+        Effect.flip,
       )
-      const errorParts = parts.filter((part) => part.type === "error")
-      expect(errorParts).toHaveLength(1)
-      expect(stringify(errorParts[0])).toContain("boom")
+
+      expect(AiError.isAiError(failure)).toBe(true)
+      if (AiError.isAiError(failure)) {
+        expect(failure.reason._tag).toBe("InternalProviderError")
+        expect(failure.isRetryable).toBe(true)
+        expect(failure.message).toContain("Our servers are currently overloaded")
+      }
     }),
   )
+
+  it.effect("bounds provider-controlled error descriptions", () => {
+    const message = `${"x".repeat(3_000)}SECRET-SUFFIX`
+    const overloaded = stringify({
+      type: "error",
+      code: "server_error",
+      message,
+      param: null,
+      sequence_number: 2,
+    })
+    const client = stubClient([`event: error\ndata: ${overloaded}\n\n`])
+    return Effect.gen(function* () {
+      const failure = yield* ModelRegistry.stream(
+        { provider: "openai", model: "gpt-test" },
+        LanguageModel.streamText({ prompt: "hello" }),
+      ).pipe(
+        Stream.provide(
+          layer({ model: "gpt-test", apiKey: Config.succeed(Redacted.make("test-key")) }).pipe(
+            Layer.provide(Layer.succeed(HttpClient.HttpClient, client)),
+          ),
+        ),
+        Stream.runDrain,
+        Effect.flip,
+      )
+
+      expect(AiError.isAiError(failure) && failure.reason._tag).toBe("InternalProviderError")
+      if (AiError.isAiError(failure) && failure.reason._tag === "InternalProviderError") {
+        expect(failure.reason.description).toHaveLength(2_048)
+        expect(failure.reason.description).not.toContain("SECRET-SUFFIX")
+      }
+    })
+  })
+
+  it.effect("maps an official vector-store timeout to a retryable provider failure", () => {
+    const timeout = stringify({
+      type: "error",
+      code: "vector_store_timeout",
+      message: "Vector store timed out",
+      param: null,
+      sequence_number: 2,
+    })
+    const client = stubClient([`event: error\ndata: ${timeout}\n\n`])
+    return Effect.gen(function* () {
+      const failure = yield* ModelRegistry.stream(
+        { provider: "openai", model: "gpt-test" },
+        LanguageModel.streamText({ prompt: "hello" }),
+      ).pipe(
+        Stream.provide(
+          layer({ model: "gpt-test", apiKey: Config.succeed(Redacted.make("test-key")) }).pipe(
+            Layer.provide(Layer.succeed(HttpClient.HttpClient, client)),
+          ),
+        ),
+        Stream.runDrain,
+        Effect.flip,
+      )
+
+      expect(AiError.isAiError(failure) && failure.reason._tag).toBe("InternalProviderError")
+      expect(AiError.isAiError(failure) && failure.isRetryable).toBe(true)
+    })
+  })
+
+  it.effect("keeps normalized context overflow on the reactive compaction path", () => {
+    const overflow = stringify({
+      type: "error",
+      error: {
+        type: "invalid_request_error",
+        code: "context_length_exceeded",
+        message: "Input exceeds the context window",
+        param: "input",
+      },
+      sequence_number: 2,
+    })
+    const client = stubClient([`event: error\ndata: ${overflow}\n\n`])
+    return Effect.gen(function* () {
+      const failure = yield* ModelRegistry.stream(
+        { provider: "openai", model: "gpt-test" },
+        LanguageModel.streamText({ prompt: "hello" }),
+      ).pipe(
+        Stream.provide(
+          layer({ model: "gpt-test", apiKey: Config.succeed(Redacted.make("test-key")) }).pipe(
+            Layer.provide(Layer.succeed(HttpClient.HttpClient, client)),
+          ),
+        ),
+        Stream.runDrain,
+        Effect.flip,
+      )
+
+      expect(AiError.isAiError(failure) && failure.reason._tag).toBe("InvalidRequestError")
+      expect(classifyFailure(failure)).toBe("context-overflow")
+    })
+  })
+
+  it.effect("retries a pre-output server overload and returns only the recovered attempt", () => {
+    let calls = 0
+    const overloaded = `event: error\ndata: ${nestedOverload}\n\n`
+    const recovered = `event: response.completed\ndata: ${completed}\n\n`
+    const client = HttpClient.make((request) => {
+      calls += 1
+      return Effect.succeed(
+        HttpClientResponse.fromWeb(request, new Response(calls === 1 ? overloaded : recovered, { status: 200 })),
+      )
+    })
+    return Effect.gen(function* () {
+      const parts = yield* ModelRegistry.stream(
+        { provider: "openai", model: "gpt-test" },
+        Stream.unwrap(
+          Effect.map(LanguageModel.LanguageModel, (model) =>
+            ModelResilience.apply(model, ModelResilience.make({ retrySchedule: Schedule.recurs(1) })).streamText({
+              prompt: "hello",
+            }),
+          ),
+        ),
+      ).pipe(
+        Stream.provide(
+          layer({ model: "gpt-test", apiKey: Config.succeed(Redacted.make("test-key")) }).pipe(
+            Layer.provide(Layer.succeed(HttpClient.HttpClient, client)),
+          ),
+        ),
+        Stream.runCollect,
+      )
+
+      expect(calls).toBe(2)
+      expect(parts.map((part) => part.type)).toEqual(["finish"])
+    })
+  })
 })

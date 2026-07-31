@@ -5463,7 +5463,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(failure._tag).toBe("@batonfx/core/AgentError")
         expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toContain("stream exploded")
         expect(failure._tag === "@batonfx/core/AgentError" && failure.turn).toBe(0)
-        expect(failure._tag === "@batonfx/core/AgentError" && failure.cause).toBe(streamError)
+        if (failure._tag === "@batonfx/core/AgentError") {
+          expect(AiError.isAiError(failure.cause) && failure.cause.reason._tag).toBe("UnknownError")
+        }
       }),
     ] as const
   })
@@ -5657,35 +5659,29 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "does not retry in-band model error parts", () => {
+  ItLayer.make(it, "retries in-band model error parts before output", () => {
     let calls = 0
-    let classifications = 0
     return [
       Layer.mergeAll(
         modelLayer(() => {
           calls += 1
-          return Stream.make(Response.makePart("error", { error: transientModelError }))
+          return calls === 1
+            ? Stream.make(Response.makePart("error", { error: transientModelError }))
+            : Stream.make(textDelta("after in-band retry"))
         }),
         unusedExecutor,
         Approvals.layerAutoApprove,
-        ModelResilience.layer({
-          retrySchedule: Schedule.recurs(3),
-          classify: () => {
-            classifications += 1
-            return "transient"
-          },
-        }),
+        retryTransientModelError,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "model-in-band-error-agent" })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "in-band error" })))
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "in-band error" }))
 
-        expect(calls).toBe(1)
-        expect(classifications).toBe(0)
-        expect(failure._tag).toBe("@batonfx/core/AgentError")
-        if (failure._tag === "@batonfx/core/AgentError") expect(failure.cause).toBe(transientModelError)
+        expect(calls).toBe(2)
+        const completed = events.at(-1)
+        if (completed?._tag === "Completed") expect(completed.text).toBe("after in-band retry")
       }),
     ] as const
   })

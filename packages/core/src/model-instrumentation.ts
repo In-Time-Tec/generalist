@@ -1,6 +1,7 @@
 import { Cause, Clock, Duration, Effect, Exit, Function, Option, Schedule, Stream } from "effect"
 import { AiError, LanguageModel, Model, Response } from "effect/unstable/ai"
 import { classifyFailure } from "./model-registry.js"
+import { defaultResolveFailure, promoteResponseFailure, promoteStreamFailures } from "./model-response-failure.js"
 import { type Classification, type Interface as Resilience, apply } from "./model-resilience.js"
 import { type TerminationFailure, requireTerminal } from "./model-stream-termination.js"
 import {
@@ -79,7 +80,6 @@ interface AttemptState {
   termination: Termination
   requestId: string | undefined
   responseModel: string | undefined
-  errorCategory: ModelFailureCategory | undefined
 }
 
 interface AttemptContext {
@@ -131,9 +131,6 @@ const observeStreamPart = (
     if (part.type === "response-metadata") {
       attempt.state.requestId = part.id
       attempt.state.responseModel = part.modelId
-    }
-    if (part.type === "error") {
-      attempt.state.errorCategory = context.categorize(part.error)
     }
     if (part.type === "finish") {
       const at = yield* Clock.currentTimeMillis
@@ -195,9 +192,6 @@ const attemptExit = (
   attempt: AttemptContext,
   exit: Exit.Exit<unknown, unknown>,
 ): Effect.Effect<void> => {
-  if (attempt.state.errorCategory !== undefined) {
-    return attemptFailed(context, attempt, attempt.state.errorCategory, "terminal")
-  }
   if (Exit.isSuccess(exit)) {
     const termination = attempt.state.termination
     if (termination._tag === "Open") return attemptFailed(context, attempt, "truncated-stream", "terminal")
@@ -236,7 +230,6 @@ const beginAttempt = (context: CallContext): Effect.Effect<AttemptContext> =>
         termination: open,
         requestId: undefined,
         responseModel: undefined,
-        errorCategory: undefined,
       },
     }
   })
@@ -247,10 +240,14 @@ interface AnyResponse {
 
 const attemptEffect = <A extends AnyResponse, E, R>(
   context: CallContext,
+  method: "generateText" | "generateObject",
   run: () => Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, R> =>
+): Effect.Effect<A, E | AiError.AiError, R> =>
   Effect.flatMap(beginAttempt(context), (attempt) =>
     run().pipe(
+      Effect.flatMap((response) =>
+        promoteResponseFailure(response, method, context.options.resilience?.resolve ?? defaultResolveFailure),
+      ),
       Effect.tap((response) =>
         Effect.forEach(response.content, (part) => observeStreamPart(context, attempt, part), { discard: true }),
       ),
@@ -261,10 +258,10 @@ const attemptEffect = <A extends AnyResponse, E, R>(
 const attemptStream = <A extends Response.AnyPart, E, R>(
   context: CallContext,
   run: () => Stream.Stream<A, E, R>,
-): Stream.Stream<A, E | TerminationFailure, R> =>
+): Stream.Stream<A, E | AiError.AiError | TerminationFailure, R> =>
   Stream.unwrap(
     Effect.map(beginAttempt(context), (attempt) =>
-      requireTerminal(run(), {
+      requireTerminal(promoteStreamFailures(run(), context.options.resilience?.resolve ?? defaultResolveFailure), {
         toPart: Function.identity,
         turn: context.options.turn,
         provider: context.provider,
@@ -280,9 +277,11 @@ const attemptModel = (model: LanguageModel.Service, context: CallContext): Langu
   ({
     ...model,
     generateText: ((options: never) =>
-      attemptEffect(context, () => model.generateText(options))) as unknown as LanguageModel.Service["generateText"],
+      attemptEffect(context, "generateText", () =>
+        model.generateText(options),
+      )) as unknown as LanguageModel.Service["generateText"],
     generateObject: ((options: never) =>
-      attemptEffect(context, () =>
+      attemptEffect(context, "generateObject", () =>
         (model.generateObject as unknown as (options: never) => Effect.Effect<AnyResponse, AiError.AiError>)(options),
       )) as unknown as LanguageModel.Service["generateObject"],
     streamText: ((options: never) =>
@@ -291,6 +290,7 @@ const attemptModel = (model: LanguageModel.Service, context: CallContext): Langu
 
 const tappedResilience = (context: CallContext, resilience: Resilience): Resilience => ({
   classify: context.classify,
+  resolve: resilience.resolve,
   retrySchedule: (resilience.retrySchedule as Schedule.Schedule<unknown, unknown>).pipe(
     Schedule.while(({ input }) => context.classify(input) === "transient"),
     Schedule.tap((metadata) =>
