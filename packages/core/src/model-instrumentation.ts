@@ -7,9 +7,17 @@ import {
   type StreamTextPart,
 } from "./model-call-correction.js"
 import type { IdentityCell } from "./model-attempt-identity.js"
+import { firstOutputKind, memoized, singleFailure } from "./model-attempt-observation.js"
+import { addProviderUsage, providerUsageFromAiError } from "./model-provider-usage.js"
 import { classifyFailure } from "./model-registry.js"
 import { defaultResolveFailure, promoteResponseFailure, promoteStreamFailures } from "./model-response-failure.js"
-import { type Classification, type Interface as Resilience, apply } from "./model-resilience.js"
+import {
+  type Classification,
+  type Interface as Resilience,
+  type ModelResilienceMisconfigured,
+  apply,
+  validate,
+} from "./model-resilience.js"
 import { type TerminationFailure, requireTerminal } from "./model-stream-termination.js"
 import {
   CurrentCompactionId,
@@ -19,6 +27,7 @@ import {
   type ModelCallPurpose,
   type ModelFailureCategory,
   type ModelFirstOutputKind,
+  type ModelProviderUsage,
   classifyFailureCategory,
   generateId,
 } from "./model-telemetry.js"
@@ -43,6 +52,7 @@ interface InstrumentedMarker {
 interface CallState {
   attempts: number
   usage: Response.Usage | undefined
+  failedAttemptUsage: ModelProviderUsage | undefined
   finishReason: Response.FinishReason | undefined
   errorCategory: ModelFailureCategory | undefined
 }
@@ -80,40 +90,6 @@ interface AttemptContext {
   readonly modelAttemptId: string
   readonly attempt: number
   readonly state: AttemptState
-}
-
-const memoized = <Result>(compute: (error: unknown) => Result): ((error: unknown) => Result) => {
-  const cache = new Map<unknown, Result>()
-  return (error: unknown): Result => {
-    const cached = cache.get(error)
-    if (cached !== undefined) return cached
-    const result = compute(error)
-    cache.set(error, result)
-    return result
-  }
-}
-
-const singleFailure = (cause: Cause.Cause<unknown>): Option.Option<unknown> => {
-  const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
-  return reason !== undefined && Cause.isFailReason(reason) ? Option.some(reason.error) : Option.none()
-}
-
-const firstOutputKind = (part: Response.AnyPart): ModelFirstOutputKind | undefined => {
-  switch (part.type) {
-    case "reasoning-start":
-    case "reasoning-delta":
-    case "reasoning":
-      return "reasoning"
-    case "text-start":
-    case "text-delta":
-    case "text":
-      return "text"
-    case "tool-params-start":
-    case "tool-call":
-      return "tool-call"
-    default:
-      return undefined
-  }
 }
 
 const observeStreamPart = (
@@ -167,8 +143,11 @@ const attemptFailed = (
   attempt: AttemptContext,
   category: ModelFailureCategory,
   classification: Classification,
-): Effect.Effect<void> =>
-  Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
+  error?: unknown,
+): Effect.Effect<void> => {
+  const usage = providerUsageFromAiError(error)
+  context.state.failedAttemptUsage = addProviderUsage(context.state.failedAttemptUsage, usage)
+  return Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
     context.options.emit({
       _tag: "ModelAttemptFailed",
       turn: context.options.turn,
@@ -178,8 +157,10 @@ const attemptFailed = (
       failedAt,
       category,
       classification,
+      ...(usage === undefined ? {} : { providerUsage: usage }),
     }),
   )
+}
 
 const attemptExit = (
   context: CallContext,
@@ -196,7 +177,13 @@ const attemptExit = (
   if (Cause.hasInterrupts(exit.cause)) return attemptFailed(context, attempt, "cancellation", "terminal")
   const failure = singleFailure(exit.cause)
   if (Option.isNone(failure)) return attemptFailed(context, attempt, "unknown", "terminal")
-  return attemptFailed(context, attempt, context.categorize(failure.value), context.classify(failure.value))
+  return attemptFailed(
+    context,
+    attempt,
+    context.categorize(failure.value),
+    context.classify(failure.value),
+    failure.value,
+  )
 }
 
 const beginAttempt = (context: CallContext): Effect.Effect<AttemptContext> =>
@@ -355,7 +342,13 @@ const beginCall = (
             ? "terminal"
             : options.resilience.classify(error),
       ),
-      state: { attempts: 0, usage: undefined, finishReason: undefined, errorCategory: undefined },
+      state: {
+        attempts: 0,
+        usage: undefined,
+        failedAttemptUsage: undefined,
+        finishReason: undefined,
+        errorCategory: undefined,
+      },
     }
     const attempts = attemptModel(model, context)
     const stack =
@@ -383,6 +376,9 @@ const callCompleted = (context: CallContext): Effect.Effect<void> =>
       attempts: context.state.attempts,
       completedAt,
       ...(context.state.usage === undefined ? {} : { usage: context.state.usage }),
+      ...(context.state.failedAttemptUsage === undefined
+        ? {}
+        : { failedAttemptUsage: context.state.failedAttemptUsage }),
       ...(context.state.finishReason === undefined ? {} : { finishReason: context.state.finishReason }),
     }),
   )
@@ -402,6 +398,9 @@ const callFailed = (
       failedAt,
       category,
       classification,
+      ...(context.state.failedAttemptUsage === undefined
+        ? {}
+        : { failedAttemptUsage: context.state.failedAttemptUsage }),
     }),
   )
 
@@ -416,12 +415,15 @@ const callExit = (context: CallContext, exit: Exit.Exit<unknown, unknown>): Effe
   return callFailed(context, context.categorize(failure.value), context.classify(failure.value))
 }
 
+const validateOptions = (options: InstrumentOptions) =>
+  options.resilience === undefined ? Effect.void : validate(options.resilience).pipe(Effect.asVoid)
+
 const callEffect = <A extends AnyResponse, E, R>(
   model: LanguageModel.Service,
   options: InstrumentOptions,
   invoke: (stack: LanguageModel.Service) => Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, R> =>
-  Effect.flatMap(beginCall(model, options), ({ context, stack }) =>
+): Effect.Effect<A, E | ModelResilienceMisconfigured, R> =>
+  Effect.flatMap(validateOptions(options).pipe(Effect.andThen(beginCall(model, options))), ({ context, stack }) =>
     invoke(stack).pipe(
       Effect.tap((response) =>
         Effect.sync(() => {
@@ -430,15 +432,19 @@ const callEffect = <A extends AnyResponse, E, R>(
       ),
       Effect.onExit((exit) => callExit(context, exit)),
     ),
-  ) as Effect.Effect<A, E, R>
+  )
 
 const callStream = (
   model: LanguageModel.Service,
   options: InstrumentOptions,
   streamOptions: StreamTextOptions,
-): Stream.Stream<StreamTextPart, AiError.AiError | TerminationFailure, any> =>
+): Stream.Stream<
+  StreamTextPart,
+  AiError.AiError | TerminationFailure | import("./model-resilience.js").ModelResilienceMisconfigured,
+  any
+> =>
   Stream.unwrap(
-    Effect.map(beginCall(model, options), ({ context, stack }) =>
+    Effect.map(validateOptions(options).pipe(Effect.andThen(beginCall(model, options))), ({ context, stack }) =>
       correctInvalidToolCall({
         context: {
           modelCallId: context.modelCallId,

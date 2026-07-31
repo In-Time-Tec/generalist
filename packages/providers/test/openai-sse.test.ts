@@ -339,11 +339,12 @@ describe("OpenAI layer stream error normalization", () => {
       )
     })
     return Effect.gen(function* () {
+      const resilience = yield* ModelResilience.make({ retrySchedule: Schedule.recurs(1) })
       const parts = yield* ModelRegistry.stream(
         { provider: "openai", model: "gpt-test" },
         Stream.unwrap(
           Effect.map(LanguageModel.LanguageModel, (model) =>
-            ModelResilience.apply(model, ModelResilience.make({ retrySchedule: Schedule.recurs(1) })).streamText({
+            ModelResilience.apply(model, resilience).streamText({
               prompt: "hello",
             }),
           ),

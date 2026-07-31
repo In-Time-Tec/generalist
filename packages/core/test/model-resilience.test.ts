@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Cause, Effect, Exit, Function, Schedule, Schema, Stream } from "effect"
+import { Cause, Effect, Exit, Function, Layer, Schedule, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Response } from "effect/unstable/ai"
 import { ModelResilience, ModelStreamTermination } from "../src/index"
 
@@ -22,6 +22,9 @@ const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text
 const responseMetadata = (id: string) =>
   Response.makePart("response-metadata", { id, modelId: "m", timestamp: undefined, request: undefined })
 
+const makeResilience = (input?: Partial<ModelResilience.Interface>): ModelResilience.Interface =>
+  Effect.runSync(ModelResilience.make(input))
+
 const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel.Service =>
   ({
     generateText: () => Effect.succeed(new LanguageModel.GenerateTextResponse([])),
@@ -30,7 +33,7 @@ const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel
     ...overrides,
   }) as LanguageModel.Service
 
-const retryOnce = ModelResilience.make({
+const retryOnce = makeResilience({
   retrySchedule: Schedule.recurs(1),
   classify: (error) => (error === transientError ? "transient" : "terminal"),
 })
@@ -40,6 +43,56 @@ describe("ModelResilience", () => {
     expect(ModelResilience.defaultClassify(transientError)).toBe("transient")
     expect(ModelResilience.defaultClassify(terminalError)).toBe("terminal")
     expect(ModelResilience.defaultClassify(new Error("plain"))).toBe("terminal")
+  })
+
+  const invalidCorrectionLimits = [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1, 3]
+
+  it.effect.each(invalidCorrectionLimits)("make rejects invalid correction limit %s with a typed failure", (limit) =>
+    Effect.gen(function* () {
+      const failure = yield* ModelResilience.make({ invalidToolCallCorrectionLimit: limit }).pipe(Effect.flip)
+
+      expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(failure)).toBe(true)
+      expect(failure.reason).toBe("invalid-tool-call-correction-limit")
+    }).pipe(Effect.orDie),
+  )
+
+  it.effect("layer and layerTest fail typed for invalid correction limits", () =>
+    Effect.gen(function* () {
+      const fromOptions = yield* Layer.build(
+        ModelResilience.layer({ invalidToolCallCorrectionLimit: Number.NaN }),
+      ).pipe(Effect.scoped, Effect.flip)
+      const implementation = { ...ModelResilience.none, invalidToolCallCorrectionLimit: 3 }
+      const fromInterface = yield* Layer.build(ModelResilience.layerTest(implementation)).pipe(
+        Effect.scoped,
+        Effect.flip,
+      )
+
+      expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(fromOptions)).toBe(true)
+      expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(fromInterface)).toBe(true)
+    }).pipe(Effect.orDie),
+  )
+
+  it.effect("defensively rejects a direct Interface before provider invocation", () => {
+    let calls = 0
+    const implementation = {
+      ...ModelResilience.none,
+      invalidToolCallCorrectionLimit: Number.POSITIVE_INFINITY,
+    }
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return Stream.empty
+        },
+      }),
+      implementation,
+    )
+    return Effect.gen(function* () {
+      const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "must not run" })).pipe(Effect.flip)
+
+      expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(failure)).toBe(true)
+      expect(calls).toBe(0)
+    })
   })
 
   it.effect("none does not retry non-streaming calls", () => {
@@ -116,7 +169,7 @@ describe("ModelResilience", () => {
           return Effect.failCause(cause)
         },
       }),
-      ModelResilience.make({
+      makeResilience({
         retrySchedule: Schedule.recurs(3),
         classify: () => {
           classifications += 1
@@ -215,7 +268,7 @@ describe("ModelResilience", () => {
           return Effect.failCause(cause)
         }) as unknown as LanguageModel.Service["generateObject"],
       }),
-      ModelResilience.make({
+      makeResilience({
         retrySchedule: Schedule.recurs(3),
         classify: () => {
           classifications += 1
@@ -306,7 +359,7 @@ describe("ModelResilience", () => {
             : Stream.make(textDelta("recovered"))
         },
       }),
-      ModelResilience.make({ retrySchedule: Schedule.recurs(1) }),
+      makeResilience({ retrySchedule: Schedule.recurs(1) }),
     )
     const guarded = Stream.suspend(() =>
       ModelStreamTermination.requireTerminal(wrapped.streamText({ prompt: "truncated" }), {
@@ -371,7 +424,7 @@ describe("ModelResilience", () => {
           return Stream.fail(terminalError)
         },
       }),
-      ModelResilience.make({
+      makeResilience({
         retrySchedule: Schedule.recurs(3),
         classify: () => {
           classifications += 1
@@ -416,7 +469,7 @@ describe("ModelResilience", () => {
           return Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.fail(transientError)))
         },
       }),
-      ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+      makeResilience({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
     )
     return Effect.gen(function* () {
       const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "partial stream" }))
@@ -438,7 +491,7 @@ describe("ModelResilience", () => {
           return Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(cause)))
         },
       }),
-      ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+      makeResilience({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
     )
     return Effect.gen(function* () {
       const exit = yield* Effect.exit(Stream.runCollect(wrapped.streamText({ prompt: "interrupted stream" })))
@@ -456,7 +509,7 @@ describe("ModelResilience", () => {
       languageModel({
         streamText: () => Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(cause))),
       }),
-      ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+      makeResilience({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
     )
     return Effect.gen(function* () {
       const exit = yield* wrapped.streamText({ prompt: "defective stream" }).pipe(
@@ -481,7 +534,7 @@ describe("ModelResilience", () => {
           return Stream.make(textDelta("partial")).pipe(Stream.concat(Stream.failCause(cause)))
         },
       }),
-      ModelResilience.make({
+      makeResilience({
         retrySchedule: Schedule.recurs(3),
         classify: () => {
           classifications += 1
@@ -513,7 +566,7 @@ describe("ModelResilience", () => {
           return Stream.failCause(cause)
         },
       }),
-      ModelResilience.make({
+      makeResilience({
         retrySchedule: Schedule.recurs(3),
         classify: () => {
           classifications += 1
@@ -561,7 +614,7 @@ describe("ModelResilience", () => {
           return Stream.make(Response.makePart("error", { error: { code: "provider_specific_terminal" } }))
         },
       }),
-      ModelResilience.make({ retrySchedule: Schedule.recurs(3) }),
+      makeResilience({ retrySchedule: Schedule.recurs(3) }),
     )
     return Effect.gen(function* () {
       const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "unknown in-band error" })).pipe(Effect.flip)
@@ -585,7 +638,7 @@ describe("ModelResilience", () => {
             : Stream.make(textDelta("resolved"))
         },
       }),
-      ModelResilience.make({
+      makeResilience({
         retrySchedule: Schedule.recurs(1),
         resolve: ({ error, method }) => {
           resolutions += 1
@@ -632,7 +685,7 @@ describe("ModelResilience", () => {
           return Stream.make(textDelta("partial"), Response.makePart("error", { error: transientError }))
         },
       }),
-      ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+      makeResilience({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
     )
     return Effect.gen(function* () {
       const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "in-band partial" }))
@@ -656,7 +709,7 @@ describe("ModelResilience", () => {
           )
         },
       }),
-      ModelResilience.make({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
+      makeResilience({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
     )
     return Effect.gen(function* () {
       const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "in-band tool failure" }))

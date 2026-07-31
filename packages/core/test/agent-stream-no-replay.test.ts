@@ -66,8 +66,11 @@ const agent = Agent.make({ name: "no-replay-agent" })
 
 const runAgent = (
   model: Layer.Layer<LanguageModel.LanguageModel>,
-  policy: Layer.Layer<ModelResilience.ModelResilience> = resilience,
-) => Stream.runCollect(Agent.stream(agent, { prompt: "no replay" }).pipe(Stream.provide(Layer.mergeAll(model, policy))))
+  policy: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.ModelResilienceMisconfigured> = resilience,
+) =>
+  Stream.runCollect(
+    Agent.stream(agent, { prompt: "no replay" }).pipe(Stream.provide(Layer.mergeAll(model, policy.pipe(Layer.orDie)))),
+  )
 
 const expectTerminalWithoutReplay = (first: Stream.Stream<Response.StreamPartEncoded, AiError.AiError>) =>
   Effect.gen(function* () {

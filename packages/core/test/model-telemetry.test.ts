@@ -89,6 +89,7 @@ describe("ModelTelemetry", () => {
         failedAt: 4,
         category: "rate-limit",
         classification: "transient",
+        providerUsage: { inputTokens: 7, outputTokens: 3, totalTokens: 10 },
       },
       {
         _tag: "ModelRetryScheduled",
@@ -120,6 +121,7 @@ describe("ModelTelemetry", () => {
         purpose: "conversation",
         attempts: 2,
         completedAt: 5,
+        failedAttemptUsage: { totalTokens: 10 },
       },
       {
         _tag: "ModelCallFailed",
@@ -130,6 +132,7 @@ describe("ModelTelemetry", () => {
         failedAt: 6,
         category: "authentication",
         classification: "terminal",
+        failedAttemptUsage: { inputTokens: 2, outputTokens: 1 },
       },
       {
         _tag: "CompactionStarted",
@@ -195,6 +198,17 @@ describe("ModelTelemetry", () => {
     expect(decode({ ...withoutFinish, usage: usage(), finishReason: "stop" })._tag).toBe("None")
     expect(decode({ ...withoutFinish, usageAt: 1, finishReason: "stop" })._tag).toBe("None")
     expect(decode({ ...withoutFinish, usage: usage(), usageAt: 1, finishReason: "stop" })._tag).toBe("Some")
+  })
+
+  it("bounds provider-reported failed-attempt usage to non-negative safe integers", () => {
+    const decode = Schema.decodeUnknownOption(ModelTelemetry.ModelProviderUsage)
+
+    expect(decode({ totalTokens: 10 })._tag).toBe("Some")
+    expect(decode({ inputTokens: 7, outputTokens: 3 })._tag).toBe("Some")
+    expect(decode({})._tag).toBe("Some")
+    for (const invalid of [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(decode({ totalTokens: invalid })._tag).toBe("None")
+    }
   })
 
   it("rejects a failed call that carries no classification", () => {

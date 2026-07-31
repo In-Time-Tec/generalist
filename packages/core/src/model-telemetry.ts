@@ -47,6 +47,22 @@ export const ModelFirstOutputKind = Schema.Literals(["reasoning", "text", "tool-
 /** @experimental */
 export type ModelFirstOutputKind = typeof ModelFirstOutputKind.Type
 
+/** @experimental Provider-reported failed-attempt token usage. Absent fields mean unknown; Baton never estimates. */
+const providerTokenCount = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(0),
+  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
+)
+
+/** @experimental */
+export const ModelProviderUsage = Schema.Struct({
+  inputTokens: Schema.optionalKey(providerTokenCount),
+  outputTokens: Schema.optionalKey(providerTokenCount),
+  totalTokens: Schema.optionalKey(providerTokenCount),
+})
+
+/** @experimental */
+export type ModelProviderUsage = typeof ModelProviderUsage.Type
+
 /** @experimental Provider-reported cost. Absent means unknown; Baton never estimates. */
 export const ModelCost = Schema.Struct({
   amount: Schema.Finite,
@@ -159,6 +175,7 @@ export const ModelAttemptFailed = Schema.Struct({
   failedAt: Schema.Finite,
   category: ModelFailureCategory,
   classification: ModelFailureClassification,
+  providerUsage: Schema.optionalKey(ModelProviderUsage),
 })
 
 /** @experimental */
@@ -194,6 +211,7 @@ export const ModelCallCompleted = Schema.Struct({
   attempts: attemptOrdinal,
   completedAt: Schema.Finite,
   usage: Schema.optionalKey(Response.Usage),
+  failedAttemptUsage: Schema.optionalKey(ModelProviderUsage),
   finishReason: Schema.optionalKey(Response.FinishReason),
 })
 
@@ -218,6 +236,7 @@ export const ModelCallFailed = Schema.Struct({
   failedAt: Schema.Finite,
   category: ModelFailureCategory,
   classification: ModelFailureClassification,
+  failedAttemptUsage: Schema.optionalKey(ModelProviderUsage),
 })
 
 /** @experimental */

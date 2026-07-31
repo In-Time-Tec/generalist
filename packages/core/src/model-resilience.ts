@@ -29,6 +29,15 @@ export interface Interface {
 /** @experimental */
 export class ModelResilience extends Context.Service<ModelResilience, Interface>()("@batonfx/core/ModelResilience") {}
 
+/** @experimental A model resilience policy contains an unsafe correction bound. */
+export class ModelResilienceMisconfigured extends Schema.TaggedErrorClass<ModelResilienceMisconfigured>()(
+  "@batonfx/core/ModelResilienceMisconfigured",
+  {
+    reason: Schema.Literal("invalid-tool-call-correction-limit"),
+    message: Schema.String,
+  },
+) {}
+
 /**
  * @experimental A stream that ended without its terminal event is retryable
  * only while nothing a consumer would replay escaped downstream; retrying after
@@ -51,22 +60,38 @@ export const none: Interface = {
   invalidToolCallCorrectionLimit: 0,
 }
 
-/** @experimental */
-export const make = (input?: Partial<Interface>): Interface => ({
-  classify: input?.classify ?? defaultClassify,
-  resolve: input?.resolve ?? defaultResolveFailure,
-  retrySchedule: input?.retrySchedule ?? none.retrySchedule,
-  invalidToolCallCorrectionLimit: input?.invalidToolCallCorrectionLimit ?? 0,
-  ...(input?.streamIdleTimeout === undefined ? {} : { streamIdleTimeout: input.streamIdleTimeout }),
-})
+const misconfigured = (): ModelResilienceMisconfigured =>
+  ModelResilienceMisconfigured.make({
+    reason: "invalid-tool-call-correction-limit",
+    message: "invalidToolCallCorrectionLimit must be a safe integer between 0 and 2",
+  })
+
+/** @experimental Validate a structurally supplied model resilience policy. */
+export const validate = (implementation: Interface): Effect.Effect<Interface, ModelResilienceMisconfigured> =>
+  Effect.suspend(() => {
+    const limit = implementation.invalidToolCallCorrectionLimit
+    return Number.isSafeInteger(limit) && limit >= 0 && limit <= 2
+      ? Effect.succeed(implementation)
+      : Effect.fail(misconfigured())
+  })
 
 /** @experimental */
-export const layer = (input?: Partial<Interface>): Layer.Layer<ModelResilience> =>
-  Layer.succeed(ModelResilience, ModelResilience.of(make(input)))
+export const make = (input?: Partial<Interface>): Effect.Effect<Interface, ModelResilienceMisconfigured> =>
+  validate({
+    classify: input?.classify ?? defaultClassify,
+    resolve: input?.resolve ?? defaultResolveFailure,
+    retrySchedule: input?.retrySchedule ?? none.retrySchedule,
+    invalidToolCallCorrectionLimit: input?.invalidToolCallCorrectionLimit ?? 0,
+    ...(input?.streamIdleTimeout === undefined ? {} : { streamIdleTimeout: input.streamIdleTimeout }),
+  })
 
 /** @experimental */
-export const layerTest = (implementation: Interface): Layer.Layer<ModelResilience> =>
-  Layer.succeed(ModelResilience, ModelResilience.of(implementation))
+export const layer = (input?: Partial<Interface>): Layer.Layer<ModelResilience, ModelResilienceMisconfigured> =>
+  Layer.effect(ModelResilience, make(input).pipe(Effect.map(ModelResilience.of)))
+
+/** @experimental */
+export const layerTest = (implementation: Interface): Layer.Layer<ModelResilience, ModelResilienceMisconfigured> =>
+  Layer.effect(ModelResilience, validate(implementation).pipe(Effect.map(ModelResilience.of)))
 
 const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: Interface): Effect.Effect<A, E, R> =>
   Effect.suspend(effect).pipe(
@@ -141,12 +166,16 @@ export const apply: {
     ({
       ...model,
       generateText: ((options: never) =>
-        retryEffect(
-          () =>
-            model
-              .generateText(options)
-              .pipe(Effect.flatMap((response) => promoteResponseFailure(response, "generateText", resilience.resolve))),
-          resilience,
+        Effect.flatMap(validate(resilience), (validated) =>
+          retryEffect(
+            () =>
+              model
+                .generateText(options)
+                .pipe(
+                  Effect.flatMap((response) => promoteResponseFailure(response, "generateText", validated.resolve)),
+                ),
+            validated,
+          ),
         )) as unknown as LanguageModel.Service["generateText"],
       generateObject: (<
         ObjectEncoded extends Record<string, unknown>,
@@ -156,20 +185,28 @@ export const apply: {
         options: LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
       ) => {
         const generate = model.generateObject
-        return retryEffect(
-          () =>
-            generate(options).pipe(
-              Effect.flatMap((response) => promoteResponseFailure(response, "generateObject", resilience.resolve)),
-            ),
-          resilience,
+        return Effect.flatMap(validate(resilience), (validated) =>
+          retryEffect(
+            () =>
+              generate(options).pipe(
+                Effect.flatMap((response) => promoteResponseFailure(response, "generateObject", validated.resolve)),
+              ),
+            validated,
+          ),
         )
       }) as unknown as LanguageModel.Service["generateObject"],
       streamText: ((options: never) =>
-        retryStream(
-          () => promoteStreamFailures(model.streamText(options), resilience.resolve),
-          (error) => Response.makePart("error", { error }),
-          resilience,
-          (part: Response.StreamPart<never>) => part.type !== "response-metadata",
+        Stream.unwrap(
+          validate(resilience).pipe(
+            Effect.map((validated) =>
+              retryStream(
+                () => promoteStreamFailures(model.streamText(options), validated.resolve),
+                (error) => Response.makePart("error", { error }),
+                validated,
+                (part: Response.StreamPart<never>) => part.type !== "response-metadata",
+              ),
+            ),
+          ),
         )) as unknown as LanguageModel.Service["streamText"],
     }) as LanguageModel.Service,
 )

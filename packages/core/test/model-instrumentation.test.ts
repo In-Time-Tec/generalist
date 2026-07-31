@@ -24,6 +24,9 @@ const usage = Response.Usage.make({
 
 const finishPart = Response.makePart("finish", { reason: "stop", usage, response: undefined })
 
+const makeResilience = (input?: Partial<ModelResilience.Interface>): ModelResilience.Interface =>
+  Effect.runSync(ModelResilience.make(input))
+
 const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel.Service =>
   ({
     generateText: () => Effect.succeed(new LanguageModel.GenerateTextResponse([])),
@@ -51,6 +54,34 @@ const byTag = <Tag extends ModelTelemetry.EventPayload["_tag"]>(
   events.filter((event): event is Extract<ModelTelemetry.EventPayload, { _tag: Tag }> => event._tag === tag)
 
 describe("model instrumentation", () => {
+  it.effect(
+    "rejects a structurally supplied invalid resilience policy before instrumentation invokes the provider",
+    () =>
+      Effect.gen(function* () {
+        const { events, emit } = makeCollector()
+        let calls = 0
+        const wrapped = instrument(
+          languageModel({
+            streamText: () => {
+              calls += 1
+              return Stream.make(finishPart)
+            },
+          }),
+          {
+            emit,
+            turn: 0,
+            resilience: { ...ModelResilience.none, invalidToolCallCorrectionLimit: 2.5 },
+          },
+        )
+
+        const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "must not run" })).pipe(Effect.flip)
+
+        expect(Schema.is(ModelResilience.ModelResilienceMisconfigured)(failure)).toBe(true)
+        expect(calls).toBe(0)
+        expect(events).toEqual([])
+      }),
+  )
+
   it.effect("joins one stream call across started, parts, first outputs, and completion", () =>
     Effect.gen(function* () {
       const { events, emit } = makeCollector()
@@ -119,7 +150,10 @@ describe("model instrumentation", () => {
       const invalidToolCall = AiError.make({
         module: "TestLanguageModel",
         method: "streamText",
-        reason: AiError.InvalidOutputError.make({ description: "tool arguments were not valid JSON" }),
+        reason: AiError.InvalidOutputError.make({
+          description: "tool arguments were not valid JSON",
+          usage: { totalTokens: 10 },
+        }),
       })
       const prompts: Array<Prompt.Prompt> = []
       let calls = 0
@@ -143,7 +177,7 @@ describe("model instrumentation", () => {
         {
           emit,
           turn: 2,
-          resilience: ModelResilience.make({
+          resilience: makeResilience({
             retrySchedule: Schedule.recurs(0),
             invalidToolCallCorrectionLimit: 1,
           }),
@@ -166,6 +200,12 @@ describe("model instrumentation", () => {
         correction?.role === "user" &&
           correction.content.some((part) => part.type === "text" && part.text.includes("invalid tool call")),
       ).toBe(true)
+      const [failedAttempt] = byTag(events, "ModelAttemptFailed")
+      const [completedCall] = byTag(events, "ModelCallCompleted")
+      expect(failedAttempt?.providerUsage).toEqual({ totalTokens: 10 })
+      expect(completedCall?.failedAttemptUsage).toEqual({ totalTokens: 10 })
+      expect(completedCall?.usage).toEqual(usage)
+      expect("description" in (failedAttempt?.providerUsage ?? {})).toBe(false)
       expect(byTag(events, "ModelCallFailed")).toHaveLength(0)
       expect(byTag(events, "ModelCallCompleted")).toHaveLength(1)
     }),
@@ -174,24 +214,43 @@ describe("model instrumentation", () => {
   it.effect("fails one logical call after its invalid-tool correction limit is exhausted", () =>
     Effect.gen(function* () {
       const { events, emit } = makeCollector()
-      const invalidToolCall = AiError.make({
-        module: "TestLanguageModel",
-        method: "streamText",
-        reason: AiError.InvalidOutputError.make({ description: "bad tool arguments" }),
-      })
+      const failures = [
+        AiError.make({
+          module: "TestLanguageModel",
+          method: "streamText",
+          reason: AiError.InvalidOutputError.make({
+            description: "bad tool arguments containing secret params",
+            usage: { promptTokens: 7, completionTokens: 3, totalTokens: 10 },
+          }),
+        }),
+        AiError.make({
+          module: "TestLanguageModel",
+          method: "streamText",
+          reason: AiError.InvalidOutputError.make({ description: "bad tool arguments without usage" }),
+        }),
+        AiError.make({
+          module: "TestLanguageModel",
+          method: "streamText",
+          reason: AiError.InvalidOutputError.make({
+            description: "more bad tool arguments",
+            usage: { promptTokens: 5, completionTokens: 2, totalTokens: 7 },
+          }),
+        }),
+      ]
       let calls = 0
       const wrapped = instrument(
         languageModel({
           streamText: () =>
             Stream.suspend(() => {
+              const failure = failures[calls]!
               calls += 1
-              return Stream.fail(invalidToolCall)
+              return Stream.fail(failure)
             }),
         }),
         {
           emit,
           turn: 0,
-          resilience: ModelResilience.make({
+          resilience: makeResilience({
             retrySchedule: Schedule.recurs(0),
             invalidToolCallCorrectionLimit: 2,
           }),
@@ -200,13 +259,22 @@ describe("model instrumentation", () => {
 
       const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "use the tool" })).pipe(Effect.flip)
 
-      expect(failure).toBe(invalidToolCall)
+      expect(failure).toBe(failures[2])
       expect(calls).toBe(3)
       expect(byTag(events, "ModelAttemptStarted")).toHaveLength(3)
       expect(byTag(events, "ModelRetryScheduled").map((event) => event.reason)).toEqual([
         "invalid-tool-call-correction",
         "invalid-tool-call-correction",
       ])
+      expect(byTag(events, "ModelAttemptFailed").map((event) => event.providerUsage)).toEqual([
+        { inputTokens: 7, outputTokens: 3, totalTokens: 10 },
+        undefined,
+        { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+      ])
+      const [failedCall] = byTag(events, "ModelCallFailed")
+      expect(failedCall?.failedAttemptUsage).toEqual({ inputTokens: 12, outputTokens: 5, totalTokens: 17 })
+      expect(failedCall).not.toHaveProperty("description")
+      expect(failedCall).not.toHaveProperty("params")
       expect(byTag(events, "ModelCallFailed")).toHaveLength(1)
       expect(byTag(events, "ModelCallCompleted")).toHaveLength(0)
     }),
@@ -233,7 +301,7 @@ describe("model instrumentation", () => {
         {
           emit,
           turn: 0,
-          resilience: ModelResilience.make({
+          resilience: makeResilience({
             retrySchedule: Schedule.recurs(0),
             invalidToolCallCorrectionLimit: 2,
           }),
@@ -303,7 +371,7 @@ describe("model instrumentation", () => {
         {
           emit,
           turn: 1,
-          resilience: ModelResilience.make({
+          resilience: makeResilience({
             retrySchedule: Schedule.exponential("100 millis"),
             classify: (error) => (error === transientError ? "transient" : "terminal"),
           }),
@@ -378,7 +446,7 @@ describe("model instrumentation", () => {
         {
           emit,
           turn: 2,
-          resilience: ModelResilience.make({
+          resilience: makeResilience({
             retrySchedule: Schedule.recurs(1),
             classify: (error) => (error === transientError ? "transient" : "terminal"),
           }),
@@ -416,7 +484,7 @@ describe("model instrumentation", () => {
       const wrapped = instrument(languageModel({ generateText: () => Effect.fail(terminalError) }), {
         emit,
         turn: 0,
-        resilience: ModelResilience.make({
+        resilience: makeResilience({
           retrySchedule: Schedule.exponential("100 millis"),
           classify: (error) => (error === transientError ? "transient" : "terminal"),
         }),
@@ -454,7 +522,7 @@ describe("model instrumentation", () => {
         {
           emit,
           turn: 0,
-          resilience: ModelResilience.make({ retrySchedule: Schedule.recurs(1) }),
+          resilience: makeResilience({ retrySchedule: Schedule.recurs(1) }),
         },
       )
 
@@ -485,7 +553,7 @@ describe("model instrumentation", () => {
         {
           emit,
           turn: 0,
-          resilience: ModelResilience.make({
+          resilience: makeResilience({
             retrySchedule: Schedule.exponential("100 millis"),
             classify: (error) => (error === transientError ? "transient" : "terminal"),
           }),
@@ -588,7 +656,7 @@ describe("model instrumentation", () => {
         {
           emit,
           turn: 0,
-          resilience: ModelResilience.make({
+          resilience: makeResilience({
             retrySchedule: Schedule.recurs(1),
             streamIdleTimeout: "10 millis",
           }),
@@ -630,7 +698,7 @@ describe("model instrumentation", () => {
         {
           emit,
           turn: 0,
-          resilience: ModelResilience.make({
+          resilience: makeResilience({
             retrySchedule: Schedule.recurs(2),
             streamIdleTimeout: "10 millis",
           }),
@@ -868,7 +936,7 @@ describe("model instrumentation", () => {
         {
           emit,
           turn: 0,
-          resilience: ModelResilience.make({
+          resilience: makeResilience({
             retrySchedule: Schedule.exponential("100 millis"),
             classify: (error) => {
               classified.push(error)

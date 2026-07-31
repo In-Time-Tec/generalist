@@ -350,7 +350,7 @@ layer(Layer.empty)("TestModel: remaining behavior", (it) => {
       const fixture = yield* TestModel.make([TestModel.failure(retryable), TestModel.text("retried")])
       const services = yield* Layer.build(fixture.layer)
       const model = yield* LanguageModel.LanguageModel.pipe(Effect.provide(services))
-      const resilient = ModelResilience.apply(model, ModelResilience.make({ retrySchedule: Schedule.recurs(1) }))
+      const resilient = ModelResilience.apply(model, yield* ModelResilience.make({ retrySchedule: Schedule.recurs(1) }))
 
       const response = yield* resilient.generateText({ prompt: "retry request" })
       const requests = yield* fixture.requests
