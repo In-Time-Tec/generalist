@@ -1,12 +1,16 @@
 /** @effect-diagnostics missingPipeableSignature:skip-file */
 import { Effect, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { ModelProviderUsage, providerUsage } from "./model-attempt-observation.js"
 import { type ToolJsonSchemaCompiler, toolJsonSchemaCompiler } from "./model-registry.js"
 
 /** @experimental A model emitted parameters that do not satisfy the named Effect tool schema. */
 export class InvalidToolCallParameters extends Schema.TaggedErrorClass<InvalidToolCallParameters>()(
   "@batonfx/core/InvalidToolCallParameters",
-  { toolName: Schema.String },
+  {
+    toolName: Schema.String,
+    providerUsage: Schema.optionalKey(ModelProviderUsage),
+  },
 ) {}
 
 /** @experimental Tool correction was enabled for schema-backed tools, but the active model has no exact compiler. */
@@ -114,7 +118,13 @@ export const projectToolkit = (
 
 const findTool = (toolkit: Toolkit.Any, name: string): Tool.Any | undefined => toolkit.tools[name]
 
-const invalid = (name: string): InvalidToolCallParameters => InvalidToolCallParameters.make({ toolName: name })
+const invalid = (name: string, usage?: Response.Usage): InvalidToolCallParameters => {
+  const reportedUsage = usage === undefined ? undefined : providerUsage.fromResponse(usage)
+  return InvalidToolCallParameters.make({
+    toolName: name,
+    ...(reportedUsage === undefined ? {} : { providerUsage: reportedUsage }),
+  })
+}
 
 /** @experimental Decode one raw model tool call with the original Effect parameter schema. */
 export const decodeToolCall = (
@@ -161,6 +171,7 @@ const validatedStream = (
 ): Stream.Stream<Response.StreamPart<any>, any, any> =>
   Stream.suspend(() => {
     let released = false
+    let invalidToolName: string | undefined
     let buffered: Array<Response.StreamPart<any>> = []
     const release = (part: Response.StreamPart<any>): ReadonlyArray<Response.StreamPart<any>> => {
       released = true
@@ -170,6 +181,11 @@ const validatedStream = (
     }
     return stream.pipe(
       Stream.mapEffect((part) => {
+        if (invalidToolName !== undefined) {
+          return part.type === "finish"
+            ? Effect.fail(invalid(invalidToolName, part.usage))
+            : Effect.succeed<ReadonlyArray<Response.StreamPart<any>>>([])
+        }
         if (released) {
           return part.type === "tool-call"
             ? decodeToolCall(original, part).pipe(Effect.map((decoded) => [decoded]))
@@ -181,11 +197,22 @@ const validatedStream = (
             return []
           })
         }
-        return part.type === "tool-call"
-          ? decodeToolCall(original, part).pipe(Effect.map((decoded) => release(decoded)))
-          : Effect.succeed(release(part))
+        if (part.type !== "tool-call") return Effect.succeed(release(part))
+        return decodeToolCall(original, part).pipe(
+          Effect.map((decoded) => release(decoded)),
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              invalidToolName = error.toolName
+              buffered = []
+              return []
+            }),
+          ),
+        )
       }),
       Stream.flatMap(Stream.fromIterable),
+      Stream.concat(
+        Stream.suspend(() => (invalidToolName === undefined ? Stream.empty : Stream.fail(invalid(invalidToolName)))),
+      ),
     )
   })
 
@@ -212,7 +239,7 @@ export const prepare = (
   if (correctionLimit === 0 || Object.keys(original.tools).length === 0) return Effect.succeed(model)
   const compile = toolJsonSchemaCompiler(model)
   const requiresCompiler = Object.values(original.tools).some(
-    (tool) => !Tool.isDynamic(tool) || tool.jsonSchema === undefined,
+    (tool) => !Tool.isProviderDefined(tool) && (!Tool.isDynamic(tool) || tool.jsonSchema === undefined),
   )
   if (requiresCompiler && compile === undefined) return Effect.fail(ToolJsonSchemaCompilerMissing.make({}))
   return project(original, compile).pipe(Effect.map((projected) => wrap(model, original, projected.toolkit)))

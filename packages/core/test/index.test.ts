@@ -8,7 +8,6 @@ import {
   Model as EffectModel,
   Prompt as EffectPrompt,
   Response as EffectResponse,
-  ResponseIdTracker as EffectResponseIdTracker,
   Telemetry as EffectTelemetry,
   Tokenizer as EffectTokenizer,
   Tool as EffectTool,
@@ -24,7 +23,6 @@ import {
   ModelTelemetry,
   Prompt,
   Response,
-  ResponseIdTracker,
   Telemetry,
   Tokenizer,
   Tool,
@@ -44,7 +42,6 @@ describe("@batonfx/core public surface", () => {
     expect(EmbeddingModel).toBe(EffectEmbeddingModel)
     expect(IdGenerator).toBe(EffectIdGenerator)
     expect(Model).toBe(EffectModel)
-    expect(ResponseIdTracker).toBe(EffectResponseIdTracker)
     expect(Telemetry).toBe(EffectTelemetry)
   })
 

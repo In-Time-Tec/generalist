@@ -1,6 +1,95 @@
-import { Cause, Option } from "effect"
-import { Response } from "effect/unstable/ai"
-import type { ModelFirstOutputKind } from "./model-telemetry.js"
+import { Cause, Clock, Duration, Effect, Option, Schedule, Schema } from "effect"
+import { AiError, Response, ResponseIdTracker } from "effect/unstable/ai"
+import type { Classification, Interface as Resilience } from "./model-resilience.js"
+import type { EventPayload, ModelFailureCategory, ModelFirstOutputKind } from "./model-telemetry.js"
+
+export const disabledResponseIdTracker: ResponseIdTracker.Service = {
+  clearUnsafe: () => undefined,
+  markParts: () => undefined,
+  prepareUnsafe: () => Option.none(),
+}
+
+const ProviderTokenCount = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(0),
+  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
+)
+
+export const ModelProviderUsage = Schema.Struct({
+  inputTokens: Schema.optionalKey(ProviderTokenCount),
+  outputTokens: Schema.optionalKey(ProviderTokenCount),
+  totalTokens: Schema.optionalKey(ProviderTokenCount),
+})
+
+export type ModelProviderUsage = typeof ModelProviderUsage.Type
+
+const tokenCount = (value: number | undefined): number | undefined =>
+  value !== undefined && Number.isSafeInteger(value) && value >= 0 ? value : undefined
+
+const makeProviderUsage = (
+  input: number | undefined,
+  output: number | undefined,
+  total: number | undefined,
+): ModelProviderUsage | undefined => {
+  const inputTokens = tokenCount(input)
+  const outputTokens = tokenCount(output)
+  const totalTokens = tokenCount(total)
+  if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined) return undefined
+  return {
+    ...(inputTokens === undefined ? {} : { inputTokens }),
+    ...(outputTokens === undefined ? {} : { outputTokens }),
+    ...(totalTokens === undefined ? {} : { totalTokens }),
+  }
+}
+
+const responseUsageToProviderUsage = (usage: Response.Usage): ModelProviderUsage | undefined =>
+  makeProviderUsage(usage.inputTokens.total, usage.outputTokens.total, undefined)
+
+const providerUsageFromError = (error: unknown): ModelProviderUsage | undefined => {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "_tag" in error &&
+    error._tag === "@batonfx/core/InvalidToolCallParameters" &&
+    "providerUsage" in error
+  ) {
+    return error.providerUsage as ModelProviderUsage | undefined
+  }
+  if (!AiError.isAiError(error)) return undefined
+  if (error.reason._tag !== "InvalidOutputError" && error.reason._tag !== "StructuredOutputError") return undefined
+  const usage = error.reason.usage
+  return usage === undefined
+    ? undefined
+    : makeProviderUsage(usage.promptTokens, usage.completionTokens, usage.totalTokens)
+}
+
+const addTokenCount = (left: number | undefined, right: number | undefined): number | undefined => {
+  if (left === undefined) return right
+  if (right === undefined) return left
+  const total = left + right
+  return Number.isSafeInteger(total) ? total : undefined
+}
+
+const addProviderUsage = (
+  left: ModelProviderUsage | undefined,
+  right: ModelProviderUsage | undefined,
+): ModelProviderUsage | undefined => {
+  if (left === undefined) return right
+  if (right === undefined) return left
+  const inputTokens = addTokenCount(left.inputTokens, right.inputTokens)
+  const outputTokens = addTokenCount(left.outputTokens, right.outputTokens)
+  const totalTokens = addTokenCount(left.totalTokens, right.totalTokens)
+  return {
+    ...(inputTokens === undefined ? {} : { inputTokens }),
+    ...(outputTokens === undefined ? {} : { outputTokens }),
+    ...(totalTokens === undefined ? {} : { totalTokens }),
+  }
+}
+
+export const providerUsage = {
+  add: addProviderUsage,
+  fromError: providerUsageFromError,
+  fromResponse: responseUsageToProviderUsage,
+}
 
 export const memoized = <Result>(compute: (error: unknown) => Result): ((error: unknown) => Result) => {
   const cache = new Map<unknown, Result>()
@@ -35,3 +124,39 @@ export const firstOutputKind = (part: Response.AnyPart): ModelFirstOutputKind | 
       return undefined
   }
 }
+
+interface RetryContext {
+  readonly resilience: Resilience
+  readonly classify: (error: unknown) => Classification
+  readonly categorize: (error: unknown) => ModelFailureCategory
+  readonly attempt: () => number
+  readonly turn: number
+  readonly modelCallId: string
+  readonly emit: (event: EventPayload) => Effect.Effect<void>
+}
+
+export const tapRetryTelemetry = (context: RetryContext): Resilience => ({
+  classify: context.classify,
+  resolve: context.resilience.resolve,
+  invalidToolCallCorrectionLimit: context.resilience.invalidToolCallCorrectionLimit,
+  ...(context.resilience.streamIdleTimeout === undefined
+    ? {}
+    : { streamIdleTimeout: context.resilience.streamIdleTimeout }),
+  retrySchedule: (context.resilience.retrySchedule as Schedule.Schedule<unknown, unknown>).pipe(
+    Schedule.while(({ input }) => context.classify(input) === "transient"),
+    Schedule.tap((metadata) =>
+      Effect.flatMap(Clock.currentTimeMillis, (at) =>
+        context.emit({
+          _tag: "ModelRetryScheduled",
+          turn: context.turn,
+          modelCallId: context.modelCallId,
+          attempt: context.attempt(),
+          reason: "provider-resilience",
+          category: context.categorize(metadata.input),
+          delayMillis: Duration.toMillis(metadata.duration),
+          at,
+        }),
+      ),
+    ),
+  ) as Schedule.Schedule<unknown>,
+})

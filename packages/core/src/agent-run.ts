@@ -1476,7 +1476,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                     }),
                   )
                 }
-                if (transformed.type !== "tool-call" || transformed === part) {
+                if (transformed.type !== "tool-call") {
                   return Effect.succeed(Option.some<Response.StreamPart<any>>(transformed))
                 }
                 return validateDecodedToolCall(toolkit, transformed).pipe(

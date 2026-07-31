@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Exit, Fiber, Function, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { AiError, LanguageModel, Model, Prompt, Response } from "effect/unstable/ai"
+import { AiError, LanguageModel, Model, Prompt, Response, ResponseIdTracker } from "effect/unstable/ai"
 import { ModelResilience, ModelStreamTermination, ModelTelemetry, ModelToolCallValidation } from "../src/index"
 import { instrument, makeIdentityCell } from "../src/model-instrumentation"
 
@@ -54,6 +54,53 @@ const byTag = <Tag extends ModelTelemetry.EventPayload["_tag"]>(
   events.filter((event): event is Extract<ModelTelemetry.EventPayload, { _tag: Tag }> => event._tag === tag)
 
 describe("model instrumentation", () => {
+  it.effect("disables the SDK response-id fallback so each Baton attempt invokes the provider once", () =>
+    Effect.gen(function* () {
+      const first = Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "first" })] })
+      const assistant = Prompt.makeMessage("assistant", {
+        content: [Prompt.makePart("text", { text: "answer" })],
+      })
+      const next = Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "next" })] })
+      const prompt = Prompt.fromMessages([first, assistant, next])
+      const incrementalRejected = AiError.make({
+        module: "ResponseIdFallbackTest",
+        method: "request",
+        reason: AiError.InvalidRequestError.make({ description: "incremental request rejected" }),
+      })
+      const tracker = yield* ResponseIdTracker.make
+      tracker.markParts([first], "previous-response")
+      let generateRawCalls = 0
+      let streamRawCalls = 0
+      const model = yield* LanguageModel.make({
+        generateText: (options) => {
+          generateRawCalls += 1
+          return options.previousResponseId === undefined
+            ? Effect.succeed([
+                Response.makePart("text", { text: "generated" }),
+                finishPart,
+              ] as Array<Response.PartEncoded>)
+            : Effect.fail(incrementalRejected)
+        },
+        streamText: (options) => {
+          streamRawCalls += 1
+          return options.previousResponseId === undefined
+            ? Stream.make(Response.makePart("text-delta", { id: "text", delta: "streamed" }), finishPart)
+            : Stream.fail(incrementalRejected)
+        },
+      })
+      const { emit } = makeCollector()
+      const wrapped = instrument(model, { emit, turn: 0 })
+
+      yield* wrapped.generateText({ prompt }).pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, tracker))
+      yield* wrapped
+        .streamText({ prompt })
+        .pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, tracker), Stream.runDrain)
+
+      expect(generateRawCalls).toBe(1)
+      expect(streamRawCalls).toBe(1)
+    }),
+  )
+
   it.effect(
     "rejects a structurally supplied invalid resilience policy before instrumentation invokes the provider",
     () =>

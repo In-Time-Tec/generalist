@@ -78,6 +78,14 @@ const lookup = Tool.make("lookup", {
 })
 const toolkit = Toolkit.make(lookup)
 const toolLayer = toolkit.toLayer({ lookup: () => Effect.succeed("ok") })
+const reportedUsage = (inputTokens: number, outputTokens: number): Response.Usage =>
+  Response.Usage.make({
+    inputTokens: { uncached: inputTokens, total: inputTokens, cacheRead: undefined, cacheWrite: undefined },
+    outputTokens: { total: outputTokens, text: outputTokens, reasoning: undefined },
+  })
+
+const invalidUsage = reportedUsage(7, 3)
+const successfulUsage = reportedUsage(11, 5)
 const invalidToolParts = Stream.make(
   Response.makePart("response-metadata", {
     id: "discarded",
@@ -94,10 +102,12 @@ const invalidToolParts = Stream.make(
     name: "lookup",
     params: { value: 1 },
   } as Response.StreamPartEncoded,
+  Response.makePart("finish", { reason: "tool-calls", usage: invalidUsage, response: undefined }),
 )
 
-const healthy = withProviderFinish(
-  Stream.make(Response.makePart("text-delta", { id: "text", delta: "recovered" }) as Response.StreamPartEncoded),
+const healthy = Stream.make(
+  Response.makePart("text-delta", { id: "text", delta: "recovered" }) as Response.StreamPartEncoded,
+  Response.makePart("finish", { reason: "stop", usage: successfulUsage, response: undefined }),
 )
 
 const resilience = ModelResilience.layer({ retrySchedule: Schedule.recurs(3) })
@@ -145,6 +155,19 @@ describe("agent model stream replay safety", () => {
       expect(completed?._tag === "Completed" && completed.text).toBe("recovered")
       const modelParts = Array.from(events).filter((event) => event._tag === "ModelPart")
       expect(modelParts.every((event) => event.part.type !== "tool-params-start")).toBe(true)
+      const failedAttempt = Array.from(events).find((event) => event._tag === "ModelAttemptFailed")
+      const completedCall = Array.from(events).find((event) => event._tag === "ModelCallCompleted")
+      const completedAttempts = Array.from(events).filter((event) => event._tag === "ModelAttemptCompleted")
+      expect(failedAttempt?._tag === "ModelAttemptFailed" && failedAttempt.providerUsage).toEqual({
+        inputTokens: 7,
+        outputTokens: 3,
+      })
+      expect(completedCall?._tag === "ModelCallCompleted" && completedCall.failedAttemptUsage).toEqual({
+        inputTokens: 7,
+        outputTokens: 3,
+      })
+      expect(completedCall?._tag === "ModelCallCompleted" && completedCall.usage).toEqual(successfulUsage)
+      expect(completedAttempts.map((event) => event.usage)).toEqual([successfulUsage])
     }),
   )
 
@@ -241,6 +264,39 @@ describe("agent model stream replay safety", () => {
           {
             transformPart: (part) =>
               Effect.succeed(Option.some(part.type === "tool-call" ? { ...part, params: { value: 1 } } : part)),
+          },
+        ]),
+      ).pipe(Effect.flip)
+
+      expect(Schema.is(AgentEvent.MiddlewareViolation)(failure)).toBe(true)
+      expect(model.attempts()).toBe(1)
+    }),
+  )
+
+  it.effect("revalidates a tool call that middleware mutates in place", () =>
+    Effect.gen(function* () {
+      const model = scriptedModel(
+        [
+          withProviderFinish(
+            Stream.make({
+              type: "tool-call",
+              id: "call-1",
+              name: "lookup",
+              params: { value: "valid" },
+            } as Response.StreamPartEncoded),
+          ),
+        ],
+        true,
+      )
+      const failure = yield* runAgent(
+        model.layer,
+        ModelResilience.layer({ invalidToolCallCorrectionLimit: 2 }),
+        ModelMiddleware.layer([
+          {
+            transformPart: (part) => {
+              if (part.type === "tool-call") Object.assign(part, { params: { value: 1 } })
+              return Effect.succeed(Option.some(part))
+            },
           },
         ]),
       ).pipe(Effect.flip)

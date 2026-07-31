@@ -112,7 +112,7 @@ export const coreModelsReference = definePage({
       code(
         '{ resolve: (input) => AiError; classify: (error) => "transient" | "terminal"; retrySchedule: Schedule; invalidToolCallCorrectionLimit: number; streamIdleTimeout?: Duration.Input }',
       ),
-      "; only transient-classified errors retry. Invalid-tool correction limits are safe integers from 0 through 2, and generic InvalidOutputError values never enter that correction path. Direct custom models using correction with schema-backed tools attach their provider-exact compiler through ModelRegistry.withToolJsonSchemaCompiler.",
+      "; only transient-classified errors retry. Invalid-tool correction limits are safe integers from 0 through 2, and generic InvalidOutputError values never enter that correction path. Direct custom models using correction with schema-backed tools attach their provider-exact compiler through ModelRegistry.withToolJsonSchemaCompiler. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock register compilers; OpenRouter rejects schema-backed correction before transport because its pinned adapter cannot preserve the permissive projection's compiled request schema.",
     ),
     table(
       ["Export", "Notes"],

@@ -9,7 +9,15 @@ import {
   Toolkit,
 } from "effect/unstable/ai"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
-import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
+import {
+  Agent,
+  Approvals,
+  ModelMiddleware,
+  ModelRegistry,
+  ModelResilience,
+  ModelToolCallValidation,
+  ToolExecutor,
+} from "@batonfx/core"
 import {
   classifyFailure as classifyAnthropicFailure,
   layer as anthropicLayer,
@@ -25,11 +33,7 @@ import {
   layer as compatibleLayer,
   toolJsonSchemaCompiler as compatibleToolJsonSchemaCompiler,
 } from "@batonfx/providers/openai-compat"
-import {
-  classifyFailure as classifyOpenRouterFailure,
-  layer as openRouterLayer,
-  toolJsonSchemaCompiler as openRouterToolJsonSchemaCompiler,
-} from "@batonfx/providers/openrouter"
+import { classifyFailure as classifyOpenRouterFailure, layer as openRouterLayer } from "@batonfx/providers/openrouter"
 import { Deterministic, Embedding, Presets } from "../src/index.js"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
@@ -70,15 +74,11 @@ describe("providers", () => {
     const expectedAnthropic = Tool.getJsonSchema(tool, {
       transformer: AnthropicStructuredOutput.toCodecAnthropic,
     })
-    const expectedDefault = Tool.getJsonSchema(tool, { transformer: LanguageModel.defaultCodecTransformer })
 
     return Effect.gen(function* () {
       expect(yield* openAiToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
       expect(yield* compatibleToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
       expect(yield* anthropicToolJsonSchemaCompiler(tool)).toEqual(expectedAnthropic)
-      expect(yield* openRouterToolJsonSchemaCompiler("anthropic/claude-test")(tool)).toEqual(expectedAnthropic)
-      expect(yield* openRouterToolJsonSchemaCompiler("openai/gpt-test")(tool)).toEqual(expectedOpenAi)
-      expect(yield* openRouterToolJsonSchemaCompiler("other/model")(tool)).toEqual(expectedDefault)
     })
   })
 
@@ -418,8 +418,39 @@ describe("providers", () => {
           ["anthropic", "claude-test"],
           ["openrouter", "openrouter-test"],
         ])
+        const openRouterCompiler = yield* ModelRegistry.operate(
+          { provider: "openrouter", model: "openrouter-test" },
+          LanguageModel.LanguageModel.pipe(Effect.map(ModelRegistry.toolJsonSchemaCompiler)),
+        )
+        expect(openRouterCompiler).toBeUndefined()
       }),
     )
+  })
+
+  testLayer(
+    Layer.mergeAll(
+      Layer.provide(
+        openRouterLayer({ model: "openrouter-test", apiKey }),
+        Layer.succeed(HttpClient.HttpClient, hostHttpClient),
+      ),
+      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+      Approvals.layerAutoApprove,
+      ModelMiddleware.layerIdentity,
+      unexpectedToolLayer,
+      ModelResilience.layer({ invalidToolCallCorrectionLimit: 1 }).pipe(Layer.orDie),
+    ),
+  )((test) => {
+    test.effect("rejects schema-backed OpenRouter correction before transport", () => {
+      const agent = Agent.make({ name: "openrouter-correction-agent", toolkit: unexpectedToolkit })
+      return Effect.gen(function* () {
+        const failure = yield* ModelRegistry.operate(
+          { provider: "openrouter", model: "openrouter-test" },
+          Agent.generate({ prompt: "do not send" })(agent),
+        ).pipe(Effect.flip)
+
+        expect(Schema.is(ModelToolCallValidation.ToolJsonSchemaCompilerMissing)(failure)).toBe(true)
+      })
+    })
   })
 
   it("builds embedding layers without live calls", () => {

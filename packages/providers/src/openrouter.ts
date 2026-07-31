@@ -1,7 +1,7 @@
 import { OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter"
 import { ContextOverflow, ModelRegistry } from "@batonfx/core"
-import { Config, Effect, Layer, Redacted } from "effect"
-import { AiError, AnthropicStructuredOutput, LanguageModel, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
+import { Config, Layer, Redacted } from "effect"
+import { AiError } from "effect/unstable/ai"
 import { layerImageSources } from "./image-source.js"
 import { type FailureInput, layerModelFailures } from "./model-failure.js"
 import type { RegistrationOptions } from "./openai.js"
@@ -88,39 +88,6 @@ const openRouterLanguageModelLayer = (input: OpenRouterInput) =>
 /** @experimental */
 export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 
-const codecTransformer = (model: string): LanguageModel.CodecTransformer => {
-  if (model.startsWith("anthropic/") || model.startsWith("claude-")) {
-    return AnthropicStructuredOutput.toCodecAnthropic
-  }
-  if (
-    model.startsWith("openai/") ||
-    model.startsWith("gpt-") ||
-    model.startsWith("o1-") ||
-    model.startsWith("o3-") ||
-    model.startsWith("o4-")
-  ) {
-    return OpenAiStructuredOutput.toCodecOpenAI
-  }
-  return LanguageModel.defaultCodecTransformer
-}
-
-/** @experimental */
-export const toolJsonSchemaCompiler = (model: string): ModelRegistry.ToolJsonSchemaCompiler => {
-  const transformer = codecTransformer(model)
-  return (tool) =>
-    Effect.try({
-      try: () => Tool.getJsonSchema(tool, { transformer }),
-      catch: (error) =>
-        AiError.make({
-          module: "OpenRouterLanguageModel",
-          method: "prepareTools",
-          reason: AiError.UnsupportedSchemaError.make({
-            description: error instanceof Error ? error.message : String(error),
-          }),
-        }),
-    })
-}
-
 /** @experimental */
 export interface LayerOptions extends OpenRouterInput {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
@@ -135,7 +102,6 @@ export const layer = (input: LayerOptions) =>
       model: input.model,
       layer: openRouterLanguageModelLayer(input),
       classifyFailure,
-      toolJsonSchemaCompiler: toolJsonSchemaCompiler(input.model),
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     }),

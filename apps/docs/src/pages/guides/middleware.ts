@@ -97,7 +97,7 @@ export const middleware = definePage({
       [
         "Response metadata is withheld while a retry is possible. Reasoning, text, and tool-call output are absolute retry barriers, so a consumed stream is never replayed.",
         "Set streamIdleTimeout only when the host wants an explicit model-silence deadline; Baton has no hidden timeout.",
-        "Set invalidToolCallCorrectionLimit (0–2) to allow bounded, instrumented correction attempts under the same logical model call. Baton corrects only its precise pre-emission tool-parameter validation signal; generic model output decode failures are terminal unless ordinary provider resilience classifies them otherwise. Direct custom models with schema-backed tools must attach their exact compiler with ModelRegistry.withToolJsonSchemaCompiler.",
+        "Set invalidToolCallCorrectionLimit (0–2) to allow bounded, instrumented correction attempts under the same logical model call. Baton corrects only its precise pre-emission tool-parameter validation signal; generic model output decode failures are terminal unless ordinary provider resilience classifies them otherwise. Direct custom models with schema-backed tools must attach their exact compiler with ModelRegistry.withToolJsonSchemaCompiler. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock support this projection; OpenRouter fails typed before transport when schema-backed correction is enabled.",
       ],
       ["Without the layer the default is ", code("ModelResilience.none"), ": every failure is terminal."],
     ),

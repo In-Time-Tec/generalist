@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Validate model-emitted tool parameters before middleware, events, authorization, execution, or history. Invalid-tool correction now uses only Baton's precise typed signal and the active provider's exact registered tool JSON Schema compiler; generic `InvalidOutputError` values never trigger correction.
-
+- Validate model-emitted tool parameters before middleware, events, authorization, execution, or history. Invalid-tool correction now uses only Baton's precise typed signal and the active provider's exact registered tool JSON Schema compiler; generic `InvalidOutputError` values never trigger correction. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock support schema-backed correction. OpenRouter rejects that policy before transport because its pinned adapter does not preserve a permissive dynamic tool's compiled request schema.
+- Preserve provider-reported usage from a withheld invalid-tool attempt until its terminal finish, and keep failed-attempt usage separate from the successful terminal attempt.
+- Remove `ResponseIdTracker` from the Baton surface and mask it inside instrumented calls so Effect's hidden incremental fallback cannot issue an uninstrumented second provider request.
 - Make one instrumented model call the sole owner of provider retries and invalid-tool-call correction. Consumer-visible reasoning, text, or tool-call output is an absolute replay barrier; the separate whole-Agent consumed-stream restart path is removed.
 - Replace the hidden model-stream liveness backstop with optional `ModelResilience.streamIdleTimeout`. An explicit idle deadline fails with typed `ModelStreamTimeout`, retries only before output, and reports the `timeout` telemetry category.
 

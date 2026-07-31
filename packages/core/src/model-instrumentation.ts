@@ -1,13 +1,19 @@
-import { Cause, Clock, Duration, Effect, Exit, Function, Option, Schedule, Stream } from "effect"
-import { AiError, LanguageModel, Model, Response } from "effect/unstable/ai"
+import { Cause, Clock, Effect, Exit, Function, Option, Stream } from "effect"
+import { AiError, LanguageModel, Model, Response, ResponseIdTracker } from "effect/unstable/ai"
 import {
   correct as correctInvalidToolCall,
   type StreamTextOptions,
   type StreamTextPart,
 } from "./model-call-correction.js"
 import type { IdentityCell } from "./model-attempt-identity.js"
-import { firstOutputKind, memoized, singleFailure } from "./model-attempt-observation.js"
-import { addProviderUsage, providerUsageFromAiError } from "./model-provider-usage.js"
+import {
+  disabledResponseIdTracker,
+  firstOutputKind,
+  memoized,
+  providerUsage,
+  singleFailure,
+  tapRetryTelemetry,
+} from "./model-attempt-observation.js"
 import { classifyFailure } from "./model-registry.js"
 import { type InvalidToolCallParameters, isInvalidToolCallParameters } from "./model-tool-call-validation.js"
 import { defaultResolveFailure, promoteResponseFailure, promoteStreamFailures } from "./model-response-failure.js"
@@ -46,7 +52,6 @@ interface InstrumentedMarker {
   readonly emit: InstrumentOptions["emit"]
   readonly base: LanguageModel.Service
 }
-
 interface CallState {
   attempts: number
   usage: Response.Usage | undefined
@@ -54,7 +59,6 @@ interface CallState {
   finishReason: Response.FinishReason | undefined
   errorCategory: ModelFailureCategory | undefined
 }
-
 interface CallContext {
   readonly options: InstrumentOptions
   readonly modelCallId: string
@@ -65,7 +69,6 @@ interface CallContext {
   readonly classify: (error: unknown) => Classification
   readonly state: CallState
 }
-
 interface Finished {
   readonly _tag: "Finished"
   readonly reason: Response.FinishReason
@@ -142,8 +145,8 @@ const attemptFailed = (
   classification: Classification,
   error?: unknown,
 ): Effect.Effect<void> => {
-  const usage = providerUsageFromAiError(error)
-  context.state.failedAttemptUsage = addProviderUsage(context.state.failedAttemptUsage, usage)
+  const usage = providerUsage.fromError(error)
+  context.state.failedAttemptUsage = providerUsage.add(context.state.failedAttemptUsage, usage)
   return Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
     context.options.emit({
       _tag: "ModelAttemptFailed",
@@ -259,39 +262,23 @@ const attemptModel = (model: LanguageModel.Service, context: CallContext): Langu
     ...model,
     generateText: ((options: never) =>
       attemptEffect(context, "generateText", () =>
-        model.generateText(options),
+        model
+          .generateText(options)
+          .pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
       )) as unknown as LanguageModel.Service["generateText"],
     generateObject: ((options: never) =>
       attemptEffect(context, "generateObject", () =>
-        (model.generateObject as unknown as (options: never) => Effect.Effect<AnyResponse, AiError.AiError>)(options),
+        (model.generateObject as unknown as (options: never) => Effect.Effect<AnyResponse, AiError.AiError>)(
+          options,
+        ).pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
       )) as unknown as LanguageModel.Service["generateObject"],
     streamText: ((options: never) =>
-      attemptStream(context, () => model.streamText(options))) as unknown as LanguageModel.Service["streamText"],
+      attemptStream(context, () =>
+        model
+          .streamText(options)
+          .pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+      )) as unknown as LanguageModel.Service["streamText"],
   }) as LanguageModel.Service
-
-const tappedResilience = (context: CallContext, resilience: Resilience): Resilience => ({
-  classify: context.classify,
-  resolve: resilience.resolve,
-  invalidToolCallCorrectionLimit: resilience.invalidToolCallCorrectionLimit,
-  ...(resilience.streamIdleTimeout === undefined ? {} : { streamIdleTimeout: resilience.streamIdleTimeout }),
-  retrySchedule: (resilience.retrySchedule as Schedule.Schedule<unknown, unknown>).pipe(
-    Schedule.while(({ input }) => context.classify(input) === "transient"),
-    Schedule.tap((metadata) =>
-      Effect.flatMap(Clock.currentTimeMillis, (at) =>
-        context.options.emit({
-          _tag: "ModelRetryScheduled",
-          turn: context.options.turn,
-          modelCallId: context.modelCallId,
-          attempt: context.state.attempts - 1,
-          reason: "provider-resilience",
-          category: context.categorize(metadata.input),
-          delayMillis: Duration.toMillis(metadata.duration),
-          at,
-        }),
-      ),
-    ),
-  ) as Schedule.Schedule<unknown>,
-})
 
 const beginCall = (
   model: LanguageModel.Service,
@@ -349,7 +336,20 @@ const beginCall = (
     }
     const attempts = attemptModel(model, context)
     const stack =
-      options.resilience === undefined ? attempts : apply(attempts, tappedResilience(context, options.resilience))
+      options.resilience === undefined
+        ? attempts
+        : apply(
+            attempts,
+            tapRetryTelemetry({
+              resilience: options.resilience,
+              classify: context.classify,
+              categorize: context.categorize,
+              attempt: () => context.state.attempts - 1,
+              turn: options.turn,
+              modelCallId: context.modelCallId,
+              emit: options.emit,
+            }),
+          )
     return { context, stack }
   })
 

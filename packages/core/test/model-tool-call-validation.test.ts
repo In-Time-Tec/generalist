@@ -147,6 +147,9 @@ describe("model tool-call validation", () => {
         expect(projectedProvider.argsSchema).toBe(providerDefined.argsSchema)
         expect(projectedProvider.parametersSchema).toBe(Schema.Unknown)
       }
+
+      const direct = yield* makeModel([])
+      yield* ModelToolCallValidation.prepare(direct, Toolkit.make(dynamic, providerDefined), 1)
     }),
   )
 

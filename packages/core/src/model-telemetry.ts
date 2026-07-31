@@ -1,7 +1,17 @@
 import { Cause, Context, Effect, Layer, Option, Schema } from "effect"
 import { AiError, IdGenerator, LanguageModel, Response } from "effect/unstable/ai"
+import {
+  ModelProviderUsage as ModelProviderUsageSchema,
+  type ModelProviderUsage as ModelProviderUsageValue,
+} from "./model-attempt-observation.js"
 import { isModelStreamTimeout, isTerminationFailure } from "./model-stream-termination.js"
 import { isInvalidToolCallParameters } from "./model-tool-call-validation.js"
+
+/** @experimental */
+export const ModelProviderUsage = ModelProviderUsageSchema
+
+/** @experimental */
+export type ModelProviderUsage = ModelProviderUsageValue
 
 /** @experimental Bounded purpose of one model call issued by the loop. */
 export const ModelCallPurpose = Schema.Literals(["conversation", "structured-output", "compaction-summary"])
@@ -47,22 +57,6 @@ export const ModelFirstOutputKind = Schema.Literals(["reasoning", "text", "tool-
 
 /** @experimental */
 export type ModelFirstOutputKind = typeof ModelFirstOutputKind.Type
-
-/** @experimental Provider-reported failed-attempt token usage. Absent fields mean unknown; Baton never estimates. */
-const providerTokenCount = Schema.Int.check(
-  Schema.isGreaterThanOrEqualTo(0),
-  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
-)
-
-/** @experimental */
-export const ModelProviderUsage = Schema.Struct({
-  inputTokens: Schema.optionalKey(providerTokenCount),
-  outputTokens: Schema.optionalKey(providerTokenCount),
-  totalTokens: Schema.optionalKey(providerTokenCount),
-})
-
-/** @experimental */
-export type ModelProviderUsage = typeof ModelProviderUsage.Type
 
 /** @experimental Provider-reported cost. Absent means unknown; Baton never estimates. */
 export const ModelCost = Schema.Struct({

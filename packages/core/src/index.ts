@@ -35,7 +35,6 @@ export {
   Model,
   Prompt,
   Response,
-  ResponseIdTracker,
   Telemetry,
   Tokenizer,
   Tool,
