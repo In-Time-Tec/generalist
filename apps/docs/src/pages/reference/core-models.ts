@@ -112,7 +112,7 @@ export const coreModelsReference = definePage({
       code(
         '{ resolve: (input) => AiError; classify: (error) => "transient" | "terminal"; retrySchedule: Schedule; invalidToolCallCorrectionLimit: number; streamIdleTimeout?: Duration.Input }',
       ),
-      "; only transient-classified errors retry.",
+      "; only transient-classified errors retry. Invalid-tool correction limits are safe integers from 0 through 2, and generic InvalidOutputError values never enter that correction path. Direct custom models using correction with schema-backed tools attach their provider-exact compiler through ModelRegistry.withToolJsonSchemaCompiler.",
     ),
     table(
       ["Export", "Notes"],

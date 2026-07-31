@@ -2,7 +2,6 @@ import { Cause, Clock, Duration, Effect, Exit, Function, Option, Schedule, Strea
 import { AiError, LanguageModel, Model, Response } from "effect/unstable/ai"
 import {
   correct as correctInvalidToolCall,
-  isInvalidToolCallOutput,
   type StreamTextOptions,
   type StreamTextPart,
 } from "./model-call-correction.js"
@@ -10,6 +9,7 @@ import type { IdentityCell } from "./model-attempt-identity.js"
 import { firstOutputKind, memoized, singleFailure } from "./model-attempt-observation.js"
 import { addProviderUsage, providerUsageFromAiError } from "./model-provider-usage.js"
 import { classifyFailure } from "./model-registry.js"
+import { type InvalidToolCallParameters, isInvalidToolCallParameters } from "./model-tool-call-validation.js"
 import { defaultResolveFailure, promoteResponseFailure, promoteStreamFailures } from "./model-response-failure.js"
 import {
   type Classification,
@@ -33,7 +33,6 @@ import {
 } from "./model-telemetry.js"
 
 export { type Identity, type IdentityCell, makeIdentityCell } from "./model-attempt-identity.js"
-
 /** @experimental Options for instrumenting one loop-owned model service. */
 export interface InstrumentOptions {
   readonly emit: (event: EventPayload) => Effect.Effect<void>
@@ -43,7 +42,6 @@ export interface InstrumentOptions {
 }
 
 const InstrumentedTypeId = Symbol.for("@batonfx/core/model-instrumentation/Instrumented")
-
 interface InstrumentedMarker {
   readonly emit: InstrumentOptions["emit"]
   readonly base: LanguageModel.Service
@@ -76,7 +74,6 @@ interface Finished {
 }
 
 type Termination = { readonly _tag: "Open" } | Finished
-
 const open: Termination = { _tag: "Open" }
 
 interface AttemptState {
@@ -336,7 +333,7 @@ const beginCall = (
         providerClassification(error) === "context-overflow" ? "context-overflow" : classifyFailureCategory(error),
       ),
       classify: memoized((error) =>
-        providerClassification(error) === "context-overflow" || isInvalidToolCallOutput(error)
+        providerClassification(error) === "context-overflow" || isInvalidToolCallParameters(error)
           ? "terminal"
           : options.resilience === undefined
             ? "terminal"
@@ -440,7 +437,10 @@ const callStream = (
   streamOptions: StreamTextOptions,
 ): Stream.Stream<
   StreamTextPart,
-  AiError.AiError | TerminationFailure | import("./model-resilience.js").ModelResilienceMisconfigured,
+  | AiError.AiError
+  | InvalidToolCallParameters
+  | TerminationFailure
+  | import("./model-resilience.js").ModelResilienceMisconfigured,
   any
 > =>
   Stream.unwrap(

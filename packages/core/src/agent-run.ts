@@ -50,6 +50,13 @@ import {
 import { instrument, makeIdentityCell } from "./model-instrumentation.js"
 import { ModelResilience } from "./model-resilience.js"
 import {
+  InvalidToolCallParameters,
+  isInvalidToolCallParameters,
+  prepare as prepareToolCallValidation,
+  ToolJsonSchemaCompilerMissing,
+  validateDecodedToolCall,
+} from "./model-tool-call-validation.js"
+import {
   CurrentCompactionId,
   CurrentInstrumentation,
   CurrentPurpose,
@@ -1454,12 +1461,34 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
 
       const transformPart = (
         turn: number,
+        toolkit: Toolkit.Toolkit<Record<string, Tool.Any>>,
         part: Response.StreamPart<any>,
       ): Effect.Effect<Option.Option<Response.StreamPart<any>>, RunError> =>
         applyPartChain(chain, part, { agentName: agent.name, turn }).pipe(
           Effect.flatMap(
             Option.match({
-              onSome: (transformed) => Effect.succeed(Option.some(transformed)),
+              onSome: (transformed): Effect.Effect<Option.Option<Response.StreamPart<any>>, MiddlewareViolation> => {
+                if (part.type === "tool-call" && transformed.type !== "tool-call") {
+                  return Effect.fail(
+                    MiddlewareViolation.make({
+                      turn,
+                      detail: "ModelMiddleware replaced a tool-call part with another part type",
+                    }),
+                  )
+                }
+                if (transformed.type !== "tool-call" || transformed === part) {
+                  return Effect.succeed(Option.some<Response.StreamPart<any>>(transformed))
+                }
+                return validateDecodedToolCall(toolkit, transformed).pipe(
+                  Effect.map((decoded) => Option.some<Response.StreamPart<any>>(decoded)),
+                  Effect.mapError(() =>
+                    MiddlewareViolation.make({
+                      turn,
+                      detail: `ModelMiddleware produced invalid parameters for tool '${transformed.name}'`,
+                    }),
+                  ),
+                )
+              },
               onNone: () =>
                 part.type === "tool-call"
                   ? Effect.fail(
@@ -1506,12 +1535,23 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
         const instrumentTurnStream = <A, E>(
           stream: Stream.Stream<A, E, LanguageModel.LanguageModel>,
-        ): Stream.Stream<A, E, LanguageModel.LanguageModel> =>
+        ): Stream.Stream<
+          A,
+          E | InvalidToolCallParameters | ToolJsonSchemaCompilerMissing | AiError.AiError,
+          LanguageModel.LanguageModel
+        > =>
           Stream.unwrap(
             LanguageModel.LanguageModel.pipe(
-              Effect.map((model) =>
+              Effect.flatMap((model) =>
+                prepareToolCallValidation(
+                  model,
+                  activeRegistry.toolkit,
+                  Option.getOrUndefined(resilienceService)?.invalidToolCallCorrectionLimit ?? 0,
+                ),
+              ),
+              Effect.map((validatedModel) =>
                 stream.pipe(
-                  Stream.provideService(LanguageModel.LanguageModel, instrumentModel(model, turn)),
+                  Stream.provideService(LanguageModel.LanguageModel, instrumentModel(validatedModel, turn)),
                   Stream.provideService(CurrentInstrumentation, {
                     emit: emitTelemetry,
                     wrap: (summaryModel) => instrumentModel(summaryModel, turn),
@@ -1604,19 +1644,23 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                               captureProviderOutput(part)
                             }),
                       ),
-                      Stream.catchCause((cause) => {
+                      Stream.catchCause((cause): Stream.Stream<Response.StreamPart<any>, RunError> => {
                         if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
                         if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
                         const error = singleFailure(cause)
                         if (Option.isNone(error)) return Stream.failCause(cause)
-                        if (Schema.is(AgentError)(error.value) || isToolNameCollision(error.value)) {
+                        if (
+                          Schema.is(AgentError)(error.value) ||
+                          isToolNameCollision(error.value) ||
+                          isInvalidToolCallParameters(error.value)
+                        ) {
                           return Stream.fail(error.value)
                         }
                         return Stream.make(Response.makePart("error", { error: error.value }))
                       }),
                     )
                     return rawParts.pipe(
-                      Stream.mapEffect((part) => transformPart(turn, part)),
+                      Stream.mapEffect((part) => transformPart(turn, activeRegistry.toolkit, part)),
                       Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
                       Stream.map((part) => ({
                         part,

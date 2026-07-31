@@ -1,7 +1,7 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai"
 import { ContextOverflow, ModelRegistry } from "@batonfx/core"
 import { Config, Effect, Function, Layer, Option, Redacted, Schema, Stream } from "effect"
-import { AiError } from "effect/unstable/ai"
+import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import type { Credential, ServiceInterface } from "./openai-account-auth.js"
 import { layerImageSources } from "./image-source.js"
 import { type FailureInput, layerModelFailures } from "./model-failure.js"
@@ -145,6 +145,20 @@ const openAiLanguageModelLayer = (input: OpenAiInput) =>
 export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 
 /** @experimental */
+export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
+  Effect.try({
+    try: () => Tool.getJsonSchema(tool, { transformer: OpenAiStructuredOutput.toCodecOpenAI }),
+    catch: (error) =>
+      AiError.make({
+        module: "OpenAiLanguageModel",
+        method: "prepareTools",
+        reason: AiError.UnsupportedSchemaError.make({
+          description: error instanceof Error ? error.message : String(error),
+        }),
+      }),
+  })
+
+/** @experimental */
 export interface LayerOptions extends OpenAiInput {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof OpenAiClient.layerConfig>[0]>, "apiKey">
@@ -158,6 +172,7 @@ export const layer = (input: LayerOptions) =>
       model: input.model,
       layer: openAiLanguageModelLayer(input),
       classifyFailure,
+      toolJsonSchemaCompiler,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     }),
@@ -170,6 +185,7 @@ export const registration = (input: OpenAiInput) =>
     model: input.model,
     layer: openAiLanguageModelLayer(input),
     classifyFailure,
+    toolJsonSchemaCompiler,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })
@@ -434,6 +450,7 @@ export const registrationAccount = (input: OpenAiAccountInput) =>
     model: input.model,
     layer: openAiLanguageModelLayer(input).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
     classifyFailure,
+    toolJsonSchemaCompiler,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })

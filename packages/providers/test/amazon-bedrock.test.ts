@@ -135,6 +135,38 @@ describe("AmazonBedrock", () => {
     }),
   )
 
+  it.effect("sends a raw dynamic tool JSON Schema instead of the permissive runtime schema", () => {
+    let request: ConverseCommandInput | undefined
+    const rawSchema = {
+      type: "object",
+      properties: { query: { type: "string" } },
+      required: ["query"],
+    } as const
+    return Effect.gen(function* () {
+      const model = yield* make({ model: "dynamic-tool-model" }).pipe(
+        Effect.provideService(
+          Client,
+          fakeClient({
+            output: {
+              ...output,
+              output: { message: { role: "assistant", content: [{ text: "ok" }] } },
+              stopReason: "end_turn",
+            },
+            capture: (value) => (request = value),
+          }),
+        ),
+      )
+      const dynamic = Tool.dynamic("search", { parameters: rawSchema })
+      yield* model.generateText({
+        prompt: "search",
+        toolkit: Toolkit.make(dynamic),
+        disableToolCallResolution: true,
+      })
+
+      expect(request?.toolConfig?.tools?.[0]?.toolSpec?.inputSchema?.json).toEqual(rawSchema)
+    })
+  })
+
   it.effect("forces the schema tool for structured output and removes only thinking", () => {
     let request: ConverseCommandInput | undefined
     const structured: ConverseCommandOutput = {

@@ -2885,7 +2885,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "denies a static tool excluded after it was active on the previous turn", () => {
+  ItLayer.make(it, "rejects middleware changing a call to an excluded static tool", () => {
     let modelCalls = 0
     let gatedExecutions = 0
     const policy = TurnPolicy.make(({ turn }) =>
@@ -2937,7 +2937,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           ),
         )
 
-        expect(failure).toMatchObject({ stage: "authorization", tool: "gated" })
+        expect(Schema.is(AgentEvent.MiddlewareViolation)(failure)).toBe(true)
         expect(gatedExecutions).toBe(0)
         expect(events.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
         expect(
@@ -2947,7 +2947,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "denies an activated skill tool excluded from the current turn", () => {
+  ItLayer.make(it, "rejects middleware introducing an excluded activated skill tool", () => {
     let modelCalls = 0
     const reviewTool = Tool.make("review_tool", {
       parameters: Schema.Struct({ target: Schema.String }),
@@ -2995,7 +2995,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           ),
         )
 
-        expect(failure).toMatchObject({ stage: "authorization", tool: "review_tool" })
+        expect(Schema.is(AgentEvent.MiddlewareViolation)(failure)).toBe(true)
         expect(events.filter((event) => event._tag === "ToolExecutionStarted")).toHaveLength(1)
         expect(
           events.some((event) => event._tag === "ToolExecutionCompleted" && event.call.id === "excluded-skill"),

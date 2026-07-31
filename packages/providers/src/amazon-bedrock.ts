@@ -1,7 +1,7 @@
 import type { ConverseCommandInput } from "@aws-sdk/client-bedrock-runtime"
 import { ContextOverflow, ModelRegistry } from "@batonfx/core"
 import { Effect, Layer, Schema, Stream } from "effect"
-import { AiError, LanguageModel } from "effect/unstable/ai"
+import { AiError, LanguageModel, Tool } from "effect/unstable/ai"
 import type { RegistrationOptions } from "./openai.js"
 import { Client, ClientFailure, layerClient, type Options } from "./amazon-bedrock-client.js"
 import { conformImageSourceModel } from "./image-source.js"
@@ -126,6 +126,19 @@ export const layerLanguageModel = (input: Input) => Layer.effect(LanguageModel.L
 /** @experimental */
 export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 /** @experimental */
+export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
+  Effect.try({
+    try: () => Tool.getJsonSchema(tool),
+    catch: (error) =>
+      AiError.make({
+        module: "AmazonBedrock",
+        method: "makeRequest",
+        reason: AiError.UnsupportedSchemaError.make({
+          description: error instanceof Error ? error.message : String(error),
+        }),
+      }),
+  })
+/** @experimental */
 export const layer = (input: Input & { readonly client?: Options }) =>
   ModelRegistry.layer([
     ModelRegistry.registration({
@@ -133,6 +146,7 @@ export const layer = (input: Input & { readonly client?: Options }) =>
       model: input.model,
       layer: layerLanguageModel(input),
       classifyFailure,
+      toolJsonSchemaCompiler,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     }),

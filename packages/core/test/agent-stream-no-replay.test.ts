@@ -1,8 +1,15 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Fiber, Layer, Schedule, Stream } from "effect"
+import { Effect, Fiber, Layer, Option, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { AiError, LanguageModel, Response } from "effect/unstable/ai"
-import { Agent, ModelResilience } from "../src/index"
+import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import {
+  Agent,
+  AgentEvent,
+  ModelMiddleware,
+  ModelRegistry,
+  ModelResilience,
+  ModelToolCallValidation,
+} from "../src/index"
 import { withProviderFinish } from "./provider-finish"
 
 const rateLimit = AiError.make({
@@ -11,7 +18,10 @@ const rateLimit = AiError.make({
   reason: AiError.RateLimitError.make({}),
 })
 
-const scriptedModel = (streams: Array<Stream.Stream<Response.StreamPartEncoded, AiError.AiError>>) => {
+const scriptedModel = (
+  streams: Array<Stream.Stream<Response.StreamPartEncoded, AiError.AiError>>,
+  withCompiler = false,
+) => {
   let attempts = 0
   const layer = Layer.effect(
     LanguageModel.LanguageModel,
@@ -23,7 +33,13 @@ const scriptedModel = (streams: Array<Stream.Stream<Response.StreamPartEncoded, 
           attempts += 1
           return script
         }),
-    }),
+    }).pipe(
+      Effect.map((model) =>
+        withCompiler
+          ? ModelRegistry.withToolJsonSchemaCompiler(model, (tool) => Effect.succeed(Tool.getJsonSchema(tool)))
+          : model,
+      ),
+    ),
   )
   return { layer, attempts: () => attempts }
 }
@@ -50,11 +66,35 @@ const inBandTextThenFail = Stream.make(
   Response.makePart("error", { error: rateLimit }) as Response.StreamPartEncoded,
 )
 
-const invalidToolCall = AiError.make({
+const malformedOutput = AiError.make({
   module: "NoReplayTestLanguageModel",
   method: "streamText",
-  reason: AiError.InvalidOutputError.make({ description: "tool arguments were not valid JSON" }),
+  reason: AiError.InvalidOutputError.make({ description: "response metadata was malformed" }),
 })
+
+const lookup = Tool.make("lookup", {
+  parameters: Schema.Struct({ value: Schema.String }),
+  success: Schema.String,
+})
+const toolkit = Toolkit.make(lookup)
+const toolLayer = toolkit.toLayer({ lookup: () => Effect.succeed("ok") })
+const invalidToolParts = Stream.make(
+  Response.makePart("response-metadata", {
+    id: "discarded",
+    modelId: "test",
+    timestamp: undefined,
+    request: undefined,
+  }) as Response.StreamPartEncoded,
+  { type: "tool-params-start", id: "call-1", name: "lookup" } as Response.StreamPartEncoded,
+  { type: "tool-params-delta", id: "call-1", delta: '{"value":1}' } as Response.StreamPartEncoded,
+  { type: "tool-params-end", id: "call-1" } as Response.StreamPartEncoded,
+  {
+    type: "tool-call",
+    id: "call-1",
+    name: "lookup",
+    params: { value: 1 },
+  } as Response.StreamPartEncoded,
+)
 
 const healthy = withProviderFinish(
   Stream.make(Response.makePart("text-delta", { id: "text", delta: "recovered" }) as Response.StreamPartEncoded),
@@ -62,14 +102,18 @@ const healthy = withProviderFinish(
 
 const resilience = ModelResilience.layer({ retrySchedule: Schedule.recurs(3) })
 
-const agent = Agent.make({ name: "no-replay-agent" })
+const agent = Agent.make({ name: "no-replay-agent", toolkit })
+const noToolAgent = Agent.make({ name: "no-tool-agent" })
 
 const runAgent = (
   model: Layer.Layer<LanguageModel.LanguageModel>,
   policy: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.ModelResilienceMisconfigured> = resilience,
+  middleware: Layer.Layer<ModelMiddleware.ModelMiddleware> = ModelMiddleware.layerIdentity,
 ) =>
   Stream.runCollect(
-    Agent.stream(agent, { prompt: "no replay" }).pipe(Stream.provide(Layer.mergeAll(model, policy.pipe(Layer.orDie)))),
+    Agent.stream(agent, { prompt: "no replay" }).pipe(
+      Stream.provide(Layer.mergeAll(model, policy.pipe(Layer.orDie), middleware, toolLayer)),
+    ),
   )
 
 const expectTerminalWithoutReplay = (first: Stream.Stream<Response.StreamPartEncoded, AiError.AiError>) =>
@@ -87,7 +131,7 @@ const expectTerminalWithoutReplay = (first: Stream.Stream<Response.StreamPartEnc
 describe("agent model stream replay safety", () => {
   it.effect("corrects pre-output invalid tool output through the public Agent path", () =>
     Effect.gen(function* () {
-      const model = scriptedModel([Stream.fail(invalidToolCall), healthy])
+      const model = scriptedModel([invalidToolParts, healthy], true)
       const events = yield* runAgent(
         model.layer,
         ModelResilience.layer({
@@ -99,6 +143,110 @@ describe("agent model stream replay safety", () => {
 
       expect(model.attempts()).toBe(2)
       expect(completed?._tag === "Completed" && completed.text).toBe("recovered")
+      const modelParts = Array.from(events).filter((event) => event._tag === "ModelPart")
+      expect(modelParts.every((event) => event.part.type !== "tool-params-start")).toBe(true)
+    }),
+  )
+
+  it.effect("fails typed before invoking a direct model whose correction compiler is missing", () =>
+    Effect.gen(function* () {
+      const model = scriptedModel([healthy])
+      const failure = yield* runAgent(model.layer, ModelResilience.layer({ invalidToolCallCorrectionLimit: 1 })).pipe(
+        Effect.flip,
+      )
+
+      expect(Schema.is(ModelToolCallValidation.ToolJsonSchemaCompilerMissing)(failure)).toBe(true)
+      expect(model.attempts()).toBe(0)
+    }),
+  )
+
+  it.effect("never corrects generic malformed output when no toolkit is present", () =>
+    Effect.gen(function* () {
+      const model = scriptedModel([Stream.fail(malformedOutput), healthy], true)
+      const failure = yield* Agent.stream(noToolAgent, { prompt: "malformed" }).pipe(
+        Stream.provide(
+          Layer.mergeAll(
+            model.layer,
+            ModelResilience.layer({
+              retrySchedule: Schedule.recurs(0),
+              invalidToolCallCorrectionLimit: 2,
+            }).pipe(Layer.orDie),
+          ),
+        ),
+        Stream.runDrain,
+        Effect.flip,
+      )
+
+      expect(model.attempts()).toBe(1)
+      expect(String(failure)).toContain("Invalid output")
+    }),
+  )
+
+  it.effect("does not correct invalid parameters after a valid tool call escaped", () =>
+    Effect.gen(function* () {
+      const model = scriptedModel(
+        [
+          Stream.make(
+            {
+              type: "tool-call",
+              id: "valid-call",
+              name: "lookup",
+              params: { value: "valid" },
+            } as Response.StreamPartEncoded,
+            {
+              type: "tool-call",
+              id: "invalid-call",
+              name: "lookup",
+              params: { value: 1 },
+            } as Response.StreamPartEncoded,
+          ),
+          healthy,
+        ],
+        true,
+      )
+      const failure = yield* runAgent(model.layer, ModelResilience.layer({ invalidToolCallCorrectionLimit: 2 })).pipe(
+        Effect.flip,
+      )
+
+      expect(Schema.is(AgentEvent.AgentError)(failure)).toBe(true)
+      expect(
+        Schema.is(ModelToolCallValidation.InvalidToolCallParameters)(
+          Schema.is(AgentEvent.AgentError)(failure) ? failure.cause : undefined,
+        ),
+      ).toBe(true)
+      expect(model.attempts()).toBe(1)
+    }),
+  )
+
+  it.effect("fails middleware-introduced invalid tool parameters without provider replay", () =>
+    Effect.gen(function* () {
+      const model = scriptedModel(
+        [
+          withProviderFinish(
+            Stream.make({
+              type: "tool-call",
+              id: "call-1",
+              name: "lookup",
+              params: { value: "valid" },
+            } as Response.StreamPartEncoded),
+          ),
+          healthy,
+        ],
+        true,
+      )
+      const failure = yield* runAgent(
+        model.layer,
+        ModelResilience.layer({ invalidToolCallCorrectionLimit: 2 }),
+        ModelMiddleware.layer([
+          {
+            transformPart: (part) =>
+              Effect.succeed(Option.some(part.type === "tool-call" ? { ...part, params: { value: 1 } } : part)),
+          },
+        ]),
+      ).pipe(Effect.flip)
+
+      expect(Schema.is(AgentEvent.MiddlewareViolation)(failure)).toBe(true)
+      expect(model.attempts()).toBe(1)
     }),
   )
 

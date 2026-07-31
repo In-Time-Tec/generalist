@@ -1,5 +1,19 @@
-import { Context, Effect, Fiber, Function, HashMap, Layer, Option, Ref, Schema, Scope, Semaphore, Stream } from "effect"
-import { LanguageModel, Model } from "effect/unstable/ai"
+import {
+  Context,
+  Effect,
+  Fiber,
+  Function,
+  HashMap,
+  type JsonSchema,
+  Layer,
+  Option,
+  Ref,
+  Schema,
+  Scope,
+  Semaphore,
+  Stream,
+} from "effect"
+import { AiError, LanguageModel, Model, Tool } from "effect/unstable/ai"
 import { classify as classifyContextOverflow } from "./context-overflow.js"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
@@ -23,9 +37,14 @@ export type FailureClassification = "context-overflow" | "other"
 export type FailureClassifier = (error: unknown) => FailureClassification
 
 const FailureClassifierTypeId = Symbol.for("@batonfx/core/model-registry/FailureClassifier")
+const ToolJsonSchemaCompilerTypeId = Symbol.for("@batonfx/core/model-registry/ToolJsonSchemaCompiler")
 
-type ClassifiedLanguageModel = LanguageModel.Service & {
+/** @experimental Provider-owned compilation of a tool's exact request JSON Schema. */
+export type ToolJsonSchemaCompiler = (tool: Tool.Any) => Effect.Effect<JsonSchema.JsonSchema, AiError.AiError>
+
+type RegisteredLanguageModel = LanguageModel.Service & {
   readonly [FailureClassifierTypeId]?: FailureClassifier
+  readonly [ToolJsonSchemaCompilerTypeId]?: ToolJsonSchemaCompiler
 }
 
 /** @experimental Classify a failure using semantics attached to the active registered model, falling back to provider-agnostic context-overflow evidence. */
@@ -33,18 +52,38 @@ export const classifyFailure: {
   (error: unknown): (model: LanguageModel.Service) => FailureClassification
   (model: LanguageModel.Service, error: unknown): FailureClassification
 } = Function.dual(2, (model: LanguageModel.Service, error: unknown): FailureClassification => {
-  const classified = (model as ClassifiedLanguageModel)[FailureClassifierTypeId]?.(error)
+  const classified = (model as RegisteredLanguageModel)[FailureClassifierTypeId]?.(error)
   return classified !== undefined && classified !== "other" ? classified : classifyContextOverflow(error)
 })
 
-const attachFailureClassifier = (registration: Registration, context: Context.Context<ModelEnvironment>) => {
-  if (registration.classifyFailure === undefined) return context
+/** @experimental Read the compiler attached to the active registered or explicitly wrapped model. */
+export const toolJsonSchemaCompiler = (model: LanguageModel.Service): ToolJsonSchemaCompiler | undefined =>
+  (model as RegisteredLanguageModel)[ToolJsonSchemaCompilerTypeId]
+
+/** @experimental Attach a provider-exact tool JSON Schema compiler to a direct language model. */
+export const withToolJsonSchemaCompiler: {
+  (compiler: ToolJsonSchemaCompiler): (model: LanguageModel.Service) => LanguageModel.Service
+  (model: LanguageModel.Service, compiler: ToolJsonSchemaCompiler): LanguageModel.Service
+} = Function.dual(
+  2,
+  (model: LanguageModel.Service, compiler: ToolJsonSchemaCompiler): LanguageModel.Service =>
+    ({
+      ...model,
+      [ToolJsonSchemaCompilerTypeId]: compiler,
+    }) as RegisteredLanguageModel,
+)
+
+const attachRegistrationMetadata = (registration: Registration, context: Context.Context<ModelEnvironment>) => {
+  if (registration.classifyFailure === undefined && registration.toolJsonSchemaCompiler === undefined) return context
   const model = Context.get(context, LanguageModel.LanguageModel)
-  const classified: ClassifiedLanguageModel = {
+  const registered: RegisteredLanguageModel = {
     ...model,
-    [FailureClassifierTypeId]: registration.classifyFailure,
+    ...(registration.classifyFailure === undefined ? {} : { [FailureClassifierTypeId]: registration.classifyFailure }),
+    ...(registration.toolJsonSchemaCompiler === undefined
+      ? {}
+      : { [ToolJsonSchemaCompilerTypeId]: registration.toolJsonSchemaCompiler }),
   }
-  return Context.add(context, LanguageModel.LanguageModel, classified)
+  return Context.add(context, LanguageModel.LanguageModel, registered)
 }
 
 /** @experimental */
@@ -65,6 +104,7 @@ export interface Registration {
   readonly layer: Layer.Layer<ModelEnvironment>
   readonly metadata?: Metadata
   readonly classifyFailure?: FailureClassifier
+  readonly toolJsonSchemaCompiler?: ToolJsonSchemaCompiler
 }
 
 /** @experimental */
@@ -123,6 +163,7 @@ export const registration = <R>(input: {
   readonly layer: Layer.Layer<LanguageModel.LanguageModel, never, R>
   readonly metadata?: Metadata
   readonly classifyFailure?: FailureClassifier
+  readonly toolJsonSchemaCompiler?: ToolJsonSchemaCompiler
 }) =>
   Model.make(input.provider, input.model, input.layer).captureRequirements.pipe(
     Effect.map(
@@ -133,6 +174,7 @@ export const registration = <R>(input: {
         ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
         ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
         ...(input.classifyFailure === undefined ? {} : { classifyFailure: input.classifyFailure }),
+        ...(input.toolJsonSchemaCompiler === undefined ? {} : { toolJsonSchemaCompiler: input.toolJsonSchemaCompiler }),
       }),
     ),
   )
@@ -189,7 +231,7 @@ const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: 
         }
         const provided = entry.context.pipe(
           Effect.flatMap((context) =>
-            effect.pipe(Effect.provide(attachFailureClassifier(entry.registration, context))),
+            effect.pipe(Effect.provide(attachRegistrationMetadata(entry.registration, context))),
           ),
         )
         return yield* semaphore === undefined ? provided : semaphore.withPermits(1)(provided)
@@ -210,7 +252,7 @@ const makeLayer = (initialRegistrations: ReadonlyArray<Registration>, options?: 
             if (semaphore !== undefined) {
               yield* Effect.acquireRelease(semaphore.take(1), () => semaphore.release(1), { interruptible: true })
             }
-            const context = attachFailureClassifier(entry.registration, yield* entry.context)
+            const context = attachRegistrationMetadata(entry.registration, yield* entry.context)
             return operation.pipe(Stream.provideContext(context))
           }),
         )

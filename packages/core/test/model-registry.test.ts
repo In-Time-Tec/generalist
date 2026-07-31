@@ -312,6 +312,26 @@ describe("ModelRegistry", () => {
     ] as const
   })
 
+  ItLayer.make(it, "attaches a registration tool compiler to only the active model", () => {
+    const compiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) => Effect.succeed({ title: tool.name })
+    const selection = { provider: "test", model: "compiled" }
+    return [
+      ModelRegistry.layer([
+        ModelRegistry.registration({
+          ...selection,
+          layer: modelLayer("compiled"),
+          toolJsonSchemaCompiler: compiler,
+        }),
+      ]),
+      ModelRegistry.operate(
+        selection,
+        LanguageModel.LanguageModel.pipe(
+          Effect.map((model) => expect(ModelRegistry.toolJsonSchemaCompiler(model)).toBe(compiler)),
+        ),
+      ),
+    ] as const
+  })
+
   ItLayer.make(
     it,
     "layerCombined resolves models from every combined registry layer",

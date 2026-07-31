@@ -1,6 +1,7 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "@batonfx/core"
-import { Config, Layer, Redacted } from "effect"
+import { Config, Effect, Layer, Redacted } from "effect"
+import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "./image-source.js"
 import type { RegistrationOptions } from "./openai.js"
 
@@ -11,6 +12,20 @@ export interface OpenAiCompatibleInput extends RegistrationOptions {
   readonly config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">
   readonly classifyFailure?: ModelRegistry.FailureClassifier
 }
+
+/** @experimental */
+export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
+  Effect.try({
+    try: () => Tool.getJsonSchema(tool, { transformer: OpenAiStructuredOutput.toCodecOpenAI }),
+    catch: (error) =>
+      AiError.make({
+        module: "OpenAiLanguageModel",
+        method: "prepareTools",
+        reason: AiError.UnsupportedSchemaError.make({
+          description: error instanceof Error ? error.message : String(error),
+        }),
+      }),
+  })
 
 /** @experimental */
 export interface LayerOptions extends OpenAiCompatibleInput {
@@ -31,6 +46,7 @@ export const layer = (input: LayerOptions) =>
           ...(input.config === undefined ? {} : { config: input.config }),
         }),
       ),
+      toolJsonSchemaCompiler,
       ...(input.classifyFailure === undefined ? {} : { classifyFailure: input.classifyFailure }),
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),

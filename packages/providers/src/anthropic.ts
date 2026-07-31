@@ -1,7 +1,7 @@
 import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic"
 import { ContextOverflow, ModelRegistry } from "@batonfx/core"
-import { Config, Layer, Redacted } from "effect"
-import { AiError } from "effect/unstable/ai"
+import { Config, Effect, Layer, Redacted } from "effect"
+import { AiError, AnthropicStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "./image-source.js"
 import { type FailureInput, layerModelFailures } from "./model-failure.js"
 import type { RegistrationOptions } from "./openai.js"
@@ -80,6 +80,20 @@ const anthropicLanguageModelLayer = (input: AnthropicInput) =>
 export const classifyFailure: ModelRegistry.FailureClassifier = ContextOverflow.classify
 
 /** @experimental */
+export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) =>
+  Effect.try({
+    try: () => Tool.getJsonSchema(tool, { transformer: AnthropicStructuredOutput.toCodecAnthropic }),
+    catch: (error) =>
+      AiError.make({
+        module: "AnthropicLanguageModel",
+        method: "prepareTools",
+        reason: AiError.UnsupportedSchemaError.make({
+          description: error instanceof Error ? error.message : String(error),
+        }),
+      }),
+  })
+
+/** @experimental */
 export interface LayerOptions extends AnthropicInput {
   readonly apiKey: Config.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof AnthropicClient.layerConfig>[0]>, "apiKey">
@@ -93,6 +107,7 @@ export const layer = (input: LayerOptions) =>
       model: input.model,
       layer: anthropicLanguageModelLayer(input),
       classifyFailure,
+      toolJsonSchemaCompiler,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     }),
@@ -105,6 +120,7 @@ export const registration = (input: AnthropicInput) =>
     model: input.model,
     layer: anthropicLanguageModelLayer(input),
     classifyFailure,
+    toolJsonSchemaCompiler,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })

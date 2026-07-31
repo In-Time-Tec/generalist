@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Exit, Fiber, Function, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { AiError, LanguageModel, Model, Prompt, Response } from "effect/unstable/ai"
-import { ModelResilience, ModelStreamTermination, ModelTelemetry } from "../src/index"
+import { ModelResilience, ModelStreamTermination, ModelTelemetry, ModelToolCallValidation } from "../src/index"
 import { instrument, makeIdentityCell } from "../src/model-instrumentation"
 
 const transientError = AiError.make({
@@ -27,7 +27,7 @@ const finishPart = Response.makePart("finish", { reason: "stop", usage, response
 const makeResilience = (input?: Partial<ModelResilience.Interface>): ModelResilience.Interface =>
   Effect.runSync(ModelResilience.make(input))
 
-const languageModel = (overrides: Partial<LanguageModel.Service>): LanguageModel.Service =>
+const languageModel = (overrides: Record<string, unknown>): LanguageModel.Service =>
   ({
     generateText: () => Effect.succeed(new LanguageModel.GenerateTextResponse([])),
     generateObject: () => Effect.succeed(new LanguageModel.GenerateObjectResponse({}, [])),
@@ -147,14 +147,7 @@ describe("model instrumentation", () => {
   it.effect("corrects invalid tool output inside one logical call with visible attempt telemetry", () =>
     Effect.gen(function* () {
       const { events, emit } = makeCollector()
-      const invalidToolCall = AiError.make({
-        module: "TestLanguageModel",
-        method: "streamText",
-        reason: AiError.InvalidOutputError.make({
-          description: "tool arguments were not valid JSON",
-          usage: { totalTokens: 10 },
-        }),
-      })
+      const invalidToolCall = ModelToolCallValidation.InvalidToolCallParameters.make({ toolName: "lookup" })
       const prompts: Array<Prompt.Prompt> = []
       let calls = 0
       const wrapped = instrument(
@@ -198,12 +191,12 @@ describe("model instrumentation", () => {
       expect(correction?.role).toBe("user")
       expect(
         correction?.role === "user" &&
-          correction.content.some((part) => part.type === "text" && part.text.includes("invalid tool call")),
+          correction.content.some((part) => part.type === "text" && part.text.includes('Tool "lookup"')),
       ).toBe(true)
       const [failedAttempt] = byTag(events, "ModelAttemptFailed")
       const [completedCall] = byTag(events, "ModelCallCompleted")
-      expect(failedAttempt?.providerUsage).toEqual({ totalTokens: 10 })
-      expect(completedCall?.failedAttemptUsage).toEqual({ totalTokens: 10 })
+      expect(failedAttempt?.providerUsage).toBeUndefined()
+      expect(completedCall?.failedAttemptUsage).toBeUndefined()
       expect(completedCall?.usage).toEqual(usage)
       expect("description" in (failedAttempt?.providerUsage ?? {})).toBe(false)
       expect(byTag(events, "ModelCallFailed")).toHaveLength(0)
@@ -211,31 +204,59 @@ describe("model instrumentation", () => {
     }),
   )
 
+  it.effect("reports generic invalid-output usage without scheduling tool correction", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      const malformed = AiError.make({
+        module: "TestLanguageModel",
+        method: "streamText",
+        reason: AiError.InvalidOutputError.make({
+          description: "malformed response metadata",
+          usage: { promptTokens: 7, completionTokens: 3, totalTokens: 10 },
+        }),
+      })
+      let calls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () => {
+            calls += 1
+            return Stream.fail(malformed)
+          },
+        }),
+        {
+          emit,
+          turn: 0,
+          resilience: makeResilience({
+            retrySchedule: Schedule.recurs(0),
+            invalidToolCallCorrectionLimit: 2,
+          }),
+        },
+      )
+
+      const failure = yield* wrapped.streamText({ prompt: "malformed" }).pipe(Stream.runDrain, Effect.flip)
+      expect(failure).toBe(malformed)
+      expect(calls).toBe(1)
+      expect(byTag(events, "ModelRetryScheduled")).toEqual([])
+      expect(byTag(events, "ModelAttemptFailed")[0]?.providerUsage).toEqual({
+        inputTokens: 7,
+        outputTokens: 3,
+        totalTokens: 10,
+      })
+      expect(byTag(events, "ModelCallFailed")[0]?.failedAttemptUsage).toEqual({
+        inputTokens: 7,
+        outputTokens: 3,
+        totalTokens: 10,
+      })
+    }),
+  )
+
   it.effect("fails one logical call after its invalid-tool correction limit is exhausted", () =>
     Effect.gen(function* () {
       const { events, emit } = makeCollector()
       const failures = [
-        AiError.make({
-          module: "TestLanguageModel",
-          method: "streamText",
-          reason: AiError.InvalidOutputError.make({
-            description: "bad tool arguments containing secret params",
-            usage: { promptTokens: 7, completionTokens: 3, totalTokens: 10 },
-          }),
-        }),
-        AiError.make({
-          module: "TestLanguageModel",
-          method: "streamText",
-          reason: AiError.InvalidOutputError.make({ description: "bad tool arguments without usage" }),
-        }),
-        AiError.make({
-          module: "TestLanguageModel",
-          method: "streamText",
-          reason: AiError.InvalidOutputError.make({
-            description: "more bad tool arguments",
-            usage: { promptTokens: 5, completionTokens: 2, totalTokens: 7 },
-          }),
-        }),
+        ModelToolCallValidation.InvalidToolCallParameters.make({ toolName: "lookup" }),
+        ModelToolCallValidation.InvalidToolCallParameters.make({ toolName: "lookup" }),
+        ModelToolCallValidation.InvalidToolCallParameters.make({ toolName: "lookup" }),
       ]
       let calls = 0
       const wrapped = instrument(
@@ -267,12 +288,12 @@ describe("model instrumentation", () => {
         "invalid-tool-call-correction",
       ])
       expect(byTag(events, "ModelAttemptFailed").map((event) => event.providerUsage)).toEqual([
-        { inputTokens: 7, outputTokens: 3, totalTokens: 10 },
         undefined,
-        { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
+        undefined,
+        undefined,
       ])
       const [failedCall] = byTag(events, "ModelCallFailed")
-      expect(failedCall?.failedAttemptUsage).toEqual({ inputTokens: 12, outputTokens: 5, totalTokens: 17 })
+      expect(failedCall?.failedAttemptUsage).toBeUndefined()
       expect(failedCall).not.toHaveProperty("description")
       expect(failedCall).not.toHaveProperty("params")
       expect(byTag(events, "ModelCallFailed")).toHaveLength(1)
@@ -283,11 +304,7 @@ describe("model instrumentation", () => {
   it.effect("never corrects invalid tool output after text escaped", () =>
     Effect.gen(function* () {
       const { events, emit } = makeCollector()
-      const invalidToolCall = AiError.make({
-        module: "TestLanguageModel",
-        method: "streamText",
-        reason: AiError.InvalidOutputError.make({ description: "bad tool arguments" }),
-      })
+      const invalidToolCall = ModelToolCallValidation.InvalidToolCallParameters.make({ toolName: "lookup" })
       let calls = 0
       const wrapped = instrument(
         languageModel({

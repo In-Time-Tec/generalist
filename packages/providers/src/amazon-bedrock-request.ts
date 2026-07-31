@@ -98,7 +98,7 @@ const tools = (options: LanguageModel.ProviderOptions): ToolConfiguration | unde
             toolSpec: {
               name: tool.name,
               ...(description === undefined ? {} : { description }),
-              inputSchema: { json: jsonSchema(tool.parametersSchema) },
+              inputSchema: { json: Tool.getJsonSchema(tool) as DocumentType },
             },
           }
         })

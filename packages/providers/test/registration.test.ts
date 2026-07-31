@@ -1,13 +1,35 @@
 import { describe, expect, it, layer as testLayer } from "@effect/vitest"
 import { Config, ConfigProvider, Effect, Layer, Redacted, Ref, Schema } from "effect"
-import { AiError, Tool, Toolkit } from "effect/unstable/ai"
+import {
+  AiError,
+  AnthropicStructuredOutput,
+  LanguageModel,
+  OpenAiStructuredOutput,
+  Tool,
+  Toolkit,
+} from "effect/unstable/ai"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
-import { classifyFailure as classifyAnthropicFailure, layer as anthropicLayer } from "@batonfx/providers/anthropic"
+import {
+  classifyFailure as classifyAnthropicFailure,
+  layer as anthropicLayer,
+  toolJsonSchemaCompiler as anthropicToolJsonSchemaCompiler,
+} from "@batonfx/providers/anthropic"
 import { layerOpenAi as deterministicLayerOpenAi } from "@batonfx/providers/deterministic"
-import { classifyFailure as classifyOpenAiFailure, layer as openAiLayer } from "@batonfx/providers/openai"
-import { layer as compatibleLayer } from "@batonfx/providers/openai-compat"
-import { classifyFailure as classifyOpenRouterFailure, layer as openRouterLayer } from "@batonfx/providers/openrouter"
+import {
+  classifyFailure as classifyOpenAiFailure,
+  layer as openAiLayer,
+  toolJsonSchemaCompiler as openAiToolJsonSchemaCompiler,
+} from "@batonfx/providers/openai"
+import {
+  layer as compatibleLayer,
+  toolJsonSchemaCompiler as compatibleToolJsonSchemaCompiler,
+} from "@batonfx/providers/openai-compat"
+import {
+  classifyFailure as classifyOpenRouterFailure,
+  layer as openRouterLayer,
+  toolJsonSchemaCompiler as openRouterToolJsonSchemaCompiler,
+} from "@batonfx/providers/openrouter"
 import { Deterministic, Embedding, Presets } from "../src/index.js"
 
 const apiKey = Config.succeed(Redacted.make("test-key"))
@@ -40,6 +62,26 @@ type EveryLayerError<Layers extends ReadonlyArray<Layer.Any>, Error> = Layers ex
 const tuple = <const Values extends ReadonlyArray<unknown>>(...values: Values): Values => values
 
 describe("providers", () => {
+  it.effect("compiles the same request schema as each released provider codec", () => {
+    const tool = Tool.make("lookup", {
+      parameters: Schema.Struct({ required: Schema.String, optional: Schema.optionalKey(Schema.String) }),
+    }).annotate(Tool.Strict, true)
+    const expectedOpenAi = Tool.getJsonSchema(tool, { transformer: OpenAiStructuredOutput.toCodecOpenAI })
+    const expectedAnthropic = Tool.getJsonSchema(tool, {
+      transformer: AnthropicStructuredOutput.toCodecAnthropic,
+    })
+    const expectedDefault = Tool.getJsonSchema(tool, { transformer: LanguageModel.defaultCodecTransformer })
+
+    return Effect.gen(function* () {
+      expect(yield* openAiToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
+      expect(yield* compatibleToolJsonSchemaCompiler(tool)).toEqual(expectedOpenAi)
+      expect(yield* anthropicToolJsonSchemaCompiler(tool)).toEqual(expectedAnthropic)
+      expect(yield* openRouterToolJsonSchemaCompiler("anthropic/claude-test")(tool)).toEqual(expectedAnthropic)
+      expect(yield* openRouterToolJsonSchemaCompiler("openai/gpt-test")(tool)).toEqual(expectedOpenAi)
+      expect(yield* openRouterToolJsonSchemaCompiler("other/model")(tool)).toEqual(expectedDefault)
+    })
+  })
+
   it("classifies provider context failures from structured metadata and narrow messages", () => {
     const openAiStructured = AiError.make({
       module: "OpenAiClient",

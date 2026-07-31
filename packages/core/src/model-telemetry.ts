@@ -1,6 +1,7 @@
 import { Cause, Context, Effect, Layer, Option, Schema } from "effect"
 import { AiError, IdGenerator, LanguageModel, Response } from "effect/unstable/ai"
 import { isModelStreamTimeout, isTerminationFailure } from "./model-stream-termination.js"
+import { isInvalidToolCallParameters } from "./model-tool-call-validation.js"
 
 /** @experimental Bounded purpose of one model call issued by the loop. */
 export const ModelCallPurpose = Schema.Literals(["conversation", "structured-output", "compaction-summary"])
@@ -360,6 +361,7 @@ export const layerNoop: Layer.Layer<Delivery> = Layer.succeed(Delivery, Delivery
 export const classifyFailureCategory = (error: unknown): ModelFailureCategory => {
   if (isModelStreamTimeout(error) || Cause.isTimeoutError(error)) return "timeout"
   if (isTerminationFailure(error)) return "truncated-stream"
+  if (isInvalidToolCallParameters(error)) return "invalid-tool-call"
   if (!AiError.isAiError(error)) return "unknown"
   switch (error.reason._tag) {
     case "AuthenticationError":

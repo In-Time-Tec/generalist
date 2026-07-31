@@ -18,6 +18,7 @@ import {
 } from "./agent-event.js"
 import type { DeliveryFailed } from "./model-telemetry.js"
 import type { ModelResilienceMisconfigured } from "./model-resilience.js"
+import type { InvalidToolCallParameters, ToolJsonSchemaCompilerMissing } from "./model-tool-call-validation.js"
 import { type Key, Memory } from "./memory.js"
 import { type LanguageModelNotRegistered, type ModelSelection, ModelRegistry } from "./model-registry.js"
 import type { ToolAuthorizer } from "./tool-authorization.js"
@@ -247,6 +248,8 @@ export type RunError =
   | RunEndedWithoutOutput
   | MiddlewareViolation
   | ModelResilienceMisconfigured
+  | InvalidToolCallParameters
+  | ToolJsonSchemaCompilerMissing
   | DuplicateToolCallId
   | ProgressOverflow
   | ToolNameCollision
