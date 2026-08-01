@@ -1,7 +1,5 @@
-// @ts-nocheck
-/* oxlint-disable */
 /** @effect-diagnostics missingPipeableSignature:skip-file */
-// @ts-nocheck
+/* oxlint-disable */
 // prettier-ignore
 import { Cause, Channel, Effect, Equal, Exit, Fiber, HashMap, Option, Queue, Ref, Schema, Semaphore, Stream, } from "effect"
 import { AiError, Chat, LanguageModel, Prompt, Response, Telemetry, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
@@ -36,6 +34,11 @@ import { type Candidate, type Registry, assemble, get, select } from "../tool-re
 import { type Decision, StopReason, type TurnOverrides, TurnPolicyError } from "../turn-policy.js"
 
 import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "../agent.js"
+
+type Tools = Record<string, Tool.Any>
+type StaticDeclaration = { readonly origin: import("../agent-event.js").ToolOrigin; readonly tool: Tool.Any }
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 import { Runtime } from "../agent-persistence-lock.js"
 // prettier-ignore
 import { applyPartChain, applyPromptChain, detachEntry, detachPrompt, preservesRecalledMessages, recalledMessages, skillListingsInstructions, withSystem, } from "../agent-message.js"
@@ -172,13 +175,13 @@ export const setupRun = (agent: any, options: any): any =>
       }
     }
 
-    const staticCandidates: ReadonlyArray<Candidate> = (
+    const staticDeclarations: ReadonlyArray<StaticDeclaration> =
       agent.toolDeclarations ??
       Object.values(agent.toolkit.tools).map((tool) => ({
         tool,
         origin: { _tag: "Static" as const, agent: agent.name },
       }))
-    ).map(({ origin, tool }) => ({
+    const staticCandidates: ReadonlyArray<Candidate> = staticDeclarations.map(({ origin, tool }) => ({
       origin,
       tool,
       dispatch: "Static",
@@ -188,7 +191,10 @@ export const setupRun = (agent: any, options: any): any =>
     if (
       agent.toolDeclarations !== undefined &&
       (agent.toolDeclarations.length !== Object.keys(agent.toolkit.tools).length ||
-        agent.toolDeclarations.some((declaration) => agent.toolkit.tools[declaration.tool.name] !== declaration.tool))
+        agent.toolDeclarations.some(
+          (declaration: import("../agent.js").ToolDeclaration) =>
+            agent.toolkit.tools[declaration.tool.name] !== declaration.tool,
+        ))
     ) {
       return yield* AgentError.make({
         message: "Agent tool declarations and toolkit must contain the same tool instances",
@@ -313,7 +319,7 @@ export const setupRun = (agent: any, options: any): any =>
         undeliveredTelemetry.push(event)
       })
     const flushTelemetry = (): ReadonlyArray<Event> => pendingTelemetry.splice(0, pendingTelemetry.length)
-    const deliverPending = (): Effect.Effect<void, import("./model-telemetry.js").DeliveryFailed> => {
+    const deliverPending = (): Effect.Effect<void, import("../model-telemetry.js").DeliveryFailed> => {
       if (Option.isNone(deliveryService) || undeliveredTelemetry.length === 0) return Effect.void
       const snapshot = Object.freeze([...undeliveredTelemetry])
       return deliveryService.value.deliver({ sessionId, events: snapshot }).pipe(
@@ -348,7 +354,7 @@ export const setupRun = (agent: any, options: any): any =>
     const steeringService = yield* Effect.serviceOption(Steering)
     const memoryService = yield* Effect.serviceOption(Memory)
     const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
-    const defaultRules = yield* Ref.make<ReadonlyArray<import("./permissions.js").Rule>>([])
+    const defaultRules = yield* Ref.make<ReadonlyArray<import("../permissions.js").Rule>>([])
     const authorizer =
       agent.authorization ??
       Option.getOrElse(authorizationService, () =>

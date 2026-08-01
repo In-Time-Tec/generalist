@@ -1,4 +1,3 @@
-// @ts-nocheck
 /* oxlint-disable */
 import {
   Cause,
@@ -39,24 +38,14 @@ import { Approvals } from "./approvals.js"
 import { coalesceAdjacentText, diagnose as diagnoseSessionSync, equivalentMessages } from "./session-sync.js"
 import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "./compaction.js"
 import { Instructions, openEpoch } from "./instructions.js"
-import { classify as classifyContextOverflow } from "./context-overflow.js"
 import { type Item, type Key, Memory, type MemoryError, messageFromRecall, projectTranscript } from "./memory.js"
 import { ModelMiddleware } from "./model-middleware.js"
 import {
   classifyFailure as classifyModelFailure,
-  type FailureClassifier,
   type LanguageModelNotRegistered,
   ModelRegistry,
 } from "./model-registry.js"
 import { instrument, makeIdentityCell } from "./model-instrumentation.js"
-import { ModelResilience } from "./model-resilience.js"
-import {
-  InvalidToolCallParameters,
-  isInvalidToolCallParameters,
-  prepare as prepareToolCallValidation,
-  ToolJsonSchemaCompilerMissing,
-  validateDecodedToolCall,
-} from "./model-tool-call-validation.js"
 import {
   CurrentCompactionId,
   CurrentInstrumentation,
@@ -133,13 +122,12 @@ import {
   type ToolCallIdState,
 } from "./agent-tool-result.js"
 import { emptyAgentRunResources } from "./agent/agent-run-resources.js"
+import type { AgentRunState } from "./agent/agent-run-state.js"
 import { makeModelTurn } from "./agent/model-turn.js"
 import { makeToolExecution } from "./agent/tool-execution.js"
 import { makeCompactionRuntime } from "./agent/compaction-runtime.js"
 import { setupRun } from "./agent/setup.js"
 import { makeRunLoop } from "./agent/run-loop.js"
-type CompactionResult = import("./compaction.js").Result
-const classifyOtherFailure: FailureClassifier = (error) => classifyContextOverflow(error)
 const defaultProgressOverflowPolicy: ProgressOverflowPolicy = { _tag: "Backpressure", capacity: 64 }
 const progressCapacitySchema = Schema.Finite.pipe(Schema.check(Schema.isInt(), Schema.isGreaterThan(0)))
 const progressOverflowPolicySchema = Schema.Union([
@@ -159,9 +147,7 @@ interface StructuredRunConfig<S extends ObjectSchema> {
   readonly objectName: string
   readonly objectPrompt: Prompt.RawInput
 }
-type StaticToolServices<Tools extends Record<string, Tool.Any>> =
-  | Tool.HandlersFor<Tools>
-  | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
+type RunStream<S extends ObjectSchema, R> = Stream.Stream<Event, RunError, R | S["DecodingServices"]>
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
 const isToolNameCollision = Schema.is(ToolNameCollision)
 const appendInstructionFragment = (base: string | undefined, fragment: string | undefined): string | undefined => {
@@ -224,7 +210,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
         pending.length === 0
           ? Ref.get(runResources.chat.history)
-          : Ref.updateAndGet(runResources.chat.history, (history) =>
+          : Ref.updateAndGet(runResources.chat.history, (history: Prompt.Prompt) =>
               Prompt.concat(history, Prompt.fromResponseParts(pending)),
             ).pipe(Effect.tap(() => savePersisted(turn)))
       const checkpointSuspended = (
@@ -285,12 +271,15 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           )
           if (Option.isNone(activeSession)) yield* savePersisted(turn)
           return yield* Ref.get(chat.history)
-        })
+        }) as Effect.Effect<Prompt.Prompt, RunError>
       const checkpointPending = (
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
-        appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint)))
+        appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint))) as Effect.Effect<
+          Prompt.Prompt,
+          AgentError
+        >
       const state: AgentRunState = {
         text: "",
         turn: 0,
@@ -336,7 +325,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
               const registry = yield* assemble([
                 ...current.registry.entries,
                 ...skill.tools.map(
-                  (tool): Candidate => ({
+                  (tool: Tool.Any): Candidate => ({
                     tool,
                     origin: { _tag: "Skill", skill: skill.frontmatter.name },
                     dispatch: "Skill",
@@ -350,10 +339,17 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           }
         }).pipe(
           Effect.mapError((error) =>
-            isToolNameCollision(error) ? error : AgentError.make({ message: error.message, turn: 0, cause: error }),
+            isToolNameCollision(error)
+              ? error
+              : AgentError.make({
+                  message: error instanceof Error ? error.message : String(error),
+                  turn: 0,
+                  cause: error,
+                }),
           ),
-        )
-      if (validatedResume !== undefined) yield* Ref.get(chat.history).pipe(Effect.flatMap(restoreActivatedSkills))
+        ) as Effect.Effect<void, AgentError | ToolNameCollision>
+      if (validatedResume !== undefined)
+        yield* (Ref.get(chat.history) as Effect.Effect<Prompt.Prompt>).pipe(Effect.flatMap(restoreActivatedSkills))
       const activeSession = Option.isSome(compactionService)
         ? sessionService
         : Option.none<typeof SessionStore.Service>()
@@ -380,8 +376,8 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         memoryRuntime === undefined
           ? Effect.succeed(prompt)
           : memoryRuntime.service.recall({ key: memoryRuntime.key, turn: 0, prompt }).pipe(
-              Effect.mapError((error) => memoryError(0, error)),
-              Effect.map((items) => insertRecalledItems(prompt, items)),
+              Effect.mapError((error) => memoryError(0, error as MemoryError)),
+              Effect.map((items: ReadonlyArray<Item>) => insertRecalledItems(prompt, items)),
             )
       const rememberTurn = (
         turn: number,
@@ -398,7 +394,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                 transcript: Option.isSome(activeSession) ? buildMemoryContext(path) : projectTranscript(transcript),
                 terminal,
               })
-              .pipe(Effect.mapError((error) => memoryError(turn, error)))
+              .pipe(Effect.mapError((error) => memoryError(turn, error as MemoryError)))
       const compactionRuntime = makeCompactionRuntime({
         activeSession,
         sessionService,
@@ -497,4 +493,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         rememberTurn,
       })
     }),
-  ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } }))
+  ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } })) as RunStream<
+    StructuredOutputSchema,
+    R
+  >

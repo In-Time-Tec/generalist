@@ -1,5 +1,34 @@
 export * as Anthropic from "./anthropic.js"
-export * as AmazonBedrock from "./amazon-bedrock.js"
+import {
+  Client as amazonBedrockClient,
+  ClientFailure as amazonBedrockClientFailure,
+  CredentialFailure as amazonBedrockCredentialFailure,
+  RecoveryFailure as amazonBedrockRecoveryFailure,
+  defaultChain as amazonBedrockDefaultChain,
+  isRecoverableCredentialFailure as amazonBedrockIsRecoverableCredentialFailure,
+  layerClient as amazonBedrockLayerClient,
+  makeRequest as amazonBedrockMakeRequest,
+  make as amazonBedrockMake,
+  layerLanguageModel as amazonBedrockLayerLanguageModel,
+  classifyFailure as amazonBedrockClassifyFailure,
+  toolJsonSchemaCompiler as amazonBedrockToolJsonSchemaCompiler,
+  layer as amazonBedrockLayer,
+} from "./amazon-bedrock.js"
+export const AmazonBedrock = {
+  Client: amazonBedrockClient,
+  ClientFailure: amazonBedrockClientFailure,
+  CredentialFailure: amazonBedrockCredentialFailure,
+  RecoveryFailure: amazonBedrockRecoveryFailure,
+  defaultChain: amazonBedrockDefaultChain,
+  isRecoverableCredentialFailure: amazonBedrockIsRecoverableCredentialFailure,
+  layerClient: amazonBedrockLayerClient,
+  makeRequest: amazonBedrockMakeRequest,
+  make: amazonBedrockMake,
+  layerLanguageModel: amazonBedrockLayerLanguageModel,
+  classifyFailure: amazonBedrockClassifyFailure,
+  toolJsonSchemaCompiler: amazonBedrockToolJsonSchemaCompiler,
+  layer: amazonBedrockLayer,
+} as typeof import("./amazon-bedrock.js")
 export * as Catalog from "./catalog.js"
 export * as Deterministic from "./deterministic.js"
 export * as Embedding from "./embedding.js"

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /* oxlint-disable */
 import { Cause, Channel, Effect, Equal, Exit, Fiber, HashMap, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Telemetry, Tool, Toolkit } from "effect/unstable/ai"
@@ -46,7 +45,7 @@ const classifyOtherFailure = (error: unknown) => classifyContextOverflow(error)
 const isToolNameCollision = Schema.is(ToolNameCollision)
 const attemptText = (parts: ReadonlyArray<Response.StreamPart<any>>): string =>
   parts.reduce((text, part) => (part.type === "text-delta" ? `${text}${part.delta}` : text), "")
-export const makeModelTurn = (context: RuntimeContext): ModelRuntime => {
+export const makeModelTurn = (context: RuntimeContext): any => {
   const {
     agent,
     resilienceService,
@@ -124,13 +123,11 @@ export const makeModelTurn = (context: RuntimeContext): ModelRuntime => {
   ): Stream.Stream<A, E | AgentError, R2 | ModelRegistry> {
     return agentModelRegistry === undefined || agentModel === undefined
       ? stream
-      : agentModelRegistry
-          .stream(agentModel, stream)
-          .pipe(
-            Stream.catchTag("@batonfx/core/LanguageModelNotRegistered", (error) =>
-              Stream.fail(AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error })),
-            ),
-          )
+      : ((agentModelRegistry.stream(agentModel, stream) as any).pipe(
+          (Stream.catchTag as any)("@batonfx/core/LanguageModelNotRegistered", (error: unknown) =>
+            Stream.fail(AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error })),
+          ),
+        ) as any)
   }
   const partEvents = (
     turn: number,
@@ -244,7 +241,7 @@ export const makeModelTurn = (context: RuntimeContext): ModelRuntime => {
             prepareToolCallValidation(
               model,
               activeRegistry.toolkit,
-              Option.getOrUndefined(resilienceService)?.invalidToolCallCorrectionLimit ?? 0,
+              (Option.getOrUndefined(resilienceService) as any)?.invalidToolCallCorrectionLimit ?? 0,
             ),
           ),
           Effect.map((validatedModel) =>
@@ -296,12 +293,12 @@ export const makeModelTurn = (context: RuntimeContext): ModelRuntime => {
         )
       }
       return Stream.fromChannel(
-        Channel.acquireUseRelease(
+        (Channel.acquireUseRelease as any)(
           Ref.make<ToolCallIdState>({
             nextIndex: 0,
             firstIndexes: HashMap.empty(),
           }),
-          (toolCallIds) =>
+          (toolCallIds: any) =>
             Stream.unwrap(
               Effect.gen(function* () {
                 const activeModel = yield* LanguageModel.LanguageModel
@@ -312,11 +309,11 @@ export const makeModelTurn = (context: RuntimeContext): ModelRuntime => {
                 }
                 const coalescedContent = prepared.prompt.content.map(coalesceAdjacentText)
                 const preparedPrompt = coalescedContent.some(
-                  (message, index) => message !== prepared.prompt.content[index],
+                  (message: Prompt.Message, index: number) => message !== prepared.prompt.content[index],
                 )
                   ? Prompt.fromMessages(coalescedContent)
                   : prepared.prompt
-                const history = yield* Ref.get(chat.history)
+                const history = (yield* Ref.get(chat.history)) as Prompt.Prompt
                 preparedState = { history, preparedPrompt }
                 const responsePrompt = Prompt.concat(history, preparedPrompt)
                 const messages = responsePrompt.content
@@ -381,12 +378,12 @@ export const makeModelTurn = (context: RuntimeContext): ModelRuntime => {
                 )
               }),
             ).pipe(Stream.toChannel),
-          (_, exit) =>
+          (_: unknown, exit: Exit.Exit<unknown, unknown>) =>
             preparedState === undefined ||
             !completed ||
             (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
               ? Effect.void
-              : Effect.suspend(() => {
+              : (Effect.suspend(() => {
                   state.text = `${state.text}${attemptText(transformedParts)}`
                   return Ref.set(
                     chat.history,
@@ -399,13 +396,13 @@ export const makeModelTurn = (context: RuntimeContext): ModelRuntime => {
                   Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
                   Effect.orDie,
                   Effect.asVoid,
-                ),
+                ) as any),
         ),
       ).pipe(
         Stream.catchCause((cause) => {
           if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
           if (retryableOverflow(cause, emitted)) {
-            return attempt(preparedState?.preparedPrompt ?? activePrompt, false, true, cause)
+            return attempt(preparedState?.preparedPrompt ?? activePrompt, false, true, cause as Cause.Cause<RunError>)
           }
           return Stream.failCause(cause)
         }),
@@ -415,7 +412,7 @@ export const makeModelTurn = (context: RuntimeContext): ModelRuntime => {
             ? Stream.fail(AgentError.make({ message: errorMessage(failure.value), turn, cause: failure.value }))
             : Stream.failCause(cause)
         }),
-      )
+      ) as any
     }
     const parts = Stream.unwrap(
       applyPromptChain(chain, Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
@@ -470,14 +467,14 @@ export const makeModelTurn = (context: RuntimeContext): ModelRuntime => {
                               (event) =>
                                 Ref.update(collected, (current) => {
                                   const next = new Map(current)
-                                  next.set(toolCallIndex, [...(next.get(toolCallIndex) ?? []), event])
+                                  next.set(toolCallIndex, [...(next.get(toolCallIndex) ?? []), event as Event])
                                   return next
                                 }),
                             ),
                           { concurrency: "unbounded", discard: true },
                         ).pipe(Effect.exit)
                         if (Exit.isFailure(exit)) {
-                          failure = exit.cause
+                          failure = exit.cause as Cause.Cause<RunError>
                           break
                         }
                       }

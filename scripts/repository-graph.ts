@@ -43,7 +43,7 @@ const program = Effect.sync(() => {
   ].toSorted((left, right) => `${left.source}:${left.test}`.localeCompare(`${right.source}:${right.test}`))
   const graph = {
     schemaVersion: 1,
-    files: files.map((file) => ({ path: file })),
+    files: files.map((path) => ({ path })),
     relationships,
   }
   const output = join(root, "tooling/repository-graph/generated")
