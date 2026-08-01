@@ -63,6 +63,7 @@ import {
   CurrentSummaryCall,
   Delivery,
   DeliveryFailed,
+  InvocationCoordinator,
   type Event as ModelTelemetryEvent,
   type EventPayload as ModelTelemetryEventPayload,
   type ModelCallPurpose,
@@ -338,6 +339,15 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           turn: 0,
         })
       }
+      if (
+        options.modelCallOrdinalStart !== undefined &&
+        (!Number.isSafeInteger(options.modelCallOrdinalStart) || options.modelCallOrdinalStart < 0)
+      ) {
+        return yield* AgentError.make({
+          message: "RunOptions.modelCallOrdinalStart must be a non-negative safe integer",
+          turn: 0,
+        })
+      }
 
       const decodedProgressPolicy = Schema.decodeUnknownOption(progressOverflowPolicySchema)(
         options.toolProgress === undefined ? defaultProgressOverflowPolicy : options.toolProgress,
@@ -422,6 +432,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
 
       const resilienceService = yield* Effect.serviceOption(ModelResilience)
       const deliveryService = yield* Effect.serviceOption(Delivery)
+      const invocationCoordinator = yield* Effect.serviceOption(InvocationCoordinator)
       const telemetryRunId = yield* generateId
       let telemetrySequence = 0
       const pendingTelemetry: Array<ModelTelemetryEvent> = []
@@ -450,11 +461,15 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         )
       }
       const telemetryIdentity = makeIdentityCell()
+      let modelCallOrdinal = options.modelCallOrdinalStart ?? 0
       const instrumentModel = (model: LanguageModel.Service, turn: number): LanguageModel.Service =>
         instrument(model, {
           emit: emitTelemetry,
           turn,
           identity: telemetryIdentity,
+          nextCallOrdinal: () => modelCallOrdinal++,
+          ...(options.logicalOperationId === undefined ? {} : { logicalOperationId: options.logicalOperationId }),
+          ...(Option.isSome(invocationCoordinator) ? { coordinator: invocationCoordinator.value } : {}),
           ...(Option.isSome(resilienceService) ? { resilience: resilienceService.value } : {}),
         })
       const modelRegistryService = yield* Effect.serviceOption(ModelRegistry)
@@ -1759,15 +1774,47 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                           toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
                         ),
                       )
-                    : executionStreams.pipe(
-                        Stream.mapEffect(
-                          ({ call, messages, toolCallIndex }) =>
-                            Stream.runCollect(
-                              toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
-                            ),
-                          { concurrency },
-                        ),
-                        Stream.flatMap(Stream.fromIterable),
+                    : Stream.unwrap(
+                        Effect.gen(function* () {
+                          const collected = yield* Ref.make(new Map<number, Array<Event>>())
+                          const batchSize = concurrency === "unbounded" ? executions.length : concurrency
+                          let failure: Cause.Cause<RunError> | undefined
+                          for (let offset = 0; offset < executions.length; offset += batchSize) {
+                            const batch = executions.slice(offset, offset + batchSize)
+                            const exit = yield* Effect.forEach(
+                              batch,
+                              ({ call, messages, toolCallIndex }) =>
+                                Stream.runForEach(
+                                  toolCallEvents(
+                                    turn,
+                                    toolCallBatch,
+                                    toolCallIndex,
+                                    call,
+                                    messages,
+                                    activeRegistry,
+                                  ),
+                                  (event) =>
+                                    Ref.update(collected, (current) => {
+                                      const next = new Map(current)
+                                      next.set(toolCallIndex, [...(next.get(toolCallIndex) ?? []), event])
+                                      return next
+                                    }),
+                                ),
+                              { concurrency: "unbounded", discard: true },
+                            ).pipe(Effect.exit)
+                            if (Exit.isFailure(exit)) {
+                              failure = exit.cause
+                              break
+                            }
+                          }
+                          const events = [...(yield* Ref.get(collected)).entries()]
+                            .toSorted(([left], [right]) => left - right)
+                            .flatMap(([, items]) => items)
+                          const completed = Stream.fromIterable(events)
+                          return failure === undefined
+                            ? completed
+                            : Stream.concat(completed, Stream.failCause(failure))
+                        }),
                       )
                 }),
               )

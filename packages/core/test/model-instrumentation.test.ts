@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Fiber, Function, Schedule, Schema, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Function, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { AiError, LanguageModel, Model, Prompt, Response, ResponseIdTracker } from "effect/unstable/ai"
 import { ModelResilience, ModelStreamTermination, ModelTelemetry, ModelToolCallValidation } from "../src/index"
@@ -127,6 +127,184 @@ describe("model instrumentation", () => {
         expect(calls).toBe(0)
         expect(events).toEqual([])
       }),
+  )
+
+  it.effect("awaits the invocation coordinator before constructing a provider stream", () =>
+    Effect.gen(function* () {
+      const { emit } = makeCollector()
+      const entered = yield* Deferred.make<void>()
+      const permit = yield* Deferred.make<void>()
+      const coordinated: Array<string> = []
+      let providerCalls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () => {
+            providerCalls += 1
+            return Stream.make(finishPart)
+          },
+        }),
+        {
+          emit,
+          turn: 0,
+          logicalOperationId: "execution:test:generation:0:turn:0",
+          coordinator: {
+            beforeAttempt: (input) =>
+              Deferred.succeed(entered, undefined).pipe(
+                Effect.andThen(Deferred.await(permit)),
+                Effect.tap(() => Effect.sync(() => coordinated.push(`started:${input.modelAttemptId}`))),
+              ),
+            completeAttempt: (input) =>
+              Effect.sync(() => {
+                coordinated.push(`completed:${input.modelAttemptId}`)
+              }),
+            failAttempt: (input) =>
+              Effect.sync(() => {
+                coordinated.push(`failed:${input.modelAttemptId}`)
+              }),
+          },
+        },
+      )
+
+      const fiber = yield* Stream.runDrain(wrapped.streamText({ prompt: "hello" })).pipe(Effect.forkChild)
+      yield* Deferred.await(entered)
+      expect(providerCalls).toBe(0)
+      yield* Deferred.succeed(permit, undefined)
+      yield* Fiber.join(fiber)
+
+      expect(providerCalls).toBe(1)
+      expect(coordinated).toEqual([
+        "started:execution:test:generation:0:turn:0:model-call:0:conversation:attempt:0",
+        "completed:execution:test:generation:0:turn:0:model-call:0:conversation:attempt:0",
+      ])
+    }),
+  )
+
+  it.effect("settles a coordinated finish consumed at a downstream stream boundary", () =>
+    Effect.gen(function* () {
+      const { emit } = makeCollector()
+      const coordinated: Array<string> = []
+      const wrapped = instrument(
+        languageModel({ streamText: () => Stream.make(finishPart) }),
+        {
+          emit,
+          turn: 0,
+          logicalOperationId: "execution:test:generation:0:turn:finish-boundary",
+          coordinator: {
+            beforeAttempt: () => Effect.sync(() => coordinated.push("started")),
+            completeAttempt: () => Effect.sync(() => coordinated.push("completed")),
+            failAttempt: () => Effect.sync(() => coordinated.push("failed")),
+          },
+        },
+      )
+
+      yield* wrapped.streamText({ prompt: "hello" }).pipe(Stream.take(1), Stream.runDrain)
+
+      expect(coordinated).toEqual(["started", "completed"])
+    }),
+  )
+
+  it.effect("rejects an exhausted model-call ordinal before provider entry", () =>
+    Effect.gen(function* () {
+      const { emit } = makeCollector()
+      let ordinal = Number.MAX_SAFE_INTEGER
+      let providerCalls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () => {
+            providerCalls += 1
+            return Stream.make(finishPart)
+          },
+        }),
+        {
+          emit,
+          turn: 0,
+          logicalOperationId: "execution:test:generation:0:turn:ordinal",
+          nextCallOrdinal: () => ordinal++,
+        },
+      )
+
+      yield* wrapped.streamText({ prompt: "first" }).pipe(Stream.runDrain)
+      const failure = yield* wrapped.streamText({ prompt: "second" }).pipe(Stream.runDrain, Effect.flip)
+
+      expect(ModelTelemetry.isInvocationCoordinationFailed(failure)).toBe(true)
+      expect(providerCalls).toBe(1)
+    }),
+  )
+
+  it.effect("awaits the invocation coordinator before entering generateText", () =>
+    Effect.gen(function* () {
+      const { emit } = makeCollector()
+      const entered = yield* Deferred.make<void>()
+      const permit = yield* Deferred.make<void>()
+      let providerCalls = 0
+      const wrapped = instrument(
+        languageModel({
+          generateText: () => {
+            providerCalls += 1
+            return Effect.succeed(new LanguageModel.GenerateTextResponse([finishPart]))
+          },
+        }),
+        {
+          emit,
+          turn: 0,
+          logicalOperationId: "execution:test:generation:0:turn:1",
+          coordinator: {
+            beforeAttempt: () => Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(permit))),
+            completeAttempt: () => Effect.void,
+            failAttempt: () => Effect.void,
+          },
+        },
+      )
+
+      const fiber = yield* wrapped.generateText({ prompt: "hello" }).pipe(Effect.forkChild)
+      yield* Deferred.await(entered)
+      expect(providerCalls).toBe(0)
+      yield* Deferred.succeed(permit, undefined)
+      yield* Fiber.join(fiber)
+      expect(providerCalls).toBe(1)
+    }),
+  )
+
+  it.effect("does not retry an invocation coordination failure", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      let providerCalls = 0
+      let coordinationCalls = 0
+      const wrapped = instrument(
+        languageModel({
+          streamText: () => {
+            providerCalls += 1
+            return Stream.make(finishPart)
+          },
+        }),
+        {
+          emit,
+          turn: 0,
+          logicalOperationId: "execution:test:generation:0:turn:2",
+          coordinator: {
+            beforeAttempt: () => {
+              coordinationCalls += 1
+              return Effect.fail(
+                ModelTelemetry.InvocationCoordinationFailed.make({ message: "durable fence rejected" }),
+              )
+            },
+            completeAttempt: () => Effect.void,
+            failAttempt: () => Effect.void,
+          },
+          resilience: makeResilience({
+            classify: () => "transient",
+            retrySchedule: Schedule.recurs(3),
+          }),
+        },
+      )
+
+      const failure = yield* Stream.runDrain(wrapped.streamText({ prompt: "hello" })).pipe(Effect.flip)
+
+      expect(ModelTelemetry.isInvocationCoordinationFailed(failure)).toBe(true)
+      expect(coordinationCalls).toBe(1)
+      expect(providerCalls).toBe(0)
+      expect(byTag(events, "ModelRetryScheduled")).toHaveLength(0)
+    }),
   )
 
   it.effect("joins one stream call across started, parts, first outputs, and completion", () =>

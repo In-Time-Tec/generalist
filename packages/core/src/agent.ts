@@ -16,7 +16,7 @@ import {
   TurnLimitExceeded,
   TurnPolicyStopped,
 } from "./agent-event.js"
-import type { DeliveryFailed } from "./model-telemetry.js"
+import type { DeliveryFailed, InvocationCoordinationFailed } from "./model-telemetry.js"
 import type { ModelResilienceMisconfigured } from "./model-resilience.js"
 import type { InvalidToolCallParameters, ToolJsonSchemaCompilerMissing } from "./model-tool-call-validation.js"
 import { type Key, Memory } from "./memory.js"
@@ -203,6 +203,10 @@ export interface RunOptions {
   readonly resume?: Resume
   /** @experimental Opaque host-assigned identity for this run/session. */
   readonly sessionId?: string
+  /** @experimental Stable host identity for the logical model operations in this run. */
+  readonly logicalOperationId?: string
+  /** @experimental First model-call ordinal for a host resuming from a durable checkpoint. */
+  readonly modelCallOrdinalStart?: number
   /** @experimental Opaque host-assigned write-ownership token, forwarded on every Session append and checkpoint so durable hosts can fence stale writers. */
   readonly sessionOwnerToken?: string
   /** @experimental Spill successful tool outputs whose encoded size exceeds this byte limit. */
@@ -239,6 +243,7 @@ export const defaultObjectPrompt = "Return the final structured output for the t
 /** @experimental The error channel of `stream` and `generate`. */
 export type RunError =
   | DeliveryFailed
+  | InvocationCoordinationFailed
   | AgentError
   | AgentSuspended
   | ResumeMismatch

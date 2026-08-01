@@ -81,6 +81,74 @@ export type CompactionKind = typeof CompactionKind.Type
 
 const attemptOrdinal = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
+export const ModelInvocationMethod = Schema.Literals(["generateText", "generateObject", "streamText"])
+export type ModelInvocationMethod = typeof ModelInvocationMethod.Type
+
+export const ModelInvocationStarted = Schema.Struct({
+  logicalOperationId: Schema.String,
+  modelCallId: Schema.String,
+  modelAttemptId: Schema.String,
+  callOrdinal: attemptOrdinal,
+  attempt: attemptOrdinal,
+  turn: Schema.Finite,
+  purpose: ModelCallPurpose,
+  method: ModelInvocationMethod,
+  provider: Schema.optionalKey(Schema.String),
+  model: Schema.optionalKey(Schema.String),
+  startedAt: Schema.Finite,
+})
+export type ModelInvocationStarted = typeof ModelInvocationStarted.Type
+
+export const ModelInvocationCompleted = Schema.Struct({
+  logicalOperationId: Schema.String,
+  modelCallId: Schema.String,
+  modelAttemptId: Schema.String,
+  attempt: attemptOrdinal,
+  completedAt: Schema.Finite,
+  usage: Response.Usage,
+  finishReason: Response.FinishReason,
+  requestId: Schema.optionalKey(Schema.String),
+  responseModel: Schema.optionalKey(Schema.String),
+})
+export type ModelInvocationCompleted = typeof ModelInvocationCompleted.Type
+
+export const ModelInvocationFailed = Schema.Struct({
+  logicalOperationId: Schema.String,
+  modelCallId: Schema.String,
+  modelAttemptId: Schema.String,
+  attempt: attemptOrdinal,
+  failedAt: Schema.Finite,
+  category: ModelFailureCategory,
+  classification: ModelFailureClassification,
+})
+export type ModelInvocationFailed = typeof ModelInvocationFailed.Type
+
+export class InvocationCoordinationFailed extends Schema.TaggedErrorClass<InvocationCoordinationFailed>()(
+  "@batonfx/core/InvocationCoordinationFailed",
+  { message: Schema.String },
+) {}
+
+export interface InvocationCoordinatorInterface {
+  readonly beforeAttempt: (input: ModelInvocationStarted) => Effect.Effect<void, InvocationCoordinationFailed>
+  readonly completeAttempt: (input: ModelInvocationCompleted) => Effect.Effect<void, InvocationCoordinationFailed>
+  readonly failAttempt: (input: ModelInvocationFailed) => Effect.Effect<void, InvocationCoordinationFailed>
+}
+
+export class InvocationCoordinator extends Context.Service<InvocationCoordinator, InvocationCoordinatorInterface>()(
+  "@batonfx/core/InvocationCoordinator",
+) {}
+
+export const invocationCoordinatorNoop: Layer.Layer<InvocationCoordinator> = Layer.succeed(
+  InvocationCoordinator,
+  InvocationCoordinator.of({
+    beforeAttempt: () => Effect.void,
+    completeAttempt: () => Effect.void,
+    failAttempt: () => Effect.void,
+  }),
+)
+
+export const isInvocationCoordinationFailed = Schema.is(InvocationCoordinationFailed)
+
 /**
  * @experimental A model call began. One call spans every provider attempt made
  * for one prepared input. All timestamps are epoch milliseconds sampled from

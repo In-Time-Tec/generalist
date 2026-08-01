@@ -723,6 +723,37 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "fails before model calls when modelCallOrdinalStart is invalid", () => {
+    let modelCalls = 0
+    const invalidValues = [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN, Number.POSITIVE_INFINITY]
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("unexpected"))
+        }),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "invalid-model-call-ordinal-agent" })
+
+        for (const modelCallOrdinalStart of invalidValues) {
+          const failure = yield* Effect.flip(
+            Stream.runDrain(Agent.stream(agent, { prompt: "hello", modelCallOrdinalStart })),
+          )
+
+          expect(failure._tag).toBe("@batonfx/core/AgentError")
+          expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
+            "RunOptions.modelCallOrdinalStart must be a non-negative safe integer",
+          )
+        }
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "fails before model calls when tool progress capacity is invalid", () => {
     let modelCalls = 0
     const invalidValues = [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN, Number.POSITIVE_INFINITY]
@@ -7221,7 +7252,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Effect.gen(function* () {
         const agent = Agent.make({ name: "telemetry-agent", toolkit: Toolkit.make(echoTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use the echo tool" }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(agent, {
+            prompt: "use the echo tool",
+            logicalOperationId: "operation:telemetry-offset",
+            modelCallOrdinalStart: 7,
+          }),
+        )
 
         const callsStarted = events.filter((event) => event._tag === "ModelCallStarted")
         const attemptsStarted = events.filter((event) => event._tag === "ModelAttemptStarted")
@@ -7230,7 +7267,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
 
         expect(callsStarted.map((event) => event.turn)).toEqual([0, 1])
         expect(callsStarted.every((event) => event.purpose === "conversation")).toBe(true)
-        expect(new Set(callsStarted.map((event) => event.modelCallId)).size).toBe(2)
+        expect(callsStarted.map((event) => event.modelCallId)).toEqual([
+          "operation:telemetry-offset:model-call:7:conversation",
+          "operation:telemetry-offset:model-call:8:conversation",
+        ])
         expect(callsCompleted.map((event) => event.attempts)).toEqual([1, 1])
         expect(callsCompleted.map((event) => event.usage?.outputTokens.total)).toEqual([2, 3])
         expect(modelParts.length).toBeGreaterThan(0)
