@@ -1,0 +1,9 @@
+{
+  "name": "@batonfx/repository-policy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun --cwd ../.. vitest run tooling/repository-policy/test",
+    "typecheck": "bun --cwd ../.. tsc --noEmit"
+  }
+}

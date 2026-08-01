@@ -1,0 +1,17 @@
+[
+  {
+    "source": "apps/docs/src/main.ts",
+    "test": "apps/docs/src/smoke.test.ts",
+    "kind": "integration"
+  },
+  {
+    "source": "examples/deep-research-agent/server/src/index.ts",
+    "test": "examples/deep-research-agent/server/test/transport.e2e.test.ts",
+    "kind": "integration"
+  },
+  {
+    "source": "examples/deep-research-agent/web/src/main.ts",
+    "test": "examples/deep-research-agent/web/src/scene.test.ts",
+    "kind": "integration"
+  }
+]

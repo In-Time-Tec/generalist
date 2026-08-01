@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "bun src/index.ts",
+    "test": "bun --cwd ../../.. vitest run examples/deep-research-agent/server/test",
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {

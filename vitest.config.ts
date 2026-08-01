@@ -1,18 +1,29 @@
-import { fileURLToPath } from "node:url"
+import { join } from "node:path"
 import { defineConfig } from "vitest/config"
 
 export default defineConfig({
-  resolve: {
-    alias: [
-      { find: "@", replacement: fileURLToPath(new URL("./examples/deep-research-agent/web/src", import.meta.url)) },
-    ],
-  },
+  plugins: [
+    {
+      name: "workspace-at-alias",
+      resolveId(source: string, importer: string | undefined) {
+        if (!source.startsWith("@/")) return undefined
+        const docs = importer?.indexOf("/apps/docs/") ?? -1
+        const workspaceRoot = docs >= 0 ? importer!.slice(0, docs) : importer!.slice(0, importer!.indexOf("/examples/"))
+        const base = docs >= 0 ? "apps/docs/src" : "examples/deep-research-agent/web/src"
+        return `${join(workspaceRoot, base, source.slice(2))}.ts`
+      },
+    },
+  ],
   test: {
+    environmentMatchGlobs: [["apps/docs/**", "happy-dom"]],
     include: [
       "packages/**/test/**/*.test.ts",
-      "examples/deep-research-agent/server/test/**/*.test.ts",
-      "examples/deep-research-agent/web/src/**/*.test.ts",
-      "test/scripts/**/*.test.ts",
+      "apps/**/src/**/*.test.ts",
+      "apps/**/test/**/*.test.ts",
+      "examples/**/test/**/*.test.ts",
+      "examples/**/src/**/*.test.ts",
+      "test/**/*.test.ts",
+      "tooling/**/test/**/*.test.ts",
     ],
     coverage: {
       enabled: false,

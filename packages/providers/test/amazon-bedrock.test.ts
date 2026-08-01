@@ -106,6 +106,24 @@ const fakeClient = (options?: {
 })
 
 describe("AmazonBedrock", () => {
+  it("keeps the explicit public runtime surface", async () => {
+    const module = await import("@batonfx/providers/amazon-bedrock")
+    expect(Object.keys(module).toSorted()).toEqual([
+      "Client",
+      "ClientFailure",
+      "CredentialFailure",
+      "RecoveryFailure",
+      "classifyFailure",
+      "defaultChain",
+      "isRecoverableCredentialFailure",
+      "layer",
+      "layerClient",
+      "layerLanguageModel",
+      "make",
+      "makeRequest",
+      "toolJsonSchemaCompiler",
+    ])
+  })
   it.effect("maps complete text, tools, reasoning, usage, and provider metadata", () =>
     Effect.gen(function* () {
       const model = yield* make({ model: "profile/us.test" }).pipe(Effect.provideService(Client, fakeClient()))

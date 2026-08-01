@@ -7,8 +7,17 @@ import { Client, ClientFailure, layerClient, type Options } from "./amazon-bedro
 import { conformImageSourceModel } from "./image-source.js"
 import { makeRequest } from "./amazon-bedrock-request.js"
 import { responseParts, streamParts } from "./amazon-bedrock-response.js"
-export * from "./amazon-bedrock-client.js"
-export * from "./amazon-bedrock-credentials.js"
+export {
+  Client,
+  ClientFailure,
+  layerClient,
+  isRecoverableCredentialFailure,
+  type Interface,
+  type Options,
+  type Recovery,
+  RecoveryFailure,
+} from "./amazon-bedrock-client.js"
+export { CredentialFailure, defaultChain, type Credential, type Credentials } from "./amazon-bedrock-credentials.js"
 export { makeRequest } from "./amazon-bedrock-request.js"
 
 declare module "effect/unstable/ai/Prompt" {

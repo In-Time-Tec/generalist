@@ -30,6 +30,50 @@ import {
 } from "../src/index"
 
 describe("@batonfx/core public surface", () => {
+  it("keeps the frozen root namespace and Effect AI keys", async () => {
+    const module = await import("../src/index.js")
+    expect(Object.keys(module).toSorted()).toEqual([
+      "Agent",
+      "AgentEvent",
+      "AgentTool",
+      "AiError",
+      "Approvals",
+      "Chat",
+      "Compaction",
+      "ContextOverflow",
+      "EmbeddingModel",
+      "Guardrail",
+      "Handoff",
+      "IdGenerator",
+      "Instructions",
+      "LanguageModel",
+      "Memory",
+      "Model",
+      "ModelMiddleware",
+      "ModelRegistry",
+      "ModelResilience",
+      "ModelStreamTermination",
+      "ModelTelemetry",
+      "ModelToolCallValidation",
+      "Permissions",
+      "Prompt",
+      "Response",
+      "Session",
+      "SessionSync",
+      "SkillSource",
+      "Steering",
+      "Telemetry",
+      "Tokenizer",
+      "Tool",
+      "ToolAuthorization",
+      "ToolContext",
+      "ToolExecutor",
+      "ToolOutput",
+      "ToolPlacement",
+      "Toolkit",
+      "TurnPolicy",
+    ])
+  })
   it("re-exports Effect AI primitives by identity", () => {
     expect(Tool).toBe(EffectTool)
     expect(Toolkit).toBe(EffectToolkit)

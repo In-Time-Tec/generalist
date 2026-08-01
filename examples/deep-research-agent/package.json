@@ -7,7 +7,7 @@
     "start": "bun run --cwd server start",
     "server": "bun run --cwd server start",
     "web": "bun run --cwd web dev",
-    "test": "bun --cwd ../.. vitest run examples/deep-research-agent --passWithNoTests",
+    "test": "bun --cwd ../.. vitest run examples/deep-research-agent",
     "typecheck": "bun run --cwd server typecheck && bun run --cwd web typecheck"
   },
   "devDependencies": {

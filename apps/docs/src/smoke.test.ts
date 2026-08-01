@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { it } from "@effect/vitest"
 import { Effect } from "effect"
 import { TestClock } from "effect/testing"

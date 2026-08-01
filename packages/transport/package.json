@@ -37,7 +37,7 @@
   "scripts": {
     "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
     "lint": "bun --cwd ../.. oxlint packages/transport/src packages/transport/test",
-    "test": "bun --cwd ../.. vitest run packages/transport/test --passWithNoTests",
+    "test": "bun --cwd ../.. vitest run packages/transport/test",
     "typecheck": "bun tsc --noEmit"
   },
   "dependencies": {

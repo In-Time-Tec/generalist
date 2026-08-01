@@ -1,0 +1,1564 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "apps/docs/scripts/generate-llms.ts"
+    },
+    {
+      "path": "apps/docs/scripts/raw-plugin.ts"
+    },
+    {
+      "path": "apps/docs/src/app/init.ts"
+    },
+    {
+      "path": "apps/docs/src/app/message.ts"
+    },
+    {
+      "path": "apps/docs/src/app/model.ts"
+    },
+    {
+      "path": "apps/docs/src/app/searchPalette.ts"
+    },
+    {
+      "path": "apps/docs/src/app/subscriptions.ts"
+    },
+    {
+      "path": "apps/docs/src/app/update.ts"
+    },
+    {
+      "path": "apps/docs/src/app/view.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/badge.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/breadcrumb.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/button.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/card.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/code-block.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/command.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/dialog.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/input.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/kbd.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/navigation-menu.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/scroll-area.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/separator.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/sidebar.ts"
+    },
+    {
+      "path": "apps/docs/src/components/ui/skeleton.ts"
+    },
+    {
+      "path": "apps/docs/src/content/registry.ts"
+    },
+    {
+      "path": "apps/docs/src/entry.ts"
+    },
+    {
+      "path": "apps/docs/src/layout/brand.ts"
+    },
+    {
+      "path": "apps/docs/src/layout/docsLayout.ts"
+    },
+    {
+      "path": "apps/docs/src/layout/icon.ts"
+    },
+    {
+      "path": "apps/docs/src/layout/pager.ts"
+    },
+    {
+      "path": "apps/docs/src/layout/shell.ts"
+    },
+    {
+      "path": "apps/docs/src/layout/sidebarStorage.ts"
+    },
+    {
+      "path": "apps/docs/src/layout/tableOfContents.ts"
+    },
+    {
+      "path": "apps/docs/src/layout/themeSelector.ts"
+    },
+    {
+      "path": "apps/docs/src/layout/types.ts"
+    },
+    {
+      "path": "apps/docs/src/lib/highlight.ts"
+    },
+    {
+      "path": "apps/docs/src/lib/utils.ts"
+    },
+    {
+      "path": "apps/docs/src/main.ts"
+    },
+    {
+      "path": "apps/docs/src/page/landing.ts"
+    },
+    {
+      "path": "apps/docs/src/page/notFound.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/approvals.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/compaction.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/define-tools.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/foldkit-chat.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/instructions.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/mcp.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/memory.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/middleware.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/multi-agent.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/permissions.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/providers.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/serve-transport.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/skills.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/steering.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/structured-output.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/testing-evals.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/guides/turn-policy.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/learn/agent-loop.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/learn/baton-and-relay.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/learn/comparisons.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/learn/one-payload-vocabulary.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/learn/seams-as-services.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/learn/sessions-and-history.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/learn/suspension.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/core-agent.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/core-context.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/core-events.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/core-models.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/core-policies.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/core-tools.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/foldkit.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/mcp.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/memory.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/providers.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/skills.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/test.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/transport.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/reference/versioning.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/start/examples.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/start/installation.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/start/introduction.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/start/quickstart.ts"
+    },
+    {
+      "path": "apps/docs/src/pages/start/research-agent.ts"
+    },
+    {
+      "path": "apps/docs/src/prose/build.ts"
+    },
+    {
+      "path": "apps/docs/src/prose/extract.ts"
+    },
+    {
+      "path": "apps/docs/src/prose/index.ts"
+    },
+    {
+      "path": "apps/docs/src/prose/node.ts"
+    },
+    {
+      "path": "apps/docs/src/prose/page.ts"
+    },
+    {
+      "path": "apps/docs/src/prose/render.ts"
+    },
+    {
+      "path": "apps/docs/src/route/route.ts"
+    },
+    {
+      "path": "apps/docs/src/smoke.test.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/approvals/approvals-layer.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/approvals/needs-approval-tool.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/approvals/suspend-and-resume.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/compaction/compaction-layer.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/compaction/trim-middleware.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/compaction/truncate-only.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/define-tools/executor.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/define-tools/progress-handler.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/define-tools/run-agent.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/define-tools/search-tool.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/define-tools/spill-large-outputs.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/foldkit-chat/entry.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/foldkit-chat/model.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/foldkit-chat/view.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/instructions/context-sources.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/instructions/instruction-files.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/mcp/connect-server.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/mcp/scripted-source.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/memory/pgvector-store.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/memory/semantic-recall.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/memory/working-memory.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/middleware/custom-middleware.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/middleware/pii-scrub.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/middleware/resilience.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/middleware/validate-input.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/multi-agent/agent-as-tool.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/multi-agent/fan-out.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/multi-agent/supervisor.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/permissions/deny-in-the-loop.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/permissions/evaluate-ruleset.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/permissions/interactive-asks.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/providers/combine-providers.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/providers/deterministic-registry.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/providers/gemini-openai-compat.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/providers/openai-or-deterministic.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/providers/openrouter.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/serve-transport/approval-resume.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/serve-transport/http-routes.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/serve-transport/session-frames.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/skills/activate-skill.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/skills/hosted-skills.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/skills/skill-loader.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/steering/queue-modes.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/steering/steer-and-follow-up.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/structured-output/extract.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/structured-output/stream-object.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/testing-evals/eval-in-ci.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/testing-evals/scripted-loop-test.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/turn-policy/compose-policies.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/turn-policy/override-turns.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/turn-policy/token-budget.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/guides/turn-policy/turn-limit.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/landing/one-turn.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/learn/agent-loop/event-trace.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/learn/baton-and-relay/tool-wait.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/learn/one-payload-vocabulary/portable-transcript.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/learn/seams-as-services/four-layers.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/learn/sessions-and-history/projection.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/learn/suspension/suspend-and-resume.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/quickstart/eval.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/quickstart/step-2.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/quickstart/step-3.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/quickstart/step-4.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/quickstart/step-5.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/research-agent/agent.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/research-agent/approve.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/research-agent/model.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/research-agent/search-provider.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/research-agent/server.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/research-agent/tools.ts"
+    },
+    {
+      "path": "apps/docs/src/snippets/research-agent/web-main.ts"
+    },
+    {
+      "path": "apps/docs/vite.config.ts"
+    },
+    {
+      "path": "examples/capstone-local-assistant/src/index.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/src/agent.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/src/index.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/src/model.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/src/search-provider.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/src/tools.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/test/agent.test.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/test/model.test.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/test/search-provider.test.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/test/tools.test.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/server/test/transport.e2e.test.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/badge.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/button.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/conversation.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/input.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/loader.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/message-scroller.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/message.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/prompt-input.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/reasoning.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/response.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/select.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/sources.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/spinner.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/textarea.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/components/ui/tool.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/entry.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/lib/utils.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/main.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/scene.test.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/src/story.test.ts"
+    },
+    {
+      "path": "examples/deep-research-agent/web/vite.config.ts"
+    },
+    {
+      "path": "examples/eval-in-ci/src/index.ts"
+    },
+    {
+      "path": "examples/hitl-over-sse/src/index.ts"
+    },
+    {
+      "path": "examples/mcp-agent/src/index.ts"
+    },
+    {
+      "path": "examples/memory-chat/src/index.ts"
+    },
+    {
+      "path": "examples/multi-agent/src/index.ts"
+    },
+    {
+      "path": "examples/package-composition-guides/src/core.ts"
+    },
+    {
+      "path": "examples/package-composition-guides/src/foldkit.ts"
+    },
+    {
+      "path": "examples/package-composition-guides/src/mcp.ts"
+    },
+    {
+      "path": "examples/package-composition-guides/src/memory.ts"
+    },
+    {
+      "path": "examples/package-composition-guides/src/providers.ts"
+    },
+    {
+      "path": "examples/package-composition-guides/src/skills.ts"
+    },
+    {
+      "path": "examples/package-composition-guides/src/test.ts"
+    },
+    {
+      "path": "examples/package-composition-guides/src/transport.ts"
+    },
+    {
+      "path": "examples/structured-extraction/src/index.ts"
+    },
+    {
+      "path": "examples/tool-calling-chatbot/src/index.ts"
+    },
+    {
+      "path": "packages/core/src/agent-event.ts"
+    },
+    {
+      "path": "packages/core/src/agent-message.ts"
+    },
+    {
+      "path": "packages/core/src/agent-persistence-lock.ts"
+    },
+    {
+      "path": "packages/core/src/agent-run.ts"
+    },
+    {
+      "path": "packages/core/src/agent-skill-tool.ts"
+    },
+    {
+      "path": "packages/core/src/agent-suspension.ts"
+    },
+    {
+      "path": "packages/core/src/agent-tool-result.ts"
+    },
+    {
+      "path": "packages/core/src/agent-tool.ts"
+    },
+    {
+      "path": "packages/core/src/agent.ts"
+    },
+    {
+      "path": "packages/core/src/agent/agent-run-resources.ts"
+    },
+    {
+      "path": "packages/core/src/agent/agent-run-state.ts"
+    },
+    {
+      "path": "packages/core/src/agent/compaction-runtime.ts"
+    },
+    {
+      "path": "packages/core/src/agent/model-turn.ts"
+    },
+    {
+      "path": "packages/core/src/agent/run-loop.ts"
+    },
+    {
+      "path": "packages/core/src/agent/setup.ts"
+    },
+    {
+      "path": "packages/core/src/agent/tool-execution.ts"
+    },
+    {
+      "path": "packages/core/src/approvals.ts"
+    },
+    {
+      "path": "packages/core/src/compaction-telemetry.ts"
+    },
+    {
+      "path": "packages/core/src/compaction.ts"
+    },
+    {
+      "path": "packages/core/src/context-overflow.ts"
+    },
+    {
+      "path": "packages/core/src/guardrail.ts"
+    },
+    {
+      "path": "packages/core/src/handoff.ts"
+    },
+    {
+      "path": "packages/core/src/index.ts"
+    },
+    {
+      "path": "packages/core/src/instructions.ts"
+    },
+    {
+      "path": "packages/core/src/memory.ts"
+    },
+    {
+      "path": "packages/core/src/model-attempt-identity.ts"
+    },
+    {
+      "path": "packages/core/src/model-attempt-instrumentation.ts"
+    },
+    {
+      "path": "packages/core/src/model-attempt-observation.ts"
+    },
+    {
+      "path": "packages/core/src/model-call-correction.ts"
+    },
+    {
+      "path": "packages/core/src/model-instrumentation.ts"
+    },
+    {
+      "path": "packages/core/src/model-middleware.ts"
+    },
+    {
+      "path": "packages/core/src/model-registry.ts"
+    },
+    {
+      "path": "packages/core/src/model-resilience.ts"
+    },
+    {
+      "path": "packages/core/src/model-response-failure.ts"
+    },
+    {
+      "path": "packages/core/src/model-stream-termination.ts"
+    },
+    {
+      "path": "packages/core/src/model-telemetry.ts"
+    },
+    {
+      "path": "packages/core/src/model-tool-call-validation.ts"
+    },
+    {
+      "path": "packages/core/src/permissions.ts"
+    },
+    {
+      "path": "packages/core/src/session-sync.ts"
+    },
+    {
+      "path": "packages/core/src/session.ts"
+    },
+    {
+      "path": "packages/core/src/skill-source.ts"
+    },
+    {
+      "path": "packages/core/src/steering.ts"
+    },
+    {
+      "path": "packages/core/src/summary-model.ts"
+    },
+    {
+      "path": "packages/core/src/tool-authorization.ts"
+    },
+    {
+      "path": "packages/core/src/tool-context.ts"
+    },
+    {
+      "path": "packages/core/src/tool-executor.ts"
+    },
+    {
+      "path": "packages/core/src/tool-output.ts"
+    },
+    {
+      "path": "packages/core/src/tool-placement.ts"
+    },
+    {
+      "path": "packages/core/src/tool-registry.ts"
+    },
+    {
+      "path": "packages/core/src/tool-result-codec.ts"
+    },
+    {
+      "path": "packages/core/src/turn-policy.ts"
+    },
+    {
+      "path": "packages/core/test/agent-stream-no-replay.test.ts"
+    },
+    {
+      "path": "packages/core/test/agent-tool.test.ts"
+    },
+    {
+      "path": "packages/core/test/agent.test.ts"
+    },
+    {
+      "path": "packages/core/test/compaction.test.ts"
+    },
+    {
+      "path": "packages/core/test/context-overflow.test.ts"
+    },
+    {
+      "path": "packages/core/test/guardrail.test.ts"
+    },
+    {
+      "path": "packages/core/test/handoff.test.ts"
+    },
+    {
+      "path": "packages/core/test/index.test.ts"
+    },
+    {
+      "path": "packages/core/test/instructions.test.ts"
+    },
+    {
+      "path": "packages/core/test/it-layer.ts"
+    },
+    {
+      "path": "packages/core/test/json.ts"
+    },
+    {
+      "path": "packages/core/test/memory.test.ts"
+    },
+    {
+      "path": "packages/core/test/model-instrumentation.test.ts"
+    },
+    {
+      "path": "packages/core/test/model-middleware.test.ts"
+    },
+    {
+      "path": "packages/core/test/model-registry.test.ts"
+    },
+    {
+      "path": "packages/core/test/model-resilience.test.ts"
+    },
+    {
+      "path": "packages/core/test/model-stream-termination.test.ts"
+    },
+    {
+      "path": "packages/core/test/model-telemetry.test.ts"
+    },
+    {
+      "path": "packages/core/test/model-tool-call-validation.test.ts"
+    },
+    {
+      "path": "packages/core/test/permissions.test.ts"
+    },
+    {
+      "path": "packages/core/test/persistence.test.ts"
+    },
+    {
+      "path": "packages/core/test/provider-finish.ts"
+    },
+    {
+      "path": "packages/core/test/session-fencing.test.ts"
+    },
+    {
+      "path": "packages/core/test/session-sync.test.ts"
+    },
+    {
+      "path": "packages/core/test/session.test.ts"
+    },
+    {
+      "path": "packages/core/test/skill-source.test.ts"
+    },
+    {
+      "path": "packages/core/test/steering.test.ts"
+    },
+    {
+      "path": "packages/core/test/tool-authorization.test.ts"
+    },
+    {
+      "path": "packages/core/test/tool-handler-layer.ts"
+    },
+    {
+      "path": "packages/core/test/tool-output.test.ts"
+    },
+    {
+      "path": "packages/core/test/turn-policy.test.ts"
+    },
+    {
+      "path": "packages/foldkit/src/chat-update-logic.ts"
+    },
+    {
+      "path": "packages/foldkit/src/chat-update.ts"
+    },
+    {
+      "path": "packages/foldkit/src/chat.ts"
+    },
+    {
+      "path": "packages/foldkit/src/connection.ts"
+    },
+    {
+      "path": "packages/foldkit/src/index.ts"
+    },
+    {
+      "path": "packages/foldkit/test/chat.scene.test.ts"
+    },
+    {
+      "path": "packages/foldkit/test/chat.story.test.ts"
+    },
+    {
+      "path": "packages/foldkit/test/chat.test.ts"
+    },
+    {
+      "path": "packages/foldkit/test/connection.test.ts"
+    },
+    {
+      "path": "packages/mcp/src/baton.ts"
+    },
+    {
+      "path": "packages/mcp/src/index.ts"
+    },
+    {
+      "path": "packages/mcp/src/mcp-tool-source.ts"
+    },
+    {
+      "path": "packages/mcp/src/oauth.ts"
+    },
+    {
+      "path": "packages/mcp/test/baton.test.ts"
+    },
+    {
+      "path": "packages/mcp/test/fixture.ts"
+    },
+    {
+      "path": "packages/mcp/test/mcp-tool-source.test.ts"
+    },
+    {
+      "path": "packages/mcp/test/oauth.test.ts"
+    },
+    {
+      "path": "packages/memory/src/index.ts"
+    },
+    {
+      "path": "packages/memory/src/semantic-recall.ts"
+    },
+    {
+      "path": "packages/memory/src/vector-store.ts"
+    },
+    {
+      "path": "packages/memory/src/working-memory.ts"
+    },
+    {
+      "path": "packages/memory/test/index.test.ts"
+    },
+    {
+      "path": "packages/memory/test/semantic-recall.test.ts"
+    },
+    {
+      "path": "packages/memory/test/vector-store.test.ts"
+    },
+    {
+      "path": "packages/memory/test/working-memory.test.ts"
+    },
+    {
+      "path": "packages/providers/src/amazon-bedrock-client.ts"
+    },
+    {
+      "path": "packages/providers/src/amazon-bedrock-credentials.ts"
+    },
+    {
+      "path": "packages/providers/src/amazon-bedrock-request.ts"
+    },
+    {
+      "path": "packages/providers/src/amazon-bedrock-response.ts"
+    },
+    {
+      "path": "packages/providers/src/amazon-bedrock.ts"
+    },
+    {
+      "path": "packages/providers/src/anthropic.ts"
+    },
+    {
+      "path": "packages/providers/src/catalog.ts"
+    },
+    {
+      "path": "packages/providers/src/deterministic.ts"
+    },
+    {
+      "path": "packages/providers/src/embedding.ts"
+    },
+    {
+      "path": "packages/providers/src/image-source.ts"
+    },
+    {
+      "path": "packages/providers/src/index.ts"
+    },
+    {
+      "path": "packages/providers/src/model-failure.ts"
+    },
+    {
+      "path": "packages/providers/src/openai-account-auth-http.ts"
+    },
+    {
+      "path": "packages/providers/src/openai-account-auth.ts"
+    },
+    {
+      "path": "packages/providers/src/openai-compat.ts"
+    },
+    {
+      "path": "packages/providers/src/openai.ts"
+    },
+    {
+      "path": "packages/providers/src/openrouter.ts"
+    },
+    {
+      "path": "packages/providers/src/presets.ts"
+    },
+    {
+      "path": "packages/providers/test/amazon-bedrock.test.ts"
+    },
+    {
+      "path": "packages/providers/test/anthropic-stream-error.test.ts"
+    },
+    {
+      "path": "packages/providers/test/catalog.test.ts"
+    },
+    {
+      "path": "packages/providers/test/image-source.test.ts"
+    },
+    {
+      "path": "packages/providers/test/openai-account-auth-lifecycle.test.ts"
+    },
+    {
+      "path": "packages/providers/test/openai-account-auth.test.ts"
+    },
+    {
+      "path": "packages/providers/test/openai-account.test.ts"
+    },
+    {
+      "path": "packages/providers/test/openai-sse.test.ts"
+    },
+    {
+      "path": "packages/providers/test/openrouter-stream-error.test.ts"
+    },
+    {
+      "path": "packages/providers/test/registration.test.ts"
+    },
+    {
+      "path": "packages/skills/src/github-catalog.ts"
+    },
+    {
+      "path": "packages/skills/src/hosted-catalog.ts"
+    },
+    {
+      "path": "packages/skills/src/http-catalog.ts"
+    },
+    {
+      "path": "packages/skills/src/index.ts"
+    },
+    {
+      "path": "packages/skills/src/instructions-files.ts"
+    },
+    {
+      "path": "packages/skills/src/s3-catalog.ts"
+    },
+    {
+      "path": "packages/skills/src/skill-document.ts"
+    },
+    {
+      "path": "packages/skills/src/skill-loader.ts"
+    },
+    {
+      "path": "packages/skills/test/hosted-catalog.test.ts"
+    },
+    {
+      "path": "packages/skills/test/instructions-files.test.ts"
+    },
+    {
+      "path": "packages/skills/test/skill-loader.test.ts"
+    },
+    {
+      "path": "packages/test/src/index.ts"
+    },
+    {
+      "path": "packages/test/src/test-model.ts"
+    },
+    {
+      "path": "packages/test/test/test-model.test.ts"
+    },
+    {
+      "path": "packages/transport/src/client.ts"
+    },
+    {
+      "path": "packages/transport/src/errors.ts"
+    },
+    {
+      "path": "packages/transport/src/frame-journal.ts"
+    },
+    {
+      "path": "packages/transport/src/index.ts"
+    },
+    {
+      "path": "packages/transport/src/session-coordination.ts"
+    },
+    {
+      "path": "packages/transport/src/session-registry-approvals.ts"
+    },
+    {
+      "path": "packages/transport/src/session-registry-contract.ts"
+    },
+    {
+      "path": "packages/transport/src/session-registry-errors.ts"
+    },
+    {
+      "path": "packages/transport/src/session-registry-finalization.ts"
+    },
+    {
+      "path": "packages/transport/src/session-registry-runtime.ts"
+    },
+    {
+      "path": "packages/transport/src/session-registry-status.ts"
+    },
+    {
+      "path": "packages/transport/src/session-registry.ts"
+    },
+    {
+      "path": "packages/transport/src/sse.ts"
+    },
+    {
+      "path": "packages/transport/src/wire.ts"
+    },
+    {
+      "path": "packages/transport/src/ws.ts"
+    },
+    {
+      "path": "packages/transport/test/client.test.ts"
+    },
+    {
+      "path": "packages/transport/test/frame-journal.test.ts"
+    },
+    {
+      "path": "packages/transport/test/session-coordination.test.ts"
+    },
+    {
+      "path": "packages/transport/test/session-registry.test.ts"
+    },
+    {
+      "path": "packages/transport/test/sse.test.ts"
+    },
+    {
+      "path": "packages/transport/test/wire.test.ts"
+    },
+    {
+      "path": "packages/transport/test/ws.test.ts"
+    },
+    {
+      "path": "scripts/install-preflight.ts"
+    },
+    {
+      "path": "scripts/package-smoke.ts"
+    },
+    {
+      "path": "scripts/repository-graph.ts"
+    },
+    {
+      "path": "scripts/repository-policy.ts"
+    },
+    {
+      "path": "test/scripts/release-workflow.test.ts"
+    },
+    {
+      "path": "test/workspace-test-discovery.test.ts"
+    },
+    {
+      "path": "tooling/repository-graph/test/repository-graph.test.ts"
+    },
+    {
+      "path": "tooling/repository-policy/test/policy.test.ts"
+    },
+    {
+      "path": "vitest.config.ts"
+    }
+  ],
+  "relationships": [
+    {
+      "source": "apps/docs/src/main.ts",
+      "test": "apps/docs/src/smoke.test.ts",
+      "kind": "integration"
+    },
+    {
+      "source": "apps/docs/src/pages/reference/test.ts",
+      "test": "apps/docs/src/pages/reference/test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "examples/deep-research-agent/server/src/index.ts",
+      "test": "examples/deep-research-agent/server/test/transport.e2e.test.ts",
+      "kind": "integration"
+    },
+    {
+      "source": "examples/deep-research-agent/server/test/agent.test.ts",
+      "test": "examples/deep-research-agent/server/test/agent.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "examples/deep-research-agent/server/test/model.test.ts",
+      "test": "examples/deep-research-agent/server/test/model.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "examples/deep-research-agent/server/test/search-provider.test.ts",
+      "test": "examples/deep-research-agent/server/test/search-provider.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "examples/deep-research-agent/server/test/tools.test.ts",
+      "test": "examples/deep-research-agent/server/test/tools.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "examples/deep-research-agent/server/test/transport.e2e.test.ts",
+      "test": "examples/deep-research-agent/server/test/transport.e2e.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "examples/deep-research-agent/web/src/main.ts",
+      "test": "examples/deep-research-agent/web/src/scene.test.ts",
+      "kind": "integration"
+    },
+    {
+      "source": "examples/package-composition-guides/src/test.ts",
+      "test": "examples/package-composition-guides/src/test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/agent-stream-no-replay.test.ts",
+      "test": "packages/core/test/agent-stream-no-replay.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/agent-tool.test.ts",
+      "test": "packages/core/test/agent-tool.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/agent.test.ts",
+      "test": "packages/core/test/agent.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/compaction.test.ts",
+      "test": "packages/core/test/compaction.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/context-overflow.test.ts",
+      "test": "packages/core/test/context-overflow.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/guardrail.test.ts",
+      "test": "packages/core/test/guardrail.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/handoff.test.ts",
+      "test": "packages/core/test/handoff.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/index.test.ts",
+      "test": "packages/core/test/index.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/instructions.test.ts",
+      "test": "packages/core/test/instructions.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/it-layer.ts",
+      "test": "packages/core/test/it-layer.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/json.ts",
+      "test": "packages/core/test/json.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/memory.test.ts",
+      "test": "packages/core/test/memory.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/model-instrumentation.test.ts",
+      "test": "packages/core/test/model-instrumentation.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/model-middleware.test.ts",
+      "test": "packages/core/test/model-middleware.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/model-registry.test.ts",
+      "test": "packages/core/test/model-registry.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/model-resilience.test.ts",
+      "test": "packages/core/test/model-resilience.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/model-stream-termination.test.ts",
+      "test": "packages/core/test/model-stream-termination.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/model-telemetry.test.ts",
+      "test": "packages/core/test/model-telemetry.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/model-tool-call-validation.test.ts",
+      "test": "packages/core/test/model-tool-call-validation.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/permissions.test.ts",
+      "test": "packages/core/test/permissions.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/persistence.test.ts",
+      "test": "packages/core/test/persistence.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/provider-finish.ts",
+      "test": "packages/core/test/provider-finish.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/session-fencing.test.ts",
+      "test": "packages/core/test/session-fencing.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/session-sync.test.ts",
+      "test": "packages/core/test/session-sync.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/session.test.ts",
+      "test": "packages/core/test/session.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/skill-source.test.ts",
+      "test": "packages/core/test/skill-source.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/steering.test.ts",
+      "test": "packages/core/test/steering.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/tool-authorization.test.ts",
+      "test": "packages/core/test/tool-authorization.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/tool-handler-layer.ts",
+      "test": "packages/core/test/tool-handler-layer.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/tool-output.test.ts",
+      "test": "packages/core/test/tool-output.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/turn-policy.test.ts",
+      "test": "packages/core/test/turn-policy.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/foldkit/test/chat.scene.test.ts",
+      "test": "packages/foldkit/test/chat.scene.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/foldkit/test/chat.story.test.ts",
+      "test": "packages/foldkit/test/chat.story.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/foldkit/test/chat.test.ts",
+      "test": "packages/foldkit/test/chat.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/foldkit/test/connection.test.ts",
+      "test": "packages/foldkit/test/connection.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/mcp/test/baton.test.ts",
+      "test": "packages/mcp/test/baton.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/mcp/test/fixture.ts",
+      "test": "packages/mcp/test/fixture.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/mcp/test/mcp-tool-source.test.ts",
+      "test": "packages/mcp/test/mcp-tool-source.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/mcp/test/oauth.test.ts",
+      "test": "packages/mcp/test/oauth.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/memory/test/index.test.ts",
+      "test": "packages/memory/test/index.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/memory/test/semantic-recall.test.ts",
+      "test": "packages/memory/test/semantic-recall.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/memory/test/vector-store.test.ts",
+      "test": "packages/memory/test/vector-store.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/memory/test/working-memory.test.ts",
+      "test": "packages/memory/test/working-memory.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/amazon-bedrock.test.ts",
+      "test": "packages/providers/test/amazon-bedrock.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/anthropic-stream-error.test.ts",
+      "test": "packages/providers/test/anthropic-stream-error.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/catalog.test.ts",
+      "test": "packages/providers/test/catalog.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/image-source.test.ts",
+      "test": "packages/providers/test/image-source.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/openai-account-auth-lifecycle.test.ts",
+      "test": "packages/providers/test/openai-account-auth-lifecycle.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/openai-account-auth.test.ts",
+      "test": "packages/providers/test/openai-account-auth.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/openai-account.test.ts",
+      "test": "packages/providers/test/openai-account.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/openai-sse.test.ts",
+      "test": "packages/providers/test/openai-sse.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/openrouter-stream-error.test.ts",
+      "test": "packages/providers/test/openrouter-stream-error.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/providers/test/registration.test.ts",
+      "test": "packages/providers/test/registration.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/skills/test/hosted-catalog.test.ts",
+      "test": "packages/skills/test/hosted-catalog.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/skills/test/instructions-files.test.ts",
+      "test": "packages/skills/test/instructions-files.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/skills/test/skill-loader.test.ts",
+      "test": "packages/skills/test/skill-loader.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/test/src/index.ts",
+      "test": "packages/test/src/index.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/test/src/test-model.ts",
+      "test": "packages/test/src/test-model.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/test/test/test-model.test.ts",
+      "test": "packages/test/test/test-model.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/transport/test/client.test.ts",
+      "test": "packages/transport/test/client.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/transport/test/frame-journal.test.ts",
+      "test": "packages/transport/test/frame-journal.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/transport/test/session-coordination.test.ts",
+      "test": "packages/transport/test/session-coordination.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/transport/test/session-registry.test.ts",
+      "test": "packages/transport/test/session-registry.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/transport/test/sse.test.ts",
+      "test": "packages/transport/test/sse.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/transport/test/wire.test.ts",
+      "test": "packages/transport/test/wire.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/transport/test/ws.test.ts",
+      "test": "packages/transport/test/ws.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "tooling/repository-graph/test/repository-graph.test.ts",
+      "test": "tooling/repository-graph/test/repository-graph.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "tooling/repository-policy/test/policy.test.ts",
+      "test": "tooling/repository-policy/test/policy.test.ts",
+      "kind": "same-stem"
+    }
+  ]
+}

@@ -3,7 +3,6 @@ import {
   Clock,
   Context,
   Duration,
-  Equal,
   Effect,
   Exit,
   Fiber,
@@ -34,7 +33,6 @@ import {
   type SessionState,
 } from "./session-registry-runtime.js"
 import type { ClientApproval, LooseServerFrameType, SessionStatus } from "./wire.js"
-
 const {
   errorMessage,
   infoFrom,
@@ -44,61 +42,14 @@ const {
   sessionError,
   stripEventTranscript,
 } = sessionRegistryRuntime
-
 export { SessionBusy, SessionError, SessionQueueFull, SubscriberLagged } from "./session-registry-errors.js"
-
-/** @experimental */
-export interface SessionInfo {
-  readonly sessionId: string
-  readonly chatId: string
-  readonly status: SessionStatus
-  readonly lastSeq: number
-  readonly idleSince: Option.Option<number>
-  readonly pendingMessages: number
-}
-
-/** @experimental */
-export interface MemoryOptions<Tools extends Record<string, Tool.Any>, R> {
-  readonly agent: Agent.Agent<Tools, R>
-  readonly ringBufferCapacity?: number
-  readonly subscriberQueueCapacity?: number
-  readonly idleTimeout?: Duration.Input
-  readonly stripTranscripts?: boolean
-  readonly onConcurrentMessage?: "reject" | "enqueue"
-  readonly pendingMessageCapacity?: number
-  readonly maxConcurrentRuns?: number
-}
-
-/** @experimental */
-export interface Interface {
-  readonly open: (options: {
-    readonly sessionId?: string
-    readonly chatId?: string
-    readonly system?: string
-  }) => Effect.Effect<SessionInfo, SessionError>
-  readonly send: (
-    sessionId: string,
-    prompt: Prompt.RawInput,
-  ) => Effect.Effect<void, SessionError | SessionBusy | SessionQueueFull>
-  readonly resolveApproval: (
-    sessionId: string,
-    token: string,
-    decision: ClientApproval,
-  ) => Effect.Effect<void, SessionError | SessionBusy>
-  readonly attach: (
-    sessionId: string,
-    afterSeq?: number,
-  ) => Stream.Stream<LooseServerFrameType, SessionError | SubscriberLagged>
-  readonly interrupt: (sessionId: string) => Effect.Effect<void, SessionError>
-  readonly info: (sessionId: string) => Effect.Effect<SessionInfo, SessionError>
-}
-
-/** @experimental */
-export class SessionRegistry extends Context.Service<SessionRegistry, Interface>()(
-  "@batonfx/transport/SessionRegistry",
-) {}
-
-/** @experimental */
+export type { SessionInfo, MemoryOptions, Interface } from "./session-registry-contract.js"
+export { SessionRegistry } from "./session-registry-contract.js"
+import { SessionRegistry } from "./session-registry-contract.js"
+import type { SessionInfo, MemoryOptions } from "./session-registry-contract.js"
+import { makeResumeApprovals } from "./session-registry-approvals.js"
+import { makeInterruptionFinalizer } from "./session-registry-finalization.js"
+import { setSessionStatus } from "./session-registry-status.js"
 export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
   options: MemoryOptions<Tools, R>,
 ): Layer.Layer<SessionRegistry, never, R | Chat.Persistence> =>
@@ -127,7 +78,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
         options.maxConcurrentRuns === undefined
           ? undefined
           : yield* positiveInteger("maxConcurrentRuns", options.maxConcurrentRuns).pipe(Effect.flatMap(Semaphore.make))
-
       const lookup = (sessionId: string): Effect.Effect<SessionState, SessionError> =>
         Ref.get(state).pipe(
           Effect.flatMap((current) => {
@@ -137,32 +87,14 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
               : Effect.succeed(session)
           }),
         )
-
       const publish = (
         sessionId: string,
         input: FrameWithoutSeq,
         transcript?: Prompt.Prompt,
       ): Effect.Effect<LooseServerFrameType, SessionError> =>
         lookup(sessionId).pipe(Effect.flatMap((session) => session.journal.publish(input, transcript)))
-
       const setStatus = (sessionId: string, runId: number, status: SessionStatus): Effect.Effect<void, SessionError> =>
-        Clock.currentTimeMillis.pipe(
-          Effect.flatMap((now) =>
-            Ref.modify(state, (current): readonly [boolean, RegistryState] => {
-              const session = current.sessions.get(sessionId)
-              if (session === undefined) return [false, current]
-              const [updated, nextCoordination] = coordination.setStatus(session.coordination, runId, status, now)
-              if (!updated) return [false, current]
-              const sessions = new Map(current.sessions)
-              sessions.set(sessionId, { ...session, coordination: nextCoordination })
-              return [true, { ...current, sessions }]
-            }),
-          ),
-          Effect.flatMap((updated) =>
-            updated ? publish(sessionId, { _tag: "SessionStatus", status }).pipe(Effect.asVoid) : Effect.void,
-          ),
-        )
-
+        setSessionStatus({ state, publish, sessionId, runId, status })
       const finalizeRun = (
         sessionId: string,
         runId: number,
@@ -192,71 +124,17 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
               : Effect.void,
           ),
         )
-
-      const finalizeInterrupted = (sessionId: string, runId: number): Effect.Effect<void> => {
-        const error = AgentEvent.AgentError.make({ message: "Session interrupted", turn: 0 })
-        return lookup(sessionId).pipe(
-          Effect.flatMap((session) => Ref.get(session.chat)),
-          Effect.flatMap((chat) => Ref.get(chat.history)),
-          Effect.flatMap((transcript) =>
-            finalizeRun(sessionId, runId, { _tag: "Failed", error }, { _tag: "Failed", error }, transcript),
-          ),
-          Effect.ignore,
-        )
-      }
-
       let drainAfterInterrupt = (_sessionId: string, _runId: number): Effect.Effect<void> => Effect.void
-
-      const stopRun = (sessionId: string, runId: number, fiber: Fiber.Fiber<void>): Effect.Effect<void> =>
-        Fiber.interrupt(fiber).pipe(
-          Effect.andThen(finalizeInterrupted(sessionId, runId)),
-          Effect.andThen(drainAfterInterrupt(sessionId, runId)),
-        )
-
+      const stopRun = makeInterruptionFinalizer({
+        lookup,
+        finalize: finalizeRun,
+        drain: (sessionId, runId) => drainAfterInterrupt(sessionId, runId),
+      })
       const makeApprovals = (
         resume: Agent.Resume | undefined,
         decision: ClientApproval | undefined,
         sessionId: string,
-      ): Effect.Effect<Option.Option<Approvals.Interface>> => {
-        if (resume === undefined || decision === undefined) return Effect.succeed(approvals)
-        const fallbackApprovals = Option.getOrElse(approvals, () =>
-          Approvals.Approvals.of({ resolve: () => Effect.succeed({ _tag: "Approved" }) }),
-        )
-        return Ref.make(false).pipe(
-          Effect.map((consumed) =>
-            Option.some(
-              Approvals.Approvals.of({
-                resolve: (pending) => {
-                  if (
-                    pending.turn !== 0 ||
-                    pending.agentName !== options.agent.name ||
-                    pending.sessionId !== sessionId ||
-                    pending.call.id !== resume.suspension.tool_call_id ||
-                    pending.call.name !== resume.suspension.tool_name ||
-                    !Equal.equals(pending.call.params, resume.suspension.tool_params)
-                  )
-                    return fallbackApprovals.resolve(pending)
-                  return Ref.modify(consumed, (used) => [!used, true]).pipe(
-                    Effect.flatMap((useOverride) =>
-                      useOverride
-                        ? Effect.succeed(
-                            decision._tag === "Approved"
-                              ? { _tag: "Approved" }
-                              : {
-                                  _tag: "Denied",
-                                  ...(decision.reason === undefined ? {} : { reason: decision.reason }),
-                                },
-                          )
-                        : fallbackApprovals.resolve(pending),
-                    ),
-                  )
-                },
-              }),
-            ),
-          ),
-        )
-      }
-
+      ) => makeResumeApprovals({ agentName: options.agent.name, approvals, resume, decision, sessionId })
       const runStream = (
         session: SessionState,
         prompt: Prompt.RawInput,
@@ -337,7 +215,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
           )
           return yield* run.pipe(Effect.provide(runContext))
         })
-
       const reserveRun = (
         sessionId: string,
         resume: Agent.Resume | undefined,
@@ -361,7 +238,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
             }
           }),
         )
-
       const reserveOrEnqueue = (
         sessionId: string,
         prompt: Prompt.RawInput,
@@ -394,7 +270,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
             }
           }),
         )
-
       const reserveNextRun = (
         sessionId: string,
         completedRunId: number,
@@ -409,14 +284,12 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
           sessions.set(sessionId, updated)
           return [Option.some([updated, next.value[1]] as const), { ...current, sessions }]
         })
-
       let launchRun: (
         session: SessionState,
         prompt: Prompt.RawInput,
         resume?: Agent.Resume,
         approvalDecision?: ClientApproval,
       ) => Effect.Effect<void, SessionError>
-
       const drainNext = (sessionId: string, completedRunId: number): Effect.Effect<void> =>
         reserveNextRun(sessionId, completedRunId).pipe(
           Effect.flatMap(
@@ -426,9 +299,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
             }),
           ),
         )
-
       drainAfterInterrupt = drainNext
-
       launchRun = (
         runSession: SessionState,
         prompt: Prompt.RawInput,
@@ -460,7 +331,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
           })
           if (stopRequested) yield* stopRun(runSession.sessionId, runSession.coordination.runId, fiber)
         })
-
       const beginRun = (
         sessionId: string,
         prompt: Prompt.RawInput,
@@ -471,7 +341,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
           const runSession = yield* reserveRun(sessionId, resume)
           yield* launchRun(runSession, prompt, resume, approvalDecision)
         })
-
       const sweep = Clock.currentTimeMillis.pipe(
         Effect.flatMap((now) =>
           Ref.modify(state, (current) => {
@@ -505,9 +374,7 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
           ),
         ),
       )
-
       yield* Effect.sleep(idleTimeout).pipe(Effect.andThen(sweep), Effect.forever, Effect.forkIn(scope))
-
       yield* Effect.addFinalizer(() =>
         Ref.get(state).pipe(
           Effect.flatMap((current) =>
@@ -528,7 +395,6 @@ export const layerMemory = <Tools extends Record<string, Tool.Any>, R>(
           ),
         ),
       )
-
       return SessionRegistry.of({
         open: (openOptions) =>
           Effect.gen(function* () {

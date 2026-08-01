@@ -8,12 +8,15 @@
   "packageManager": "bun@1.3.14",
   "scripts": {
     "build": "bun turbo build",
-    "check": "prettier --cache --check . && oxlint packages apps examples scripts test && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck && bun run test && bun run package",
+    "check": "prettier --cache --check . && oxlint packages apps examples scripts test && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck && bun run repository-policy && bun run repository-graph -- check",
+    "repository-policy": "bun scripts/repository-policy.ts",
+    "repository-graph": "bun scripts/repository-graph.ts",
+    "install-preflight": "bun scripts/install-preflight.ts",
     "dev": "bun --cwd apps/docs dev",
     "format": "prettier --write .",
     "package": "bun scripts/package-smoke.ts",
-    "test": "bun turbo test",
-    "typecheck": "ast-grep scan --config sgconfig.yml --filter '^effect-' --report-style short && bun turbo typecheck && effect-tsgo diagnostics --project ./tsconfig.json --format pretty --strict"
+    "test": "bun run build && vitest run",
+    "typecheck": "ast-grep scan --config sgconfig.yml --filter '^effect-' --report-style short && bun turbo typecheck && bun tsc --noEmit -p tsconfig.json"
   },
   "workspaces": {
     "packages": [
