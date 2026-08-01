@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.12.0
+
+- Persist deterministic model-attempt identities before provider construction, settle terminal stream parts even when downstream consumption stops at the boundary, and reject exhausted call ordinals before provider entry.
+- Preserve completed concurrent sibling tool results before propagating suspension or failure, including bounded and unbounded execution modes.
 - Validate model-emitted tool parameters before middleware, events, authorization, execution, or history. Invalid-tool correction now uses only Baton's precise typed signal and the active provider's exact registered tool JSON Schema compiler; generic `InvalidOutputError` values never trigger correction. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock support schema-backed correction. OpenRouter rejects that policy before transport because its pinned adapter does not preserve a permissive dynamic tool's compiled request schema.
 - Preserve provider-reported usage from a withheld invalid-tool attempt until its terminal finish, and keep failed-attempt usage separate from the successful terminal attempt.
 - Remove `ResponseIdTracker` from the Baton surface and mask it inside instrumented calls so Effect's hidden incremental fallback cannot issue an uninstrumented second provider request.

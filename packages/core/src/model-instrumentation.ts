@@ -10,12 +10,7 @@ import { attemptModel, type CallContext, type InstrumentOptions } from "./model-
 import { memoized, singleFailure, tapRetryTelemetry } from "./model-attempt-observation.js"
 import { classifyFailure } from "./model-registry.js"
 import { type InvalidToolCallParameters, isInvalidToolCallParameters } from "./model-tool-call-validation.js"
-import {
-  type Classification,
-  type ModelResilienceMisconfigured,
-  apply,
-  validate,
-} from "./model-resilience.js"
+import { type Classification, type ModelResilienceMisconfigured, apply, validate } from "./model-resilience.js"
 import type { TerminationFailure } from "./model-stream-termination.js"
 import {
   CurrentCompactionId,

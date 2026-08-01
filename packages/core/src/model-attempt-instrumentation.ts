@@ -230,9 +230,7 @@ const beginAttempt = (
     const attempt = context.state.attempts
     context.state.attempts += 1
     const modelAttemptId =
-      context.logicalOperationId === undefined
-        ? yield* generateId
-        : `${context.modelCallId}:attempt:${attempt}`
+      context.logicalOperationId === undefined ? yield* generateId : `${context.modelCallId}:attempt:${attempt}`
     if (context.options.identity !== undefined) {
       context.options.identity.current = { modelCallId: context.modelCallId, modelAttemptId, attempt }
     }
@@ -319,15 +317,13 @@ const attemptStream = <A extends Response.AnyPart, E, R>(
         Stream.tap((part) => observeStreamPart(context, attempt, part)),
         Stream.catchCause((cause) =>
           Stream.unwrap(
-            attemptExit(context, attempt, Exit.failCause(cause)).pipe(
-              Effect.map(() => Stream.failCause(cause)),
-            ),
+            attemptExit(context, attempt, Exit.failCause(cause)).pipe(Effect.map(() => Stream.failCause(cause))),
           ),
         ),
         Stream.concat(
-          Stream.fromEffect(
-            Effect.suspend(() => attemptExit(context, attempt, Exit.succeed(undefined))),
-          ).pipe(Stream.drain),
+          Stream.fromEffect(Effect.suspend(() => attemptExit(context, attempt, Exit.succeed(undefined)))).pipe(
+            Stream.drain,
+          ),
         ),
         Stream.onExit((exit) => attemptExit(context, attempt, exit).pipe(Effect.ignore)),
       ),
@@ -337,25 +333,28 @@ const attemptStream = <A extends Response.AnyPart, E, R>(
 export const attemptModel: {
   (context: CallContext): (model: LanguageModel.Service) => LanguageModel.Service
   (model: LanguageModel.Service, context: CallContext): LanguageModel.Service
-} = Function.dual(2, (model: LanguageModel.Service, context: CallContext): LanguageModel.Service =>
-  ({
-    ...model,
-    generateText: ((options: never) =>
-      attemptEffect(context, "generateText", () =>
-        model
-          .generateText(options)
-          .pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-      )) as unknown as LanguageModel.Service["generateText"],
-    generateObject: ((options: never) =>
-      attemptEffect(context, "generateObject", () =>
-        (model.generateObject as unknown as (options: never) => Effect.Effect<AnyResponse, AiError.AiError>)(
-          options,
-        ).pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-      )) as unknown as LanguageModel.Service["generateObject"],
-    streamText: ((options: never) =>
-      attemptStream(context, () =>
-        model
-          .streamText(options)
-          .pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-      )) as unknown as LanguageModel.Service["streamText"],
-  }) as LanguageModel.Service)
+} = Function.dual(
+  2,
+  (model: LanguageModel.Service, context: CallContext): LanguageModel.Service =>
+    ({
+      ...model,
+      generateText: ((options: never) =>
+        attemptEffect(context, "generateText", () =>
+          model
+            .generateText(options)
+            .pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+        )) as unknown as LanguageModel.Service["generateText"],
+      generateObject: ((options: never) =>
+        attemptEffect(context, "generateObject", () =>
+          (model.generateObject as unknown as (options: never) => Effect.Effect<AnyResponse, AiError.AiError>)(
+            options,
+          ).pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+        )) as unknown as LanguageModel.Service["generateObject"],
+      streamText: ((options: never) =>
+        attemptStream(context, () =>
+          model
+            .streamText(options)
+            .pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+        )) as unknown as LanguageModel.Service["streamText"],
+    }) as LanguageModel.Service,
+)

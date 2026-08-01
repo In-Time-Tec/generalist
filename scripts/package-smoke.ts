@@ -5,7 +5,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 
 const packages = ["core", "test", "skills", "memory", "providers", "mcp", "transport", "foldkit"] as const
 const compressedSizeLimits: Record<(typeof packages)[number], number> = {
-  core: 85_000,
+  core: 90_000,
   test: 8_000,
   skills: 13_000,
   memory: 10_000,

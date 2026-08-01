@@ -183,19 +183,16 @@ describe("model instrumentation", () => {
     Effect.gen(function* () {
       const { emit } = makeCollector()
       const coordinated: Array<string> = []
-      const wrapped = instrument(
-        languageModel({ streamText: () => Stream.make(finishPart) }),
-        {
-          emit,
-          turn: 0,
-          logicalOperationId: "execution:test:generation:0:turn:finish-boundary",
-          coordinator: {
-            beforeAttempt: () => Effect.sync(() => coordinated.push("started")),
-            completeAttempt: () => Effect.sync(() => coordinated.push("completed")),
-            failAttempt: () => Effect.sync(() => coordinated.push("failed")),
-          },
+      const wrapped = instrument(languageModel({ streamText: () => Stream.make(finishPart) }), {
+        emit,
+        turn: 0,
+        logicalOperationId: "execution:test:generation:0:turn:finish-boundary",
+        coordinator: {
+          beforeAttempt: () => Effect.sync(() => coordinated.push("started")),
+          completeAttempt: () => Effect.sync(() => coordinated.push("completed")),
+          failAttempt: () => Effect.sync(() => coordinated.push("failed")),
         },
-      )
+      })
 
       yield* wrapped.streamText({ prompt: "hello" }).pipe(Stream.take(1), Stream.runDrain)
 

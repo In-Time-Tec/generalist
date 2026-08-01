@@ -1785,14 +1785,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                               batch,
                               ({ call, messages, toolCallIndex }) =>
                                 Stream.runForEach(
-                                  toolCallEvents(
-                                    turn,
-                                    toolCallBatch,
-                                    toolCallIndex,
-                                    call,
-                                    messages,
-                                    activeRegistry,
-                                  ),
+                                  toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
                                   (event) =>
                                     Ref.update(collected, (current) => {
                                       const next = new Map(current)
@@ -1811,9 +1804,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                             .toSorted(([left], [right]) => left - right)
                             .flatMap(([, items]) => items)
                           const completed = Stream.fromIterable(events)
-                          return failure === undefined
-                            ? completed
-                            : Stream.concat(completed, Stream.failCause(failure))
+                          return failure === undefined ? completed : Stream.concat(completed, Stream.failCause(failure))
                         }),
                       )
                 }),

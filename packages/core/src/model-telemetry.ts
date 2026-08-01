@@ -138,7 +138,7 @@ export class InvocationCoordinator extends Context.Service<InvocationCoordinator
   "@batonfx/core/InvocationCoordinator",
 ) {}
 
-export const invocationCoordinatorNoop: Layer.Layer<InvocationCoordinator> = Layer.succeed(
+export const layerInvocationCoordinatorNoop: Layer.Layer<InvocationCoordinator> = Layer.succeed(
   InvocationCoordinator,
   InvocationCoordinator.of({
     beforeAttempt: () => Effect.void,
