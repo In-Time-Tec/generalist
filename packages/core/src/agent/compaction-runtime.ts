@@ -1,23 +1,56 @@
-// @ts-nocheck
-/* oxlint-disable */
 import { Effect, Equal, Option, Ref, Schema } from "effect"
-import { Prompt } from "effect/unstable/ai"
+import { Chat, LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { AgentError, MiddlewareViolation } from "../agent-event.js"
-import { DEFAULT_RESERVE_TOKENS } from "../compaction.js"
+import {
+  Compaction,
+  DEFAULT_RESERVE_TOKENS,
+  type CompactionError,
+  type Result as CompactionResult,
+  type Usage,
+} from "../compaction.js"
 import { diagnose as diagnoseSessionSync, equivalentMessages } from "../session-sync.js"
-import { checkpointMatches, buildContext, buildMemoryContext } from "../session.js"
+import { checkpointMatches, buildContext } from "../session.js"
 import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "../agent-message.js"
-import { generateId } from "../model-telemetry.js"
+import { type CompactionCommit, type Event as ModelTelemetryEvent, generateId } from "../model-telemetry.js"
+import type { RunError, RunOptions } from "../agent.js"
+import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../session.js"
 
-export const makeCompactionRuntime = (context: any): any => {
+import type { MemoryError } from "../memory.js"
+import type { SkillSourceError } from "../skill-source.js"
+
+type CompactionContext = {
+  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly sessionService: Option.Option<typeof SessionStore.Service>
+  readonly sessionId: string
+  readonly sessionOwnerToken: string | undefined
+  readonly sessionAppendOptions: (expectedLeafId: string | null) => {
+    readonly expectedLeafId: string | null
+    readonly ownerToken?: string
+  }
+  readonly chat: Chat.Service
+  readonly persisted: Chat.Persisted | undefined
+  readonly options: RunOptions
+  readonly compactionService: Option.Option<typeof Compaction.Service>
+  readonly tokenizerService: Option.Option<typeof Tokenizer.Tokenizer.Service>
+  readonly deliverPending: () => Effect.Effect<void, import("../model-telemetry.js").DeliveryFailed>
+  readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
+  readonly undeliveredTelemetry: Array<ModelTelemetryEvent>
+  readonly errorMessage: (error: unknown) => string
+  readonly agent: { readonly name: string }
+  readonly memoryRuntime: unknown | undefined
+  readonly memoryError: (turn: number, error: MemoryError) => AgentError
+  readonly skillError: (turn: number, error: SkillSourceError) => AgentError
+  readonly compactionError: (turn: number, error: CompactionError) => AgentError
+  readonly sessionError: (turn: number, error: SessionStoreError | SessionConflict) => AgentError
+}
+
+export const makeCompactionRuntime = (context: CompactionContext) => {
   const {
     activeSession,
-    sessionService,
     sessionId,
     sessionOwnerToken,
     sessionAppendOptions,
     chat,
-    persisted,
     options,
     compactionService,
     tokenizerService,
@@ -26,9 +59,6 @@ export const makeCompactionRuntime = (context: any): any => {
     undeliveredTelemetry,
     errorMessage,
     agent,
-    memoryRuntime,
-    memoryError,
-    skillError,
     compactionError,
     sessionError,
   } = context
@@ -165,7 +195,7 @@ export const makeCompactionRuntime = (context: any): any => {
     turn: number,
     result: CompactionResult,
     parentId: string | null,
-    commitData?: Omit<import("./model-telemetry.js").CompactionCommit, "checkpointId" | "summaryModelCallId">,
+    commitData?: Omit<CompactionCommit, "checkpointId" | "summaryModelCallId">,
   ): Effect.Effect<void, RunError> =>
     Option.match(activeSession, {
       onNone: () => deliverPending().pipe(Effect.andThen(Ref.set(chat.history, result.history))),

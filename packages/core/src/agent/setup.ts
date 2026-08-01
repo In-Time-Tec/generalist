@@ -1,58 +1,38 @@
-/** @effect-diagnostics missingPipeableSignature:skip-file */
-/* oxlint-disable */
-// prettier-ignore
-import { Cause, Channel, Effect, Equal, Exit, Fiber, HashMap, Option, Queue, Ref, Schema, Semaphore, Stream, } from "effect"
-import { AiError, Chat, LanguageModel, Prompt, Response, Telemetry, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
-// prettier-ignore
-import { addUsage, AgentError, AgentSuspended, type Completed, DuplicateToolCallId, type Event, MiddlewareViolation, ProgressOverflow, ResumeMismatch, RunEndedWithoutOutput, type SteeringDrained, type StructuredOutput, type ToolProgress, ToolNameCollision, type TurnCompleted, TurnLimitExceeded, TurnPolicyStopped, } from "../agent-event.js"
+import { Effect, Option, Ref, Schema } from "effect"
+import { Chat, LanguageModel, Prompt, Tokenizer, Tool } from "effect/unstable/ai"
+import { AgentError, type Event as AgentEvent, ResumeMismatch } from "../agent-event.js"
 import { Approvals } from "../approvals.js"
-import { coalesceAdjacentText, diagnose as diagnoseSessionSync, equivalentMessages } from "../session-sync.js"
-import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "../compaction.js"
+import { Compaction } from "../compaction.js"
 import { Instructions, openEpoch } from "../instructions.js"
-import { classify as classifyContextOverflow } from "../context-overflow.js"
-import { type Item, type Key, Memory, type MemoryError, messageFromRecall, projectTranscript } from "../memory.js"
+import { type Key, Memory } from "../memory.js"
 import { ModelMiddleware } from "../model-middleware.js"
-// prettier-ignore
-import { classifyFailure as classifyModelFailure, type FailureClassifier, type LanguageModelNotRegistered, ModelRegistry, } from "../model-registry.js"
+import { ModelRegistry } from "../model-registry.js"
 import { instrument, makeIdentityCell } from "../model-instrumentation.js"
 import { ModelResilience } from "../model-resilience.js"
-// prettier-ignore
-import { InvalidToolCallParameters, isInvalidToolCallParameters, prepare as prepareToolCallValidation, ToolJsonSchemaCompilerMissing, validateDecodedToolCall, } from "../model-tool-call-validation.js"
-// prettier-ignore
-import { CurrentCompactionId, CurrentInstrumentation, CurrentPurpose, CurrentSummaryCall, Delivery, DeliveryFailed, InvocationCoordinator, type Event as ModelTelemetryEvent, type EventPayload as ModelTelemetryEventPayload, type ModelCallPurpose, generateId, } from "../model-telemetry.js"
+import {
+  Delivery,
+  InvocationCoordinator,
+  type Event as ModelTelemetryEvent,
+  type EventPayload as ModelTelemetryEventPayload,
+  generateId,
+} from "../model-telemetry.js"
 import { Permissions, RuleStore } from "../permissions.js"
-// prettier-ignore
-import { type Entry, SessionStore, SessionConflict, type SessionStoreError, buildContext, buildMemoryContext, checkpointMatches, } from "../session.js"
-import { SkillSource, type SkillSourceError, selectListings } from "../skill-source.js"
-import { type Input, Steering } from "../steering.js"
-import { type AuthorizationError, ToolAuthorizerService, make as makeToolAuthorizer } from "../tool-authorization.js"
-import { ToolContext } from "../tool-context.js"
-// prettier-ignore
-import { type DomainFailure, FrameworkFailure, type Outcome, type Request, RemoteRetryMisconfigured, type Success, ToolExecutor, executeToolkit, } from "../tool-executor.js"
-import { bound } from "../tool-output.js"
-import { type Candidate, type Registry, assemble, get, select } from "../tool-registry.js"
-import { type Decision, StopReason, type TurnOverrides, TurnPolicyError } from "../turn-policy.js"
+import { SessionStore, buildContext } from "../session.js"
+import { SkillSource, selectListings } from "../skill-source.js"
+import { Steering } from "../steering.js"
+import { ToolAuthorizerService, make as makeToolAuthorizer } from "../tool-authorization.js"
+import { ToolExecutor } from "../tool-executor.js"
+import { type Candidate, assemble } from "../tool-registry.js"
+import type { Agent, ProgressOverflowPolicy, RunOptions } from "../agent.js"
+import { Runtime } from "../agent-persistence-lock.js"
+import { activateSkillTool, skillListingBudgetTokens } from "../agent-skill-tool.js"
+import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "../agent-suspension.js"
+import { skillListingsInstructions } from "../agent-message.js"
+import { emptyAgentRunResources } from "./agent-run-resources.js"
 
-import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "../agent.js"
-
-type Tools = Record<string, Tool.Any>
 type StaticDeclaration = { readonly origin: import("../agent-event.js").ToolOrigin; readonly tool: Tool.Any }
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-import { Runtime } from "../agent-persistence-lock.js"
-// prettier-ignore
-import { applyPartChain, applyPromptChain, detachEntry, detachPrompt, preservesRecalledMessages, recalledMessages, skillListingsInstructions, withSystem, } from "../agent-message.js"
-// prettier-ignore
-import { activateSkillParameters, activateSkillSuccess, activateSkillTool, activateSkillToolName, skillListingBudgetTokens, } from "../agent-skill-tool.js"
-// prettier-ignore
-import { canonicalSuspensionCall, sameSuspension, suspended, suspensionCheckpoint, suspensionCheckpointOption, type SuspensionCheckpoint, unresolvedToolCall, } from "../agent-suspension.js"
-// prettier-ignore
-import { domainFailureResult, successResult, type AnyToolCall, type PendingToolResult, type ToolCallIdState, } from "../agent-tool-result.js"
-import type { AgentRunState } from "../agent/agent-run-state.js"
-import { emptyAgentRunResources } from "../agent/agent-run-resources.js"
-import { makeModelTurn } from "../agent/model-turn.js"
-import { makeToolExecution } from "../agent/tool-execution.js"
-import { makeCompactionRuntime } from "../agent/compaction-runtime.js"
 
 const appendInstructionFragment = (base: string | undefined, fragment: string | undefined): string | undefined => {
   if (fragment === undefined || fragment.length === 0) return base
@@ -68,7 +48,7 @@ const progressOverflowPolicySchema = Schema.Union([
   Schema.TaggedStruct("Fail", { capacity: progressCapacitySchema }),
 ])
 
-export const setupRun = (agent: any, options: any): any =>
+export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
   Effect.gen(function* () {
     const persistenceOptions = options.persistence
     const resume = options.resume
@@ -187,7 +167,7 @@ export const setupRun = (agent: any, options: any): any =>
       dispatch: "Static",
     }))
     const staticRegistry = yield* assemble(staticCandidates)
-    const staticToolkit = staticRegistry.toolkit as unknown as Toolkit.Toolkit<Tools>
+    const staticToolkit = staticRegistry.toolkit
     if (
       agent.toolDeclarations !== undefined &&
       (agent.toolDeclarations.length !== Object.keys(agent.toolkit.tools).length ||
@@ -318,7 +298,7 @@ export const setupRun = (agent: any, options: any): any =>
         pendingTelemetry.push(event)
         undeliveredTelemetry.push(event)
       })
-    const flushTelemetry = (): ReadonlyArray<Event> => pendingTelemetry.splice(0, pendingTelemetry.length)
+    const flushTelemetry = (): ReadonlyArray<AgentEvent> => pendingTelemetry.splice(0, pendingTelemetry.length)
     const deliverPending = (): Effect.Effect<void, import("../model-telemetry.js").DeliveryFailed> => {
       if (Option.isNone(deliveryService) || undeliveredTelemetry.length === 0) return Effect.void
       const snapshot = Object.freeze([...undeliveredTelemetry])

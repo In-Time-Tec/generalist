@@ -1,141 +1,26 @@
-/* oxlint-disable */
-import {
-  Cause,
-  Channel,
-  Effect,
-  Equal,
-  Exit,
-  Fiber,
-  HashMap,
-  Option,
-  Queue,
-  Ref,
-  Schema,
-  Semaphore,
-  Stream,
-} from "effect"
-import { AiError, Chat, LanguageModel, Prompt, Response, Telemetry, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
-import {
-  addUsage,
-  AgentError,
-  AgentSuspended,
-  type Completed,
-  DuplicateToolCallId,
-  type Event,
-  MiddlewareViolation,
-  ProgressOverflow,
-  ResumeMismatch,
-  RunEndedWithoutOutput,
-  type SteeringDrained,
-  type StructuredOutput,
-  type ToolProgress,
-  ToolNameCollision,
-  type TurnCompleted,
-  TurnLimitExceeded,
-  TurnPolicyStopped,
-} from "./agent-event.js"
-import { Approvals } from "./approvals.js"
-import { coalesceAdjacentText, diagnose as diagnoseSessionSync, equivalentMessages } from "./session-sync.js"
-import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "./compaction.js"
-import { Instructions, openEpoch } from "./instructions.js"
-import { type Item, type Key, Memory, type MemoryError, messageFromRecall, projectTranscript } from "./memory.js"
-import { ModelMiddleware } from "./model-middleware.js"
-import {
-  classifyFailure as classifyModelFailure,
-  type LanguageModelNotRegistered,
-  ModelRegistry,
-} from "./model-registry.js"
-import { instrument, makeIdentityCell } from "./model-instrumentation.js"
-import {
-  CurrentCompactionId,
-  CurrentInstrumentation,
-  CurrentPurpose,
-  CurrentSummaryCall,
-  Delivery,
-  DeliveryFailed,
-  InvocationCoordinator,
-  type Event as ModelTelemetryEvent,
-  type EventPayload as ModelTelemetryEventPayload,
-  type ModelCallPurpose,
-  generateId,
-} from "./model-telemetry.js"
-import { Permissions, RuleStore } from "./permissions.js"
-import {
-  type Entry,
-  SessionStore,
-  SessionConflict,
-  type SessionStoreError,
-  buildContext,
-  buildMemoryContext,
-  checkpointMatches,
-} from "./session.js"
-import { SkillSource, type SkillSourceError, selectListings } from "./skill-source.js"
-import { type Input, Steering } from "./steering.js"
-import { type AuthorizationError, ToolAuthorizerService, make as makeToolAuthorizer } from "./tool-authorization.js"
-import { ToolContext } from "./tool-context.js"
-import {
-  type DomainFailure,
-  FrameworkFailure,
-  type Outcome,
-  type Request,
-  RemoteRetryMisconfigured,
-  type Success,
-  ToolExecutor,
-  executeToolkit,
-} from "./tool-executor.js"
-import { bound } from "./tool-output.js"
-import { type Candidate, type Registry, assemble, get, select } from "./tool-registry.js"
-import { type Decision, StopReason, type TurnOverrides, TurnPolicyError } from "./turn-policy.js"
-import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "./agent.js"
-import { Runtime } from "./agent-persistence-lock.js"
-import {
-  applyPartChain,
-  applyPromptChain,
-  detachEntry,
-  detachPrompt,
-  preservesRecalledMessages,
-  recalledMessages,
-  skillListingsInstructions,
-  withSystem,
-} from "./agent-message.js"
-import {
-  activateSkillParameters,
-  activateSkillSuccess,
-  activateSkillTool,
-  activateSkillToolName,
-  skillListingBudgetTokens,
-} from "./agent-skill-tool.js"
-import {
-  canonicalSuspensionCall,
-  sameSuspension,
-  suspended,
-  suspensionCheckpoint,
-  suspensionCheckpointOption,
-  type SuspensionCheckpoint,
-  unresolvedToolCall,
-} from "./agent-suspension.js"
-import {
-  domainFailureResult,
-  successResult,
-  type AnyToolCall,
-  type PendingToolResult,
-  type ToolCallIdState,
-} from "./agent-tool-result.js"
-import { emptyAgentRunResources } from "./agent/agent-run-resources.js"
+import { Effect, Equal, Option, Ref, Schema, Stream } from "effect"
+import { Prompt, Response, Tool } from "effect/unstable/ai"
+import { AgentError, AgentSuspended, type Event } from "./agent-event.js"
+import { type Item, type MemoryError, messageFromRecall, projectTranscript } from "./memory.js"
+import { type Entry, SessionConflict, SessionStore, type SessionStoreError, buildMemoryContext } from "./session.js"
+import { type Candidate, assemble, get, type Registry } from "./tool-registry.js"
+import type { CompactionError } from "./compaction.js"
+import type { SkillSourceError } from "./skill-source.js"
+import type { Agent, RunError, RunOptions } from "./agent.js"
+import { withSystem } from "./agent-message.js"
+import { activateSkillSuccess, activateSkillToolName } from "./agent-skill-tool.js"
+import { suspensionCheckpointOption, unresolvedToolCall } from "./agent-suspension.js"
+import type { AnyToolCall, PendingToolResult } from "./agent-tool-result.js"
+import type { Input } from "./steering.js"
+import { type Decision, StopReason } from "./turn-policy.js"
+import type { SteeringDrained } from "./agent-event.js"
+import { ToolNameCollision } from "./agent-event.js"
 import type { AgentRunState } from "./agent/agent-run-state.js"
 import { makeModelTurn } from "./agent/model-turn.js"
 import { makeToolExecution } from "./agent/tool-execution.js"
 import { makeCompactionRuntime } from "./agent/compaction-runtime.js"
 import { setupRun } from "./agent/setup.js"
 import { makeRunLoop } from "./agent/run-loop.js"
-const defaultProgressOverflowPolicy: ProgressOverflowPolicy = { _tag: "Backpressure", capacity: 64 }
-const progressCapacitySchema = Schema.Finite.pipe(Schema.check(Schema.isInt(), Schema.isGreaterThan(0)))
-const progressOverflowPolicySchema = Schema.Union([
-  Schema.TaggedStruct("Backpressure", { capacity: progressCapacitySchema }),
-  Schema.TaggedStruct("Dropping", { capacity: progressCapacitySchema }),
-  Schema.TaggedStruct("Sliding", { capacity: progressCapacitySchema }),
-  Schema.TaggedStruct("Fail", { capacity: progressCapacitySchema }),
-])
 const providerOutputState = (): {
   textCharacters: number
   reasoningCharacters: number
@@ -150,11 +35,6 @@ interface StructuredRunConfig<S extends ObjectSchema> {
 type RunStream<S extends ObjectSchema, R> = Stream.Stream<Event, RunError, R | S["DecodingServices"]>
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
 const isToolNameCollision = Schema.is(ToolNameCollision)
-const appendInstructionFragment = (base: string | undefined, fragment: string | undefined): string | undefined => {
-  if (fragment === undefined || fragment.length === 0) return base
-  if (base === undefined || base.length === 0) return fragment
-  return `${base}\n\n${fragment}`
-}
 const isTurnPolicyDecision = (input: unknown): input is Decision => {
   if (typeof input !== "object" || input === null || !("_tag" in input)) return false
   if (input._tag === "Continue") return true
@@ -170,8 +50,6 @@ const steeringDrainedEvent = (
   queue,
   count: inputs.length,
 })
-const attemptText = (parts: ReadonlyArray<Response.StreamPart<any>>): string =>
-  parts.reduce((text, part) => (part.type === "text-delta" ? `${text}${part.delta}` : text), "")
 export const streamInternal = <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
   agent: Agent<Tools, R>,
   options: RunOptions,
@@ -188,15 +66,35 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       const setup = yield* setupRun(agent, options)
       // prettier-ignore
       const {
-        persistenceOptions, resume, persistenceService, runtimeService, compactionService, sessionService, persisted,
-        recoveredHistory, resumeChat, validatedResume, staticCandidates, staticRegistry, staticToolkit, executor, approvals,
-        chain, progressPolicy, sessionId, sessionOwnerToken, sessionAppendOptions, instructionsService, skillSourceService,
-        skillRuntime, selectedSkills, skillListings, hasActivatableSkills, initialRegistry, instructionsEpoch, baseSystem,
-        system, resilienceService, deliveryService, invocationCoordinator, telemetryRunId, telemetrySequence,
-        pendingTelemetry, undeliveredTelemetry, emitTelemetry, flushTelemetry, deliverPending, telemetryIdentity,
-        modelCallOrdinal, instrumentModel, modelRegistryService, permissionsService, ruleStoreService, authorizationService,
-        steeringService, memoryService, tokenizerService, defaultRules, authorizer, memoryOptions, agentModel,
-        agentModelRegistry, memoryRuntime, seedSystem, freshChat, chat, runResources,
+        compactionService,
+        sessionService,
+        persisted,
+        validatedResume,
+        staticToolkit,
+        executor,
+        chain,
+        progressPolicy,
+        sessionId,
+        sessionOwnerToken,
+        sessionAppendOptions,
+        skillRuntime,
+        initialRegistry,
+        resilienceService,
+        undeliveredTelemetry,
+        emitTelemetry,
+        flushTelemetry,
+        deliverPending,
+        telemetryIdentity,
+        instrumentModel,
+        steeringService,
+        tokenizerService,
+        authorizer,
+        agentModel,
+        agentModelRegistry,
+        memoryRuntime,
+        seedSystem,
+        chat,
+        runResources,
       } = setup
       const savePersisted = (turn: number): Effect.Effect<void, AgentError> =>
         persisted === undefined
@@ -436,7 +334,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         skillError,
       })
       const { toolCallEvents } = toolRuntime
-      const modelRuntime = makeModelTurn({
+      const modelRuntime = makeModelTurn<Tools, R>({
         agent,
         resilienceService,
         telemetryIdentity,
@@ -458,7 +356,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         seedSystem === undefined ? Prompt.make(options.prompt) : withSystem(seedSystem, Prompt.make(options.prompt))
       const initialPrompt =
         options.resume === undefined ? yield* recallInitialPrompt(baseInitialPrompt) : baseInitialPrompt
-      return makeRunLoop({
+      return makeRunLoop<Tools, R, StructuredOutputSchema>({
         agent,
         options,
         state,

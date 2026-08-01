@@ -1,6 +1,5 @@
-// @ts-nocheck
-/* oxlint-disable */
 import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
+import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import {
   AgentSuspended,
   AgentError,
@@ -8,12 +7,11 @@ import {
   type ToolProgress,
   ProgressOverflow,
   ToolNameCollision,
-  DuplicateToolCallId,
 } from "../agent-event.js"
-import { Approvals } from "../approvals.js"
 import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "../agent-tool-result.js"
-import { type Agent } from "../agent.js"
-import { type AuthorizationError } from "../tool-authorization.js"
+import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "../agent.js"
+import type { AgentRunState } from "./agent-run-state.js"
+import { type AuthorizationError, type ToolAuthorizer } from "../tool-authorization.js"
 import {
   type DomainFailure,
   FrameworkFailure,
@@ -27,11 +25,43 @@ import {
 import { bound } from "../tool-output.js"
 import { type Candidate, type Registry, assemble, get } from "../tool-registry.js"
 import { ToolContext } from "../tool-context.js"
-import { activateSkillParameters, activateSkillSuccess, activateSkillToolName } from "../agent-skill-tool.js"
+import { activateSkillParameters } from "../agent-skill-tool.js"
 import { canonicalSuspensionCall, suspended } from "../agent-suspension.js"
+import type { Skill, SkillSourceError } from "../skill-source.js"
+
+type StaticToolServices<T extends Record<string, Tool.Any>> =
+  | Tool.HandlersFor<T>
+  | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
 const isToolNameCollision = Schema.is(ToolNameCollision)
 
-export const makeToolExecution = (context: any): any => {
+interface ToolState {
+  readonly registry: Registry
+  readonly activatedSkillBodies: Map<string, string>
+}
+
+interface ToolExecutionContext<T extends Record<string, Tool.Any>, R> {
+  readonly options: RunOptions
+  readonly state: AgentRunState
+  readonly isSkillActivationCall: (call: AnyToolCall, registry: Registry) => boolean
+  readonly agent: Agent<T, R>
+  readonly sessionId: string
+  readonly staticToolkit: Toolkit.Toolkit<Record<string, Tool.Any>>
+  readonly executor: Option.Option<typeof ToolExecutor.Service>
+  readonly authorizer: ToolAuthorizer<R>
+  readonly skillRuntime:
+    | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillSourceError> } }
+    | undefined
+  readonly toolState: Ref.Ref<ToolState>
+  readonly progressPolicy: ProgressOverflowPolicy
+  readonly activeSession: Option.Option<unknown>
+  readonly memoryRuntime: unknown | undefined
+  readonly errorMessage: (error: unknown) => string
+  readonly skillError: (turn: number, error: SkillSourceError) => AgentError
+}
+
+export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>(
+  inputContext: ToolExecutionContext<T, R>,
+) => {
   const {
     options,
     state,
@@ -44,11 +74,8 @@ export const makeToolExecution = (context: any): any => {
     skillRuntime,
     toolState,
     progressPolicy,
-    activeSession,
-    memoryRuntime,
-    errorMessage,
     skillError,
-  } = context
+  } = inputContext
   const boundedSuccessResult = (call: AnyToolCall, outcome: Success): Effect.Effect<PendingToolResult> =>
     options.toolOutputMaxBytes === undefined
       ? Effect.succeed(successResult(call, outcome))
@@ -88,7 +115,7 @@ export const makeToolExecution = (context: any): any => {
   const defaultExecute = (
     request: Request,
     registry: Registry,
-  ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>> => {
+  ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<T> | Tool.HandlerServices<T[keyof T]>> => {
     const registered = get(registry, request.call.name)
     if (registered?.dispatch === "Static") {
       return executeToolkit(staticToolkit, request)
@@ -127,7 +154,7 @@ export const makeToolExecution = (context: any): any => {
     call: AnyToolCall,
     request: Request,
     registry: Registry,
-  ): Stream.Stream<Event, RunError, StaticToolServices<Tools>> =>
+  ): Stream.Stream<Event, RunError, StaticToolServices<T>> =>
     Stream.concat(
       Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
       Stream.unwrap(
@@ -136,7 +163,7 @@ export const makeToolExecution = (context: any): any => {
           const droppedProgress = yield* Ref.make(0)
           const emitSemaphore = yield* Semaphore.make(1)
           const signal = yield* Effect.abortSignal
-          const context = ToolContext.of({
+          const toolContext = ToolContext.of({
             signal,
             sessionId,
             emit: (progress) => {
@@ -174,7 +201,7 @@ export const makeToolExecution = (context: any): any => {
           const execution: Effect.Effect<
             Outcome,
             AgentError | ToolNameCollision | FrameworkFailure,
-            ToolContext | Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>
+            ToolContext | Tool.HandlersFor<T> | Tool.HandlerServices<T[keyof T]>
           > = isSkillActivationCall(call, registry)
             ? activateSkillOutcome(turn, call)
             : Option.isNone(executor)
@@ -189,7 +216,7 @@ export const makeToolExecution = (context: any): any => {
                     ),
                   )
           const fiber = yield* Effect.uninterruptibleMask((restore) =>
-            restore(execution.pipe(Effect.provideService(ToolContext, context))).pipe(
+            restore(execution.pipe(Effect.provideService(ToolContext, toolContext))).pipe(
               Effect.flatMap((outcome) =>
                 Ref.get(droppedProgress).pipe(
                   Effect.flatMap((dropped) =>
@@ -279,7 +306,7 @@ export const makeToolExecution = (context: any): any => {
     call: AnyToolCall,
     messages: ReadonlyArray<Prompt.Message>,
     registry: Registry,
-  ): Stream.Stream<Event, RunError, StaticToolServices<Tools> | R> => {
+  ): Stream.Stream<Event, RunError, StaticToolServices<T> | R> => {
     const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: agent.name, sessionId }
     const candidate = get(registry, call.name)
     if (candidate === undefined)

@@ -665,7 +665,13 @@
       "path": "packages/core/src/agent/compaction-runtime.ts"
     },
     {
+      "path": "packages/core/src/agent/model-turn-context.ts"
+    },
+    {
       "path": "packages/core/src/agent/model-turn.ts"
+    },
+    {
+      "path": "packages/core/src/agent/run-loop-context.ts"
     },
     {
       "path": "packages/core/src/agent/run-loop.ts"

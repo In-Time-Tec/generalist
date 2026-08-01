@@ -1,4 +1,3 @@
-/** @effect-diagnostics missingPipeableSignature:skip-file */
 import { HashMap } from "effect"
 import { Response } from "effect/unstable/ai"
 import type { DomainFailure, Success } from "./tool-executor.js"

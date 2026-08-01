@@ -1,19 +1,15 @@
-/* oxlint-disable */
-import { Cause, Channel, Effect, Equal, Exit, Fiber, HashMap, Option, Ref, Schema, Stream } from "effect"
+import { Cause, Channel, Effect, Exit, HashMap, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Telemetry, Tool, Toolkit } from "effect/unstable/ai"
-import { addUsage, AgentError, type Event, type StructuredOutput, type ToolProgress } from "../agent-event.js"
+import { addUsage, AgentError, type Event } from "../agent-event.js"
 import { coalesceAdjacentText } from "../session-sync.js"
 import { applyPartChain, applyPromptChain } from "../agent-message.js"
-import { type Registry, get, select } from "../tool-registry.js"
+import { type Registry, select } from "../tool-registry.js"
 import { type Request } from "../tool-executor.js"
 import { classify as classifyContextOverflow } from "../context-overflow.js"
-import {
-  ModelRegistry,
-  classifyFailure as classifyModelFailure,
-  type LanguageModelNotRegistered,
-} from "../model-registry.js"
+import { classifyFailure as classifyModelFailure, type LanguageModelNotRegistered } from "../model-registry.js"
 import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../model-telemetry.js"
 import { type AnyToolCall, type ToolCallIdState } from "../agent-tool-result.js"
+import type { RuntimeContext } from "./model-turn-context.js"
 import {
   InvalidToolCallParameters,
   isInvalidToolCallParameters,
@@ -22,30 +18,13 @@ import {
   validateDecodedToolCall,
 } from "../model-tool-call-validation.js"
 import { DuplicateToolCallId, MiddlewareViolation, ToolNameCollision } from "../agent-event.js"
-import type { Agent, RunError, RunOptions } from "../agent.js"
+import type { RunError } from "../agent.js"
 import type { TurnOverrides } from "../turn-policy.js"
-type RuntimeContext = any
-type ModelRuntime = {
-  readonly modelTurn: (
-    turn: number,
-    prompt: Prompt.RawInput,
-    registry: Registry,
-    overrides?: TurnOverrides,
-  ) => Stream.Stream<Event, RunError, LanguageModel.LanguageModel>
-  readonly captureStructuredUsage: (content: ReadonlyArray<Response.Part<any>>) => Effect.Effect<void>
-  readonly withModelTelemetry: (
-    turn: number,
-    purpose: string,
-  ) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
-  readonly withAgentModel: <A, E, R>(
-    effect: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, E | LanguageModelNotRegistered, R>
-}
 const classifyOtherFailure = (error: unknown) => classifyContextOverflow(error)
 const isToolNameCollision = Schema.is(ToolNameCollision)
 const attemptText = (parts: ReadonlyArray<Response.StreamPart<any>>): string =>
   parts.reduce((text, part) => (part.type === "text-delta" ? `${text}${part.delta}` : text), "")
-export const makeModelTurn = (context: RuntimeContext): any => {
+export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
     agent,
     resilienceService,
@@ -117,17 +96,17 @@ export const makeModelTurn = (context: RuntimeContext): any => {
     agentModelRegistry === undefined || agentModel === undefined
       ? effect
       : agentModelRegistry.operate(agentModel, effect)
-  function provideAgentModel<A, E, R2>(stream: Stream.Stream<A, E, R2>): Stream.Stream<A, E, R2 | ModelRegistry>
-  function provideAgentModel<A, E, R2>(
-    stream: Stream.Stream<A, E, R2>,
-  ): Stream.Stream<A, E | AgentError, R2 | ModelRegistry> {
+  function provideAgentModel<A, E, R2>(stream: Stream.Stream<A, E, R2>): Stream.Stream<A, E | AgentError, R2>
+  function provideAgentModel<A, E, R2>(stream: Stream.Stream<A, E, R2>): Stream.Stream<A, E | AgentError, R2> {
     return agentModelRegistry === undefined || agentModel === undefined
       ? stream
-      : ((agentModelRegistry.stream(agentModel, stream) as any).pipe(
-          (Stream.catchTag as any)("@batonfx/core/LanguageModelNotRegistered", (error: unknown) =>
-            Stream.fail(AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error })),
-          ),
-        ) as any)
+      : agentModelRegistry
+          .stream(agentModel, stream)
+          .pipe(
+            Stream.catchTag("@batonfx/core/LanguageModelNotRegistered", (error) =>
+              Stream.fail(AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error })),
+            ),
+          )
   }
   const partEvents = (
     turn: number,
@@ -241,7 +220,10 @@ export const makeModelTurn = (context: RuntimeContext): any => {
             prepareToolCallValidation(
               model,
               activeRegistry.toolkit,
-              (Option.getOrUndefined(resilienceService) as any)?.invalidToolCallCorrectionLimit ?? 0,
+              Option.match(resilienceService, {
+                onNone: () => 0,
+                onSome: (resilience) => resilience.invalidToolCallCorrectionLimit,
+              }),
             ),
           ),
           Effect.map((validatedModel) =>
@@ -293,12 +275,12 @@ export const makeModelTurn = (context: RuntimeContext): any => {
         )
       }
       return Stream.fromChannel(
-        (Channel.acquireUseRelease as any)(
+        Channel.acquireUseRelease(
           Ref.make<ToolCallIdState>({
             nextIndex: 0,
             firstIndexes: HashMap.empty(),
           }),
-          (toolCallIds: any) =>
+          (toolCallIds) =>
             Stream.unwrap(
               Effect.gen(function* () {
                 const activeModel = yield* LanguageModel.LanguageModel
@@ -313,7 +295,7 @@ export const makeModelTurn = (context: RuntimeContext): any => {
                 )
                   ? Prompt.fromMessages(coalescedContent)
                   : prepared.prompt
-                const history = (yield* Ref.get(chat.history)) as Prompt.Prompt
+                const history = yield* Ref.get(chat.history)
                 preparedState = { history, preparedPrompt }
                 const responsePrompt = Prompt.concat(history, preparedPrompt)
                 const messages = responsePrompt.content
@@ -378,12 +360,12 @@ export const makeModelTurn = (context: RuntimeContext): any => {
                 )
               }),
             ).pipe(Stream.toChannel),
-          (_: unknown, exit: Exit.Exit<unknown, unknown>) =>
+          (_toolCallIds, exit: Exit.Exit<unknown, RunError>) =>
             preparedState === undefined ||
             !completed ||
             (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
               ? Effect.void
-              : (Effect.suspend(() => {
+              : Effect.suspend(() => {
                   state.text = `${state.text}${attemptText(transformedParts)}`
                   return Ref.set(
                     chat.history,
@@ -396,7 +378,7 @@ export const makeModelTurn = (context: RuntimeContext): any => {
                   Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
                   Effect.orDie,
                   Effect.asVoid,
-                ) as any),
+                ),
         ),
       ).pipe(
         Stream.catchCause((cause) => {
@@ -412,7 +394,7 @@ export const makeModelTurn = (context: RuntimeContext): any => {
             ? Stream.fail(AgentError.make({ message: errorMessage(failure.value), turn, cause: failure.value }))
             : Stream.failCause(cause)
         }),
-      ) as any
+      )
     }
     const parts = Stream.unwrap(
       applyPromptChain(chain, Prompt.make(prompt), { agentName: agent.name, turn }).pipe(

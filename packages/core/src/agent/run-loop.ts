@@ -1,6 +1,3 @@
-// @ts-nocheck
-/* oxlint-disable */
-/** @effect-diagnostics missingPipeableSignature:skip-file */
 import { Cause, Effect, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import {
@@ -10,9 +7,6 @@ import {
   RunEndedWithoutOutput,
   TurnLimitExceeded,
   TurnPolicyStopped,
-  MiddlewareViolation,
-  ResumeMismatch,
-  ToolNameCollision,
 } from "../agent-event.js"
 import {
   CurrentCompactionId,
@@ -22,27 +16,36 @@ import {
   DeliveryFailed,
 } from "../model-telemetry.js"
 import { TurnPolicyError } from "../turn-policy.js"
+import type { LanguageModelNotRegistered } from "../model-registry.js"
+import type { AnyToolCall } from "../agent-tool-result.js"
+import type { SuspensionCheckpoint } from "../agent-suspension.js"
+import type { RunError } from "../agent.js"
+import type { TurnOverrides } from "../turn-policy.js"
+import type { Input } from "../steering.js"
+import type { Completed, Event, StructuredOutput, TurnCompleted } from "../agent-event.js"
 import { applyPromptChain } from "../agent-message.js"
+import type { ObjectSchema, RunLoopContext, StructuredRunConfig } from "./run-loop-context.js"
+import type { Request } from "../tool-executor.js"
 import { select } from "../tool-registry.js"
-
-const isToolNameCollision = Schema.is(ToolNameCollision)
 const providerOutputState = () => ({ textCharacters: 0, reasoningCharacters: 0, finishReason: undefined })
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
 
-export const makeRunLoop = (context: any): any => {
+export const makeRunLoop = <
+  Tools extends Record<string, Tool.Any>,
+  R,
+  StructuredOutputSchema extends ObjectSchema = ObjectSchema,
+>(
+  context: RunLoopContext<Tools, R, StructuredOutputSchema>,
+): Stream.Stream<Event, RunError, R | StructuredOutputSchema["DecodingServices"]> => {
   const {
     agent,
-    options,
     state,
     chat,
     chain,
     activeSession,
-    memoryRuntime,
     steeringService,
     structured,
     validatedResume,
-    seedSystem,
-    recallInitialPrompt,
     initialPrompt,
     toolState,
     modelTurn,
@@ -426,29 +429,6 @@ export const makeRunLoop = (context: any): any => {
       if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(DeliveryFailed)(reason.error)) {
         return Stream.failCause<RunError>(cause)
       }
-      return Stream.unwrap(
-        deliverPending().pipe(
-          Effect.map(() => Stream.concat(Stream.fromIterable(flushTelemetry()), Stream.failCause<RunError>(cause))),
-        ),
-      )
-    }),
-  )
-  return guardedStream.pipe(
-    Stream.provideService(CurrentInstrumentation, undefined),
-    Stream.provideService(CurrentPurpose, "conversation"),
-    Stream.provideService(CurrentCompactionId, undefined),
-    Stream.provideService(CurrentSummaryCall, undefined),
-    Stream.mapEffect(
-      (event): Effect.Effect<ReadonlyArray<Event>, RunError> =>
-        deliverPending().pipe(Effect.map(() => [...flushTelemetry(), event])),
-    ),
-    Stream.flattenIterable,
-    Stream.concat(Stream.unwrap(deliverPending().pipe(Effect.map(() => Stream.fromIterable(flushTelemetry()))))),
-    Stream.catchCause((cause) => {
-      if (Cause.hasInterrupts(cause)) return Stream.failCause<RunError>(cause)
-      const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
-      if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(DeliveryFailed)(reason.error))
-        return Stream.failCause<RunError>(cause)
       return Stream.unwrap(
         deliverPending().pipe(
           Effect.map(() => Stream.concat(Stream.fromIterable(flushTelemetry()), Stream.failCause<RunError>(cause))),

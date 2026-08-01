@@ -1,4 +1,3 @@
-/** @effect-diagnostics missingPipeableSignature:skip-file */
 import { Effect, Option, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { AgentError, MiddlewareViolation } from "./agent-event.js"

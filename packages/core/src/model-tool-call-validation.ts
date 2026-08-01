@@ -1,4 +1,3 @@
-/** @effect-diagnostics missingPipeableSignature:skip-file */
 import { Effect, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { ModelProviderUsage, providerUsage } from "./model-attempt-observation.js"

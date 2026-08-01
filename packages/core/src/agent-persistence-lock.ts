@@ -1,4 +1,3 @@
-/** @effect-diagnostics missingPipeableSignature:skip-file */
 import { Context, Effect, Layer, RcMap, Scope, Semaphore } from "effect"
 import { Chat } from "effect/unstable/ai"
 

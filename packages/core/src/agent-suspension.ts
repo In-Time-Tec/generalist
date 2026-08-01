@@ -1,4 +1,3 @@
-/** @effect-diagnostics missingPipeableSignature:skip-file */
 import { Equal, Option, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { AgentSuspended } from "./agent-event.js"

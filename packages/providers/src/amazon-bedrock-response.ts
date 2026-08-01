@@ -1,4 +1,3 @@
-/** @effect-diagnostics missingPipeableSignature:skip-file */
 import type { ConverseCommandOutput, ConverseStreamOutput, TokenUsage } from "@aws-sdk/client-bedrock-runtime"
 import { Effect, Encoding, Schema, Stream } from "effect"
 import { AiError, Response, Tool } from "effect/unstable/ai"
