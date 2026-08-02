@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Exit, Fiber, Layer, Schedule, Schema, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
+import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Prompt } from "effect/unstable/ai"
 import { Client, Wire } from "../src/index"
@@ -78,20 +78,9 @@ const invalidSequenceEventText = (seq: number): string =>
   `id: ${seq}\nevent: Ended\ndata: ${JSON.stringify({ _tag: "Ended", seq })}\n\n`
 
 const httpClientLayer = (body: string): Layer.Layer<HttpClient.HttpClient> => {
-  const baseRequest = HttpClientRequest.get("http://test/events")
-  const response = HttpClientResponse.fromWeb(baseRequest, new globalThis.Response(body, { status: 200 }))
-  const client = {
-    execute: () => Effect.succeed(response),
-    get: () => Effect.succeed(response),
-    head: () => Effect.succeed(response),
-    post: () => Effect.succeed(response),
-    patch: () => Effect.succeed(response),
-    put: () => Effect.succeed(response),
-    del: () => Effect.succeed(response),
-    options: () => Effect.succeed(response),
-    preprocess: (input: HttpClientRequest.HttpClientRequest) => Effect.succeed(input),
-    postprocess: (input: Effect.Effect<HttpClientRequest.HttpClientRequest>) => input.pipe(Effect.as(response)),
-  } as unknown as HttpClient.HttpClient
+  const client = HttpClient.make((request) =>
+    Effect.succeed(HttpClientResponse.fromWeb(request, new globalThis.Response(body, { status: 200 }))),
+  )
   return Layer.succeed(HttpClient.HttpClient, client)
 }
 
