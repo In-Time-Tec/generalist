@@ -1,8 +1,8 @@
 import { Agent, TurnPolicy } from "@batonfx/core"
-import { toolkit } from "./tools"
+import { toolkit, webSearchTool } from "./tools"
 
 /** @experimental The bounded research policy used by the demo agent. */
-export const policy = TurnPolicy.recurs(6)
+export const policy: TurnPolicy.TurnPolicy = TurnPolicy.recurs(6)
 
 /** @experimental The deep-research agent: plan briefly, search as needed, then synthesize a cited answer. */
 export const agent = Agent.make({
@@ -10,4 +10,4 @@ export const agent = Agent.make({
   instructions: "Plan briefly, call web_search as needed, then synthesize a cited answer with source URLs.",
   toolkit,
   policy,
-})
+}) as unknown as Agent.Agent<{ readonly web_search: typeof webSearchTool }>

@@ -19,4 +19,4 @@ export const policyLayer = Layer.mergeAll(
       ),
   }),
   Permissions.layerRuleStoreMemory([{ pattern: "read_*", level: "allow" }]),
-)
+) as unknown

@@ -1,5 +1,5 @@
 import type { Response, Prompt } from "effect/unstable/ai"
-import type { PendingToolResult } from "../agent-tool-result.js"
+import type { PendingToolResult } from "./agent-tool-result.js"
 
 /** @internal Mutable state owned by one Agent.stream invocation. */
 export interface AgentRunState {

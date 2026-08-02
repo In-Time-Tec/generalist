@@ -15,4 +15,4 @@ export const tokenBudget = (maxTokens: number): TurnPolicy.TurnPolicy =>
 export const agent = Agent.make({
   name: "budgeted-researcher",
   policy: TurnPolicy.both(tokenBudget(24_000), TurnPolicy.recurs(8)),
-})
+}) as unknown

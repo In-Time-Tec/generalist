@@ -5,7 +5,7 @@ import { Sse } from "effect/unstable/encoding"
 import { Headers, HttpBody, HttpServerRequest } from "effect/unstable/http"
 import { Prompt, Toolkit } from "effect/unstable/ai"
 import { Errors, SessionRegistry, Wire } from "../src/index"
-import { lastEventId, respond, streamSuccess } from "../src/sse"
+import { lastEventId, respond, streamSuccess } from "../src/transport/sse"
 
 const provideTestLayer =
   <R, E, RIn>(layer: Layer.Layer<R, E, RIn>) =>

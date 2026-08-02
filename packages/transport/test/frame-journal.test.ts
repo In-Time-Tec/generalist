@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Option, Queue } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { makeFrameJournal } from "../src/frame-journal.js"
-import type { FrameWithoutSeq } from "../src/frame-journal.js"
-import type { SessionError, SubscriberLagged } from "../src/session-registry-errors.js"
-import type { LooseServerFrameType } from "../src/wire.js"
+import { makeFrameJournal } from "../src/transport/frame-journal.js"
+import type { FrameWithoutSeq } from "../src/transport/frame-journal.js"
+import type { SessionError, SubscriberLagged } from "../src/session/session-registry-errors.js"
+import type { LooseServerFrameType } from "../src/transport/wire.js"
 
 const status = (turn: number) => ({ _tag: "SessionStatus" as const, status: { _tag: "Running" as const, turn } })
 

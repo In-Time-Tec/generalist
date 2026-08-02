@@ -3,7 +3,7 @@ import { Deferred, Effect, Exit, Fiber, Function, Schedule, Schema, Stream } fro
 import { TestClock } from "effect/testing"
 import { AiError, LanguageModel, Model, Prompt, Response, ResponseIdTracker } from "effect/unstable/ai"
 import { ModelResilience, ModelStreamTermination, ModelTelemetry, ModelToolCallValidation } from "../src/index"
-import { instrument, makeIdentityCell } from "../src/model-instrumentation"
+import { instrument, makeIdentityCell } from "../src/model/model-instrumentation"
 
 const transientError = AiError.make({
   module: "TestLanguageModel",

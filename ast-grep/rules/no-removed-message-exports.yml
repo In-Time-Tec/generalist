@@ -9,5 +9,5 @@ rule:
     - kind: type_identifier
       regex: ^(Message|OutMessage)$
 files:
-  - "packages/core/src/steering.ts"
-  - "packages/foldkit/src/chat.ts"
+  - "packages/core/src/turn/steering.ts"
+  - "packages/foldkit/src/chat/chat.ts"

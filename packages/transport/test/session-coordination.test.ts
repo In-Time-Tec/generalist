@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
 import { Response } from "effect/unstable/ai"
 import { AgentEvent } from "@batonfx/core"
-import { coordination } from "../src/session-coordination.js"
+import { coordination } from "../src/session/session-coordination.js"
 
 describe("session coordination", () => {
   it("transitions idle runs and rejects overlapping work by default", () => {

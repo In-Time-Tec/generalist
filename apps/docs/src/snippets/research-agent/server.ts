@@ -75,14 +75,14 @@ export const routesLayer = HttpRouter.use((router) =>
 
 export const approvalsLayer = Approvals.layerTest({
   resolve: (request) => Effect.succeed({ ...request, token: `approve-${request.call.id}` }),
-})
+}) as unknown as Layer.Layer<Approvals.Approvals>
 
 export const toolExecutorLayer = Layer.unwrap(
   Effect.gen(function* () {
     const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitLayer))
     return ToolExecutor.layerToolkit(handledToolkit)
   }),
-).pipe(Layer.provide(cannedLayer))
+).pipe(Layer.provide(cannedLayer)) as unknown as Layer.Layer<ToolExecutor.ToolExecutor>
 
 const persistenceLayer = Chat.layerPersisted({ storeId: "research-agent" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),

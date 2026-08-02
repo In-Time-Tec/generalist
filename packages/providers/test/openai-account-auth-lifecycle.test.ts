@@ -28,7 +28,7 @@ import {
   OpenAiAccountDevicePresenter,
   StoreError,
   layer,
-} from "../src/openai-account-auth.js"
+} from "../src/provider/openai-account-auth.js"
 
 const digest = (_algorithm: string, data: Uint8Array) =>
   Effect.promise(() =>
@@ -55,7 +55,7 @@ const tokens = (account?: string, user?: string) => ({
   refresh_token: "refresh-secret",
   expires_in: 3600,
 })
-type Disk = Schema.Schema.Type<typeof import("../src/openai-account-auth.js").CredentialDisk>
+type Disk = Schema.Schema.Type<typeof import("../src/provider/openai-account-auth.js").CredentialDisk>
 const fingerprint = (account = "account-secret", user = "user-secret") =>
   account === "account-secret" && user === "user-secret"
     ? "-tORTwymPrvcfDjuXFED-owRjtjXqgQTMZE3uLEz620"

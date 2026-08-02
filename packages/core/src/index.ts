@@ -1,30 +1,74 @@
-export * as Agent from "./agent.js"
-export * as AgentEvent from "./agent-event.js"
-export * as AgentTool from "./agent-tool.js"
-export * as Approvals from "./approvals.js"
-export * as Compaction from "./compaction.js"
-export * as ContextOverflow from "./context-overflow.js"
-export * as Guardrail from "./guardrail.js"
-export * as Handoff from "./handoff.js"
-export * as Instructions from "./instructions.js"
-export * as Memory from "./memory.js"
-export * as ModelMiddleware from "./model-middleware.js"
-export * as ModelRegistry from "./model-registry.js"
-export * as ModelResilience from "./model-resilience.js"
-export * as ModelStreamTermination from "./model-stream-termination.js"
-export * as ModelTelemetry from "./model-telemetry.js"
-export * as ModelToolCallValidation from "./model-tool-call-validation.js"
-export * as Permissions from "./permissions.js"
-export * as Session from "./session.js"
-export * as SessionSync from "./session-sync.js"
-export * as SkillSource from "./skill-source.js"
-export * as Steering from "./steering.js"
-export * as ToolAuthorization from "./tool-authorization.js"
-export * as ToolContext from "./tool-context.js"
-export * as ToolExecutor from "./tool-executor.js"
-export * as ToolOutput from "./tool-output.js"
-export * as ToolPlacement from "./tool-placement.js"
-export * as TurnPolicy from "./turn-policy.js"
+import { Agent } from "./agent/facade-agent.js"
+import { AgentEvent } from "./agent/facade-agentEvent.js"
+import { AgentTool } from "./agent/facade-agentTool.js"
+import { Approvals } from "./policy/facade-approvals.js"
+import { Compaction } from "./turn/facade-compaction.js"
+import { ContextOverflow } from "./model/facade-contextOverflow.js"
+import { Guardrail } from "./policy/facade-guardrail.js"
+import { Handoff } from "./policy/facade-handoff.js"
+import { Instructions } from "./context/facade-instructions.js"
+import { Memory } from "./context/facade-memory.js"
+import { ModelMiddleware } from "./model/facade-modelMiddleware.js"
+import { ModelRegistry } from "./model/facade-modelRegistry.js"
+import { ModelResilience } from "./model/facade-modelResilience.js"
+import { ModelStreamTermination } from "./model/facade-modelStreamTermination.js"
+import { ModelTelemetry } from "./model/facade-modelTelemetry.js"
+import { ModelToolCallValidation } from "./model/facade-modelToolCallValidation.js"
+import { Permissions } from "./policy/facade-permissions.js"
+import { Session } from "./context/facade-session.js"
+import { SessionSync } from "./context/facade-sessionSync.js"
+import { SkillSource } from "./context/facade-skillSource.js"
+import { Steering } from "./turn/facade-steering.js"
+import { ToolAuthorization } from "./tools/facade-toolAuthorization.js"
+import { ToolContext } from "./tools/facade-toolContext.js"
+import { ToolExecutor } from "./tools/facade-toolExecutor.js"
+import { ToolOutput } from "./tools/facade-toolOutput.js"
+import { ToolPlacement } from "./tools/facade-toolPlacement.js"
+import { TurnPolicy } from "./turn/facade-turnPolicy.js"
+
+export {
+  Agent,
+  AgentEvent,
+  AgentTool,
+  Approvals,
+  Compaction,
+  ContextOverflow,
+  Guardrail,
+  Handoff,
+  Instructions,
+  Memory,
+  ModelMiddleware,
+  ModelRegistry,
+  ModelResilience,
+  ModelStreamTermination,
+  ModelTelemetry,
+  ModelToolCallValidation,
+  Permissions,
+  Session,
+  SessionSync,
+  SkillSource,
+  Steering,
+  ToolAuthorization,
+  ToolContext,
+  ToolExecutor,
+  ToolOutput,
+  ToolPlacement,
+  TurnPolicy,
+}
+
+export type AgentFacade = typeof import("./agent/agent.js")
+export type AgentEventFacade = typeof import("./agent/agent-event.js")
+export type ModelTelemetryFacade = typeof import("./model/model-telemetry.js")
+export type ToolExecutorFacade = typeof import("./tools/tool-executor.js")
+export type TurnPolicyFacade = typeof import("./turn/turn-policy.js")
+export type ModelRegistryFacade = typeof import("./model/model-registry.js")
+export type SkillSourceFacade = typeof import("./context/skill-source.js")
+export type CoreAgent = import("./agent/agent.js").Agent
+export type CoreMemory = import("./context/memory.js").Memory
+export type CoreSkillSource = import("./context/skill-source.js").SkillSource
+export type CoreSkillSourceError = import("./context/skill-source.js").SkillSourceError
+export type CoreModelRegistry = import("./model/model-registry.js").ModelRegistry
+export type CoreModelRegistryRegistration = import("./model/model-registry.js").Registration
 
 export {
   AiError,

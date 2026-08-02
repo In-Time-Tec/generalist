@@ -1,22 +1,22 @@
 import { Effect, Equal, Option, Ref, Schema } from "effect"
 import { Chat, LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
-import { AgentError, MiddlewareViolation } from "../agent-event.js"
+import { AgentError, MiddlewareViolation } from "./agent-event.js"
 import {
   Compaction,
   DEFAULT_RESERVE_TOKENS,
   type CompactionError,
   type Result as CompactionResult,
   type Usage,
-} from "../compaction.js"
-import { diagnose as diagnoseSessionSync, equivalentMessages } from "../session-sync.js"
-import { checkpointMatches, buildContext } from "../session.js"
-import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "../agent-message.js"
-import { type CompactionCommit, type Event as ModelTelemetryEvent, generateId } from "../model-telemetry.js"
-import type { RunError, RunOptions } from "../agent.js"
-import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../session.js"
+} from "../turn/compaction.js"
+import { diagnose as diagnoseSessionSync, equivalentMessages } from "../context/session-sync.js"
+import { checkpointMatches, buildContext } from "../context/session.js"
+import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "./agent-message.js"
+import { type CompactionCommit, type Event as ModelTelemetryEvent, generateId } from "../model/model-telemetry.js"
+import type { RunError, RunOptions } from "./agent.js"
+import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../context/session.js"
 
-import type { MemoryError } from "../memory.js"
-import type { SkillSourceError } from "../skill-source.js"
+import type { MemoryError } from "../context/memory.js"
+import type { SkillSourceError } from "../context/skill-source.js"
 
 type CompactionContext = {
   readonly activeSession: Option.Option<typeof SessionStore.Service>
@@ -32,7 +32,7 @@ type CompactionContext = {
   readonly options: RunOptions
   readonly compactionService: Option.Option<typeof Compaction.Service>
   readonly tokenizerService: Option.Option<typeof Tokenizer.Tokenizer.Service>
-  readonly deliverPending: () => Effect.Effect<void, import("../model-telemetry.js").DeliveryFailed>
+  readonly deliverPending: () => Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed>
   readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
   readonly undeliveredTelemetry: Array<ModelTelemetryEvent>
   readonly errorMessage: (error: unknown) => string

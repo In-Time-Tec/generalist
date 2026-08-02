@@ -11,4 +11,4 @@ export const agent = Agent.make({
   name: "researcher",
   toolkit: Toolkit.make(submitAnswerTool),
   policy: TurnPolicy.both(TurnPolicy.recurs(4), TurnPolicy.untilToolCall("submit_answer")),
-})
+}) as unknown

@@ -1,6 +1,6 @@
 import type { Fiber, Queue, Scope, Semaphore } from "effect"
 import type { Chat } from "effect/unstable/ai"
-import type { ToolProgress } from "../agent-event.js"
+import type { ToolProgress } from "./agent-event.js"
 
 /** @internal Resources acquired and released by one Agent.stream invocation. */
 export interface AgentRunResources {

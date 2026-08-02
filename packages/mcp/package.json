@@ -10,8 +10,8 @@
       "import": "./dist/index.js"
     },
     "./baton": {
-      "types": "./dist/baton.d.ts",
-      "import": "./dist/baton.js"
+      "types": "./dist/mcp/baton.d.ts",
+      "import": "./dist/mcp/baton.js"
     }
   },
   "scripts": {

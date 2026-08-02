@@ -629,31 +629,13 @@
       "path": "examples/tool-calling-chatbot/src/index.ts"
     },
     {
-      "path": "packages/core/src/agent-event.ts"
+      "path": "packages/core/src/agent/agent-event.ts"
     },
     {
-      "path": "packages/core/src/agent-message.ts"
+      "path": "packages/core/src/agent/agent-message.ts"
     },
     {
-      "path": "packages/core/src/agent-persistence-lock.ts"
-    },
-    {
-      "path": "packages/core/src/agent-run.ts"
-    },
-    {
-      "path": "packages/core/src/agent-skill-tool.ts"
-    },
-    {
-      "path": "packages/core/src/agent-suspension.ts"
-    },
-    {
-      "path": "packages/core/src/agent-tool-result.ts"
-    },
-    {
-      "path": "packages/core/src/agent-tool.ts"
-    },
-    {
-      "path": "packages/core/src/agent.ts"
+      "path": "packages/core/src/agent/agent-persistence-lock.ts"
     },
     {
       "path": "packages/core/src/agent/agent-run-resources.ts"
@@ -662,7 +644,34 @@
       "path": "packages/core/src/agent/agent-run-state.ts"
     },
     {
+      "path": "packages/core/src/agent/agent-run.ts"
+    },
+    {
+      "path": "packages/core/src/agent/agent-skill-tool.ts"
+    },
+    {
+      "path": "packages/core/src/agent/agent-suspension.ts"
+    },
+    {
+      "path": "packages/core/src/agent/agent-tool-result.ts"
+    },
+    {
+      "path": "packages/core/src/agent/agent-tool.ts"
+    },
+    {
+      "path": "packages/core/src/agent/agent.ts"
+    },
+    {
       "path": "packages/core/src/agent/compaction-runtime.ts"
+    },
+    {
+      "path": "packages/core/src/agent/facade-agent.ts"
+    },
+    {
+      "path": "packages/core/src/agent/facade-agentEvent.ts"
+    },
+    {
+      "path": "packages/core/src/agent/facade-agentTool.ts"
     },
     {
       "path": "packages/core/src/agent/model-turn-context.ts"
@@ -683,109 +692,181 @@
       "path": "packages/core/src/agent/tool-execution.ts"
     },
     {
-      "path": "packages/core/src/approvals.ts"
+      "path": "packages/core/src/context/facade-instructions.ts"
     },
     {
-      "path": "packages/core/src/compaction-telemetry.ts"
+      "path": "packages/core/src/context/facade-memory.ts"
     },
     {
-      "path": "packages/core/src/compaction.ts"
+      "path": "packages/core/src/context/facade-session.ts"
     },
     {
-      "path": "packages/core/src/context-overflow.ts"
+      "path": "packages/core/src/context/facade-sessionSync.ts"
     },
     {
-      "path": "packages/core/src/guardrail.ts"
+      "path": "packages/core/src/context/facade-skillSource.ts"
     },
     {
-      "path": "packages/core/src/handoff.ts"
+      "path": "packages/core/src/context/instructions.ts"
+    },
+    {
+      "path": "packages/core/src/context/memory.ts"
+    },
+    {
+      "path": "packages/core/src/context/session-sync.ts"
+    },
+    {
+      "path": "packages/core/src/context/session.ts"
+    },
+    {
+      "path": "packages/core/src/context/skill-source.ts"
     },
     {
       "path": "packages/core/src/index.ts"
     },
     {
-      "path": "packages/core/src/instructions.ts"
+      "path": "packages/core/src/model/context-overflow.ts"
     },
     {
-      "path": "packages/core/src/memory.ts"
+      "path": "packages/core/src/model/facade-contextOverflow.ts"
     },
     {
-      "path": "packages/core/src/model-attempt-identity.ts"
+      "path": "packages/core/src/model/facade-modelMiddleware.ts"
     },
     {
-      "path": "packages/core/src/model-attempt-instrumentation.ts"
+      "path": "packages/core/src/model/facade-modelRegistry.ts"
     },
     {
-      "path": "packages/core/src/model-attempt-observation.ts"
+      "path": "packages/core/src/model/facade-modelResilience.ts"
     },
     {
-      "path": "packages/core/src/model-call-correction.ts"
+      "path": "packages/core/src/model/facade-modelStreamTermination.ts"
     },
     {
-      "path": "packages/core/src/model-instrumentation.ts"
+      "path": "packages/core/src/model/facade-modelTelemetry.ts"
     },
     {
-      "path": "packages/core/src/model-middleware.ts"
+      "path": "packages/core/src/model/facade-modelToolCallValidation.ts"
     },
     {
-      "path": "packages/core/src/model-registry.ts"
+      "path": "packages/core/src/model/model-attempt-identity.ts"
     },
     {
-      "path": "packages/core/src/model-resilience.ts"
+      "path": "packages/core/src/model/model-attempt-instrumentation.ts"
     },
     {
-      "path": "packages/core/src/model-response-failure.ts"
+      "path": "packages/core/src/model/model-attempt-observation.ts"
     },
     {
-      "path": "packages/core/src/model-stream-termination.ts"
+      "path": "packages/core/src/model/model-call-correction.ts"
     },
     {
-      "path": "packages/core/src/model-telemetry.ts"
+      "path": "packages/core/src/model/model-instrumentation.ts"
     },
     {
-      "path": "packages/core/src/model-tool-call-validation.ts"
+      "path": "packages/core/src/model/model-middleware.ts"
     },
     {
-      "path": "packages/core/src/permissions.ts"
+      "path": "packages/core/src/model/model-registry.ts"
     },
     {
-      "path": "packages/core/src/session-sync.ts"
+      "path": "packages/core/src/model/model-resilience.ts"
     },
     {
-      "path": "packages/core/src/session.ts"
+      "path": "packages/core/src/model/model-response-failure.ts"
     },
     {
-      "path": "packages/core/src/skill-source.ts"
+      "path": "packages/core/src/model/model-stream-termination.ts"
     },
     {
-      "path": "packages/core/src/steering.ts"
+      "path": "packages/core/src/model/model-telemetry.ts"
     },
     {
-      "path": "packages/core/src/summary-model.ts"
+      "path": "packages/core/src/model/model-tool-call-validation.ts"
     },
     {
-      "path": "packages/core/src/tool-authorization.ts"
+      "path": "packages/core/src/model/summary-model.ts"
     },
     {
-      "path": "packages/core/src/tool-context.ts"
+      "path": "packages/core/src/policy/approvals.ts"
     },
     {
-      "path": "packages/core/src/tool-executor.ts"
+      "path": "packages/core/src/policy/facade-approvals.ts"
     },
     {
-      "path": "packages/core/src/tool-output.ts"
+      "path": "packages/core/src/policy/facade-guardrail.ts"
     },
     {
-      "path": "packages/core/src/tool-placement.ts"
+      "path": "packages/core/src/policy/facade-handoff.ts"
     },
     {
-      "path": "packages/core/src/tool-registry.ts"
+      "path": "packages/core/src/policy/facade-permissions.ts"
     },
     {
-      "path": "packages/core/src/tool-result-codec.ts"
+      "path": "packages/core/src/policy/guardrail.ts"
     },
     {
-      "path": "packages/core/src/turn-policy.ts"
+      "path": "packages/core/src/policy/handoff.ts"
+    },
+    {
+      "path": "packages/core/src/policy/permissions.ts"
+    },
+    {
+      "path": "packages/core/src/tools/facade-toolAuthorization.ts"
+    },
+    {
+      "path": "packages/core/src/tools/facade-toolContext.ts"
+    },
+    {
+      "path": "packages/core/src/tools/facade-toolExecutor.ts"
+    },
+    {
+      "path": "packages/core/src/tools/facade-toolOutput.ts"
+    },
+    {
+      "path": "packages/core/src/tools/facade-toolPlacement.ts"
+    },
+    {
+      "path": "packages/core/src/tools/tool-authorization.ts"
+    },
+    {
+      "path": "packages/core/src/tools/tool-context.ts"
+    },
+    {
+      "path": "packages/core/src/tools/tool-executor.ts"
+    },
+    {
+      "path": "packages/core/src/tools/tool-output.ts"
+    },
+    {
+      "path": "packages/core/src/tools/tool-placement.ts"
+    },
+    {
+      "path": "packages/core/src/tools/tool-registry.ts"
+    },
+    {
+      "path": "packages/core/src/tools/tool-result-codec.ts"
+    },
+    {
+      "path": "packages/core/src/turn/compaction-telemetry.ts"
+    },
+    {
+      "path": "packages/core/src/turn/compaction.ts"
+    },
+    {
+      "path": "packages/core/src/turn/facade-compaction.ts"
+    },
+    {
+      "path": "packages/core/src/turn/facade-steering.ts"
+    },
+    {
+      "path": "packages/core/src/turn/facade-turnPolicy.ts"
+    },
+    {
+      "path": "packages/core/src/turn/steering.ts"
+    },
+    {
+      "path": "packages/core/src/turn/turn-policy.ts"
     },
     {
       "path": "packages/core/test/agent-stream-no-replay.test.ts"
@@ -881,16 +962,16 @@
       "path": "packages/core/test/turn-policy.test.ts"
     },
     {
-      "path": "packages/foldkit/src/chat-update-logic.ts"
+      "path": "packages/foldkit/src/chat/chat-update-logic.ts"
     },
     {
-      "path": "packages/foldkit/src/chat-update.ts"
+      "path": "packages/foldkit/src/chat/chat-update.ts"
     },
     {
-      "path": "packages/foldkit/src/chat.ts"
+      "path": "packages/foldkit/src/chat/chat.ts"
     },
     {
-      "path": "packages/foldkit/src/connection.ts"
+      "path": "packages/foldkit/src/chat/connection.ts"
     },
     {
       "path": "packages/foldkit/src/index.ts"
@@ -908,16 +989,16 @@
       "path": "packages/foldkit/test/connection.test.ts"
     },
     {
-      "path": "packages/mcp/src/baton.ts"
-    },
-    {
       "path": "packages/mcp/src/index.ts"
     },
     {
-      "path": "packages/mcp/src/mcp-tool-source.ts"
+      "path": "packages/mcp/src/mcp/baton.ts"
     },
     {
-      "path": "packages/mcp/src/oauth.ts"
+      "path": "packages/mcp/src/mcp/mcp-tool-source.ts"
+    },
+    {
+      "path": "packages/mcp/src/mcp/oauth.ts"
     },
     {
       "path": "packages/mcp/test/baton.test.ts"
@@ -935,13 +1016,13 @@
       "path": "packages/memory/src/index.ts"
     },
     {
-      "path": "packages/memory/src/semantic-recall.ts"
+      "path": "packages/memory/src/memory/semantic-recall.ts"
     },
     {
-      "path": "packages/memory/src/vector-store.ts"
+      "path": "packages/memory/src/memory/vector-store.ts"
     },
     {
-      "path": "packages/memory/src/working-memory.ts"
+      "path": "packages/memory/src/memory/working-memory.ts"
     },
     {
       "path": "packages/memory/test/index.test.ts"
@@ -956,58 +1037,58 @@
       "path": "packages/memory/test/working-memory.test.ts"
     },
     {
-      "path": "packages/providers/src/amazon-bedrock-client.ts"
+      "path": "packages/providers/src/catalog/catalog.ts"
     },
     {
-      "path": "packages/providers/src/amazon-bedrock-credentials.ts"
-    },
-    {
-      "path": "packages/providers/src/amazon-bedrock-request.ts"
-    },
-    {
-      "path": "packages/providers/src/amazon-bedrock-response.ts"
-    },
-    {
-      "path": "packages/providers/src/amazon-bedrock.ts"
-    },
-    {
-      "path": "packages/providers/src/anthropic.ts"
-    },
-    {
-      "path": "packages/providers/src/catalog.ts"
-    },
-    {
-      "path": "packages/providers/src/deterministic.ts"
-    },
-    {
-      "path": "packages/providers/src/embedding.ts"
-    },
-    {
-      "path": "packages/providers/src/image-source.ts"
+      "path": "packages/providers/src/catalog/presets.ts"
     },
     {
       "path": "packages/providers/src/index.ts"
     },
     {
-      "path": "packages/providers/src/model-failure.ts"
+      "path": "packages/providers/src/model/embedding.ts"
     },
     {
-      "path": "packages/providers/src/openai-account-auth-http.ts"
+      "path": "packages/providers/src/model/image-source.ts"
     },
     {
-      "path": "packages/providers/src/openai-account-auth.ts"
+      "path": "packages/providers/src/model/model-failure.ts"
     },
     {
-      "path": "packages/providers/src/openai-compat.ts"
+      "path": "packages/providers/src/provider/amazon-bedrock-client.ts"
     },
     {
-      "path": "packages/providers/src/openai.ts"
+      "path": "packages/providers/src/provider/amazon-bedrock-credentials.ts"
     },
     {
-      "path": "packages/providers/src/openrouter.ts"
+      "path": "packages/providers/src/provider/amazon-bedrock-request.ts"
     },
     {
-      "path": "packages/providers/src/presets.ts"
+      "path": "packages/providers/src/provider/amazon-bedrock-response.ts"
+    },
+    {
+      "path": "packages/providers/src/provider/amazon-bedrock.ts"
+    },
+    {
+      "path": "packages/providers/src/provider/anthropic.ts"
+    },
+    {
+      "path": "packages/providers/src/provider/deterministic.ts"
+    },
+    {
+      "path": "packages/providers/src/provider/openai-account-auth-http.ts"
+    },
+    {
+      "path": "packages/providers/src/provider/openai-account-auth.ts"
+    },
+    {
+      "path": "packages/providers/src/provider/openai-compat.ts"
+    },
+    {
+      "path": "packages/providers/src/provider/openai.ts"
+    },
+    {
+      "path": "packages/providers/src/provider/openrouter.ts"
     },
     {
       "path": "packages/providers/test/amazon-bedrock.test.ts"
@@ -1040,28 +1121,28 @@
       "path": "packages/providers/test/registration.test.ts"
     },
     {
-      "path": "packages/skills/src/github-catalog.ts"
-    },
-    {
-      "path": "packages/skills/src/hosted-catalog.ts"
-    },
-    {
-      "path": "packages/skills/src/http-catalog.ts"
-    },
-    {
       "path": "packages/skills/src/index.ts"
     },
     {
-      "path": "packages/skills/src/instructions-files.ts"
+      "path": "packages/skills/src/skill/github-catalog.ts"
     },
     {
-      "path": "packages/skills/src/s3-catalog.ts"
+      "path": "packages/skills/src/skill/hosted-catalog.ts"
     },
     {
-      "path": "packages/skills/src/skill-document.ts"
+      "path": "packages/skills/src/skill/http-catalog.ts"
     },
     {
-      "path": "packages/skills/src/skill-loader.ts"
+      "path": "packages/skills/src/skill/instructions-files.ts"
+    },
+    {
+      "path": "packages/skills/src/skill/s3-catalog.ts"
+    },
+    {
+      "path": "packages/skills/src/skill/skill-document.ts"
+    },
+    {
+      "path": "packages/skills/src/skill/skill-loader.ts"
     },
     {
       "path": "packages/skills/test/hosted-catalog.test.ts"
@@ -1076,55 +1157,55 @@
       "path": "packages/test/src/index.ts"
     },
     {
-      "path": "packages/test/src/test-model.ts"
+      "path": "packages/test/src/model/test-model.ts"
     },
     {
       "path": "packages/test/test/test-model.test.ts"
     },
     {
-      "path": "packages/transport/src/client.ts"
-    },
-    {
-      "path": "packages/transport/src/errors.ts"
-    },
-    {
-      "path": "packages/transport/src/frame-journal.ts"
-    },
-    {
       "path": "packages/transport/src/index.ts"
     },
     {
-      "path": "packages/transport/src/session-coordination.ts"
+      "path": "packages/transport/src/session/session-coordination.ts"
     },
     {
-      "path": "packages/transport/src/session-registry-approvals.ts"
+      "path": "packages/transport/src/session/session-registry-approvals.ts"
     },
     {
-      "path": "packages/transport/src/session-registry-contract.ts"
+      "path": "packages/transport/src/session/session-registry-contract.ts"
     },
     {
-      "path": "packages/transport/src/session-registry-errors.ts"
+      "path": "packages/transport/src/session/session-registry-errors.ts"
     },
     {
-      "path": "packages/transport/src/session-registry-finalization.ts"
+      "path": "packages/transport/src/session/session-registry-finalization.ts"
     },
     {
-      "path": "packages/transport/src/session-registry-runtime.ts"
+      "path": "packages/transport/src/session/session-registry-runtime.ts"
     },
     {
-      "path": "packages/transport/src/session-registry-status.ts"
+      "path": "packages/transport/src/session/session-registry-status.ts"
     },
     {
-      "path": "packages/transport/src/session-registry.ts"
+      "path": "packages/transport/src/session/session-registry.ts"
     },
     {
-      "path": "packages/transport/src/sse.ts"
+      "path": "packages/transport/src/transport/client.ts"
     },
     {
-      "path": "packages/transport/src/wire.ts"
+      "path": "packages/transport/src/transport/errors.ts"
     },
     {
-      "path": "packages/transport/src/ws.ts"
+      "path": "packages/transport/src/transport/frame-journal.ts"
+    },
+    {
+      "path": "packages/transport/src/transport/sse.ts"
+    },
+    {
+      "path": "packages/transport/src/transport/wire.ts"
+    },
+    {
+      "path": "packages/transport/src/transport/ws.ts"
     },
     {
       "path": "packages/transport/test/client.test.ts"
@@ -1512,8 +1593,8 @@
       "kind": "same-stem"
     },
     {
-      "source": "packages/test/src/test-model.ts",
-      "test": "packages/test/src/test-model.ts",
+      "source": "packages/test/src/model/test-model.ts",
+      "test": "packages/test/src/model/test-model.ts",
       "kind": "same-stem"
     },
     {

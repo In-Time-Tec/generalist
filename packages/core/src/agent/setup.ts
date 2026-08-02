@@ -1,36 +1,36 @@
 import { Effect, Option, Ref, Schema } from "effect"
 import { Chat, LanguageModel, Prompt, Tokenizer, Tool } from "effect/unstable/ai"
-import { AgentError, type Event as AgentEvent, ResumeMismatch } from "../agent-event.js"
-import { Approvals } from "../approvals.js"
-import { Compaction } from "../compaction.js"
-import { Instructions, openEpoch } from "../instructions.js"
-import { type Key, Memory } from "../memory.js"
-import { ModelMiddleware } from "../model-middleware.js"
-import { ModelRegistry } from "../model-registry.js"
-import { instrument, makeIdentityCell } from "../model-instrumentation.js"
-import { ModelResilience } from "../model-resilience.js"
+import { AgentError, type Event as AgentEvent, ResumeMismatch } from "./agent-event.js"
+import { Approvals } from "../policy/approvals.js"
+import { Compaction } from "../turn/compaction.js"
+import { Instructions, openEpoch } from "../context/instructions.js"
+import { type Key, Memory } from "../context/memory.js"
+import { ModelMiddleware } from "../model/model-middleware.js"
+import { ModelRegistry } from "../model/model-registry.js"
+import { instrument, makeIdentityCell } from "../model/model-instrumentation.js"
+import { ModelResilience } from "../model/model-resilience.js"
 import {
   Delivery,
   InvocationCoordinator,
   type Event as ModelTelemetryEvent,
   type EventPayload as ModelTelemetryEventPayload,
   generateId,
-} from "../model-telemetry.js"
-import { Permissions, RuleStore } from "../permissions.js"
-import { SessionStore, buildContext } from "../session.js"
-import { SkillSource, selectListings } from "../skill-source.js"
-import { Steering } from "../steering.js"
-import { ToolAuthorizerService, make as makeToolAuthorizer } from "../tool-authorization.js"
-import { ToolExecutor } from "../tool-executor.js"
-import { type Candidate, assemble } from "../tool-registry.js"
-import type { Agent, ProgressOverflowPolicy, RunOptions } from "../agent.js"
-import { Runtime } from "../agent-persistence-lock.js"
-import { activateSkillTool, skillListingBudgetTokens } from "../agent-skill-tool.js"
-import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "../agent-suspension.js"
-import { skillListingsInstructions } from "../agent-message.js"
+} from "../model/model-telemetry.js"
+import { Permissions, RuleStore } from "../policy/permissions.js"
+import { SessionStore, buildContext } from "../context/session.js"
+import { SkillSource, selectListings } from "../context/skill-source.js"
+import { Steering } from "../turn/steering.js"
+import { ToolAuthorizerService, make as makeToolAuthorizer } from "../tools/tool-authorization.js"
+import { ToolExecutor } from "../tools/tool-executor.js"
+import { type Candidate, assemble } from "../tools/tool-registry.js"
+import type { Agent, ProgressOverflowPolicy, RunOptions } from "./agent.js"
+import { Runtime } from "./agent-persistence-lock.js"
+import { activateSkillTool, skillListingBudgetTokens } from "./agent-skill-tool.js"
+import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "./agent-suspension.js"
+import { skillListingsInstructions } from "./agent-message.js"
 import { emptyAgentRunResources } from "./agent-run-resources.js"
 
-type StaticDeclaration = { readonly origin: import("../agent-event.js").ToolOrigin; readonly tool: Tool.Any }
+type StaticDeclaration = { readonly origin: import("./agent-event.js").ToolOrigin; readonly tool: Tool.Any }
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 
@@ -172,7 +172,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       agent.toolDeclarations !== undefined &&
       (agent.toolDeclarations.length !== Object.keys(agent.toolkit.tools).length ||
         agent.toolDeclarations.some(
-          (declaration: import("../agent.js").ToolDeclaration) =>
+          (declaration: import("./agent.js").ToolDeclaration) =>
             agent.toolkit.tools[declaration.tool.name] !== declaration.tool,
         ))
     ) {
@@ -299,7 +299,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
         undeliveredTelemetry.push(event)
       })
     const flushTelemetry = (): ReadonlyArray<AgentEvent> => pendingTelemetry.splice(0, pendingTelemetry.length)
-    const deliverPending = (): Effect.Effect<void, import("../model-telemetry.js").DeliveryFailed> => {
+    const deliverPending = (): Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed> => {
       if (Option.isNone(deliveryService) || undeliveredTelemetry.length === 0) return Effect.void
       const snapshot = Object.freeze([...undeliveredTelemetry])
       return deliveryService.value.deliver({ sessionId, events: snapshot }).pipe(
@@ -334,7 +334,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
     const steeringService = yield* Effect.serviceOption(Steering)
     const memoryService = yield* Effect.serviceOption(Memory)
     const tokenizerService = yield* Effect.serviceOption(Tokenizer.Tokenizer)
-    const defaultRules = yield* Ref.make<ReadonlyArray<import("../permissions.js").Rule>>([])
+    const defaultRules = yield* Ref.make<ReadonlyArray<import("../policy/permissions.js").Rule>>([])
     const authorizer =
       agent.authorization ??
       Option.getOrElse(authorizationService, () =>

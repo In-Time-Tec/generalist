@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Agent, Approvals, ModelMiddleware, Response, ToolContext, ToolExecutor } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
-import { layerToolkit, route, toolkit } from "../src/baton"
+import { layerToolkit, route, toolkit } from "../src/mcp/baton"
 import { McpToolSource } from "../src/index"
 import { makeFixture, makeTransportFixture } from "./fixture"
 

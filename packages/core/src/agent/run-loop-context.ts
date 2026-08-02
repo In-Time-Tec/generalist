@@ -1,20 +1,20 @@
 import { type Effect, type Option, type Ref, type Schema, type Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
-import type { AgentError, AgentSuspended, Event, SteeringDrained } from "../agent-event.js"
-import type { Agent, RunError } from "../agent.js"
-import type { PendingToolResult, AnyToolCall } from "../agent-tool-result.js"
-import type { Result as CompactionResult } from "../compaction.js"
-import type { LanguageModelNotRegistered } from "../model-registry.js"
-import type { ModelCallPurpose, DeliveryFailed } from "../model-telemetry.js"
-import type { Decision, TurnOverrides } from "../turn-policy.js"
-import type { Key, Memory } from "../memory.js"
-import type { Middleware } from "../model-middleware.js"
-import type { Registry } from "../tool-registry.js"
-import type { Request } from "../tool-executor.js"
-import type { SuspensionCheckpoint } from "../agent-suspension.js"
-import type { SessionStore, Entry } from "../session.js"
-import type { Steering, Input } from "../steering.js"
-import type { ToolContext } from "../tool-context.js"
+import type { AgentError, AgentSuspended, Event, SteeringDrained } from "./agent-event.js"
+import type { Agent, RunError } from "./agent.js"
+import type { PendingToolResult, AnyToolCall } from "./agent-tool-result.js"
+import type { Result as CompactionResult } from "../turn/compaction.js"
+import type { LanguageModelNotRegistered } from "../model/model-registry.js"
+import type { ModelCallPurpose, DeliveryFailed } from "../model/model-telemetry.js"
+import type { Decision, TurnOverrides } from "../turn/turn-policy.js"
+import type { Key, Memory } from "../context/memory.js"
+import type { Middleware } from "../model/model-middleware.js"
+import type { Registry } from "../tools/tool-registry.js"
+import type { Request } from "../tools/tool-executor.js"
+import type { SuspensionCheckpoint } from "./agent-suspension.js"
+import type { SessionStore, Entry } from "../context/session.js"
+import type { Steering, Input } from "../turn/steering.js"
+import type { ToolContext } from "../tools/tool-context.js"
 
 export type ObjectSchema = Schema.Codec<unknown, Record<string, unknown>, unknown, unknown>
 export interface StructuredRunConfig<S extends ObjectSchema> {
@@ -31,7 +31,7 @@ export type ToolState = {
 }
 export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema> {
   readonly agent: Agent<Tools, R>
-  readonly options: import("../agent.js").RunOptions
+  readonly options: import("./agent.js").RunOptions
   readonly state: import("./agent-run-state.js").AgentRunState
   readonly chat: Chat.Service
   readonly chain: ReadonlyArray<Middleware>

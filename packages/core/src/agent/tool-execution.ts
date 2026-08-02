@@ -7,11 +7,11 @@ import {
   type ToolProgress,
   ProgressOverflow,
   ToolNameCollision,
-} from "../agent-event.js"
-import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "../agent-tool-result.js"
-import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "../agent.js"
+} from "./agent-event.js"
+import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./agent-tool-result.js"
+import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "./agent.js"
 import type { AgentRunState } from "./agent-run-state.js"
-import { type AuthorizationError, type ToolAuthorizer } from "../tool-authorization.js"
+import { type AuthorizationError, type ToolAuthorizer } from "../tools/tool-authorization.js"
 import {
   type DomainFailure,
   FrameworkFailure,
@@ -21,13 +21,13 @@ import {
   type Success,
   ToolExecutor,
   executeToolkit,
-} from "../tool-executor.js"
-import { bound } from "../tool-output.js"
-import { type Candidate, type Registry, assemble, get } from "../tool-registry.js"
-import { ToolContext } from "../tool-context.js"
-import { activateSkillParameters } from "../agent-skill-tool.js"
-import { canonicalSuspensionCall, suspended } from "../agent-suspension.js"
-import type { Skill, SkillSourceError } from "../skill-source.js"
+} from "../tools/tool-executor.js"
+import { bound } from "../tools/tool-output.js"
+import { type Candidate, type Registry, assemble, get } from "../tools/tool-registry.js"
+import { ToolContext } from "../tools/tool-context.js"
+import { activateSkillParameters } from "./agent-skill-tool.js"
+import { canonicalSuspensionCall, suspended } from "./agent-suspension.js"
+import type { Skill, SkillSourceError } from "../context/skill-source.js"
 
 type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>

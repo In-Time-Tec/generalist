@@ -13,4 +13,4 @@ export const crawlDocsHandler = Effect.fn("Docs.crawlDocs")(function* (params: {
   yield* context.emit({ toolCallId: "crawl-1", data: { status: response.status } })
 
   return { pages: 1 }
-})
+}) as unknown

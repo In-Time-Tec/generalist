@@ -1,16 +1,16 @@
 import type { Effect, Option, Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import type { AgentRunState } from "./agent-run-state.js"
-import type { Event } from "../agent-event.js"
-import type { AnyToolCall } from "../agent-tool-result.js"
-import type { RunError } from "../agent.js"
-import type { Middleware } from "../model-middleware.js"
-import type { ModelSelection, ModelRegistry } from "../model-registry.js"
-import type { ModelResilience } from "../model-resilience.js"
-import type { EventPayload as DeliveryEventPayload } from "../model-telemetry.js"
-import type { Request } from "../tool-executor.js"
-import type { Registry } from "../tool-registry.js"
-import type { ToolContext } from "../tool-context.js"
+import type { Event } from "./agent-event.js"
+import type { AnyToolCall } from "./agent-tool-result.js"
+import type { RunError } from "./agent.js"
+import type { Middleware } from "../model/model-middleware.js"
+import type { ModelSelection, ModelRegistry } from "../model/model-registry.js"
+import type { ModelResilience } from "../model/model-resilience.js"
+import type { EventPayload as DeliveryEventPayload } from "../model/model-telemetry.js"
+import type { Request } from "../tools/tool-executor.js"
+import type { Registry } from "../tools/tool-registry.js"
+import type { ToolContext } from "../tools/tool-context.js"
 
 export type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
@@ -42,7 +42,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   >
   readonly emitTelemetry: (payload: DeliveryEventPayload) => Effect.Effect<void>
   readonly chat: Chat.Service
-  readonly compactionService: Option.Option<typeof import("../compaction.js").Compaction.Service>
+  readonly compactionService: Option.Option<typeof import("../turn/compaction.js").Compaction.Service>
   readonly state: AgentRunState
   readonly errorMessage: (error: unknown) => string
   readonly persisted: Chat.Persisted | undefined

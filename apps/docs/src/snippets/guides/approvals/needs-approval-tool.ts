@@ -12,4 +12,4 @@ export const agent = Agent.make({
   name: "release-agent",
   instructions: "Deploy services when asked, and wait for approval.",
   toolkit: Toolkit.make(deployTool),
-})
+}) as unknown

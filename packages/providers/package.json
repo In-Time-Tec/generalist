@@ -10,48 +10,48 @@
       "import": "./dist/index.js"
     },
     "./catalog": {
-      "types": "./dist/catalog.d.ts",
-      "import": "./dist/catalog.js"
+      "types": "./dist/catalog/catalog.d.ts",
+      "import": "./dist/catalog/catalog.js"
     },
     "./openai": {
-      "types": "./dist/openai.d.ts",
-      "import": "./dist/openai.js"
+      "types": "./dist/provider/openai.d.ts",
+      "import": "./dist/provider/openai.js"
     },
     "./openai-account-auth": {
-      "types": "./dist/openai-account-auth.d.ts",
-      "import": "./dist/openai-account-auth.js"
+      "types": "./dist/provider/openai-account-auth.d.ts",
+      "import": "./dist/provider/openai-account-auth.js"
     },
     "./openai-account-auth-http": {
-      "types": "./dist/openai-account-auth-http.d.ts",
-      "import": "./dist/openai-account-auth-http.js"
+      "types": "./dist/provider/openai-account-auth-http.d.ts",
+      "import": "./dist/provider/openai-account-auth-http.js"
     },
     "./anthropic": {
-      "types": "./dist/anthropic.d.ts",
-      "import": "./dist/anthropic.js"
+      "types": "./dist/provider/anthropic.d.ts",
+      "import": "./dist/provider/anthropic.js"
     },
     "./amazon-bedrock": {
-      "types": "./dist/amazon-bedrock.d.ts",
-      "import": "./dist/amazon-bedrock.js"
+      "types": "./dist/provider/amazon-bedrock.d.ts",
+      "import": "./dist/provider/amazon-bedrock.js"
     },
     "./openrouter": {
-      "types": "./dist/openrouter.d.ts",
-      "import": "./dist/openrouter.js"
+      "types": "./dist/provider/openrouter.d.ts",
+      "import": "./dist/provider/openrouter.js"
     },
     "./openai-compat": {
-      "types": "./dist/openai-compat.d.ts",
-      "import": "./dist/openai-compat.js"
+      "types": "./dist/provider/openai-compat.d.ts",
+      "import": "./dist/provider/openai-compat.js"
     },
     "./deterministic": {
-      "types": "./dist/deterministic.d.ts",
-      "import": "./dist/deterministic.js"
+      "types": "./dist/provider/deterministic.d.ts",
+      "import": "./dist/provider/deterministic.js"
     },
     "./presets": {
-      "types": "./dist/presets.d.ts",
-      "import": "./dist/presets.js"
+      "types": "./dist/catalog/presets.d.ts",
+      "import": "./dist/catalog/presets.js"
     },
     "./embedding": {
-      "types": "./dist/embedding.d.ts",
-      "import": "./dist/embedding.js"
+      "types": "./dist/model/embedding.d.ts",
+      "import": "./dist/model/embedding.js"
     }
   },
   "scripts": {

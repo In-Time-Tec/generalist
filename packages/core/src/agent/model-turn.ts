@@ -1,14 +1,14 @@
 import { Cause, Channel, Effect, Exit, HashMap, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Telemetry, Tool, Toolkit } from "effect/unstable/ai"
-import { addUsage, AgentError, type Event } from "../agent-event.js"
-import { coalesceAdjacentText } from "../session-sync.js"
-import { applyPartChain, applyPromptChain } from "../agent-message.js"
-import { type Registry, select } from "../tool-registry.js"
-import { type Request } from "../tool-executor.js"
-import { classify as classifyContextOverflow } from "../context-overflow.js"
-import { classifyFailure as classifyModelFailure, type LanguageModelNotRegistered } from "../model-registry.js"
-import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../model-telemetry.js"
-import { type AnyToolCall, type ToolCallIdState } from "../agent-tool-result.js"
+import { addUsage, AgentError, type Event } from "./agent-event.js"
+import { coalesceAdjacentText } from "../context/session-sync.js"
+import { applyPartChain, applyPromptChain } from "./agent-message.js"
+import { type Registry, select } from "../tools/tool-registry.js"
+import { type Request } from "../tools/tool-executor.js"
+import { classify as classifyContextOverflow } from "../model/context-overflow.js"
+import { classifyFailure as classifyModelFailure, type LanguageModelNotRegistered } from "../model/model-registry.js"
+import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../model/model-telemetry.js"
+import { type AnyToolCall, type ToolCallIdState } from "./agent-tool-result.js"
 import type { RuntimeContext } from "./model-turn-context.js"
 import {
   InvalidToolCallParameters,
@@ -16,10 +16,10 @@ import {
   prepare as prepareToolCallValidation,
   ToolJsonSchemaCompilerMissing,
   validateDecodedToolCall,
-} from "../model-tool-call-validation.js"
-import { DuplicateToolCallId, MiddlewareViolation, ToolNameCollision } from "../agent-event.js"
-import type { RunError } from "../agent.js"
-import type { TurnOverrides } from "../turn-policy.js"
+} from "../model/model-tool-call-validation.js"
+import { DuplicateToolCallId, MiddlewareViolation, ToolNameCollision } from "./agent-event.js"
+import type { RunError } from "./agent.js"
+import type { TurnOverrides } from "../turn/turn-policy.js"
 const classifyOtherFailure = (error: unknown) => classifyContextOverflow(error)
 const isToolNameCollision = Schema.is(ToolNameCollision)
 const attemptText = (parts: ReadonlyArray<Response.StreamPart<any>>): string =>

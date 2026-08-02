@@ -16,7 +16,7 @@ export interface Model {
 
 export const Model: Schema.Schema<Model> = Schema.Struct({ chat: Chat.Model })
 
-const GotChatActionFields = { action: Chat.Action }
+const GotChatActionFields: { readonly action: typeof Chat.Action } = { action: Chat.Action }
 
 export const GotChatAction: CallableTaggedStruct<"GotChatAction", typeof GotChatActionFields> = m(
   "GotChatAction",

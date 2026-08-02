@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Context, Crypto, Effect, Encoding, Layer, Option, Redacted, Schema } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
-import { credentialsFromAccountAuth } from "../src/openai.js"
+import { credentialsFromAccountAuth } from "../src/provider/openai.js"
 import {
   AuthError,
   authorizationUrl,
@@ -13,8 +13,8 @@ import {
   redirectUri,
   scopes,
   type ServiceInterface,
-} from "../src/openai-account-auth.js"
-import { layer } from "../src/openai-account-auth-http.js"
+} from "../src/provider/openai-account-auth.js"
+import { layer } from "../src/provider/openai-account-auth-http.js"
 
 const digest = (_algorithm: string, data: Uint8Array) =>
   Effect.promise(() =>
