@@ -731,8 +731,10 @@ describe("Wire", () => {
       part: { type: "tool-call", id: "call-0", name: "unknown", params: {} },
     }
     const dynamicEvent = Effect.runSyncExit(Schema.decodeUnknownEffect(Wire.EventSchema(toolkit))(unknownToolEvent))
+    expect(Schema.is(Wire.EventSchema(toolkit))(unknownToolEvent)).toBe(false)
     expect(Exit.isFailure(dynamicEvent)).toBe(true)
     const dynamicToolEvent = Effect.runSyncExit(Schema.decodeUnknownEffect(Wire.LooseEventSchema)(unknownToolEvent))
+    expect(Schema.is(Wire.LooseEventSchema)({ _tag: "Bogus" })).toBe(false)
     expect(Exit.isSuccess(dynamicToolEvent)).toBe(true)
     const malformedFrame = Effect.runSyncExit(
       Schema.decodeUnknownEffect(Wire.LooseServerFrame)({

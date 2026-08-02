@@ -7047,13 +7047,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
   ItLayer.make(it, "fails closed when needsApproval functions throw or fail", () => {
     let approvals = 0
     let calls = 0
-    const failingNeedsApproval = (() => Effect.fail("approval predicate failed")) as unknown as (
-      params: { readonly amount: number },
-      context: Tool.NeedsApprovalContext,
-    ) => boolean
+    const amountParameters = Schema.Struct({ amount: Schema.Finite })
+    const failingNeedsApproval: Tool.NeedsApprovalFunction<typeof amountParameters> = () =>
+      Effect.die("approval predicate failed")
     const throwingTool = Tool.make("throwing-approval", {
       description: "Throwing approval test tool",
-      parameters: Schema.Struct({ amount: Schema.Finite }),
+      parameters: amountParameters,
       success: Schema.Unknown,
       needsApproval: () => {
         throw new Error("approval predicate exploded")
@@ -7061,7 +7060,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     })
     const failingTool = Tool.make("failing-approval", {
       description: "Failing approval test tool",
-      parameters: Schema.Struct({ amount: Schema.Finite }),
+      parameters: amountParameters,
       success: Schema.Unknown,
       needsApproval: failingNeedsApproval,
     })

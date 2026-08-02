@@ -278,10 +278,14 @@ describe("OpenAI account Responses registration", () => {
       expiresAt: 1,
       refreshedAt: 1,
     })
-    const auth = {
+    const auth: ServiceInterface = {
+      loginBrowser: () => Effect.succeed(authCredential("profile-a", "old")),
+      loginDevice: Effect.succeed(authCredential("profile-a", "old")),
+      status: Effect.succeed({ _tag: "Present", fingerprint: "profile-a" }),
+      logout: Effect.succeed({ removed: false, revocationSupported: false }),
       acquire: Effect.succeed(authCredential("profile-a", "old")),
       refreshRejected: () => Effect.succeed(authCredential("profile-b", "new")),
-    } as unknown as ServiceInterface
+    }
     const accountCredentials = credentialsFromAccountAuth(auth, "profile-a")
 
     return Effect.gen(function* () {

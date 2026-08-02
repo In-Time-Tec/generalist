@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Function, Schedule, Schema, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Function, Option, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { AiError, LanguageModel, Model, Prompt, Response, ResponseIdTracker } from "effect/unstable/ai"
 import { ModelResilience, ModelStreamTermination, ModelTelemetry, ModelToolCallValidation } from "../src/index"
@@ -1011,7 +1011,9 @@ describe("model instrumentation", () => {
       const error = yield* Stream.runDrain(wrapped.streamText({ prompt: "write" })).pipe(Effect.flip)
 
       expect(Schema.is(ModelStreamTermination.ModelStreamTruncated)(error)).toBe(true)
-      const truncated = error as unknown as ModelStreamTermination.ModelStreamTruncated
+      const truncated = Option.getOrThrow(
+        Schema.decodeUnknownOption(ModelStreamTermination.ModelStreamTruncated)(error),
+      )
       expect(truncated.turn).toBe(3)
       expect(truncated.requestId).toBe("req-1")
       expect(truncated.lastPart).toBe("tool-params-delta")
@@ -1099,7 +1101,7 @@ describe("model instrumentation", () => {
         { emit, turn: 0 },
       )
 
-      yield* (wrapped.generateObject as unknown as (options: unknown) => Effect.Effect<unknown>)({ prompt: "object" })
+      yield* wrapped.generateObject({ prompt: "object", schema: Schema.Struct({ value: Schema.String }) })
 
       expect(tags(events)).toEqual([
         "ModelCallStarted",

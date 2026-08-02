@@ -100,17 +100,17 @@ class FakeWebSocket {
   readyState = 0
   binaryType: BinaryType = "blob"
   throwOnSend = false
-  private readonly listeners = new Map<string, Array<(event: any) => void>>()
+  private readonly listeners = new Map<string, Array<(event: unknown) => void>>()
 
   constructor(readonly url: string) {}
 
-  addEventListener(type: string, listener: (event: any) => void): void {
+  addEventListener(type: string, listener: (event: unknown) => void): void {
     const listeners = this.listeners.get(type) ?? []
     listeners.push(listener)
     this.listeners.set(type, listeners)
   }
 
-  removeEventListener(type: string, listener: (event: any) => void): void {
+  removeEventListener(type: string, listener: (event: unknown) => void): void {
     this.listeners.set(
       type,
       (this.listeners.get(type) ?? []).filter((candidate) => candidate !== listener),
@@ -137,7 +137,7 @@ class FakeWebSocket {
     this.emit("message", { data })
   }
 
-  private emit(type: string, event: any): void {
+  private emit(type: string, event: unknown): void {
     for (const listener of this.listeners.get(type) ?? []) listener(event)
   }
 }

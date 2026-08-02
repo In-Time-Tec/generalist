@@ -1,4 +1,4 @@
-import { Effect, Option, Schema, SchemaIssue, SchemaTransformation } from "effect"
+import { Effect, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { AgentEvent, ModelTelemetry } from "@batonfx/core"
 import { WireEncodeFailed } from "./errors.js"
@@ -13,7 +13,6 @@ import {
   LooseToolCallPart,
   LooseToolResultPart,
   type ClientFrameType,
-  type LooseEventType,
   type ToolkitInput,
   type ToolkitServices,
   type ServerFrameType,
@@ -180,7 +179,7 @@ const normalizeEvent = (value: unknown): unknown => {
   if (typeof value !== "object" || value === null || !("usage" in value)) return value
   return { ...value, usage: normalizeUsage(value.usage) }
 }
-const standardPartSchema = (part: unknown): Schema.Constraint | undefined => {
+export const standardPartSchema = (part: unknown): Schema.Constraint | undefined => {
   switch (partTag(part)) {
     case "text":
       return Response.TextPart
@@ -264,7 +263,7 @@ const toolPart = <T extends ToolkitInput | undefined>(
 }
 type Direction = "encode" | "decode"
 
-const mapEvent = <T extends ToolkitInput | undefined>(
+export const mapEvent = <T extends ToolkitInput | undefined>(
   toolkit: T,
   event: unknown,
   direction: Direction,
@@ -326,7 +325,7 @@ const frameSchema = (tag: string): Schema.Constraint | undefined => {
       return undefined
   }
 }
-const decodeFrame = <T extends ToolkitInput | undefined>(
+export const decodeFrame = <T extends ToolkitInput | undefined>(
   toolkit: T,
   value: unknown,
 ): Effect.Effect<unknown, WireEncodeFailed, unknown> => {
@@ -341,7 +340,7 @@ const decodeFrame = <T extends ToolkitInput | undefined>(
         Effect.flatMap((frame) => mapFrame(toolkit, frame, "decode")),
       )
 }
-const mapFrame = <T extends ToolkitInput | undefined>(
+export const mapFrame = <T extends ToolkitInput | undefined>(
   toolkit: T,
   frame: unknown,
   direction: Direction,
@@ -366,74 +365,14 @@ const mapFrame = <T extends ToolkitInput | undefined>(
 }
 
 type CodecRequirement<T extends ToolkitInput | undefined> = T extends ToolkitInput ? ToolkitServices<T> : never
-const schemaIssue = (value: unknown, error: unknown): SchemaIssue.Issue =>
-  new SchemaIssue.InvalidValue(Option.some(value), {
-    message: error instanceof Error ? error.message : String(error),
-  })
-const isLooseEvent = (value: unknown): value is LooseEventType =>
-  typeof value === "object" && value !== null && "_tag" in value && typeof value._tag === "string"
-const isLooseFrame = (value: unknown): value is LooseServerFrameType =>
-  typeof value === "object" && value !== null && "_tag" in value && typeof value._tag === "string"
-const looseEventValue = Schema.declare<LooseEventType, unknown>(isLooseEvent)
-const looseFrameValue = Schema.declare<LooseServerFrameType, unknown>(isLooseFrame)
+const looseFrameValue = Schema.declare<LooseServerFrameType, unknown>(
+  (value): value is LooseServerFrameType =>
+    typeof value === "object" && value !== null && "_tag" in value && typeof value._tag === "string",
+)
 const asLooseFrame = (value: unknown): Effect.Effect<LooseServerFrameType, WireEncodeFailed> =>
   Schema.is(looseFrameValue)(value)
     ? Effect.succeed(value)
     : Effect.fail(encodeError(new Error("Decoded value is not a server frame")))
-
-export function makeEventSchema<T extends ToolkitInput>(
-  toolkit: T,
-): Schema.Codec<LooseEventType, unknown, ToolkitServices<T>, ToolkitServices<T>>
-export function makeEventSchema(toolkit: undefined): Schema.Codec<LooseEventType, unknown, never, never>
-export function makeEventSchema(
-  toolkit: ToolkitInput | undefined,
-): Schema.Codec<LooseEventType, unknown, unknown, unknown> {
-  return Schema.Unknown.pipe(
-    Schema.decodeTo(
-      looseEventValue,
-      SchemaTransformation.transformOrFail<LooseEventType, unknown, unknown, unknown>({
-        decode: (value) =>
-          mapEvent(toolkit, value, "decode").pipe(
-            Effect.flatMap((event) =>
-              Schema.is(looseEventValue)(event)
-                ? Effect.succeed(event)
-                : Effect.fail(schemaIssue(value, "Invalid event")),
-            ),
-            Effect.mapError((error) => (error instanceof SchemaIssue.InvalidValue ? error : schemaIssue(value, error))),
-          ),
-        encode: (event) =>
-          mapEvent(toolkit, event, "encode").pipe(Effect.mapError((error) => schemaIssue(event, error))),
-      }),
-    ),
-  )
-}
-
-export function makeFrameSchema<T extends ToolkitInput>(
-  toolkit: T,
-): Schema.Codec<LooseServerFrameType, unknown, ToolkitServices<T>, ToolkitServices<T>>
-export function makeFrameSchema(toolkit: undefined): Schema.Codec<LooseServerFrameType, unknown, never, never>
-export function makeFrameSchema(
-  toolkit: ToolkitInput | undefined,
-): Schema.Codec<LooseServerFrameType, unknown, unknown, unknown> {
-  return Schema.Unknown.pipe(
-    Schema.decodeTo(
-      looseFrameValue,
-      SchemaTransformation.transformOrFail<LooseServerFrameType, unknown, unknown, unknown>({
-        decode: (value) =>
-          decodeFrame(toolkit, value).pipe(
-            Effect.flatMap((frame) =>
-              Schema.is(looseFrameValue)(frame)
-                ? Effect.succeed(frame)
-                : Effect.fail(schemaIssue(value, "Invalid frame")),
-            ),
-            Effect.mapError((error) => (error instanceof SchemaIssue.InvalidValue ? error : schemaIssue(value, error))),
-          ),
-        encode: (frame) =>
-          mapFrame(toolkit, frame, "encode").pipe(Effect.mapError((error) => schemaIssue(frame, error))),
-      }),
-    ),
-  )
-}
 
 export function makeFixedCodec<T extends ToolkitInput>(
   toolkit: T,

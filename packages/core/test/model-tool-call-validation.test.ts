@@ -102,7 +102,7 @@ describe("model tool-call validation", () => {
       ])
       const projected = yield* ModelToolCallValidation.projectToolkit(originalToolkit, compiler)
       const wrapped = ModelToolCallValidation.wrap(model, originalToolkit, projected.toolkit)
-      const seen: Array<Response.StreamPart<any>> = []
+      const seen: Array<Response.StreamPart<Record<string, Tool.Any>>> = []
       const failure = yield* wrapped
         .streamText({ prompt: "lookup", toolkit: originalToolkit, disableToolCallResolution: true })
         .pipe(

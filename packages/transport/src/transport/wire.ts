@@ -340,7 +340,8 @@ export interface WireCodec<Frame = ServerFrameType, R = never> {
   readonly decodeClient: (data: string) => Effect.Effect<ClientFrameType, WireEncodeFailed>
 }
 
-import { makeEventSchema, makeFixedCodec, makeDynamicCodec, makeFrameSchema, makeSchemaCodec } from "./wire-codec.js"
+import { makeEventSchema, makeFrameSchema } from "./wire-schema.js"
+import { makeFixedCodec, makeDynamicCodec, makeSchemaCodec } from "./wire-codec.js"
 
 /** @experimental Fixed startup-toolkit or runtime-dynamic server-frame validation policy. */
 export type Capability<T extends ToolkitInput = ToolkitInput> =

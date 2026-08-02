@@ -39,7 +39,12 @@ export interface HandoffAgent<R> {
   readonly requirements: (value: R) => R
 }
 
-export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = LanguageModel.LanguageModel> {
+export interface Agent<
+  Tools extends Record<string, Tool.Any> = {},
+  R = LanguageModel.LanguageModel,
+  PolicyServices = R,
+  AuthorizationServices = R,
+> {
   readonly handoff: <A>(f: (agent: HandoffAgent<R>) => A) => A
   readonly [AgentTypeId]: {
     readonly tools: Types.Invariant<Tools>
@@ -48,10 +53,10 @@ export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = Language
   readonly name: string
   readonly instructions?: string
   readonly toolkit: Toolkit.Toolkit<Tools>
-  readonly policy: TurnPolicy<any>
+  readonly policy: TurnPolicy<PolicyServices>
   readonly model?: ModelSelection
   readonly memory?: Key
-  readonly authorization?: ToolAuthorizer<any>
+  readonly authorization?: ToolAuthorizer<AuthorizationServices>
   readonly toolExecution?: ToolExecutionPolicy
   readonly metadata?: Readonly<Record<string, unknown>>
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
@@ -177,7 +182,7 @@ export function make<
     ),
   }
   type AgentRequirements = OptionRequirements<Tools, typeof options>
-  const complete: Agent<Tools, AgentRequirements> = {
+  const complete: Agent<Tools, AgentRequirements, PolicyServices, AuthorizationServices> = {
     ...definition,
     [AgentTypeId]: {
       tools: (value: Tools) => value,

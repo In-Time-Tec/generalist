@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Context, Crypto, Effect, Encoding, Layer, Option, Redacted, Schema } from "effect"
+import { Crypto, Effect, Encoding, Layer, Option, Redacted, Schema } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { credentialsFromAccountAuth } from "../src/provider/openai.js"
 import {
@@ -22,14 +22,10 @@ const digest = (_algorithm: string, data: Uint8Array) =>
   )
 
 const provideAuth =
-  <RIn>(clientLayer: Layer.Layer<HttpClient.HttpClient, never, RIn>) =>
-  <A, E, R>(effect: Effect.Effect<A, E, R | OpenAiAccountAuthHttp>) =>
+  (clientLayer: Layer.Layer<HttpClient.HttpClient>) =>
+  <A, E>(effect: Effect.Effect<A, E, OpenAiAccountAuthHttp>) =>
     Effect.scoped(
-      Layer.build(Layer.provide(layer, clientLayer)).pipe(
-        Effect.flatMap((context) =>
-          Effect.provide(effect, context as unknown as Context.Context<R | OpenAiAccountAuthHttp>),
-        ),
-      ),
+      Layer.build(Layer.provide(layer, clientLayer)).pipe(Effect.flatMap((context) => Effect.provide(effect, context))),
     )
 
 describe("OpenAI account authorization protocol", () => {
@@ -189,27 +185,31 @@ describe("OpenAI account authorization protocol", () => {
   it.effect("maps auth credentials and redacts all auth failure details", () =>
     Effect.gen(function* () {
       const secretError = AuthError.make({ kind: "protocol", message: "token-secret account-secret" })
-      const service = {
+      const credential = {
+        accessToken: Redacted.make("access-secret"),
+        idToken: Redacted.make("id-secret"),
+        refreshToken: Redacted.make("refresh-secret"),
+        accountId: Redacted.make("account-secret"),
+        fingerprint: "fingerprint",
+        generation: "generation",
+        expiresAt: 1,
+        refreshedAt: 1,
+      }
+      const service: ServiceInterface = {
+        loginBrowser: () => Effect.fail(secretError),
+        loginDevice: Effect.fail(secretError),
+        status: Effect.succeed({ _tag: "Present", fingerprint: "fingerprint" }),
+        logout: Effect.succeed({ removed: false, revocationSupported: false }),
         acquire: Effect.fail(secretError),
-        refreshRejected: () =>
-          Effect.succeed({
-            accessToken: Redacted.make("access-secret"),
-            idToken: Redacted.make("id-secret"),
-            refreshToken: Redacted.make("refresh-secret"),
-            accountId: Redacted.make("account-secret"),
-            fingerprint: "fingerprint",
-            generation: "generation",
-            expiresAt: 1,
-            refreshedAt: 1,
-          }),
-      } as unknown as ServiceInterface
+        refreshRejected: () => Effect.succeed(credential),
+      }
       const credentials = credentialsFromAccountAuth(service, "fingerprint")
       const error = yield* Effect.flip(credentials.acquire)
       expect(yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(error)).not.toMatch(/token-secret|account-secret/)
-      const credential = yield* credentials.refreshRejected("old")
-      expect(Redacted.value(credential.accessToken)).toBe("access-secret")
-      expect(credential.accountId).toBe("account-secret")
-      expect(credential.generation).toBe("generation")
+      const mappedCredential = yield* credentials.refreshRejected("old")
+      expect(Redacted.value(mappedCredential.accessToken)).toBe("access-secret")
+      expect(mappedCredential.accountId).toBe("account-secret")
+      expect(mappedCredential.generation).toBe("generation")
       const mismatch = credentialsFromAccountAuth(service, "another-fingerprint")
       expect((yield* Effect.flip(mismatch.refreshRejected("old"))).operation).toBe("refreshRejected")
     }),

@@ -2023,6 +2023,11 @@
       "test": false
     },
     {
+      "path": "packages/transport/src/transport/wire-schema.ts",
+      "package": "@batonfx/transport",
+      "test": false
+    },
+    {
       "path": "packages/transport/src/transport/wire.ts",
       "package": "@batonfx/transport",
       "test": false
@@ -9540,12 +9545,24 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/transport/src/transport/wire-schema.ts",
+      "specifier": "./wire-codec.js"
+    },
+    {
+      "source": "packages/transport/src/transport/wire-schema.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/transport/src/transport/wire.ts",
       "specifier": "./errors.js"
     },
     {
       "source": "packages/transport/src/transport/wire.ts",
       "specifier": "./wire-codec.js"
+    },
+    {
+      "source": "packages/transport/src/transport/wire.ts",
+      "specifier": "./wire-schema.js"
     },
     {
       "source": "packages/transport/src/transport/wire.ts",

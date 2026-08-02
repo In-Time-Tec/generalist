@@ -1,7 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import {
   Cause,
-  Context,
   Crypto,
   Effect,
   Encoding,
@@ -132,11 +131,7 @@ const provideLayer: {
     provided: Layer.Layer<O, OE, IR>,
   ): Effect.Effect<A, E | OE, IR | Exclude<R, O>>
 } = Function.dual(2, <A, E, R, O, OE, IR>(effect: Effect.Effect<A, E, R>, provided: Layer.Layer<O, OE, IR>) =>
-  Effect.scoped(
-    Layer.build(provided).pipe(
-      Effect.flatMap((context) => effect.pipe(Effect.provide(context as unknown as Context.Context<R>))),
-    ),
-  ),
+  Effect.provide(effect, provided),
 )
 const challenge = (verifier: string) =>
   Effect.promise(() =>
