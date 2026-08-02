@@ -137,10 +137,13 @@ const activeToolNames = (options: Parameters<ModelParams["streamText"]>[0]) => o
 layer(unusedToolHandlerLayer)("Handoff", (it) => {
   expect(handoffRequirementProofs.every(Boolean)).toBe(true)
 
-  it("names transfer tools by specialist", () => {
+  it("names transfer tools by specialist and exposes closed handoff registration", () => {
     const specialist = Agent.make({ name: "math" })
+    const registration = specialist.handoff((target) => target)
     const transfer = Handoff.transferTool(specialist)
 
+    expect(registration.name).toBe("math")
+    expect(registration.requirements).toBeTypeOf("function")
     expect(Object.keys(transfer.tools)).toEqual(["transfer_to_math"])
   })
 
