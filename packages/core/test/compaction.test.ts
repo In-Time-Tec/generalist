@@ -3,6 +3,7 @@ import { Json } from "./json"
 import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { Compaction, Session, ToolOutput } from "../src/index"
+import { estimatePromptTokens } from "../src/prompt-token-estimate"
 import { ItLayer } from "./it-layer"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -13,6 +14,11 @@ const user = (text: string): Prompt.Message =>
 const assistantToolCall = (id: string): Prompt.Message =>
   Prompt.makeMessage("assistant", {
     content: [Prompt.makePart("tool-call", { id, name: "echo", params: { text: "call" }, providerExecuted: false })],
+  })
+
+const imageMessage = (data: string): Prompt.Message =>
+  Prompt.makeMessage("user", {
+    content: [Prompt.makePart("file", { mediaType: "image/png", data })],
   })
 
 const toolResult = (id: string, result: unknown): Prompt.Message =>
@@ -69,6 +75,22 @@ describe("Compaction", () => {
     ).toBe(false)
   })
 
+  it("preserves text-only estimates at strict threshold boundaries", () => {
+    const prompt = Prompt.make("text-only boundary")
+    const contextTokens = Math.ceil(JSON.stringify(prompt.content).length / 4)
+    const strategy = Compaction.defaultStrategy()
+
+    expect(estimatePromptTokens(prompt)).toBe(contextTokens)
+    expect(strategy.shouldCompact({ contextTokens, contextWindow: contextTokens + 20, reserveTokens: 20 })).toBe(false)
+    expect(
+      strategy.shouldCompact({
+        contextTokens: contextTokens + 1,
+        contextWindow: contextTokens + 20,
+        reserveTokens: 20,
+      }),
+    ).toBe(true)
+  })
+
   it("cuts at a safe tool boundary", () => {
     const strategy = Compaction.defaultStrategy()
     const entries = [
@@ -104,6 +126,57 @@ describe("Compaction", () => {
       expect(plan.value.recent.map((item) => item.id)).toEqual(["2", "3"])
     }
   })
+
+  it("bounds inline image cost when keeping recent entries", () => {
+    const strategy = Compaction.defaultStrategy()
+    const entries = [
+      entry("0", user("old")),
+      entry("1", user("tail ".repeat(400))),
+      entry("2", imageMessage(`data:image/png;base64,${"A".repeat(1_000_000)}`)),
+      entry("3", user("recent")),
+    ]
+
+    const plan = strategy.cut(entries, 2_000)
+
+    expect(Option.isSome(plan)).toBe(true)
+    if (Option.isSome(plan)) {
+      expect(plan.value.head.map((item) => item.id)).toEqual(["0"])
+      expect(plan.value.recent.map((item) => item.id)).toEqual(["1", "2", "3"])
+    }
+  })
+
+  ItLayer.make(it, "does not repeat an unchanged threshold pass without context growth", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
+    Effect.gen(function* () {
+      let cuts = 0
+      const strategy: Compaction.Strategy = {
+        ...Compaction.defaultStrategy(),
+        shouldCompact: () => true,
+        cut: () => {
+          cuts += 1
+          return Option.none()
+        },
+      }
+      const service = Compaction.make(strategy)
+      const request = {
+        compactionId: "unchanged-threshold",
+        agentName: "unchanged-threshold-agent",
+        sessionId: "session",
+        turn: 0,
+        history: Prompt.empty,
+        prompt: Prompt.make("same context"),
+        path: [],
+        usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+        overflow: false,
+      } as const
+
+      yield* service.maybeCompact(request)
+      yield* service.maybeCompact({ ...request, compactionId: "unchanged-threshold-retry", turn: 1 })
+      yield* service.maybeCompact({ ...request, compactionId: "overflow-retry", turn: 2, overflow: true })
+
+      expect(cuts).toBe(2)
+    }),
+  ])
 
   it("reports whether a compaction would run before any prompt work", () => {
     const service = Compaction.make(Compaction.defaultStrategy(), {

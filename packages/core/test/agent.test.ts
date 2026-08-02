@@ -3245,7 +3245,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           return streamCalls === 1
             ? Stream.make(
                 toolCallPart("tool-call-after-compaction", "echo", { text: "small" }),
-                finishPart("stop", usage({ total: 9_999 }, { total: 1 })),
+                finishPart("stop", usage({ total: 50 }, { total: 1 })),
               )
             : Stream.make(textDelta("done"))
         }),
@@ -3273,6 +3273,47 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(streamCalls).toBe(2)
         expect(measuredTokens[0]).toBeGreaterThan(800)
         expect(measuredTokens[1]).toBeLessThan(1_000)
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "uses prior reported input usage as the context baseline", () => {
+    let streamCalls = 0
+    const measuredTokens: Array<number> = []
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          streamCalls += 1
+          return streamCalls === 1
+            ? Stream.make(
+                toolCallPart("tool-call-reported-context", "echo", { text: "small" }),
+                finishPart("stop", usage({ total: 90_000 }, { total: 1 })),
+              )
+            : Stream.make(textDelta("done"))
+        }),
+        echoExecutor,
+        Compaction.layerTest({
+          maybeCompact: (request) =>
+            Effect.sync(() => {
+              measuredTokens.push(request.usage.contextTokens)
+              return Option.none()
+            }),
+        }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "reported-context-agent", toolkit: Toolkit.make(echoTool) }), {
+            prompt: "small prompt",
+            compaction: { contextWindow: 100_000 },
+          }),
+        )
+
+        expect(streamCalls).toBe(2)
+        expect(measuredTokens[0]).toBeLessThan(1_000)
+        expect(measuredTokens[1]).toBeGreaterThanOrEqual(90_000)
         expect(events.at(-1)?._tag).toBe("Completed")
       }),
     ] as const
@@ -7543,6 +7584,44 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       ])
     }),
   )
+
+  ItLayer.make(it, "does not threshold-compact a large inline image by encoded byte length", () => {
+    let calls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return Stream.make(textDelta("image understood"))
+        }),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        Session.layerMemory,
+        Compaction.layer({ contextWindow: 100_000, reserveTokens: 10_000, keepRecentTokens: 20_000 }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const prompt = Prompt.fromMessages([
+          Prompt.makeMessage("user", {
+            content: [
+              Prompt.makePart("text", { text: "Describe this image" }),
+              Prompt.makePart("file", {
+                mediaType: "image/png",
+                data: `data:image/png;base64,${"A".repeat(1_000_000)}`,
+              }),
+            ],
+          }),
+        ])
+
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "inline-image-compaction-agent" }), { prompt }),
+        )
+
+        expect(calls).toBe(1)
+        expect(events.filter((event) => event._tag === "CompactionStarted")).toHaveLength(0)
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
 
   ItLayer.make(it, "links compaction lifecycle to the summary model call", () => {
     let streamCalls = 0

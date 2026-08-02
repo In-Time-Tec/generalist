@@ -38,6 +38,7 @@ import { Approvals } from "./approvals.js"
 import { coalesceAdjacentText, diagnose as diagnoseSessionSync, equivalentMessages } from "./session-sync.js"
 import { Compaction, type CompactionError, DEFAULT_RESERVE_TOKENS, type Usage } from "./compaction.js"
 import { Instructions, openEpoch } from "./instructions.js"
+import { estimatePromptTokens } from "./prompt-token-estimate.js"
 import { classify as classifyContextOverflow } from "./context-overflow.js"
 import { type Item, type Key, Memory, type MemoryError, messageFromRecall, projectTranscript } from "./memory.js"
 import { ModelMiddleware } from "./model-middleware.js"
@@ -640,6 +641,10 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         pending: new Map<number, PendingToolResult>(),
         finish: undefined as { readonly usage: Response.Usage; readonly reason: Response.FinishReason } | undefined,
         usage: undefined as Response.Usage | undefined,
+        currentContextTokens: undefined as number | undefined,
+        reportedContextUsage: undefined as
+          | { readonly estimatedTokens: number; readonly reportedTokens: number }
+          | undefined,
         providerOutput: providerOutputState(),
       }
 
@@ -823,7 +828,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
 
       const countTokens = (turn: number, prompt: Prompt.Prompt): Effect.Effect<number, AgentError> =>
         Option.match(tokenizerService, {
-          onNone: () => Effect.succeed(Math.ceil(JSON.stringify(prompt.content).length / 4)),
+          onNone: () => Effect.succeed(estimatePromptTokens(prompt)),
           onSome: (tokenizer) =>
             tokenizer.tokenize(prompt).pipe(
               Effect.map((tokens) => tokens.length),
@@ -837,11 +842,18 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         prompt: Prompt.Prompt,
       ): Effect.Effect<Usage, AgentError> =>
         countTokens(turn, Prompt.concat(history, prompt)).pipe(
-          Effect.map((contextTokens) => ({
-            contextTokens,
-            contextWindow: options.compaction?.contextWindow ?? Number.POSITIVE_INFINITY,
-            reserveTokens: DEFAULT_RESERVE_TOKENS,
-          })),
+          Effect.map((estimatedTokens) => {
+            const reported = state.reportedContextUsage
+            const contextTokens =
+              reported !== undefined && estimatedTokens >= reported.estimatedTokens
+                ? reported.reportedTokens + estimatedTokens - reported.estimatedTokens
+                : estimatedTokens
+            return {
+              contextTokens,
+              contextWindow: options.compaction?.contextWindow ?? Number.POSITIVE_INFINITY,
+              reserveTokens: DEFAULT_RESERVE_TOKENS,
+            }
+          }),
         )
 
       const validateCompactionProjection = (
@@ -1386,6 +1398,18 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             reason: part.reason,
           }
           state.usage = state.usage === undefined ? part.usage : addUsage(state.usage, part.usage)
+          const reportedTokens = part.usage.inputTokens.total
+          if (
+            state.currentContextTokens !== undefined &&
+            reportedTokens !== undefined &&
+            Number.isSafeInteger(reportedTokens) &&
+            reportedTokens >= 0
+          ) {
+            state.reportedContextUsage = {
+              estimatedTokens: state.currentContextTokens,
+              reportedTokens,
+            }
+          }
           Telemetry.addGenAIAnnotations(span, {
             operation: { name: "chat" },
             usage: {
@@ -1636,6 +1660,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                     const history = yield* Ref.get(chat.history)
                     preparedState = { history, preparedPrompt }
                     const responsePrompt = Prompt.concat(history, preparedPrompt)
+                    state.currentContextTokens = yield* countTokens(turn, responsePrompt)
                     const messages = responsePrompt.content
                     const rawParts = LanguageModel.streamText({
                       prompt: responsePrompt,

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.12.1
+
+- Bound fallback token estimates for inline images independently of encoded byte length, baseline later threshold decisions on provider-reported input usage when available, and suppress repeated unchanged threshold passes until context grows.
+
 ## 0.12.0
 
 - Persist deterministic model-attempt identities before provider construction, settle terminal stream parts even when downstream consumption stops at the boundary, and reject exhausted call ordinals before provider entry.
