@@ -1,4 +1,4 @@
-import { Array, Effect, Function, Schema } from "effect"
+import { Array, Effect, Function, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import {
   type Agent,
@@ -95,18 +95,76 @@ const positiveConcurrency = (value: number | undefined): Effect.Effect<number, A
       )
 }
 
-const mergeHandled = <Tools extends Record<string, Tool.Any>>(
-  toolkits: ReadonlyArray<Toolkit.WithHandler<Tools>>,
-): Toolkit.WithHandler<Tools> => {
-  const entries = new Map<string, { readonly tool: Tool.Any; readonly toolkit: Toolkit.WithHandler<Tools> }>()
+type TransferToolkit<Parameters extends Schema.Top, Success extends Schema.Top, R> = AgentToolToolkit<
+  string,
+  Parameters,
+  Success,
+  R
+>
+type TransferInvocation<Parameters extends Schema.Top, Success extends Schema.Top, R> = Effect.Effect<
+  Stream.Stream<
+    Tool.HandlerResult<
+      Tool.Tool<
+        string,
+        {
+          readonly parameters: Parameters
+          readonly success: Success
+          readonly failure: typeof Schema.String
+          readonly failureMode: "return"
+        },
+        R
+      >
+    >,
+    never,
+    R | Parameters["DecodingServices"] | Success["EncodingServices"]
+  >,
+  AiError.AiError
+>
+
+const mergeHandled = <Parameters extends Schema.Top, Success extends Schema.Top, R>(
+  toolkits: ReadonlyArray<TransferToolkit<Parameters, Success, R>>,
+): TransferToolkit<Parameters, Success, R> => {
+  type TransferTool = Tool.Tool<
+    string,
+    {
+      readonly parameters: Parameters
+      readonly success: Success
+      readonly failure: typeof Schema.String
+      readonly failureMode: "return"
+    },
+    R
+  >
+  const entries = new Map<
+    string,
+    {
+      readonly tool: TransferTool
+      readonly invoke: (params: Parameters["Type"]) => TransferInvocation<Parameters, Success, R>
+    }
+  >()
   for (const toolkit of toolkits) {
-    for (const tool of Object.values(toolkit.tools)) {
-      if (!entries.has(tool.name)) entries.set(tool.name, { tool, toolkit })
+    for (const name of Object.keys(toolkit.tools)) {
+      const tool = toolkit.tools[name]
+      if (tool !== undefined && !entries.has(name)) {
+        entries.set(name, { tool, invoke: (params) => toolkit.handle(name, params) })
+      }
     }
   }
-  const tools = Object.fromEntries([...entries].map(([name, entry]) => [name, entry.tool]))
+  const tools: Record<
+    string,
+    Tool.Tool<
+      string,
+      {
+        readonly parameters: Parameters
+        readonly success: Success
+        readonly failure: typeof Schema.String
+        readonly failureMode: "return"
+      },
+      R
+    >
+  > = {}
+  for (const [name, entry] of entries) tools[name] = entry.tool
   return {
-    tools: tools as Tools,
+    tools,
     handle: (name, params) => {
       const entry = entries.get(String(name))
       return entry === undefined
@@ -116,18 +174,24 @@ const mergeHandled = <Tools extends Record<string, Tool.Any>>(
               method: `${String(name)}.handle`,
               reason: AiError.ToolNotFoundError.make({
                 toolName: String(name),
-                availableTools: Object.keys(tools),
+                availableTools: [...entries.keys()],
               }),
             }),
           )
-        : entry.toolkit.handle(name, params)
+        : entry.invoke(params)
     },
   }
 }
 
 const toolkitFromHandled = <Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
-): Toolkit.Toolkit<Tools> => Toolkit.make(...Object.values(toolkit.tools)) as unknown as Toolkit.Toolkit<Tools>
+): Toolkit.Toolkit<Tools> =>
+  Toolkit.make(
+    ...Object.keys(toolkit.tools).flatMap((name) => {
+      const tool = toolkit.tools[name]
+      return tool === undefined ? [] : [tool]
+    }),
+  ) as unknown as Toolkit.Toolkit<Tools>
 
 /** @experimental Build a `transfer_to_<agent.name>` same-process handoff tool. */
 export const transferTool: {
@@ -221,10 +285,7 @@ export const fanOut: {
               ...child.options,
               prompt: child.prompt,
             } as { readonly prompt: Prompt.RawInput }
-            return generate(
-              child.agent as unknown as Agent<Record<string, Tool.Any>, FanOutRequirements<Children>>,
-              runOptions,
-            )
+            return generate(child.agent, runOptions)
           },
           { concurrency },
         ),
@@ -236,9 +297,7 @@ export const fanOut: {
 export const supervisor = <const Specialists extends ReadonlyArray<Agent<any, any>>>(
   options: SupervisorOptions<Specialists>,
 ): Supervisor<Requirements<Specialists[number]>> => {
-  const specialists = options.specialists as unknown as ReadonlyArray<
-    Agent<Record<string, Tool.Any>, Requirements<Specialists[number]>>
-  >
+  const specialists = options.specialists
   const transferTools = specialists.map((specialist) => transferTool(specialist))
   const toolkit = mergeHandled(transferTools)
   const agent = make({

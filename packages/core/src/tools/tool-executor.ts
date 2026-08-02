@@ -94,15 +94,48 @@ export class ToolExecutor extends Context.Service<ToolExecutor, Interface>()("@b
 /** @experimental */
 export type ToolkitInput<Tools extends Record<string, Tool.Any>> = Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
 
-const findTool = <Tools extends Record<string, Tool.Any>>(tools: Tools, name: string): Tools[keyof Tools] | undefined =>
-  tools[name as keyof Tools]
+type ResolvedTool = {
+  readonly tool: Tool.Any
+  readonly invoke: (
+    params: unknown,
+  ) => Effect.Effect<
+    Stream.Stream<Tool.HandlerResult<Tool.Any>, Tool.HandlerError<Tool.Any>, Tool.HandlerServices<Tool.Any>>,
+    AiError.AiError
+  >
+}
+
+const hasTool = <Tools extends Record<string, Tool.Any>>(
+  tools: Tools,
+  name: string,
+): name is Extract<keyof Tools, string> => Object.hasOwn(tools, name)
+
+const resolvedToolkitCache = new WeakMap<object, ReadonlyMap<string, ResolvedTool>>()
+
+const resolveTools = <Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.WithHandler<Tools>,
+): ReadonlyMap<string, ResolvedTool> => {
+  const cached = resolvedToolkitCache.get(toolkit)
+  if (cached !== undefined) return cached
+  const resolved = new Map<string, ResolvedTool>()
+  for (const name of Object.keys(toolkit.tools)) {
+    if (!hasTool(toolkit.tools, name)) continue
+    const tool = toolkit.tools[name]
+    if (tool === undefined) continue
+    resolved.set(name, {
+      tool,
+      invoke: (params) => toolkit.handle(name, params as Tool.Parameters<Tools[typeof name]>),
+    })
+  }
+  resolvedToolkitCache.set(toolkit, resolved)
+  return resolved
+}
 
 const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
   request: Request,
 ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlerServices<Tools[keyof Tools]>> => {
-  const tool = findTool(toolkit.tools, request.call.name)
-  if (tool === undefined) {
+  const resolved = resolveTools(toolkit).get(request.call.name)
+  if (resolved === undefined) {
     return Effect.fail(
       toolResultCodec.frameworkFailure(
         "missing-handler",
@@ -111,12 +144,13 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
       ),
     )
   }
+  const { tool } = resolved
   const handleFailure = (error: unknown): Effect.Effect<Outcome, FrameworkFailure> => {
     if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
     if (AiError.isAiError(error)) return Effect.fail(toolResultCodec.aiFrameworkFailure(tool, error))
     return toolResultCodec.encodeDomainCandidate(tool, error)
   }
-  return toolkit.handle(request.call.name as keyof Tools, request.call.params as never).pipe(
+  return resolved.invoke(request.call.params).pipe(
     Effect.flatMap((results) =>
       results.pipe(
         Stream.filter((item) => item.preliminary === false),
@@ -240,7 +274,7 @@ const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
   return route({
     tools: routedTools,
     execute: (request) => {
-      const tool = findTool(options.toolkit.tools, request.call.name)
+      const tool = options.toolkit.tools[request.call.name]
       if (tool === undefined) {
         return Effect.fail(
           toolResultCodec.frameworkFailure(
