@@ -641,9 +641,10 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         pending: new Map<number, PendingToolResult>(),
         finish: undefined as { readonly usage: Response.Usage; readonly reason: Response.FinishReason } | undefined,
         usage: undefined as Response.Usage | undefined,
+        currentContext: undefined as Prompt.Prompt | undefined,
         currentContextTokens: undefined as number | undefined,
         reportedContextUsage: undefined as
-          | { readonly estimatedTokens: number; readonly reportedTokens: number }
+          | { readonly prompt: Prompt.Prompt; readonly estimatedTokens: number; readonly reportedTokens: number }
           | undefined,
         providerOutput: providerOutputState(),
       }
@@ -836,18 +837,27 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             ),
         })
 
+      const isAppendOnlyDescendant = (ancestor: Prompt.Prompt, descendant: Prompt.Prompt): boolean =>
+        ancestor.content.length <= descendant.content.length &&
+        ancestor.content.every((message, index) => Equal.equals(message, descendant.content[index]))
+
       const compactionUsage = (
         turn: number,
         history: Prompt.Prompt,
         prompt: Prompt.Prompt,
-      ): Effect.Effect<Usage, AgentError> =>
-        countTokens(turn, Prompt.concat(history, prompt)).pipe(
+      ): Effect.Effect<Usage, AgentError> => {
+        const context = Prompt.concat(history, prompt)
+        return countTokens(turn, context).pipe(
           Effect.map((estimatedTokens) => {
             const reported = state.reportedContextUsage
-            const contextTokens =
-              reported !== undefined && estimatedTokens >= reported.estimatedTokens
-                ? reported.reportedTokens + estimatedTokens - reported.estimatedTokens
-                : estimatedTokens
+            const canApplyReportedGrowth =
+              reported !== undefined &&
+              isAppendOnlyDescendant(reported.prompt, context) &&
+              estimatedTokens >= reported.estimatedTokens
+            const contextTokens = canApplyReportedGrowth
+              ? reported.reportedTokens + estimatedTokens - reported.estimatedTokens
+              : estimatedTokens
+            if (reported !== undefined && !canApplyReportedGrowth) state.reportedContextUsage = undefined
             return {
               contextTokens,
               contextWindow: options.compaction?.contextWindow ?? Number.POSITIVE_INFINITY,
@@ -855,6 +865,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             }
           }),
         )
+      }
 
       const validateCompactionProjection = (
         turn: number,
@@ -912,7 +923,15 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         commitData?: Omit<import("./model-telemetry.js").CompactionCommit, "checkpointId" | "summaryModelCallId">,
       ): Effect.Effect<void, RunError> =>
         Option.match(activeSession, {
-          onNone: () => deliverPending().pipe(Effect.andThen(Ref.set(chat.history, result.history))),
+          onNone: () =>
+            deliverPending().pipe(
+              Effect.andThen(Ref.set(chat.history, result.history)),
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  state.reportedContextUsage = undefined
+                }),
+              ),
+            ),
           onSome: (session) =>
             Effect.gen(function* () {
               const id = yield* session.reserveEntryId
@@ -978,6 +997,11 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                   Effect.flatMap((appended) => restore(session.path(appended.leafId))),
                   Effect.map(buildContext),
                   Effect.tap((projection) => Ref.set(chat.history, projection)),
+                  Effect.tap(() =>
+                    Effect.sync(() => {
+                      state.reportedContextUsage = undefined
+                    }),
+                  ),
                   Effect.andThen(restore(savePersisted(turn))),
                 ),
               )
@@ -1399,16 +1423,15 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           }
           state.usage = state.usage === undefined ? part.usage : addUsage(state.usage, part.usage)
           const reportedTokens = part.usage.inputTokens.total
-          if (
-            state.currentContextTokens !== undefined &&
-            reportedTokens !== undefined &&
-            Number.isSafeInteger(reportedTokens) &&
-            reportedTokens >= 0
-          ) {
-            state.reportedContextUsage = {
-              estimatedTokens: state.currentContextTokens,
-              reportedTokens,
-            }
+          if (state.currentContextTokens !== undefined && state.currentContext !== undefined) {
+            state.reportedContextUsage =
+              reportedTokens !== undefined && Number.isSafeInteger(reportedTokens) && reportedTokens >= 0
+                ? {
+                    prompt: state.currentContext,
+                    estimatedTokens: state.currentContextTokens,
+                    reportedTokens,
+                  }
+                : undefined
           }
           Telemetry.addGenAIAnnotations(span, {
             operation: { name: "chat" },
@@ -1660,6 +1683,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
                     const history = yield* Ref.get(chat.history)
                     preparedState = { history, preparedPrompt }
                     const responsePrompt = Prompt.concat(history, preparedPrompt)
+                    state.currentContext = responsePrompt
                     state.currentContextTokens = yield* countTokens(turn, responsePrompt)
                     const messages = responsePrompt.content
                     const rawParts = LanguageModel.streamText({

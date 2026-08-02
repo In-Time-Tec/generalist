@@ -23,6 +23,7 @@ import {
   ToolOutput,
   TurnPolicy,
 } from "../src/index"
+import { estimatePromptTokens } from "../src/prompt-token-estimate"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 import { withProviderFinish, withProviderFinishContent } from "./provider-finish"
@@ -3314,6 +3315,123 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(streamCalls).toBe(2)
         expect(measuredTokens[0]).toBeLessThan(1_000)
         expect(measuredTokens[1]).toBeGreaterThanOrEqual(90_000)
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "clears reported usage after a rewrite whose replacement call omits input usage", () => {
+    let streamCalls = 0
+    const measuredTokens: Array<number> = []
+    const estimatedTokens: Array<number> = []
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          streamCalls += 1
+          switch (streamCalls) {
+            case 1:
+              return Stream.make(
+                toolCallPart("tool-call-before-rewrite", "echo", { text: "first" }),
+                finishPart("stop", usage({ total: 90_000 }, { total: 1 })),
+              )
+            case 2:
+              return Stream.make(
+                toolCallPart("tool-call-replacement-without-usage", "echo", { text: "second" }),
+                finishPart("stop", usage({}, { total: 1 })),
+              )
+            default:
+              return Stream.make(textDelta("done"))
+          }
+        }),
+        echoExecutor,
+        Compaction.layerTest({
+          maybeCompact: (request) =>
+            Effect.sync(() => {
+              measuredTokens.push(request.usage.contextTokens)
+              estimatedTokens.push(estimatePromptTokens(Prompt.concat(request.history, request.prompt)))
+              return measuredTokens.length === 2
+                ? Option.some({ _tag: "Microcompact", history: Prompt.empty, prompt: Prompt.make("replacement") })
+                : Option.none()
+            }),
+        }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "replacement-without-usage-agent", toolkit: Toolkit.make(echoTool) }), {
+            prompt: "original prompt",
+            compaction: { contextWindow: 100_000 },
+          }),
+        )
+
+        expect(streamCalls).toBe(3)
+        expect(measuredTokens).toHaveLength(3)
+        expect(measuredTokens[2]).toBe(estimatedTokens[2])
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "rechecks threshold usage after a rewritten context grows past a stale baseline", () => {
+    let streamCalls = 0
+    let toolCalls = 0
+    let compactionCalls = 0
+    const thresholdUsages: Array<number> = []
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          streamCalls += 1
+          switch (streamCalls) {
+            case 1:
+              return Stream.make(
+                toolCallPart("tool-call-stale-baseline-first", "echo", { text: "first" }),
+                finishPart("stop", usage({ total: 10 }, { total: 1 })),
+              )
+            case 2:
+              return Stream.make(
+                toolCallPart("tool-call-stale-baseline-second", "echo", { text: "second" }),
+                finishPart("stop", usage({}, { total: 1 })),
+              )
+            default:
+              return Stream.make(textDelta("done"))
+          }
+        }),
+        ToolExecutor.layerTest({
+          execute: () =>
+            Effect.sync(() => {
+              toolCalls += 1
+              const result = toolCalls === 1 ? "small" : "x".repeat(10_000)
+              return { _tag: "Success", result, encodedResult: result }
+            }),
+        }),
+        Compaction.layerTest({
+          willCompact: ({ usage: measured }) => {
+            thresholdUsages.push(measured.contextTokens)
+            return thresholdUsages.length < 3 || measured.contextTokens > (thresholdUsages[0] as number) + 800
+          },
+          maybeCompact: () =>
+            Effect.sync(() => {
+              compactionCalls += 1
+              return compactionCalls === 2
+                ? Option.some({ _tag: "Microcompact", history: Prompt.empty, prompt: Prompt.make("replacement") })
+                : Option.none()
+            }),
+        }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const events = yield* Stream.runCollect(
+          Agent.stream(Agent.make({ name: "stale-baseline-threshold-agent", toolkit: Toolkit.make(echoTool) }), {
+            prompt: "a".repeat(4_000),
+            compaction: { contextWindow: 100_000 },
+          }),
+        )
+
+        expect(streamCalls).toBe(3)
+        expect(compactionCalls).toBe(3)
+        expect(thresholdUsages[2]).toBeGreaterThan((thresholdUsages[0] as number) + 800)
         expect(events.at(-1)?._tag).toBe("Completed")
       }),
     ] as const

@@ -178,6 +178,82 @@ describe("Compaction", () => {
     }),
   ])
 
+  ItLayer.make(it, "reruns the default threshold strategy when an equal-usage path grows", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "summary" }])),
+    Effect.gen(function* () {
+      const service = Compaction.make(Compaction.defaultStrategy(), { keepRecentTokens: 1 })
+      const request = {
+        compactionId: "default-equal-usage",
+        agentName: "default-equal-usage-agent",
+        sessionId: "session",
+        turn: 0,
+        history: Prompt.empty,
+        prompt: Prompt.make("same text-only prompt"),
+        path: [],
+        usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+        overflow: false,
+      } as const
+      const path = [
+        entry("0", user("old")),
+        entry("1", assistantToolCall("call")),
+        entry("2", toolResult("call", "ok")),
+      ]
+
+      const first = yield* service.maybeCompact(request)
+      const second = yield* service.maybeCompact({
+        ...request,
+        compactionId: "default-equal-usage-path",
+        turn: 1,
+        path,
+      })
+
+      expect(Option.isNone(first)).toBe(true)
+      expect(Option.isSome(second)).toBe(true)
+    }),
+  ])
+
+  ItLayer.make(it, "reruns a custom threshold strategy when an equal-usage path grows", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "summary" }])),
+    Effect.gen(function* () {
+      let cuts = 0
+      const base = Compaction.defaultStrategy()
+      const service = Compaction.make(
+        {
+          ...base,
+          shouldCompact: () => true,
+          cut: (entries, keepRecentTokens) => {
+            cuts += 1
+            return base.cut(entries, keepRecentTokens)
+          },
+        },
+        { keepRecentTokens: 1 },
+      )
+      const request = {
+        compactionId: "custom-equal-usage",
+        agentName: "custom-equal-usage-agent",
+        sessionId: "session",
+        turn: 0,
+        history: Prompt.empty,
+        prompt: Prompt.make("same text-only prompt"),
+        path: [],
+        usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+        overflow: false,
+      } as const
+      const path = [
+        entry("0", user("old")),
+        entry("1", assistantToolCall("call")),
+        entry("2", toolResult("call", "ok")),
+      ]
+
+      const first = yield* service.maybeCompact(request)
+      const second = yield* service.maybeCompact({ ...request, compactionId: "custom-equal-usage-path", turn: 1, path })
+
+      expect(cuts).toBe(2)
+      expect(Option.isNone(first)).toBe(true)
+      expect(Option.isSome(second)).toBe(true)
+    }),
+  ])
+
   it("reports whether a compaction would run before any prompt work", () => {
     const service = Compaction.make(Compaction.defaultStrategy(), {
       contextWindow: 1_000,

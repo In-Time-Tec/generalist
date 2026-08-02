@@ -159,10 +159,7 @@ export interface StructuredSummaryOptions {
   readonly summaryPrompt?: string
 }
 
-const serialized = (value: unknown): string => {
-  const json = JSON.stringify(value)
-  return json === undefined ? String(value) : json
-}
+const serialized = (value: unknown): string => JSON.stringify(value) ?? String(value)
 
 const safeNonNegativeInteger = (name: string, value: number): number => {
   if (!Number.isSafeInteger(value) || value < 0) throw new TypeError(`${name} must be a non-negative safe integer`)
@@ -264,6 +261,18 @@ const makeMicrocompact = (history: Prompt.Prompt, prompt: Prompt.Prompt): Microc
   history,
   prompt,
 })
+
+const contextRevision = (input: Request): string | undefined => {
+  try {
+    const context = JSON.stringify([input.path?.at(-1)?.id, input.history.content, input.prompt.content])
+    let hash = 2_166_136_261
+    for (let index = 0; index < context.length; index += 1)
+      hash = Math.imul(hash ^ context.charCodeAt(index), 16_777_619)
+    return `${context.length}:${hash >>> 0}`
+  } catch {
+    return undefined
+  }
+}
 
 /** @experimental The default two-stage compaction strategy. */
 export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
@@ -387,11 +396,14 @@ export const make: {
             thresholds.clear(input.sessionId)
             return Effect.succeed(Option.none<Result>())
           }
-          if (!input.overflow && thresholds.isUnchanged(input.sessionId, usage)) return Effect.succeed(Option.none())
+          const revision = contextRevision(input)
+          if (revision !== undefined && !input.overflow && thresholds.isUnchanged(input.sessionId, usage, revision))
+            return Effect.succeed(Option.none())
           return withCompactionLifecycle(compact(compactionStrategy, input, usage, options), input, usage).pipe(
             Effect.tap((result) =>
               Effect.sync(() => {
-                if (!input.overflow && Option.isNone(result)) thresholds.recordUnchanged(input.sessionId, usage)
+                if (!input.overflow && revision !== undefined && Option.isNone(result))
+                  thresholds.recordUnchanged(input.sessionId, usage, revision)
                 else thresholds.clear(input.sessionId)
               }),
             ),
