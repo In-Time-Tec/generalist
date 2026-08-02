@@ -97,6 +97,7 @@ import {
   ServerFrame as Wire_ServerFrame,
   LooseServerFrame as Wire_LooseServerFrame,
   codec as Wire_codec,
+  codecEffect as Wire_codecEffect,
 } from "./transport/wire.js"
 export const Wire = {
   Sequence: Wire_Sequence,
@@ -110,6 +111,7 @@ export const Wire = {
   ServerFrame: Wire_ServerFrame,
   LooseServerFrame: Wire_LooseServerFrame,
   codec: Wire_codec,
+  codecEffect: Wire_codecEffect,
 } as typeof import("./transport/wire.js")
 export namespace Wire {
   export type Sequence = import("./transport/wire.js").Sequence
@@ -123,6 +125,7 @@ export namespace Wire {
   export type ServerFrame = typeof import("./transport/wire.js").ServerFrame
   export type LooseServerFrame = typeof import("./transport/wire.js").LooseServerFrame
   export type codec = typeof import("./transport/wire.js").codec
+  export type codecEffect = typeof import("./transport/wire.js").codecEffect
   export type Capability<
     T extends
       | import("effect/unstable/ai").Toolkit.Any

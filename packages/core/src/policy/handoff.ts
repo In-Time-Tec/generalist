@@ -1,24 +1,62 @@
-import { Array, Effect, Function, Schema } from "effect"
+import { Array, Effect, Function, Layer, Schema } from "effect"
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import {
   type Agent,
-  type HandoffAgent,
-  type HandoffAgentCapability,
-  type Requirements,
   type Result,
   type RunError,
   type RunOptions,
+  type RunResult,
+  type RunRequirements,
+  generate,
   make,
 } from "../agent/agent.js"
 import { AgentError } from "../agent/agent-event.js"
 import { type AgentToolToolkit, asTool } from "../agent/agent-tool.js"
-import { type Memory } from "../context/memory.js"
 import { type ClosedToolSet } from "../tools/tool-executor.js"
 import { type TurnPolicy } from "../turn/turn-policy.js"
 
 const defaultTransferParameters = Schema.Struct({ prompt: Schema.String })
 
 type DefaultTransferParameters = typeof defaultTransferParameters
+
+/** @experimental A failure while constructing the services for a registered agent. */
+export class RegistrationError extends Schema.TaggedErrorClass<RegistrationError>()("@batonfx/core/RegistrationError", {
+  agent: Schema.String,
+  message: Schema.String,
+  cause: Schema.Unknown,
+}) {}
+
+/** @experimental A service-free, closed agent registration. */
+export interface Registration {
+  readonly name: string
+  readonly run: <O extends RunOptions>(
+    options: O,
+  ) => Effect.Effect<RunResult<O>, RunError | RegistrationError, RunRequirements<never, O>>
+  readonly requirements: (value: never) => never
+}
+
+/** @experimental Register an agent with the complete service layer required by its runs. */
+export const register = <Tools extends Record<string, Tool.Any>, R, E>(
+  agent: Agent<Tools, R>,
+  layer: Layer.Layer<R, E, never>,
+): Registration => {
+  const registrationLayer = Layer.effectContext(
+    Layer.build(layer).pipe(
+      Effect.mapError((cause) =>
+        RegistrationError.make({
+          agent: agent.name,
+          message: `Failed to build services for agent '${agent.name}'`,
+          cause,
+        }),
+      ),
+    ),
+  )
+  return {
+    name: agent.name,
+    run: (options) => generate(agent, options).pipe(Effect.provide(registrationLayer)),
+    requirements: (value) => value,
+  }
+}
 
 /** @experimental Options for a conventionally named transfer tool. */
 export interface TransferOptions<
@@ -34,14 +72,10 @@ export interface TransferOptions<
 }
 
 /** @experimental One child run in a bounded fan-out. */
-export interface FanOutChild<
-  Tools extends Record<string, Tool.Any>,
-  R,
-  Options extends Omit<RunOptions, "prompt"> | undefined = Omit<RunOptions, "prompt"> | undefined,
-> {
-  readonly agent: Agent<Tools, R>
+export interface FanOutChild {
+  readonly registration: Registration
   readonly prompt: Prompt.RawInput
-  readonly options?: Options
+  readonly options?: Omit<RunOptions, "prompt" | "output" | "memory" | "persistence">
 }
 
 /** @experimental Options for bounded same-process fan-out. */
@@ -52,14 +86,14 @@ export interface FanOutOptions {
 /** @experimental Built supervisor agent and handled toolkit for its transfer tools. */
 export interface Supervisor<R> {
   readonly agent: Agent<Record<string, Tool.Any>, R | LanguageModel.LanguageModel>
-  readonly toolkit: ClosedToolSet<R>
+  readonly toolkit: ClosedToolSet<never>
 }
 
 /** @experimental Options for building a transfer-tool supervisor. */
-export interface SupervisorOptions<Specialists extends ReadonlyArray<HandoffAgentCapability>> {
+export interface SupervisorOptions {
   readonly name: string
   readonly instructions?: string
-  readonly specialists: Specialists
+  readonly specialists: ReadonlyArray<Registration>
   readonly policy?: TurnPolicy
 }
 
@@ -77,20 +111,20 @@ const positiveConcurrency = (value: number | undefined): Effect.Effect<number, A
       )
 }
 
-type TransferToolkit<Parameters extends Schema.Top, Success extends Schema.Top, R> = AgentToolToolkit<
+type TransferToolkit<Parameters extends Schema.Top, Success extends Schema.Top> = AgentToolToolkit<
   string,
   Parameters,
   Success,
-  R
+  never
 >
-type TransferInvocation<R> = Effect.Effect<unknown, string, R>
+type TransferInvocation = Effect.Effect<unknown, string>
 
-const mergeHandled = <Parameters extends Schema.Top, Success extends Schema.Top, R>(
-  toolkits: ReadonlyArray<TransferToolkit<Parameters, Success, R>>,
-): ClosedToolSet<R> => {
+const mergeHandled = <Parameters extends Schema.Top, Success extends Schema.Top>(
+  toolkits: ReadonlyArray<TransferToolkit<Parameters, Success>>,
+): ClosedToolSet<never> => {
   const entries = new Map<
     string,
-    { readonly tool: Tool.Any; readonly invoke: (params: unknown) => TransferInvocation<R> }
+    { readonly tool: Tool.Any; readonly invoke: (params: unknown) => TransferInvocation }
   >()
   for (const toolkit of toolkits) {
     for (const name of Object.keys(toolkit.tools)) {
@@ -115,29 +149,17 @@ const mergeHandled = <Parameters extends Schema.Top, Success extends Schema.Top,
 export const transferTool: {
   <Parameters extends Schema.Top = DefaultTransferParameters, Success extends Schema.Top = typeof Schema.String>(
     options?: TransferOptions<Parameters, Success>,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    target: Agent<Tools, R> | HandoffAgent<R>,
-  ) => AgentToolToolkit<string, Parameters, Success, R>
-  <
-    Tools extends Record<string, Tool.Any>,
-    R,
-    Parameters extends Schema.Top = DefaultTransferParameters,
-    Success extends Schema.Top = typeof Schema.String,
-  >(
-    target: Agent<Tools, R> | HandoffAgent<R>,
+  ): (target: Registration) => AgentToolToolkit<string, Parameters, Success, never>
+  <Parameters extends Schema.Top = DefaultTransferParameters, Success extends Schema.Top = typeof Schema.String>(
+    target: Registration,
     options?: TransferOptions<Parameters, Success>,
-  ): AgentToolToolkit<string, Parameters, Success, R>
+  ): AgentToolToolkit<string, Parameters, Success, never>
 } = Function.dual(
-  (args) => args.length !== 1 || "name" in args[0],
-  <
-    Tools extends Record<string, Tool.Any>,
-    R,
-    Parameters extends Schema.Top = DefaultTransferParameters,
-    Success extends Schema.Top = typeof Schema.String,
-  >(
-    target: Agent<Tools, R> | HandoffAgent<R>,
+  (args) => args.length !== 1 || "run" in args[0],
+  <Parameters extends Schema.Top = DefaultTransferParameters, Success extends Schema.Top = typeof Schema.String>(
+    target: Registration,
     options: TransferOptions<Parameters, Success> = {},
-  ): AgentToolToolkit<string, Parameters, Success, R> =>
+  ): AgentToolToolkit<string, Parameters, Success, never> =>
     asTool(target, {
       name: options.nameOverride ?? transferName(target.name),
       description: options.description ?? `Transfer to ${target.name}`,
@@ -148,90 +170,35 @@ export const transferTool: {
     }),
 )
 
-type FanOutInput = {
-  readonly agent: HandoffAgentCapability
-  readonly prompt: Prompt.RawInput
-  readonly options?: Omit<RunOptions, "prompt">
-}
-
-type FanOutOptionRequirements<Options> =
-  Exclude<Options, undefined> extends {
-    readonly memory?: infer SelectedMemory
-  }
-    ? [Extract<SelectedMemory, { readonly key: import("../context/memory.js").Key }>] extends [never]
-      ? never
-      : Memory
-    : never
-
-type FanOutRequirements<Children extends ReadonlyArray<FanOutInput>> = Children[number] extends infer Child
-  ? Child extends { readonly agent: infer ChildAgent }
-    ?
-        | Requirements<ChildAgent>
-        | (Child extends { readonly options?: infer Options } ? FanOutOptionRequirements<Options> : never)
-    : never
-  : never
-
-/** @experimental Run isolated child agents concurrently and preserve input order. */
+/** @experimental Run isolated registered agents concurrently and preserve input order. */
 export const fanOut: {
   (
     options: FanOutOptions,
-  ): <Children extends ReadonlyArray<FanOutInput>>(
-    children: Children,
-  ) => Effect.Effect<ReadonlyArray<Result>, RunError, FanOutRequirements<Children>>
-  (): <Children extends ReadonlyArray<FanOutInput>>(
-    children: Children,
-  ) => Effect.Effect<ReadonlyArray<Result>, RunError, FanOutRequirements<Children>>
-  <Children extends ReadonlyArray<FanOutInput>>(
-    children: Children,
-    options: FanOutOptions,
-  ): Effect.Effect<ReadonlyArray<Result>, RunError, FanOutRequirements<Children>>
-  <Children extends ReadonlyArray<FanOutInput>>(
-    children: Children,
-  ): Effect.Effect<ReadonlyArray<Result>, RunError, FanOutRequirements<Children>>
+  ): (children: ReadonlyArray<FanOutChild>) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
+  (): (children: ReadonlyArray<FanOutChild>) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
+  (
+    children: ReadonlyArray<FanOutChild>,
+    options?: FanOutOptions,
+  ): Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
 } = Function.dual(
   (args) => args.length !== 1 || globalThis.Array.isArray(args[0]),
-  <Children extends ReadonlyArray<FanOutInput>>(
-    children: Children,
+  (
+    children: ReadonlyArray<FanOutChild>,
     options: FanOutOptions = {},
-  ): Effect.Effect<ReadonlyArray<Result>, RunError, FanOutRequirements<Children>> =>
+  ): Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError> =>
     positiveConcurrency(options.concurrency).pipe(
       Effect.flatMap((concurrency) =>
-        Effect.forEach(
-          children,
-          (child) => {
-            const runOptions = {
-              ...child.options,
-              prompt: child.prompt,
-            }
-            return child.agent.handoff((target) => target.run(runOptions)) as Effect.Effect<
-              Result,
-              RunError,
-              FanOutRequirements<Children>
-            >
-          },
-          { concurrency },
-        ),
+        Effect.forEach(children, (child) => child.registration.run({ ...child.options, prompt: child.prompt }), {
+          concurrency,
+        }),
       ),
     ),
 )
 
 /** @experimental Build a supervisor agent plus handled transfer-tool toolkit. */
-export const supervisor = <const Specialists extends ReadonlyArray<HandoffAgentCapability>>(
-  options: SupervisorOptions<Specialists>,
-): Supervisor<Requirements<Specialists[number]>> => {
+export const supervisor = (options: SupervisorOptions): Supervisor<never> => {
   const specialists = options.specialists
-  const transferTools = specialists.map((specialist) =>
-    specialist.handoff<
-      TransferToolkit<DefaultTransferParameters, typeof Schema.String, Requirements<Specialists[number]>>
-    >(
-      (target) =>
-        transferTool(target) as TransferToolkit<
-          DefaultTransferParameters,
-          typeof Schema.String,
-          Requirements<Specialists[number]>
-        >,
-    ),
-  )
+  const transferTools = specialists.map((specialist) => transferTool(specialist))
   const toolkit = mergeHandled(transferTools)
   const agent = make({
     name: options.name,

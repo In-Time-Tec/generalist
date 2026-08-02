@@ -13,6 +13,7 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import { TurnPolicyError } from "../turn/turn-policy.js"
+import type { Registration } from "../policy/handoff.js"
 
 const defaultParameters = Schema.Struct({ prompt: Schema.String })
 
@@ -109,15 +110,16 @@ const promptFor = <Parameters extends Schema.Top>(
   schema: Parameters | undefined,
   callback: ((params: Parameters["Type"]) => Prompt.RawInput) | undefined,
   params: unknown,
-): Effect.Effect<Prompt.RawInput, string> =>
-  schema === undefined
-    ? Effect.succeed(defaultPrompt(params))
-    : Schema.is(schema)(params)
-      ? Effect.try({
-          try: () => (callback === undefined ? defaultPrompt(params) : callback(params)),
-          catch: errorMessage,
-        })
-      : Effect.fail("Invalid agent-tool parameters")
+): Effect.Effect<Prompt.RawInput, string> => {
+  if (schema !== undefined && !Schema.is(schema)(params)) return Effect.fail("Invalid agent-tool parameters")
+  return Effect.try({
+    try: () =>
+      callback === undefined
+        ? defaultPrompt(params)
+        : callback(schema === undefined ? (params as Parameters["Type"]) : params),
+    catch: errorMessage,
+  })
+}
 
 const resultFor = <Success extends Schema.Top>(
   schema: Success | undefined,
@@ -125,7 +127,7 @@ const resultFor = <Success extends Schema.Top>(
   result: Result,
 ): Effect.Effect<unknown, string> =>
   Effect.try({
-    try: () => (schema === undefined || callback === undefined ? defaultResult(result) : callback(result)),
+    try: () => (callback === undefined ? defaultResult(result) : callback(result)),
     catch: errorMessage,
   })
 
@@ -153,7 +155,7 @@ export const asTool: {
   >(
     options?: AsToolOptions<Name, Parameters, Success>,
   ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R> | HandoffAgent<R>,
+    agent: Agent<Tools, R> | HandoffAgent<R> | Registration,
   ) => AgentToolToolkit<Name, Parameters, Success, R>
   <
     Tools extends Record<string, Tool.Any>,
@@ -162,7 +164,7 @@ export const asTool: {
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
   >(
-    agent: Agent<Tools, R> | HandoffAgent<R>,
+    agent: Agent<Tools, R> | HandoffAgent<R> | Registration,
     options?: AsToolOptions<Name, Parameters, Success>,
   ): AgentToolToolkit<Name, Parameters, Success, R>
 } = Function.dual(
@@ -174,7 +176,7 @@ export const asTool: {
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
   >(
-    agent: Agent<Tools, R> | HandoffAgent<R>,
+    agent: Agent<Tools, R> | HandoffAgent<R> | Registration,
     options: AsToolOptions<Name, Parameters, Success> = {},
   ): AgentToolToolkit<Name, Parameters, Success, R> => {
     const name = options.name ?? agent.name

@@ -43,10 +43,9 @@ const encodeDomainCandidate = (tool: Tool.Any, failure: unknown): Effect.Effect<
     ? Effect.fail(frameworkFailure("handler", tool.name, failure))
     : encodeDomainFailure(tool, failure)
 
-const decodeInput = (tool: Tool.Any, input: unknown): Effect.Effect<void, FrameworkFailure> => {
+const decodeInput = (tool: Tool.Any, input: unknown): Effect.Effect<unknown, FrameworkFailure> => {
   return Schema.decodeUnknownEffect(tool.parametersSchema)(input).pipe(
     Effect.provide(schemaContext),
-    Effect.asVoid,
     Effect.mapError((error) => frameworkFailure("decode-input", tool.name, error)),
   )
 }

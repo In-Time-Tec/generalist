@@ -36,18 +36,14 @@ const AgentTypeId: unique symbol = Symbol.for("@batonfx/core/Agent")
 export interface HandoffAgent<R> {
   readonly name: string
   readonly description?: string
-  readonly run: (options: Pick<RunOptions, "prompt">) => Effect.Effect<Result, RunError, R>
+  readonly run: (
+    options: Pick<RunOptions, "prompt" | "history" | "system" | "resume">,
+  ) => Effect.Effect<Result, unknown, R>
   readonly requirements: (value: R) => R
 }
 
-/** @experimental Structural existential capability used by Handoff. */
-export interface HandoffAgentCapability {
-  readonly name: string
-  readonly handoff: <A>(f: <R>(agent: HandoffAgent<R>) => A) => A
-}
-
-export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = LanguageModel.LanguageModel>
-  extends HandoffAgentCapability {
+export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = LanguageModel.LanguageModel> {
+  readonly handoff: <A>(f: (agent: HandoffAgent<R>) => A) => A
   readonly [AgentTypeId]: {
     readonly tools: Types.Invariant<Tools>
     readonly requirements: Types.Invariant<R>
@@ -55,10 +51,10 @@ export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = Language
   readonly name: string
   readonly instructions?: string
   readonly toolkit: Toolkit.Toolkit<Tools>
-  readonly policy: TurnPolicy<R>
+  readonly policy: TurnPolicy<any>
   readonly model?: ModelSelection
   readonly memory?: Key
-  readonly authorization?: ToolAuthorizer<R>
+  readonly authorization?: ToolAuthorizer<any>
   readonly toolExecution?: ToolExecutionPolicy
   readonly metadata?: Readonly<Record<string, unknown>>
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
@@ -167,10 +163,6 @@ export function make<
     }
   }
   const definition = {
-    [AgentTypeId]: {
-      tools: (value: Tools) => value,
-      requirements: (value: unknown) => value,
-    },
     name: options.name,
     ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
     toolkit: toolkit as Toolkit.Toolkit<Tools>,
@@ -180,22 +172,28 @@ export function make<
     ...(options.authorization === undefined ? {} : { authorization: options.authorization }),
     ...(options.toolExecution === undefined ? {} : { toolExecution: options.toolExecution }),
     ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
-    toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map((tool) => ({
-      tool,
-      origin: { _tag: "Static", agent: options.name },
-    })),
+    toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map(
+      (tool): ToolDeclaration => ({
+        tool,
+        origin: { _tag: "Static", agent: options.name },
+      }),
+    ),
   }
-  let complete!: Agent<Tools, OptionRequirements<Tools, typeof options>>
-  complete = {
+  type AgentRequirements = OptionRequirements<Tools, typeof options>
+  const complete: Agent<Tools, AgentRequirements> = {
     ...definition,
-    handoff: <A>(f: <R>(agent: HandoffAgent<R>) => A): A =>
+    [AgentTypeId]: {
+      tools: (value: Tools) => value,
+      requirements: (value: AgentRequirements) => value,
+    },
+    handoff: <A>(f: (agent: HandoffAgent<AgentRequirements>) => A): A =>
       f({
         name: options.name,
         ...(options.instructions === undefined ? {} : { description: options.instructions }),
-        run: ({ prompt }) => generate(complete, { prompt }),
+        run: (runOptions) => generate(complete, runOptions),
         requirements: (value) => value,
       }),
-  } as Agent<Tools, OptionRequirements<Tools, typeof options>>
+  }
   return complete
 }
 
@@ -302,9 +300,11 @@ type SchemaOf<O> = SchemaFromOutput<PresentOption<O, "output">>
 type PersistenceRequirement<O> = [PresentOption<O, "persistence">] extends [never] ? never : Chat.Persistence | Runtime
 type OutputRequirement<O> = [SchemaOf<O>] extends [never] ? never : SchemaOf<O>["DecodingServices"]
 
-type RunRequirements<R, O> = R | OperationRequirements<O> | PersistenceRequirement<O> | OutputRequirement<O>
+/** @experimental Services required by one run option set. */
+export type RunRequirements<R, O> = R | OperationRequirements<O> | PersistenceRequirement<O> | OutputRequirement<O>
 
-type RunResult<O> = O extends unknown
+/** @experimental Result selected by one run option set. */
+export type RunResult<O> = O extends unknown
   ? O extends { readonly output: { readonly schema: infer S extends ObjectSchema } }
     ? ObjectResult<S["Type"]>
     : [SchemaOf<O>] extends [never]

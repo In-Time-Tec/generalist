@@ -1,120 +1,11 @@
 import { expect, layer } from "@effect/vitest"
-import { Json } from "./json"
 import { Effect, Layer, Schema, Stream } from "effect"
-import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import {
-  Agent,
-  AgentEvent,
-  Approvals,
-  Handoff,
-  Memory,
-  ModelMiddleware,
-  ModelRegistry,
-  ToolExecutor,
-} from "../src/index"
-import { unusedToolHandlerLayer } from "./tool-handler-layer"
+import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
+import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "../src/index"
 import { ItLayer } from "./it-layer"
 import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
-type Equal<Left, Right> =
-  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false
-type Assert<Value extends true> = Value
-type EffectRequirements<Value> =
-  Value extends Effect.Effect<unknown, unknown, infer Requirements> ? Requirements : never
-type AgentToolRequirements<Value> = Value extends { readonly requirements: (value: infer R) => infer R } ? R : never
-
-const handoffPlainAgent = Agent.make({ name: "handoff-plain" })
-const handoffMemoryAgent = Agent.make({
-  name: "handoff-memory",
-  memory: { agent: "handoff-memory", subject: "subject" },
-})
-const handoffSelectedAgent = Agent.make({
-  name: "handoff-selected",
-  model: { provider: "test", model: "test" },
-})
-const handoffTypedTool = Tool.make("handoff_typed", {
-  parameters: Schema.Struct({ value: Schema.String }),
-  success: Schema.String,
-})
-const handoffToolAgent = Agent.make({
-  name: "handoff-tool",
-  toolkit: Toolkit.make(handoffTypedTool),
-})
-const requirementTransfer = Handoff.transferTool(handoffMemoryAgent)
-const requirementFanOut = Handoff.fanOut([
-  { agent: handoffPlainAgent, prompt: "plain" },
-  { agent: handoffMemoryAgent, prompt: "memory" },
-  { agent: handoffSelectedAgent, prompt: "selected" },
-] as const)
-const widenedFanOutOptions: Omit<Agent.RunOptions, "prompt"> = {
-  memory: { key: { agent: "handoff-run-memory", subject: "subject" } },
-}
-const requirementFanOutWidened = Handoff.fanOut([
-  { agent: handoffPlainAgent, prompt: "plain", options: widenedFanOutOptions },
-])
-const requirementFanOutCurried = Handoff.fanOut({ concurrency: 1 })([
-  { agent: handoffPlainAgent, prompt: "plain", options: widenedFanOutOptions },
-])
-const requirementToolFanOut = Handoff.fanOut([{ agent: handoffToolAgent, prompt: "tool" }])
-const requirementSupervisor = Handoff.supervisor({
-  name: "requirement-supervisor",
-  specialists: [handoffPlainAgent, handoffMemoryAgent, handoffSelectedAgent, handoffToolAgent],
-})
-
-const handoffRequirementProofs: ReadonlyArray<true> = [
-  true satisfies Assert<
-    Equal<AgentToolRequirements<typeof requirementTransfer>, LanguageModel.LanguageModel | Memory.Memory>
-  >,
-  true satisfies Assert<
-    Equal<
-      EffectRequirements<typeof requirementFanOut>,
-      LanguageModel.LanguageModel | Memory.Memory | ModelRegistry.ModelRegistry
-    >
-  >,
-  true satisfies Assert<
-    Equal<EffectRequirements<typeof requirementFanOutWidened>, LanguageModel.LanguageModel | Memory.Memory>
-  >,
-  true satisfies Assert<
-    Equal<EffectRequirements<typeof requirementFanOutCurried>, LanguageModel.LanguageModel | Memory.Memory>
-  >,
-  true satisfies Assert<
-    Equal<
-      Tool.HandlersFor<typeof handoffToolAgent.toolkit.tools> extends EffectRequirements<typeof requirementToolFanOut>
-        ? true
-        : false,
-      true
-    >
-  >,
-  true satisfies Assert<
-    Equal<Memory.Memory extends Agent.Requirements<typeof requirementSupervisor.agent> ? true : false, true>
-  >,
-  true satisfies Assert<
-    Equal<
-      ModelRegistry.ModelRegistry extends Agent.Requirements<typeof requirementSupervisor.agent> ? true : false,
-      true
-    >
-  >,
-  true satisfies Assert<
-    Equal<
-      LanguageModel.LanguageModel extends Agent.Requirements<typeof requirementSupervisor.agent> ? true : false,
-      true
-    >
-  >,
-  true satisfies Assert<
-    Equal<
-      Tool.HandlersFor<typeof handoffToolAgent.toolkit.tools> extends Agent.Requirements<
-        typeof requirementSupervisor.agent
-      >
-        ? true
-        : false,
-      true
-    >
-  >,
-  true satisfies Assert<
-    Equal<{} extends Handoff.FanOutChild<{}, LanguageModel.LanguageModel>["agent"] ? true : false, false>
-  >,
-]
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
@@ -126,58 +17,91 @@ const modelLayer = (streamText: ModelParams["streamText"]) =>
   )
 
 const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
-
 const toolCallPart = (id: string, name: string, params: unknown) =>
   Response.makePart("tool-call", { id, name, params, providerExecuted: false })
+const promptText = (prompt: Prompt.Prompt): string => JSON.stringify(prompt.content)
 
-const promptText = (prompt: Prompt.Prompt): string => Json.stringify(prompt.content)
+layer(Layer.empty)("Handoff", (it) => {
+  it("requires an explicit layer and closes full run options", () => {
+    let observed: Prompt.Prompt | undefined
+    const registration = Handoff.register(
+      Agent.make({ name: "math" }),
+      modelLayer((options) => {
+        observed = options.prompt
+        return Stream.make(textDelta("child result"))
+      }),
+    )
+    return Effect.gen(function* () {
+      const history = Prompt.fromMessages([
+        Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "prior" })] }),
+      ])
+      const result = yield* registration.run({
+        prompt: "current",
+        history,
+        system: "system override",
+        sessionId: "session-1",
+        logicalOperationId: "operation-1",
+        modelCallOrdinalStart: 3,
+        sessionOwnerToken: "owner-1",
+        toolProgress: { _tag: "Backpressure", capacity: 4 },
+        compaction: { contextWindow: 1024 },
+      })
+      expect(result.text).toBe("child result")
+      expect(observed).toBeDefined()
+      expect(promptText(observed!)).toContain("prior")
+    })
+  })
 
-const activeToolNames = (options: Parameters<ModelParams["streamText"]>[0]) => options.tools.map((tool) => tool.name)
+  it("maps registration layer failures to a named typed error", () => {
+    const registration = Handoff.register(
+      Agent.make({ name: "unavailable" }),
+      Layer.effect(LanguageModel.LanguageModel, Effect.fail("service unavailable")),
+    )
+    return Effect.gen(function* () {
+      const failure = yield* Effect.flip(registration.run({ prompt: "hello" }))
+      expect(failure._tag).toBe("@batonfx/core/RegistrationError")
+      if (Schema.is(Handoff.RegistrationError)(failure)) {
+        expect(failure.agent).toBe("unavailable")
+        expect(failure.cause).toBe("service unavailable")
+      }
+      expect(Schema.is(Handoff.RegistrationError)(failure)).toBe(true)
+    })
+  })
 
-layer(unusedToolHandlerLayer)("Handoff", (it) => {
-  expect(handoffRequirementProofs.every(Boolean)).toBe(true)
-
-  it("names transfer tools by specialist and exposes closed handoff registration", () => {
-    const specialist = Agent.make({ name: "math" })
-    const registration = specialist.handoff((target) => target)
-    const transfer = Handoff.transferTool(specialist)
-
+  it("names transfer tools by registered specialist", () => {
+    const registration = Handoff.register(
+      Agent.make({ name: "math" }),
+      modelLayer(() => Stream.make(textDelta("done"))),
+    )
+    const transfer = Handoff.transferTool(registration)
     expect(registration.name).toBe("math")
-    expect(registration.requirements).toBeTypeOf("function")
     expect(Object.keys(transfer.tools)).toEqual(["transfer_to_math"])
   })
 
-  ItLayer.make(it, "builds a supervisor that routes through transfer tools", () => {
+  ItLayer.make(it, "builds a supervisor that routes through registered specialists", () => {
     let supervisorCalls = 0
+    const math = Handoff.register(
+      Agent.make({ name: "math" }),
+      modelLayer((options) => {
+        const content = promptText(options.prompt)
+        return content.includes("math child task") ? Stream.make(textDelta("42")) : Stream.make(textDelta("unused"))
+      }),
+    )
     return [
       Layer.mergeAll(
-        modelLayer((options) => {
-          const content = promptText(options.prompt)
-          if (activeToolNames(options).length === 0 && content.includes("math child task")) {
-            return Stream.make(textDelta("42"))
-          }
+        modelLayer(() => {
           supervisorCalls += 1
           return supervisorCalls === 1
             ? Stream.make(toolCallPart("call-transfer", "transfer_to_math", { prompt: "math child task" }))
             : Stream.make(textDelta("supervisor got 42"))
         }),
-        ToolExecutor.layerToolkit(
-          Handoff.supervisor({ name: "supervisor", specialists: [Agent.make({ name: "math" })] }).toolkit,
-        ).pipe(Layer.provide(modelLayer(() => Stream.make(textDelta("unused"))))),
+        ToolExecutor.layerToolkit(Handoff.supervisor({ name: "supervisor", specialists: [math] }).toolkit),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const math = Agent.make({ name: "math" })
         const supervisor = Handoff.supervisor({ name: "supervisor", specialists: [math] })
-
-        const events = yield* Stream.runCollect(
-          Agent.stream(
-            supervisor.agent as Agent.Agent<typeof supervisor.agent.toolkit.tools, LanguageModel.LanguageModel>,
-            { prompt: "solve" },
-          ),
-        )
-
+        const events = yield* Stream.runCollect(Agent.stream(supervisor.agent, { prompt: "solve" }))
         const started = events.find((event) => event._tag === "ToolExecutionStarted")
         expect(started?._tag === "ToolExecutionStarted" && started.call.name).toBe("transfer_to_math")
         const completed = events.at(-1)
@@ -186,28 +110,35 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "rejects duplicate Handoff names before the supervisor model is called", () => {
+  ItLayer.make(it, "rejects duplicate registered names", () => {
+    const math = (suffix: string) =>
+      Handoff.register(
+        Agent.make({ name: `math${suffix}` }),
+        modelLayer(() => Stream.make(textDelta("unused"))),
+      )
+    const first = Handoff.register(
+      Agent.make({ name: "math" }),
+      modelLayer(() => Stream.make(textDelta("unused"))),
+    )
+    const second = Handoff.register(
+      Agent.make({ name: "math" }),
+      modelLayer(() => Stream.make(textDelta("unused"))),
+    )
+    void math
     let modelCalls = 0
     return [
-      modelLayer(() => {
-        modelCalls += 1
-        return Stream.make(textDelta("unexpected"))
-      }),
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("unexpected"))
+        }),
+        ToolExecutor.layerToolkit(Handoff.supervisor({ name: "supervisor", specialists: [first, second] }).toolkit),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
       Effect.gen(function* () {
-        const supervisor = Handoff.supervisor({
-          name: "supervisor",
-          specialists: [Agent.make({ name: "math" }), Agent.make({ name: "math" })],
-        })
-
-        const failure = yield* Effect.flip(
-          Stream.runDrain(
-            Agent.stream(
-              supervisor.agent as Agent.Agent<typeof supervisor.agent.toolkit.tools, LanguageModel.LanguageModel>,
-              { prompt: "solve" },
-            ),
-          ),
-        )
-
+        const supervisor = Handoff.supervisor({ name: "supervisor", specialists: [first, second] })
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisor.agent, { prompt: "solve" })))
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
             name: "transfer_to_math",
@@ -222,15 +153,12 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "fans out child agents with bounded concurrency and ordered results", () => {
+  ItLayer.make(it, "fans out registered agents with bounded concurrency and ordered results", () => {
     let active = 0
     let maxActive = 0
     const children = Array.from({ length: 6 }, (_, index) => ({
-      agent: Agent.make({ name: `child-${index}` }),
-      prompt: `task ${index}`,
-    }))
-    return [
-      Layer.mergeAll(
+      registration: Handoff.register(
+        Agent.make({ name: `child-${index}` }),
         modelLayer((options) =>
           Stream.unwrap(
             Effect.gen(function* () {
@@ -244,13 +172,13 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
             }),
           ),
         ),
-        ToolExecutor.layerTest({ execute: () => Effect.die("fanOut children should not execute tools") }),
-        Approvals.layerAutoApprove,
-        ModelMiddleware.layerIdentity,
       ),
+      prompt: `task ${index}`,
+    }))
+    return [
+      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
       Effect.gen(function* () {
         const results = yield* Handoff.fanOut(children)
-
         expect(results.map((result) => result.text)).toEqual([
           "done task 0",
           "done task 1",
@@ -264,23 +192,15 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
     ] as const
   })
 
-  ItLayer.make(it, "propagates fanOut child run errors", () => {
-    const child = Agent.make({ name: "failing-child" })
-    const modelError = AiError.make({
-      module: "HandoffTest",
-      method: "streamText",
-      reason: AiError.UnknownError.make({ description: "child failed" }),
-    })
+  ItLayer.make(it, "propagates registered run errors", () => {
+    const child = Handoff.register(
+      Agent.make({ name: "failing-child" }),
+      modelLayer(() => Stream.fail(new Error("child failed") as never)),
+    )
     return [
-      Layer.mergeAll(
-        modelLayer(() => Stream.fail(modelError)),
-        ToolExecutor.layerTest({ execute: () => Effect.die("fanOut failure should not execute tools") }),
-        Approvals.layerAutoApprove,
-        ModelMiddleware.layerIdentity,
-      ),
+      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
       Effect.gen(function* () {
-        const failure = yield* Effect.flip(Handoff.fanOut([{ agent: child, prompt: "fail" }]))
-
+        const failure = yield* Effect.flip(Handoff.fanOut([{ registration: child, prompt: "fail" }]))
         expect(failure._tag).toBe("@batonfx/core/AgentError")
       }),
     ] as const

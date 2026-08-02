@@ -7470,18 +7470,8 @@
     },
     {
       "source": "packages/core/test/handoff.test.ts",
-      "specifier": "./json",
-      "target": "packages/core/test/json.ts"
-    },
-    {
-      "source": "packages/core/test/handoff.test.ts",
       "specifier": "./provider-finish",
       "target": "packages/core/test/provider-finish.ts"
-    },
-    {
-      "source": "packages/core/test/handoff.test.ts",
-      "specifier": "./tool-handler-layer",
-      "target": "packages/core/test/tool-handler-layer.ts"
     },
     {
       "source": "packages/core/test/handoff.test.ts",

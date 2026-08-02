@@ -157,7 +157,7 @@ const executeWithClosedSet = <R>(
     return toolResultCodec.encodeDomainCandidate(tool, error)
   }
   return toolResultCodec.decodeInput(tool, request.call.params).pipe(
-    Effect.flatMap(() => toolkit.invoke(request.call.name, request.call.params)),
+    Effect.flatMap((params) => toolkit.invoke(request.call.name, params)),
     Effect.flatMap((result) => toolResultCodec.decodeSuccess(tool, result)),
     Effect.catchIf(() => true, handleFailure, handleFailure),
   )

@@ -89,7 +89,7 @@ export const multiAgent = definePage({
     h2("fan-out-child-runs", "1. Fan out child runs"),
     p(
       code("Handoff.fanOut"),
-      " runs isolated child agents concurrently with ",
+      " runs registered child agents concurrently with ",
       code("Effect.forEach"),
       " semantics: bounded concurrency (default 4) and results in input order. It is not a tool boundary, so child failures propagate to the caller as run errors.",
     ),
@@ -106,8 +106,8 @@ export const multiAgent = definePage({
     codeBlock({ label: "supervisor.ts", source: supervisor, expectedOutput: supervisorExpected }),
     callout(
       "info",
-      "Services are ambient; run options are not",
-      "Child runs execute in the current Effect Context: an unpinned child sees the ambient model, and the executor, approvals, and middleware remain visible unless overridden. A model-selected child resolves through the ambient ModelRegistry. No parent sessionId, persistence chat ID, transport runId, queue position, or separate scheduling policy is copied into the child call.",
+      "Registrations close services",
+      "Register each specialist with Handoff.register(agent, layer) before passing it to fan-out or a supervisor. The registration provides the agent's required services and maps layer-construction failures to RegistrationError; run options remain explicit and are forwarded unchanged.",
     ),
     h2("expose-an-agent-as-a-tool", "3. Expose an agent as a tool"),
     p(

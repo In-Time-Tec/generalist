@@ -291,6 +291,8 @@ const applyEvent = (model: Model, event: Wire.LooseEventType): readonly [Model, 
       const flushed = flushStreaming(model)
       return [{ ...flushed, run: Idle() }, Option.some(RunCompleted({ text: event.text }))]
     }
+    default:
+      return [model, Option.none()]
   }
 }
 

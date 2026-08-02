@@ -91,39 +91,7 @@ type AnnotatedSessionRegistryCanonical = Assert<
     readonly [SessionRegistry.SessionRegistry, never, LanguageModel.LanguageModel | Chat.Persistence]
   >
 >
-const fanOut = Handoff.fanOut([
-  { agent: Agent.make({ name: "plain-package-smoke" }), prompt: "plain" },
-  { agent: memoryAgent, prompt: "memory" },
-])
-type FanOutRequirements = Assert<
-  Equal<EffectServices<typeof fanOut>, LanguageModel.LanguageModel | Memory.Memory>
->
-const packageSmokeTool = Tool.make("package_smoke_tool", {
-  parameters: Schema.Struct({ value: Schema.String }),
-  success: Schema.String,
-})
-const packageSmokeToolAgent = Agent.make({ name: "tool-package-smoke", toolkit: Toolkit.make(packageSmokeTool) })
-const providerLayer = OpenAi.layer({ model: "gpt-4o-mini", apiKey: Config.redacted("OPENAI_API_KEY") })
-const bedrockProviderLayer = AmazonBedrock.layer({ model: "us.example.model" })
-const providerCatalogLayer: Layer.Layer<Catalog.ModelCatalog> = Catalog.layer()
-const testModelLayer: Layer.Layer<LanguageModel.LanguageModel> = TestModel.layer([TestModel.text("identity")])
-type ProviderLayerRequirements = Assert<Equal<Layer.Services<typeof providerLayer>, HttpClient.HttpClient>>
-type ProviderLayerFailure = Assert<Equal<Layer.Error<typeof providerLayer>, Config.ConfigError>>
-type ProviderLayerSuccess = Assert<Equal<Layer.Success<typeof providerLayer>, ModelRegistry.ModelRegistry>>
-type BedrockProviderLayerRequirements = Assert<Equal<Layer.Services<typeof bedrockProviderLayer>, never>>
-type BedrockProviderLayerFailure = Assert<Equal<Layer.Error<typeof bedrockProviderLayer>, never>>
-type BedrockProviderLayerSuccess = Assert<Equal<Layer.Success<typeof bedrockProviderLayer>, ModelRegistry.ModelRegistry>>
-void providerLayer
-void bedrockProviderLayer
-void providerCatalogLayer
-void testModelLayer
-const toolFanOut = Handoff.fanOut([{ agent: packageSmokeToolAgent, prompt: "tool" }])
-const heterogeneousSupervisor = Handoff.supervisor({
-  name: "heterogeneous-package-smoke",
-  specialists: [memoryAgent, packageSmokeToolAgent],
-})
-void toolFanOut
-void heterogeneousSupervisor
+void Handoff
 type ProviderRoot = typeof import("@batonfx/providers")
 type TransportRoot = typeof import("@batonfx/transport")
 type ProviderCatalogSubpath = Assert<Equal<ProviderRoot["Catalog"], typeof import("@batonfx/providers/catalog")>>

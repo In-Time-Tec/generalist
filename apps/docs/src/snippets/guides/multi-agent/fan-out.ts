@@ -13,15 +13,14 @@ const modelLayer = Layer.effect(
 )
 
 const children = [
-  { agent: Agent.make({ name: "planner" }), prompt: "Plan the work" },
-  { agent: Agent.make({ name: "reviewer" }), prompt: "Review the work" },
+  { registration: Handoff.register(Agent.make({ name: "planner" }), modelLayer), prompt: "Plan the work" },
+  { registration: Handoff.register(Agent.make({ name: "reviewer" }), modelLayer), prompt: "Review the work" },
 ]
 
 const program = Handoff.fanOut(children, { concurrency: 2 }).pipe(
   Effect.flatMap((results) => Console.log(results.map((result) => result.text).join("\n"))),
   Effect.provide(
     Layer.mergeAll(
-      modelLayer,
       ToolExecutor.layerTest({ execute: () => Effect.die("fanOut children have no tools") }),
       Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,

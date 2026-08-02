@@ -84,6 +84,30 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     expect(typeof requirementChildTool.invoke).toBe("function")
   })
 
+  ItLayer.make(it, "ToolExecutor decodes closed invocation parameters before invoking", () => {
+    const numericTool = Tool.make("numeric", {
+      parameters: Schema.FiniteFromString,
+      success: Schema.String,
+    })
+    let seen: unknown
+    const toolkit: ToolExecutor.ClosedToolSet = {
+      tools: { numeric: numericTool },
+      invoke: (_name, params) => {
+        seen = params
+        return Effect.succeed("ok")
+      },
+    }
+    return [
+      ToolExecutor.layerToolkit(toolkit),
+      Effect.gen(function* () {
+        const executor = yield* ToolExecutor.ToolExecutor
+        const result = yield* executor.execute(request("numeric", "42"))
+        expect(result).toMatchObject({ _tag: "Success", result: "ok" })
+        expect(seen).toBe(42)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "ToolExecutor.layerToolkit preserves decoded and encoded declared failures", () => {
     const failingTool = Tool.make("failing", {
       parameters: Schema.Struct({}),
@@ -994,6 +1018,45 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         const completed = events.at(-1)
         expect(completed?._tag === "Completed" && completed.text).toBe("parent saw reviewer failure")
         expect(parentCalls).toBe(2)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "runs callbacks without explicit schemas", () => {
+    let parentCalls = 0
+    const parentModel = modelLayer((options) => {
+      if (Json.stringify(options.prompt.content).includes("callback prompt"))
+        return Stream.make(textDelta("callback answer"))
+      parentCalls += 1
+      return parentCalls === 1
+        ? Stream.make(toolCallPart("call-callback", "ask_callback", { prompt: "ignored" }))
+        : Stream.make(textDelta("parent done"))
+    })
+    return [
+      Layer.mergeAll(
+        parentModel,
+        ToolExecutor.layerToolkit(
+          AgentTool.asTool(Agent.make({ name: "callback-child" }), {
+            name: "ask_callback",
+            toPrompt: () => "callback prompt",
+            fromResult: (result) => `mapped:${result.text}`,
+          }),
+        ).pipe(Layer.provide(parentModel)),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const childTool = AgentTool.asTool(Agent.make({ name: "callback-child" }), {
+          name: "ask_callback",
+          toPrompt: () => "callback prompt",
+          fromResult: (result) => `mapped:${result.text}`,
+        })
+        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_callback!) })
+        const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
+        const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
+        expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.result).toBe(
+          "mapped:callback answer",
+        )
       }),
     ] as const
   })

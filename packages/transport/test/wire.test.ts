@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Option, Schema } from "effect"
+import { Effect, Exit, Option, Schema } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentEvent, ModelTelemetry, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import { Wire } from "../src/index"
@@ -12,6 +12,11 @@ const echoTool = Tool.make("echo", {
 })
 
 const toolkit = Toolkit.make(echoTool)
+
+const decodeFixedOption = (activeToolkit: Toolkit.Any, frame: unknown) => {
+  const exit = Effect.runSyncExit(Wire.codec(activeToolkit).decodeServer(JSON.stringify(frame)))
+  return Exit.isSuccess(exit) ? Option.some(exit.value) : Option.none()
+}
 
 const overlappingTool = Tool.make("overlapping", {
   parameters: Schema.Struct({}),
@@ -267,7 +272,7 @@ describe("Wire", () => {
   })
 
   it.each(invalidSequences)("rejects invalid server frame sequence %s", (seq) => {
-    expect(Option.isNone(Schema.decodeUnknownOption(Wire.ServerFrame(toolkit))({ _tag: "Ended", seq }))).toBe(true)
+    expect(Option.isNone(decodeFixedOption(toolkit, { _tag: "Ended", seq }))).toBe(true)
     expect(Option.isNone(Schema.decodeUnknownOption(Wire.LooseServerFrame)({ _tag: "Ended", seq }))).toBe(true)
   })
 
@@ -321,10 +326,10 @@ describe("Wire", () => {
 
   it.effect("strict server frames round-trip every current AgentEvent tag", () =>
     Effect.gen(function* () {
-      const schema = Wire.ServerFrame(toolkit)
+      const codec = Wire.codec(toolkit)
       for (const frame of eventFrames()) {
-        const encoded = yield* Schema.encodeUnknownEffect(schema)(frame)
-        const decoded = yield* Schema.decodeUnknownEffect(schema)(encoded)
+        const encoded = yield* codec.encodeServer(frame)
+        const decoded = yield* codec.decodeServer(encoded)
         expect(decoded._tag).toBe(frame._tag)
         expect(decoded.seq).toBe(frame.seq)
       }
@@ -333,20 +338,23 @@ describe("Wire", () => {
 
   it.effect("model telemetry events round-trip losslessly on strict and loose frames", () =>
     Effect.gen(function* () {
-      const schemas = [Wire.ServerFrame(toolkit), Wire.LooseServerFrame] as const
-      for (const schema of schemas) {
-        for (const frame of telemetryFrames()) {
-          const encoded = yield* Schema.encodeUnknownEffect(schema)(frame)
-          const decoded = yield* Schema.decodeUnknownEffect(schema)(encoded)
-          expect(decoded).toEqual(frame)
-        }
+      const fixedCodec = Wire.codec(toolkit)
+      for (const frame of telemetryFrames()) {
+        const encoded = yield* fixedCodec.encodeServer(frame)
+        const decoded = yield* fixedCodec.decodeServer(encoded)
+        expect(decoded).toEqual(frame)
+        const looseEncoded = yield* Schema.encodeUnknownEffect(Schema.fromJsonString(Wire.LooseServerFrame))(frame)
+        const looseDecoded = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Wire.LooseServerFrame))(
+          looseEncoded,
+        )
+        expect(looseDecoded).toEqual(frame)
       }
     }),
   )
 
   it.effect("model telemetry events keep absent optional metadata absent across the wire", () =>
     Effect.gen(function* () {
-      const schema = Wire.ServerFrame(toolkit)
+      const codec = Wire.codec(toolkit)
       const frame: Wire.ServerFrameType = {
         _tag: "Event",
         seq: 0,
@@ -363,8 +371,8 @@ describe("Wire", () => {
           finishReason: "stop",
         },
       }
-      const encoded = yield* Schema.encodeUnknownEffect(schema)(frame)
-      const decoded = yield* Schema.decodeUnknownEffect(schema)(encoded)
+      const encoded = yield* codec.encodeServer(frame)
+      const decoded = yield* codec.decodeServer(encoded)
       expect(decoded).toEqual(frame)
       expect(decoded._tag === "Event" && "requestId" in decoded.event).toBe(false)
       expect(decoded._tag === "Event" && "cost" in decoded.event).toBe(false)
@@ -373,7 +381,7 @@ describe("Wire", () => {
 
   it.effect("strict failed tool results use the declared failure encoding when decoded schemas overlap", () =>
     Effect.gen(function* () {
-      const schema = Wire.ServerFrame(overlappingToolkit)
+      const codec = Wire.codec(overlappingToolkit)
       const call = Response.makePart("tool-call", {
         id: "overlap-1",
         name: "overlapping",
@@ -395,10 +403,10 @@ describe("Wire", () => {
         event: { _tag: "ToolExecutionCompleted", turn: 0, call, result },
       }
 
-      const encoded = yield* Schema.encodeUnknownEffect(schema)(frame)
-      const decoded = yield* Schema.decodeUnknownEffect(schema)(encoded)
+      const encoded = yield* codec.encodeServer(frame)
+      const decoded = yield* codec.decodeServer(encoded)
 
-      expect(encoded).toMatchObject({ event: { result: { isFailure: true, result: 409 } } })
+      expect(JSON.parse(encoded)).toMatchObject({ event: { result: { isFailure: true, result: 409 } } })
       expect(decoded).toMatchObject({
         event: { result: { isFailure: true, result: 409, encodedResult: 409 } },
       })
@@ -407,7 +415,7 @@ describe("Wire", () => {
 
   it.effect("encodes non-suspension run failures and suspension terminals separately", () =>
     Effect.gen(function* () {
-      const schema = Wire.ServerFrame(toolkit)
+      const codec = Wire.codec(toolkit)
       const failures: ReadonlyArray<Wire.RunFailure> = [
         AgentEvent.AgentError.make({ message: "boom", turn: 0 }),
         AgentEvent.ResumeMismatch.make({
@@ -444,17 +452,16 @@ describe("Wire", () => {
       ]
 
       for (const error of failures) {
-        const jsonSchema = Schema.fromJsonString(schema)
-        const encoded = yield* Schema.encodeUnknownEffect(jsonSchema)({ _tag: "Failed", seq: 10, error })
-        const decoded = yield* Schema.decodeUnknownEffect(jsonSchema)(encoded)
+        const encoded = yield* codec.encodeServer({ _tag: "Failed", seq: 10, error })
+        const decoded = yield* codec.decodeServer(encoded)
         expect(decoded._tag).toBe("Failed")
 
-        const statusEncoded = yield* Schema.encodeUnknownEffect(schema)({
+        const statusEncoded = yield* codec.encodeServer({
           _tag: "SessionStatus",
           seq: 11,
           status: { _tag: "Failed", error },
         })
-        const statusDecoded = yield* Schema.decodeUnknownEffect(schema)(statusEncoded)
+        const statusDecoded = yield* codec.decodeServer(statusEncoded)
         expect(statusDecoded).toMatchObject({ _tag: "SessionStatus", status: { _tag: "Failed" } })
       }
 
@@ -473,11 +480,14 @@ describe("Wire", () => {
           }),
         ],
       })
-      const suspended = yield* Schema.decodeUnknownEffect(schema)({ _tag: "Suspended", seq: 11, suspension })
+      const suspendedEncoded = yield* codec.encodeServer({ _tag: "Suspended", seq: 11, suspension })
+      const suspended = yield* codec.decodeServer(suspendedEncoded)
       expect(suspended._tag).toBe("Suspended")
-      expect(Option.isNone(Schema.decodeUnknownOption(schema)({ _tag: "Failed", seq: 12, error: suspension }))).toBe(
-        true,
-      )
+      expect(
+        Exit.isFailure(
+          Effect.runSyncExit(codec.decodeServer(JSON.stringify({ _tag: "Failed", seq: 12, error: suspension }))),
+        ),
+      ).toBe(true)
     }),
   )
 
@@ -495,13 +505,20 @@ describe("Wire", () => {
       },
     }
 
-    expect(Option.isNone(Schema.decodeUnknownOption(Wire.ServerFrame(toolkit))(unknownToolFrame))).toBe(true)
+    expect(Option.isNone(decodeFixedOption(toolkit, unknownToolFrame))).toBe(true)
     const decoded = Schema.decodeUnknownSync(Wire.LooseServerFrame)(unknownToolFrame)
-    expect(decoded._tag === "Event" && decoded.event._tag === "ModelPart" && decoded.event.part.type).toBe("tool-call")
+    expect(
+      decoded._tag === "Event" &&
+        decoded.event._tag === "ModelPart" &&
+        typeof decoded.event.part === "object" &&
+        decoded.event.part !== null &&
+        "type" in decoded.event.part &&
+        decoded.event.part.type,
+    ).toBe("tool-call")
   })
 
   it("strict frames reject missing tool names and invalid fixed-tool payloads", () => {
-    const schema = Wire.ServerFrame(toolkit)
+    const codec = Wire.codec(toolkit)
     const invalidEvents = [
       {
         _tag: "ToolExecutionStarted",
@@ -528,7 +545,9 @@ describe("Wire", () => {
     ]
 
     for (const event of invalidEvents) {
-      expect(Option.isNone(Schema.decodeUnknownOption(schema)({ _tag: "Event", seq: 0, event }))).toBe(true)
+      expect(
+        Exit.isFailure(Effect.runSyncExit(codec.decodeServer(JSON.stringify({ _tag: "Event", seq: 0, event })))),
+      ).toBe(true)
     }
   })
 
@@ -649,12 +668,16 @@ describe("Wire", () => {
   )
 
   it("accepts stripped transcripts on completed events", () => {
-    const schema = Wire.ServerFrame(toolkit)
-    const decoded = Schema.decodeUnknownSync(schema)({
-      _tag: "Event",
-      seq: 0,
-      event: { _tag: "Completed", turns: 1, text: "done" },
-    })
+    const codec = Wire.codec(toolkit)
+    const decoded = Effect.runSync(
+      codec.decodeServer(
+        JSON.stringify({
+          _tag: "Event",
+          seq: 0,
+          event: { _tag: "Completed", turns: 1, text: "done" },
+        }),
+      ),
+    )
     expect(decoded._tag === "Event" && decoded.event._tag === "Completed" && decoded.event.transcript).toBeUndefined()
   })
 })
