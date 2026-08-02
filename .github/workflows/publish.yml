@@ -245,6 +245,10 @@ jobs:
             grep -Fxq "${digest}  ${filename}" SHA256SUMS
           done < <(jq -r '.packages[] | [.filename, .sha256] | @tsv' release-evidence.json)
           publish_args=(--access public)
+          latest_version=$(npm view @batonfx/core version 2>/dev/null || true)
+          if [[ -n "$latest_version" ]] && [[ "$(printf '%s\n' "$latest_version" "$VERSION" | sort -V | tail -1)" == "$latest_version" ]] && [[ "$latest_version" != "$VERSION" ]]; then
+            publish_args+=(--tag "patch-$(printf '%s' "$VERSION" | cut -d. -f1-2 | tr . -)")
+          fi
           if [[ "$NPM_PROVENANCE_SUPPORTED" == true ]]; then
             publish_args+=(--provenance)
           else
