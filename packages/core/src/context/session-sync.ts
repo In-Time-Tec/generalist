@@ -1,4 +1,4 @@
-import { Equal, Schema } from "effect"
+import { Equal, Option, Schema } from "effect"
 import { dual } from "effect/Function"
 import { Prompt } from "effect/unstable/ai"
 
@@ -82,8 +82,10 @@ const canonicalValue = (value: unknown): unknown => {
   if (value instanceof Uint8Array) return Array.from(value)
   if (Array.isArray(value)) return value.map(canonicalValue)
   if (value !== null && typeof value === "object") {
+    const record = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))(value)
+    if (Option.isNone(record)) return value
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
+      Object.entries(record.value)
         .filter(([, item]) => item !== undefined)
         .toSorted(([left], [right]) => left.localeCompare(right))
         .map(([key, item]) => [key, canonicalValue(item)]),

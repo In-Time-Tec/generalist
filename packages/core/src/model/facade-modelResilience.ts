@@ -34,5 +34,7 @@ export namespace ModelResilience {
   export type apply = typeof import("./model-resilience.js").apply
   export type defaultResolveFailure = typeof import("./model-resilience.js").defaultResolveFailure
   export type Classification = import("./model-resilience.js").Classification
+  export type FailureInput = import("./model-resilience.js").FailureInput
+  export type FailureResolver = import("./model-resilience.js").FailureResolver
   export type Interface = import("./model-resilience.js").Interface
 }

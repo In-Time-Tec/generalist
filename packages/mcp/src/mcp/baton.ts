@@ -35,7 +35,7 @@ export interface BatonTools {
  * @experimental
  */
 export const toolkit = (source: Interface): Effect.Effect<Toolkit.Toolkit<Record<string, McpAiTool>>> =>
-  source.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools) as Toolkit.Toolkit<Record<string, McpAiTool>>))
+  source.aiTools.pipe(Effect.map((tools) => Toolkit.make(...tools)))
 
 const toolFailure = (server: string, tool: string, message: string): McpToolFailure => ({
   _tag: "@batonfx/mcp/McpToolCallFailed",

@@ -28,8 +28,6 @@ import { Runtime } from "./agent-persistence-lock.js"
 import { activateSkillTool, skillListingBudgetTokens } from "./agent-skill-tool.js"
 import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "./agent-suspension.js"
 import { skillListingsInstructions } from "./agent-message.js"
-import { emptyAgentRunResources } from "./agent-run-resources.js"
-
 type StaticDeclaration = { readonly origin: import("./agent-event.js").ToolOrigin; readonly tool: Tool.Any }
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -405,7 +403,6 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
           ? Chat.fromPrompt([Prompt.makeMessage("system", { content: system })])
           : Chat.empty
     const chat: Chat.Service = resumeChat ?? persisted ?? (yield* freshChat)
-    const runResources = emptyAgentRunResources(chat, yield* Effect.scope)
     return {
       persistenceOptions,
       resume,
@@ -466,6 +463,5 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       seedSystem,
       freshChat,
       chat,
-      runResources,
     }
   })

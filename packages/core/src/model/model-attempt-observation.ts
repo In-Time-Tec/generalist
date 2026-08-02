@@ -142,7 +142,7 @@ export const tapRetryTelemetry = (context: RetryContext): Resilience => ({
   ...(context.resilience.streamIdleTimeout === undefined
     ? {}
     : { streamIdleTimeout: context.resilience.streamIdleTimeout }),
-  retrySchedule: (context.resilience.retrySchedule as Schedule.Schedule<unknown, unknown>).pipe(
+  retrySchedule: context.resilience.retrySchedule.pipe(
     Schedule.while(({ input }) => context.classify(input) === "transient"),
     Schedule.tap((metadata) =>
       Effect.flatMap(Clock.currentTimeMillis, (at) =>
@@ -158,5 +158,5 @@ export const tapRetryTelemetry = (context: RetryContext): Resilience => ({
         }),
       ),
     ),
-  ) as Schedule.Schedule<unknown>,
+  ),
 })

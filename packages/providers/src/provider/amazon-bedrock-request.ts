@@ -65,11 +65,22 @@ const fileBlock = Effect.fnUntraced(function* (part: {
   return { document: { format: document, name, source: { bytes: source } } } satisfies ContentBlock
 })
 
+const toDocument = (value: unknown): DocumentType => {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value
+  }
+  if (Array.isArray(value)) return value.map(toDocument)
+  if (typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, toDocument(item)]))
+  }
+  return null
+}
+
 const jsonSchema = (schema: Schema.Top): DocumentType => {
   const document = Schema.toJsonSchemaDocument(schema)
-  return (
-    document.definitions !== undefined ? { ...document.schema, $defs: document.definitions } : document.schema
-  ) as DocumentType
+  return toDocument(
+    document.definitions === undefined ? document.schema : { ...document.schema, $defs: document.definitions },
+  )
 }
 
 const tools = (options: LanguageModel.ProviderOptions): ToolConfiguration | undefined => {
@@ -98,7 +109,7 @@ const tools = (options: LanguageModel.ProviderOptions): ToolConfiguration | unde
             toolSpec: {
               name: tool.name,
               ...(description === undefined ? {} : { description }),
-              inputSchema: { json: Tool.getJsonSchema(tool) as DocumentType },
+              inputSchema: { json: toDocument(Tool.getJsonSchema(tool)) },
             },
           }
         })
@@ -127,8 +138,7 @@ export const makeRequest = Effect.fnUntraced(function* (input: Input, options: L
     if (previous?.role === role) previous.content?.push(...content)
     else messages.push({ role, content })
   }
-  for (let messageIndex = 0; messageIndex < options.prompt.content.length; messageIndex++) {
-    const message = options.prompt.content[messageIndex]!
+  for (const [messageIndex, message] of options.prompt.content.entries()) {
     if (message.role === "system") {
       if (sawConversation) return yield* fail("system messages must precede conversation messages")
       system.push({ text: message.content })
@@ -137,8 +147,7 @@ export const makeRequest = Effect.fnUntraced(function* (input: Input, options: L
     }
     sawConversation = true
     const content: Array<ContentBlock> = []
-    for (let partIndex = 0; partIndex < message.content.length; partIndex++) {
-      const part = message.content[partIndex]!
+    for (const [partIndex, part] of message.content.entries()) {
       if (part.type === "text") {
         const finalPrefill =
           message.role === "assistant" &&
@@ -158,7 +167,7 @@ export const makeRequest = Effect.fnUntraced(function* (input: Input, options: L
         )
         if (hasCachePoint(part.options)) content.push({ cachePoint: { type: "default" } })
       } else if (part.type === "tool-call")
-        content.push({ toolUse: { toolUseId: part.id, name: part.name, input: part.params as DocumentType } })
+        content.push({ toolUse: { toolUseId: part.id, name: part.name, input: toDocument(part.params) } })
       else if (part.type === "tool-result") {
         const result = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(part.result).pipe(
           Effect.mapError(() => fail(`tool '${part.name}' returned a non-JSON result`)),
@@ -193,11 +202,11 @@ export const makeRequest = Effect.fnUntraced(function* (input: Input, options: L
     append(message.role === "assistant" ? "assistant" : "user", content)
   }
   const config: Config = input.config ?? {}
-  const additional = (
+  const additionalInput =
     options.responseFormat.type === "json" && config.additionalModelRequestFields !== undefined
       ? Object.fromEntries(Object.entries(config.additionalModelRequestFields).filter(([key]) => key !== "thinking"))
       : config.additionalModelRequestFields
-  ) as DocumentType | undefined
+  const additional = additionalInput === undefined ? undefined : toDocument(additionalInput)
   const toolConfig = tools(options)
   return {
     modelId: input.model,

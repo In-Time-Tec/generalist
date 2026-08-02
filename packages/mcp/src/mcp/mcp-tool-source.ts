@@ -91,17 +91,15 @@ const connectionError = (server: string, error: unknown): McpConnectionFailed | 
 const sanitizedConnectionError = (server: string): McpConnectionFailed =>
   McpConnectionFailed.make({ server, message: "MCP connection failed" })
 
+const textContent = Schema.Struct({ type: Schema.Literal("text"), text: Schema.String })
+
 const joinedText = (content: unknown): string => {
   if (!Array.isArray(content)) return ""
   return content
-    .filter(
-      (part): part is { readonly type: "text"; readonly text: string } =>
-        typeof part === "object" &&
-        part !== null &&
-        (part as { type?: unknown }).type === "text" &&
-        typeof (part as { text?: unknown }).text === "string",
-    )
-    .map((part) => part.text)
+    .flatMap((part) => {
+      const decoded = Schema.decodeUnknownOption(textContent)(part)
+      return Option.isSome(decoded) ? [decoded.value.text] : []
+    })
     .join("\n")
 }
 
@@ -126,13 +124,22 @@ const discoveredTool = (
     })),
   )
 
-const callArguments = (input: JsonValue): Record<string, unknown> | undefined =>
-  typeof input === "object" && input !== null && !Array.isArray(input) ? (input as Record<string, unknown>) : undefined
+const jsonObject = Schema.Record(Schema.String, Schema.Unknown)
+
+const callArguments = (input: JsonValue): Record<string, unknown> | undefined => {
+  const decoded = Schema.decodeUnknownOption(jsonObject)(input)
+  return Option.isSome(decoded) ? decoded.value : undefined
+}
+
+const asJsonSchema = (value: JsonValue): JsonSchema => {
+  const decoded = Schema.decodeUnknownOption(jsonObject)(value)
+  return Option.isSome(decoded) ? decoded.value : {}
+}
 
 const aiToolFromDiscovered = (tool: DiscoveredTool): McpAiTool =>
   Tool.dynamic(tool.name, {
     description: tool.description,
-    parameters: tool.inputSchema as JsonSchema,
+    parameters: asJsonSchema(tool.inputSchema),
     success: Schema.Unknown,
     failure: McpToolFailure,
     failureMode: "return",

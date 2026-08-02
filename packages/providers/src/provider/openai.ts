@@ -412,7 +412,7 @@ const withAccountHeaderRedaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.updateService(Headers.CurrentRedactedNames, (names) => [...names, openAiAccountIdHeader]))
 
 const withoutOpenAiSocket = <A, E>(effect: Effect.Effect<A, E>) =>
-  effect.pipe(Effect.provideService(OpenAiClient.OpenAiSocket, null as never))
+  effect.pipe(Effect.provideService(OpenAiClient.OpenAiSocket, undefined!))
 
 const openAiAccountClientLayer = (credentials: OpenAiAccountCredentials) =>
   Layer.effect(

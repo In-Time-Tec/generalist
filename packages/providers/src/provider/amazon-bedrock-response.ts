@@ -1,5 +1,5 @@
 import type { ConverseCommandOutput, ConverseStreamOutput, TokenUsage } from "@aws-sdk/client-bedrock-runtime"
-import { Effect, Encoding, Schema, Stream } from "effect"
+import { Effect, Encoding, Option, Schema, Stream } from "effect"
 import { AiError, Response, Tool } from "effect/unstable/ai"
 
 const invalidOutput = (description: string) =>
@@ -31,18 +31,32 @@ const usage = (value: TokenUsage | undefined) => ({
   outputTokens: { total: value?.outputTokens, text: undefined, reasoning: undefined },
 })
 
-const finishMetadata = (response: ConverseCommandOutput) => ({
-  amazonBedrock: {
-    ...(response.metrics?.latencyMs === undefined ? {} : { metrics: { latencyMs: response.metrics.latencyMs } }),
-    ...(response.trace === undefined ? {} : { trace: response.trace as Schema.Json }),
-    ...(response.additionalModelResponseFields === undefined
-      ? {}
-      : { additionalModelResponseFields: response.additionalModelResponseFields as Schema.Json }),
-    ...(response.performanceConfig === undefined
-      ? {}
-      : { performanceConfig: response.performanceConfig as Schema.Json }),
-  },
+const json = (value: unknown): Schema.Json | undefined =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(Schema.Json)(value))
+
+const bedrockMetadata = Schema.Struct({
+  metrics: Schema.optionalKey(Schema.Struct({ latencyMs: Schema.optionalKey(Schema.Number) })),
+  trace: Schema.optionalKey(Schema.Json),
+  additionalModelResponseFields: Schema.optionalKey(Schema.Json),
+  performanceConfig: Schema.optionalKey(Schema.Json),
 })
+
+const decodeBedrockMetadata = (value: unknown): typeof bedrockMetadata.Type | undefined =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(bedrockMetadata)(value))
+
+const finishMetadata = (response: ConverseCommandOutput) => {
+  const trace = json(response.trace)
+  const additionalModelResponseFields = json(response.additionalModelResponseFields)
+  const performanceConfig = json(response.performanceConfig)
+  return {
+    amazonBedrock: {
+      ...(response.metrics?.latencyMs === undefined ? {} : { metrics: { latencyMs: response.metrics.latencyMs } }),
+      ...(trace === undefined ? {} : { trace }),
+      ...(additionalModelResponseFields === undefined ? {} : { additionalModelResponseFields }),
+      ...(performanceConfig === undefined ? {} : { performanceConfig }),
+    },
+  }
+}
 
 /** @experimental */
 export const responseParts = (
@@ -169,9 +183,10 @@ export const streamParts = (
     }
     if (event.contentBlockStop !== undefined) {
       const index = event.contentBlockStop.contentBlockIndex
-      const block = index === undefined ? undefined : blocks.get(index)
+      if (index === undefined) throw invalidOutput("Bedrock stopped an unknown content block")
+      const block = blocks.get(index)
       if (block === undefined) throw invalidOutput("Bedrock stopped an unknown content block")
-      blocks.delete(index!)
+      blocks.delete(index)
       if (block.type === "text") return [{ type: "text-end", id: block.id }]
       if (block.type === "reasoning") return [{ type: "reasoning-end", id: block.id }]
       if (structuredOutputName === block.name) return [{ type: "text-end", id: block.id }]
@@ -187,35 +202,33 @@ export const streamParts = (
       ]
     }
     if (event.messageStop !== undefined) {
-      stop = {
-        reason: event.messageStop.stopReason,
-        ...(event.messageStop.additionalModelResponseFields === undefined
-          ? {}
-          : { additional: event.messageStop.additionalModelResponseFields as Schema.Json }),
-      }
+      const additional = json(event.messageStop.additionalModelResponseFields)
+      stop =
+        additional === undefined
+          ? { reason: event.messageStop.stopReason }
+          : { reason: event.messageStop.stopReason, additional }
       return []
     }
     if (event.metadata !== undefined) {
       if (stop === undefined) throw invalidOutput("Bedrock sent metadata before message stop")
       finished = true
+      const trace = json(event.metadata.trace)
+      const performanceConfig = json(event.metadata.performanceConfig)
+      const amazonBedrock = decodeBedrockMetadata({
+        ...(event.metadata.metrics?.latencyMs === undefined
+          ? {}
+          : { metrics: { latencyMs: event.metadata.metrics.latencyMs } }),
+        ...(trace === undefined ? {} : { trace }),
+        ...(performanceConfig === undefined ? {} : { performanceConfig }),
+        ...(stop.additional === undefined ? {} : { additionalModelResponseFields: stop.additional }),
+      })
       return [
         {
           type: "finish",
           reason: finishReason(stop.reason),
           usage: usage(event.metadata.usage),
           response: undefined,
-          metadata: {
-            amazonBedrock: {
-              ...(event.metadata.metrics?.latencyMs === undefined
-                ? {}
-                : { metrics: { latencyMs: event.metadata.metrics.latencyMs } }),
-              ...(event.metadata.trace === undefined ? {} : { trace: event.metadata.trace as Schema.Json }),
-              ...(event.metadata.performanceConfig === undefined
-                ? {}
-                : { performanceConfig: event.metadata.performanceConfig as Schema.Json }),
-              ...(stop.additional === undefined ? {} : { additionalModelResponseFields: stop.additional }),
-            },
-          },
+          ...(amazonBedrock === undefined ? {} : { metadata: { amazonBedrock } }),
         },
       ]
     }

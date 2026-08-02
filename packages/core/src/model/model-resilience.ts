@@ -103,7 +103,7 @@ const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: 
         : Effect.fail(reason.error)
     }),
     Effect.retry({
-      schedule: resilience.retrySchedule as Schedule.Schedule<unknown, E>,
+      schedule: resilience.retrySchedule,
       while: (error) => resilience.classify(error) === "transient",
     }),
     Effect.flatMap((result) =>
@@ -112,9 +112,7 @@ const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: 
   )
 
 const retryStreamSchedule = (resilience: Interface): Schedule.Schedule<unknown, unknown> =>
-  resilience.retrySchedule.pipe(
-    Schedule.while(({ input }) => resilience.classify(input) === "transient"),
-  ) as Schedule.Schedule<unknown, unknown>
+  resilience.retrySchedule.pipe(Schedule.while(({ input }) => resilience.classify(input) === "transient"))
 
 const retryStream = <A, E, R>(
   stream: () => Stream.Stream<A, E, R>,
@@ -165,18 +163,17 @@ export const apply: {
   (model: LanguageModel.Service, resilience: Interface): LanguageModel.Service =>
     ({
       ...model,
-      generateText: ((options: never) =>
+      generateText: (options: LanguageModel.GenerateTextOptions<{}>) =>
         Effect.flatMap(validate(resilience), (validated) =>
           retryEffect(
             () =>
-              model
-                .generateText(options)
-                .pipe(
-                  Effect.flatMap((response) => promoteResponseFailure(response, "generateText", validated.resolve)),
-                ),
+              (options.toolkit === undefined
+                ? model.generateText({ ...options, toolkit: undefined })
+                : model.generateText({ ...options, toolkit: options.toolkit })
+              ).pipe(Effect.flatMap((response) => promoteResponseFailure(response, "generateText", validated.resolve))),
             validated,
           ),
-        )) as unknown as LanguageModel.Service["generateText"],
+        ),
       generateObject: (<
         ObjectEncoded extends Record<string, unknown>,
         StructuredOutputSchema extends Schema.Codec<unknown, ObjectEncoded, unknown, unknown>,
@@ -194,19 +191,25 @@ export const apply: {
             validated,
           ),
         )
-      }) as unknown as LanguageModel.Service["generateObject"],
-      streamText: ((options: never) =>
+      }) as LanguageModel.Service["generateObject"],
+      streamText: (options: LanguageModel.GenerateTextOptions<{}>) =>
         Stream.unwrap(
           validate(resilience).pipe(
             Effect.map((validated) =>
               retryStream(
-                () => promoteStreamFailures(model.streamText(options), validated.resolve),
+                () =>
+                  promoteStreamFailures(
+                    options.toolkit === undefined
+                      ? model.streamText({ ...options, toolkit: undefined })
+                      : model.streamText({ ...options, toolkit: options.toolkit }),
+                    validated.resolve,
+                  ),
                 (error) => Response.makePart("error", { error }),
                 validated,
                 (part: Response.StreamPart<never>) => part.type !== "response-metadata",
               ),
             ),
           ),
-        )) as unknown as LanguageModel.Service["streamText"],
+        ),
     }) as LanguageModel.Service,
 )

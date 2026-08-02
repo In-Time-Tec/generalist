@@ -58,7 +58,7 @@ type ProgramCommand = Command<Message, never, Connection.AgentConnection>
 
 const asProgramCommands = (
   commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
-): ReadonlyArray<ProgramCommand> => commands as unknown as ReadonlyArray<ProgramCommand>
+): ReadonlyArray<ProgramCommand> => commands as ReadonlyArray<ProgramCommand>
 
 export const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
   switch (message._tag) {

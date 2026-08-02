@@ -1,4 +1,4 @@
-import { Effect, Function, Stream } from "effect"
+import { Effect, Function, Schema, Stream } from "effect"
 import { AiError, Response } from "effect/unstable/ai"
 
 /** @experimental */
@@ -24,10 +24,18 @@ const failureDescription = (error: unknown): string => {
   if (typeof error !== "object" || error === null || Array.isArray(error)) {
     return "Language model returned an unknown error part"
   }
-  const record = error as Record<string, unknown>
-  const evidence = ["message", "description", "code", "type"]
-    .map((field) => record[field])
-    .filter((value): value is string => typeof value === "string" && value.length > 0)
+  const record = Schema.decodeUnknownOption(
+    Schema.Struct({
+      message: Schema.optionalKey(Schema.String),
+      description: Schema.optionalKey(Schema.String),
+      code: Schema.optionalKey(Schema.String),
+      type: Schema.optionalKey(Schema.String),
+    }),
+  )(error)
+  if (record._tag === "None") return "Language model returned an unknown error part"
+  const evidence = [record.value.message, record.value.description, record.value.code, record.value.type].filter(
+    (value): value is string => value !== undefined && value.length > 0,
+  )
   return evidence.length === 0 ? "Language model returned an unknown error part" : bounded(evidence.join(" "))
 }
 

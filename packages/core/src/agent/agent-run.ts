@@ -100,7 +100,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         memoryRuntime,
         seedSystem,
         chat,
-        runResources,
       } = setup
       const savePersisted = (turn: number): Effect.Effect<void, AgentError> =>
         persisted === undefined
@@ -113,8 +112,8 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         pending: ReadonlyArray<PendingToolResult>,
       ): Effect.Effect<Prompt.Prompt, AgentError> =>
         pending.length === 0
-          ? Ref.get(runResources.chat.history)
-          : Ref.updateAndGet(runResources.chat.history, (history: Prompt.Prompt) =>
+          ? Ref.get(chat.history)
+          : Ref.updateAndGet(chat.history, (history: Prompt.Prompt) =>
               Prompt.concat(history, Prompt.fromResponseParts(pending)),
             ).pipe(Effect.tap(() => savePersisted(turn)))
       const checkpointSuspended = (

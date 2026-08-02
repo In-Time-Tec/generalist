@@ -10,4 +10,4 @@ export const agent = Agent.make({
   instructions: "Plan briefly, call web_search as needed, then synthesize a cited answer with source URLs.",
   toolkit,
   policy,
-}) as unknown as Agent.Agent<{ readonly web_search: typeof webSearchTool }>
+}) as Agent.Agent<{ readonly web_search: typeof webSearchTool }>

@@ -105,10 +105,10 @@ const LooseToolResultPart = Schema.Struct({
 })
 
 const unionOrNever = (schemas: ReadonlyArray<Schema.Top>): Schema.Top =>
-  schemas.length === 0 ? Schema.Never : Schema.Union(schemas as [Schema.Top, ...Array<Schema.Top>])
+  schemas.length === 0 ? Schema.Never : Schema.Union(schemas)
 
-const toolSchemas = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>) =>
-  Object.values(toolkit.tools) as ReadonlyArray<Tool.Any>
+const toolSchemas = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>): ReadonlyArray<Tool.Any> =>
+  Object.values(toolkit.tools)
 
 const toolCallSchema = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>): Schema.Top =>
   unionOrNever(toolSchemas(toolkit).map((tool) => Response.ToolCallPart(tool.name, tool.parametersSchema)))

@@ -146,12 +146,7 @@ export const validateDecodedToolCall = (
 ): Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters> => {
   const tool = findTool(toolkit, part.name)
   if (tool === undefined) return Effect.fail(invalid(part.name))
-  const schema = Schema.toType(tool.parametersSchema) as unknown as Schema.ConstraintCodec<
-    unknown,
-    unknown,
-    never,
-    never
-  >
+  const schema = Schema.toType(tool.parametersSchema)
   return Schema.decodeUnknownEffect(schema)(part.params).pipe(
     Effect.map((params) => ({ ...part, params })),
     Effect.mapError(() => invalid(part.name)),

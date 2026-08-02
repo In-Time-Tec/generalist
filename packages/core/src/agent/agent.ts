@@ -139,10 +139,7 @@ export function make<
 ): unknown {
   const declaredTools: ReadonlyArray<Tool.Any> | undefined =
     "tools" in options && Array.isArray(options.tools) ? options.tools : undefined
-  const toolkit =
-    declaredTools === undefined
-      ? (options.toolkit ?? (Toolkit.empty as unknown as Toolkit.Toolkit<Tools>))
-      : Toolkit.make(...declaredTools)
+  const toolkit = declaredTools === undefined ? (options.toolkit ?? Toolkit.empty) : Toolkit.make(...declaredTools)
   if (declaredTools !== undefined) {
     for (const tool of declaredTools) {
       if (!Object.hasOwn(toolkit.tools, tool.name)) {
@@ -162,7 +159,7 @@ export function make<
     },
     name: options.name,
     ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
-    toolkit: toolkit as unknown as Toolkit.Toolkit<Tools>,
+    toolkit: toolkit as Toolkit.Toolkit<Tools>,
     policy: options.policy ?? defaultPolicy,
     ...(options.model === undefined ? {} : { model: options.model }),
     ...(options.memory === undefined ? {} : { memory: options.memory }),
@@ -379,14 +376,12 @@ export const generate: {
     agent: Agent<Tools, R>,
     options: O,
   ): Effect.Effect<RunResult<O>, RunError, RunRequirements<R, O>>
-} = dual(
-  2,
-  <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
-    (options.output === undefined
-      ? generateText(agent, options)
-      : generateObjectResult(agent, options, {
-          schema: options.output.schema,
-          objectName: options.output.name ?? "output",
-          objectPrompt: options.output.prompt ?? defaultObjectPrompt,
-        })) as any,
+} = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
+  options.output === undefined
+    ? generateText(agent, options)
+    : generateObjectResult(agent, options, {
+        schema: options.output.schema,
+        objectName: options.output.name ?? "output",
+        objectPrompt: options.output.prompt ?? defaultObjectPrompt,
+      }),
 )

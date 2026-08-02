@@ -106,17 +106,9 @@ type ProgramCommand = Command<Message, never, Connection.AgentConnection>
 const toggle = (keys: ReadonlyArray<string>, key: string): ReadonlyArray<string> =>
   keys.includes(key) ? keys.filter((existing) => existing !== key) : [...keys, key]
 
-/**
- * Both `Chat.update` and `MessageScroller.update` guarantee their Commands'
- * effects never fail (failures are already converted to Messages inside
- * them), but their exported types widen the error channel to `any` /
- * unconstrained. Foldkit's runtime requires `Command<Message, never, R>`
- * exactly, so this narrows the type back at the one seam where child
- * Commands are lifted into the program's own Message type.
- */
 const asProgramCommands = (
   commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
-): ReadonlyArray<ProgramCommand> => commands as unknown as ReadonlyArray<ProgramCommand>
+): ReadonlyArray<ProgramCommand> => commands as ReadonlyArray<ProgramCommand>
 
 export const update = (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
   switch (currentMessage._tag) {
