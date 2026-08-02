@@ -33,7 +33,21 @@ export { Runtime, layerRuntime } from "./agent-persistence-lock.js"
 
 const AgentTypeId: unique symbol = Symbol.for("@batonfx/core/Agent")
 /** @experimental An agent definition: a plain value, not a service. */
-export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = LanguageModel.LanguageModel> {
+export interface HandoffAgent<R> {
+  readonly name: string
+  readonly description?: string
+  readonly run: (options: Pick<RunOptions, "prompt">) => Effect.Effect<Result, RunError, R>
+  readonly requirements: (value: R) => R
+}
+
+/** @experimental Structural existential capability used by Handoff. */
+export interface HandoffAgentCapability {
+  readonly name: string
+  readonly handoff: <A>(f: <R>(agent: HandoffAgent<R>) => A) => A
+}
+
+export interface Agent<Tools extends Record<string, Tool.Any> = {}, R = LanguageModel.LanguageModel>
+  extends HandoffAgentCapability {
   readonly [AgentTypeId]: {
     readonly tools: Types.Invariant<Tools>
     readonly requirements: Types.Invariant<R>
@@ -120,14 +134,14 @@ type OptionRequirements<Tools extends Record<string, Tool.Any>, O> =
 /** @experimental Defaults: empty toolkit, `defaultPolicy`. */
 export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
-  const O extends MakeToolsOptions<StaticTools, any, any> = MakeToolsOptions<StaticTools>,
+  const O extends MakeToolsOptions<StaticTools, unknown, unknown> = MakeToolsOptions<StaticTools>,
 >(
-  options: MakeToolsOptions<StaticTools, any, any> & O,
+  options: MakeToolsOptions<StaticTools, unknown, unknown> & O,
 ): Agent<Toolkit.ToolsByName<StaticTools>, OptionRequirements<Toolkit.ToolsByName<StaticTools>, O>>
 export function make<
   Tools extends Record<string, Tool.Any> = {},
-  const O extends MakeOptions<Tools, any, any> = MakeOptions<Tools>,
->(options: MakeOptions<Tools, any, any> & O): Agent<Tools, OptionRequirements<Tools, O>>
+  const O extends MakeOptions<Tools, unknown, unknown> = MakeOptions<Tools>,
+>(options: MakeOptions<Tools, unknown, unknown> & O): Agent<Tools, OptionRequirements<Tools, O>>
 export function make<
   Tools extends Record<string, Tool.Any> = {},
   PolicyServices = never,
@@ -152,7 +166,7 @@ export function make<
       }
     }
   }
-  return {
+  const definition = {
     [AgentTypeId]: {
       tools: (value: Tools) => value,
       requirements: (value: unknown) => value,
@@ -171,6 +185,18 @@ export function make<
       origin: { _tag: "Static", agent: options.name },
     })),
   }
+  let complete!: Agent<Tools, OptionRequirements<Tools, typeof options>>
+  complete = {
+    ...definition,
+    handoff: <A>(f: <R>(agent: HandoffAgent<R>) => A): A =>
+      f({
+        name: options.name,
+        ...(options.instructions === undefined ? {} : { description: options.instructions }),
+        run: ({ prompt }) => generate(complete, { prompt }),
+        requirements: (value) => value,
+      }),
+  } as Agent<Tools, OptionRequirements<Tools, typeof options>>
+  return complete
 }
 
 /** @experimental Re-entry bound to an authoritative `AgentSuspended` checkpoint. */
@@ -231,8 +257,8 @@ export interface RunOptions {
 
 type OperationRequirements<O> = [PresentOption<O, "memory">] extends [never] ? never : Memory
 
-type ObjectSchema = Schema.Codec<unknown, Record<string, any>, unknown, unknown>
-type NoOutputSchema = Schema.Codec<unknown, Record<string, any>, never, never>
+type ObjectSchema = Schema.Codec<unknown, Record<string, unknown>, unknown, unknown>
+type NoOutputSchema = Schema.Codec<unknown, Record<string, unknown>, never, never>
 
 /** @experimental Default prompt for the terminal structured-output turn. */
 export const defaultObjectPrompt = "Return the final structured output for the task above."

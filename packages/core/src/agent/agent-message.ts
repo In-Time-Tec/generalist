@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect"
-import { Prompt, Response } from "effect/unstable/ai"
+import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError, MiddlewareViolation } from "./agent-event.js"
 import { activateSkillToolName } from "./agent-skill-tool.js"
 import { isMessageFromRecall, recalledMessageIdentity, replaceRecalledMessage } from "../context/memory.js"
@@ -79,11 +79,11 @@ export const applyPromptChain = (
 /** Thread a stream part through every `transformPart` hook; the first `none()` short-circuits. */
 export const applyPartChain = (
   chain: ReadonlyArray<Middleware>,
-  part: Response.StreamPart<any>,
+  part: Response.StreamPart<Record<string, Tool.Any>>,
   context: TurnContext,
-): Effect.Effect<Option.Option<Response.StreamPart<any>>, AgentError> =>
+): Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError> =>
   Effect.gen(function* () {
-    let current: Option.Option<Response.StreamPart<any>> = Option.some(part)
+    let current: Option.Option<Response.StreamPart<Record<string, Tool.Any>>> = Option.some(part)
     for (const middleware of chain) {
       if (Option.isNone(current)) break
       if (middleware.transformPart !== undefined) {

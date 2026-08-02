@@ -1,5 +1,5 @@
 import { Effect, Option } from "effect"
-import { Prompt, Response } from "effect/unstable/ai"
+import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError } from "../agent/agent-event.js"
 import { isMessageFromRecall, replaceRecalledMessage } from "../context/memory.js"
 import type { Middleware, TurnContext } from "../model/model-middleware.js"
@@ -111,7 +111,9 @@ export const redactOutput = (options: RedactOptions): Middleware => ({
 })
 
 /** @experimental Drop streamed non-tool-call parts when `keep` returns false. */
-export const filterOutput = (keep: (part: Response.StreamPart<any>, context: TurnContext) => boolean): Middleware => ({
+export const filterOutput = (
+  keep: (part: Response.StreamPart<Record<string, Tool.Any>>, context: TurnContext) => boolean,
+): Middleware => ({
   transformPart: (part, context) =>
     Effect.succeed(part.type === "tool-call" || keep(part, context) ? Option.some(part) : Option.none()),
 })

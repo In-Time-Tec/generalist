@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Option } from "effect"
-import { Prompt, Response } from "effect/unstable/ai"
+import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError } from "../agent/agent-event.js"
 /** @experimental Typed operation-level adapter for LanguageModel.Service wrappers. */
 export { adapt } from "./model-service.js"
@@ -20,9 +20,9 @@ export interface Middleware {
    * is a middleware bug; the loop fails the run with MiddlewareViolation if it happens.
    */
   readonly transformPart?: (
-    part: Response.StreamPart<any>,
+    part: Response.StreamPart<Record<string, Tool.Any>>,
     context: TurnContext,
-  ) => Effect.Effect<Option.Option<Response.StreamPart<any>>, AgentError>
+  ) => Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, AgentError>
 }
 
 /** @experimental Service holding the middleware chain, applied in array order. */

@@ -7,7 +7,7 @@ type BroadTools = Record<string, Tool.Any>
 
 type BroadGenerateObjectOptions = LanguageModel.GenerateObjectOptions<
   BroadTools,
-  Schema.Encoder<Record<string, any>, unknown>
+  Schema.Encoder<Record<string, Tool.Any>, unknown>
 >
 type BroadGenerateTextResponse = LanguageModel.GenerateTextResponse<BroadTools>
 type BroadGenerateObjectResponse = LanguageModel.GenerateObjectResponse<BroadTools, unknown>
@@ -69,7 +69,7 @@ export const invokeGenerateText = (
 
 export const invokeGenerateObject = (
   model: LanguageModel.Service,
-  options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, any>, unknown>>,
+  options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
 ) => model.generateObject(options)
 
 export const invokeStreamText = (
@@ -121,8 +121,8 @@ export const adapt = <GenerateError = never, GenerateObjectError = never, Stream
   >
   function generateText<
     Options extends {
-      readonly toolkit: LanguageModel.ToolkitOption<any>
-    } & NoExcessProperties<LanguageModel.GenerateTextOptions<any>, Options>,
+      readonly toolkit: LanguageModel.ToolkitOption<Record<string, Tool.Any>>
+    } & NoExcessProperties<LanguageModel.GenerateTextOptions<Record<string, Tool.Any>>, Options>,
   >(
     options: Options &
       LanguageModel.GenerateTextOptions<LanguageModel.ExtractTools<Options>> & {
@@ -159,8 +159,8 @@ export const adapt = <GenerateError = never, GenerateObjectError = never, Stream
   >
   function streamText<
     Options extends {
-      readonly toolkit: LanguageModel.ToolkitOption<any>
-    } & NoExcessProperties<LanguageModel.GenerateTextOptions<any>, Options>,
+      readonly toolkit: LanguageModel.ToolkitOption<Record<string, Tool.Any>>
+    } & NoExcessProperties<LanguageModel.GenerateTextOptions<Record<string, Tool.Any>>, Options>,
   >(
     options: Options &
       LanguageModel.GenerateTextOptions<LanguageModel.ExtractTools<Options>> & {
@@ -177,9 +177,12 @@ export const adapt = <GenerateError = never, GenerateObjectError = never, Stream
   }
 
   function generateObject<
-    ObjectEncoded extends Record<string, any>,
+    ObjectEncoded extends Record<string, Tool.Any>,
     StructuredOutputSchema extends Schema.Encoder<ObjectEncoded, unknown>,
-    Options extends NoExcessProperties<LanguageModel.GenerateObjectOptions<any, StructuredOutputSchema>, Options>,
+    Options extends NoExcessProperties<
+      LanguageModel.GenerateObjectOptions<Record<string, Tool.Any>, StructuredOutputSchema>,
+      Options
+    >,
     Tools extends Record<string, Tool.Any> = {},
   >(
     options: Options & LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
@@ -189,7 +192,7 @@ export const adapt = <GenerateError = never, GenerateObjectError = never, Stream
     LanguageModel.ExtractServices<Options> | StructuredOutputSchema["DecodingServices"]
   >
   function generateObject(
-    options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, any>, unknown>>,
+    options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
   ) {
     const invoke = (input = options) => invokeGenerateObject(model, input)
     return middleware.generateObject === undefined ? invoke() : middleware.generateObject(options, invoke)

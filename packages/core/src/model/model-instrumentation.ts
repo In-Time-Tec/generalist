@@ -214,7 +214,7 @@ const callStream = (
   | InvocationCoordinationFailed
   | TerminationFailure
   | import("./model-resilience.js").ModelResilienceMisconfigured,
-  any
+  unknown
 > =>
   Stream.unwrap(
     Effect.map(validateOptions(options).pipe(Effect.andThen(beginCall(model, options))), ({ context, stack }) =>

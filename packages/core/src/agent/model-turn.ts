@@ -22,7 +22,7 @@ import type { RunError } from "./agent.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
 const classifyOtherFailure = (error: unknown) => classifyContextOverflow(error)
 const isToolNameCollision = Schema.is(ToolNameCollision)
-const attemptText = (parts: ReadonlyArray<Response.StreamPart<any>>): string =>
+const attemptText = (parts: ReadonlyArray<Response.StreamPart<Record<string, Tool.Any>>>): string =>
   parts.reduce((text, part) => (part.type === "text-delta" ? `${text}${part.delta}` : text), "")
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
@@ -42,7 +42,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     persisted,
     toolCallEvents,
   } = context
-  const captureProviderOutput = (part: Response.StreamPart<any>): void => {
+  const captureProviderOutput = (part: Response.StreamPart<Record<string, Tool.Any>>): void => {
     if (part.type === "text-delta") state.providerOutput.textCharacters += part.delta.length
     if (part.type === "reasoning-delta") state.providerOutput.reasoningCharacters += part.delta.length
     if (part.type === "finish") state.providerOutput.finishReason = part.reason
@@ -64,7 +64,9 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         response: { finishReasons: [part.reason] },
       })
     }).pipe(Effect.orDie)
-  const captureStructuredUsage = (content: ReadonlyArray<Response.Part<any>>): Effect.Effect<void> =>
+  const captureStructuredUsage = (
+    content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
+  ): Effect.Effect<void> =>
     Effect.gen(function* () {
       const span = yield* Effect.currentSpan
       for (const part of content) {
@@ -138,12 +140,14 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
   const transformPart = (
     turn: number,
     toolkit: Toolkit.Toolkit<Record<string, Tool.Any>>,
-    part: Response.StreamPart<any>,
-  ): Effect.Effect<Option.Option<Response.StreamPart<any>>, RunError> =>
+    part: Response.StreamPart<Record<string, Tool.Any>>,
+  ): Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, RunError> =>
     applyPartChain(chain, part, { agentName: agent.name, turn }).pipe(
       Effect.flatMap(
         Option.match({
-          onSome: (transformed): Effect.Effect<Option.Option<Response.StreamPart<any>>, MiddlewareViolation> => {
+          onSome: (
+            transformed,
+          ): Effect.Effect<Option.Option<Response.StreamPart<Record<string, Tool.Any>>>, MiddlewareViolation> => {
             if (part.type === "tool-call" && transformed.type !== "tool-call") {
               return Effect.fail(
                 MiddlewareViolation.make({
@@ -153,10 +157,10 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
               )
             }
             if (transformed.type !== "tool-call") {
-              return Effect.succeed(Option.some<Response.StreamPart<any>>(transformed))
+              return Effect.succeed(Option.some<Response.StreamPart<Record<string, Tool.Any>>>(transformed))
             }
             return validateDecodedToolCall(toolkit, transformed).pipe(
-              Effect.map((decoded) => Option.some<Response.StreamPart<any>>(decoded)),
+              Effect.map((decoded) => Option.some<Response.StreamPart<Record<string, Tool.Any>>>(decoded)),
               Effect.mapError(() =>
                 MiddlewareViolation.make({
                   turn,
@@ -179,7 +183,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     )
   const validateToolCallId = (
     idState: Ref.Ref<ToolCallIdState>,
-    part: Response.StreamPart<any>,
+    part: Response.StreamPart<Record<string, Tool.Any>>,
   ): Effect.Effect<void, DuplicateToolCallId> => {
     if (part.type !== "tool-call") return Effect.void
     return Ref.modify(idState, (current) => {
@@ -244,7 +248,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
       overflowCause?: Cause.Cause<RunError>,
     ): Stream.Stream<
       {
-        readonly part: Response.StreamPart<any>
+        readonly part: Response.StreamPart<Record<string, Tool.Any>>
         readonly messages: ReadonlyArray<Prompt.Message>
         readonly accept: Effect.Effect<void, DuplicateToolCallId>
       },
@@ -254,7 +258,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
       let emitted = false
       let completed = false
       let classifyFailure = classifyOtherFailure
-      const transformedParts = new Array<Response.StreamPart<any>>()
+      const transformedParts = new Array<Response.StreamPart<Record<string, Tool.Any>>>()
       let preparedState: { readonly history: Prompt.Prompt; readonly preparedPrompt: Prompt.Prompt } | undefined
       const singleFailure = (cause: Cause.Cause<unknown>) => {
         const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
@@ -321,7 +325,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                           captureProviderOutput(part)
                         }),
                   ),
-                  Stream.catchCause((cause): Stream.Stream<Response.StreamPart<any>, RunError> => {
+                  Stream.catchCause((cause): Stream.Stream<Response.StreamPart<Record<string, Tool.Any>>, RunError> => {
                     if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
                     if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
                     const error = singleFailure(cause)

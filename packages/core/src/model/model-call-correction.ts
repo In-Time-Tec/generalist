@@ -51,7 +51,7 @@ const correctLoop = (
   model: LanguageModel.Service,
   options: StreamTextOptions,
   corrections: number,
-): Stream.Stream<StreamTextPart, AiError.AiError | InvalidToolCallParameters, any> =>
+): Stream.Stream<StreamTextPart, AiError.AiError | InvalidToolCallParameters, unknown> =>
   Stream.suspend(() => {
     let consumed = false
     return invokeStreamText(model, options).pipe(
@@ -86,5 +86,5 @@ export const correct = (input: {
   readonly context: Context
   readonly model: LanguageModel.Service
   readonly options: StreamTextOptions
-}): Stream.Stream<StreamTextPart, AiError.AiError | InvalidToolCallParameters, any> =>
+}): Stream.Stream<StreamTextPart, AiError.AiError | InvalidToolCallParameters, unknown> =>
   correctLoop(input.context, input.model, input.options, 0)

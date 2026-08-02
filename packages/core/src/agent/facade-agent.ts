@@ -27,6 +27,8 @@ export namespace Agent {
     Tools extends Record<string, import("effect/unstable/ai").Tool.Any> = {},
     R = import("effect/unstable/ai").LanguageModel.LanguageModel,
   > = import("./agent.js").Agent<Tools, R>
+  export type HandoffAgent<R> = import("./agent.js").HandoffAgent<R>
+  export type HandoffAgentCapability = import("./agent.js").HandoffAgentCapability
   export type MakeOptions<
     Tools extends Record<string, import("effect/unstable/ai").Tool.Any> = {},
     PolicyServices = never,

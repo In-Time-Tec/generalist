@@ -2,11 +2,12 @@ import { Array, Effect, Function, Schema } from "effect"
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import {
   type Agent,
+  type HandoffAgent,
+  type HandoffAgentCapability,
   type Requirements,
   type Result,
   type RunError,
   type RunOptions,
-  generate,
   make,
 } from "../agent/agent.js"
 import { AgentError } from "../agent/agent-event.js"
@@ -55,7 +56,7 @@ export interface Supervisor<R> {
 }
 
 /** @experimental Options for building a transfer-tool supervisor. */
-export interface SupervisorOptions<Specialists extends ReadonlyArray<Agent<any, any>>> {
+export interface SupervisorOptions<Specialists extends ReadonlyArray<HandoffAgentCapability>> {
   readonly name: string
   readonly instructions?: string
   readonly specialists: Specialists
@@ -115,7 +116,7 @@ export const transferTool: {
   <Parameters extends Schema.Top = DefaultTransferParameters, Success extends Schema.Top = typeof Schema.String>(
     options?: TransferOptions<Parameters, Success>,
   ): <Tools extends Record<string, Tool.Any>, R>(
-    target: Agent<Tools, R>,
+    target: Agent<Tools, R> | HandoffAgent<R>,
   ) => AgentToolToolkit<string, Parameters, Success, R>
   <
     Tools extends Record<string, Tool.Any>,
@@ -123,7 +124,7 @@ export const transferTool: {
     Parameters extends Schema.Top = DefaultTransferParameters,
     Success extends Schema.Top = typeof Schema.String,
   >(
-    target: Agent<Tools, R>,
+    target: Agent<Tools, R> | HandoffAgent<R>,
     options?: TransferOptions<Parameters, Success>,
   ): AgentToolToolkit<string, Parameters, Success, R>
 } = Function.dual(
@@ -134,7 +135,7 @@ export const transferTool: {
     Parameters extends Schema.Top = DefaultTransferParameters,
     Success extends Schema.Top = typeof Schema.String,
   >(
-    target: Agent<Tools, R>,
+    target: Agent<Tools, R> | HandoffAgent<R>,
     options: TransferOptions<Parameters, Success> = {},
   ): AgentToolToolkit<string, Parameters, Success, R> =>
     asTool(target, {
@@ -148,7 +149,7 @@ export const transferTool: {
 )
 
 type FanOutInput = {
-  readonly agent: Agent<any, any>
+  readonly agent: HandoffAgentCapability
   readonly prompt: Prompt.RawInput
   readonly options?: Omit<RunOptions, "prompt">
 }
@@ -202,7 +203,11 @@ export const fanOut: {
               ...child.options,
               prompt: child.prompt,
             }
-            return generate(child.agent, runOptions)
+            return child.agent.handoff((target) => target.run(runOptions)) as Effect.Effect<
+              Result,
+              RunError,
+              FanOutRequirements<Children>
+            >
           },
           { concurrency },
         ),
@@ -211,11 +216,22 @@ export const fanOut: {
 )
 
 /** @experimental Build a supervisor agent plus handled transfer-tool toolkit. */
-export const supervisor = <const Specialists extends ReadonlyArray<Agent<any, any>>>(
+export const supervisor = <const Specialists extends ReadonlyArray<HandoffAgentCapability>>(
   options: SupervisorOptions<Specialists>,
 ): Supervisor<Requirements<Specialists[number]>> => {
   const specialists = options.specialists
-  const transferTools = specialists.map((specialist) => transferTool(specialist))
+  const transferTools = specialists.map((specialist) =>
+    specialist.handoff<
+      TransferToolkit<DefaultTransferParameters, typeof Schema.String, Requirements<Specialists[number]>>
+    >(
+      (target) =>
+        transferTool(target) as TransferToolkit<
+          DefaultTransferParameters,
+          typeof Schema.String,
+          Requirements<Specialists[number]>
+        >,
+    ),
+  )
   const toolkit = mergeHandled(transferTools)
   const agent = make({
     name: options.name,

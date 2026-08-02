@@ -32,7 +32,7 @@ const providerOutputState = (): {
   reasoningCharacters: number
   finishReason: Response.FinishReason | undefined
 } => ({ textCharacters: 0, reasoningCharacters: 0, finishReason: undefined })
-type ObjectSchema = Schema.Codec<unknown, Record<string, any>, unknown, unknown>
+type ObjectSchema = Schema.Codec<unknown, Record<string, unknown>, unknown, unknown>
 interface StructuredRunConfig<S extends ObjectSchema> {
   readonly schema: S
   readonly objectName: string

@@ -50,7 +50,9 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     registry: Registry,
     overrides?: TurnOverrides,
   ) => Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<Tools>>
-  readonly captureStructuredUsage: (content: ReadonlyArray<Response.Part<any>>) => Effect.Effect<void>
+  readonly captureStructuredUsage: (
+    content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
+  ) => Effect.Effect<void>
   readonly withModelTelemetry: <A, E, R2>(
     turn: number,
     purpose: ModelCallPurpose,

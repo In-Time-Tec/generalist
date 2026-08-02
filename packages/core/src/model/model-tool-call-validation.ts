@@ -34,7 +34,7 @@ const preserveAnnotations = (projected: Tool.Any, original: Tool.Any): Tool.Any 
   return projected
 }
 
-const projectProviderDefined = (tool: Tool.ProviderDefined<`${string}.${string}`, string, any>): Tool.Any => {
+const projectProviderDefined = (tool: Tool.AnyProviderDefined): Tool.Any => {
   const constructor = Tool.providerDefined({
     id: tool.id,
     customName: tool.name,
@@ -49,7 +49,7 @@ const projectProviderDefined = (tool: Tool.ProviderDefined<`${string}.${string}`
     tool.failureMode === "return" && typeof tool.args === "object" && tool.args !== null
       ? { ...tool.args, failureMode: "return" as const }
       : tool.args
-  return preserveAnnotations(constructor(args), tool)
+  return preserveAnnotations(constructor(args as object), tool)
 }
 
 const projectCompiled = (tool: Tool.Any, compile: ToolJsonSchemaCompiler): Effect.Effect<Tool.Any, AiError.AiError> =>
@@ -163,21 +163,27 @@ export const validateDecodedToolCall = (
   )
 }
 
-const isBuffered = (part: Response.StreamPart<any>): boolean =>
+const isBuffered = (part: Response.StreamPart<Record<string, Tool.Any>>): boolean =>
   part.type === "response-metadata" ||
   part.type === "tool-params-start" ||
   part.type === "tool-params-delta" ||
   part.type === "tool-params-end"
 
 const validatedStream = (
-  stream: Stream.Stream<Response.StreamPart<any>, any, any>,
+  stream: Stream.Stream<
+    Response.StreamPart<Record<string, Tool.Any>>,
+    AiError.AiError | InvalidToolCallParameters,
+    unknown
+  >,
   original: Toolkit.Any,
-): Stream.Stream<Response.StreamPart<any>, any, any> =>
+): Stream.Stream<Response.StreamPart<Record<string, Tool.Any>>, AiError.AiError | InvalidToolCallParameters, unknown> =>
   Stream.suspend(() => {
     let released = false
     let invalidToolName: string | undefined
-    let buffered: Array<Response.StreamPart<any>> = []
-    const release = (part: Response.StreamPart<any>): ReadonlyArray<Response.StreamPart<any>> => {
+    let buffered: Array<Response.StreamPart<Record<string, Tool.Any>>> = []
+    const release = (
+      part: Response.StreamPart<Record<string, Tool.Any>>,
+    ): ReadonlyArray<Response.StreamPart<Record<string, Tool.Any>>> => {
       released = true
       const parts = [...buffered, part]
       buffered = []
@@ -188,7 +194,7 @@ const validatedStream = (
         if (invalidToolName !== undefined) {
           return part.type === "finish"
             ? Effect.fail(invalid(invalidToolName, part.usage))
-            : Effect.succeed<ReadonlyArray<Response.StreamPart<any>>>([])
+            : Effect.succeed<ReadonlyArray<Response.StreamPart<Record<string, Tool.Any>>>>([])
         }
         if (released) {
           return part.type === "tool-call"
