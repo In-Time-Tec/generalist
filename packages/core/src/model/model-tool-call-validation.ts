@@ -1,4 +1,5 @@
 import { Effect, Schema, Stream } from "effect"
+import { adapt } from "./model-service.js"
 import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { ModelProviderUsage, providerUsage } from "./model-attempt-observation.js"
 import { type ToolJsonSchemaCompiler, toolJsonSchemaCompiler } from "./model-registry.js"
@@ -48,7 +49,7 @@ const projectProviderDefined = (tool: Tool.ProviderDefined<`${string}.${string}`
     tool.failureMode === "return" && typeof tool.args === "object" && tool.args !== null
       ? { ...tool.args, failureMode: "return" as const }
       : tool.args
-  return preserveAnnotations(constructor(args as never) as Tool.Any, tool)
+  return preserveAnnotations(constructor(args), tool)
 }
 
 const projectCompiled = (tool: Tool.Any, compile: ToolJsonSchemaCompiler): Effect.Effect<Tool.Any, AiError.AiError> =>
@@ -65,6 +66,15 @@ const projectCompiled = (tool: Tool.Any, compile: ToolJsonSchemaCompiler): Effec
       tool,
     ),
   )
+
+const toolkitTools = (toolkit: Toolkit.Any): ReadonlyArray<Tool.Any> => {
+  const tools: Array<Tool.Any> = []
+  for (const name of Object.keys(toolkit.tools)) {
+    const tool = toolkit.tools[name]
+    if (tool !== undefined) tools.push(tool)
+  }
+  return tools
+}
 
 const makeToolkit = (tools: ReadonlyArray<Tool.Any>): Toolkit.Toolkit<Record<string, Tool.Any>> => {
   const toolkit = Toolkit.make(...tools)
@@ -87,7 +97,7 @@ const project = (
 ): Effect.Effect<ProjectedToolkit, AiError.AiError | ToolJsonSchemaCompilerMissing> =>
   Effect.gen(function* () {
     const tools: Array<Tool.Any> = []
-    for (const tool of Object.values(original.tools)) {
+    for (const tool of toolkitTools(original)) {
       if (Tool.isProviderDefined(tool)) {
         tools.push(projectProviderDefined(tool))
       } else if (Tool.isDynamic(tool) && tool.jsonSchema !== undefined) {
@@ -107,7 +117,7 @@ export const projectToolkit = (
 ): Effect.Effect<ProjectedToolkit, AiError.AiError> =>
   Effect.gen(function* () {
     const tools: Array<Tool.Any> = []
-    for (const tool of Object.values(original.tools)) {
+    for (const tool of toolkitTools(original)) {
       if (Tool.isProviderDefined(tool)) tools.push(projectProviderDefined(tool))
       else if (Tool.isDynamic(tool) && tool.jsonSchema !== undefined) tools.push(tool)
       else tools.push(yield* projectCompiled(tool, compile))
@@ -132,7 +142,7 @@ export const decodeToolCall = (
 ): Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters> => {
   const tool = findTool(toolkit, part.name)
   if (tool === undefined) return Effect.fail(invalid(part.name))
-  const schema = tool.parametersSchema as unknown as Schema.ConstraintCodec<unknown, unknown, never, never>
+  const schema = Schema.toType(tool.parametersSchema)
   return Schema.decodeUnknownEffect(schema)(part.params).pipe(
     Effect.map((params) => ({ ...part, params })),
     Effect.mapError(() => invalid(part.name)),
@@ -216,13 +226,15 @@ export const wrap = (
   original: Toolkit.Any,
   projected: Toolkit.Toolkit<Record<string, Tool.Any>>,
 ): LanguageModel.Service =>
-  ({
-    ...model,
-    streamText: ((options: LanguageModel.GenerateTextOptions<Record<string, Tool.Any>>) =>
-      options.disableToolCallResolution === true
-        ? validatedStream(model.streamText({ ...options, toolkit: projected } as never), original)
-        : model.streamText(options as never)) as LanguageModel.Service["streamText"],
-  }) as LanguageModel.Service
+  adapt<AiError.AiError | InvalidToolCallParameters, AiError.AiError, AiError.AiError | InvalidToolCallParameters>(
+    model,
+    {
+      streamText: (options, invoke) =>
+        options.disableToolCallResolution === true
+          ? validatedStream(invoke({ ...options, toolkit: projected }), original)
+          : invoke(),
+    },
+  )
 
 /** @experimental Prepare correction validation for the active direct or registered model. */
 export const prepare = (
@@ -232,7 +244,7 @@ export const prepare = (
 ): Effect.Effect<LanguageModel.Service, ToolJsonSchemaCompilerMissing | AiError.AiError> => {
   if (correctionLimit === 0 || Object.keys(original.tools).length === 0) return Effect.succeed(model)
   const compile = toolJsonSchemaCompiler(model)
-  const requiresCompiler = Object.values(original.tools).some(
+  const requiresCompiler = toolkitTools(original).some(
     (tool) => !Tool.isProviderDefined(tool) && (!Tool.isDynamic(tool) || tool.jsonSchema === undefined),
   )
   if (requiresCompiler && compile === undefined) return Effect.fail(ToolJsonSchemaCompilerMissing.make({}))

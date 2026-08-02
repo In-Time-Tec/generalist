@@ -15,6 +15,7 @@ import {
 } from "effect"
 import { AiError, LanguageModel, Model, Tool } from "effect/unstable/ai"
 import { classify as classifyContextOverflow } from "./context-overflow.js"
+import { registerMetadataCopier } from "./model-service.js"
 /** @experimental */
 export type Metadata = Readonly<Record<string, unknown>>
 
@@ -36,52 +37,58 @@ export type FailureClassification = "context-overflow" | "other"
 /** @experimental Provider-owned semantic model-failure classifier. */
 export type FailureClassifier = (error: unknown) => FailureClassification
 
-const FailureClassifierTypeId = Symbol.for("@batonfx/core/model-registry/FailureClassifier")
-const ToolJsonSchemaCompilerTypeId = Symbol.for("@batonfx/core/model-registry/ToolJsonSchemaCompiler")
+const failureClassifiers = new WeakMap<LanguageModel.Service, FailureClassifier>()
+const toolJsonSchemaCompilers = new WeakMap<LanguageModel.Service, ToolJsonSchemaCompiler>()
+
+registerMetadataCopier((source, target) => {
+  const classifier = failureClassifiers.get(source)
+  if (classifier !== undefined) failureClassifiers.set(target, classifier)
+  const compiler = toolJsonSchemaCompilers.get(source)
+  if (compiler !== undefined) toolJsonSchemaCompilers.set(target, compiler)
+})
 
 /** @experimental Provider-owned compilation of a tool's exact request JSON Schema. */
 export type ToolJsonSchemaCompiler = (tool: Tool.Any) => Effect.Effect<JsonSchema.JsonSchema, AiError.AiError>
-
-type RegisteredLanguageModel = LanguageModel.Service & {
-  readonly [FailureClassifierTypeId]?: FailureClassifier
-  readonly [ToolJsonSchemaCompilerTypeId]?: ToolJsonSchemaCompiler
-}
 
 /** @experimental Classify a failure using semantics attached to the active registered model, falling back to provider-agnostic context-overflow evidence. */
 export const classifyFailure: {
   (error: unknown): (model: LanguageModel.Service) => FailureClassification
   (model: LanguageModel.Service, error: unknown): FailureClassification
 } = Function.dual(2, (model: LanguageModel.Service, error: unknown): FailureClassification => {
-  const classified = (model as RegisteredLanguageModel)[FailureClassifierTypeId]?.(error)
+  const classified = failureClassifiers.get(model)?.(error)
   return classified !== undefined && classified !== "other" ? classified : classifyContextOverflow(error)
 })
 
 /** @experimental Read the compiler attached to the active registered or explicitly wrapped model. */
 export const toolJsonSchemaCompiler = (model: LanguageModel.Service): ToolJsonSchemaCompiler | undefined =>
-  (model as RegisteredLanguageModel)[ToolJsonSchemaCompilerTypeId]
+  toolJsonSchemaCompilers.get(model)
 
 /** @experimental Attach a provider-exact tool JSON Schema compiler to a direct language model. */
 export const withToolJsonSchemaCompiler: {
   (compiler: ToolJsonSchemaCompiler): (model: LanguageModel.Service) => LanguageModel.Service
   (model: LanguageModel.Service, compiler: ToolJsonSchemaCompiler): LanguageModel.Service
-} = Function.dual(
-  2,
-  (model: LanguageModel.Service, compiler: ToolJsonSchemaCompiler): LanguageModel.Service =>
-    ({
-      ...model,
-      [ToolJsonSchemaCompilerTypeId]: compiler,
-    }) as RegisteredLanguageModel,
-)
+} = Function.dual(2, (model: LanguageModel.Service, compiler: ToolJsonSchemaCompiler): LanguageModel.Service => {
+  const wrapped = { ...model }
+  toolJsonSchemaCompilers.set(wrapped, compiler)
+  const classifier = failureClassifiers.get(model)
+  if (classifier !== undefined) failureClassifiers.set(wrapped, classifier)
+  return wrapped
+})
 
 const attachRegistrationMetadata = (registration: Registration, context: Context.Context<ModelEnvironment>) => {
   if (registration.classifyFailure === undefined && registration.toolJsonSchemaCompiler === undefined) return context
   const model = Context.get(context, LanguageModel.LanguageModel)
-  const registered: RegisteredLanguageModel = {
-    ...model,
-    ...(registration.classifyFailure === undefined ? {} : { [FailureClassifierTypeId]: registration.classifyFailure }),
-    ...(registration.toolJsonSchemaCompiler === undefined
-      ? {}
-      : { [ToolJsonSchemaCompilerTypeId]: registration.toolJsonSchemaCompiler }),
+  const registered = { ...model }
+  if (registration.classifyFailure !== undefined) failureClassifiers.set(registered, registration.classifyFailure)
+  else {
+    const classifier = failureClassifiers.get(model)
+    if (classifier !== undefined) failureClassifiers.set(registered, classifier)
+  }
+  if (registration.toolJsonSchemaCompiler !== undefined)
+    toolJsonSchemaCompilers.set(registered, registration.toolJsonSchemaCompiler)
+  else {
+    const compiler = toolJsonSchemaCompilers.get(model)
+    if (compiler !== undefined) toolJsonSchemaCompilers.set(registered, compiler)
   }
   return Context.add(context, LanguageModel.LanguageModel, registered)
 }

@@ -1,5 +1,6 @@
 import { Cause, Clock, Effect, Exit, Function, Option, Stream } from "effect"
 import { AiError, LanguageModel, Response, ResponseIdTracker } from "effect/unstable/ai"
+import { adapt } from "./model-service.js"
 import type { IdentityCell } from "./model-attempt-identity.js"
 import {
   disabledResponseIdTracker,
@@ -336,25 +337,22 @@ export const attemptModel: {
 } = Function.dual(
   2,
   (model: LanguageModel.Service, context: CallContext): LanguageModel.Service =>
-    ({
-      ...model,
-      generateText: ((options: never) =>
+    adapt<
+      AiError.AiError | InvocationCoordinationFailed,
+      AiError.AiError | InvocationCoordinationFailed,
+      AiError.AiError | InvocationCoordinationFailed | TerminationFailure
+    >(model, {
+      generateText: (_options, invoke) =>
         attemptEffect(context, "generateText", () =>
-          model
-            .generateText(options)
-            .pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-        )) as unknown as LanguageModel.Service["generateText"],
-      generateObject: ((options: never) =>
+          invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+        ),
+      generateObject: (_options, invoke) =>
         attemptEffect(context, "generateObject", () =>
-          (model.generateObject as unknown as (options: never) => Effect.Effect<AnyResponse, AiError.AiError>)(
-            options,
-          ).pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-        )) as unknown as LanguageModel.Service["generateObject"],
-      streamText: ((options: never) =>
+          invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+        ),
+      streamText: (_options, invoke) =>
         attemptStream(context, () =>
-          model
-            .streamText(options)
-            .pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-        )) as unknown as LanguageModel.Service["streamText"],
-    }) as LanguageModel.Service,
+          invoke().pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+        ),
+    }),
 )

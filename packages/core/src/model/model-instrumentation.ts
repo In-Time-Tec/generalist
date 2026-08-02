@@ -9,6 +9,7 @@ import type { IdentityCell } from "./model-attempt-identity.js"
 import { attemptModel, type CallContext, type InstrumentOptions } from "./model-attempt-instrumentation.js"
 import { memoized, singleFailure, tapRetryTelemetry } from "./model-attempt-observation.js"
 import { classifyFailure } from "./model-registry.js"
+import { adapt, invokeGenerateObject, invokeGenerateText } from "./model-service.js"
 import { type InvalidToolCallParameters, isInvalidToolCallParameters } from "./model-tool-call-validation.js"
 import { type Classification, type ModelResilienceMisconfigured, apply, validate } from "./model-resilience.js"
 import type { TerminationFailure } from "./model-stream-termination.js"
@@ -26,7 +27,7 @@ import {
 export { type Identity, type IdentityCell, makeIdentityCell } from "./model-attempt-identity.js"
 export type { InstrumentOptions } from "./model-attempt-instrumentation.js"
 
-const InstrumentedTypeId = Symbol.for("@batonfx/core/model-instrumentation/Instrumented")
+const instrumentedModels = new WeakMap<LanguageModel.Service, InstrumentedMarker>()
 interface InstrumentedMarker {
   readonly emit: InstrumentOptions["emit"]
   readonly base: LanguageModel.Service
@@ -246,9 +247,7 @@ export const instrument: {
   (options: InstrumentOptions): (model: LanguageModel.Service) => LanguageModel.Service
   (model: LanguageModel.Service, options: InstrumentOptions): LanguageModel.Service
 } = Function.dual(2, (model: LanguageModel.Service, options: InstrumentOptions): LanguageModel.Service => {
-  const marker = (model as unknown as Record<PropertyKey, unknown>)[InstrumentedTypeId] as
-    | InstrumentedMarker
-    | undefined
+  const marker = instrumentedModels.get(model)
   if (marker !== undefined) {
     return marker.emit === options.emit ? model : instrument(marker.base, options)
   }
@@ -257,20 +256,13 @@ export const instrument: {
     ...options,
     nextCallOrdinal: options.nextCallOrdinal ?? (() => localCallOrdinal++),
   }
-  return {
-    ...model,
-    [InstrumentedTypeId]: { emit: options.emit, base: model } satisfies InstrumentedMarker,
-    generateText: ((generateOptions: never) =>
-      callEffect(model, activeOptions, (stack) =>
-        stack.generateText(generateOptions),
-      )) as unknown as LanguageModel.Service["generateText"],
-    generateObject: ((generateOptions: never) =>
-      callEffect(model, activeOptions, (stack) =>
-        (stack.generateObject as unknown as (options: never) => Effect.Effect<AnyResponse, AiError.AiError>)(
-          generateOptions,
-        ),
-      )) as unknown as LanguageModel.Service["generateObject"],
-    streamText: ((streamOptions: StreamTextOptions) =>
-      callStream(model, activeOptions, streamOptions)) as unknown as LanguageModel.Service["streamText"],
-  } as LanguageModel.Service
+  const wrapped = adapt(model, {
+    generateText: (generateOptions) =>
+      callEffect(model, activeOptions, (stack) => invokeGenerateText(stack, generateOptions)),
+    generateObject: (generateOptions) =>
+      callEffect(model, activeOptions, (stack) => invokeGenerateObject(stack, generateOptions)),
+    streamText: (streamOptions) => callStream(model, activeOptions, streamOptions),
+  })
+  instrumentedModels.set(wrapped, { emit: options.emit, base: model })
+  return wrapped
 })

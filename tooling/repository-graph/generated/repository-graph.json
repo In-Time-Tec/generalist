@@ -1293,6 +1293,11 @@
       "test": false
     },
     {
+      "path": "packages/core/src/model/model-service.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
       "path": "packages/core/src/model/model-stream-termination.ts",
       "package": "@batonfx/core",
       "test": false
@@ -1524,6 +1529,11 @@
     },
     {
       "path": "packages/core/test/model-resilience.test.ts",
+      "package": "@batonfx/core",
+      "test": true
+    },
+    {
+      "path": "packages/core/test/model-service-api.test.ts",
       "package": "@batonfx/core",
       "test": true
     },
@@ -6788,6 +6798,10 @@
     },
     {
       "source": "packages/core/src/model/model-attempt-instrumentation.ts",
+      "specifier": "./model-service.js"
+    },
+    {
+      "source": "packages/core/src/model/model-attempt-instrumentation.ts",
       "specifier": "./model-stream-termination.js"
     },
     {
@@ -6809,6 +6823,10 @@
     {
       "source": "packages/core/src/model/model-attempt-observation.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/model/model-call-correction.ts",
+      "specifier": "./model-service.js"
     },
     {
       "source": "packages/core/src/model/model-call-correction.ts",
@@ -6848,6 +6866,10 @@
     },
     {
       "source": "packages/core/src/model/model-instrumentation.ts",
+      "specifier": "./model-service.js"
+    },
+    {
+      "source": "packages/core/src/model/model-instrumentation.ts",
       "specifier": "./model-telemetry.js"
     },
     {
@@ -6868,6 +6890,10 @@
     },
     {
       "source": "packages/core/src/model/model-middleware.ts",
+      "specifier": "./model-service.js"
+    },
+    {
+      "source": "packages/core/src/model/model-middleware.ts",
       "specifier": "effect"
     },
     {
@@ -6880,6 +6906,10 @@
     },
     {
       "source": "packages/core/src/model/model-registry.ts",
+      "specifier": "./model-service.js"
+    },
+    {
+      "source": "packages/core/src/model/model-registry.ts",
       "specifier": "effect"
     },
     {
@@ -6889,6 +6919,10 @@
     {
       "source": "packages/core/src/model/model-resilience.ts",
       "specifier": "./model-response-failure.js"
+    },
+    {
+      "source": "packages/core/src/model/model-resilience.ts",
+      "specifier": "./model-service.js"
     },
     {
       "source": "packages/core/src/model/model-resilience.ts",
@@ -6908,6 +6942,14 @@
     },
     {
       "source": "packages/core/src/model/model-response-failure.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/model/model-service.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/model/model-service.ts",
       "specifier": "effect/unstable/ai"
     },
     {
@@ -6945,6 +6987,10 @@
     {
       "source": "packages/core/src/model/model-tool-call-validation.ts",
       "specifier": "./model-registry.js"
+    },
+    {
+      "source": "packages/core/src/model/model-tool-call-validation.ts",
+      "specifier": "./model-service.js"
     },
     {
       "source": "packages/core/src/model/model-tool-call-validation.ts",
@@ -7603,6 +7649,22 @@
     {
       "source": "packages/core/test/model-resilience.test.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/test/model-service-api.test.ts",
+      "specifier": "../src/model/model-service.js"
+    },
+    {
+      "source": "packages/core/test/model-service-api.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/test/model-service-api.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/test/model-service-api.test.ts",
+      "specifier": "vitest"
     },
     {
       "source": "packages/core/test/model-stream-termination.test.ts",
@@ -8499,11 +8561,21 @@
     },
     {
       "source": "packages/providers/src/model/image-source.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/providers/src/model/image-source.ts",
       "specifier": "effect"
     },
     {
       "source": "packages/providers/src/model/image-source.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/providers/src/model/model-failure.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
     },
     {
       "source": "packages/providers/src/model/model-failure.ts",
@@ -9928,6 +10000,11 @@
     {
       "source": "packages/core/test/model-resilience.test.ts",
       "test": "packages/core/test/model-resilience.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/model-service-api.test.ts",
+      "test": "packages/core/test/model-service-api.test.ts",
       "kind": "same-stem"
     },
     {

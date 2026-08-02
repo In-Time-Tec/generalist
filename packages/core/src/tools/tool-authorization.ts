@@ -79,7 +79,7 @@ const approvalRequired = (request: Request): Effect.Effect<boolean> => {
   if (needsApproval === undefined) return Effect.succeed(false)
   if (typeof needsApproval === "boolean") return Effect.succeed(needsApproval)
   return Effect.suspend(() => {
-    const result = needsApproval(request.call.params as never, {
+    const result = needsApproval(request.call.params, {
       toolCallId: request.call.id,
       messages: request.messages,
     })

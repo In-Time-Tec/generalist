@@ -1,5 +1,6 @@
 import { Cause, Context, Duration, Effect, Function, Layer, Result, Schedule, Schema, Stream } from "effect"
-import { AiError, LanguageModel, Response, Tool } from "effect/unstable/ai"
+import { AiError, LanguageModel, Response } from "effect/unstable/ai"
+import { adapt } from "./model-service.js"
 import {
   type FailureResolver,
   defaultResolveFailure,
@@ -114,22 +115,22 @@ const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: 
 const retryStreamSchedule = (resilience: Interface): Schedule.Schedule<unknown, unknown> =>
   resilience.retrySchedule.pipe(Schedule.while(({ input }) => resilience.classify(input) === "transient"))
 
-const retryStream = <A, E, R>(
+const retryStream = <A, B, E, R>(
   stream: () => Stream.Stream<A, E, R>,
-  onEmittedFailure: (error: E) => A,
+  onEmittedFailure: (error: E) => B,
   resilience: Interface,
   consumesReplay: (value: A) => boolean,
-): Stream.Stream<A, E, R> =>
+): Stream.Stream<A | B, E, R> =>
   Stream.suspend(() => {
     let consumed = false
-    let held: Array<A> = []
-    const release = (): ReadonlyArray<A> => {
+    let held: Array<A | B> = []
+    const release = (): ReadonlyArray<A | B> => {
       const pending = held
       held = []
       return pending
     }
     return stream().pipe(
-      Stream.flatMap((value): Stream.Stream<A> => {
+      Stream.flatMap((value): Stream.Stream<A | B> => {
         if (!consumesReplay(value)) {
           held.push(value)
           return Stream.empty
@@ -138,8 +139,8 @@ const retryStream = <A, E, R>(
         return Stream.fromIterable([...release(), value])
       }),
       Stream.concat(Stream.suspend(() => Stream.fromIterable(release()))),
-      Stream.map((value): Result.Result<A, Cause.Cause<E>> => Result.succeed(value)),
-      Stream.catchCause((cause): Stream.Stream<Result.Result<A, Cause.Cause<E>>, E> => {
+      Stream.map((value): Result.Result<A | B, Cause.Cause<E>> => Result.succeed(value)),
+      Stream.catchCause((cause): Stream.Stream<Result.Result<A | B, Cause.Cause<E>>, E> => {
         const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
         if (reason === undefined || !Cause.isFailReason(reason)) return Stream.succeed(Result.fail(cause))
         if (!consumed) return Stream.fail(reason.error)
@@ -149,7 +150,7 @@ const retryStream = <A, E, R>(
   }).pipe(
     Stream.retry(retryStreamSchedule(resilience)),
     Stream.flatMap(
-      (result): Stream.Stream<A, E> =>
+      (result): Stream.Stream<A | B, E> =>
         Result.isFailure(result) ? Stream.failCause(result.failure) : Stream.succeed(result.success),
     ),
   )
@@ -161,55 +162,43 @@ export const apply: {
 } = Function.dual(
   2,
   (model: LanguageModel.Service, resilience: Interface): LanguageModel.Service =>
-    ({
-      ...model,
-      generateText: (options: LanguageModel.GenerateTextOptions<{}>) =>
+    adapt<
+      AiError.AiError | ModelResilienceMisconfigured,
+      AiError.AiError | ModelResilienceMisconfigured,
+      AiError.AiError | ModelResilienceMisconfigured
+    >(model, {
+      generateText: (_options, invoke) =>
         Effect.flatMap(validate(resilience), (validated) =>
           retryEffect(
             () =>
-              (options.toolkit === undefined
-                ? model.generateText({ ...options, toolkit: undefined })
-                : model.generateText({ ...options, toolkit: options.toolkit })
-              ).pipe(Effect.flatMap((response) => promoteResponseFailure(response, "generateText", validated.resolve))),
+              invoke().pipe(
+                Effect.flatMap((response) => promoteResponseFailure(response, "generateText", validated.resolve)),
+              ),
             validated,
           ),
         ),
-      generateObject: (<
-        ObjectEncoded extends Record<string, unknown>,
-        StructuredOutputSchema extends Schema.Codec<unknown, ObjectEncoded, unknown, unknown>,
-        Tools extends Record<string, Tool.Any>,
-      >(
-        options: LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
-      ) => {
-        const generate = model.generateObject
-        return Effect.flatMap(validate(resilience), (validated) =>
+      generateObject: (_options, invoke) =>
+        Effect.flatMap(validate(resilience), (validated) =>
           retryEffect(
             () =>
-              generate(options).pipe(
+              invoke().pipe(
                 Effect.flatMap((response) => promoteResponseFailure(response, "generateObject", validated.resolve)),
               ),
             validated,
           ),
-        )
-      }) as LanguageModel.Service["generateObject"],
-      streamText: (options: LanguageModel.GenerateTextOptions<{}>) =>
+        ),
+      streamText: (_options, invoke) =>
         Stream.unwrap(
           validate(resilience).pipe(
             Effect.map((validated) =>
               retryStream(
-                () =>
-                  promoteStreamFailures(
-                    options.toolkit === undefined
-                      ? model.streamText({ ...options, toolkit: undefined })
-                      : model.streamText({ ...options, toolkit: options.toolkit }),
-                    validated.resolve,
-                  ),
+                () => promoteStreamFailures(invoke(), validated.resolve),
                 (error) => Response.makePart("error", { error }),
                 validated,
-                (part: Response.StreamPart<never>) => part.type !== "response-metadata",
+                (part) => part.type !== "response-metadata",
               ),
             ),
           ),
         ),
-    }) as LanguageModel.Service,
+    }),
 )

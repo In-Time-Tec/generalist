@@ -1,6 +1,8 @@
 import { Context, Effect, Layer, Option } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { AgentError } from "../agent/agent-event.js"
+/** @experimental Typed operation-level adapter for LanguageModel.Service wrappers. */
+export { adapt } from "./model-service.js"
 /** @experimental Turn-scoped info handed to middleware. */
 export interface TurnContext {
   readonly agentName: string

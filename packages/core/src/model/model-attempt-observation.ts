@@ -52,7 +52,7 @@ const providerUsageFromError = (error: unknown): ModelProviderUsage | undefined 
     error._tag === "@batonfx/core/InvalidToolCallParameters" &&
     "providerUsage" in error
   ) {
-    return error.providerUsage as ModelProviderUsage | undefined
+    return Schema.is(ModelProviderUsage)(error.providerUsage) ? error.providerUsage : undefined
   }
   if (!AiError.isAiError(error)) return undefined
   if (error.reason._tag !== "InvalidOutputError" && error.reason._tag !== "StructuredOutputError") return undefined

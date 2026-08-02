@@ -1,6 +1,7 @@
 import { Cause, Clock, Effect, Option, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import { type InvalidToolCallParameters, isInvalidToolCallParameters } from "./model-tool-call-validation.js"
+import { invokeStreamText } from "./model-service.js"
 import type { EventPayload, ModelFailureCategory } from "./model-telemetry.js"
 
 export type StreamTextOptions = LanguageModel.GenerateTextOptions<Record<string, Tool.Any>>
@@ -53,10 +54,7 @@ const correctLoop = (
 ): Stream.Stream<StreamTextPart, AiError.AiError | InvalidToolCallParameters, any> =>
   Stream.suspend(() => {
     let consumed = false
-    const invoke = model.streamText as unknown as (
-      input: StreamTextOptions,
-    ) => Stream.Stream<StreamTextPart, AiError.AiError, any>
-    return invoke(options).pipe(
+    return invokeStreamText(model, options).pipe(
       Stream.tap((part) =>
         Effect.sync(() => {
           if (part.type !== "response-metadata") consumed = true

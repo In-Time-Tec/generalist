@@ -1,5 +1,6 @@
 import { Effect, Encoding, Layer, Result, Stream } from "effect"
 import { AiError, LanguageModel, Prompt } from "effect/unstable/ai"
+import { ModelMiddleware } from "@batonfx/core"
 
 const imageMediaTypes = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"])
 const base64Pattern = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
@@ -71,28 +72,13 @@ const normalizeOptions = <Options extends { readonly prompt: Prompt.RawInput }>(
   Effect.map(normalizePrompt(options.prompt), (prompt) => ({ ...options, prompt }))
 
 /** @experimental */
-export const conformImageSourceModel = (model: LanguageModel.Service): LanguageModel.Service => {
-  const generateText = model.generateText as unknown as (options: {
-    readonly prompt: Prompt.RawInput
-  }) => Effect.Effect<unknown, AiError.AiError>
-  const generateObject = model.generateObject as unknown as (options: {
-    readonly prompt: Prompt.RawInput
-  }) => Effect.Effect<unknown, AiError.AiError>
-  const streamText = model.streamText as unknown as (options: {
-    readonly prompt: Prompt.RawInput
-  }) => Stream.Stream<unknown, AiError.AiError>
-  return {
-    ...model,
-    generateText: ((options: { readonly prompt: Prompt.RawInput }) =>
-      Effect.flatMap(normalizeOptions(options), generateText)) as unknown as LanguageModel.Service["generateText"],
-    generateObject: ((options: { readonly prompt: Prompt.RawInput }) =>
-      Effect.flatMap(normalizeOptions(options), generateObject)) as unknown as LanguageModel.Service["generateObject"],
-    streamText: ((options: { readonly prompt: Prompt.RawInput }) =>
-      Stream.unwrap(
-        Effect.map(normalizeOptions(options), streamText),
-      )) as unknown as LanguageModel.Service["streamText"],
-  } as LanguageModel.Service
-}
+export const conformImageSourceModel = (model: LanguageModel.Service): LanguageModel.Service =>
+  ModelMiddleware.adapt<AiError.AiError, AiError.AiError, AiError.AiError>(model, {
+    generateText: (options, invoke) => Effect.flatMap(normalizeOptions(options), (normalized) => invoke(normalized)),
+    generateObject: (options, invoke) => Effect.flatMap(normalizeOptions(options), (normalized) => invoke(normalized)),
+    streamText: (options, invoke) =>
+      Stream.unwrap(Effect.map(normalizeOptions(options), (normalized) => invoke(normalized))),
+  })
 
 /** @experimental */
 export const layerImageSources = <E, R>(
