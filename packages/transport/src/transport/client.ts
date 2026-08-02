@@ -67,7 +67,7 @@ export class AgentClient extends Context.Service<AgentClient, AgentClientInterfa
   "@batonfx/transport/AgentClient",
 ) {}
 
-const ServerFrameJson = Schema.fromJsonString(LooseServerFrame)
+const dynamicWireCodec = codec({ capability: "runtime-dynamic" })
 const wireCodec = codec(Toolkit.empty)
 
 const transportError = (message: string, kind?: TransportError["kind"]): TransportError =>
@@ -77,9 +77,7 @@ const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 
 const decodeServerText = (text: string): Effect.Effect<LooseServerFrameType, TransportError> =>
-  Schema.decodeUnknownEffect(ServerFrameJson)(text).pipe(
-    Effect.mapError((error) => transportError(errorMessage(error), "protocol")),
-  )
+  dynamicWireCodec.decodeServer(text).pipe(Effect.mapError((error) => transportError(error.message, "protocol")))
 
 const encodeClientText = (frame: ClientFrameType): Effect.Effect<string, TransportError> =>
   wireCodec.encodeClient(frame).pipe(Effect.mapError((error) => transportError(error.message, "encoding")))

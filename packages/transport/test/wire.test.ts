@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Option, Schema } from "effect"
+import { Context, Effect, Exit, Layer, Option, Schema, SchemaTransformation } from "effect"
 import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentEvent, ModelTelemetry, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import { Wire } from "../src/index"
@@ -12,6 +12,21 @@ const echoTool = Tool.make("echo", {
 })
 
 const toolkit = Toolkit.make(echoTool)
+
+class WirePrefix extends Context.Service<WirePrefix, string>()("@batonfx/transport/test/WirePrefix") {}
+const requiresPrefix = Schema.String.pipe(
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transformOrFail({
+      decode: (value) =>
+        Effect.gen(function* () {
+          const prefix = yield* WirePrefix
+          return value + prefix
+        }),
+      encode: (value) => Effect.succeed(value),
+    }),
+  ),
+)
 
 const decodeFixedOption = (activeToolkit: Toolkit.Any, frame: unknown) => {
   const exit = Effect.runSyncExit(Wire.codec(activeToolkit).decodeServer(JSON.stringify(frame)))
@@ -680,4 +695,102 @@ describe("Wire", () => {
     )
     expect(decoded._tag === "Event" && decoded.event._tag === "Completed" && decoded.event.transcript).toBeUndefined()
   })
+
+  it("keeps standard validation strict in runtime-dynamic mode", () => {
+    const codec = Wire.codec({ capability: "runtime-dynamic" })
+    const probes = [
+      {
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ModelPart",
+          turn: 0,
+          modelCallId: "model-call-0",
+          modelAttemptId: "model-attempt-0",
+          attempt: 0,
+          part: { type: "not-a-response-part" },
+        },
+      },
+      { _tag: "Failed", seq: 0, error: { _tag: "NotAFrameworkError" } },
+      { _tag: "Suspended", seq: 0, suspension: { _tag: "NotASuspension" } },
+      { _tag: "SessionStatus", seq: 0, status: { _tag: "Failed", error: { _tag: "NotAFrameworkError" } } },
+    ]
+
+    for (const probe of probes) {
+      expect(Exit.isFailure(Effect.runSyncExit(codec.decodeServer(JSON.stringify(probe))))).toBe(true)
+    }
+  })
+
+  it("exposes a service-free event schema for toolkit introspection", () => {
+    expect(Schema.is(Wire.EventSchema(toolkit))({ _tag: "TurnStarted", turn: 0 })).toBe(true)
+  })
+
+  it.effect("preserves tool schema services in the fixed codec requirement", () =>
+    Effect.gen(function* () {
+      const serviceTool = Tool.make("service-tool", {
+        parameters: Schema.Struct({ value: requiresPrefix }),
+        success: Schema.String,
+        failure: Schema.String,
+        failureMode: "return",
+      })
+      const serviceCodec = Wire.codec(Toolkit.make(serviceTool))
+      const json = JSON.stringify({
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ModelPart",
+          turn: 0,
+          modelCallId: "model-call-0",
+          modelAttemptId: "model-attempt-0",
+          attempt: 0,
+          part: {
+            type: "tool-call",
+            id: "call-0",
+            name: "service-tool",
+            params: { value: "value" },
+            providerExecuted: false,
+          },
+        },
+      })
+      const missingPrefix = serviceCodec.decodeServer(json) as unknown as Effect.Effect<unknown, unknown, never>
+      expect(Exit.isFailure(Effect.runSyncExit(missingPrefix))).toBe(true)
+      const needsPrefix = serviceCodec.decodeServer(json) as unknown as Effect.Effect<unknown, unknown, WirePrefix>
+      const provided = needsPrefix.pipe(Effect.provide(Layer.succeed(WirePrefix, WirePrefix.of("!"))))
+      const decoded = yield* provided
+      expect(decoded).toMatchObject({ event: { part: { params: { value: "value!" } } } })
+    }),
+  )
+
+  it.effect("dispatches transformed fixed-tool parameters through the concrete schema", () =>
+    Effect.gen(function* () {
+      const transformed = Tool.make("transformed", {
+        parameters: Schema.Struct({ count: Schema.FiniteFromString }),
+        success: Schema.String,
+        failure: Schema.String,
+        failureMode: "return",
+      })
+      const transformedCodec = Wire.codec(Toolkit.make(transformed))
+      const frame = {
+        _tag: "Event" as const,
+        seq: 0,
+        event: {
+          _tag: "ModelPart" as const,
+          turn: 0,
+          modelCallId: "model-call-0",
+          modelAttemptId: "model-attempt-0",
+          attempt: 0,
+          part: Response.makePart("tool-call", {
+            id: "call-0",
+            name: "transformed",
+            params: { count: 3 },
+            providerExecuted: false,
+          }),
+        },
+      }
+      const encoded = yield* transformedCodec.encodeServer(frame)
+      expect(JSON.parse(encoded).event.part.params).toEqual({ count: "3" })
+      const decoded = yield* transformedCodec.decodeServer(encoded)
+      expect(decoded).toMatchObject({ event: { part: { params: { count: 3 } } } })
+    }),
+  )
 })

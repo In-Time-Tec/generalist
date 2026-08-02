@@ -1,5 +1,5 @@
 import { Effect, Schema, SchemaTransformation } from "effect"
-import { Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentEvent, ModelTelemetry, ToolExecutor, TurnPolicy } from "@batonfx/core"
 import { WireEncodeFailed } from "./errors.js"
 
@@ -14,7 +14,9 @@ export type Sequence = typeof Sequence.Type
 export const SequenceFromString = Schema.String.check(Schema.isPattern(/^\d+$/)).pipe(
   Schema.decodeTo(Sequence, SchemaTransformation.numberFromString),
 )
-const SnapshotSequence = Schema.Union([Schema.Literals([-1]), Sequence])
+export const SnapshotSequence = Schema.Union([Schema.Literals([-1]), Sequence])
+export const Metadata = Schema.Record(Schema.String, Schema.Unknown)
+export const OptionalMetadata = Schema.optionalKey(Metadata)
 
 /** @experimental */
 export type RunFailure =
@@ -42,8 +44,8 @@ export const RunFailure: Schema.Schema<RunFailure> = Schema.Union([
 export type SessionStatus =
   | { readonly _tag: "Idle" }
   | { readonly _tag: "Running"; readonly turn: number }
-  | { readonly _tag: "Suspended"; readonly suspension: any }
-  | { readonly _tag: "Failed"; readonly error: any }
+  | { readonly _tag: "Suspended"; readonly suspension: AgentEvent.AgentSuspended }
+  | { readonly _tag: "Failed"; readonly error: RunFailure }
 /** @experimental */
 export const SessionStatus: Schema.Schema<SessionStatus> = Schema.Union([
   Schema.Struct({ _tag: Schema.tag("Idle") }),
@@ -73,45 +75,48 @@ export const ClientFrame = Schema.Union([
 /** @experimental */
 export type ClientFrameType = typeof ClientFrame.Type
 
-const Metadata = Schema.Record(Schema.String, Schema.Unknown)
-const OptionalMetadata = Schema.optionalKey(Metadata)
-const LooseToolCallPart = Schema.Struct({
-  type: Schema.tag("tool-call"),
-  id: Schema.String,
-  name: Schema.String,
-  params: Schema.Unknown,
-  providerExecuted: Schema.optionalKey(Schema.Boolean),
-  metadata: OptionalMetadata,
-})
-const LooseToolResultPart = Schema.Struct({
-  type: Schema.tag("tool-result"),
-  id: Schema.String,
-  name: Schema.String,
-  result: Schema.Unknown,
-  encodedResult: Schema.optionalKey(Schema.Unknown),
-  isFailure: Schema.Boolean,
-  providerExecuted: Schema.optionalKey(Schema.Boolean),
-  preliminary: Schema.optionalKey(Schema.Boolean),
-  metadata: OptionalMetadata,
-})
-
-const StructuralPart = Schema.Unknown
-const StructuralResponsePart = Schema.Unknown
-const isTelemetryTag = (tag: unknown): boolean =>
-  tag === "ModelCallStarted" ||
-  tag === "ModelAttemptStarted" ||
-  tag === "ModelAttemptFirstOutput" ||
-  tag === "ModelAttemptCompleted" ||
-  tag === "ModelAttemptFailed" ||
-  tag === "ModelRetryScheduled" ||
-  tag === "ModelCallCompleted" ||
-  tag === "ModelCallFailed" ||
-  tag === "CompactionStarted" ||
-  tag === "CompactionCompleted" ||
-  tag === "CompactionFailed"
-const StructuralTelemetry = Schema.Record(Schema.String, Schema.Unknown).pipe(
-  Schema.check(Schema.makeFilter((event) => isTelemetryTag(event._tag) || "Expected telemetry event")),
+type WireToolCall = {
+  readonly type: "tool-call"
+  readonly id: string
+  readonly name: string
+  readonly params: unknown
+  readonly providerExecuted?: boolean
+  readonly metadata?: Readonly<Record<string, unknown>>
+}
+type WireToolResult = {
+  readonly type: "tool-result"
+  readonly id: string
+  readonly name: string
+  readonly result: unknown
+  readonly encodedResult?: unknown
+  readonly isFailure: boolean
+  readonly providerExecuted?: boolean
+  readonly preliminary?: boolean
+  readonly metadata?: Readonly<Record<string, unknown>>
+}
+type WireResponsePart = Response.StreamPart<Record<string, Tool.Any>> | WireToolCall | WireToolResult
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null
+const isWireToolCall = (value: unknown): value is WireToolCall =>
+  isRecord(value) && value.type === "tool-call" && typeof value.id === "string" && typeof value.name === "string"
+export const LooseToolCallPart: Schema.Schema<WireToolCall> = Schema.declare(isWireToolCall)
+type WireTelemetry = typeof ModelTelemetry.Event.Type
+const StructuralTelemetry: Schema.Schema<WireTelemetry> = Schema.declare(
+  (value): value is WireTelemetry =>
+    (isRecord(value) && typeof value._tag === "string" && value._tag.startsWith("Model")) ||
+    (isRecord(value) && typeof value._tag === "string" && value._tag.startsWith("Compaction")),
 )
+const StructuralPart: Schema.Schema<WireResponsePart> = Schema.declare(
+  (value): value is WireResponsePart => isRecord(value) && typeof value.type === "string",
+)
+const isWireToolResult = (value: unknown): value is WireToolResult =>
+  isRecord(value) &&
+  value.type === "tool-result" &&
+  typeof value.id === "string" &&
+  typeof value.name === "string" &&
+  typeof value.isFailure === "boolean"
+export const LooseToolResultPart: Schema.Schema<WireToolResult> = Schema.declare(isWireToolResult)
+
 const StructuralEvent = Schema.Union([
   Schema.Struct({ _tag: Schema.tag("TurnStarted"), turn: Schema.Finite, metadata: OptionalMetadata }),
   Schema.Struct({
@@ -161,9 +166,9 @@ const StructuralEvent = Schema.Union([
   Schema.Struct({
     _tag: Schema.tag("TurnCompleted"),
     turn: Schema.Finite,
-    transcript: Schema.optionalKey(Schema.Unknown),
-    usage: Schema.optionalKey(Schema.Unknown),
-    finishReason: Schema.optionalKey(Schema.Unknown),
+    transcript: Schema.optionalKey(Prompt.Prompt),
+    usage: Schema.optionalKey(Response.Usage),
+    finishReason: Schema.optionalKey(Response.FinishReason),
     metadata: OptionalMetadata,
   }),
   Schema.Struct({
@@ -171,67 +176,156 @@ const StructuralEvent = Schema.Union([
     turn: Schema.Finite,
     modelCallId: Schema.String,
     modelAttemptId: Schema.String,
-    attempt: Schema.Int,
+    attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     value: Schema.Unknown,
-    content: Schema.Array(StructuralResponsePart),
+    content: Schema.Array(Schema.Unknown),
     metadata: OptionalMetadata,
   }),
   Schema.Struct({
     _tag: Schema.tag("Completed"),
     turns: Schema.Finite,
     text: Schema.String,
-    transcript: Schema.optionalKey(Schema.Unknown),
-    usage: Schema.optionalKey(Schema.Unknown),
+    transcript: Schema.optionalKey(Prompt.Prompt),
+    usage: Schema.optionalKey(Response.Usage),
     metadata: OptionalMetadata,
   }),
 ])
 
-/** @experimental Event type for runtime-dynamic tool names and payloads. */
-export type LooseEventType = any
-/** @experimental Wire event type. */
-export type EventType = any
-/** @experimental */
-export type ServerFrameType =
-  | { readonly _tag: "Event"; readonly seq: number; readonly event: EventType }
-  | { readonly _tag: "Failed"; readonly seq: number; readonly error: any }
-  | { readonly _tag: "Suspended"; readonly seq: number; readonly suspension: any }
-  | { readonly _tag: "Ended"; readonly seq: number }
-  | { readonly _tag: "Snapshot"; readonly seq: number; readonly transcript: any }
-  | { readonly _tag: "SessionStatus"; readonly seq: number; readonly status: any }
-/** @experimental */
-export type LooseServerFrameType =
-  | { readonly _tag: "Event"; readonly seq: number; readonly event: LooseEventType }
-  | { readonly _tag: "Failed"; readonly seq: number; readonly error: any }
-  | { readonly _tag: "Suspended"; readonly seq: number; readonly suspension: any }
-  | { readonly _tag: "Ended"; readonly seq: number }
-  | { readonly _tag: "Snapshot"; readonly seq: number; readonly transcript: any }
-  | { readonly _tag: "SessionStatus"; readonly seq: number; readonly status: any }
+const StructuralSuspension = Schema.Struct({
+  _tag: Schema.tag("@batonfx/core/AgentSuspended"),
+  token: Schema.String,
+  reason: Schema.Literals(["tool-wait", "approval"]),
+  tool_call_index: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  tool_call_id: Schema.String,
+  tool_name: Schema.String,
+  tool_params: Schema.Unknown,
+  tool_call_batch: Schema.Array(
+    Schema.Struct({
+      type: Schema.Literal("tool-call"),
+      id: Schema.String,
+      name: Schema.String,
+      params: Schema.Unknown,
+      providerExecuted: Schema.Boolean,
+      metadata: Response.ProviderMetadata,
+    }),
+  ),
+  active_tools: Schema.optional(Schema.Array(Schema.String)),
+  activated_skills: Schema.optional(Schema.Array(Schema.String)),
+})
+const StructuralFrameSchema = Schema.Union([
+  Schema.Struct({ _tag: Schema.tag("Event"), seq: Sequence, event: StructuralEvent }),
+  Schema.Struct({ _tag: Schema.tag("Failed"), seq: Sequence, error: RunFailure }),
+  Schema.Struct({ _tag: Schema.tag("Suspended"), seq: Sequence, suspension: StructuralSuspension }),
+  Schema.Struct({ _tag: Schema.tag("Ended"), seq: Sequence }),
+  Schema.Struct({ _tag: Schema.tag("Snapshot"), seq: SnapshotSequence, transcript: Prompt.Prompt }),
+  Schema.Struct({ _tag: Schema.tag("SessionStatus"), seq: Sequence, status: SessionStatus }),
+])
 
-/** @experimental Structural event schema; fixed codecs add concrete tool schemas in a second stage. */
-export const EventSchema = StructuralEvent
+/** @experimental Event type for runtime-dynamic tool names and payloads. */
+export type LooseEventType = Schema.Schema.Type<typeof StructuralEvent>
+/** @experimental Wire event type for fixed-tool frames. */
+export type EventType = LooseEventType & { readonly __batonFixedEvent?: never }
+/** @experimental */
+const telemetryTags = new Set([
+  "ModelCallStarted",
+  "ModelAttemptStarted",
+  "ModelAttemptFirstOutput",
+  "ModelAttemptCompleted",
+  "ModelAttemptFailed",
+  "ModelRetryScheduled",
+  "ModelCallCompleted",
+  "ModelCallFailed",
+  "CompactionStarted",
+  "CompactionCompleted",
+  "CompactionFailed",
+])
+const isStructuralEvent = (value: unknown): value is Schema.Schema.Type<typeof StructuralEvent> => {
+  if (!isRecord(value) || typeof value._tag !== "string") return false
+  const finiteTurn = typeof value.turn === "number" && Number.isFinite(value.turn)
+  switch (value._tag) {
+    case "TurnStarted":
+      return finiteTurn
+    case "ModelPart":
+      return finiteTurn && isRecord(value.part) && typeof value.part.type === "string"
+    case "ToolExecutionStarted":
+    case "ApprovalRequested":
+      return finiteTurn && isWireToolCall(value.call)
+    case "ToolExecutionCompleted":
+      return finiteTurn && isWireToolCall(value.call) && isWireToolResult(value.result)
+    case "ToolProgress":
+      return finiteTurn && typeof value.toolCallId === "string"
+    case "SteeringDrained":
+      return finiteTurn && (value.queue === "steering" || value.queue === "followUp")
+    case "TurnCompleted":
+      return finiteTurn
+    case "StructuredOutput":
+      return finiteTurn && Array.isArray(value.content)
+    case "Completed":
+      return typeof value.turns === "number" && Number.isFinite(value.turns) && typeof value.text === "string"
+    default:
+      return telemetryTags.has(value._tag)
+  }
+}
+export const StructuralFrame: Schema.Codec<
+  Schema.Schema.Type<typeof StructuralFrameSchema>,
+  Schema.Schema.Type<typeof StructuralFrameSchema>,
+  never,
+  never
+> = Schema.declare((value): value is Schema.Schema.Type<typeof StructuralFrameSchema> => {
+  if (!isRecord(value) || typeof value._tag !== "string") return false
+  const validSequence = typeof value.seq === "number" && Number.isSafeInteger(value.seq) && value.seq >= 0
+  if (value._tag === "Snapshot") {
+    return (validSequence || value.seq === -1) && isRecord(value.transcript) && Array.isArray(value.transcript.content)
+  }
+  if (!validSequence) return false
+  if (value._tag === "Event") return isStructuralEvent(value.event)
+  if (value._tag === "Ended") return true
+  if (value._tag === "Failed" || value._tag === "Suspended" || value._tag === "SessionStatus") return true
+  return false
+})
+/** @experimental */
+export type LooseServerFrameType = Schema.Schema.Type<typeof StructuralFrame>
+/** @experimental */
+export type ServerFrameType = LooseServerFrameType & { readonly __batonFixedFrame?: never }
+
+/** @experimental Structural event schema used for public wire introspection. */
+export function EventSchema<T extends ToolkitInput>(_toolkit: T): typeof StructuralEvent {
+  return StructuralEvent
+}
 /** @experimental Structural event schema for dynamic tool payloads. */
 export const LooseEventSchema = StructuralEvent
-const StructuralFrame = Schema.Union([
-  Schema.Struct({ _tag: Schema.tag("Event"), seq: Sequence, event: StructuralEvent }),
-  Schema.Struct({ _tag: Schema.tag("Failed"), seq: Sequence, error: Schema.Unknown }),
-  Schema.Struct({ _tag: Schema.tag("Suspended"), seq: Sequence, suspension: Schema.Unknown }),
-  Schema.Struct({ _tag: Schema.tag("Ended"), seq: Sequence }),
-  Schema.Struct({ _tag: Schema.tag("Snapshot"), seq: SnapshotSequence, transcript: Schema.Unknown }),
-  Schema.Struct({ _tag: Schema.tag("SessionStatus"), seq: Sequence, status: Schema.Unknown }),
-])
 /** @experimental Structural server frame schema. */
-export function ServerFrame<T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(_toolkit: T) {
+export function ServerFrame<T extends ToolkitInput>(_toolkit: T): typeof StructuralFrame {
   return StructuralFrame
 }
 /** @experimental Structural loose server frame schema. */
 export const LooseServerFrame = StructuralFrame
 
-/** @experimental Fixed startup-toolkit or runtime-dynamic server-frame validation policy. */
-export type Capability<
-  T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>> =
-    | Toolkit.Any
-    | Toolkit.WithHandler<Record<string, Tool.Any>>,
-> = { readonly capability: "fixed"; readonly toolkit: T } | { readonly capability: "runtime-dynamic" }
+export type ToolkitInput = Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>
+type ToolkitTools<T extends ToolkitInput> =
+  T extends Toolkit.WithHandler<infer Tools> ? Tools : T extends Toolkit.Toolkit<infer Tools> ? Tools : never
+type ToolFailureSchema<T extends Tool.Any> =
+  T extends Tool.Tool<string, infer Config, infer _Requirements> ? Config["failure"] : Schema.Never
+type ToolSchemaServices<T extends Tool.Any> =
+  | Tool.ParametersSchema<T>["EncodingServices"]
+  | Tool.ParametersSchema<T>["DecodingServices"]
+  | Tool.SuccessSchema<T>["EncodingServices"]
+  | Tool.SuccessSchema<T>["DecodingServices"]
+  | ToolFailureSchema<T>["EncodingServices"]
+  | ToolFailureSchema<T>["DecodingServices"]
+type ToolkitServicesForTools<Tools extends Record<string, Tool.Any>> = [keyof Tools] extends [never]
+  ? never
+  : Tools[keyof Tools] extends infer ToolValue
+    ? ToolValue extends Tool.Any
+      ? ToolSchemaServices<ToolValue>
+      : never
+    : never
+export type ToolkitServices<T extends ToolkitInput> =
+  ToolkitTools<T> extends infer Tools
+    ? Tools extends Record<string, Tool.Any>
+      ? ToolkitServicesForTools<Tools>
+      : never
+    : never
 
 /** @experimental Lazy wire codec. Encoding and decoding services are carried by the effect channels. */
 export interface WireCodec<Frame = ServerFrameType, R = never> {
@@ -241,134 +335,40 @@ export interface WireCodec<Frame = ServerFrameType, R = never> {
   readonly decodeClient: (data: string) => Effect.Effect<ClientFrameType, WireEncodeFailed>
 }
 
-const encodeError = (error: unknown): WireEncodeFailed => WireEncodeFailed.make({ message: String(error) })
-const missingTool = (name: string): Effect.Effect<never, WireEncodeFailed> =>
-  Effect.fail(WireEncodeFailed.make({ message: `Tool '${name}' is not declared by the fixed toolkit` }))
+import { makeFixedCodec, makeDynamicCodec, makeSchemaCodec } from "./wire-codec.js"
 
-type ToolkitInput = Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>
-type ToolkitServices = unknown
-
-type Direction = "encode" | "decode"
-const toolPart = (toolkit: ToolkitInput, part: any, direction: Direction) => {
-  if (part.type !== "tool-call" && part.type !== "tool-result") return Effect.succeed(part)
-  const tools = Object.values(toolkit.tools)
-  const tool = tools.find((candidate) => candidate.name === part.name)
-  if (tool === undefined) return missingTool(part.name)
-  const schema =
-    part.type === "tool-call"
-      ? Response.ToolCallPart(tool.name, tool.parametersSchema)
-      : Response.ToolResultPart(
-          tool.name,
-          part.isFailure ? Schema.Never : tool.successSchema,
-          part.isFailure ? tool.failureSchema : Schema.Never,
-        )
-  return direction === "encode"
-    ? Schema.encodeUnknownEffect(schema)(part).pipe(Effect.mapError(encodeError))
-    : Schema.decodeUnknownEffect(schema)(part).pipe(Effect.mapError(encodeError))
-}
-
-const mapEvent = (toolkit: ToolkitInput, event: any, direction: Direction) => {
-  const mapPart = (part: any) => toolPart(toolkit, part, direction)
-  switch (event._tag) {
-    case "ModelPart":
-      return mapPart(event.part).pipe(Effect.map((part) => ({ ...event, part })))
-    case "ToolExecutionStarted":
-    case "ApprovalRequested":
-      return mapPart(event.call).pipe(Effect.map((call) => ({ ...event, call })))
-    case "ToolExecutionCompleted":
-      return Effect.all({ call: mapPart(event.call), result: mapPart(event.result) }).pipe(
-        Effect.map(({ call, result }) => ({ ...event, call, result })),
-      )
-    case "StructuredOutput":
-      return Effect.forEach(event.content, mapPart).pipe(Effect.map((content) => ({ ...event, content })))
-    default:
-      return Effect.succeed(event)
-  }
-}
-
-const mapFrame = (toolkit: ToolkitInput, frame: any, direction: Direction) => {
-  if (frame._tag === "Event") {
-    return mapEvent(toolkit, frame.event, direction).pipe(Effect.map((event) => ({ ...frame, event })))
-  }
-  if (direction === "decode" && frame._tag === "Failed") {
-    return Schema.decodeUnknownEffect(RunFailure)(frame.error).pipe(Effect.map((error) => ({ ...frame, error })))
-  }
-  if (direction === "decode" && frame._tag === "Suspended") {
-    return Schema.decodeUnknownEffect(AgentEvent.AgentSuspended)(frame.suspension).pipe(
-      Effect.map((suspension) => ({ ...frame, suspension })),
-    )
-  }
-  if (direction === "decode" && frame._tag === "SessionStatus") {
-    return Schema.decodeUnknownEffect(SessionStatus)(frame.status).pipe(Effect.map((status) => ({ ...frame, status })))
-  }
-  return Effect.succeed(frame)
-}
-
-const makeDynamicCodec = (): WireCodec<LooseServerFrameType, never> => ({
-  encodeServer: (frame) =>
-    Schema.encodeUnknownEffect(Schema.fromJsonString(StructuralFrame))(frame).pipe(Effect.mapError(encodeError)),
-  encodeClient: (frame) =>
-    Schema.encodeEffect(Schema.fromJsonString(ClientFrame))(frame).pipe(Effect.mapError(encodeError)),
-  decodeServer: (data) =>
-    Schema.decodeUnknownEffect(Schema.fromJsonString(StructuralFrame))(data).pipe(Effect.mapError(encodeError)),
-  decodeClient: (data) =>
-    Schema.decodeUnknownEffect(Schema.fromJsonString(ClientFrame))(data).pipe(Effect.mapError(encodeError)),
-})
-
-const makeCodec = (toolkit: ToolkitInput): WireCodec<ServerFrameType | LooseServerFrameType, ToolkitServices> => ({
-  encodeServer: (frame) =>
-    mapFrame(toolkit, frame, "encode").pipe(
-      Effect.mapError(encodeError),
-      Effect.flatMap((mapped) => Schema.encodeUnknownEffect(Schema.fromJsonString(StructuralFrame))(mapped)),
-      Effect.mapError(encodeError),
-    ),
-  encodeClient: (frame) =>
-    Schema.encodeEffect(Schema.fromJsonString(ClientFrame))(frame).pipe(Effect.mapError(encodeError)),
-  decodeServer: (data) =>
-    Schema.decodeUnknownEffect(Schema.fromJsonString(StructuralFrame))(data).pipe(
-      Effect.flatMap((frame) => mapFrame(toolkit, frame, "decode").pipe(Effect.mapError(encodeError))),
-      Effect.mapError(encodeError),
-    ),
-  decodeClient: (data) =>
-    Schema.decodeUnknownEffect(Schema.fromJsonString(ClientFrame))(data).pipe(Effect.mapError(encodeError)),
-})
-
-const makeSchemaCodec = <S extends Schema.Constraint>(
-  schema: S,
-): WireCodec<S["Type"], S["EncodingServices"] | S["DecodingServices"]> => ({
-  encodeServer: (frame) =>
-    Schema.encodeUnknownEffect(Schema.fromJsonString(schema))(frame).pipe(Effect.mapError(encodeError)),
-  encodeClient: (frame) =>
-    Schema.encodeEffect(Schema.fromJsonString(ClientFrame))(frame).pipe(Effect.mapError(encodeError)),
-  decodeServer: (data) =>
-    Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(data).pipe(Effect.mapError(encodeError)),
-  decodeClient: (data) =>
-    Schema.decodeUnknownEffect(Schema.fromJsonString(ClientFrame))(data).pipe(Effect.mapError(encodeError)),
-})
+/** @experimental Fixed startup-toolkit or runtime-dynamic server-frame validation policy. */
+export type Capability<T extends ToolkitInput = ToolkitInput> =
+  | { readonly capability: "fixed"; readonly toolkit: T }
+  | { readonly capability: "runtime-dynamic" }
 
 /** @experimental Builds an effectful codec from a concrete schema, preserving its services. */
 export function codecEffect<S extends Schema.Constraint>(
   schema: S,
 ): WireCodec<S["Type"], S["EncodingServices"] | S["DecodingServices"]>
 /** @experimental Builds an effectful fixed codec from a toolkit. */
-export function codecEffect(toolkit: ToolkitInput): WireCodec<ServerFrameType | LooseServerFrameType, unknown>
+export function codecEffect<T extends ToolkitInput>(
+  toolkit: T,
+): WireCodec<ServerFrameType | LooseServerFrameType, ToolkitServices<T>>
 export function codecEffect(input: Schema.Constraint | ToolkitInput) {
-  return "ast" in input ? makeSchemaCodec(input) : makeCodec(input)
+  return "ast" in input ? makeSchemaCodec(input) : makeFixedCodec(input)
 }
-/** @experimental Builds a synchronous fixed codec for service-free toolkits. */
-export function codec(toolkit: ToolkitInput): WireCodec<ServerFrameType | LooseServerFrameType, never>
+/** @experimental Builds a fixed codec, exposing any tool schema services in its effect requirement. */
+export function codec<T extends ToolkitInput>(
+  toolkit: T,
+): WireCodec<ServerFrameType | LooseServerFrameType, ToolkitServices<T>>
 /** @experimental Builds a synchronous dynamic codec. */
 export function codec(capability: { readonly capability: "runtime-dynamic" }): WireCodec<LooseServerFrameType, never>
-/** @experimental Builds a synchronous codec from a capability. */
+/** @experimental Builds a codec from a capability. */
 export function codec<T extends ToolkitInput>(
   capability: Capability<T>,
-): WireCodec<ServerFrameType | LooseServerFrameType, never>
+): WireCodec<ServerFrameType | LooseServerFrameType, ToolkitServices<T>>
 export function codec(
   input:
     | ToolkitInput
     | { readonly capability: "fixed"; readonly toolkit: ToolkitInput }
     | { readonly capability: "runtime-dynamic" },
 ) {
-  if ("tools" in input) return makeCodec(input)
-  return input.capability === "runtime-dynamic" ? makeDynamicCodec() : makeCodec(input.toolkit)
+  if ("tools" in input) return makeFixedCodec(input)
+  return input.capability === "runtime-dynamic" ? makeDynamicCodec() : makeFixedCodec(input.toolkit)
 }

@@ -2018,6 +2018,11 @@
       "test": false
     },
     {
+      "path": "packages/transport/src/transport/wire-codec.ts",
+      "package": "@batonfx/transport",
+      "test": false
+    },
+    {
       "path": "packages/transport/src/transport/wire.ts",
       "package": "@batonfx/transport",
       "test": false
@@ -9514,8 +9519,33 @@
       "specifier": "effect/unstable/httpapi"
     },
     {
+      "source": "packages/transport/src/transport/wire-codec.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/transport/src/transport/wire-codec.ts",
+      "specifier": "./wire.js"
+    },
+    {
+      "source": "packages/transport/src/transport/wire-codec.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/transport/src/transport/wire-codec.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/transport/src/transport/wire-codec.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
       "source": "packages/transport/src/transport/wire.ts",
       "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/transport/src/transport/wire.ts",
+      "specifier": "./wire-codec.js"
     },
     {
       "source": "packages/transport/src/transport/wire.ts",
