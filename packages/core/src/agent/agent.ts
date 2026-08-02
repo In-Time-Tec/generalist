@@ -36,9 +36,6 @@ const AgentTypeId: unique symbol = Symbol.for("@batonfx/core/Agent")
 export interface HandoffAgent<R> {
   readonly name: string
   readonly description?: string
-  readonly run: (
-    options: Pick<RunOptions, "prompt" | "history" | "system" | "resume">,
-  ) => Effect.Effect<Result, unknown, R>
   readonly requirements: (value: R) => R
 }
 
@@ -190,7 +187,6 @@ export function make<
       f({
         name: options.name,
         ...(options.instructions === undefined ? {} : { description: options.instructions }),
-        run: (runOptions) => generate(complete, runOptions),
         requirements: (value) => value,
       }),
   }

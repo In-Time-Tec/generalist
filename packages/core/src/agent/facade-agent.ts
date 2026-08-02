@@ -45,6 +45,8 @@ export namespace Agent {
   export type Resume = import("./agent.js").Resume
   export type RunError = import("./agent.js").RunError
   export type RunOptions = import("./agent.js").RunOptions
+  export type RunRequirements<R, O> = import("./agent.js").RunRequirements<R, O>
+  export type RunResult<O> = import("./agent.js").RunResult<O>
   export type ToolDeclaration = import("./agent.js").ToolDeclaration
   export type ToolExecutionPolicy = import("./agent.js").ToolExecutionPolicy
   export type WithModelDefault = import("./agent.js").WithModelDefault

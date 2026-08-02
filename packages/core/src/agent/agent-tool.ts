@@ -1,6 +1,6 @@
 import { Cause, Effect, Function, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
-import { type Agent, type HandoffAgent, type Result, generate } from "./agent.js"
+import { type Agent, type Result, generate } from "./agent.js"
 import {
   AgentError,
   AgentSuspended,
@@ -155,7 +155,7 @@ export const asTool: {
   >(
     options?: AsToolOptions<Name, Parameters, Success>,
   ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R> | HandoffAgent<R> | Registration,
+    agent: Agent<Tools, R> | Registration,
   ) => AgentToolToolkit<Name, Parameters, Success, R>
   <
     Tools extends Record<string, Tool.Any>,
@@ -164,7 +164,7 @@ export const asTool: {
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
   >(
-    agent: Agent<Tools, R> | HandoffAgent<R> | Registration,
+    agent: Agent<Tools, R> | Registration,
     options?: AsToolOptions<Name, Parameters, Success>,
   ): AgentToolToolkit<Name, Parameters, Success, R>
 } = Function.dual(
@@ -176,7 +176,7 @@ export const asTool: {
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
   >(
-    agent: Agent<Tools, R> | HandoffAgent<R> | Registration,
+    agent: Agent<Tools, R> | Registration,
     options: AsToolOptions<Name, Parameters, Success> = {},
   ): AgentToolToolkit<Name, Parameters, Success, R> => {
     const name = options.name ?? agent.name
@@ -185,7 +185,9 @@ export const asTool: {
     const handler = (params: unknown): Effect.Effect<unknown, string, R> =>
       Effect.gen(function* () {
         const prompt = yield* promptFor(options.parameters, options.toPrompt, params)
-        const result = yield* ("run" in agent ? agent.run({ prompt }) : generate(agent, { prompt })).pipe(
+        const execution: Effect.Effect<Result, unknown, R> =
+          "run" in agent ? agent.run({ prompt }) : generate(agent, { prompt })
+        const result = yield* execution.pipe(
           Effect.catchCause((cause) => {
             if (Cause.hasInterrupts(cause)) return Effect.interrupt
             return Effect.fail(causeMessage(agent.name, cause))
