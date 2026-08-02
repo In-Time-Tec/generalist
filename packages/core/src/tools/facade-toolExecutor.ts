@@ -55,4 +55,5 @@ export namespace ToolExecutor {
   export type Suspend = import("./tool-executor.js").Suspend
   export type ToolkitInput<Tools extends Record<string, import("effect/unstable/ai").Tool.Any>> =
     import("./tool-executor.js").ToolkitInput<Tools>
+  export type ClosedToolSet<R = unknown> = import("./tool-executor.js").ClosedToolSet<R>
 }

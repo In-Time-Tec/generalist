@@ -7,6 +7,7 @@ import {
   ModelMiddleware,
   Response,
   ToolExecutor,
+  Tool,
   Toolkit,
 } from "@batonfx/core"
 
@@ -22,7 +23,15 @@ const summarizeToolkit = AgentTool.asTool(summarizer, {
   toPrompt: (params) => `Summarize this: ${params.document}`,
 })
 
-const parentToolkit = Toolkit.make(...Object.values(summarizeToolkit.tools))
+const parentToolkit = Toolkit.make(
+  Tool.make("summarize", {
+    description: "Summarize a document in one sentence",
+    parameters: Schema.Struct({ document: Schema.String }),
+    success: Schema.String,
+    failure: Schema.String,
+    failureMode: "return",
+  }),
+)
 
 const parent = Agent.make({
   name: "editor",
@@ -70,7 +79,7 @@ const program = Agent.generate(parent, { prompt: "Summarize the intro document."
     Layer.mergeAll(
       modelLayer,
       parentToolkit.toLayer({ summarize: () => Effect.die("agent tool bridge handles summarize") }),
-      ToolExecutor.layerToolkit(summarizeToolkit),
+      ToolExecutor.layerToolkit(summarizeToolkit).pipe(Layer.provide(modelLayer)),
       Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),

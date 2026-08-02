@@ -1,5 +1,5 @@
 import { Cause, Effect, Function, Schema } from "effect"
-import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { Prompt, Tool } from "effect/unstable/ai"
 import { type Agent, type Result, generate } from "./agent.js"
 import {
   AgentError,
@@ -18,16 +18,7 @@ const defaultParameters = Schema.Struct({ prompt: Schema.String })
 
 type DefaultParameters = typeof defaultParameters
 type DefaultSuccess = typeof Schema.String
-type AgentToolTool<Name extends string, Parameters extends Schema.Top, Success extends Schema.Top, R> = Tool.Tool<
-  Name,
-  {
-    readonly parameters: Parameters
-    readonly success: Success
-    readonly failure: typeof Schema.String
-    readonly failureMode: "return"
-  },
-  R
->
+type ToolMap = { readonly [name: string]: Tool.Any }
 
 /** @experimental */
 export interface AsToolOptions<
@@ -43,13 +34,21 @@ export interface AsToolOptions<
   readonly fromResult?: (result: Result) => Success["Type"]
 }
 
-/** @experimental */
-export type AgentToolToolkit<
-  Name extends string,
-  Parameters extends Schema.Top,
-  Success extends Schema.Top,
+/** @experimental A schema-backed tool with a stable name and closed invocation. */
+export interface AgentToolToolkit<
+  _Name extends string,
+  _Parameters extends Schema.Top,
+  _Success extends Schema.Top,
   R,
-> = Toolkit.WithHandler<Record<Name, AgentToolTool<Name, Parameters, Success, R>>>
+> {
+  readonly name: string
+  readonly tool: Tool.Any
+  readonly tools: ToolMap
+  readonly parametersSchema: Schema.Top
+  readonly successSchema: Schema.Top
+  readonly invoke: (params: unknown) => Effect.Effect<unknown, string, R>
+  readonly requirements: (value: R) => R
+}
 
 const errorMessage = (error: unknown): string => {
   if (Schema.is(AgentSuspended)(error)) {
@@ -99,21 +98,50 @@ const errorMessage = (error: unknown): string => {
 const causeMessage = (agentName: string, cause: Cause.Cause<unknown>): string =>
   `sub-agent '${agentName}' could not complete: ${errorMessage(Cause.squash(cause))}`
 
+const defaultPrompt = (params: unknown): Prompt.RawInput =>
+  typeof params === "object" && params !== null && "prompt" in params && typeof params.prompt === "string"
+    ? params.prompt
+    : String(params)
+
+const defaultResult = (result: Result): string => result.text
+
+const promptFor = <Parameters extends Schema.Top>(
+  schema: Parameters | undefined,
+  callback: ((params: Parameters["Type"]) => Prompt.RawInput) | undefined,
+  params: unknown,
+): Effect.Effect<Prompt.RawInput, string> =>
+  schema === undefined
+    ? Effect.succeed(defaultPrompt(params))
+    : Schema.is(schema)(params)
+      ? Effect.try({
+          try: () => (callback === undefined ? defaultPrompt(params) : callback(params)),
+          catch: errorMessage,
+        })
+      : Effect.fail("Invalid agent-tool parameters")
+
+const resultFor = <Success extends Schema.Top>(
+  schema: Success | undefined,
+  callback: ((result: Result) => Success["Type"]) | undefined,
+  result: Result,
+): Effect.Effect<unknown, string> =>
+  Effect.try({
+    try: () => (schema === undefined || callback === undefined ? defaultResult(result) : callback(result)),
+    catch: errorMessage,
+  })
+
 const lazyHandled = <Name extends string, Parameters extends Schema.Top, Success extends Schema.Top, R>(
-  toolkit: Toolkit.Toolkit<Record<Name, AgentToolTool<Name, Parameters, Success, R>>>,
-  name: Name,
-  handler: (params: Parameters["Type"]) => Effect.Effect<Success["Type"], string, R>,
+  tool: Tool.Any,
+  name: string,
+  parameters: Parameters,
+  invoke: (params: unknown) => Effect.Effect<unknown, string, R>,
 ): AgentToolToolkit<Name, Parameters, Success, R> => ({
-  tools: toolkit.tools,
-  handle: (toolName, params) =>
-    toolkit
-      .toHandlers({
-        [name]: handler,
-      } as unknown as Toolkit.HandlersFrom<Record<Name, AgentToolTool<Name, Parameters, Success, R>>>)
-      .pipe(
-        Effect.flatMap((handlers) => toolkit.pipe(Effect.provide(handlers))),
-        Effect.flatMap((handled) => handled.handle(toolName, params)),
-      ),
+  name,
+  tool,
+  tools: { [name]: tool },
+  parametersSchema: parameters,
+  successSchema: tool.successSchema,
+  invoke,
+  requirements: (value) => value,
 })
 
 /** @experimental */
@@ -149,34 +177,27 @@ export const asTool: {
     agent: Agent<Tools, R>,
     options: AsToolOptions<Name, Parameters, Success> = {},
   ): AgentToolToolkit<Name, Parameters, Success, R> => {
-    const name = (options.name ?? agent.name) as Name
-    const parameters = (options.parameters ?? defaultParameters) as Parameters
-    const success = (options.success ?? Schema.String) as Success
-    const toPrompt = (options.toPrompt ?? ((params: DefaultParameters["Type"]) => params.prompt)) as (
-      params: Parameters["Type"],
-    ) => Prompt.RawInput
-    const fromResult = (options.fromResult ?? ((result: Result) => result.text)) as (result: Result) => Success["Type"]
-    const tool = Tool.make(name, {
-      ...(options.description === undefined ? {} : { description: options.description }),
-      parameters,
-      success,
-      failure: Schema.String,
-      failureMode: "return",
-    }) as AgentToolTool<Name, Parameters, Success, R>
-    const toolkit = Toolkit.make(tool) as unknown as Toolkit.Toolkit<
-      Record<Name, AgentToolTool<Name, Parameters, Success, R>>
-    >
-    const handler = (params: Parameters["Type"]): Effect.Effect<Success["Type"], string, R> =>
+    const name = options.name ?? agent.name
+    const parameters = options.parameters ?? defaultParameters
+    const success = options.success ?? Schema.String
+    const handler = (params: unknown): Effect.Effect<unknown, string, R> =>
       Effect.gen(function* () {
-        const prompt = yield* Effect.try({ try: () => toPrompt(params), catch: errorMessage })
+        const prompt = yield* promptFor(options.parameters, options.toPrompt, params)
         const result = yield* generate(agent, { prompt }).pipe(
           Effect.catchCause((cause) => {
             if (Cause.hasInterrupts(cause)) return Effect.interrupt
             return Effect.fail(causeMessage(agent.name, cause))
           }),
         )
-        return yield* Effect.try({ try: () => fromResult(result), catch: errorMessage })
+        return yield* resultFor(options.success, options.fromResult, result)
       })
-    return lazyHandled(toolkit, name, handler)
+    const tool: Tool.Any = Tool.make(name, {
+      ...(options.description === undefined ? {} : { description: options.description }),
+      parameters,
+      success,
+      failure: Schema.String,
+      failureMode: "return",
+    })
+    return lazyHandled(tool, name, parameters, handler)
   },
 )

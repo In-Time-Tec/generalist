@@ -5,21 +5,21 @@ import { toolResultCodec } from "./tool-result-codec.js"
 import type { ToolContext } from "./tool-context.js"
 
 /** @experimental */
-export interface Route {
+export interface Route<R = ToolContext> {
   readonly tools: ReadonlyArray<string>
   readonly matches: (request: Request) => boolean
-  readonly execute: Interface["execute"]
+  readonly execute: Interface<R>["execute"]
 }
 
 /** @experimental */
-export interface RouteOptions {
+export interface RouteOptions<R = ToolContext> {
   readonly tools?: ReadonlyArray<string> | undefined
   readonly matches?: ((request: Request) => boolean) | undefined
-  readonly execute: Interface["execute"]
+  readonly execute: Interface<R>["execute"]
 }
 
 /** @experimental */
-export type RouteInput<R = never> = Route | Effect.Effect<Route, never, R>
+export type RouteInput<R = never> = Route<R> | Effect.Effect<Route<R>, never, R>
 
 /** @experimental */
 export type Placement = "client" | "remote" | "mcp" | "sandbox"

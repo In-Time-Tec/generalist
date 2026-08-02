@@ -1,19 +1,10 @@
 import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
 import { AiError, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { AgentError } from "../agent/agent-event.js"
+import type { AgentToolToolkit } from "../agent/agent-tool.js"
 import { ToolContext } from "./tool-context.js"
-import {
-  type Placement,
-  type PlacementRequest,
-  type PlacementResponse,
-  type PlacementRouteOptions,
-  placementOutcome,
-  type RemoteRouteIdempotentOptions,
-  type RemoteRouteOptions,
-  type Route,
-  type RouteInput,
-  type RouteOptions,
-} from "./tool-placement.js"
+import type { Route, RouteInput } from "./tool-placement.js"
+import { client, mcp, remote, route, sandbox } from "./tool-executor-routes.js"
+export { client, mcp, remote, route, sandbox }
 import { toolResultCodec } from "./tool-result-codec.js"
 /** @experimental */
 export interface Request {
@@ -82,32 +73,52 @@ export class RemoteRetryMisconfigured extends Schema.TaggedErrorClass<RemoteRetr
 ) {}
 
 /** @experimental */
-export interface Interface {
-  readonly execute: (
-    request: Request,
-  ) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured, ToolContext>
+export interface Interface<R = ToolContext> {
+  readonly execute: (request: Request) => Effect.Effect<Outcome, FrameworkFailure | RemoteRetryMisconfigured, R>
 }
 
 /** @experimental */
-export class ToolExecutor extends Context.Service<ToolExecutor, Interface>()("@batonfx/core/ToolExecutor") {}
+export class ToolExecutor extends Context.Service<ToolExecutor, Interface<ToolContext>>()(
+  "@batonfx/core/ToolExecutor",
+) {}
 
 /** @experimental */
 export type ToolkitInput<Tools extends Record<string, Tool.Any>> = Toolkit.Toolkit<Tools> | Toolkit.WithHandler<Tools>
 
+/** @experimental A schema-backed tool set with a closed name-based invocation. */
+export interface ClosedToolSet<R = unknown> {
+  readonly tools: Readonly<Record<string, Tool.Any>>
+  readonly invoke: (name: string, params: unknown) => Effect.Effect<unknown, unknown, R>
+}
+
 type ResolvedTool = {
   readonly tool: Tool.Any
-  readonly invoke: (
+  invoke(
     params: unknown,
-  ) => Effect.Effect<
+  ): Effect.Effect<
     Stream.Stream<Tool.HandlerResult<Tool.Any>, Tool.HandlerError<Tool.Any>, Tool.HandlerServices<Tool.Any>>,
     AiError.AiError
   >
 }
 
+const registerResolvedTool = <Tools extends Record<string, Tool.Any>, Name extends Extract<keyof Tools, string>>(
+  toolkit: Toolkit.WithHandler<Tools>,
+  name: Name,
+  tool: Tools[Name],
+): ResolvedTool => ({
+  tool,
+  invoke(params: Tool.Parameters<Tools[Name]>) {
+    return toolkit.handle(name, params)
+  },
+})
+
 const hasTool = <Tools extends Record<string, Tool.Any>>(
   tools: Tools,
   name: string,
 ): name is Extract<keyof Tools, string> => Object.hasOwn(tools, name)
+
+const isRequest = (value: unknown): value is Request =>
+  typeof value === "object" && value !== null && "call" in value && "toolCallBatch" in value
 
 const resolvedToolkitCache = new WeakMap<object, ReadonlyMap<string, ResolvedTool>>()
 
@@ -121,14 +132,53 @@ const resolveTools = <Tools extends Record<string, Tool.Any>>(
     if (!hasTool(toolkit.tools, name)) continue
     const tool = toolkit.tools[name]
     if (tool === undefined) continue
-    resolved.set(name, {
-      tool,
-      invoke: (params) => toolkit.handle(name, params as Tool.Parameters<Tools[typeof name]>),
-    })
+    resolved.set(name, registerResolvedTool(toolkit, name, tool))
   }
   resolvedToolkitCache.set(toolkit, resolved)
   return resolved
 }
+
+const executeWithClosedSet = <R>(
+  toolkit: ClosedToolSet<R>,
+  request: Request,
+): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext> => {
+  const tool = toolkit.tools[request.call.name]
+  if (tool === undefined) {
+    return Effect.fail(
+      toolResultCodec.frameworkFailure(
+        "missing-handler",
+        request.call.name,
+        `Tool ${request.call.name} is not registered`,
+      ),
+    )
+  }
+  const handleFailure = (error: unknown): Effect.Effect<Outcome, FrameworkFailure> => {
+    if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
+    return toolResultCodec.encodeDomainCandidate(tool, error)
+  }
+  return toolResultCodec.decodeInput(tool, request.call.params).pipe(
+    Effect.flatMap(() => toolkit.invoke(request.call.name, request.call.params)),
+    Effect.flatMap((result) => toolResultCodec.decodeSuccess(tool, result)),
+    Effect.catchIf(() => true, handleFailure, handleFailure),
+  )
+}
+
+const executeWithClosedToolkit = <
+  Name extends string,
+  Parameters extends Schema.Top,
+  SuccessSchema extends Schema.Top,
+  R,
+>(
+  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
+  request: Request,
+): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext> =>
+  executeWithClosedSet(
+    {
+      tools: toolkit.tools,
+      invoke: (name, params) => (name === toolkit.name ? toolkit.invoke(params) : Effect.fail(`Unknown tool ${name}`)),
+    },
+    request,
+  )
 
 const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
@@ -176,6 +226,14 @@ const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
 }
 
 /** @experimental */
+export function executeToolkit<R>(
+  toolkit: ClosedToolSet<R>,
+  request: Request,
+): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext>
+export function executeToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
+  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
+  request: Request,
+): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext>
 export function executeToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
   request: Request,
@@ -186,18 +244,38 @@ export function executeToolkit<Tools extends Record<string, Tool.Any>>(
 ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>>
 export function executeToolkit(
   request: Request,
-): (<Tools extends Record<string, Tool.Any>>(
-  toolkit: Toolkit.WithHandler<Tools>,
-) => Effect.Effect<Outcome, FrameworkFailure, Tool.HandlerServices<Tools[keyof Tools]>>) &
+): (<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
+  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
+) => Effect.Effect<Outcome, FrameworkFailure, R | ToolContext>) &
+  (<Tools extends Record<string, Tool.Any>>(
+    toolkit: Toolkit.WithHandler<Tools>,
+  ) => Effect.Effect<Outcome, FrameworkFailure, Tool.HandlerServices<Tools[keyof Tools]>>) &
   (<Tools extends Record<string, Tool.Any>>(
     toolkit: Toolkit.Toolkit<Tools>,
   ) => Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]>>)
-export function executeToolkit<Tools extends Record<string, Tool.Any>>(
-  toolkitOrRequest: ToolkitInput<Tools> | Request,
+export function executeToolkit<
+  Tools extends Record<string, Tool.Any>,
+  Name extends string,
+  Parameters extends Schema.Top,
+  SuccessSchema extends Schema.Top,
+  R,
+>(
+  toolkitOrRequest:
+    | ToolkitInput<Tools>
+    | AgentToolToolkit<Name, Parameters, SuccessSchema, R>
+    | ClosedToolSet<R>
+    | Request,
   request?: Request,
 ): unknown {
   if (request === undefined) {
-    const pipeableRequest = toolkitOrRequest as Request
+    if (!isRequest(toolkitOrRequest)) return () => Effect.die("executeToolkit pipeable form requires a Request")
+    const pipeableRequest = toolkitOrRequest
+    function pipeable(
+      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R>,
+    ): unknown
+    function pipeable<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
+      toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
+    ): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext>
     function pipeable<CurrentTools extends Record<string, Tool.Any>>(
       toolkit: Toolkit.WithHandler<CurrentTools>,
     ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlerServices<CurrentTools[keyof CurrentTools]>>
@@ -215,189 +293,125 @@ export function executeToolkit<Tools extends Record<string, Tool.Any>>(
       FrameworkFailure,
       Tool.HandlersFor<CurrentTools> | Tool.HandlerServices<CurrentTools[keyof CurrentTools]>
     >
-    function pipeable<CurrentTools extends Record<string, Tool.Any>>(
-      toolkit: ToolkitInput<CurrentTools>,
-    ): Effect.Effect<
-      Outcome,
-      FrameworkFailure,
-      Tool.HandlersFor<CurrentTools> | Tool.HandlerServices<CurrentTools[keyof CurrentTools]>
-    > {
-      return "handle" in toolkit
-        ? executeWithToolkit(toolkit, pipeableRequest)
-        : executeToolkit(toolkit, pipeableRequest)
+    function pipeable(
+      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R>,
+    ): unknown {
+      if ("invoke" in toolkit) {
+        return "name" in toolkit
+          ? executeWithClosedToolkit(toolkit, pipeableRequest)
+          : executeWithClosedSet(toolkit, pipeableRequest)
+      }
+      if ("handle" in toolkit) return executeWithToolkit(toolkit, pipeableRequest)
+      const unhandled: Toolkit.Toolkit<Tools> = toolkit
+      return executeToolkit(unhandled, pipeableRequest)
     }
     return pipeable
   }
-  const toolkit = toolkitOrRequest as ToolkitInput<Tools>
-  return ("handle" in toolkit ? Effect.succeed(toolkit) : toolkit).pipe(
-    Effect.flatMap((handled) => executeWithToolkit(handled, request)),
-  )
+  if (isRequest(toolkitOrRequest)) return Effect.die("executeToolkit requires a toolkit when a Request is supplied")
+  const toolkit = toolkitOrRequest
+  if ("invoke" in toolkit) {
+    return "name" in toolkit ? executeWithClosedToolkit(toolkit, request) : executeWithClosedSet(toolkit, request)
+  }
+  if ("handle" in toolkit) return executeWithToolkit(toolkit, request)
+  const unhandled: Toolkit.Toolkit<Tools> = toolkit
+  return Effect.flatMap(unhandled, (handled) => executeWithToolkit(handled, request))
 }
 
+const layerClosedAgentToolkit = <
+  Name extends string,
+  Parameters extends Schema.Top,
+  SuccessSchema extends Schema.Top,
+  R,
+>(
+  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
+): Layer.Layer<ToolExecutor, never, R> =>
+  Layer.effect(
+    ToolExecutor,
+    Effect.contextWith((context: Context.Context<R>) =>
+      Effect.succeed(
+        ToolExecutor.of({
+          execute: (request) => executeWithClosedToolkit(toolkit, request).pipe(Effect.provideContext(context)),
+        }),
+      ),
+    ),
+  )
+
+const layerClosedToolSet = <R>(toolkit: ClosedToolSet<R>): Layer.Layer<ToolExecutor, never, R> =>
+  Layer.effect(
+    ToolExecutor,
+    Effect.contextWith((context: Context.Context<R>) =>
+      Effect.succeed(
+        ToolExecutor.of({
+          execute: (request) => executeWithClosedSet(toolkit, request).pipe(Effect.provideContext(context)),
+        }),
+      ),
+    ),
+  )
+
 /** @experimental */
+export function layerToolkit<R>(toolkit: ClosedToolSet<R>): Layer.Layer<ToolExecutor, never, R>
+export function layerToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
+  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
+): Layer.Layer<ToolExecutor, never, R>
 export function layerToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
 ): Layer.Layer<ToolExecutor>
 export function layerToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.Toolkit<Tools>,
 ): Layer.Layer<ToolExecutor, never, Tool.HandlersFor<Tools>>
-export function layerToolkit<Tools extends Record<string, Tool.Any>>(
-  toolkit: ToolkitInput<Tools>,
-): Layer.Layer<ToolExecutor, never, Tool.HandlersFor<Tools>> {
+export function layerToolkit<
+  Tools extends Record<string, Tool.Any>,
+  Name extends string,
+  Parameters extends Schema.Top,
+  SuccessSchema extends Schema.Top,
+  R,
+>(
+  toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R>,
+): Layer.Layer<ToolExecutor, never, Tool.HandlersFor<Tools> | Tool.HandlerServices<Tools[keyof Tools]> | R> {
+  if ("invoke" in toolkit) return "name" in toolkit ? layerClosedAgentToolkit(toolkit) : layerClosedToolSet(toolkit)
+  if ("handle" in toolkit) {
+    return Layer.succeed(
+      ToolExecutor,
+      ToolExecutor.of({
+        execute: (request) => executeWithToolkit(toolkit, request),
+      }),
+    )
+  }
   return Layer.effect(
     ToolExecutor,
-    ("handle" in toolkit ? Effect.succeed(toolkit) : toolkit).pipe(
-      Effect.map((handled) =>
-        ToolExecutor.of({
-          execute: (request) => executeWithToolkit(handled, request),
-        }),
-      ),
+    Effect.map(toolkit, (handled) =>
+      ToolExecutor.of({
+        execute: (request) => executeWithToolkit(handled, request),
+      }),
     ),
   )
 }
 
 /** @experimental */
-export const route = (options: RouteOptions): Route => {
-  const routedTools = options.tools ?? []
-  return {
-    tools: routedTools,
-    matches: (request) => routedTools.includes(request.call.name) || options.matches?.(request) === true,
-    execute: options.execute,
-  }
-}
-
-const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
-  placement: Placement,
-  options: PlacementRouteOptions<Tools, E>,
-): Route => {
-  const routedTools = options.tools ?? Object.keys(options.toolkit.tools)
-  return route({
-    tools: routedTools,
-    execute: (request) => {
-      const tool = options.toolkit.tools[request.call.name]
-      if (tool === undefined) {
-        return Effect.fail(
-          toolResultCodec.frameworkFailure(
-            "missing-handler",
-            request.call.name,
-            `Tool ${request.call.name} is not registered`,
-          ),
-        )
-      }
-      return toolResultCodec.decodeInput(tool, request.call.params).pipe(
-        Effect.flatMap(() => {
-          const effect = options.execute({ ...request, placement, tool })
-          return effect
-        }),
-        Effect.mapError((error) =>
-          Schema.is(FrameworkFailure)(error) || Schema.is(RemoteRetryMisconfigured)(error)
-            ? error
-            : toolResultCodec.frameworkFailure("placement", request.call.name, error),
-        ),
-        Effect.flatMap((response) => placementOutcome.fromResponse(placement, tool, response)),
-      )
-    },
-  })
-}
-
-const remoteRetryError = (reason: RemoteRetryMisconfigured["reason"], message: string): RemoteRetryMisconfigured =>
-  RemoteRetryMisconfigured.make({ reason, message })
-
-const validateOperationKey = (operationKey: unknown): Effect.Effect<string, RemoteRetryMisconfigured> =>
-  typeof operationKey !== "string" || operationKey.trim().length === 0
-    ? Effect.fail(remoteRetryError("missing-operation-key", "Remote retry operation key must be non-empty"))
-    : Effect.succeed(operationKey)
-
-const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
-  options: RemoteRouteIdempotentOptions<Tools, E>,
-  request: PlacementRequest,
-): Effect.Effect<PlacementResponse, E | RemoteRetryMisconfigured, ToolContext> =>
-  Effect.suspend(() => {
-    if (!Number.isFinite(options.maxRetries) || !Number.isInteger(options.maxRetries) || options.maxRetries < 0) {
-      return Effect.fail(
-        remoteRetryError("invalid-max-retries", "Remote retry maxRetries must be a non-negative finite integer"),
-      )
-    }
-    const operationKey = typeof options.operationKey === "function" ? options.operationKey(request) : undefined
-    return validateOperationKey(operationKey).pipe(
-      Effect.flatMap((stableKey) => {
-        let attempt = 0
-        const executeAttempt: Effect.Effect<PlacementResponse | RemoteRetryMisconfigured, E, ToolContext> =
-          Effect.suspend(() => {
-            const currentKey = attempt === 0 ? stableKey : options.operationKey(request)
-            attempt += 1
-            return validateOperationKey(currentKey).pipe(
-              Effect.match({
-                onFailure: (error): string | RemoteRetryMisconfigured => error,
-                onSuccess: (validatedKey): string | RemoteRetryMisconfigured => validatedKey,
-              }),
-              Effect.flatMap(
-                (validatedKey): Effect.Effect<PlacementResponse | RemoteRetryMisconfigured, E, ToolContext> =>
-                  typeof validatedKey !== "string"
-                    ? Effect.succeed(validatedKey)
-                    : validatedKey === stableKey
-                      ? options.execute({ ...request, operationKey: stableKey })
-                      : Effect.succeed(
-                          remoteRetryError(
-                            "changed-operation-key",
-                            "Remote retry operation key changed between attempts",
-                          ),
-                        ),
-              ),
-            )
-          })
-        return Effect.retry(executeAttempt, {
-          schedule: options.schedule,
-          times: options.maxRetries,
-          while: (error: E) =>
-            !Schema.is(AgentError)(error) &&
-            !Schema.is(FrameworkFailure)(error) &&
-            !Schema.is(RemoteRetryMisconfigured)(error),
-        }).pipe(
-          Effect.flatMap(
-            (result): Effect.Effect<PlacementResponse, RemoteRetryMisconfigured> =>
-              Schema.is(RemoteRetryMisconfigured)(result) ? Effect.fail(result) : Effect.succeed(result),
-          ),
-        )
-      }),
-    )
-  })
-
-/** @experimental Route tool calls to a user/browser/desktop client. */
-export const client = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
-  options: PlacementRouteOptions<Tools, E>,
-): Route => placementRoute("client", options)
-
-/** @experimental Route tool calls to a remote tool worker or service. */
-export const remote = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
-  options: RemoteRouteOptions<Tools, E>,
-): Route =>
-  options.idempotent === true
-    ? placementRoute("remote", {
-        toolkit: options.toolkit,
-        ...(options.tools === undefined ? {} : { tools: options.tools }),
-        execute: (request) => retryRemote(options, request),
-      })
-    : placementRoute("remote", options)
-
-/** @experimental Route tool calls to an MCP placement adapter. */
-export const mcp = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
-  options: PlacementRouteOptions<Tools, E>,
-): Route => placementRoute("mcp", options)
-
-/** @experimental Route tool calls to a workspace or sandbox runtime. */
-export const sandbox = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
-  options: PlacementRouteOptions<Tools, E>,
-): Route => placementRoute("sandbox", options)
-
-/** @experimental */
+export function routeToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
+  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
+): Route<R | ToolContext>
+export function routeToolkit<R>(toolkit: ClosedToolSet<R>): RouteInput<R | ToolContext>
 export function routeToolkit<Tools extends Record<string, Tool.Any>>(toolkit: Toolkit.WithHandler<Tools>): Route
 export function routeToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.Toolkit<Tools>,
 ): Effect.Effect<Route, never, Tool.HandlersFor<Tools>>
-export function routeToolkit<Tools extends Record<string, Tool.Any>>(
-  toolkit: ToolkitInput<Tools>,
-): RouteInput<Tool.HandlersFor<Tools>> {
+export function routeToolkit<
+  Tools extends Record<string, Tool.Any>,
+  Name extends string,
+  Parameters extends Schema.Top,
+  SuccessSchema extends Schema.Top,
+  R,
+>(
+  toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R>,
+): RouteInput<Tool.HandlersFor<Tools> | R | ToolContext> {
+  if ("invoke" in toolkit) {
+    return route({
+      tools: Object.keys(toolkit.tools),
+      execute: (request) =>
+        "name" in toolkit ? executeWithClosedToolkit(toolkit, request) : executeWithClosedSet(toolkit, request),
+    })
+  }
   const makeRoute = (handled: Toolkit.WithHandler<Tools>) =>
     route({
       tools: Object.keys(handled.tools),
@@ -406,29 +420,40 @@ export function routeToolkit<Tools extends Record<string, Tool.Any>>(
   return "handle" in toolkit ? makeRoute(toolkit) : toolkit.pipe(Effect.map(makeRoute))
 }
 
-const routeInputEffect = <R>(input: RouteInput<R>): Effect.Effect<Route, never, R> =>
+const routeInputEffect = <R>(input: RouteInput<R>): Effect.Effect<Route<R>, never, R> =>
   Effect.isEffect(input) ? input : Effect.succeed(input)
 
 /** @experimental */
-export function layerRouter(routes: Iterable<Route>): Layer.Layer<ToolExecutor>
+export function layerRouter(routes: Iterable<Route<ToolContext>>): Layer.Layer<ToolExecutor, never, ToolContext>
+export function layerRouter<R>(
+  routes: Iterable<Route<ToolContext> | Effect.Effect<Route<ToolContext>, never, R>>,
+): Layer.Layer<ToolExecutor, never, ToolContext | R>
+export function layerRouter<R>(
+  routes: Iterable<RouteInput<ToolContext> | RouteInput<R>>,
+): Layer.Layer<ToolExecutor, never, ToolContext | R>
+export function layerRouter<R1, R2>(
+  routes: Iterable<RouteInput<R1> | RouteInput<R2>>,
+): Layer.Layer<ToolExecutor, never, R1 | R2>
 export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R>
 export function layerRouter<R>(routes: Iterable<RouteInput<R>>): Layer.Layer<ToolExecutor, never, R> {
   return Layer.effect(
     ToolExecutor,
-    Effect.all(Array.from(routes, routeInputEffect)).pipe(
-      Effect.map((resolved) =>
+    Effect.contextWith((context: Context.Context<R>) =>
+      Effect.map(Effect.all(Array.from(routes, routeInputEffect)), (resolved) =>
         ToolExecutor.of({
           execute: (request) => {
             const matched = resolved.find((candidate) => candidate.matches(request))
-            return matched === undefined
-              ? Effect.fail(
-                  toolResultCodec.frameworkFailure(
-                    "route",
-                    request.call.name,
-                    `Tool ${request.call.name} has no matching route`,
-                  ),
-                )
-              : matched.execute(request)
+            const execution =
+              matched === undefined
+                ? Effect.fail(
+                    toolResultCodec.frameworkFailure(
+                      "route",
+                      request.call.name,
+                      `Tool ${request.call.name} has no matching route`,
+                    ),
+                  )
+                : matched.execute(request)
+            return execution.pipe(Effect.provideContext(context))
           },
         }),
       ),

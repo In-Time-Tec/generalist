@@ -22,8 +22,7 @@ type ModelParams = Parameters<typeof LanguageModel.make>[0]
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false
 type Assert<Value extends true> = Value
-type ToolkitRequirements<Value> =
-  Value extends Toolkit.WithHandler<infer Tools> ? Tool.HandlerServices<Tools[keyof Tools]> : never
+type AgentToolRequirements<Value> = Value extends { readonly requirements: (value: infer R) => infer R } ? R : never
 
 const requirementChild = Agent.make({
   name: "requirement-child",
@@ -31,7 +30,7 @@ const requirementChild = Agent.make({
 })
 const requirementChildTool = AgentTool.asTool(requirementChild)
 const agentToolRequirementProof: Assert<
-  Equal<ToolkitRequirements<typeof requirementChildTool>, LanguageModel.LanguageModel | Memory.Memory>
+  Equal<AgentToolRequirements<typeof requirementChildTool>, LanguageModel.LanguageModel | Memory.Memory>
 > = true
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
@@ -75,6 +74,15 @@ class AuthorizationDependency extends Context.Service<AuthorizationDependency, s
 
 layer(unusedToolHandlerLayer)("AgentTool", (it) => {
   expect(agentToolRequirementProof).toBe(true)
+
+  it("exposes a stable schema-backed closed tool contract", () => {
+    expect(requirementChildTool.name).toBe("requirement-child")
+    expect(Object.keys(requirementChildTool.tools)).toEqual(["requirement-child"])
+    expect(Schema.isSchema(requirementChildTool.parametersSchema)).toBe(true)
+    expect(requirementChildTool.successSchema).toBe(Schema.String)
+    expect("pipe" in requirementChildTool).toBe(false)
+    expect(typeof requirementChildTool.invoke).toBe("function")
+  })
 
   ItLayer.make(it, "ToolExecutor.layerToolkit preserves decoded and encoded declared failures", () => {
     const failingTool = Tool.make("failing", {
@@ -851,26 +859,29 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
   ItLayer.make(it, "exposes a child agent as a parent tool", () => {
     let parentCalls = 0
+    const parentModel = modelLayer((options) => {
+      const content = Json.stringify(options.prompt.content)
+      if (activeToolNames(options).length === 0 && content.includes("child task")) {
+        return Stream.make(textDelta("child answer"))
+      }
+      parentCalls += 1
+      return parentCalls === 1
+        ? Stream.make(toolCallPart("call-child", "ask_child", { prompt: "child task" }))
+        : Stream.make(textDelta("parent saw child answer"))
+    })
     return [
       Layer.mergeAll(
-        modelLayer((options) => {
-          const content = Json.stringify(options.prompt.content)
-          if (activeToolNames(options).length === 0 && content.includes("child task")) {
-            return Stream.make(textDelta("child answer"))
-          }
-          parentCalls += 1
-          return parentCalls === 1
-            ? Stream.make(toolCallPart("call-child", "ask_child", { prompt: "child task" }))
-            : Stream.make(textDelta("parent saw child answer"))
-        }),
-        ToolExecutor.layerToolkit(AgentTool.asTool(Agent.make({ name: "child" }), { name: "ask_child" })),
+        parentModel,
+        ToolExecutor.layerToolkit(AgentTool.asTool(Agent.make({ name: "child" }), { name: "ask_child" })).pipe(
+          Layer.provide(parentModel),
+        ),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const child = Agent.make({ name: "child" })
         const childTool = AgentTool.asTool(child, { name: "ask_child" })
-        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_child) })
+        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_child!) })
 
         const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
 
@@ -945,30 +956,31 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
   ItLayer.make(it, "returns child suspension as a failed parent tool result", () => {
     let parentCalls = 0
+    const parentModel = modelLayer((options) => {
+      const content = Json.stringify(options.prompt.content)
+      if (activeToolNames(options).includes("gated") && content.includes("child approval task")) {
+        return Stream.make(toolCallPart("call-gated", "gated", { text: "hold" }))
+      }
+      parentCalls += 1
+      return parentCalls === 1
+        ? Stream.make(toolCallPart("call-reviewer", "ask_reviewer", { prompt: "child approval task" }))
+        : Stream.make(textDelta("parent saw reviewer failure"))
+    })
     return [
       Layer.mergeAll(
-        modelLayer((options) => {
-          const content = Json.stringify(options.prompt.content)
-          if (activeToolNames(options).includes("gated") && content.includes("child approval task")) {
-            return Stream.make(toolCallPart("call-gated", "gated", { text: "hold" }))
-          }
-          parentCalls += 1
-          return parentCalls === 1
-            ? Stream.make(toolCallPart("call-reviewer", "ask_reviewer", { prompt: "child approval task" }))
-            : Stream.make(textDelta("parent saw reviewer failure"))
-        }),
+        parentModel,
         ToolExecutor.layerToolkit(
           AgentTool.asTool(Agent.make({ name: "reviewer", toolkit: Toolkit.make(gatedTool) }), {
             name: "ask_reviewer",
           }),
-        ),
+        ).pipe(Layer.provide(parentModel)),
         Approvals.layerTest({ resolve: (pending) => Effect.succeed({ ...pending, token: "approval-1" }) }),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const child = Agent.make({ name: "reviewer", toolkit: Toolkit.make(gatedTool) })
         const childTool = AgentTool.asTool(child, { name: "ask_reviewer" })
-        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_reviewer) })
+        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_reviewer!) })
 
         const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
 
@@ -988,16 +1000,17 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
   ItLayer.make(it, "honors parameter and result mapping overrides", () => {
     let parentCalls = 0
+    const parentModel = modelLayer((options) => {
+      const content = Json.stringify(options.prompt.content)
+      if (content.includes("custom prompt")) return Stream.make(textDelta("custom answer"))
+      parentCalls += 1
+      return parentCalls === 1
+        ? Stream.make(toolCallPart("call-custom", "ask_custom", { question: "custom prompt" }))
+        : Stream.make(textDelta("parent done"))
+    })
     return [
       Layer.mergeAll(
-        modelLayer((options) => {
-          const content = Json.stringify(options.prompt.content)
-          if (content.includes("custom prompt")) return Stream.make(textDelta("custom answer"))
-          parentCalls += 1
-          return parentCalls === 1
-            ? Stream.make(toolCallPart("call-custom", "ask_custom", { question: "custom prompt" }))
-            : Stream.make(textDelta("parent done"))
-        }),
+        parentModel,
         ToolExecutor.layerToolkit(
           AgentTool.asTool(Agent.make({ name: "custom-child" }), {
             name: "ask_custom",
@@ -1006,7 +1019,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             toPrompt: (params) => params.question,
             fromResult: (result) => ({ answer: result.text }),
           }),
-        ),
+        ).pipe(Layer.provide(parentModel)),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
@@ -1019,7 +1032,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           toPrompt: (params) => params.question,
           fromResult: (result) => ({ answer: result.text }),
         })
-        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_custom) })
+        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_custom!) })
 
         const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
 

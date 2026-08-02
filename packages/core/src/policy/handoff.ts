@@ -1,5 +1,5 @@
-import { Array, Effect, Function, Schema, Stream } from "effect"
-import { AiError, LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { Array, Effect, Function, Schema } from "effect"
+import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import {
   type Agent,
   type Requirements,
@@ -12,7 +12,7 @@ import {
 import { AgentError } from "../agent/agent-event.js"
 import { type AgentToolToolkit, asTool } from "../agent/agent-tool.js"
 import { type Memory } from "../context/memory.js"
-import { ToolContext } from "../tools/tool-context.js"
+import { type ClosedToolSet } from "../tools/tool-executor.js"
 import { type TurnPolicy } from "../turn/turn-policy.js"
 
 const defaultTransferParameters = Schema.Struct({ prompt: Schema.String })
@@ -48,29 +48,10 @@ export interface FanOutOptions {
   readonly concurrency?: number
 }
 
-type SupervisorTools<R> = Record<
-  string,
-  Tool.Tool<
-    string,
-    {
-      readonly parameters: DefaultTransferParameters
-      readonly success: typeof Schema.String
-      readonly failure: typeof Schema.String
-      readonly failureMode: "return"
-    },
-    R
-  >
->
-
 /** @experimental Built supervisor agent and handled toolkit for its transfer tools. */
 export interface Supervisor<R> {
-  readonly agent: Agent<
-    SupervisorTools<R>,
-    | LanguageModel.LanguageModel
-    | Tool.HandlersFor<SupervisorTools<R>>
-    | Exclude<Tool.HandlerServices<SupervisorTools<R>[keyof SupervisorTools<R>]>, ToolContext>
-  >
-  readonly toolkit: AgentToolToolkit<string, DefaultTransferParameters, typeof Schema.String, R>
+  readonly agent: Agent<Record<string, Tool.Any>, R | LanguageModel.LanguageModel>
+  readonly toolkit: ClosedToolSet<R>
 }
 
 /** @experimental Options for building a transfer-tool supervisor. */
@@ -101,97 +82,33 @@ type TransferToolkit<Parameters extends Schema.Top, Success extends Schema.Top, 
   Success,
   R
 >
-type TransferInvocation<Parameters extends Schema.Top, Success extends Schema.Top, R> = Effect.Effect<
-  Stream.Stream<
-    Tool.HandlerResult<
-      Tool.Tool<
-        string,
-        {
-          readonly parameters: Parameters
-          readonly success: Success
-          readonly failure: typeof Schema.String
-          readonly failureMode: "return"
-        },
-        R
-      >
-    >,
-    never,
-    R | Parameters["DecodingServices"] | Success["EncodingServices"]
-  >,
-  AiError.AiError
->
+type TransferInvocation<R> = Effect.Effect<unknown, string, R>
 
 const mergeHandled = <Parameters extends Schema.Top, Success extends Schema.Top, R>(
   toolkits: ReadonlyArray<TransferToolkit<Parameters, Success, R>>,
-): TransferToolkit<Parameters, Success, R> => {
-  type TransferTool = Tool.Tool<
-    string,
-    {
-      readonly parameters: Parameters
-      readonly success: Success
-      readonly failure: typeof Schema.String
-      readonly failureMode: "return"
-    },
-    R
-  >
+): ClosedToolSet<R> => {
   const entries = new Map<
     string,
-    {
-      readonly tool: TransferTool
-      readonly invoke: (params: Parameters["Type"]) => TransferInvocation<Parameters, Success, R>
-    }
+    { readonly tool: Tool.Any; readonly invoke: (params: unknown) => TransferInvocation<R> }
   >()
   for (const toolkit of toolkits) {
     for (const name of Object.keys(toolkit.tools)) {
       const tool = toolkit.tools[name]
       if (tool !== undefined && !entries.has(name)) {
-        entries.set(name, { tool, invoke: (params) => toolkit.handle(name, params) })
+        entries.set(name, { tool, invoke: (params) => toolkit.invoke(params) })
       }
     }
   }
-  const tools: Record<
-    string,
-    Tool.Tool<
-      string,
-      {
-        readonly parameters: Parameters
-        readonly success: Success
-        readonly failure: typeof Schema.String
-        readonly failureMode: "return"
-      },
-      R
-    >
-  > = {}
+  const tools: Record<string, Tool.Any> = {}
   for (const [name, entry] of entries) tools[name] = entry.tool
   return {
     tools,
-    handle: (name, params) => {
-      const entry = entries.get(String(name))
-      return entry === undefined
-        ? Effect.fail(
-            AiError.make({
-              module: "Handoff",
-              method: `${String(name)}.handle`,
-              reason: AiError.ToolNotFoundError.make({
-                toolName: String(name),
-                availableTools: [...entries.keys()],
-              }),
-            }),
-          )
-        : entry.invoke(params)
+    invoke: (name, params) => {
+      const entry = entries.get(name)
+      return entry === undefined ? Effect.fail(`Tool ${name} is not registered`) : entry.invoke(params)
     },
   }
 }
-
-const toolkitFromHandled = <Tools extends Record<string, Tool.Any>>(
-  toolkit: Toolkit.WithHandler<Tools>,
-): Toolkit.Toolkit<Tools> =>
-  Toolkit.make(
-    ...Object.keys(toolkit.tools).flatMap((name) => {
-      const tool = toolkit.tools[name]
-      return tool === undefined ? [] : [tool]
-    }),
-  ) as unknown as Toolkit.Toolkit<Tools>
 
 /** @experimental Build a `transfer_to_<agent.name>` same-process handoff tool. */
 export const transferTool: {
@@ -284,7 +201,7 @@ export const fanOut: {
             const runOptions = {
               ...child.options,
               prompt: child.prompt,
-            } as { readonly prompt: Prompt.RawInput }
+            }
             return generate(child.agent, runOptions)
           },
           { concurrency },
@@ -303,7 +220,7 @@ export const supervisor = <const Specialists extends ReadonlyArray<Agent<any, an
   const agent = make({
     name: options.name,
     ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
-    toolkit: toolkitFromHandled(toolkit),
+    tools: Object.values(toolkit.tools),
     ...(options.policy === undefined ? {} : { policy: options.policy }),
   })
   return {

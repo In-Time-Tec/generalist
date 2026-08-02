@@ -107,6 +107,12 @@ const LooseToolResultPart = Schema.Struct({
 const unionOrNever = (schemas: ReadonlyArray<Schema.Top>): Schema.Top =>
   schemas.length === 0 ? Schema.Never : Schema.Union(schemas)
 
+const serviceFree = <S extends Schema.Constraint>(schema: S): Schema.Codec<S["Type"], unknown, never, never> =>
+  Schema.make<Schema.Codec<S["Type"], unknown, never, never>>(schema.ast)
+
+const serviceFreeAs = <T, S extends Schema.Constraint>(schema: S): Schema.Codec<T, unknown, never, never> =>
+  Schema.make<Schema.Codec<T, unknown, never, never>>(schema.ast)
+
 const toolSchemas = (toolkit: Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>): ReadonlyArray<Tool.Any> =>
   Object.values(toolkit.tools)
 
@@ -215,20 +221,26 @@ const EventSchemaWith = <
   ])
 
 /** @experimental Codec for one Baton loop event using the supplied toolkit. */
-export const EventSchema = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
-  EventSchemaWith(
-    Response.StreamPart(toolkit),
-    Response.Part(toolkit),
-    toolCallSchema(toolkit),
-    toolResultSchema(toolkit),
-  ) as unknown as Schema.Codec<EventType, unknown, never, never>
+export const EventSchema = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(
+  toolkit: T,
+): Schema.Codec<EventType, unknown, never, never> =>
+  serviceFreeAs<EventType, Schema.Constraint>(
+    EventSchemaWith(
+      Response.StreamPart(toolkit),
+      Response.Part(toolkit),
+      toolCallSchema(toolkit),
+      toolResultSchema(toolkit),
+    ),
+  )
 
 /** @experimental Loose event codec for browser display of unknown tool names. */
-export const LooseEventSchema = EventSchemaWith(
-  Schema.Union([Response.StreamPart(Toolkit.empty), LooseToolCallPart, LooseToolResultPart]),
-  Schema.Union([Response.Part(Toolkit.empty), LooseToolCallPart, LooseToolResultPart]),
-  LooseToolCallPart,
-  LooseToolResultPart,
+export const LooseEventSchema = serviceFree(
+  EventSchemaWith(
+    Schema.Union([Response.StreamPart(Toolkit.empty), LooseToolCallPart, LooseToolResultPart]),
+    Schema.Union([Response.Part(Toolkit.empty), LooseToolCallPart, LooseToolResultPart]),
+    LooseToolCallPart,
+    LooseToolResultPart,
+  ),
 )
 
 /** @experimental Event type for runtime-dynamic tool names and payloads. */
@@ -268,8 +280,10 @@ const ServerFrameWith = <Event extends Schema.Constraint>(event: Event) =>
   ])
 
 /** @experimental Server frame codec using the supplied toolkit. */
-export const ServerFrame = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(toolkit: T) =>
-  ServerFrameWith(EventSchema(toolkit)) as unknown as Schema.Codec<ServerFrameType, unknown, never, never>
+export const ServerFrame = <T extends Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>>(
+  toolkit: T,
+): Schema.Codec<ServerFrameType, unknown, never, never> =>
+  serviceFreeAs<ServerFrameType, Schema.Constraint>(ServerFrameWith(EventSchema(toolkit)))
 
 /** @experimental */
 export type LooseServerFrameType =
@@ -281,9 +295,10 @@ export type LooseServerFrameType =
   | { readonly _tag: "SessionStatus"; readonly seq: number; readonly status: SessionStatus }
 
 /** @experimental Loose server frame codec for browser display of unknown tool names. */
-const looseServerFrameCodec: Schema.Codec<LooseServerFrameType, unknown, never, never> = ServerFrameWith(
-  LooseEventSchema,
-) as unknown as Schema.Codec<LooseServerFrameType, unknown, never, never>
+const looseServerFrameCodec: Schema.Codec<LooseServerFrameType, unknown, never, never> = serviceFreeAs<
+  LooseServerFrameType,
+  Schema.Constraint
+>(ServerFrameWith(LooseEventSchema))
 
 /** @experimental */
 export const LooseServerFrame = looseServerFrameCodec

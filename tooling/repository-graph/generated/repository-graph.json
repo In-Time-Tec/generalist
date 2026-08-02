@@ -1393,6 +1393,11 @@
       "test": false
     },
     {
+      "path": "packages/core/src/tools/tool-executor-routes.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
       "path": "packages/core/src/tools/tool-executor.ts",
       "package": "@batonfx/core",
       "test": false
@@ -7058,10 +7063,6 @@
     },
     {
       "source": "packages/core/src/policy/handoff.ts",
-      "specifier": "../tools/tool-context.js"
-    },
-    {
-      "source": "packages/core/src/policy/handoff.ts",
       "specifier": "effect"
     },
     {
@@ -7117,8 +7118,28 @@
       "specifier": "effect"
     },
     {
-      "source": "packages/core/src/tools/tool-executor.ts",
+      "source": "packages/core/src/tools/tool-executor-routes.ts",
       "specifier": "../agent/agent-event.js"
+    },
+    {
+      "source": "packages/core/src/tools/tool-executor-routes.ts",
+      "specifier": "./tool-executor.js"
+    },
+    {
+      "source": "packages/core/src/tools/tool-executor-routes.ts",
+      "specifier": "./tool-placement.js"
+    },
+    {
+      "source": "packages/core/src/tools/tool-executor-routes.ts",
+      "specifier": "./tool-result-codec.js"
+    },
+    {
+      "source": "packages/core/src/tools/tool-executor-routes.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/tools/tool-executor-routes.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/core/src/tools/tool-executor.ts",
@@ -7126,7 +7147,7 @@
     },
     {
       "source": "packages/core/src/tools/tool-executor.ts",
-      "specifier": "./tool-placement.js"
+      "specifier": "./tool-executor-routes.js"
     },
     {
       "source": "packages/core/src/tools/tool-executor.ts",

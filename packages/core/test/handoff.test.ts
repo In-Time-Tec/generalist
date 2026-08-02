@@ -22,8 +22,7 @@ type Equal<Left, Right> =
 type Assert<Value extends true> = Value
 type EffectRequirements<Value> =
   Value extends Effect.Effect<unknown, unknown, infer Requirements> ? Requirements : never
-type ToolkitRequirements<Value> =
-  Value extends Toolkit.WithHandler<infer Tools> ? Tool.HandlerServices<Tools[keyof Tools]> : never
+type AgentToolRequirements<Value> = Value extends { readonly requirements: (value: infer R) => infer R } ? R : never
 
 const handoffPlainAgent = Agent.make({ name: "handoff-plain" })
 const handoffMemoryAgent = Agent.make({
@@ -65,7 +64,7 @@ const requirementSupervisor = Handoff.supervisor({
 
 const handoffRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<
-    Equal<ToolkitRequirements<typeof requirementTransfer>, LanguageModel.LanguageModel | Memory.Memory>
+    Equal<AgentToolRequirements<typeof requirementTransfer>, LanguageModel.LanguageModel | Memory.Memory>
   >,
   true satisfies Assert<
     Equal<
@@ -161,7 +160,7 @@ layer(unusedToolHandlerLayer)("Handoff", (it) => {
         }),
         ToolExecutor.layerToolkit(
           Handoff.supervisor({ name: "supervisor", specialists: [Agent.make({ name: "math" })] }).toolkit,
-        ),
+        ).pipe(Layer.provide(modelLayer(() => Stream.make(textDelta("unused"))))),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
