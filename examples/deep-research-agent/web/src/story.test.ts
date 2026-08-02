@@ -9,7 +9,11 @@ import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } 
 
 const sessionId = "deep-research-story"
 
-const eventFrame = (seq: number, event: Wire.EventType): Wire.LooseServerFrameType => ({ _tag: "Event", seq, event })
+const eventFrame = (seq: number, event: Wire.LooseEventType): Wire.LooseServerFrameType => ({
+  _tag: "Event",
+  seq,
+  event,
+})
 
 const agentAction = (incoming: Wire.LooseServerFrameType) => GotChatAction({ action: Chat.ReceivedAgent({ incoming }) })
 

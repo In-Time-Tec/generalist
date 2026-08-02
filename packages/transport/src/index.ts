@@ -134,10 +134,14 @@ export namespace Wire {
       | import("effect/unstable/ai").Toolkit.WithHandler<Record<string, import("effect/unstable/ai").Tool.Any>>,
   > = import("./transport/wire.js").Capability<T>
   export type ClientFrameType = import("./transport/wire.js").ClientFrameType
-  export type EventType = import("./transport/wire.js").EventType
+  export type EventType<
+    T extends import("./transport/wire.js").ToolkitInput = import("effect/unstable/ai").Toolkit.Any,
+  > = import("./transport/wire.js").EventType<T>
   export type LooseEventType = import("./transport/wire.js").LooseEventType
   export type LooseServerFrameType = import("./transport/wire.js").LooseServerFrameType
-  export type ServerFrameType = import("./transport/wire.js").ServerFrameType
+  export type ServerFrameType<
+    T extends import("./transport/wire.js").ToolkitInput = import("effect/unstable/ai").Toolkit.Any,
+  > = import("./transport/wire.js").ServerFrameType<T>
   export type WireCodec<Frame = ServerFrameType> = import("./transport/wire.js").WireCodec<Frame>
 }
 import { handle as Ws_handle } from "./transport/ws.js"

@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
-import { Context, Deferred, Effect, Exit, Fiber, Layer, Schedule, Schema, Stream } from "effect"
+import { Context, Deferred, Effect, Exit, Fiber, Layer, Schedule, Schema, SchemaTransformation, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import {
@@ -72,6 +72,24 @@ class AuthorizationDependency extends Context.Service<AuthorizationDependency, s
   "@batonfx/core/test/agent-tool.test/AuthorizationDependency",
 ) {}
 
+class PlacementPrefix extends Context.Service<PlacementPrefix, string>()(
+  "@batonfx/core/test/agent-tool.test/PlacementPrefix",
+) {}
+
+const placementPrefixSchema = Schema.String.pipe(
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transformOrFail({
+      decode: (value) =>
+        Effect.gen(function* () {
+          const prefix = yield* PlacementPrefix
+          return value + prefix
+        }),
+      encode: (value) => Effect.succeed(value),
+    }),
+  ),
+)
+
 layer(unusedToolHandlerLayer)("AgentTool", (it) => {
   expect(agentToolRequirementProof).toBe(true)
 
@@ -105,6 +123,30 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         expect(result).toMatchObject({ _tag: "Success", result: "ok" })
         expect(seen).toBe(42)
       }),
+    ] as const
+  })
+
+  ItLayer.make(it, "placement routes preserve concrete schema services", () => {
+    const serviceTool = Tool.make("service-placement", {
+      parameters: Schema.Struct({ value: placementPrefixSchema }),
+      success: Schema.String,
+      failure: Schema.String,
+      failureMode: "return",
+    })
+    const route = ToolExecutor.client({
+      toolkit: Toolkit.make(serviceTool),
+      execute: () => Effect.succeed({ _tag: "Success", result: "ok" }),
+    })
+    const needsPrefix: Effect.Effect<
+      ToolExecutor.Outcome,
+      ToolExecutor.FrameworkFailure | ToolExecutor.RemoteRetryMisconfigured,
+      ToolContext.ToolContext | PlacementPrefix
+    > = route.execute(request("service-placement", { value: "value" }))
+    return [
+      Layer.mergeAll(ToolContext.layerDefault, Layer.succeed(PlacementPrefix, PlacementPrefix.of("!"))),
+      needsPrefix.pipe(
+        Effect.tap((outcome) => Effect.sync(() => expect(outcome).toMatchObject({ _tag: "Success", result: "ok" }))),
+      ),
     ] as const
   })
 

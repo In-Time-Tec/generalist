@@ -86,7 +86,7 @@ export interface FanOutOptions {
 /** @experimental Built supervisor agent and handled toolkit for its transfer tools. */
 export interface Supervisor<R> {
   readonly agent: Agent<Record<string, Tool.Any>, R | LanguageModel.LanguageModel>
-  readonly toolkit: ClosedToolSet<never>
+  readonly toolkit: ClosedToolSet<never, Tool.Any>
 }
 
 /** @experimental Options for building a transfer-tool supervisor. */
@@ -121,7 +121,7 @@ type TransferInvocation = Effect.Effect<unknown, string>
 
 const mergeHandled = <Parameters extends Schema.Top, Success extends Schema.Top>(
   toolkits: ReadonlyArray<TransferToolkit<Parameters, Success>>,
-): ClosedToolSet<never> => {
+): ClosedToolSet<never, Tool.Any> => {
   const entries = new Map<
     string,
     { readonly tool: Tool.Any; readonly invoke: (params: unknown) => TransferInvocation }

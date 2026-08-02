@@ -5,7 +5,7 @@ import type { FrameJournal } from "../transport/frame-journal.js"
 import type { CoordinationState } from "./session-coordination.js"
 import { SessionError } from "./session-registry-errors.js"
 import type { SessionInfo } from "./session-registry.js"
-import type { EventType, RunFailure } from "../transport/wire.js"
+import type { LooseEventType, RunFailure } from "../transport/wire.js"
 
 export interface SessionState {
   readonly sessionId: string
@@ -51,7 +51,7 @@ const positiveInteger = (name: string, value: number): Effect.Effect<number> =>
     ? Effect.succeed(value)
     : Effect.die(new TypeError(`${name} must be a positive safe integer`))
 
-const stripEventTranscript = (event: AgentEvent.Event, strip: boolean): EventType => {
+const stripEventTranscript = (event: AgentEvent.Event, strip: boolean): LooseEventType => {
   if (!strip) return event
   if (event._tag === "TurnCompleted") {
     const { transcript: _transcript, ...rest } = event

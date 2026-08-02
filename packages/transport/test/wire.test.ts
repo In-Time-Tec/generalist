@@ -72,7 +72,7 @@ const transcript = Prompt.fromMessages([
   Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "hello" })] }),
 ])
 
-const eventFrames = (): ReadonlyArray<Wire.ServerFrameType> => [
+const eventFrames = (): ReadonlyArray<Wire.ServerFrameType<typeof toolkit>> => [
   { _tag: "Event", seq: 0, event: { _tag: "TurnStarted", turn: 0, metadata: { source: "test" } } },
   {
     _tag: "Event",
@@ -122,7 +122,7 @@ const withDeliveryId = <Event extends ModelTelemetry.EventPayload>(
   deliveryId: string,
 ): Event & { readonly deliveryId: string } => ({ ...event, deliveryId })
 
-const telemetryFrames = (): ReadonlyArray<Wire.ServerFrameType> => {
+const telemetryFrames = (): ReadonlyArray<Wire.ServerFrameType<typeof toolkit>> => {
   const frames = [
     {
       _tag: "Event",
@@ -278,6 +278,13 @@ const telemetryFrames = (): ReadonlyArray<Wire.ServerFrameType> => {
 }
 
 describe("Wire", () => {
+  it("keeps loose frames out of fixed codec inputs", () => {
+    const fixed = Wire.codec(toolkit)
+    const loose = {} as Wire.LooseServerFrameType
+    // @ts-expect-error Fixed codecs accept only frames typed for their concrete toolkit.
+    fixed.encodeServer(loose)
+  })
+
   const invalidSequences = [-1, 1.5, Number.POSITIVE_INFINITY, Number.NaN, Number.MAX_SAFE_INTEGER + 1]
 
   it.each(invalidSequences)("rejects invalid client frame sequence %s", (afterSeq) => {
@@ -370,7 +377,7 @@ describe("Wire", () => {
   it.effect("model telemetry events keep absent optional metadata absent across the wire", () =>
     Effect.gen(function* () {
       const codec = Wire.codec(toolkit)
-      const frame: Wire.ServerFrameType = {
+      const frame: Wire.ServerFrameType<typeof toolkit> = {
         _tag: "Event",
         seq: 0,
         event: {
@@ -412,7 +419,7 @@ describe("Wire", () => {
         providerExecuted: false,
         preliminary: false,
       })
-      const frame: Wire.ServerFrameType = {
+      const frame: Wire.ServerFrameType<typeof overlappingToolkit> = {
         _tag: "Event",
         seq: 0,
         event: { _tag: "ToolExecutionCompleted", turn: 0, call, result },
@@ -614,7 +621,9 @@ describe("Wire", () => {
           },
         },
       }
-      const fixedFailure = yield* Wire.codec(Toolkit.empty).encodeServer(frame).pipe(Effect.flip)
+      const fixedFailure = yield* Wire.codec(Toolkit.empty)
+        .encodeServer(frame as never)
+        .pipe(Effect.flip)
       const dynamicJson = yield* Wire.codec({ capability: "runtime-dynamic" }).encodeServer(frame)
       const decoded = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Wire.LooseServerFrame))(dynamicJson)
 
@@ -635,9 +644,11 @@ describe("Wire", () => {
           call: { type: "tool-call", id: "runtime-1", name: "runtime", params: {} },
         },
       }
-      const shorthandError = yield* Wire.codec(toolkitWithProperty).encodeServer(frame).pipe(Effect.flip)
+      const shorthandError = yield* Wire.codec(toolkitWithProperty)
+        .encodeServer(frame as never)
+        .pipe(Effect.flip)
       const explicitError = yield* Wire.codec({ capability: "fixed", toolkit: toolkitWithProperty })
-        .encodeServer(frame)
+        .encodeServer(frame as never)
         .pipe(Effect.flip)
 
       expect(shorthandError._tag).toBe("@batonfx/transport/WireEncodeFailed")
@@ -657,8 +668,12 @@ describe("Wire", () => {
           result: { ...toolResult, isFailure: true, result: 1, encodedResult: 1 },
         },
       }
-      const shorthandError = yield* Wire.codec(toolkit).encodeServer(frame).pipe(Effect.flip)
-      const explicitError = yield* Wire.codec({ capability: "fixed", toolkit }).encodeServer(frame).pipe(Effect.flip)
+      const shorthandError = yield* Wire.codec(toolkit)
+        .encodeServer(frame as never)
+        .pipe(Effect.flip)
+      const explicitError = yield* Wire.codec({ capability: "fixed", toolkit })
+        .encodeServer(frame as never)
+        .pipe(Effect.flip)
 
       expect(shorthandError._tag).toBe("@batonfx/transport/WireEncodeFailed")
       expect(explicitError._tag).toBe("@batonfx/transport/WireEncodeFailed")
@@ -732,6 +747,44 @@ describe("Wire", () => {
     }
     const dynamicEvent = Effect.runSyncExit(Schema.decodeUnknownEffect(Wire.EventSchema(toolkit))(unknownToolEvent))
     expect(Schema.is(Wire.EventSchema(toolkit))(unknownToolEvent)).toBe(false)
+    const inheritedToolEvents = [
+      {
+        ...unknownToolEvent,
+        part: { type: "tool-call", id: "call-inherited", name: "toString", params: {} },
+      },
+      {
+        ...unknownToolEvent,
+        part: { type: "tool-result", id: "result-inherited", name: "toString", result: {}, isFailure: false },
+      },
+    ]
+    for (const event of inheritedToolEvents) expect(Schema.is(Wire.EventSchema(toolkit))(event)).toBe(false)
+    const invalidFixedEvents = [
+      {
+        _tag: "ToolExecutionStarted",
+        turn: 0,
+        call: { type: "tool-call", id: "call-0", name: "echo", params: { text: 1 } },
+      },
+      {
+        _tag: "ApprovalRequested",
+        turn: 0,
+        call: { type: "tool-call", id: "call-0", name: "echo", params: { text: 1 } },
+      },
+      {
+        _tag: "ToolExecutionCompleted",
+        turn: 0,
+        call: toolCall,
+        result: { ...toolResult, result: 1 },
+      },
+      {
+        _tag: "ModelPart",
+        turn: 0,
+        modelCallId: "model-call-0",
+        modelAttemptId: "model-attempt-0",
+        attempt: 0,
+        part: { ...toolCall, params: { text: 1 } },
+      },
+    ]
+    for (const event of invalidFixedEvents) expect(Schema.is(Wire.EventSchema(toolkit))(event)).toBe(false)
     expect(Exit.isFailure(dynamicEvent)).toBe(true)
     const dynamicToolEvent = Effect.runSyncExit(Schema.decodeUnknownEffect(Wire.LooseEventSchema)(unknownToolEvent))
     expect(Schema.is(Wire.LooseEventSchema)({ _tag: "Bogus" })).toBe(false)

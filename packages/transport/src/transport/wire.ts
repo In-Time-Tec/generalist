@@ -94,7 +94,7 @@ type WireToolResult = {
   readonly preliminary?: boolean
   readonly metadata?: Readonly<Record<string, unknown>>
 }
-type WireResponsePart = Response.StreamPart<Record<string, Tool.Any>> | WireToolCall | WireToolResult
+type WireResponsePart = Response.AnyPart | WireToolCall | WireToolResult
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null
 const isWireToolCall = (value: unknown): value is WireToolCall =>
@@ -228,8 +228,64 @@ const StructuralFrameSchema = Schema.Union([
 
 /** @experimental Event type for runtime-dynamic tool names and payloads. */
 export type LooseEventType = Schema.Schema.Type<typeof StructuralEvent>
+
+type FixedTools<T extends ToolkitInput> =
+  T extends Toolkit.WithHandler<infer Tools> ? Tools : T extends Toolkit.Toolkit<infer Tools> ? Tools : never
+type FixedCall<T extends ToolkitInput> = {
+  [Name in keyof FixedTools<T>]: Name extends string
+    ? {
+        readonly type: "tool-call"
+        readonly id: string
+        readonly name: Name
+        readonly params: Tool.Parameters<FixedTools<T>[Name]>
+        readonly providerExecuted?: boolean
+        readonly metadata?: Readonly<Record<string, unknown>>
+      }
+    : never
+}[keyof FixedTools<T>]
+type FixedResult<T extends ToolkitInput> = {
+  [Name in keyof FixedTools<T>]: Name extends string
+    ? {
+        readonly type: "tool-result"
+        readonly id: string
+        readonly name: Name
+        readonly result: Tool.Success<FixedTools<T>[Name]> | Tool.FailureResult<FixedTools<T>[Name]>
+        readonly encodedResult?: unknown
+        readonly isFailure: boolean
+        readonly providerExecuted?: boolean
+        readonly preliminary?: boolean
+        readonly metadata?: Readonly<Record<string, unknown>>
+      }
+    : never
+}[keyof FixedTools<T>]
+type FixedStandardPart = Response.AnyPart & {
+  readonly type: Exclude<Response.AnyPart["type"], "tool-call" | "tool-result">
+}
+type FixedPart<T extends ToolkitInput> = FixedStandardPart | FixedCall<T> | FixedResult<T>
+type FixedEvent<T extends ToolkitInput> =
+  | Exclude<
+      LooseEventType,
+      {
+        readonly _tag:
+          | "ModelPart"
+          | "ToolExecutionStarted"
+          | "ToolExecutionCompleted"
+          | "ApprovalRequested"
+          | "StructuredOutput"
+      }
+    >
+  | (Omit<Extract<LooseEventType, { readonly _tag: "ModelPart" }>, "part"> & { readonly part: FixedPart<T> })
+  | (Omit<Extract<LooseEventType, { readonly _tag: "ToolExecutionStarted" }>, "call"> & { readonly call: FixedCall<T> })
+  | (Omit<Extract<LooseEventType, { readonly _tag: "ToolExecutionCompleted" }>, "call" | "result"> & {
+      readonly call: FixedCall<T>
+      readonly result: FixedResult<T>
+    })
+  | (Omit<Extract<LooseEventType, { readonly _tag: "ApprovalRequested" }>, "call"> & { readonly call: FixedCall<T> })
+  | (Omit<Extract<LooseEventType, { readonly _tag: "StructuredOutput" }>, "content"> & {
+      readonly content: ReadonlyArray<FixedPart<T>>
+    })
 /** @experimental Wire event type for fixed-tool frames. */
-export type EventType = LooseEventType & { readonly __batonFixedEvent?: never }
+export type EventType<T extends ToolkitInput = Toolkit.Any> = FixedEvent<T>
 /** @experimental */
 const telemetryTags = new Set([
   "ModelCallStarted",
@@ -291,7 +347,9 @@ const StructuralFrame: Schema.Codec<
 /** @experimental */
 export type LooseServerFrameType = Schema.Schema.Type<typeof StructuralFrame>
 /** @experimental */
-export type ServerFrameType = LooseServerFrameType & { readonly __batonFixedFrame?: never }
+export type ServerFrameType<T extends ToolkitInput = Toolkit.Any> =
+  | Exclude<LooseServerFrameType, { readonly _tag: "Event" }>
+  | { readonly _tag: "Event"; readonly seq: Sequence; readonly event: EventType<T> }
 
 /** @experimental Structural event schema used for public wire introspection. */
 export function EventSchema<T extends ToolkitInput>(toolkit: T) {
@@ -333,7 +391,7 @@ export type ToolkitServices<T extends ToolkitInput> =
     : never
 
 /** @experimental Lazy wire codec. Encoding and decoding services are carried by the effect channels. */
-export interface WireCodec<Frame = ServerFrameType, R = never> {
+export interface WireCodec<Frame = ServerFrameType<ToolkitInput>, R = never> {
   readonly encodeServer: (frame: Frame) => Effect.Effect<string, WireEncodeFailed, R>
   readonly encodeClient: (frame: ClientFrameType) => Effect.Effect<string, WireEncodeFailed>
   readonly decodeServer: (data: string) => Effect.Effect<Frame, WireEncodeFailed, R>
@@ -353,22 +411,19 @@ export function codecEffect<S extends Schema.Constraint>(
   schema: S,
 ): WireCodec<S["Type"], S["EncodingServices"] | S["DecodingServices"]>
 /** @experimental Builds an effectful fixed codec from a toolkit. */
-export function codecEffect<T extends ToolkitInput>(
-  toolkit: T,
-): WireCodec<ServerFrameType | LooseServerFrameType, ToolkitServices<T>>
+export function codecEffect<T extends ToolkitInput>(toolkit: T): WireCodec<ServerFrameType<T>, ToolkitServices<T>>
 export function codecEffect(input: Schema.Constraint | ToolkitInput) {
   return "ast" in input ? makeSchemaCodec(input) : makeFixedCodec(input)
 }
-/** @experimental Builds a fixed codec, exposing any tool schema services in its effect requirement. */
-export function codec<T extends ToolkitInput>(
-  toolkit: T,
-): WireCodec<ServerFrameType | LooseServerFrameType, ToolkitServices<T>>
+/** @experimental Builds a fixed codec, exposing tool schema services in its effect requirement. */
+export function codec<T extends ToolkitInput>(toolkit: T): WireCodec<ServerFrameType<T>, ToolkitServices<T>>
 /** @experimental Builds a synchronous dynamic codec. */
 export function codec(capability: { readonly capability: "runtime-dynamic" }): WireCodec<LooseServerFrameType, never>
 /** @experimental Builds a codec from a capability. */
-export function codec<T extends ToolkitInput>(
-  capability: Capability<T>,
-): WireCodec<ServerFrameType | LooseServerFrameType, ToolkitServices<T>>
+export function codec<T extends ToolkitInput>(capability: {
+  readonly capability: "fixed"
+  readonly toolkit: T
+}): WireCodec<ServerFrameType<T>, ToolkitServices<T>>
 export function codec(
   input:
     | ToolkitInput

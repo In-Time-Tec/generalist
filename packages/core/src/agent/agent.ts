@@ -167,7 +167,7 @@ export function make<
   const definition = {
     name: options.name,
     ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
-    toolkit: toolkit as Toolkit.Toolkit<Tools>,
+    toolkit,
     policy: options.policy ?? defaultPolicy,
     ...(options.model === undefined ? {} : { model: options.model }),
     ...(options.memory === undefined ? {} : { memory: options.memory }),
@@ -181,11 +181,12 @@ export function make<
       }),
     ),
   }
-  type AgentRequirements = OptionRequirements<Tools, typeof options>
-  const complete: Agent<Tools, AgentRequirements, PolicyServices, AuthorizationServices> = {
+  type RuntimeTools = typeof toolkit extends Toolkit.Toolkit<infer CurrentTools> ? CurrentTools : never
+  type AgentRequirements = OptionRequirements<RuntimeTools, typeof options>
+  const complete = {
     ...definition,
     [AgentTypeId]: {
-      tools: (value: Tools) => value,
+      tools: (value: RuntimeTools) => value,
       requirements: (value: AgentRequirements) => value,
     },
     handoff: <A>(f: (agent: HandoffAgent<AgentRequirements>) => A): A =>

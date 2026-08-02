@@ -9509,10 +9509,6 @@
     },
     {
       "source": "packages/transport/src/transport/sse.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/src/transport/sse.ts",
       "specifier": "effect/unstable/encoding"
     },
     {
@@ -9526,6 +9522,10 @@
     {
       "source": "packages/transport/src/transport/wire-codec.ts",
       "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/transport/src/transport/wire-codec.ts",
+      "specifier": "./wire-schema.js"
     },
     {
       "source": "packages/transport/src/transport/wire-codec.ts",
@@ -9592,10 +9592,6 @@
     {
       "source": "packages/transport/src/transport/ws.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/transport/ws.ts",
-      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/transport/src/transport/ws.ts",

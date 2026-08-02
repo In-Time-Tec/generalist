@@ -11,7 +11,11 @@ import { describe, test } from "vitest"
 
 const sessionId = "foldkit-scene-session"
 
-const eventFrame = (seq: number, event: Wire.EventType): Wire.LooseServerFrameType => ({ _tag: "Event", seq, event })
+const eventFrame = (seq: number, event: Wire.LooseEventType): Wire.LooseServerFrameType => ({
+  _tag: "Event",
+  seq,
+  event,
+})
 
 const toolCall = Response.makePart("tool-call", {
   id: "lookup-1",

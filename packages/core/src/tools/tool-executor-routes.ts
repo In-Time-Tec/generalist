@@ -7,6 +7,7 @@ import {
   type PlacementRequest,
   type PlacementResponse,
   type PlacementRouteOptions,
+  type PlacementSchemaServices,
   placementOutcome,
   type RemoteRouteIdempotentOptions,
   type RemoteRouteOptions,
@@ -32,9 +33,9 @@ export function route<R>(options: RouteOptions<R>): Route<R> {
 const placementRoute = <Tools extends Record<string, Tool.Any>, E>(
   placement: Placement,
   options: PlacementRouteOptions<Tools, E>,
-): Route<ToolContext> => {
+): Route<ToolContext | PlacementSchemaServices<Tools>> => {
   const routedTools = options.tools ?? Object.keys(options.toolkit.tools)
-  return route<ToolContext>({
+  return route<ToolContext | PlacementSchemaServices<Tools>>({
     tools: routedTools,
     execute: (request) => {
       const tool = options.toolkit.tools[request.call.name]
@@ -71,7 +72,7 @@ const validateOperationKey = (operationKey: unknown): Effect.Effect<string, Remo
 const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
   options: RemoteRouteIdempotentOptions<Tools, E>,
   request: PlacementRequest,
-): Effect.Effect<PlacementResponse, E | RemoteRetryMisconfigured, ToolContext> =>
+): Effect.Effect<PlacementResponse, E | RemoteRetryMisconfigured, ToolContext | PlacementSchemaServices<Tools>> =>
   Effect.suspend(() => {
     if (!Number.isFinite(options.maxRetries) || !Number.isInteger(options.maxRetries) || options.maxRetries < 0) {
       return Effect.fail(
@@ -82,30 +83,39 @@ const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
     return validateOperationKey(operationKey).pipe(
       Effect.flatMap((stableKey) => {
         let attempt = 0
-        const executeAttempt: Effect.Effect<PlacementResponse | RemoteRetryMisconfigured, E, ToolContext> =
-          Effect.suspend(() => {
-            const currentKey = attempt === 0 ? stableKey : options.operationKey(request)
-            attempt += 1
-            return validateOperationKey(currentKey).pipe(
-              Effect.match({
-                onFailure: (error): string | RemoteRetryMisconfigured => error,
-                onSuccess: (validatedKey): string | RemoteRetryMisconfigured => validatedKey,
-              }),
-              Effect.flatMap(
-                (validatedKey): Effect.Effect<PlacementResponse | RemoteRetryMisconfigured, E, ToolContext> =>
-                  typeof validatedKey !== "string"
-                    ? Effect.succeed(validatedKey)
-                    : validatedKey === stableKey
-                      ? options.execute({ ...request, operationKey: stableKey })
-                      : Effect.succeed(
-                          remoteRetryError(
-                            "changed-operation-key",
-                            "Remote retry operation key changed between attempts",
-                          ),
+        const executeAttempt: Effect.Effect<
+          PlacementResponse | RemoteRetryMisconfigured,
+          E,
+          ToolContext | PlacementSchemaServices<Tools>
+        > = Effect.suspend(() => {
+          const currentKey = attempt === 0 ? stableKey : options.operationKey(request)
+          attempt += 1
+          return validateOperationKey(currentKey).pipe(
+            Effect.match({
+              onFailure: (error): string | RemoteRetryMisconfigured => error,
+              onSuccess: (validatedKey): string | RemoteRetryMisconfigured => validatedKey,
+            }),
+            Effect.flatMap(
+              (
+                validatedKey,
+              ): Effect.Effect<
+                PlacementResponse | RemoteRetryMisconfigured,
+                E,
+                ToolContext | PlacementSchemaServices<Tools>
+              > =>
+                typeof validatedKey !== "string"
+                  ? Effect.succeed(validatedKey)
+                  : validatedKey === stableKey
+                    ? options.execute({ ...request, operationKey: stableKey })
+                    : Effect.succeed(
+                        remoteRetryError(
+                          "changed-operation-key",
+                          "Remote retry operation key changed between attempts",
                         ),
-              ),
-            )
-          })
+                      ),
+            ),
+          )
+        })
         return Effect.retry(executeAttempt, {
           schedule: options.schedule,
           times: options.maxRetries,
@@ -125,12 +135,12 @@ const retryRemote = <Tools extends Record<string, Tool.Any>, E>(
 /** @experimental Route tool calls to a user/browser/desktop client. */
 export const client = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
   options: PlacementRouteOptions<Tools, E>,
-): Route<ToolContext> => placementRoute("client", options)
+): Route<ToolContext | PlacementSchemaServices<Tools>> => placementRoute("client", options)
 
 /** @experimental Route tool calls to a remote tool worker or service. */
 export const remote = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
   options: RemoteRouteOptions<Tools, E>,
-): Route<ToolContext> =>
+): Route<ToolContext | PlacementSchemaServices<Tools>> =>
   options.idempotent === true
     ? placementRoute("remote", {
         toolkit: options.toolkit,
@@ -142,9 +152,9 @@ export const remote = <Tools extends Record<string, Tool.Any>, E = FrameworkFail
 /** @experimental Route tool calls to an MCP placement adapter. */
 export const mcp = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
   options: PlacementRouteOptions<Tools, E>,
-): Route<ToolContext> => placementRoute("mcp", options)
+): Route<ToolContext | PlacementSchemaServices<Tools>> => placementRoute("mcp", options)
 
 /** @experimental Route tool calls to a workspace or sandbox runtime. */
 export const sandbox = <Tools extends Record<string, Tool.Any>, E = FrameworkFailure>(
   options: PlacementRouteOptions<Tools, E>,
-): Route<ToolContext> => placementRoute("sandbox", options)
+): Route<ToolContext | PlacementSchemaServices<Tools>> => placementRoute("sandbox", options)

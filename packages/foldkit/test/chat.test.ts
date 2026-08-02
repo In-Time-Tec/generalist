@@ -4,7 +4,11 @@ import { Prompt, Response } from "effect/unstable/ai"
 import { Errors, Wire } from "@batonfx/transport"
 import { Chat, Connection } from "../src/index"
 
-const eventFrame = (seq: number, event: Wire.EventType): Wire.LooseServerFrameType => ({ _tag: "Event", seq, event })
+const eventFrame = (seq: number, event: Wire.LooseEventType): Wire.LooseServerFrameType => ({
+  _tag: "Event",
+  seq,
+  event,
+})
 
 const updateWith = (model: Chat.Model, incoming: Connection.Incoming) =>
   Chat.update(model, Chat.ReceivedAgent({ incoming }))
@@ -109,7 +113,7 @@ describe("Chat", () => {
     ;[model] = updateWith(model, eventFrame(0, { _tag: "TurnStarted", turn: 0 }))
     const afterTurnStarted = model
 
-    const telemetryEvents: ReadonlyArray<Wire.EventType> = [
+    const telemetryEvents: ReadonlyArray<Wire.LooseEventType> = [
       {
         _tag: "ModelCallStarted",
         deliveryId: "delivery-0",

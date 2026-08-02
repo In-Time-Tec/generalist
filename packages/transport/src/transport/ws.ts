@@ -1,18 +1,16 @@
 import { Cause, Effect, Fiber, Schema, Scope, Stream, SynchronizedRef } from "effect"
 import { HttpServerError, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
-import { Tool, Toolkit } from "effect/unstable/ai"
-import { NotAttached, SessionMismatch, TransportError } from "./errors.js"
+import { NotAttached, SessionMismatch, TransportError, WireEncodeFailed } from "./errors.js"
 import { SessionRegistry } from "../session/session-registry.js"
-import { ClientFrame, codec } from "./wire.js"
-import type { Capability, ClientFrameType, LooseServerFrameType, WireCodec } from "./wire.js"
+import { ClientFrame, codec, ServerFrame } from "./wire.js"
+import type { Capability, ClientFrameType, LooseServerFrameType, ToolkitInput, ToolkitServices } from "./wire.js"
 const ClientFrameJson = Schema.fromJsonString(ClientFrame)
 
-type ToolkitInput = Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>
-type Handle = Effect.Effect<
+type Handle<R = never> = Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   HttpServerError.HttpServerError | Socket.SocketError,
-  HttpServerRequest.HttpServerRequest | SessionRegistry | Scope.Scope
+  HttpServerRequest.HttpServerRequest | SessionRegistry | Scope.Scope | R
 >
 
 type CommandFrame = Exclude<ClientFrameType, { readonly _tag: "Attach" }>
@@ -49,19 +47,25 @@ const authorizeCommand = (
 }
 
 /** @experimental One-session-per-socket fixed-tool WebSocket handler using the supplied toolkit. */
-export function handle<T extends ToolkitInput>(toolkit: T): Handle
+export function handle<T extends ToolkitInput>(toolkit: T): Handle<ToolkitServices<T>>
 /** @experimental One-session-per-socket fixed-tool WebSocket handler using an explicit capability. */
 export function handle<T extends ToolkitInput>(capability: {
   readonly capability: "fixed"
   readonly toolkit: T
-}): Handle
+}): Handle<ToolkitServices<T>>
 /** @experimental One-session-per-socket runtime-dynamic WebSocket handler. */
 export function handle(capability: { readonly capability: "runtime-dynamic" }): Handle
 /** @experimental One-session-per-socket WebSocket handler using a caller-selected capability. */
-export function handle<T extends ToolkitInput>(capability: Capability<T>): Handle
-export function handle<T extends ToolkitInput>(input: T | Capability<T>): Handle {
+export function handle<T extends ToolkitInput>(capability: Capability<T>): Handle<ToolkitServices<T>>
+export function handle<T extends ToolkitInput>(input: T | Capability<T>): Handle<ToolkitServices<T>> {
   const capability = "tools" in input ? ({ capability: "fixed", toolkit: input } as const) : input
-  const wireCodec: WireCodec<LooseServerFrameType> = codec(capability)
+  const encode =
+    capability.capability === "runtime-dynamic"
+      ? (frame: LooseServerFrameType) => codec(capability).encodeServer(frame)
+      : (frame: LooseServerFrameType) =>
+          Schema.decodeUnknownEffect(ServerFrame(capability.toolkit))(frame).pipe(
+            Effect.flatMap(codec(capability.toolkit).encodeServer),
+          )
   return Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest
     const registry = yield* SessionRegistry
@@ -87,7 +91,10 @@ export function handle<T extends ToolkitInput>(input: T | Capability<T>): Handle
       )
 
     const writeFrame = (frame: LooseServerFrameType) =>
-      wireCodec.encodeServer(frame).pipe(
+      encode(frame).pipe(
+        Effect.mapError((error) =>
+          error instanceof WireEncodeFailed ? error : WireEncodeFailed.make({ message: String(error) }),
+        ),
         Effect.flatMap(writer),
         Effect.catchTag("@batonfx/transport/WireEncodeFailed", (error) =>
           close(1011, "wire encoding failed").pipe(Effect.andThen(Effect.fail(error))),

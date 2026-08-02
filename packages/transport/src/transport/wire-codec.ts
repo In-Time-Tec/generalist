@@ -19,6 +19,7 @@ import {
   type LooseServerFrameType,
   type WireCodec,
 } from "./wire.js"
+import { makeFrameSchema } from "./wire-schema.js"
 
 const encodeError = (error: unknown): WireEncodeFailed =>
   WireEncodeFailed.make({ message: error instanceof Error ? error.message : String(error) })
@@ -374,10 +375,8 @@ const asLooseFrame = (value: unknown): Effect.Effect<LooseServerFrameType, WireE
     ? Effect.succeed(value)
     : Effect.fail(encodeError(new Error("Decoded value is not a server frame")))
 
-export function makeFixedCodec<T extends ToolkitInput>(
-  toolkit: T,
-): WireCodec<ServerFrameType | LooseServerFrameType, CodecRequirement<T>>
-export function makeFixedCodec(toolkit: ToolkitInput): WireCodec<ServerFrameType | LooseServerFrameType, unknown> {
+export function makeFixedCodec<T extends ToolkitInput>(toolkit: T): WireCodec<ServerFrameType<T>, CodecRequirement<T>>
+export function makeFixedCodec(toolkit: ToolkitInput): WireCodec<ServerFrameType<ToolkitInput>, unknown> {
   return {
     encodeServer: (frame) =>
       mapFrame(toolkit, frame, "encode").pipe(
@@ -389,7 +388,11 @@ export function makeFixedCodec(toolkit: ToolkitInput): WireCodec<ServerFrameType
     decodeServer: (data) =>
       decodeJson(data).pipe(
         Effect.flatMap((value) => decodeFrame(toolkit, value)),
-        Effect.flatMap(asLooseFrame),
+        Effect.flatMap((value) =>
+          Schema.is(makeFrameSchema(toolkit))(value)
+            ? Effect.succeed(value)
+            : Effect.fail(encodeError(new Error("Decoded value is not a fixed server frame"))),
+        ),
         Effect.mapError(encodeError),
       ),
     decodeClient: (data) =>

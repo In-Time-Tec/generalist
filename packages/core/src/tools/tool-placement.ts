@@ -1,4 +1,4 @@
-import { Effect, Schedule } from "effect"
+import { Effect, Schedule, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { FrameworkFailure, type Interface, type Outcome, type Request, type ToolkitInput } from "./tool-executor.js"
 import { toolResultCodec } from "./tool-result-codec.js"
@@ -41,19 +41,27 @@ export type PlacementResponse =
   | { readonly _tag: "DomainFailure"; readonly failure: unknown }
   | { readonly _tag: "Suspend"; readonly token: string }
 
-type PlacementSchemaServices<Tools extends Record<string, Tool.Any>> =
+export type PlacementSchemaServices<Tools extends Record<string, Tool.Any>> =
   | Tool.ParametersSchema<Tools[keyof Tools]>["DecodingServices"]
+  | Tool.ResultDecodingServices<Tools[keyof Tools]>
   | Tool.ResultEncodingServices<Tools[keyof Tools]>
 
-type PlacementToolkit<Tools extends Record<string, Tool.Any>> = [PlacementSchemaServices<Tools>] extends [never]
-  ? ToolkitInput<Tools>
-  : never
+type PlacementTool<Tools extends Record<string, Tool.Any>> = Tools[keyof Tools] & {
+  readonly parametersSchema: Tool.ParametersSchema<Tools[keyof Tools]>
+  readonly successSchema: Tool.SuccessSchema<Tools[keyof Tools]>
+  readonly failureSchema: Schema.Constraint
+}
+type PlacementToolkit<Tools extends Record<string, Tool.Any>> = ToolkitInput<Tools> & {
+  readonly tools: Readonly<Record<string, PlacementTool<Tools>>>
+}
 
 /** @experimental */
 export interface PlacementRouteOptions<Tools extends Record<string, Tool.Any>, E = FrameworkFailure> {
   readonly toolkit: PlacementToolkit<Tools>
   readonly tools?: ReadonlyArray<string> | undefined
-  readonly execute: (request: PlacementRequest) => Effect.Effect<PlacementResponse, E, ToolContext>
+  readonly execute: (
+    request: PlacementRequest,
+  ) => Effect.Effect<PlacementResponse, E, ToolContext | PlacementSchemaServices<Tools>>
 }
 
 /** @experimental */
@@ -71,7 +79,9 @@ export interface RemoteRouteIdempotentOptions<Tools extends Record<string, Tool.
   readonly operationKey: (request: PlacementRequest) => string
   readonly maxRetries: number
   readonly schedule: Schedule.Schedule<unknown, E>
-  readonly execute: (request: RemotePlacementRequest) => Effect.Effect<PlacementResponse, E, ToolContext>
+  readonly execute: (
+    request: RemotePlacementRequest,
+  ) => Effect.Effect<PlacementResponse, E, ToolContext | PlacementSchemaServices<Tools>>
 }
 
 /** @experimental */
@@ -79,11 +89,15 @@ export type RemoteRouteOptions<Tools extends Record<string, Tool.Any>, E = Frame
   | RemoteRouteNonIdempotentOptions<Tools, E>
   | RemoteRouteIdempotentOptions<Tools, E>
 
-const placementOutcomeFromResponse = (
+const placementOutcomeFromResponse = <SuccessSchema extends Schema.Constraint, FailureSchema extends Schema.Constraint>(
   placement: Placement,
-  tool: Tool.Any,
+  tool: { readonly name: string; readonly successSchema: SuccessSchema; readonly failureSchema: FailureSchema },
   response: unknown,
-): Effect.Effect<Outcome, FrameworkFailure> => {
+): Effect.Effect<
+  Outcome,
+  FrameworkFailure,
+  SuccessSchema["DecodingServices"] | SuccessSchema["EncodingServices"] | FailureSchema["EncodingServices"]
+> => {
   if (typeof response !== "object" || response === null || !("_tag" in response)) {
     return Effect.fail(
       toolResultCodec.frameworkFailure("placement", tool.name, "Placement returned an invalid response"),
@@ -92,7 +106,7 @@ const placementOutcomeFromResponse = (
   switch (response._tag) {
     case "DomainFailure":
       return "failure" in response
-        ? toolResultCodec.encodeDomainFailure(tool, response.failure)
+        ? toolResultCodec.encodeDomainFailure<typeof tool.failureSchema>(tool, response.failure)
         : Effect.fail(
             toolResultCodec.frameworkFailure("placement", tool.name, "DomainFailure response is missing failure"),
           )
@@ -105,7 +119,7 @@ const placementOutcomeFromResponse = (
     case "Success":
       return "result" in response
         ? toolResultCodec
-            .decodeSuccess(tool, response.result)
+            .decodeSuccess<typeof tool.successSchema>(tool, response.result)
             .pipe(
               Effect.mapError((error) =>
                 FrameworkFailure.make({ ...error, message: `${placement} result: ${error.message}` }),

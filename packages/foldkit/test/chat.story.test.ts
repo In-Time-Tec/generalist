@@ -7,7 +7,11 @@ import { describe, expect, test } from "vitest"
 
 const sessionId = "foldkit-story-session"
 
-const eventFrame = (seq: number, event: Wire.EventType): Wire.LooseServerFrameType => ({ _tag: "Event", seq, event })
+const eventFrame = (seq: number, event: Wire.LooseEventType): Wire.LooseServerFrameType => ({
+  _tag: "Event",
+  seq,
+  event,
+})
 
 const receivedFrame = (frame: Wire.LooseServerFrameType) => Chat.ReceivedAgent({ incoming: frame })
 
