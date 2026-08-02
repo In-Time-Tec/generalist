@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.13.0
+
+- Establish an agent-native topology across runtime, provider, and transport facades with precise Effect AI typing and workspace validation.
+- Make Handoff registration structural and closed over run options, and remove the obsolete handoff run path.
+- Make tool-schema services truthful by closing their requirements, preserving toolkit dispatch typing, and rejecting inherited toolkit names.
+- Tighten Wire fixed and dynamic codecs and public schema predicates, removing schema type rebranding and unsafe casts.
+
 ## 0.12.0
 
 - Persist deterministic model-attempt identities before provider construction, settle terminal stream parts even when downstream consumption stops at the boundary, and reject exhausted call ordinals before provider entry.

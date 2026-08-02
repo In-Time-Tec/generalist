@@ -341,4 +341,4 @@ const command = Command.make(
     Effect.sync(() => run(selected, Option.getOrUndefined(selectedValue))),
 )
 
-runMain(Command.run(command, { version: "0.12.0" }).pipe(Effect.provide(layer)))
+runMain(Command.run(command, { version: "0.13.0" }).pipe(Effect.provide(layer)))
