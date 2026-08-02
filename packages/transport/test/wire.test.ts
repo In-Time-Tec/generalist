@@ -721,8 +721,27 @@ describe("Wire", () => {
     }
   })
 
-  it("exposes a service-free event schema for toolkit introspection", () => {
-    expect(Schema.is(Wire.EventSchema(toolkit))({ _tag: "TurnStarted", turn: 0 })).toBe(true)
+  it("exposes strict public schemas backed by branch dispatch", () => {
+    const unknownToolEvent = {
+      _tag: "ModelPart",
+      turn: 0,
+      modelCallId: "model-call-0",
+      modelAttemptId: "model-attempt-0",
+      attempt: 0,
+      part: { type: "tool-call", id: "call-0", name: "unknown", params: {} },
+    }
+    const dynamicEvent = Effect.runSyncExit(Schema.decodeUnknownEffect(Wire.EventSchema(toolkit))(unknownToolEvent))
+    expect(Exit.isFailure(dynamicEvent)).toBe(true)
+    const dynamicToolEvent = Effect.runSyncExit(Schema.decodeUnknownEffect(Wire.LooseEventSchema)(unknownToolEvent))
+    expect(Exit.isSuccess(dynamicToolEvent)).toBe(true)
+    const malformedFrame = Effect.runSyncExit(
+      Schema.decodeUnknownEffect(Wire.LooseServerFrame)({
+        _tag: "Event",
+        seq: -1,
+        event: { _tag: "TurnStarted", turn: 0 },
+      }),
+    )
+    expect(Exit.isFailure(malformedFrame)).toBe(true)
   })
 
   it.effect("preserves tool schema services in the fixed codec requirement", () =>
@@ -752,9 +771,9 @@ describe("Wire", () => {
           },
         },
       })
-      const missingPrefix = serviceCodec.decodeServer(json) as unknown as Effect.Effect<unknown, unknown, never>
-      expect(Exit.isFailure(Effect.runSyncExit(missingPrefix))).toBe(true)
-      const needsPrefix = serviceCodec.decodeServer(json) as unknown as Effect.Effect<unknown, unknown, WirePrefix>
+      const needsPrefix: Effect.Effect<unknown, unknown, WirePrefix> = serviceCodec.decodeServer(json)
+      const withoutPrefix = yield* needsPrefix.pipe(Effect.provide(Layer.succeed(WirePrefix, WirePrefix.of(""))))
+      expect(withoutPrefix).toMatchObject({ event: { part: { params: { value: "value" } } } })
       const provided = needsPrefix.pipe(Effect.provide(Layer.succeed(WirePrefix, WirePrefix.of("!"))))
       const decoded = yield* provided
       expect(decoded).toMatchObject({ event: { part: { params: { value: "value!" } } } })

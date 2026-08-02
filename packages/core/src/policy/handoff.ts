@@ -181,7 +181,7 @@ export const fanOut: {
     options?: FanOutOptions,
   ): Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
 } = Function.dual(
-  (args) => args.length !== 1 || globalThis.Array.isArray(args[0]),
+  (args) => args.length > 1 || globalThis.Array.isArray(args[0]),
   (
     children: ReadonlyArray<FanOutChild>,
     options: FanOutOptions = {},

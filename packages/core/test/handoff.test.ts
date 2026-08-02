@@ -192,6 +192,17 @@ layer(Layer.empty)("Handoff", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "supports zero-argument currying", () => {
+    const runFanOut = Handoff.fanOut()
+    return [
+      Layer.empty,
+      Effect.gen(function* () {
+        const results = yield* runFanOut([])
+        expect(results).toEqual([])
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "propagates registered run errors", () => {
     const child = Handoff.register(
       Agent.make({ name: "failing-child" }),

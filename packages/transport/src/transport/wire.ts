@@ -98,7 +98,11 @@ type WireResponsePart = Response.StreamPart<Record<string, Tool.Any>> | WireTool
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null
 const isWireToolCall = (value: unknown): value is WireToolCall =>
-  isRecord(value) && value.type === "tool-call" && typeof value.id === "string" && typeof value.name === "string"
+  isRecord(value) &&
+  value.type === "tool-call" &&
+  typeof value.id === "string" &&
+  typeof value.name === "string" &&
+  "params" in value
 export const LooseToolCallPart: Schema.Schema<WireToolCall> = Schema.declare(isWireToolCall)
 type WireTelemetry = typeof ModelTelemetry.Event.Type
 const StructuralTelemetry: Schema.Schema<WireTelemetry> = Schema.declare(
@@ -114,6 +118,7 @@ const isWireToolResult = (value: unknown): value is WireToolResult =>
   value.type === "tool-result" &&
   typeof value.id === "string" &&
   typeof value.name === "string" &&
+  "result" in value &&
   typeof value.isFailure === "boolean"
 export const LooseToolResultPart: Schema.Schema<WireToolResult> = Schema.declare(isWireToolResult)
 
@@ -266,7 +271,7 @@ const isStructuralEvent = (value: unknown): value is Schema.Schema.Type<typeof S
       return telemetryTags.has(value._tag)
   }
 }
-export const StructuralFrame: Schema.Codec<
+const StructuralFrame: Schema.Codec<
   Schema.Schema.Type<typeof StructuralFrameSchema>,
   Schema.Schema.Type<typeof StructuralFrameSchema>,
   never,
@@ -289,17 +294,17 @@ export type LooseServerFrameType = Schema.Schema.Type<typeof StructuralFrame>
 export type ServerFrameType = LooseServerFrameType & { readonly __batonFixedFrame?: never }
 
 /** @experimental Structural event schema used for public wire introspection. */
-export function EventSchema<T extends ToolkitInput>(_toolkit: T): typeof StructuralEvent {
-  return StructuralEvent
+export function EventSchema<T extends ToolkitInput>(toolkit: T) {
+  return makeEventSchema(toolkit)
 }
 /** @experimental Structural event schema for dynamic tool payloads. */
-export const LooseEventSchema = StructuralEvent
+export const LooseEventSchema = makeEventSchema(undefined)
 /** @experimental Structural server frame schema. */
-export function ServerFrame<T extends ToolkitInput>(_toolkit: T): typeof StructuralFrame {
-  return StructuralFrame
+export function ServerFrame<T extends ToolkitInput>(toolkit: T) {
+  return makeFrameSchema(toolkit)
 }
 /** @experimental Structural loose server frame schema. */
-export const LooseServerFrame = StructuralFrame
+export const LooseServerFrame = makeFrameSchema(undefined)
 
 export type ToolkitInput = Toolkit.Any | Toolkit.WithHandler<Record<string, Tool.Any>>
 type ToolkitTools<T extends ToolkitInput> =
@@ -335,7 +340,7 @@ export interface WireCodec<Frame = ServerFrameType, R = never> {
   readonly decodeClient: (data: string) => Effect.Effect<ClientFrameType, WireEncodeFailed>
 }
 
-import { makeFixedCodec, makeDynamicCodec, makeSchemaCodec } from "./wire-codec.js"
+import { makeEventSchema, makeFixedCodec, makeDynamicCodec, makeFrameSchema, makeSchemaCodec } from "./wire-codec.js"
 
 /** @experimental Fixed startup-toolkit or runtime-dynamic server-frame validation policy. */
 export type Capability<T extends ToolkitInput = ToolkitInput> =
