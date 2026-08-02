@@ -697,6 +697,26 @@ describe("Wire", () => {
     }),
   )
 
+  it.effect("rejects inherited toolkit names as typed encode and decode failures", () =>
+    Effect.gen(function* () {
+      const codec = Wire.codec(toolkit)
+      const frame: Wire.LooseServerFrameType = {
+        _tag: "Event",
+        seq: 0,
+        event: {
+          _tag: "ToolExecutionStarted",
+          turn: 0,
+          call: { type: "tool-call", id: "inherited-1", name: "toString", params: {} },
+        },
+      }
+      const encodedError = yield* codec.encodeServer(frame as never).pipe(Effect.flip)
+      const decodedError = yield* codec.decodeServer(JSON.stringify(frame)).pipe(Effect.flip)
+
+      expect(encodedError._tag).toBe("@batonfx/transport/WireEncodeFailed")
+      expect(decodedError._tag).toBe("@batonfx/transport/WireEncodeFailed")
+    }),
+  )
+
   it("accepts stripped transcripts on completed events", () => {
     const codec = Wire.codec(toolkit)
     const decoded = Effect.runSync(

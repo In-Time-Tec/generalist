@@ -247,6 +247,7 @@ const toolPart = <T extends ToolkitInput | undefined>(
   if (typeof part !== "object" || part === null || !("name" in part) || typeof part.name !== "string") {
     return Effect.fail(encodeError(new Error("Tool part name is required")))
   }
+  if (!Object.hasOwn(toolkit.tools, part.name)) return missingTool(part.name)
   const tool = toolkit.tools[part.name]
   if (tool === undefined) return missingTool(part.name)
   const isFailure = tag === "tool-result" && "isFailure" in part && part.isFailure === true
