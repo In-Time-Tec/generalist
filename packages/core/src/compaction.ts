@@ -1,5 +1,6 @@
 import { Context, Effect, Function, Layer, Option, Schema } from "effect"
 import { LanguageModel, Prompt, Tokenizer, Toolkit } from "effect/unstable/ai"
+import { ContextRevision } from "./compaction-context-revision.js"
 import { safeCutIndex } from "./compaction-cut.js"
 import { summaryLanguageModel, withCompactionLifecycle } from "./compaction-telemetry.js"
 import { makeThresholdState } from "./compaction-threshold-state.js"
@@ -262,18 +263,6 @@ const makeMicrocompact = (history: Prompt.Prompt, prompt: Prompt.Prompt): Microc
   prompt,
 })
 
-const contextRevision = (input: Request): string | undefined => {
-  try {
-    const context = JSON.stringify([input.path?.at(-1)?.id, input.history.content, input.prompt.content])
-    let hash = 2_166_136_261
-    for (let index = 0; index < context.length; index += 1)
-      hash = Math.imul(hash ^ context.charCodeAt(index), 16_777_619)
-    return `${context.length}:${hash >>> 0}`
-  } catch {
-    return undefined
-  }
-}
-
 /** @experimental The default two-stage compaction strategy. */
 export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
   const provideSummaryModel =
@@ -396,7 +385,11 @@ export const make: {
             thresholds.clear(input.sessionId)
             return Effect.succeed(Option.none<Result>())
           }
-          const revision = contextRevision(input)
+          const revision = ContextRevision.make(
+            input.path?.at(-1)?.id ?? null,
+            input.history.content,
+            input.prompt.content,
+          )
           if (revision !== undefined && !input.overflow && thresholds.isUnchanged(input.sessionId, usage, revision))
             return Effect.succeed(Option.none())
           return withCompactionLifecycle(compact(compactionStrategy, input, usage, options), input, usage).pipe(

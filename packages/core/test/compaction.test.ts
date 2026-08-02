@@ -178,6 +178,51 @@ describe("Compaction", () => {
     }),
   ])
 
+  ItLayer.make(it, "bypasses unchanged threshold suppression for lossy prompt values", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
+    Effect.gen(function* () {
+      const values = [
+        [undefined, () => undefined],
+        [Number.NaN, Number.POSITIVE_INFINITY],
+        [-0, 0],
+        [{ nested: [1n] }, { nested: [2n] }],
+      ] as const
+
+      for (const [firstResult, secondResult] of values) {
+        let cuts = 0
+        const base = Compaction.defaultStrategy()
+        const service = Compaction.make({
+          ...base,
+          shouldCompact: () => true,
+          cut: () => {
+            cuts += 1
+            return Option.none()
+          },
+        })
+        const request = {
+          compactionId: "lossy-threshold",
+          agentName: "lossy-threshold-agent",
+          sessionId: `session-${cuts}`,
+          turn: 0,
+          history: Prompt.empty,
+          path: [],
+          usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+          overflow: false,
+        } as const
+
+        yield* service.maybeCompact({ ...request, prompt: Prompt.fromMessages([toolResult("call", firstResult)]) })
+        yield* service.maybeCompact({
+          ...request,
+          compactionId: "lossy-threshold-retry",
+          turn: 1,
+          prompt: Prompt.fromMessages([toolResult("call", secondResult)]),
+        })
+
+        expect(cuts).toBe(2)
+      }
+    }),
+  ])
+
   ItLayer.make(it, "reruns the default threshold strategy when an equal-usage path grows", () => [
     modelLayer(() => Effect.succeed([{ type: "text", text: "summary" }])),
     Effect.gen(function* () {
