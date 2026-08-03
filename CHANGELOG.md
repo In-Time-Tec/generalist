@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.13.1
+
+- Bound inline-image token estimates across fallback thresholding, recent-context cutting, and post-microcompaction fit checks while preserving text-only estimates.
+- Anchor provider-reported context usage to append-only prompt descendants and invalidate it after context rewrites or replacement finishes without valid input usage.
+- Suppress unchanged threshold passes by faithful context identity without suppressing overflow compaction or changed and lossily serializable contexts.
+
 ## 0.13.0
 
 - Establish an agent-native topology across runtime, provider, and transport facades with precise Effect AI typing and workspace validation.
