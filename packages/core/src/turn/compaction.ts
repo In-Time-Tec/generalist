@@ -395,10 +395,12 @@ export const make: {
           )
           if (revision !== undefined && !input.overflow && thresholds.isUnchanged(input.sessionId, usage, revision))
             return Effect.succeed(Option.none())
-          return withCompactionLifecycle(compact(compactionStrategy, input, usage, options), input, usage).pipe(
+          const pass = withCompactionLifecycle(compact(compactionStrategy, input, usage, options), input, usage)
+          if (input.overflow) return pass.pipe(Effect.ensuring(Effect.sync(() => thresholds.clear(input.sessionId))))
+          return pass.pipe(
             Effect.tap((result) =>
               Effect.sync(() => {
-                if (!input.overflow && revision !== undefined && Option.isNone(result))
+                if (revision !== undefined && Option.isNone(result))
                   thresholds.recordUnchanged(input.sessionId, usage, revision)
                 else thresholds.clear(input.sessionId)
               }),

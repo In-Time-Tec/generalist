@@ -314,8 +314,10 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                 const history = yield* Ref.get(chat.history)
                 preparedState = { history, preparedPrompt }
                 const responsePrompt = Prompt.concat(history, preparedPrompt)
-                state.currentContext = responsePrompt
-                state.currentContextTokens = yield* countTokens(turn, responsePrompt)
+                if (Option.isSome(compactionService)) {
+                  state.currentContext = responsePrompt
+                  state.currentContextTokens = yield* countTokens(turn, responsePrompt)
+                }
                 const messages = responsePrompt.content
                 const rawParts = LanguageModel.streamText({
                   prompt: responsePrompt,

@@ -3107,6 +3107,57 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "does not measure prompts when Compaction is absent", () => {
+    let calls = 0
+    let tokenizerCalls = 0
+    const tokenizer = Layer.succeed(
+      Tokenizer.Tokenizer,
+      Tokenizer.Tokenizer.of({
+        tokenize: () => {
+          tokenizerCalls += 1
+          return Effect.die("Tokenizer must not run without Compaction")
+        },
+        truncate: () => {
+          tokenizerCalls += 1
+          return Effect.die("Tokenizer must not run without Compaction")
+        },
+      }),
+    )
+    const prompt = Prompt.fromMessages([
+      Prompt.makeMessage("tool", {
+        content: [
+          Prompt.makePart("tool-result", {
+            id: "bigint-result",
+            name: "echo",
+            isFailure: false,
+            result: { value: 1n },
+          }),
+        ],
+      }),
+    ])
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return Stream.make(textDelta("done"))
+        }),
+        tokenizer,
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "no-compaction-measurement-agent" })
+
+        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt }))
+
+        expect(calls).toBe(1)
+        expect(tokenizerCalls).toBe(0)
+        expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "does not duplicate a pre-populated Session path when Compaction is active", () => {
     let calls = 0
     const seed = Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "seed" })] })

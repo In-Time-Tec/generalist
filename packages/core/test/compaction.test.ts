@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Json } from "./json"
-import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { Compaction, Session, ToolOutput } from "../src/index"
 import { ItLayer } from "./it-layer"
@@ -183,11 +183,16 @@ describe("Compaction", () => {
   ItLayer.make(it, "bypasses unchanged threshold suppression for lossy prompt values", () => [
     modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
     Effect.gen(function* () {
+      const firstArray = ["value"]
+      const secondArray = ["value"]
+      Object.defineProperty(firstArray, "1.5", { value: "first", enumerable: true })
+      Object.defineProperty(secondArray, "1.5", { value: "second", enumerable: true })
       const values = [
         [undefined, () => undefined],
         [Number.NaN, Number.POSITIVE_INFINITY],
         [-0, 0],
         [{ nested: [1n] }, { nested: [2n] }],
+        [firstArray, secondArray],
       ] as const
 
       for (const [firstResult, secondResult] of values) {
@@ -222,6 +227,87 @@ describe("Compaction", () => {
 
         expect(cuts).toBe(2)
       }
+    }),
+  ])
+
+  ItLayer.make(it, "fails open when context identity introspection throws", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
+    Effect.gen(function* () {
+      let cuts = 0
+      const service = Compaction.make({
+        ...Compaction.defaultStrategy(),
+        shouldCompact: () => true,
+        cut: () => {
+          cuts += 1
+          return Option.none()
+        },
+      })
+      const request = {
+        compactionId: "throwing-identity",
+        agentName: "throwing-identity-agent",
+        sessionId: "throwing-identity-session",
+        turn: 0,
+        history: Prompt.empty,
+        path: [],
+        usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+        overflow: false,
+      } as const
+      const first = Proxy.revocable({}, {})
+      const second = Proxy.revocable({}, {})
+      first.revoke()
+      second.revoke()
+
+      yield* service.maybeCompact({
+        ...request,
+        prompt: Prompt.fromMessages([toolResult("call", first.proxy)]),
+      })
+      yield* service.maybeCompact({
+        ...request,
+        compactionId: "throwing-identity-retry",
+        turn: 1,
+        prompt: Prompt.fromMessages([toolResult("call", second.proxy)]),
+      })
+
+      expect(cuts).toBe(2)
+    }),
+  ])
+
+  ItLayer.make(it, "clears unchanged threshold suppression after a failed overflow pass", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
+    Effect.gen(function* () {
+      let cuts = 0
+      const path = [entry("0", user("old")), entry("1", user("recent"))]
+      const service = Compaction.make({
+        ...Compaction.defaultStrategy(),
+        shouldCompact: () => true,
+        cut: () => {
+          cuts += 1
+          return cuts === 2
+            ? Option.some({ head: [path[0]!], recent: [path[1]!], firstKeptEntryId: "1" })
+            : Option.none()
+        },
+        summarize: () => Effect.fail(new Compaction.CompactionError({ message: "summary failed" })),
+      })
+      const request = {
+        compactionId: "failed-overflow",
+        agentName: "failed-overflow-agent",
+        sessionId: "failed-overflow-session",
+        turn: 0,
+        history: Prompt.empty,
+        prompt: Prompt.make("same context"),
+        path,
+        usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+        overflow: false,
+      } as const
+
+      yield* service.maybeCompact(request)
+      const overflow = yield* Effect.exit(
+        service.maybeCompact({ ...request, compactionId: "failed-overflow-retry", turn: 1, overflow: true }),
+      )
+      yield* service.maybeCompact({ ...request, compactionId: "post-failed-overflow", turn: 2 })
+
+      expect(Exit.isFailure(overflow)).toBe(true)
+      expect(cuts).toBe(3)
     }),
   ])
 

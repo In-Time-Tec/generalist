@@ -6,7 +6,7 @@
 
 - Bound inline-image token estimates across fallback thresholding, recent-context cutting, and post-microcompaction fit checks while preserving text-only estimates.
 - Anchor provider-reported context usage to append-only prompt descendants and invalidate it after context rewrites or replacement finishes without valid input usage.
-- Suppress unchanged threshold passes by faithful context identity without suppressing overflow compaction or changed and lossily serializable contexts.
+- Suppress unchanged threshold passes only for unchanged usage and conservatively verified plain-JSON context values. Values that serialize lossily or throw during identity inspection fail open, and overflow clears suppression on every exit.
 
 ## 0.13.0
 

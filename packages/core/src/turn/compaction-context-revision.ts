@@ -7,7 +7,6 @@ const hasFaithfulJsonIdentity = (value: unknown, ancestors: Set<object> = new Se
       return Number.isFinite(value) && !Object.is(value, -0)
     case "object": {
       if (value === null || ancestors.has(value)) return value === null
-      const prototype = Object.getPrototypeOf(value)
       if (Array.isArray(value)) {
         if (Object.getOwnPropertySymbols(value).length > 0) return false
         for (let index = 0; index < value.length; index += 1) {
@@ -19,10 +18,13 @@ const hasFaithfulJsonIdentity = (value: unknown, ancestors: Set<object> = new Se
           )
             return false
         }
-        return Object.getOwnPropertyNames(value).every(
-          (key) => key === "length" || (String(Number(key)) === key && Number(key) >= 0 && Number(key) < 2 ** 32 - 1),
-        )
+        return Object.getOwnPropertyNames(value).every((key) => {
+          if (key === "length") return true
+          const index = Number(key)
+          return Number.isInteger(index) && index >= 0 && index < value.length && String(index) === key
+        })
       }
+      const prototype = Object.getPrototypeOf(value)
       if ((prototype !== Object.prototype && prototype !== null) || Object.getOwnPropertySymbols(value).length > 0)
         return false
       return Object.getOwnPropertyNames(value).every((key) => {
@@ -42,9 +44,9 @@ const hasFaithfulJsonIdentity = (value: unknown, ancestors: Set<object> = new Se
 
 export const ContextRevision = {
   make: (pathLeafId: unknown, history: unknown, prompt: unknown): string | undefined => {
-    const input = [pathLeafId, history, prompt]
-    if (!hasFaithfulJsonIdentity(input)) return undefined
     try {
+      const input = [pathLeafId, history, prompt]
+      if (!hasFaithfulJsonIdentity(input)) return undefined
       const context = JSON.stringify(input)
       let hash = 2_166_136_261
       for (let index = 0; index < context.length; index += 1)
