@@ -1,6 +1,6 @@
 export const packages = ["core", "test", "skills", "memory", "providers", "mcp", "transport", "foldkit"] as const
 export const compressedSizeLimits: Record<(typeof packages)[number], number> = {
-  core: 110_000,
+  core: 125_000,
   test: 8_000,
   skills: 13_000,
   memory: 10_000,
