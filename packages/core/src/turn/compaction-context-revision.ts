@@ -8,7 +8,8 @@ const hasFaithfulJsonIdentity = (value: unknown, ancestors: Set<object> = new Se
     case "object": {
       if (value === null || ancestors.has(value)) return value === null
       if (Array.isArray(value)) {
-        if (Object.getOwnPropertySymbols(value).length > 0) return false
+        if (Object.getPrototypeOf(value) !== Array.prototype || Object.getOwnPropertySymbols(value).length > 0)
+          return false
         for (let index = 0; index < value.length; index += 1) {
           const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
           if (

@@ -187,12 +187,22 @@ describe("Compaction", () => {
       const secondArray = ["value"]
       Object.defineProperty(firstArray, "1.5", { value: "first", enumerable: true })
       Object.defineProperty(secondArray, "1.5", { value: "second", enumerable: true })
+      class LossyArray extends Array<string> {
+        toJSON() {
+          return ["constant"]
+        }
+      }
+      const firstSubclass = new LossyArray("first")
+      const secondSubclass = new LossyArray("second")
+      expect(firstSubclass[0]).not.toBe(secondSubclass[0])
+      expect(JSON.stringify(firstSubclass)).toBe(JSON.stringify(secondSubclass))
       const values = [
         [undefined, () => undefined],
         [Number.NaN, Number.POSITIVE_INFINITY],
         [-0, 0],
         [{ nested: [1n] }, { nested: [2n] }],
         [firstArray, secondArray],
+        [firstSubclass, secondSubclass],
       ] as const
 
       for (const [firstResult, secondResult] of values) {
@@ -227,6 +237,44 @@ describe("Compaction", () => {
 
         expect(cuts).toBe(2)
       }
+    }),
+  ])
+
+  ItLayer.make(it, "suppresses unchanged threshold passes for plain array prompt values", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
+    Effect.gen(function* () {
+      let cuts = 0
+      const service = Compaction.make({
+        ...Compaction.defaultStrategy(),
+        shouldCompact: () => true,
+        cut: () => {
+          cuts += 1
+          return Option.none()
+        },
+      })
+      const request = {
+        compactionId: "plain-array-threshold",
+        agentName: "plain-array-threshold-agent",
+        sessionId: "plain-array-threshold-session",
+        turn: 0,
+        history: Prompt.empty,
+        path: [],
+        usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+        overflow: false,
+      } as const
+
+      yield* service.maybeCompact({
+        ...request,
+        prompt: Prompt.fromMessages([toolResult("call", ["same"])]),
+      })
+      yield* service.maybeCompact({
+        ...request,
+        compactionId: "plain-array-threshold-retry",
+        turn: 1,
+        prompt: Prompt.fromMessages([toolResult("call", ["same"])]),
+      })
+
+      expect(cuts).toBe(1)
     }),
   ])
 
