@@ -4,6 +4,8 @@ import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "eff
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { Compaction, Session, ToolOutput } from "../src/index"
 import { ItLayer } from "./it-layer"
+import { estimatePromptTokens } from "../src/turn/prompt-token-estimate"
+import { makeThresholdState } from "../src/turn/compaction-threshold-state"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -13,6 +15,11 @@ const user = (text: string): Prompt.Message =>
 const assistantToolCall = (id: string): Prompt.Message =>
   Prompt.makeMessage("assistant", {
     content: [Prompt.makePart("tool-call", { id, name: "echo", params: { text: "call" }, providerExecuted: false })],
+  })
+
+const imageMessage = (data: string): Prompt.Message =>
+  Prompt.makeMessage("user", {
+    content: [Prompt.makePart("file", { mediaType: "image/png", data })],
   })
 
 const toolResult = (id: string, result: unknown): Prompt.Message =>
@@ -69,6 +76,22 @@ describe("Compaction", () => {
     ).toBe(false)
   })
 
+  it("preserves text-only estimates at strict threshold boundaries", () => {
+    const prompt = Prompt.make("text-only boundary")
+    const contextTokens = Math.ceil(JSON.stringify(prompt.content).length / 4)
+    const strategy = Compaction.defaultStrategy()
+
+    expect(estimatePromptTokens(prompt)).toBe(contextTokens)
+    expect(strategy.shouldCompact({ contextTokens, contextWindow: contextTokens + 20, reserveTokens: 20 })).toBe(false)
+    expect(
+      strategy.shouldCompact({
+        contextTokens: contextTokens + 1,
+        contextWindow: contextTokens + 20,
+        reserveTokens: 20,
+      }),
+    ).toBe(true)
+  })
+
   it("cuts at a safe tool boundary", () => {
     const strategy = Compaction.defaultStrategy()
     const entries = [
@@ -105,6 +128,179 @@ describe("Compaction", () => {
     }
   })
 
+  it("bounds inline image cost when keeping recent entries", () => {
+    const strategy = Compaction.defaultStrategy()
+    const entries = [
+      entry("0", user("old")),
+      entry("1", user("tail ".repeat(400))),
+      entry("2", imageMessage(`data:image/png;base64,${"A".repeat(1_000_000)}`)),
+      entry("3", user("recent")),
+    ]
+
+    const plan = strategy.cut(entries, 2_000)
+
+    expect(Option.isSome(plan)).toBe(true)
+    if (Option.isSome(plan)) {
+      expect(plan.value.head.map((item) => item.id)).toEqual(["0"])
+      expect(plan.value.recent.map((item) => item.id)).toEqual(["1", "2", "3"])
+    }
+  })
+
+  ItLayer.make(it, "does not repeat an unchanged threshold pass without context growth", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
+    Effect.gen(function* () {
+      let cuts = 0
+      const strategy: Compaction.Strategy = {
+        ...Compaction.defaultStrategy(),
+        shouldCompact: () => true,
+        cut: () => {
+          cuts += 1
+          return Option.none()
+        },
+      }
+      const service = Compaction.make(strategy)
+      const request = {
+        compactionId: "unchanged-threshold",
+        agentName: "unchanged-threshold-agent",
+        sessionId: "session",
+        turn: 0,
+        history: Prompt.empty,
+        prompt: Prompt.make("same context"),
+        path: [],
+        usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+        overflow: false,
+      } as const
+
+      yield* service.maybeCompact(request)
+      yield* service.maybeCompact({ ...request, compactionId: "unchanged-threshold-retry", turn: 1 })
+      yield* service.maybeCompact({ ...request, compactionId: "overflow-retry", turn: 2, overflow: true })
+      yield* service.maybeCompact({ ...request, compactionId: "post-overflow-threshold", turn: 3 })
+
+      expect(cuts).toBe(3)
+    }),
+  ])
+
+  ItLayer.make(it, "bypasses unchanged threshold suppression for lossy prompt values", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "unused" }])),
+    Effect.gen(function* () {
+      const values = [
+        [undefined, () => undefined],
+        [Number.NaN, Number.POSITIVE_INFINITY],
+        [-0, 0],
+        [{ nested: [1n] }, { nested: [2n] }],
+      ] as const
+
+      for (const [firstResult, secondResult] of values) {
+        let cuts = 0
+        const base = Compaction.defaultStrategy()
+        const service = Compaction.make({
+          ...base,
+          shouldCompact: () => true,
+          cut: () => {
+            cuts += 1
+            return Option.none()
+          },
+        })
+        const request = {
+          compactionId: "lossy-threshold",
+          agentName: "lossy-threshold-agent",
+          sessionId: `session-${cuts}`,
+          turn: 0,
+          history: Prompt.empty,
+          path: [],
+          usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+          overflow: false,
+        } as const
+
+        yield* service.maybeCompact({ ...request, prompt: Prompt.fromMessages([toolResult("call", firstResult)]) })
+        yield* service.maybeCompact({
+          ...request,
+          compactionId: "lossy-threshold-retry",
+          turn: 1,
+          prompt: Prompt.fromMessages([toolResult("call", secondResult)]),
+        })
+
+        expect(cuts).toBe(2)
+      }
+    }),
+  ])
+
+  ItLayer.make(it, "reruns the default threshold strategy when an equal-usage path grows", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "summary" }])),
+    Effect.gen(function* () {
+      const service = Compaction.make(Compaction.defaultStrategy(), { keepRecentTokens: 1 })
+      const request = {
+        compactionId: "default-equal-usage",
+        agentName: "default-equal-usage-agent",
+        sessionId: "session",
+        turn: 0,
+        history: Prompt.empty,
+        prompt: Prompt.make("same text-only prompt"),
+        path: [],
+        usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+        overflow: false,
+      } as const
+      const path = [
+        entry("0", user("old")),
+        entry("1", assistantToolCall("call")),
+        entry("2", toolResult("call", "ok")),
+      ]
+
+      const first = yield* service.maybeCompact(request)
+      const second = yield* service.maybeCompact({
+        ...request,
+        compactionId: "default-equal-usage-path",
+        turn: 1,
+        path,
+      })
+
+      expect(Option.isNone(first)).toBe(true)
+      expect(Option.isSome(second)).toBe(true)
+    }),
+  ])
+
+  ItLayer.make(it, "reruns a custom threshold strategy when an equal-usage path grows", () => [
+    modelLayer(() => Effect.succeed([{ type: "text", text: "summary" }])),
+    Effect.gen(function* () {
+      let cuts = 0
+      const base = Compaction.defaultStrategy()
+      const service = Compaction.make(
+        {
+          ...base,
+          shouldCompact: () => true,
+          cut: (entries, keepRecentTokens) => {
+            cuts += 1
+            return base.cut(entries, keepRecentTokens)
+          },
+        },
+        { keepRecentTokens: 1 },
+      )
+      const request = {
+        compactionId: "custom-equal-usage",
+        agentName: "custom-equal-usage-agent",
+        sessionId: "session",
+        turn: 0,
+        history: Prompt.empty,
+        prompt: Prompt.make("same text-only prompt"),
+        path: [],
+        usage: { contextTokens: 100, contextWindow: 100, reserveTokens: 10 },
+        overflow: false,
+      } as const
+      const path = [
+        entry("0", user("old")),
+        entry("1", assistantToolCall("call")),
+        entry("2", toolResult("call", "ok")),
+      ]
+
+      const first = yield* service.maybeCompact(request)
+      const second = yield* service.maybeCompact({ ...request, compactionId: "custom-equal-usage-path", turn: 1, path })
+
+      expect(cuts).toBe(2)
+      expect(Option.isNone(first)).toBe(true)
+      expect(Option.isSome(second)).toBe(true)
+    }),
+  ])
+
   it("reports whether a compaction would run before any prompt work", () => {
     const service = Compaction.make(Compaction.defaultStrategy(), {
       contextWindow: 1_000,
@@ -120,6 +316,16 @@ describe("Compaction", () => {
     expect(
       service.willCompact?.({ usage: { contextTokens: 100, contextWindow: 1_000, reserveTokens: 0 }, overflow: true }),
     ).toBe(true)
+  })
+
+  it("evicts the oldest unchanged threshold session toward an extra pass", () => {
+    const state = makeThresholdState()
+    const usage = { contextTokens: 100, contextWindow: 100, reserveTokens: 10 }
+    for (let index = 0; index < 1_025; index += 1) state.recordUnchanged(`session-${index}`, usage, "revision")
+
+    expect(state.isUnchanged("session-0", usage, "revision")).toBe(false)
+    expect(state.isUnchanged("session-1", usage, "revision")).toBe(true)
+    expect(state.isUnchanged("session-1024", usage, "revision")).toBe(true)
   })
 
   ItLayer.make(it, "keeps microcompaction when the token estimate fits the budget", () => {
@@ -150,6 +356,44 @@ describe("Compaction", () => {
           prompt: Prompt.fromMessages([toolResult("call-large", large)]),
           path: [entry("0", user("old")), entry("1", user("recent"))],
           usage: { contextTokens: 2_000, contextWindow: 1_000, reserveTokens: 0 },
+          overflow: false,
+          toolOutputMaxBytes: 12,
+        })
+
+        expect(summaryCalls).toBe(0)
+        expect(Option.isSome(compacted)).toBe(true)
+        if (Option.isSome(compacted)) expect(compacted.value._tag).toBe("Microcompact")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "keeps image-bearing microcompaction when the bounded estimate fits", () => {
+    let summaryCalls = 0
+    const large = "abcdef".repeat(40)
+    return [
+      Layer.mergeAll(
+        ToolOutput.layerTest({ put: () => Effect.succeed(Option.some("mem:large")) }),
+        modelLayer(() => {
+          summaryCalls += 1
+          return Effect.succeed([{ type: "text", text: "unexpected summary" }])
+        }),
+      ),
+      Effect.gen(function* () {
+        const service = Compaction.make(Compaction.defaultStrategy(), {
+          contextWindow: 5_000,
+          reserveTokens: 0,
+          keepRecentTokens: 1,
+        })
+
+        const compacted = yield* service.maybeCompact({
+          compactionId: "compaction-image-token-budget",
+          agentName: "image-token-budget-agent",
+          sessionId: "session",
+          turn: 1,
+          history: Prompt.fromMessages([imageMessage(`data:image/png;base64,${"A".repeat(1_000_000)}`)]),
+          prompt: Prompt.fromMessages([toolResult("call-large", large)]),
+          path: [entry("0", user("old")), entry("1", user("recent"))],
+          usage: { contextTokens: 300_000, contextWindow: 5_000, reserveTokens: 0 },
           overflow: false,
           toolOutputMaxBytes: 12,
         })

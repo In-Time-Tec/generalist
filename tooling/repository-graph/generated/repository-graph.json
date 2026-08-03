@@ -1423,7 +1423,22 @@
       "test": false
     },
     {
+      "path": "packages/core/src/turn/compaction-context-revision.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/turn/compaction-cut.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
       "path": "packages/core/src/turn/compaction-telemetry.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/turn/compaction-threshold-state.ts",
       "package": "@batonfx/core",
       "test": false
     },
@@ -1444,6 +1459,11 @@
     },
     {
       "path": "packages/core/src/turn/facade-turnPolicy.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/turn/prompt-token-estimate.ts",
       "package": "@batonfx/core",
       "test": false
     },
@@ -6349,6 +6369,10 @@
     },
     {
       "source": "packages/core/src/agent/compaction-runtime.ts",
+      "specifier": "../turn/prompt-token-estimate.js"
+    },
+    {
+      "source": "packages/core/src/agent/compaction-runtime.ts",
       "specifier": "./agent-event.js"
     },
     {
@@ -7220,6 +7244,18 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/core/src/turn/compaction-cut.ts",
+      "specifier": "./prompt-token-estimate.js"
+    },
+    {
+      "source": "packages/core/src/turn/compaction-cut.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/turn/compaction-cut.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
       "source": "packages/core/src/turn/compaction-telemetry.ts",
       "specifier": "../model/model-telemetry.js"
     },
@@ -7245,7 +7281,23 @@
     },
     {
       "source": "packages/core/src/turn/compaction.ts",
+      "specifier": "./compaction-context-revision.js"
+    },
+    {
+      "source": "packages/core/src/turn/compaction.ts",
+      "specifier": "./compaction-cut.js"
+    },
+    {
+      "source": "packages/core/src/turn/compaction.ts",
       "specifier": "./compaction-telemetry.js"
+    },
+    {
+      "source": "packages/core/src/turn/compaction.ts",
+      "specifier": "./compaction-threshold-state.js"
+    },
+    {
+      "source": "packages/core/src/turn/compaction.ts",
+      "specifier": "./prompt-token-estimate.js"
     },
     {
       "source": "packages/core/src/turn/compaction.ts",
@@ -7266,6 +7318,10 @@
     {
       "source": "packages/core/src/turn/facade-turnPolicy.ts",
       "specifier": "./turn-policy.js"
+    },
+    {
+      "source": "packages/core/src/turn/prompt-token-estimate.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/core/src/turn/steering.ts",
@@ -7361,6 +7417,11 @@
     },
     {
       "source": "packages/core/test/agent.test.ts",
+      "specifier": "../src/turn/prompt-token-estimate",
+      "target": "packages/core/src/turn/prompt-token-estimate.ts"
+    },
+    {
+      "source": "packages/core/test/agent.test.ts",
       "specifier": "./it-layer",
       "target": "packages/core/test/it-layer.ts"
     },
@@ -7395,6 +7456,16 @@
       "source": "packages/core/test/compaction.test.ts",
       "specifier": "../src/index",
       "target": "packages/core/src/index.ts"
+    },
+    {
+      "source": "packages/core/test/compaction.test.ts",
+      "specifier": "../src/turn/compaction-threshold-state",
+      "target": "packages/core/src/turn/compaction-threshold-state.ts"
+    },
+    {
+      "source": "packages/core/test/compaction.test.ts",
+      "specifier": "../src/turn/prompt-token-estimate",
+      "target": "packages/core/src/turn/prompt-token-estimate.ts"
     },
     {
       "source": "packages/core/test/compaction.test.ts",

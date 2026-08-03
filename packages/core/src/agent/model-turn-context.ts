@@ -1,7 +1,7 @@
 import type { Effect, Option, Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import type { AgentRunState } from "./agent-run-state.js"
-import type { Event } from "./agent-event.js"
+import type { AgentError, Event } from "./agent-event.js"
 import type { AnyToolCall } from "./agent-tool-result.js"
 import type { RunError } from "./agent.js"
 import type { Middleware } from "../model/model-middleware.js"
@@ -40,6 +40,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
     RunError,
     LanguageModel.LanguageModel
   >
+  readonly countTokens: (turn: number, prompt: Prompt.Prompt) => Effect.Effect<number, AgentError>
   readonly emitTelemetry: (payload: DeliveryEventPayload) => Effect.Effect<void>
   readonly chat: Chat.Service
   readonly compactionService: Option.Option<typeof import("../turn/compaction.js").Compaction.Service>

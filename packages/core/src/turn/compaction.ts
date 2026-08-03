@@ -1,6 +1,10 @@
 import { Context, Effect, Function, Layer, Option, Schema } from "effect"
 import { LanguageModel, Prompt, Tokenizer, Toolkit } from "effect/unstable/ai"
+import { ContextRevision } from "./compaction-context-revision.js"
+import { safeCutIndex } from "./compaction-cut.js"
 import { summaryLanguageModel, withCompactionLifecycle } from "./compaction-telemetry.js"
+import { makeThresholdState } from "./compaction-threshold-state.js"
+import { estimatePromptTokens } from "./prompt-token-estimate.js"
 import { type Entry, type EntryId, buildContext } from "../context/session.js"
 import { makeSummaryModelProvider } from "../model/summary-model.js"
 import { type Success } from "../tools/tool-executor.js"
@@ -178,27 +182,11 @@ const renderAgentSummary = (summary: AgentSummary): string =>
     `## Tool Findings\n${markdownList(summary.toolFindings)}`,
   ].join("\n\n")
 
-const APPROX_CHARS_PER_TOKEN = 4
-
-const estimateTokens = (text: string): number => Math.ceil(text.length / APPROX_CHARS_PER_TOKEN)
-
-const estimateEntryTokens = (entry: Entry): number => estimateTokens(serialized(entry))
-
-const estimatePromptTokens = (prompt: Prompt.Prompt): number => estimateTokens(serialized(prompt.content))
-
 const fits = (history: Prompt.Prompt, prompt: Prompt.Prompt, usage: Usage): boolean =>
   Number.isFinite(usage.contextWindow) &&
   estimatePromptTokens(Prompt.concat(history, prompt)) <= usage.contextWindow - usage.reserveTokens
 
 const isPromptToolResult = (part: Prompt.Part): part is Prompt.ToolResultPart => part.type === "tool-result"
-
-const messageHasToolCall = (message: Prompt.Message): boolean =>
-  typeof message.content !== "string" && message.content.some((part) => part.type === "tool-call")
-
-const isToolMessage = (entry: Entry | undefined): boolean => entry?._tag === "Message" && entry.message.role === "tool"
-
-const isAssistantToolCallEntry = (entry: Entry | undefined): boolean =>
-  entry?._tag === "Message" && entry.message.role === "assistant" && messageHasToolCall(entry.message)
 
 const compactToolPart = (
   part: Prompt.ToolResultPart,
@@ -277,19 +265,6 @@ const makeMicrocompact = (history: Prompt.Prompt, prompt: Prompt.Prompt): Microc
   history,
   prompt,
 })
-
-const safeCutIndex = (entries: ReadonlyArray<Entry>, keepRecentTokens: number): number => {
-  let total = 0
-  let index = entries.length
-  while (index > 0 && total < keepRecentTokens) {
-    index -= 1
-    total += estimateEntryTokens(entries[index] as Entry)
-  }
-  while (index > 0 && (isToolMessage(entries[index]) || isAssistantToolCallEntry(entries[index - 1]))) {
-    index -= 1
-  }
-  return index
-}
 
 /** @experimental The default two-stage compaction strategy. */
 export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
@@ -400,16 +375,38 @@ export const make: {
   (compactionStrategy: Strategy, options?: DefaultOptions): Interface
 } = Function.dual(
   (args) => args.length !== 1 || "shouldCompact" in args[0],
-  (compactionStrategy: Strategy, options: DefaultOptions = {}): Interface => ({
-    willCompact: ({ usage, overflow }) => overflow || compactionStrategy.shouldCompact(normalizeUsage(usage, options)),
-    maybeCompact: (input) =>
-      Effect.suspend(() => {
-        const usage = normalizeUsage(input.usage, options)
-        const shouldCompact = input.overflow || compactionStrategy.shouldCompact(usage)
-        if (!shouldCompact) return Effect.succeed(Option.none<Result>())
-        return withCompactionLifecycle(compact(compactionStrategy, input, usage, options), input, usage)
-      }),
-  }),
+  (compactionStrategy: Strategy, options: DefaultOptions = {}): Interface => {
+    const thresholds = makeThresholdState()
+    return {
+      willCompact: ({ usage, overflow }) =>
+        overflow || compactionStrategy.shouldCompact(normalizeUsage(usage, options)),
+      maybeCompact: (input) =>
+        Effect.suspend(() => {
+          const usage = normalizeUsage(input.usage, options)
+          const shouldCompact = input.overflow || compactionStrategy.shouldCompact(usage)
+          if (!shouldCompact) {
+            thresholds.clear(input.sessionId)
+            return Effect.succeed(Option.none<Result>())
+          }
+          const revision = ContextRevision.make(
+            input.path?.at(-1)?.id ?? null,
+            input.history.content,
+            input.prompt.content,
+          )
+          if (revision !== undefined && !input.overflow && thresholds.isUnchanged(input.sessionId, usage, revision))
+            return Effect.succeed(Option.none())
+          return withCompactionLifecycle(compact(compactionStrategy, input, usage, options), input, usage).pipe(
+            Effect.tap((result) =>
+              Effect.sync(() => {
+                if (!input.overflow && revision !== undefined && Option.isNone(result))
+                  thresholds.recordUnchanged(input.sessionId, usage, revision)
+                else thresholds.clear(input.sessionId)
+              }),
+            ),
+          )
+        }),
+    }
+  },
 )
 
 const compact = (

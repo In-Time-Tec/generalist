@@ -8,6 +8,15 @@ export interface AgentRunState {
   readonly pending: Map<number, PendingToolResult>
   finish: { readonly usage: Response.Usage; readonly reason: Response.FinishReason } | undefined
   usage: Response.Usage | undefined
+  currentContext: Prompt.Prompt | undefined
+  currentContextTokens: number | undefined
+  reportedContextUsage:
+    | {
+        readonly prompt: Prompt.Prompt
+        readonly estimatedTokens: number
+        readonly reportedTokens: number
+      }
+    | undefined
   providerOutput: {
     textCharacters: number
     reasoningCharacters: number

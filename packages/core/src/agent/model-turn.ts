@@ -32,6 +32,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     instrumentModel,
     chain,
     preparePrompt,
+    countTokens,
     emitTelemetry,
     chat,
     compactionService,
@@ -55,6 +56,17 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         reason: part.reason,
       }
       state.usage = state.usage === undefined ? part.usage : addUsage(state.usage, part.usage)
+      const reportedTokens = part.usage.inputTokens.total
+      if (state.currentContextTokens !== undefined && state.currentContext !== undefined) {
+        state.reportedContextUsage =
+          reportedTokens !== undefined && Number.isSafeInteger(reportedTokens) && reportedTokens >= 0
+            ? {
+                prompt: state.currentContext,
+                estimatedTokens: state.currentContextTokens,
+                reportedTokens,
+              }
+            : undefined
+      }
       Telemetry.addGenAIAnnotations(span, {
         operation: { name: "chat" },
         usage: {
@@ -302,6 +314,8 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                 const history = yield* Ref.get(chat.history)
                 preparedState = { history, preparedPrompt }
                 const responsePrompt = Prompt.concat(history, preparedPrompt)
+                state.currentContext = responsePrompt
+                state.currentContextTokens = yield* countTokens(turn, responsePrompt)
                 const messages = responsePrompt.content
                 const rawParts = LanguageModel.streamText({
                   prompt: responsePrompt,

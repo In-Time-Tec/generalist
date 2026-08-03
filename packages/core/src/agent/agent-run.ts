@@ -189,6 +189,9 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         pending: new Map<number, PendingToolResult>(),
         finish: undefined,
         usage: undefined,
+        currentContext: undefined,
+        currentContextTokens: undefined,
+        reportedContextUsage: undefined,
         providerOutput: providerOutputState(),
       }
       const pendingResults = (): ReadonlyArray<PendingToolResult> =>
@@ -307,6 +310,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         chat,
         persisted,
         options,
+        state,
         compactionService,
         tokenizerService,
         deliverPending,
@@ -320,7 +324,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         compactionError,
         sessionError,
       })
-      const { preparePrompt, applyCompactionResult, syncSession } = compactionRuntime
+      const { preparePrompt, applyCompactionResult, countTokens, syncSession } = compactionRuntime
       const toolRuntime = makeToolExecution({
         options,
         state,
@@ -346,6 +350,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         instrumentModel,
         chain,
         preparePrompt,
+        countTokens,
         emitTelemetry,
         chat,
         compactionService,
