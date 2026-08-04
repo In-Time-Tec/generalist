@@ -1,21 +1,29 @@
 // @vitest-environment happy-dom
 
-import { AgentEvent, Response } from "@batonfx/core"
-import { Chat } from "@batonfx/foldkit"
-import { Wire } from "@batonfx/transport"
+import { Response } from "@batonfx/core"
+import { Chat, Connection } from "@batonfx/foldkit"
+import { AgentRef, RunEvent } from "@batonfx/runtime"
+import { Prompt } from "effect/unstable/ai"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
 import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } from "./main"
 
 const sessionId = "deep-research-story"
 
-const eventFrame = (seq: number, event: Wire.LooseEventType): Wire.LooseServerFrameType => ({
-  _tag: "Event",
-  seq,
-  event,
-})
+const agent = AgentRef.make({ id: "deep-research", version: "1", digest: "sha256:deep-research" })
+const eventFrame = (sequence: number, fields: Record<string, unknown>): RunEvent.RunEvent =>
+  ({
+    specVersion: "1",
+    eventId: `${sessionId}:${sequence}`,
+    runId: sessionId,
+    sequence,
+    agent,
+    rootRunId: sessionId,
+    occurredAt: "2026-08-03T00:00:00.000Z",
+    ...fields,
+  }) as RunEvent.RunEvent
 
-const agentAction = (incoming: Wire.LooseServerFrameType) => GotChatAction({ action: Chat.ReceivedAgent({ incoming }) })
+const agentAction = (incoming: Connection.Incoming) => GotChatAction({ action: Chat.ReceivedAgent({ incoming }) })
 
 const readyModel = (): Model => {
   const [model] = update(init()[0], OpenedSession({ sessionId }))
@@ -55,7 +63,7 @@ const toolResult = Response.makePart("tool-result", {
   preliminary: false,
 })
 
-const completionFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
+const completionFrames: ReadonlyArray<Connection.Incoming> = [
   eventFrame(0, { _tag: "TurnStarted", turn: 0 }),
   eventFrame(1, {
     _tag: "ModelPart",
@@ -67,7 +75,7 @@ const completionFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
   }),
   eventFrame(2, { _tag: "ToolExecutionStarted", turn: 0, call: toolCall }),
   eventFrame(3, { _tag: "ToolExecutionCompleted", turn: 0, call: toolCall, result: toolResult }),
-  eventFrame(4, { _tag: "TurnCompleted", turn: 0 }),
+  eventFrame(4, { _tag: "TurnCompleted", turn: 0, transcript: Prompt.empty }),
   eventFrame(5, { _tag: "TurnStarted", turn: 1 }),
   eventFrame(6, {
     _tag: "ModelPart",
@@ -85,8 +93,11 @@ const completionFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
     attempt: 0,
     part: Response.makePart("text-delta", { id: "assistant", delta: "Final cited answer" }),
   }),
-  eventFrame(8, { _tag: "TurnCompleted", turn: 1 }),
-  eventFrame(9, { _tag: "Completed", turns: 2, text: "Final cited answer\n\nSources:\n[1] Baton docs" }),
+  eventFrame(8, { _tag: "TurnCompleted", turn: 1, transcript: Prompt.empty }),
+  eventFrame(9, {
+    _tag: "RunCompleted",
+    result: { turns: 2, text: "Final cited answer\n\nSources:\n[1] Baton docs", transcript: Prompt.empty },
+  }),
 ]
 
 describe("deep-research-agent web update", () => {
@@ -176,11 +187,12 @@ describe("deep-research-agent web update", () => {
         },
       }),
       Story.message(
-        agentAction({
-          _tag: "Failed",
-          seq: 9,
-          error: new AgentEvent.AgentError({ message: "model unavailable", turn: 0 }),
-        }),
+        agentAction(
+          eventFrame(9, {
+            _tag: "RunFailed",
+            error: { message: "model unavailable", turn: 0 },
+          }),
+        ),
       ),
       Story.model((model) => {
         expect(model.chat.run).toEqual({ _tag: "Failed", message: "model unavailable" })

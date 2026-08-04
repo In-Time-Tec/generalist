@@ -1,0 +1,96 @@
+import { Effect } from "effect"
+import { SqlClient } from "effect/unstable/sql"
+import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
+import { isTerminal } from "../run.js"
+import type { ExecutionClaim, ExecutionRecord } from "../run-store.js"
+import { StaleClaim } from "./errors.js"
+import { loadRun, loadRunWait, nowIso } from "./store-helpers.js"
+import type { DecodedRun } from "./rows.js"
+
+const requireRun = (runId: string) =>
+  loadRun(runId).pipe(Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))))
+
+export const requireExecutionClaim = (input: ExecutionClaim) =>
+  Effect.gen(function* () {
+    const run = yield* requireRun(input.runId)
+    if (run.ownerWorkerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
+      return yield* StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: input.attemptFence })
+    }
+  })
+
+const executionRecord = (run: DecodedRun, resolution?: ExecutionRecord["resolution"]): ExecutionRecord => ({
+  runId: run.runId,
+  message: run.message,
+  agent: run.agent,
+  attempt: run.attempt,
+  attemptFence: run.attemptFence,
+  ...(run.driverCheckpoint === undefined ? {} : { checkpoint: run.driverCheckpoint }),
+  ...(run.suspension === undefined ? {} : { suspension: run.suspension }),
+  ...(resolution === undefined ? {} : { resolution }),
+  ...(run.transcript === undefined ? {} : { transcript: run.transcript }),
+})
+
+export const loadExecution = (runId: string) =>
+  Effect.gen(function* () {
+    const run = yield* requireRun(runId)
+    const wait = yield* loadRunWait(run.runId, run.activeWaitId)
+    return executionRecord(run, wait?.resolution)
+  })
+
+export const claimExecution = (input: { readonly runId: string; readonly ownerId: string }) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const run = yield* requireRun(input.runId)
+    if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
+    if (run.status === "waiting" || run.status === "queued") {
+      return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is ${run.status}` })
+    }
+    const nextAttemptFence = run.attemptFence + 1
+    const updated = yield* nowIso
+    yield* sql`
+      UPDATE baton_runs SET
+        owner_worker_id = ${input.ownerId},
+        attempt_fence = attempt_fence + 1,
+        status = 'running',
+        updated_at = ${updated}
+      WHERE run_id = ${input.runId}
+        AND status IN ('running', 'needs-resolution')
+        AND attempt_fence = ${run.attemptFence}
+    `
+    const claimed = yield* requireRun(input.runId)
+    if (claimed.ownerWorkerId !== input.ownerId || claimed.attemptFence !== nextAttemptFence) {
+      return yield* StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: run.attemptFence })
+    }
+    const wait = yield* loadRunWait(claimed.runId, run.activeWaitId)
+    return { ...executionRecord(claimed, wait?.resolution), ownerId: input.ownerId }
+  })
+
+export const saveExecution = (
+  input: ExecutionClaim & {
+    readonly checkpoint?: ExecutionRecord["checkpoint"]
+    readonly suspension?: ExecutionRecord["suspension"]
+    readonly transcript?: ExecutionRecord["transcript"]
+  },
+) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const updated = yield* nowIso
+    const rows = yield* sql<{ run_id: string }>`
+      UPDATE baton_runs SET
+        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+        suspension_json = COALESCE(${input.suspension === undefined ? null : JSON.stringify(input.suspension)}, suspension_json),
+        transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+        updated_at = ${updated}
+      WHERE run_id = ${input.runId}
+        AND owner_worker_id = ${input.ownerId}
+        AND attempt_fence = ${input.attemptFence}
+      RETURNING run_id
+    `
+    if (rows.length === 0) {
+      return yield* StaleClaim.make({
+        runId: input.runId,
+        workerId: input.ownerId,
+        attemptFence: input.attemptFence,
+      })
+    }
+  })

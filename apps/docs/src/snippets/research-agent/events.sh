@@ -1,1 +1,1 @@
-curl -N http://localhost:4000/sessions/research-1/events
+curl -N http://localhost:4000/runs/research-run-1/events

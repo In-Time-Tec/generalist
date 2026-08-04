@@ -293,12 +293,12 @@
       "test": false
     },
     {
-      "path": "apps/docs/src/pages/learn/baton-and-relay.ts",
+      "path": "apps/docs/src/pages/learn/comparisons.ts",
       "package": "@batonfx/docs",
       "test": false
     },
     {
-      "path": "apps/docs/src/pages/learn/comparisons.ts",
+      "path": "apps/docs/src/pages/learn/native-runtime.ts",
       "package": "@batonfx/docs",
       "test": false
     },
@@ -319,6 +319,16 @@
     },
     {
       "path": "apps/docs/src/pages/learn/suspension.ts",
+      "package": "@batonfx/docs",
+      "test": false
+    },
+    {
+      "path": "apps/docs/src/pages/reference/a2a.ts",
+      "package": "@batonfx/docs",
+      "test": false
+    },
+    {
+      "path": "apps/docs/src/pages/reference/ag-ui.ts",
       "package": "@batonfx/docs",
       "test": false
     },
@@ -369,6 +379,11 @@
     },
     {
       "path": "apps/docs/src/pages/reference/providers.ts",
+      "package": "@batonfx/docs",
+      "test": false
+    },
+    {
+      "path": "apps/docs/src/pages/reference/runtime.ts",
       "package": "@batonfx/docs",
       "test": false
     },
@@ -728,11 +743,6 @@
       "test": false
     },
     {
-      "path": "apps/docs/src/snippets/learn/baton-and-relay/tool-wait.ts",
-      "package": "@batonfx/docs",
-      "test": false
-    },
-    {
       "path": "apps/docs/src/snippets/learn/one-payload-vocabulary/portable-transcript.ts",
       "package": "@batonfx/docs",
       "test": false
@@ -1053,6 +1063,71 @@
       "test": false
     },
     {
+      "path": "packages/a2a/src/adapter.ts",
+      "package": "@batonfx/a2a",
+      "test": false
+    },
+    {
+      "path": "packages/a2a/src/content.ts",
+      "package": "@batonfx/a2a",
+      "test": false
+    },
+    {
+      "path": "packages/a2a/src/errors.ts",
+      "package": "@batonfx/a2a",
+      "test": false
+    },
+    {
+      "path": "packages/a2a/src/index.ts",
+      "package": "@batonfx/a2a",
+      "test": false
+    },
+    {
+      "path": "packages/a2a/src/projection.ts",
+      "package": "@batonfx/a2a",
+      "test": false
+    },
+    {
+      "path": "packages/a2a/src/service.ts",
+      "package": "@batonfx/a2a",
+      "test": false
+    },
+    {
+      "path": "packages/a2a/test/handler.test.ts",
+      "package": "@batonfx/a2a",
+      "test": true
+    },
+    {
+      "path": "packages/ag-ui/src/ag-ui.ts",
+      "package": "@batonfx/ag-ui",
+      "test": false
+    },
+    {
+      "path": "packages/ag-ui/src/errors.ts",
+      "package": "@batonfx/ag-ui",
+      "test": false
+    },
+    {
+      "path": "packages/ag-ui/src/index.ts",
+      "package": "@batonfx/ag-ui",
+      "test": false
+    },
+    {
+      "path": "packages/ag-ui/src/projection.ts",
+      "package": "@batonfx/ag-ui",
+      "test": false
+    },
+    {
+      "path": "packages/ag-ui/test/ag-ui.test.ts",
+      "package": "@batonfx/ag-ui",
+      "test": true
+    },
+    {
+      "path": "packages/ag-ui/test/projection.test.ts",
+      "package": "@batonfx/ag-ui",
+      "test": true
+    },
+    {
       "path": "packages/core/src/agent/agent-event.ts",
       "package": "@batonfx/core",
       "test": false
@@ -1123,7 +1198,32 @@
       "test": false
     },
     {
+      "path": "packages/core/src/agent/handoff-state.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/agent/handoff-tool-execution.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
       "path": "packages/core/src/agent/model-turn-context.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/agent/model-turn-driver.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/agent/model-turn-finish.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/agent/model-turn-parts.ts",
       "package": "@batonfx/core",
       "test": false
     },
@@ -1144,6 +1244,11 @@
     },
     {
       "path": "packages/core/src/agent/setup.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/agent/tool-dispatch.ts",
       "package": "@batonfx/core",
       "test": false
     },
@@ -1199,6 +1304,71 @@
     },
     {
       "path": "packages/core/src/context/skill-source.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/agent-ref.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/canonical-digest.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/driver-contract.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/driver-interpreter.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/driver-run.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/driver-tracer.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/durable-driver.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/facade-agentRef.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/facade-durableDriver.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/facade-runBudget.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/loop-driver-state.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/loop-driver.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/run-budget.ts",
       "package": "@batonfx/core",
       "test": false
     },
@@ -1344,6 +1514,26 @@
     },
     {
       "path": "packages/core/src/policy/guardrail.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/policy/handoff-projection.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/policy/handoff-runtime.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/policy/handoff-target.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/policy/handoff-tool-meta.ts",
       "package": "@batonfx/core",
       "test": false
     },
@@ -1503,7 +1693,17 @@
       "test": true
     },
     {
+      "path": "packages/core/test/durable-driver.test.ts",
+      "package": "@batonfx/core",
+      "test": true
+    },
+    {
       "path": "packages/core/test/guardrail.test.ts",
+      "package": "@batonfx/core",
+      "test": true
+    },
+    {
+      "path": "packages/core/test/handoff-same-run.test.ts",
       "package": "@batonfx/core",
       "test": true
     },
@@ -1593,6 +1793,11 @@
       "test": true
     },
     {
+      "path": "packages/core/test/run-budget-integration.test.ts",
+      "package": "@batonfx/core",
+      "test": true
+    },
+    {
       "path": "packages/core/test/session-fencing.test.ts",
       "package": "@batonfx/core",
       "test": true
@@ -1661,16 +1866,6 @@
       "path": "packages/foldkit/src/index.ts",
       "package": "@batonfx/foldkit",
       "test": false
-    },
-    {
-      "path": "packages/foldkit/test/chat.scene.test.ts",
-      "package": "@batonfx/foldkit",
-      "test": true
-    },
-    {
-      "path": "packages/foldkit/test/chat.story.test.ts",
-      "package": "@batonfx/foldkit",
-      "test": true
     },
     {
       "path": "packages/foldkit/test/chat.test.ts",
@@ -1903,6 +2098,431 @@
       "test": true
     },
     {
+      "path": "packages/runtime/scripts/mysql-tracer.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/scripts/phase0-tracer.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/scripts/postgres-tracer.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/active-executions.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/address.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/agent-event.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/agent-host.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/agent-ref.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/cursor.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/errors.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/index.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/append.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/digest.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/lanes.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/prompt.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/runtime-layer.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/state.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/store-admit.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/store-control.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/store-events.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/store-execution.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/store-operations.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/memory/store.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/message.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/platform-layers.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/run-event.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/run-store.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/run-wait.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/run.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/runtime.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/bun-client.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/codecs.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/errors.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/migrate.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/mysql/run-schema.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/mysql/schema.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/mysql/store-claims.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/mysql/store.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/operations.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/postgres/claims.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/postgres/run-schema.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/postgres/schema.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/postgres/store.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/postgres/worker.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/rows.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/run-claims.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/runtime-layer.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/schema.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/sql-effect.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/store-admit.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/store-control.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/store-execution.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/store-helpers.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/store-operations.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/store.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/subscribers.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/tree.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/test/address.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/agent-host.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/helpers.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/index.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/message.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/mysql/helpers.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/mysql/mysql-tracer.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/postgres/helpers.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/postgres/postgres-tracer.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/runtime-children.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/runtime-control.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/runtime-events.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/runtime-fifo.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/runtime-idempotency.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/runtime-inspection.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/runtime-send.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/runtime-worker.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/sql-subscribers.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/sqlite-helpers.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/sqlite-store.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
       "path": "packages/skills/src/index.ts",
       "package": "@batonfx/skills",
       "test": false
@@ -1978,46 +2598,6 @@
       "test": false
     },
     {
-      "path": "packages/transport/src/session/session-coordination.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
-      "path": "packages/transport/src/session/session-registry-approvals.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
-      "path": "packages/transport/src/session/session-registry-contract.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
-      "path": "packages/transport/src/session/session-registry-errors.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
-      "path": "packages/transport/src/session/session-registry-finalization.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
-      "path": "packages/transport/src/session/session-registry-runtime.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
-      "path": "packages/transport/src/session/session-registry-status.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
-      "path": "packages/transport/src/session/session-registry.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
       "path": "packages/transport/src/transport/client.ts",
       "package": "@batonfx/transport",
       "test": false
@@ -2028,22 +2608,12 @@
       "test": false
     },
     {
-      "path": "packages/transport/src/transport/frame-journal.ts",
+      "path": "packages/transport/src/transport/snapshot.ts",
       "package": "@batonfx/transport",
       "test": false
     },
     {
       "path": "packages/transport/src/transport/sse.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
-      "path": "packages/transport/src/transport/wire-codec.ts",
-      "package": "@batonfx/transport",
-      "test": false
-    },
-    {
-      "path": "packages/transport/src/transport/wire-schema.ts",
       "package": "@batonfx/transport",
       "test": false
     },
@@ -2063,17 +2633,12 @@
       "test": true
     },
     {
-      "path": "packages/transport/test/frame-journal.test.ts",
+      "path": "packages/transport/test/helpers.ts",
       "package": "@batonfx/transport",
       "test": true
     },
     {
-      "path": "packages/transport/test/session-coordination.test.ts",
-      "package": "@batonfx/transport",
-      "test": true
-    },
-    {
-      "path": "packages/transport/test/session-registry.test.ts",
+      "path": "packages/transport/test/snapshot.test.ts",
       "package": "@batonfx/transport",
       "test": true
     },
@@ -2141,6 +2706,42 @@
   ],
   "packages": [
     {
+      "name": "@batonfx/a2a",
+      "path": "packages/a2a",
+      "manifest": "packages/a2a/package.json",
+      "private": false,
+      "dependencies": [
+        "@a2a-js/sdk",
+        "@batonfx/runtime",
+        "@effect/vitest",
+        "@types/bun",
+        "effect",
+        "typescript",
+        "vitest"
+      ],
+      "exports": [
+        "."
+      ]
+    },
+    {
+      "name": "@batonfx/ag-ui",
+      "path": "packages/ag-ui",
+      "manifest": "packages/ag-ui/package.json",
+      "private": false,
+      "dependencies": [
+        "@ag-ui/core",
+        "@batonfx/runtime",
+        "@effect/vitest",
+        "@types/bun",
+        "effect",
+        "typescript",
+        "vitest"
+      ],
+      "exports": [
+        "."
+      ]
+    },
+    {
       "name": "@batonfx/core",
       "path": "packages/core",
       "manifest": "packages/core/package.json",
@@ -2162,11 +2763,14 @@
       "manifest": "apps/docs/package.json",
       "private": true,
       "dependencies": [
+        "@batonfx/a2a",
+        "@batonfx/ag-ui",
         "@batonfx/core",
         "@batonfx/foldkit",
         "@batonfx/mcp",
         "@batonfx/memory",
         "@batonfx/providers",
+        "@batonfx/runtime",
         "@batonfx/skills",
         "@batonfx/test",
         "@batonfx/transport",
@@ -2199,8 +2803,8 @@
         "@batonfx/mcp",
         "@batonfx/memory",
         "@batonfx/providers",
+        "@batonfx/runtime",
         "@batonfx/skills",
-        "@batonfx/transport",
         "@types/bun",
         "effect",
         "foldkit",
@@ -2233,6 +2837,7 @@
       "dependencies": [
         "@batonfx/core",
         "@batonfx/providers",
+        "@batonfx/runtime",
         "@batonfx/transport",
         "@effect/platform-bun",
         "@types/bun",
@@ -2250,6 +2855,7 @@
       "private": true,
       "dependencies": [
         "@batonfx/foldkit",
+        "@batonfx/runtime",
         "@batonfx/transport",
         "@foldkit/ui",
         "@foldkit/vite-plugin",
@@ -2290,6 +2896,7 @@
       "private": true,
       "dependencies": [
         "@batonfx/core",
+        "@batonfx/runtime",
         "@batonfx/transport",
         "@types/bun",
         "effect",
@@ -2357,6 +2964,7 @@
         "@batonfx/mcp",
         "@batonfx/memory",
         "@batonfx/providers",
+        "@batonfx/runtime",
         "@batonfx/skills",
         "@batonfx/test",
         "@batonfx/transport",
@@ -2405,6 +3013,7 @@
       "manifest": "packages/foldkit/package.json",
       "private": false,
       "dependencies": [
+        "@batonfx/runtime",
         "@batonfx/transport",
         "@effect/vitest",
         "@types/bun",
@@ -2510,6 +3119,27 @@
       ]
     },
     {
+      "name": "@batonfx/runtime",
+      "path": "packages/runtime",
+      "manifest": "packages/runtime/package.json",
+      "private": false,
+      "dependencies": [
+        "@batonfx/core",
+        "@effect/sql-mysql2",
+        "@effect/sql-pg",
+        "@effect/sql-sqlite-bun",
+        "@effect/vitest",
+        "@types/bun",
+        "bun-types",
+        "effect",
+        "typescript",
+        "vitest"
+      ],
+      "exports": [
+        "."
+      ]
+    },
+    {
       "name": "@batonfx/skills",
       "path": "packages/skills",
       "manifest": "packages/skills/package.json",
@@ -2549,8 +3179,7 @@
       "manifest": "packages/transport/package.json",
       "private": false,
       "dependencies": [
-        "@batonfx/core",
-        "@batonfx/test",
+        "@batonfx/runtime",
         "@effect/vitest",
         "@types/bun",
         "effect",
@@ -2561,7 +3190,7 @@
         ".",
         "./client",
         "./errors",
-        "./session-registry",
+        "./snapshot",
         "./sse",
         "./wire",
         "./ws"
@@ -2574,15 +3203,21 @@
       "private": true,
       "dependencies": [
         "@ast-grep/cli",
+        "@batonfx/a2a",
+        "@batonfx/ag-ui",
         "@batonfx/core",
         "@batonfx/foldkit",
         "@batonfx/mcp",
         "@batonfx/memory",
         "@batonfx/providers",
+        "@batonfx/runtime",
         "@batonfx/skills",
         "@batonfx/test",
         "@batonfx/transport",
         "@effect/platform-bun",
+        "@effect/sql-mysql2",
+        "@effect/sql-pg",
+        "@effect/sql-sqlite-bun",
         "@effect/tsgo",
         "@effect/vitest",
         "@tsconfig/bun",
@@ -3145,13 +3780,13 @@
     },
     {
       "source": "apps/docs/src/content/registry.ts",
-      "specifier": "../pages/learn/baton-and-relay",
-      "target": "apps/docs/src/pages/learn/baton-and-relay.ts"
+      "specifier": "../pages/learn/comparisons",
+      "target": "apps/docs/src/pages/learn/comparisons.ts"
     },
     {
       "source": "apps/docs/src/content/registry.ts",
-      "specifier": "../pages/learn/comparisons",
-      "target": "apps/docs/src/pages/learn/comparisons.ts"
+      "specifier": "../pages/learn/native-runtime",
+      "target": "apps/docs/src/pages/learn/native-runtime.ts"
     },
     {
       "source": "apps/docs/src/content/registry.ts",
@@ -3172,6 +3807,16 @@
       "source": "apps/docs/src/content/registry.ts",
       "specifier": "../pages/learn/suspension",
       "target": "apps/docs/src/pages/learn/suspension.ts"
+    },
+    {
+      "source": "apps/docs/src/content/registry.ts",
+      "specifier": "../pages/reference/a2a",
+      "target": "apps/docs/src/pages/reference/a2a.ts"
+    },
+    {
+      "source": "apps/docs/src/content/registry.ts",
+      "specifier": "../pages/reference/ag-ui",
+      "target": "apps/docs/src/pages/reference/ag-ui.ts"
     },
     {
       "source": "apps/docs/src/content/registry.ts",
@@ -3222,6 +3867,11 @@
       "source": "apps/docs/src/content/registry.ts",
       "specifier": "../pages/reference/providers",
       "target": "apps/docs/src/pages/reference/providers.ts"
+    },
+    {
+      "source": "apps/docs/src/content/registry.ts",
+      "specifier": "../pages/reference/runtime",
+      "target": "apps/docs/src/pages/reference/runtime.ts"
     },
     {
       "source": "apps/docs/src/content/registry.ts",
@@ -3951,20 +4601,12 @@
       "specifier": "../../snippets/learn/agent-loop/event-trace.ts?raw"
     },
     {
-      "source": "apps/docs/src/pages/learn/baton-and-relay.ts",
+      "source": "apps/docs/src/pages/learn/comparisons.ts",
       "specifier": "../../prose",
       "target": "apps/docs/src/prose/index.ts"
     },
     {
-      "source": "apps/docs/src/pages/learn/baton-and-relay.ts",
-      "specifier": "../../snippets/learn/baton-and-relay/tool-wait.expected.txt?raw"
-    },
-    {
-      "source": "apps/docs/src/pages/learn/baton-and-relay.ts",
-      "specifier": "../../snippets/learn/baton-and-relay/tool-wait.ts?raw"
-    },
-    {
-      "source": "apps/docs/src/pages/learn/comparisons.ts",
+      "source": "apps/docs/src/pages/learn/native-runtime.ts",
       "specifier": "../../prose",
       "target": "apps/docs/src/prose/index.ts"
     },
@@ -4021,6 +4663,16 @@
       "specifier": "../../snippets/learn/suspension/suspend-and-resume.ts?raw"
     },
     {
+      "source": "apps/docs/src/pages/reference/a2a.ts",
+      "specifier": "../../prose",
+      "target": "apps/docs/src/prose/index.ts"
+    },
+    {
+      "source": "apps/docs/src/pages/reference/ag-ui.ts",
+      "specifier": "../../prose",
+      "target": "apps/docs/src/prose/index.ts"
+    },
+    {
       "source": "apps/docs/src/pages/reference/core-agent.ts",
       "specifier": "../../prose",
       "target": "apps/docs/src/prose/index.ts"
@@ -4067,6 +4719,11 @@
     },
     {
       "source": "apps/docs/src/pages/reference/providers.ts",
+      "specifier": "../../prose",
+      "target": "apps/docs/src/prose/index.ts"
+    },
+    {
+      "source": "apps/docs/src/pages/reference/runtime.ts",
       "specifier": "../../prose",
       "target": "apps/docs/src/prose/index.ts"
     },
@@ -4206,14 +4863,6 @@
     {
       "source": "apps/docs/src/pages/start/research-agent.ts",
       "specifier": "../../snippets/research-agent/search-provider.ts?raw"
-    },
-    {
-      "source": "apps/docs/src/pages/start/research-agent.ts",
-      "specifier": "../../snippets/research-agent/send-message-output.txt?raw"
-    },
-    {
-      "source": "apps/docs/src/pages/start/research-agent.ts",
-      "specifier": "../../snippets/research-agent/send-message.sh?raw"
     },
     {
       "source": "apps/docs/src/pages/start/research-agent.ts",
@@ -4830,8 +5479,8 @@
     },
     {
       "source": "apps/docs/src/snippets/guides/serve-transport/approval-resume.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "apps/docs/src/snippets/guides/serve-transport/approval-resume.ts",
@@ -4845,6 +5494,11 @@
       "source": "apps/docs/src/snippets/guides/serve-transport/http-routes.ts",
       "specifier": "@batonfx/core",
       "package": "@batonfx/core"
+    },
+    {
+      "source": "apps/docs/src/snippets/guides/serve-transport/http-routes.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "apps/docs/src/snippets/guides/serve-transport/http-routes.ts",
@@ -4870,8 +5524,8 @@
     },
     {
       "source": "apps/docs/src/snippets/guides/serve-transport/session-frames.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "apps/docs/src/snippets/guides/serve-transport/session-frames.ts",
@@ -5041,15 +5695,6 @@
       "specifier": "effect"
     },
     {
-      "source": "apps/docs/src/snippets/learn/baton-and-relay/tool-wait.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "apps/docs/src/snippets/learn/baton-and-relay/tool-wait.ts",
-      "specifier": "effect"
-    },
-    {
       "source": "apps/docs/src/snippets/learn/one-payload-vocabulary/portable-transcript.ts",
       "specifier": "@batonfx/core",
       "package": "@batonfx/core"
@@ -5155,16 +5800,11 @@
     },
     {
       "source": "apps/docs/src/snippets/research-agent/approve.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
-    },
-    {
-      "source": "apps/docs/src/snippets/research-agent/approve.ts",
       "specifier": "effect"
     },
     {
       "source": "apps/docs/src/snippets/research-agent/approve.ts",
-      "specifier": "effect/unstable/socket"
+      "specifier": "effect/unstable/http"
     },
     {
       "source": "apps/docs/src/snippets/research-agent/model.ts",
@@ -5212,6 +5852,11 @@
       "source": "apps/docs/src/snippets/research-agent/server.ts",
       "specifier": "@batonfx/core",
       "package": "@batonfx/core"
+    },
+    {
+      "source": "apps/docs/src/snippets/research-agent/server.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "apps/docs/src/snippets/research-agent/server.ts",
@@ -5323,17 +5968,21 @@
     },
     {
       "source": "examples/capstone-local-assistant/src/index.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "examples/capstone-local-assistant/src/index.ts",
       "specifier": "@batonfx/skills",
       "package": "@batonfx/skills"
     },
     {
       "source": "examples/capstone-local-assistant/src/index.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
+      "specifier": "effect"
     },
     {
       "source": "examples/capstone-local-assistant/src/index.ts",
-      "specifier": "effect"
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "examples/deep-research-agent/server/src/agent.ts",
@@ -5369,6 +6018,11 @@
       "source": "examples/deep-research-agent/server/src/index.ts",
       "specifier": "@batonfx/core",
       "package": "@batonfx/core"
+    },
+    {
+      "source": "examples/deep-research-agent/server/src/index.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "examples/deep-research-agent/server/src/index.ts",
@@ -5522,8 +6176,8 @@
     },
     {
       "source": "examples/deep-research-agent/server/test/transport.e2e.test.ts",
-      "specifier": "../src/tools",
-      "target": "examples/deep-research-agent/server/src/tools.ts"
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "examples/deep-research-agent/server/test/transport.e2e.test.ts",
@@ -5541,10 +6195,6 @@
     {
       "source": "examples/deep-research-agent/server/test/transport.e2e.test.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "examples/deep-research-agent/server/test/transport.e2e.test.ts",
-      "specifier": "effect/unstable/encoding"
     },
     {
       "source": "examples/deep-research-agent/server/test/transport.e2e.test.ts",
@@ -5909,8 +6559,12 @@
     },
     {
       "source": "examples/deep-research-agent/web/src/story.test.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "examples/deep-research-agent/web/src/story.test.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "examples/deep-research-agent/web/src/story.test.ts",
@@ -5954,6 +6608,11 @@
       "source": "examples/hitl-over-sse/src/index.ts",
       "specifier": "@batonfx/core",
       "package": "@batonfx/core"
+    },
+    {
+      "source": "examples/hitl-over-sse/src/index.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "examples/hitl-over-sse/src/index.ts",
@@ -6121,6 +6780,11 @@
     },
     {
       "source": "examples/package-composition-guides/src/transport.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "examples/package-composition-guides/src/transport.ts",
       "specifier": "@batonfx/test",
       "package": "@batonfx/test"
     },
@@ -6154,6 +6818,217 @@
     {
       "source": "examples/tool-calling-chatbot/src/index.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/a2a/src/adapter.ts",
+      "specifier": "./content.js"
+    },
+    {
+      "source": "packages/a2a/src/adapter.ts",
+      "specifier": "./projection.js"
+    },
+    {
+      "source": "packages/a2a/src/adapter.ts",
+      "specifier": "@a2a-js/sdk"
+    },
+    {
+      "source": "packages/a2a/src/adapter.ts",
+      "specifier": "@a2a-js/sdk/errors"
+    },
+    {
+      "source": "packages/a2a/src/adapter.ts",
+      "specifier": "@a2a-js/sdk/server"
+    },
+    {
+      "source": "packages/a2a/src/adapter.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "packages/a2a/src/adapter.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/a2a/src/content.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/a2a/src/content.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/a2a/src/content.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/a2a/src/errors.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/a2a/src/index.ts",
+      "specifier": "./adapter.js"
+    },
+    {
+      "source": "packages/a2a/src/index.ts",
+      "specifier": "./content.js"
+    },
+    {
+      "source": "packages/a2a/src/index.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/a2a/src/index.ts",
+      "specifier": "./projection.js"
+    },
+    {
+      "source": "packages/a2a/src/index.ts",
+      "specifier": "./service.js"
+    },
+    {
+      "source": "packages/a2a/src/projection.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/a2a/src/projection.ts",
+      "specifier": "@a2a-js/sdk"
+    },
+    {
+      "source": "packages/a2a/src/projection.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/a2a/src/service.ts",
+      "specifier": "./adapter.js"
+    },
+    {
+      "source": "packages/a2a/src/service.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "packages/a2a/src/service.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/a2a/test/handler.test.ts",
+      "specifier": "../src/adapter.js"
+    },
+    {
+      "source": "packages/a2a/test/handler.test.ts",
+      "specifier": "@a2a-js/sdk"
+    },
+    {
+      "source": "packages/a2a/test/handler.test.ts",
+      "specifier": "@a2a-js/sdk/server"
+    },
+    {
+      "source": "packages/a2a/test/handler.test.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "packages/a2a/test/handler.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/a2a/test/handler.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/a2a/test/handler.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/ag-ui/src/ag-ui.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/ag-ui/src/ag-ui.ts",
+      "specifier": "./projection.js"
+    },
+    {
+      "source": "packages/ag-ui/src/ag-ui.ts",
+      "specifier": "@ag-ui/core"
+    },
+    {
+      "source": "packages/ag-ui/src/ag-ui.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "packages/ag-ui/src/ag-ui.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/ag-ui/src/errors.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/ag-ui/src/index.ts",
+      "specifier": "./ag-ui.js"
+    },
+    {
+      "source": "packages/ag-ui/src/index.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/ag-ui/src/projection.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/ag-ui/src/projection.ts",
+      "specifier": "@ag-ui/core"
+    },
+    {
+      "source": "packages/ag-ui/src/projection.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "packages/ag-ui/src/projection.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/ag-ui/test/ag-ui.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/ag-ui/test/ag-ui.test.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "packages/ag-ui/test/ag-ui.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/ag-ui/test/ag-ui.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/ag-ui/test/projection.test.ts",
+      "specifier": "../src/projection.js"
+    },
+    {
+      "source": "packages/ag-ui/test/projection.test.ts",
+      "specifier": "@ag-ui/core"
+    },
+    {
+      "source": "packages/ag-ui/test/projection.test.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
+    },
+    {
+      "source": "packages/ag-ui/test/projection.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/ag-ui/test/projection.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/ag-ui/test/projection.test.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/core/src/agent/agent-event.ts",
@@ -6209,6 +7084,22 @@
     },
     {
       "source": "packages/core/src/agent/agent-run.ts",
+      "specifier": "../durable/agent-ref.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-run.ts",
+      "specifier": "../durable/driver-interpreter.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-run.ts",
+      "specifier": "../durable/driver-run.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-run.ts",
+      "specifier": "../durable/run-budget.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-run.ts",
       "specifier": "../tools/tool-registry.js"
     },
     {
@@ -6234,6 +7125,10 @@
     {
       "source": "packages/core/src/agent/agent-run.ts",
       "specifier": "./compaction-runtime.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-run.ts",
+      "specifier": "./handoff-state.js"
     },
     {
       "source": "packages/core/src/agent/agent-run.ts",
@@ -6273,6 +7168,10 @@
     },
     {
       "source": "packages/core/src/agent/agent-suspension.ts",
+      "specifier": "./agent-tool-result.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-suspension.ts",
       "specifier": "effect"
     },
     {
@@ -6286,6 +7185,18 @@
     {
       "source": "packages/core/src/agent/agent-tool-result.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/agent/agent-tool.ts",
+      "specifier": "../durable/driver-interpreter.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-tool.ts",
+      "specifier": "../durable/driver-run.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-tool.ts",
+      "specifier": "../durable/run-budget.js"
     },
     {
       "source": "packages/core/src/agent/agent-tool.ts",
@@ -6313,7 +7224,19 @@
     },
     {
       "source": "packages/core/src/agent/agent.ts",
+      "specifier": "../durable/run-budget.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent.ts",
       "specifier": "../model/model-registry.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent.ts",
+      "specifier": "../policy/handoff-projection.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent.ts",
+      "specifier": "../policy/handoff-runtime.js"
     },
     {
       "source": "packages/core/src/agent/agent.ts",
@@ -6341,6 +7264,10 @@
     },
     {
       "source": "packages/core/src/agent/agent.ts",
+      "specifier": "./handoff-state.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent.ts",
       "specifier": "effect"
     },
     {
@@ -6358,6 +7285,14 @@
     {
       "source": "packages/core/src/agent/compaction-runtime.ts",
       "specifier": "../context/session.js"
+    },
+    {
+      "source": "packages/core/src/agent/compaction-runtime.ts",
+      "specifier": "../durable/driver-interpreter.js"
+    },
+    {
+      "source": "packages/core/src/agent/compaction-runtime.ts",
+      "specifier": "../durable/driver-run.js"
     },
     {
       "source": "packages/core/src/agent/compaction-runtime.ts",
@@ -6400,12 +7335,96 @@
       "specifier": "./agent-tool.js"
     },
     {
-      "source": "packages/core/src/agent/model-turn.ts",
-      "specifier": "../context/session-sync.js"
+      "source": "packages/core/src/agent/handoff-state.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/agent/handoff-tool-execution.ts",
+      "specifier": "../policy/handoff-runtime.js"
+    },
+    {
+      "source": "packages/core/src/agent/handoff-tool-execution.ts",
+      "specifier": "../policy/handoff-target.js"
+    },
+    {
+      "source": "packages/core/src/agent/handoff-tool-execution.ts",
+      "specifier": "../policy/handoff-tool-meta.js"
+    },
+    {
+      "source": "packages/core/src/agent/handoff-tool-execution.ts",
+      "specifier": "../tools/tool-executor.js"
+    },
+    {
+      "source": "packages/core/src/agent/handoff-tool-execution.ts",
+      "specifier": "../tools/tool-registry.js"
+    },
+    {
+      "source": "packages/core/src/agent/handoff-tool-execution.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/agent/handoff-tool-execution.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-driver.ts",
+      "specifier": "../durable/driver-interpreter.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-driver.ts",
+      "specifier": "../durable/driver-run.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-driver.ts",
+      "specifier": "../durable/durable-driver.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-driver.ts",
+      "specifier": "../durable/loop-driver-state.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-driver.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-driver.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-finish.ts",
+      "specifier": "../durable/driver-run.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-finish.ts",
+      "specifier": "./agent-event.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-finish.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-finish.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-parts.ts",
+      "specifier": "../model/context-overflow.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-parts.ts",
+      "specifier": "./agent-event.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-parts.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn-parts.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/core/src/agent/model-turn.ts",
-      "specifier": "../model/context-overflow.js"
+      "specifier": "../context/session-sync.js"
     },
     {
       "source": "packages/core/src/agent/model-turn.ts",
@@ -6433,11 +7452,39 @@
     },
     {
       "source": "packages/core/src/agent/model-turn.ts",
+      "specifier": "./model-turn-driver.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn.ts",
+      "specifier": "./model-turn-finish.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn.ts",
+      "specifier": "./model-turn-parts.js"
+    },
+    {
+      "source": "packages/core/src/agent/model-turn.ts",
       "specifier": "effect"
     },
     {
       "source": "packages/core/src/agent/model-turn.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/agent/run-loop.ts",
+      "specifier": "../durable/driver-interpreter.js"
+    },
+    {
+      "source": "packages/core/src/agent/run-loop.ts",
+      "specifier": "../durable/driver-run.js"
+    },
+    {
+      "source": "packages/core/src/agent/run-loop.ts",
+      "specifier": "../durable/durable-driver.js"
+    },
+    {
+      "source": "packages/core/src/agent/run-loop.ts",
+      "specifier": "../durable/loop-driver-state.js"
     },
     {
       "source": "packages/core/src/agent/run-loop.ts",
@@ -6458,6 +7505,14 @@
     {
       "source": "packages/core/src/agent/run-loop.ts",
       "specifier": "./agent-message.js"
+    },
+    {
+      "source": "packages/core/src/agent/run-loop.ts",
+      "specifier": "./agent-suspension.js"
+    },
+    {
+      "source": "packages/core/src/agent/run-loop.ts",
+      "specifier": "./model-turn-finish.js"
     },
     {
       "source": "packages/core/src/agent/run-loop.ts",
@@ -6553,11 +7608,27 @@
     },
     {
       "source": "packages/core/src/agent/setup.ts",
+      "specifier": "./tool-dispatch.js"
+    },
+    {
+      "source": "packages/core/src/agent/setup.ts",
       "specifier": "effect"
     },
     {
       "source": "packages/core/src/agent/setup.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/agent/tool-execution.ts",
+      "specifier": "../durable/driver-interpreter.js"
+    },
+    {
+      "source": "packages/core/src/agent/tool-execution.ts",
+      "specifier": "../durable/driver-run.js"
+    },
+    {
+      "source": "packages/core/src/agent/tool-execution.ts",
+      "specifier": "../policy/handoff-target.js"
     },
     {
       "source": "packages/core/src/agent/tool-execution.ts",
@@ -6590,6 +7661,10 @@
     {
       "source": "packages/core/src/agent/tool-execution.ts",
       "specifier": "./agent-tool-result.js"
+    },
+    {
+      "source": "packages/core/src/agent/tool-execution.ts",
+      "specifier": "./handoff-tool-execution.js"
     },
     {
       "source": "packages/core/src/agent/tool-execution.ts",
@@ -6684,6 +7759,182 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/core/src/durable/agent-ref.ts",
+      "specifier": "./canonical-digest.js"
+    },
+    {
+      "source": "packages/core/src/durable/agent-ref.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/canonical-digest.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/driver-contract.ts",
+      "specifier": "./agent-ref.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-contract.ts",
+      "specifier": "./canonical-digest.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-contract.ts",
+      "specifier": "./run-budget.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-contract.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "./agent-ref.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "./canonical-digest.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "./driver-contract.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "./durable-driver.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "./loop-driver-state.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "./loop-driver.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "./run-budget.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/durable/driver-run.ts",
+      "specifier": "./driver-interpreter.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-run.ts",
+      "specifier": "./durable-driver.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-run.ts",
+      "specifier": "./loop-driver-state.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-run.ts",
+      "specifier": "./run-budget.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-run.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/driver-tracer.ts",
+      "specifier": "./driver-contract.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-tracer.ts",
+      "specifier": "./durable-driver.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-tracer.ts",
+      "specifier": "./run-budget.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-tracer.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/driver-tracer.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/durable/durable-driver.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/durable-driver.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/durable/facade-agentRef.ts",
+      "specifier": "./agent-ref.js"
+    },
+    {
+      "source": "packages/core/src/durable/facade-durableDriver.ts",
+      "specifier": "./driver-contract.js"
+    },
+    {
+      "source": "packages/core/src/durable/facade-durableDriver.ts",
+      "specifier": "./driver-interpreter.js"
+    },
+    {
+      "source": "packages/core/src/durable/facade-durableDriver.ts",
+      "specifier": "./driver-run.js"
+    },
+    {
+      "source": "packages/core/src/durable/facade-durableDriver.ts",
+      "specifier": "./driver-tracer.js"
+    },
+    {
+      "source": "packages/core/src/durable/facade-durableDriver.ts",
+      "specifier": "./durable-driver.js"
+    },
+    {
+      "source": "packages/core/src/durable/facade-durableDriver.ts",
+      "specifier": "./loop-driver.js"
+    },
+    {
+      "source": "packages/core/src/durable/facade-runBudget.ts",
+      "specifier": "./run-budget.js"
+    },
+    {
+      "source": "packages/core/src/durable/loop-driver-state.ts",
+      "specifier": "./driver-contract.js"
+    },
+    {
+      "source": "packages/core/src/durable/loop-driver-state.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/loop-driver.ts",
+      "specifier": "./driver-contract.js"
+    },
+    {
+      "source": "packages/core/src/durable/loop-driver.ts",
+      "specifier": "./durable-driver.js"
+    },
+    {
+      "source": "packages/core/src/durable/loop-driver.ts",
+      "specifier": "./loop-driver-state.js"
+    },
+    {
+      "source": "packages/core/src/durable/loop-driver.ts",
+      "specifier": "./run-budget.js"
+    },
+    {
+      "source": "packages/core/src/durable/loop-driver.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/run-budget.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/core/src/index.ts",
       "specifier": "./agent/facade-agent.js"
     },
@@ -6714,6 +7965,18 @@
     {
       "source": "packages/core/src/index.ts",
       "specifier": "./context/facade-skillSource.js"
+    },
+    {
+      "source": "packages/core/src/index.ts",
+      "specifier": "./durable/facade-agentRef.js"
+    },
+    {
+      "source": "packages/core/src/index.ts",
+      "specifier": "./durable/facade-durableDriver.js"
+    },
+    {
+      "source": "packages/core/src/index.ts",
+      "specifier": "./durable/facade-runBudget.js"
     },
     {
       "source": "packages/core/src/index.ts",
@@ -7084,6 +8347,62 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/core/src/policy/handoff-projection.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-projection.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "../agent/handoff-state.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "../durable/driver-interpreter.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "../durable/driver-run.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "../model/model-registry.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "../model/model-telemetry.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "../tools/tool-registry.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "./handoff-projection.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "./handoff-target.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-runtime.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-target.ts",
+      "specifier": "../durable/agent-ref.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff-target.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/core/src/policy/handoff.ts",
       "specifier": "../agent/agent-event.js"
     },
@@ -7094,6 +8413,22 @@
     {
       "source": "packages/core/src/policy/handoff.ts",
       "specifier": "../agent/agent.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff.ts",
+      "specifier": "./handoff-projection.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff.ts",
+      "specifier": "./handoff-runtime.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff.ts",
+      "specifier": "./handoff-target.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff.ts",
+      "specifier": "./handoff-tool-meta.js"
     },
     {
       "source": "packages/core/src/policy/handoff.ts",
@@ -7503,6 +8838,39 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "../src/index",
+      "target": "packages/core/src/index.ts"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "./json.js"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "./provider-finish.js"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "./tool-handler-layer.js"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "effect/unstable/persistence"
+    },
+    {
       "source": "packages/core/test/guardrail.test.ts",
       "specifier": "../src/index",
       "target": "packages/core/src/index.ts"
@@ -7537,6 +8905,33 @@
     },
     {
       "source": "packages/core/test/guardrail.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/test/handoff-same-run.test.ts",
+      "specifier": "../src/index",
+      "target": "packages/core/src/index.ts"
+    },
+    {
+      "source": "packages/core/test/handoff-same-run.test.ts",
+      "specifier": "./it-layer",
+      "target": "packages/core/test/it-layer.ts"
+    },
+    {
+      "source": "packages/core/test/handoff-same-run.test.ts",
+      "specifier": "./provider-finish",
+      "target": "packages/core/test/provider-finish.ts"
+    },
+    {
+      "source": "packages/core/test/handoff-same-run.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/core/test/handoff-same-run.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/test/handoff-same-run.test.ts",
       "specifier": "effect/unstable/ai"
     },
     {
@@ -7884,6 +9279,39 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/core/test/run-budget-integration.test.ts",
+      "specifier": "../src/index",
+      "target": "packages/core/src/index.ts"
+    },
+    {
+      "source": "packages/core/test/run-budget-integration.test.ts",
+      "specifier": "./provider-finish.js"
+    },
+    {
+      "source": "packages/core/test/run-budget-integration.test.ts",
+      "specifier": "./tool-handler-layer.js"
+    },
+    {
+      "source": "packages/core/test/run-budget-integration.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/core/test/run-budget-integration.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/test/run-budget-integration.test.ts",
+      "specifier": "effect/testing"
+    },
+    {
+      "source": "packages/core/test/run-budget-integration.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/test/run-budget-integration.test.ts",
+      "specifier": "effect/unstable/persistence"
+    },
+    {
       "source": "packages/core/test/session-fencing.test.ts",
       "specifier": "../src/index",
       "target": "packages/core/src/index.ts"
@@ -8108,10 +9536,6 @@
     },
     {
       "source": "packages/foldkit/src/chat/chat-update.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/foldkit/src/chat/chat-update.ts",
       "specifier": "foldkit/message"
     },
     {
@@ -8128,11 +9552,6 @@
     },
     {
       "source": "packages/foldkit/src/chat/chat.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
-    },
-    {
-      "source": "packages/foldkit/src/chat/chat.ts",
       "specifier": "effect"
     },
     {
@@ -8142,6 +9561,11 @@
     {
       "source": "packages/foldkit/src/chat/chat.ts",
       "specifier": "foldkit/message"
+    },
+    {
+      "source": "packages/foldkit/src/chat/connection.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "packages/foldkit/src/chat/connection.ts",
@@ -8169,66 +9593,13 @@
       "specifier": "./chat/connection.js"
     },
     {
-      "source": "packages/foldkit/test/chat.scene.test.ts",
-      "specifier": "../src/index",
-      "target": "packages/foldkit/src/index.ts"
-    },
-    {
-      "source": "packages/foldkit/test/chat.scene.test.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
-    },
-    {
-      "source": "packages/foldkit/test/chat.scene.test.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/foldkit/test/chat.scene.test.ts",
-      "specifier": "foldkit/html"
-    },
-    {
-      "source": "packages/foldkit/test/chat.scene.test.ts",
-      "specifier": "foldkit/scene"
-    },
-    {
-      "source": "packages/foldkit/test/chat.scene.test.ts",
-      "specifier": "vitest"
-    },
-    {
-      "source": "packages/foldkit/test/chat.story.test.ts",
-      "specifier": "../src/index",
-      "target": "packages/foldkit/src/index.ts"
-    },
-    {
-      "source": "packages/foldkit/test/chat.story.test.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
-    },
-    {
-      "source": "packages/foldkit/test/chat.story.test.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/foldkit/test/chat.story.test.ts",
-      "specifier": "foldkit/story"
-    },
-    {
-      "source": "packages/foldkit/test/chat.story.test.ts",
-      "specifier": "vitest"
+      "source": "packages/foldkit/test/chat.test.ts",
+      "specifier": "../src/index.js"
     },
     {
       "source": "packages/foldkit/test/chat.test.ts",
-      "specifier": "../src/index",
-      "target": "packages/foldkit/src/index.ts"
-    },
-    {
-      "source": "packages/foldkit/test/chat.test.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
-    },
-    {
-      "source": "packages/foldkit/test/chat.test.ts",
-      "specifier": "@effect/vitest"
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "packages/foldkit/test/chat.test.ts",
@@ -8239,14 +9610,12 @@
       "specifier": "effect/unstable/ai"
     },
     {
-      "source": "packages/foldkit/test/connection.test.ts",
-      "specifier": "../src/index",
-      "target": "packages/foldkit/src/index.ts"
+      "source": "packages/foldkit/test/chat.test.ts",
+      "specifier": "vitest"
     },
     {
       "source": "packages/foldkit/test/connection.test.ts",
-      "specifier": "@batonfx/transport",
-      "package": "@batonfx/transport"
+      "specifier": "../src/index.js"
     },
     {
       "source": "packages/foldkit/test/connection.test.ts",
@@ -8255,10 +9624,6 @@
     {
       "source": "packages/foldkit/test/connection.test.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/foldkit/test/connection.test.ts",
-      "specifier": "effect/unstable/socket"
     },
     {
       "source": "packages/mcp/src/index.ts",
@@ -9184,6 +10549,1679 @@
       "specifier": "effect/unstable/http"
     },
     {
+      "source": "packages/runtime/scripts/mysql-tracer.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/scripts/mysql-tracer.ts",
+      "specifier": "../test/helpers.js"
+    },
+    {
+      "source": "packages/runtime/scripts/mysql-tracer.ts",
+      "specifier": "../test/mysql/helpers.js"
+    },
+    {
+      "source": "packages/runtime/scripts/mysql-tracer.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/scripts/phase0-tracer.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/scripts/phase0-tracer.ts",
+      "specifier": "../test/helpers.js"
+    },
+    {
+      "source": "packages/runtime/scripts/phase0-tracer.ts",
+      "specifier": "../test/sqlite-helpers.js"
+    },
+    {
+      "source": "packages/runtime/scripts/phase0-tracer.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/scripts/postgres-tracer.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/scripts/postgres-tracer.ts",
+      "specifier": "../test/helpers.js"
+    },
+    {
+      "source": "packages/runtime/scripts/postgres-tracer.ts",
+      "specifier": "../test/postgres/helpers.js"
+    },
+    {
+      "source": "packages/runtime/scripts/postgres-tracer.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/active-executions.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/address.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/agent-host.ts",
+      "specifier": "./active-executions.js"
+    },
+    {
+      "source": "packages/runtime/src/agent-host.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/agent-host.ts",
+      "specifier": "./run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/agent-host.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/agent-host.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/agent-ref.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/agent-ref.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/cursor.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/errors.ts",
+      "specifier": "./address.js"
+    },
+    {
+      "source": "packages/runtime/src/errors.ts",
+      "specifier": "./agent-ref.js"
+    },
+    {
+      "source": "packages/runtime/src/errors.ts",
+      "specifier": "./cursor.js"
+    },
+    {
+      "source": "packages/runtime/src/errors.ts",
+      "specifier": "./run.js"
+    },
+    {
+      "source": "packages/runtime/src/errors.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./address.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./agent-host.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./agent-ref.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./cursor.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./memory/runtime-layer.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./memory/store.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./message.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./platform-layers.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./run-event.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./run-wait.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./run.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./runtime.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./sql/errors.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./sql/mysql/run-schema.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./sql/mysql/runtime-layer.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./sql/postgres/run-schema.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./sql/postgres/runtime-layer.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./sql/postgres/worker.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./sql/run-claims.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./tree.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/append.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/append.ts",
+      "specifier": "../run-event.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/append.ts",
+      "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/append.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/digest.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/digest.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/src/memory/lanes.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/lanes.ts",
+      "specifier": "./append.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/lanes.ts",
+      "specifier": "./state.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/lanes.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/prompt.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../active-executions.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../address.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../agent-host.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../cursor.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../message.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../runtime.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "./prompt.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "./state.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "./store.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-admit.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-admit.ts",
+      "specifier": "./append.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-admit.ts",
+      "specifier": "./digest.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-admit.ts",
+      "specifier": "./lanes.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-admit.ts",
+      "specifier": "./state.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-admit.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-control.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-control.ts",
+      "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-control.ts",
+      "specifier": "./append.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-control.ts",
+      "specifier": "./lanes.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-control.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-events.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-events.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-execution.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-execution.ts",
+      "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-execution.ts",
+      "specifier": "../sql/errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-execution.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-operations.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-operations.ts",
+      "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-operations.ts",
+      "specifier": "../sql/operations.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-operations.ts",
+      "specifier": "./append.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-operations.ts",
+      "specifier": "./state.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-operations.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "./state.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "./store-admit.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "./store-control.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "./store-events.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "./store-execution.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "./store-operations.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/message.ts",
+      "specifier": "./address.js"
+    },
+    {
+      "source": "packages/runtime/src/message.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/message.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/src/platform-layers.ts",
+      "specifier": "./sql/runtime-layer.js"
+    },
+    {
+      "source": "packages/runtime/src/platform-layers.ts",
+      "specifier": "./sql/store.js"
+    },
+    {
+      "source": "packages/runtime/src/platform-layers.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/run-event.ts",
+      "specifier": "./address.js"
+    },
+    {
+      "source": "packages/runtime/src/run-event.ts",
+      "specifier": "./agent-ref.js"
+    },
+    {
+      "source": "packages/runtime/src/run-event.ts",
+      "specifier": "./run-wait.js"
+    },
+    {
+      "source": "packages/runtime/src/run-event.ts",
+      "specifier": "./run.js"
+    },
+    {
+      "source": "packages/runtime/src/run-event.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/run-event.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/run-event.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/src/run-store.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/run-wait.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/run.ts",
+      "specifier": "./agent-ref.js"
+    },
+    {
+      "source": "packages/runtime/src/run.ts",
+      "specifier": "./cursor.js"
+    },
+    {
+      "source": "packages/runtime/src/run.ts",
+      "specifier": "./run-wait.js"
+    },
+    {
+      "source": "packages/runtime/src/run.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/runtime.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/runtime.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/src/sql/bun-client.ts",
+      "specifier": "@effect/sql-sqlite-bun/SqliteClient"
+    },
+    {
+      "source": "packages/runtime/src/sql/bun-client.ts",
+      "specifier": "bun:sqlite"
+    },
+    {
+      "source": "packages/runtime/src/sql/bun-client.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/bun-client.ts",
+      "specifier": "effect/unstable/reactivity/Reactivity"
+    },
+    {
+      "source": "packages/runtime/src/sql/bun-client.ts",
+      "specifier": "effect/unstable/sql/SqlClient"
+    },
+    {
+      "source": "packages/runtime/src/sql/bun-client.ts",
+      "specifier": "effect/unstable/sql/SqlError"
+    },
+    {
+      "source": "packages/runtime/src/sql/bun-client.ts",
+      "specifier": "effect/unstable/sql/Statement"
+    },
+    {
+      "source": "packages/runtime/src/sql/codecs.ts",
+      "specifier": "../address.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/codecs.ts",
+      "specifier": "../agent-ref.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/codecs.ts",
+      "specifier": "../message.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/codecs.ts",
+      "specifier": "../run-event.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/codecs.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/codecs.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/src/sql/errors.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/migrate.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/migrate.ts",
+      "specifier": "./schema.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/migrate.ts",
+      "specifier": "./sql-effect.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/migrate.ts",
+      "specifier": "@effect/sql-sqlite-bun"
+    },
+    {
+      "source": "packages/runtime/src/sql/migrate.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/migrate.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/run-schema.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/run-schema.ts",
+      "specifier": "./schema.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/run-schema.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/run-schema.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "specifier": "../../active-executions.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "specifier": "../../agent-host.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "specifier": "../../memory/runtime-layer.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "specifier": "../../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "specifier": "../../runtime.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "specifier": "../run-claims.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "specifier": "./store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "specifier": "@effect/sql-mysql2"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/runtime-layer.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store-claims.ts",
+      "specifier": "../../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store-claims.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store-claims.ts",
+      "specifier": "../run-claims.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store-claims.ts",
+      "specifier": "../store-control.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store-claims.ts",
+      "specifier": "../store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store-claims.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store-claims.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../../memory/state.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../sql-effect.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../store-admit.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../store-control.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../store-execution.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../store-operations.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../subscribers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "./run-schema.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "./store-claims.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "effect/unstable/sql/SqlError"
+    },
+    {
+      "source": "packages/runtime/src/sql/operations.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/claims.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/claims.ts",
+      "specifier": "../store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/claims.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/claims.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "../../run-event.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "../../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "../codecs.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "../store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "./schema.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "@effect/sql-pg"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/run-schema.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/run-schema.ts",
+      "specifier": "../sql-effect.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/run-schema.ts",
+      "specifier": "./schema.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/run-schema.ts",
+      "specifier": "@effect/sql-pg"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/run-schema.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/run-schema.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "specifier": "../../active-executions.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "specifier": "../../agent-host.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "specifier": "../../memory/runtime-layer.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "specifier": "../../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "specifier": "../../runtime.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "specifier": "../run-claims.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "specifier": "./store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "specifier": "@effect/sql-pg"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/runtime-layer.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "specifier": "../../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "specifier": "../../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "specifier": "../run-claims.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "specifier": "../store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "specifier": "./claims.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "specifier": "./pg-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-claims.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "../../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "../../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "../codecs.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "../operations.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "./pg-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../../memory/digest.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../../memory/state.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../sql-effect.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../store-execution.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../subscribers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "./pg-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "./run-schema.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "./schema.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "./store-claims.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "./store-ops.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "@effect/sql-pg"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/worker.ts",
+      "specifier": "../../agent-host.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/worker.ts",
+      "specifier": "../run-claims.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/worker.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/run-claims.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/runtime-layer.ts",
+      "specifier": "../active-executions.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/runtime-layer.ts",
+      "specifier": "../agent-host.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/runtime-layer.ts",
+      "specifier": "../memory/runtime-layer.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/runtime-layer.ts",
+      "specifier": "../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/runtime-layer.ts",
+      "specifier": "../runtime.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/runtime-layer.ts",
+      "specifier": "./bun-client.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/runtime-layer.ts",
+      "specifier": "./store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/runtime-layer.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/sql-effect.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/sql-effect.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/sql-effect.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/sql-effect.ts",
+      "specifier": "effect/unstable/sql/SqlError"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-admit.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-admit.ts",
+      "specifier": "../memory/digest.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-admit.ts",
+      "specifier": "../memory/state.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-admit.ts",
+      "specifier": "./codecs.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-admit.ts",
+      "specifier": "./store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-admit.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-admit.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-control.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-control.ts",
+      "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-control.ts",
+      "specifier": "./store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-control.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-control.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-execution.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-execution.ts",
+      "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-execution.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-execution.ts",
+      "specifier": "./store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-execution.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-execution.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "../run-event.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "../run-wait.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "./codecs.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "./codecs.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "./operations.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "./store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "../memory/state.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./migrate.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./sql-effect.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./store-admit.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./store-control.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./store-execution.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./store-operations.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./subscribers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/subscribers.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/subscribers.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/tree.ts",
+      "specifier": "./runtime.js"
+    },
+    {
+      "source": "packages/runtime/src/tree.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/address.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/address.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/address.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/agent-host.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/agent-host.test.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/test/agent-host.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/agent-host.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/agent-host.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/test/helpers.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/helpers.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/test/helpers.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/test/index.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/index.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/message.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/message.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/message.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/message.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/test/mysql/helpers.ts",
+      "specifier": "../../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/helpers.ts",
+      "specifier": "../../src/sql/mysql/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/helpers.ts",
+      "specifier": "../helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/helpers.ts",
+      "specifier": "@effect/sql-mysql2"
+    },
+    {
+      "source": "packages/runtime/test/mysql/helpers.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/mysql/helpers.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "specifier": "../../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "specifier": "../../src/sql/mysql/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "specifier": "../helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "specifier": "@effect/sql-mysql2"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-tracer.test.ts",
+      "specifier": "../../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-tracer.test.ts",
+      "specifier": "../helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-tracer.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-tracer.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-tracer.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/postgres/helpers.ts",
+      "specifier": "../../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/helpers.ts",
+      "specifier": "../../src/sql/postgres/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/helpers.ts",
+      "specifier": "../helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/helpers.ts",
+      "specifier": "@effect/sql-pg"
+    },
+    {
+      "source": "packages/runtime/test/postgres/helpers.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/postgres/helpers.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "specifier": "../../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "specifier": "../../src/sql/postgres/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "specifier": "../helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "specifier": "@effect/sql-pg"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-tracer.test.ts",
+      "specifier": "../../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-tracer.test.ts",
+      "specifier": "../helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-tracer.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-tracer.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-tracer.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-children.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-children.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-children.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-children.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-control.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-control.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-control.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-control.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-events.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-events.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-events.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-events.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-fifo.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-fifo.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-fifo.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-fifo.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-idempotency.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-idempotency.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-idempotency.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-idempotency.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-inspection.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-inspection.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-inspection.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-inspection.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-send.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-send.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-send.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-send.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-worker.test.ts",
+      "specifier": "../src/agent-host.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-worker.test.ts",
+      "specifier": "../src/sql/postgres/worker.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-worker.test.ts",
+      "specifier": "../src/sql/run-claims.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-worker.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-worker.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-worker.test.ts",
+      "specifier": "effect/testing"
+    },
+    {
+      "source": "packages/runtime/test/sql-subscribers.test.ts",
+      "specifier": "../src/sql/subscribers.js"
+    },
+    {
+      "source": "packages/runtime/test/sql-subscribers.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/sql-subscribers.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/sql-subscribers.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-helpers.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-helpers.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
+      "specifier": "./sqlite-helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "../src/sql/bun-client.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "../src/sql/migrate.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "../src/sql/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "./sqlite-helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "bun:sqlite"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/skills/src/index.ts",
       "specifier": "./skill/github-catalog.js"
     },
@@ -9383,15 +12421,15 @@
     },
     {
       "source": "packages/transport/src/index.ts",
-      "specifier": "./session/session-registry.js"
-    },
-    {
-      "source": "packages/transport/src/index.ts",
       "specifier": "./transport/client.js"
     },
     {
       "source": "packages/transport/src/index.ts",
       "specifier": "./transport/errors.js"
+    },
+    {
+      "source": "packages/transport/src/index.ts",
+      "specifier": "./transport/snapshot.js"
     },
     {
       "source": "packages/transport/src/index.ts",
@@ -9406,119 +12444,6 @@
       "specifier": "./transport/ws.js"
     },
     {
-      "source": "packages/transport/src/session/session-coordination.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-approvals.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-approvals.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-contract.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-contract.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-contract.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-errors.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-finalization.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-finalization.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-finalization.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-runtime.ts",
-      "specifier": "./session-registry-errors.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-runtime.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-runtime.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-runtime.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-status.ts",
-      "specifier": "./session-coordination.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry-status.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "../transport/frame-journal.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "./session-coordination.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "./session-registry-approvals.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "./session-registry-contract.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "./session-registry-errors.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "./session-registry-finalization.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "./session-registry-runtime.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "./session-registry-status.js"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/session/session-registry.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
       "source": "packages/transport/src/transport/client.ts",
       "specifier": "./errors.js"
     },
@@ -9528,11 +12453,12 @@
     },
     {
       "source": "packages/transport/src/transport/client.ts",
-      "specifier": "effect"
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "packages/transport/src/transport/client.ts",
-      "specifier": "effect/unstable/ai"
+      "specifier": "effect"
     },
     {
       "source": "packages/transport/src/transport/client.ts",
@@ -9551,20 +12477,13 @@
       "specifier": "effect"
     },
     {
-      "source": "packages/transport/src/transport/frame-journal.ts",
-      "specifier": "../session/session-registry-errors.js"
+      "source": "packages/transport/src/transport/snapshot.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
-      "source": "packages/transport/src/transport/frame-journal.ts",
+      "source": "packages/transport/src/transport/snapshot.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/transport/frame-journal.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/src/transport/sse.ts",
-      "specifier": "../session/session-registry.js"
     },
     {
       "source": "packages/transport/src/transport/sse.ts",
@@ -9573,6 +12492,11 @@
     {
       "source": "packages/transport/src/transport/sse.ts",
       "specifier": "./wire.js"
+    },
+    {
+      "source": "packages/transport/src/transport/sse.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "packages/transport/src/transport/sse.ts",
@@ -9591,66 +12515,17 @@
       "specifier": "effect/unstable/httpapi"
     },
     {
-      "source": "packages/transport/src/transport/wire-codec.ts",
-      "specifier": "./errors.js"
-    },
-    {
-      "source": "packages/transport/src/transport/wire-codec.ts",
-      "specifier": "./wire-schema.js"
-    },
-    {
-      "source": "packages/transport/src/transport/wire-codec.ts",
-      "specifier": "./wire.js"
-    },
-    {
-      "source": "packages/transport/src/transport/wire-codec.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "packages/transport/src/transport/wire-codec.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/transport/wire-codec.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/src/transport/wire-schema.ts",
-      "specifier": "./wire-codec.js"
-    },
-    {
-      "source": "packages/transport/src/transport/wire-schema.ts",
-      "specifier": "effect"
-    },
-    {
       "source": "packages/transport/src/transport/wire.ts",
       "specifier": "./errors.js"
     },
     {
       "source": "packages/transport/src/transport/wire.ts",
-      "specifier": "./wire-codec.js"
-    },
-    {
-      "source": "packages/transport/src/transport/wire.ts",
-      "specifier": "./wire-schema.js"
-    },
-    {
-      "source": "packages/transport/src/transport/wire.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "packages/transport/src/transport/wire.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/src/transport/wire.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/src/transport/ws.ts",
-      "specifier": "../session/session-registry.js"
     },
     {
       "source": "packages/transport/src/transport/ws.ts",
@@ -9659,6 +12534,11 @@
     {
       "source": "packages/transport/src/transport/ws.ts",
       "specifier": "./wire.js"
+    },
+    {
+      "source": "packages/transport/src/transport/ws.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "packages/transport/src/transport/ws.ts",
@@ -9674,8 +12554,11 @@
     },
     {
       "source": "packages/transport/test/client.test.ts",
-      "specifier": "../src/index",
-      "target": "packages/transport/src/index.ts"
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/transport/test/client.test.ts",
+      "specifier": "./helpers.js"
     },
     {
       "source": "packages/transport/test/client.test.ts",
@@ -9684,104 +12567,43 @@
     {
       "source": "packages/transport/test/client.test.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/test/client.test.ts",
-      "specifier": "effect/testing"
-    },
-    {
-      "source": "packages/transport/test/client.test.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/test/client.test.ts",
-      "specifier": "effect/unstable/http"
     },
     {
       "source": "packages/transport/test/client.test.ts",
       "specifier": "effect/unstable/socket"
     },
     {
-      "source": "packages/transport/test/frame-journal.test.ts",
-      "specifier": "../src/transport/frame-journal.js"
+      "source": "packages/transport/test/helpers.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
-      "source": "packages/transport/test/frame-journal.test.ts",
-      "specifier": "@effect/vitest"
-    },
-    {
-      "source": "packages/transport/test/frame-journal.test.ts",
+      "source": "packages/transport/test/helpers.ts",
       "specifier": "effect"
     },
     {
-      "source": "packages/transport/test/frame-journal.test.ts",
-      "specifier": "effect/unstable/ai"
+      "source": "packages/transport/test/snapshot.test.ts",
+      "specifier": "../src/index.js"
     },
     {
-      "source": "packages/transport/test/session-coordination.test.ts",
-      "specifier": "../src/session/session-coordination.js"
+      "source": "packages/transport/test/snapshot.test.ts",
+      "specifier": "./helpers.js"
     },
     {
-      "source": "packages/transport/test/session-coordination.test.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "packages/transport/test/session-coordination.test.ts",
+      "source": "packages/transport/test/snapshot.test.ts",
       "specifier": "@effect/vitest"
     },
     {
-      "source": "packages/transport/test/session-coordination.test.ts",
+      "source": "packages/transport/test/snapshot.test.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/test/session-coordination.test.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/test/session-registry.test.ts",
-      "specifier": "../src/index",
-      "target": "packages/transport/src/index.ts"
-    },
-    {
-      "source": "packages/transport/test/session-registry.test.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "packages/transport/test/session-registry.test.ts",
-      "specifier": "@batonfx/test",
-      "package": "@batonfx/test"
-    },
-    {
-      "source": "packages/transport/test/session-registry.test.ts",
-      "specifier": "@effect/vitest"
-    },
-    {
-      "source": "packages/transport/test/session-registry.test.ts",
-      "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/test/session-registry.test.ts",
-      "specifier": "effect/testing"
-    },
-    {
-      "source": "packages/transport/test/session-registry.test.ts",
-      "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/transport/test/session-registry.test.ts",
-      "specifier": "effect/unstable/persistence"
     },
     {
       "source": "packages/transport/test/sse.test.ts",
-      "specifier": "../src/index",
-      "target": "packages/transport/src/index.ts"
+      "specifier": "../src/index.js"
     },
     {
       "source": "packages/transport/test/sse.test.ts",
-      "specifier": "../src/transport/sse",
-      "target": "packages/transport/src/transport/sse.ts"
+      "specifier": "./helpers.js"
     },
     {
       "source": "packages/transport/test/sse.test.ts",
@@ -9790,14 +12612,6 @@
     {
       "source": "packages/transport/test/sse.test.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/test/sse.test.ts",
-      "specifier": "effect/testing"
-    },
-    {
-      "source": "packages/transport/test/sse.test.ts",
-      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/transport/test/sse.test.ts",
@@ -9809,13 +12623,16 @@
     },
     {
       "source": "packages/transport/test/wire.test.ts",
-      "specifier": "../src/index",
-      "target": "packages/transport/src/index.ts"
+      "specifier": "../src/index.js"
     },
     {
       "source": "packages/transport/test/wire.test.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/transport/test/wire.test.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "packages/transport/test/wire.test.ts",
@@ -9826,13 +12643,17 @@
       "specifier": "effect"
     },
     {
-      "source": "packages/transport/test/wire.test.ts",
-      "specifier": "effect/unstable/ai"
+      "source": "packages/transport/test/ws.test.ts",
+      "specifier": "../src/index.js"
     },
     {
       "source": "packages/transport/test/ws.test.ts",
-      "specifier": "../src/index",
-      "target": "packages/transport/src/index.ts"
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/transport/test/ws.test.ts",
+      "specifier": "@batonfx/runtime",
+      "package": "@batonfx/runtime"
     },
     {
       "source": "packages/transport/test/ws.test.ts",
@@ -9841,10 +12662,6 @@
     {
       "source": "packages/transport/test/ws.test.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/transport/test/ws.test.ts",
-      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/transport/test/ws.test.ts",
@@ -10048,6 +12865,21 @@
       "kind": "same-stem"
     },
     {
+      "source": "packages/a2a/test/handler.test.ts",
+      "test": "packages/a2a/test/handler.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/ag-ui/test/ag-ui.test.ts",
+      "test": "packages/ag-ui/test/ag-ui.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/ag-ui/test/projection.test.ts",
+      "test": "packages/ag-ui/test/projection.test.ts",
+      "kind": "same-stem"
+    },
+    {
       "source": "packages/core/test/agent-stream-no-replay.test.ts",
       "test": "packages/core/test/agent-stream-no-replay.test.ts",
       "kind": "same-stem"
@@ -10073,8 +12905,18 @@
       "kind": "same-stem"
     },
     {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "test": "packages/core/test/durable-driver.test.ts",
+      "kind": "same-stem"
+    },
+    {
       "source": "packages/core/test/guardrail.test.ts",
       "test": "packages/core/test/guardrail.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/core/test/handoff-same-run.test.ts",
+      "test": "packages/core/test/handoff-same-run.test.ts",
       "kind": "same-stem"
     },
     {
@@ -10163,6 +13005,11 @@
       "kind": "same-stem"
     },
     {
+      "source": "packages/core/test/run-budget-integration.test.ts",
+      "test": "packages/core/test/run-budget-integration.test.ts",
+      "kind": "same-stem"
+    },
+    {
       "source": "packages/core/test/session-fencing.test.ts",
       "test": "packages/core/test/session-fencing.test.ts",
       "kind": "same-stem"
@@ -10205,16 +13052,6 @@
     {
       "source": "packages/core/test/turn-policy.test.ts",
       "test": "packages/core/test/turn-policy.test.ts",
-      "kind": "same-stem"
-    },
-    {
-      "source": "packages/foldkit/test/chat.scene.test.ts",
-      "test": "packages/foldkit/test/chat.scene.test.ts",
-      "kind": "same-stem"
-    },
-    {
-      "source": "packages/foldkit/test/chat.story.test.ts",
-      "test": "packages/foldkit/test/chat.story.test.ts",
       "kind": "same-stem"
     },
     {
@@ -10318,6 +13155,121 @@
       "kind": "same-stem"
     },
     {
+      "source": "packages/runtime/test/address.test.ts",
+      "test": "packages/runtime/test/address.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/agent-host.test.ts",
+      "test": "packages/runtime/test/agent-host.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/helpers.ts",
+      "test": "packages/runtime/test/helpers.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/index.test.ts",
+      "test": "packages/runtime/test/index.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/message.test.ts",
+      "test": "packages/runtime/test/message.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/mysql/helpers.ts",
+      "test": "packages/runtime/test/mysql/helpers.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "test": "packages/runtime/test/mysql/mysql-store.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-tracer.test.ts",
+      "test": "packages/runtime/test/mysql/mysql-tracer.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/postgres/helpers.ts",
+      "test": "packages/runtime/test/postgres/helpers.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "test": "packages/runtime/test/postgres/postgres-store.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-tracer.test.ts",
+      "test": "packages/runtime/test/postgres/postgres-tracer.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/runtime-children.test.ts",
+      "test": "packages/runtime/test/runtime-children.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/runtime-control.test.ts",
+      "test": "packages/runtime/test/runtime-control.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/runtime-events.test.ts",
+      "test": "packages/runtime/test/runtime-events.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/runtime-fifo.test.ts",
+      "test": "packages/runtime/test/runtime-fifo.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/runtime-idempotency.test.ts",
+      "test": "packages/runtime/test/runtime-idempotency.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/runtime-inspection.test.ts",
+      "test": "packages/runtime/test/runtime-inspection.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/runtime-send.test.ts",
+      "test": "packages/runtime/test/runtime-send.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/runtime-worker.test.ts",
+      "test": "packages/runtime/test/runtime-worker.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/sql-subscribers.test.ts",
+      "test": "packages/runtime/test/sql-subscribers.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-helpers.ts",
+      "test": "packages/runtime/test/sqlite-helpers.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
+      "test": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "test": "packages/runtime/test/sqlite-store.test.ts",
+      "kind": "same-stem"
+    },
+    {
       "source": "packages/skills/test/hosted-catalog.test.ts",
       "test": "packages/skills/test/hosted-catalog.test.ts",
       "kind": "same-stem"
@@ -10353,18 +13305,13 @@
       "kind": "same-stem"
     },
     {
-      "source": "packages/transport/test/frame-journal.test.ts",
-      "test": "packages/transport/test/frame-journal.test.ts",
+      "source": "packages/transport/test/helpers.ts",
+      "test": "packages/transport/test/helpers.ts",
       "kind": "same-stem"
     },
     {
-      "source": "packages/transport/test/session-coordination.test.ts",
-      "test": "packages/transport/test/session-coordination.test.ts",
-      "kind": "same-stem"
-    },
-    {
-      "source": "packages/transport/test/session-registry.test.ts",
-      "test": "packages/transport/test/session-registry.test.ts",
+      "source": "packages/transport/test/snapshot.test.ts",
+      "test": "packages/transport/test/snapshot.test.ts",
       "kind": "same-stem"
     },
     {

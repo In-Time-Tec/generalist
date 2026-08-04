@@ -1245,7 +1245,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "uses the auto-approve default when approval policy is absent", () => {
+  ItLayer.make(it, "suspends when approval policy is absent and tool needs approval", () => {
     let calls = 0
     let handled = false
     return [
@@ -1267,13 +1267,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       Effect.gen(function* () {
         const agent = Agent.make({ name: "missing-approvals-agent", toolkit: Toolkit.make(gatedTool) })
 
-        const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "use gated" }))
+        const error = yield* Stream.runDrain(Agent.stream(agent, { prompt: "use gated" })).pipe(Effect.flip)
 
-        expect(handled).toBe(true)
-        expect(events.some((event) => event._tag === "ApprovalRequested")).toBe(true)
-        expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
-        expect(events.some((event) => event._tag === "ToolExecutionCompleted")).toBe(true)
-        expect(events.at(-1)?._tag).toBe("Completed")
+        expect(handled).toBe(false)
+        expect(Schema.is(AgentEvent.AgentSuspended)(error)).toBe(true)
+        if (Schema.is(AgentEvent.AgentSuspended)(error)) {
+          expect(error.reason).toBe("approval")
+          expect(error.tool_name).toBe("gated")
+        }
       }),
     ] as const
   })
@@ -6744,11 +6745,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           Agent.stream(agent, {
             prompt: "ignored",
             history: checkpoint,
-            resume: { suspension: failure },
+            resume: { suspension: failure, resolution: { _tag: "Approved" } },
           }),
         )
 
         expect(failure.active_tools).toEqual(["gated"])
+        expect(approvalResolutions).toBe(1)
         expect(executions).toBe(1)
         expect(events.some((event) => event._tag === "ToolExecutionStarted")).toBe(true)
         expect(events.at(-1)?._tag).toBe("Completed")

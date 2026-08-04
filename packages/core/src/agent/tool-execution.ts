@@ -1,5 +1,5 @@
 import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
-import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
+import { Chat, Prompt, Tool } from "effect/unstable/ai"
 import {
   AgentSuspended,
   AgentError,
@@ -11,6 +11,7 @@ import {
 import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./agent-tool-result.js"
 import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "./agent.js"
 import type { AgentRunState } from "./agent-run-state.js"
+import type { HandoffRunState } from "./handoff-state.js"
 import { type AuthorizationError, type ToolAuthorizer } from "../tools/tool-authorization.js"
 import {
   type DomainFailure,
@@ -28,6 +29,10 @@ import { ToolContext } from "../tools/tool-context.js"
 import { activateSkillParameters } from "./agent-skill-tool.js"
 import { canonicalSuspensionCall, suspended } from "./agent-suspension.js"
 import type { Skill, SkillSourceError } from "../context/skill-source.js"
+import { intercept } from "../durable/driver-run.js"
+import { operationKey } from "../durable/driver-interpreter.js"
+import { handoffDispatch } from "./handoff-tool-execution.js"
+import { HandoffCatalog } from "../policy/handoff-target.js"
 
 type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
@@ -44,14 +49,15 @@ interface ToolExecutionContext<T extends Record<string, Tool.Any>, R> {
   readonly state: AgentRunState
   readonly isSkillActivationCall: (call: AnyToolCall, registry: Registry) => boolean
   readonly agent: Agent<T, R>
+  readonly chat: Chat.Service
   readonly sessionId: string
-  readonly staticToolkit: Toolkit.Toolkit<Record<string, Tool.Any>>
   readonly executor: Option.Option<typeof ToolExecutor.Service>
   readonly authorizer: ToolAuthorizer<R>
   readonly skillRuntime:
     | { readonly source: { readonly get: (name: string) => Effect.Effect<Skill | undefined, SkillSourceError> } }
     | undefined
   readonly toolState: Ref.Ref<ToolState>
+  readonly handoffState?: Ref.Ref<HandoffRunState>
   readonly progressPolicy: ProgressOverflowPolicy
   readonly activeSession: Option.Option<unknown>
   readonly memoryRuntime: unknown | undefined
@@ -67,12 +73,13 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
     state,
     isSkillActivationCall,
     agent,
+    chat,
     sessionId,
-    staticToolkit,
     executor,
     authorizer,
     skillRuntime,
     toolState,
+    handoffState,
     progressPolicy,
     skillError,
   } = inputContext
@@ -108,9 +115,37 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
       case "DomainFailure":
         return completed(domainFailureResult(call, outcome))
       case "Suspend":
-        return Effect.fail(suspended(call, toolCallBatch, toolCallIndex, outcome.token, "tool-wait"))
+        return Effect.gen(function* () {
+          const propagation = options.suspensionPropagation ?? "propagate"
+          if (propagation === "collapse-to-domain-failure") {
+            const failure = {
+              reason: "suspended" as const,
+              message: `Tool ${call.name} suspended (${outcome.token})`,
+            }
+            return yield* completed(
+              domainFailureResult(call, { _tag: "DomainFailure", failure, encodedFailure: failure }),
+            )
+          }
+          const invocationPath =
+            handoffState === undefined ? undefined : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
+          const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
+          return yield* Effect.fail(
+            suspended(call, toolCallBatch, toolCallIndex, outcome.token, "tool-wait", {
+              active_tools: registry.entries.map((entry) => entry.tool.name),
+              activated_skills: activatedSkills,
+              ...(invocationPath === undefined || invocationPath.length === 0
+                ? {}
+                : { invocation_path: invocationPath }),
+            }),
+          )
+        })
     }
   }
+
+  const activeAgentName = (): Effect.Effect<string> =>
+    handoffState === undefined
+      ? Effect.succeed(agent.name)
+      : Ref.get(handoffState).pipe(Effect.map((handoffRun) => handoffRun.active.name))
 
   const defaultExecute = (
     request: Request,
@@ -118,7 +153,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
   ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<T> | Tool.HandlerServices<T[keyof T]>> => {
     const registered = get(registry, request.call.name)
     if (registered?.dispatch === "Static") {
-      return executeToolkit(staticToolkit, request)
+      return executeToolkit(registry.toolkit, request)
     }
     return registered === undefined
       ? Effect.fail(
@@ -154,7 +189,11 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
     call: AnyToolCall,
     request: Request,
     registry: Registry,
-  ): Stream.Stream<Event, RunError, StaticToolServices<T>> =>
+  ): Stream.Stream<
+    Event,
+    RunError,
+    StaticToolServices<T> | HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+  > =>
     Stream.concat(
       Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
       Stream.unwrap(
@@ -198,23 +237,55 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
               )
             },
           })
-          const execution: Effect.Effect<
+          const handoffCandidate = get(registry, request.call.name)
+          const handoffExecution =
+            handoffState !== undefined && handoffCandidate?.dispatch === "Handoff"
+              ? handoffDispatch(request, registry, {
+                  options,
+                  handoffState,
+                  chat,
+                  toolState,
+                  resolvingToolCallIds: request.toolCallBatch.calls.map((entry) => entry.id),
+                })
+              : undefined
+          const executionBase: Effect.Effect<
             Outcome,
-            AgentError | ToolNameCollision | FrameworkFailure,
-            ToolContext | Tool.HandlersFor<T> | Tool.HandlerServices<T[keyof T]>
+            AgentError | ToolNameCollision | FrameworkFailure | import("./agent.js").RunError,
+            | ToolContext
+            | Tool.HandlersFor<T>
+            | Tool.HandlerServices<T[keyof T]>
+            | HandoffCatalog
+            | import("../durable/driver-interpreter.js").DriverInterpreter
           > = isSkillActivationCall(call, registry)
             ? activateSkillOutcome(turn, call)
-            : Option.isNone(executor)
-              ? defaultExecute(request, registry)
-              : executor.value
-                  .execute(request)
-                  .pipe(
-                    Effect.mapError((error) =>
-                      Schema.is(RemoteRetryMisconfigured)(error)
-                        ? AgentError.make({ message: error.message, turn, cause: error })
-                        : error,
-                    ),
-                  )
+            : handoffExecution !== undefined
+              ? handoffExecution
+              : Option.isNone(executor)
+                ? defaultExecute(request, registry)
+                : executor.value
+                    .execute(request)
+                    .pipe(
+                      Effect.mapError((error) =>
+                        Schema.is(RemoteRetryMisconfigured)(error)
+                          ? AgentError.make({ message: error.message, turn, cause: error })
+                          : error,
+                      ),
+                    )
+          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+          const execution = intercept(
+            {
+              kind: "tool",
+              key: operationKey(logicalId, "tool", turn, request.toolCallIndex, call.id, call.name),
+              input: {
+                turn,
+                toolCallIndex: request.toolCallIndex,
+                callId: call.id,
+                name: call.name,
+              },
+              replayPolicy: "never",
+            },
+            executionBase,
+          )
           const fiber = yield* Effect.uninterruptibleMask((restore) =>
             restore(execution.pipe(Effect.provideService(ToolContext, toolContext))).pipe(
               Effect.flatMap((outcome) =>
@@ -299,6 +370,21 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
   const authorizationError = (turn: number, error: AuthorizationError): AgentError =>
     AgentError.make({ message: error.message, turn, cause: error })
 
+  const resumeApproved = (
+    turn: number,
+    toolCallBatch: Request["toolCallBatch"],
+    toolCallIndex: number,
+    call: AnyToolCall,
+    registry: Registry,
+  ): Stream.Stream<Event, RunError, StaticToolServices<T> | R> =>
+    Stream.unwrap(
+      activeAgentName().pipe(
+        Effect.map((agentName) =>
+          executeApproved(turn, call, { call, toolCallBatch, turn, toolCallIndex, agentName, sessionId }, registry),
+        ),
+      ),
+    ) as Stream.Stream<Event, RunError, StaticToolServices<T> | R>
+
   const toolCallEvents = (
     turn: number,
     toolCallBatch: Request["toolCallBatch"],
@@ -307,7 +393,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
     messages: ReadonlyArray<Prompt.Message>,
     registry: Registry,
   ): Stream.Stream<Event, RunError, StaticToolServices<T> | R> => {
-    const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: agent.name, sessionId }
+    const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: "", sessionId }
     const candidate = get(registry, call.name)
     if (candidate === undefined)
       return Stream.fail(
@@ -320,12 +406,14 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
     const activeTools = registry.entries.map((entry) => entry.tool.name)
     return Stream.unwrap(
       Effect.gen(function* () {
+        const agentName = yield* activeAgentName()
+        const resolvedRequest = { ...request, agentName }
         const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
         const approvalEvents = yield* Queue.bounded<Event, Cause.Done>(1)
         const fiber = yield* authorizer
           .authorize({
             call,
-            agentName: agent.name,
+            agentName,
             turn,
             sessionId,
             tool: candidate.tool,
@@ -348,7 +436,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
             Stream.flatMap((decision) => {
               switch (decision._tag) {
                 case "Execute":
-                  return executeApproved(turn, call, request, registry)
+                  return executeApproved(turn, call, resolvedRequest, registry)
                 case "Deny":
                   return Stream.fail(
                     FrameworkFailure.make({
@@ -358,25 +446,36 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
                     }),
                   )
                 case "Suspend":
-                  return Stream.fail(
-                    AgentSuspended.make({
-                      token: decision.suspension.token,
-                      reason: "approval",
-                      tool_call_index: toolCallIndex,
-                      tool_call_id: call.id,
-                      tool_name: call.name,
-                      tool_params: call.params,
-                      tool_call_batch: toolCallBatch.calls.map(canonicalSuspensionCall),
-                      active_tools: activeTools,
-                      activated_skills: activatedSkills,
+                  return Stream.unwrap(
+                    Effect.gen(function* () {
+                      const invocationPath =
+                        handoffState === undefined
+                          ? undefined
+                          : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
+                      return yield* Effect.fail(
+                        AgentSuspended.make({
+                          token: decision.suspension.token,
+                          reason: "approval",
+                          tool_call_index: toolCallIndex,
+                          tool_call_id: call.id,
+                          tool_name: call.name,
+                          tool_params: call.params,
+                          tool_call_batch: toolCallBatch.calls.map(canonicalSuspensionCall),
+                          active_tools: activeTools,
+                          activated_skills: activatedSkills,
+                          ...(invocationPath === undefined || invocationPath.length === 0
+                            ? {}
+                            : { invocation_path: invocationPath }),
+                        }),
+                      )
                     }),
                   )
               }
             }),
           ),
-        )
+        ) as Stream.Stream<Event, RunError, StaticToolServices<T> | R>
       }),
-    )
+    ) as Stream.Stream<Event, RunError, StaticToolServices<T> | R>
   }
   return {
     boundedSuccessResult,
@@ -386,6 +485,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
     executeApproved,
     activateSkillOutcome,
     authorizationError,
+    resumeApproved,
     toolCallEvents,
   }
 }

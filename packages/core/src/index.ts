@@ -1,3 +1,6 @@
+import { AgentRef } from "./durable/facade-agentRef.js"
+import { DurableDriver } from "./durable/facade-durableDriver.js"
+import { RunBudget } from "./durable/facade-runBudget.js"
 import { Agent } from "./agent/facade-agent.js"
 import { AgentEvent } from "./agent/facade-agentEvent.js"
 import { AgentTool } from "./agent/facade-agentTool.js"
@@ -29,10 +32,12 @@ import { TurnPolicy } from "./turn/facade-turnPolicy.js"
 export {
   Agent,
   AgentEvent,
+  AgentRef,
   AgentTool,
   Approvals,
   Compaction,
   ContextOverflow,
+  DurableDriver,
   Guardrail,
   Handoff,
   Instructions,
@@ -44,6 +49,7 @@ export {
   ModelTelemetry,
   ModelToolCallValidation,
   Permissions,
+  RunBudget,
   Session,
   SessionSync,
   SkillSource,

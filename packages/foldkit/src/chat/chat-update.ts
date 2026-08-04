@@ -1,8 +1,8 @@
 import { Cause, Effect, Option, Result, Schema } from "effect"
-import { Prompt } from "effect/unstable/ai"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
 import { Wire } from "@batonfx/transport"
+import type { RunEvent } from "@batonfx/runtime"
 import {
   AgentCommandError,
   type AgentConnection,
@@ -21,7 +21,6 @@ import {
   RunFailed,
   Running,
   ToolEntry,
-  UserEntry,
   type ChatEntry,
   type Model,
   type Output,
@@ -173,29 +172,6 @@ const addProgress = (entries: ReadonlyArray<ChatEntry>, callId: string, message:
       : entry,
   )
 
-const failureMessage = (failure: Wire.RunFailure): string => {
-  switch (failure._tag) {
-    case "@batonfx/core/AgentError":
-      return failure.message
-    case "@batonfx/core/TurnPolicyError":
-      return failure.message
-    case "@batonfx/core/TurnPolicyStopped":
-      return failure.reason._tag === "Policy" ? failure.reason.detail : failure.reason._tag
-    case "@batonfx/core/MiddlewareViolation":
-      return failure.detail
-    case "@batonfx/core/TurnLimitExceeded":
-      return `Turn limit exceeded at turn ${failure.turn}`
-    case "@batonfx/core/ResumeMismatch":
-      return failure.reason === "identity-mismatch"
-        ? "Resume suspension does not match the current checkpoint"
-        : "Resume checkpoint not found"
-    case "@batonfx/core/FrameworkFailure":
-      return `${failure.tool} ${failure.stage}: ${failure.message}`
-    case "@batonfx/core/DeliveryFailed":
-      return failure.message
-  }
-}
-
 const applyPart = (model: Model, turn: number, part: unknown): Model => {
   if (!isRecord(part) || typeof part.type !== "string") return model
   switch (part.type) {
@@ -212,42 +188,7 @@ const applyPart = (model: Model, turn: number, part: unknown): Model => {
   }
 }
 
-type Suspension = Extract<Wire.ServerFrameType, { readonly _tag: "Suspended" }>["suspension"]
-
-const applySuspension = (model: Model, suspension: Suspension) => {
-  if (suspension.reason === "approval") {
-    return [
-      {
-        ...model,
-        run: AwaitingApproval({
-          token: suspension.token,
-          toolName: suspension.tool_name,
-          params: suspension.tool_params,
-        }),
-      },
-      Option.some(ApprovalRequired()),
-    ] as const
-  }
-  const message = `Tool wait suspension for ${suspension.tool_name} is not resolvable by the FoldKit adapter`
-  return [{ ...model, run: Failed({ message }) }, Option.some(RunFailed({ message }))] as const
-}
-
-const applyStatus = (model: Model, status: Wire.SessionStatus): readonly [Model, Option.Option<Output>] => {
-  switch (status._tag) {
-    case "Idle":
-      return [{ ...model, run: Idle() }, Option.none()]
-    case "Running":
-      return [{ ...model, run: Running({ turn: status.turn }) }, Option.none()]
-    case "Suspended":
-      return applySuspension(model, status.suspension)
-    case "Failed": {
-      const message = failureMessage(status.error)
-      return [{ ...model, run: Failed({ message }) }, Option.some(RunFailed({ message }))]
-    }
-  }
-}
-
-const applyEvent = (model: Model, event: Wire.LooseEventType): readonly [Model, Option.Option<Output>] => {
+const applyEvent = (model: Model, event: RunEvent.RunEvent): readonly [Model, Option.Option<Output>] => {
   switch (event._tag) {
     case "TurnStarted":
       return [
@@ -287,86 +228,43 @@ const applyEvent = (model: Model, event: Wire.LooseEventType): readonly [Model, 
       return [flushStreaming(model), Option.none()]
     case "StructuredOutput":
       return [model, Option.none()]
-    case "Completed": {
-      const flushed = flushStreaming(model)
-      return [{ ...flushed, run: Idle() }, Option.some(RunCompleted({ text: event.text }))]
-    }
     default:
       return [model, Option.none()]
   }
 }
 
-const textFromContent = (content: ReadonlyArray<unknown>): string =>
-  content
-    .filter((part) => isRecord(part) && part.type === "text" && typeof part.text === "string")
-    .map((part) => (part as { readonly text: string }).text)
-    .join("")
-
-const reasoningFromContent = (content: ReadonlyArray<unknown>): string | null => {
-  const reasoning = content
-    .filter((part) => isRecord(part) && part.type === "reasoning" && typeof part.text === "string")
-    .map((part) => (part as { readonly text: string }).text)
-    .join("")
-  return reasoning.length === 0 ? null : reasoning
-}
-
-const projectPrompt = (prompt: Prompt.Prompt): ReadonlyArray<ChatEntry> => {
-  let entries: ReadonlyArray<ChatEntry> = []
-  for (const message of prompt.content) {
-    if (message.role === "user") {
-      const text = textFromContent(message.content)
-      if (text.length > 0) entries = entries.concat(UserEntry({ text }))
-    } else if (message.role === "assistant") {
-      const text = textFromContent(message.content)
-      const reasoning = reasoningFromContent(message.content)
-      if (text.length > 0 || reasoning !== null) entries = entries.concat(AssistantEntry({ text, reasoning }))
-      for (const part of message.content) {
-        if (isToolCall(part)) entries = upsertToolCall(entries, part)
-        if (isToolResult(part)) entries = resolveTool(entries, part)
-      }
-    } else if (message.role === "tool") {
-      for (const part of message.content) {
-        if (isToolResult(part)) entries = resolveTool(entries, part)
-      }
+const applyRunEvent = (model: Model, event: RunEvent.RunEvent): readonly [Model, Option.Option<Output>] => {
+  if (event.sequence <= model.lastSeq) return [model, Option.none()]
+  const withSequence = { ...model, lastSeq: event.sequence }
+  switch (event._tag) {
+    case "RunWaiting":
+      return event.wait.reason === "approval"
+        ? [
+            { ...withSequence, run: AwaitingApproval({ token: event.wait.waitId, toolName: "approval", params: {} }) },
+            Option.some(ApprovalRequired()),
+          ]
+        : [withSequence, Option.none()]
+    case "RunCompleted": {
+      const flushed = flushStreaming(withSequence)
+      return [{ ...flushed, run: Idle() }, Option.some(RunCompleted({ text: event.result.text }))]
     }
-  }
-  return entries
-}
-
-const applyFrame = (model: Model, frame: Wire.LooseServerFrameType): readonly [Model, Option.Option<Output>] => {
-  if (frame._tag === "Snapshot") {
-    return [{ ...model, lastSeq: frame.seq, entries: projectPrompt(frame.transcript), streaming: null }, Option.none()]
-  }
-  if (frame.seq <= model.lastSeq) return [model, Option.none()]
-  const withSeq = { ...model, lastSeq: frame.seq }
-  switch (frame._tag) {
-    case "Event":
-      return applyEvent(withSeq, frame.event)
-    case "Suspended":
-      return applySuspension(withSeq, frame.suspension)
-    case "Failed": {
-      const message = failureMessage(frame.error)
-      return [{ ...withSeq, run: Failed({ message }) }, Option.some(RunFailed({ message }))]
+    case "RunFailed": {
+      const message = event.error.message
+      return [{ ...withSequence, run: Failed({ message }) }, Option.some(RunFailed({ message }))]
     }
-    case "Ended":
-      return [withSeq, Option.none()]
-    case "SessionStatus":
-      return applyStatus(withSeq, frame.status)
+    case "RunCancelled":
+      return [{ ...withSequence, run: Idle(), streaming: null }, Option.none()]
+    default:
+      return applyEvent(withSequence, event)
   }
 }
 
-const isServerFrame = (incoming: Incoming): incoming is Wire.LooseServerFrameType =>
-  incoming._tag === "Event" ||
-  incoming._tag === "Suspended" ||
-  incoming._tag === "Failed" ||
-  incoming._tag === "Ended" ||
-  incoming._tag === "Snapshot" ||
-  incoming._tag === "SessionStatus"
+const isRunEvent = (incoming: Incoming): incoming is RunEvent.RunEvent => Schema.is(Wire.ObserverRunEvent)(incoming)
 
 export const chatUpdateRuntime = {
   Pending,
   Completed,
   catchCommandFailure,
-  applyFrame,
-  isServerFrame,
+  applyRunEvent,
+  isRunEvent,
 }

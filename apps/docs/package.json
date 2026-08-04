@@ -11,11 +11,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@batonfx/a2a": "workspace:*",
+    "@batonfx/ag-ui": "workspace:*",
     "@batonfx/core": "workspace:*",
     "@batonfx/foldkit": "workspace:*",
     "@batonfx/mcp": "workspace:*",
     "@batonfx/memory": "workspace:*",
     "@batonfx/providers": "workspace:*",
+    "@batonfx/runtime": "workspace:*",
     "@batonfx/skills": "workspace:*",
     "@batonfx/test": "workspace:*",
     "@batonfx/transport": "workspace:*",

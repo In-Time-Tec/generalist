@@ -10,7 +10,7 @@ export const skillsReference = definePage({
       "@batonfx/skills implements the core SkillSource seam through filesystem and manifest-backed HTTP, S3, and GitHub adapters. InstructionFiles loads AGENTS.md/CLAUDE.md instruction files.",
     ),
     command("Install", "bun add @batonfx/core @batonfx/skills"),
-    p("Published on npm at 0.4.0. Requires ", code("@batonfx/core"), "."),
+    p("Published on npm at 0.14.0. Requires ", code("@batonfx/core"), "."),
     h2("exports", "Exports map"),
     table(
       ["Subpath", "Contents"],

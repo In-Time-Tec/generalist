@@ -29,12 +29,12 @@ export const multiAgent = definePage({
     "Fan out child runs with Handoff.fanOut, route through a transfer-tool supervisor, and expose any agent as a tool with AgentTool.asTool.",
   content: [
     p(
-      "Baton's multi-agent support is same-process and non-durable: it composes ",
+      "@batonfx/core multi-agent helpers are same-process and non-durable: they compose ",
       code("Agent.generate"),
       ", toolkits, and the ",
       code("ToolExecutor"),
-      " seam rather than adding a new runtime. Durable, addressable, cross-process child executions belong to a host runtime; see ",
-      link("/docs/learn/baton-and-relay", "Baton and Relay"),
+      " seam rather than adding a second execution model. For durable, addressable parent and child Runs, use @batonfx/runtime; see ",
+      link("/docs/learn/native-runtime", "Core and Runtime"),
       ".",
     ),
     h2("two-channels", "Context services and run identity are separate channels"),

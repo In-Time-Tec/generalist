@@ -40,7 +40,7 @@ export const examples = definePage({
         ],
         [
           [code("hitl-over-sse")],
-          "An approval suspension captured as replayable transport frames from an in-process session registry",
+          "An approval suspension captured as canonical RunEvents from Runtime.layerMemory and encoded for SSE",
           [code("bun --cwd examples/hitl-over-sse start")],
         ],
         [

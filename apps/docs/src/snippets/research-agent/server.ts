@@ -1,73 +1,101 @@
 import { Approvals, Chat, ModelMiddleware, ToolExecutor } from "@batonfx/core"
-import { SessionRegistry, Sse, Ws } from "@batonfx/transport"
+import { Address, AgentHost, AgentRef, RunStore, Runtime } from "@batonfx/runtime"
+import { Sse, Ws } from "@batonfx/transport"
 import { Effect, Layer, Schema } from "effect"
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
+import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
 import { agent } from "./agent"
 import { modelLayer } from "./model"
 import { cannedLayer } from "./search-provider"
 import { toolkit, toolkitLayer } from "./tools"
 
-const OpenSessionInput = Schema.Struct({
-  body: Schema.Struct({ sessionId: Schema.optionalKey(Schema.String) }),
-})
+const agentRef = AgentRef.make({ id: "research-agent", version: "1", digest: "sha256:research-agent" })
+const agentAddress = Address.make("agent:research")
 
 const SendMessageInput = Schema.Struct({
-  pathParams: Schema.Struct({ id: Schema.String }),
-  body: Schema.Struct({ prompt: Schema.String }),
+  body: Schema.Struct({
+    runId: Schema.optionalKey(Schema.String),
+    sessionId: Schema.String,
+    idempotencyKey: Schema.String,
+    prompt: Schema.String,
+  }),
 })
 
-const SessionPathInput = Schema.Struct({
+const RunPathInput = Schema.Struct({
   pathParams: Schema.Struct({ id: Schema.String }),
 })
 
-const errorResponse = (status: number) => (error: { readonly message: string }) =>
-  Effect.succeed(HttpServerResponse.jsonUnsafe({ message: error.message }, { status }))
+const RespondInput = Schema.Struct({
+  pathParams: Schema.Struct({ id: Schema.String }),
+  body: Schema.Struct({
+    waitId: Schema.String,
+    resolution: Schema.Union([
+      Schema.TaggedStruct("Approved", {}),
+      Schema.TaggedStruct("Denied", { reason: Schema.optionalKey(Schema.String) }),
+    ]),
+  }),
+})
 
-export const routesLayer = HttpRouter.use((router) =>
+const errorResponse = (status: number) => (error: unknown) =>
+  Effect.succeed(HttpServerResponse.jsonUnsafe({ message: String(error) }, { status }))
+
+const executeRun = (runId: string) =>
   Effect.gen(function* () {
-    yield* router.add("GET", "/ws", Ws.handle(toolkit))
+    const store = yield* RunStore.RunStore
+    const host = yield* AgentHost.AgentHost
+    yield* host.execute(yield* store.claimExecution({ runId, ownerId: "research-agent-server" }))
+  })
+
+const routesLayer = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    yield* router.add("GET", "/ws", Ws.handle)
 
     yield* router.add(
       "GET",
-      "/sessions/:id/events",
-      HttpRouter.schemaNoBody(SessionPathInput).pipe(
+      "/runs/:id/events",
+      HttpRouter.schemaNoBody(RunPathInput).pipe(
         Effect.flatMap(({ pathParams }) =>
           Effect.gen(function* () {
             const request = yield* HttpServerRequest.HttpServerRequest
-            return yield* Sse.respond(toolkit)({ sessionId: pathParams.id, request, keepAlive: "5 seconds" })
+            return yield* Sse.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
           }),
         ),
-        Effect.catchTag("@batonfx/transport/SessionError", errorResponse(400)),
+        Effect.catchTag("@batonfx/transport/InvalidCursor", errorResponse(400)),
       ),
     )
 
     yield* router.add(
       "POST",
-      "/sessions",
-      HttpRouter.schemaJson(OpenSessionInput).pipe(
+      "/runs",
+      HttpRouter.schemaJson(SendMessageInput).pipe(
         Effect.flatMap(({ body }) =>
-          SessionRegistry.SessionRegistry.use((registry) =>
-            registry.open(body.sessionId === undefined ? {} : { sessionId: body.sessionId }),
+          Runtime.Runtime.use((runtime) =>
+            runtime.send({
+              ...(body.runId === undefined ? {} : { runId: body.runId }),
+              to: agentAddress,
+              sessionId: body.sessionId,
+              idempotencyKey: body.idempotencyKey,
+              prompt: body.prompt,
+            }),
           ),
         ),
-        Effect.map((info) => HttpServerResponse.jsonUnsafe(info)),
-        Effect.catchTag("@batonfx/transport/SessionError", errorResponse(400)),
+        Effect.tap((receipt) => (receipt.duplicate ? Effect.void : executeRun(receipt.runId))),
+        Effect.map((receipt) => HttpServerResponse.jsonUnsafe(receipt, { status: 202 })),
+        Effect.catch(errorResponse(400)),
       ),
     )
 
     yield* router.add(
       "POST",
-      "/sessions/:id/messages",
-      HttpRouter.schemaJson(SendMessageInput).pipe(
+      "/runs/:id/respond",
+      HttpRouter.schemaJson(RespondInput).pipe(
         Effect.flatMap(({ pathParams, body }) =>
-          SessionRegistry.SessionRegistry.use((registry) => registry.send(pathParams.id, body.prompt)),
+          Runtime.Runtime.use((runtime) =>
+            runtime.respond({ runId: pathParams.id, waitId: body.waitId, resolution: body.resolution }),
+          ).pipe(Effect.andThen(executeRun(pathParams.id))),
         ),
-        Effect.map(() => HttpServerResponse.jsonUnsafe({ status: "accepted" })),
-        Effect.catchTag("@batonfx/transport/SessionError", errorResponse(400)),
-        Effect.catchTag("@batonfx/transport/SessionBusy", (error) =>
-          errorResponse(409)({ message: `Session ${error.sessionId} is busy` }),
-        ),
+        Effect.map(() => HttpServerResponse.jsonUnsafe({ status: "accepted" }, { status: 202 })),
+        Effect.catch(errorResponse(400)),
       ),
     )
   }),
@@ -88,10 +116,21 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "research-agent" }).pipe
   Layer.provide(Persistence.layerBackingMemory),
 )
 
-export const sessionRegistryLayer = SessionRegistry.layerMemory({ agent, stripTranscripts: true }).pipe(
-  Layer.provide(
-    Layer.mergeAll(modelLayer, toolExecutorLayer, approvalsLayer, ModelMiddleware.layerIdentity, persistenceLayer),
-  ),
+const agentServices = Layer.mergeAll(
+  modelLayer,
+  toolExecutorLayer,
+  approvalsLayer,
+  ModelMiddleware.layerIdentity,
+  persistenceLayer,
 )
 
-export const appLayer = Layer.mergeAll(routesLayer, HttpRouter.cors())
+export const runtimeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | AgentHost.AgentHost> = Runtime.layerMemory(
+  {
+    agents: [{ ref: agentRef, agent, services: agentServices }],
+    addresses: [{ address: agentAddress, agent: agentRef }],
+  },
+)
+
+export const httpLayer: Layer.Layer<never, never, HttpServer.HttpServer> = HttpRouter.serve(
+  Layer.mergeAll(routesLayer, HttpRouter.cors()),
+).pipe(Layer.provide(runtimeLayer))

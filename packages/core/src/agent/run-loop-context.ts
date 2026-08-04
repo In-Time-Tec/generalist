@@ -12,6 +12,7 @@ import type { Middleware } from "../model/model-middleware.js"
 import type { Registry } from "../tools/tool-registry.js"
 import type { Request } from "../tools/tool-executor.js"
 import type { SuspensionCheckpoint } from "./agent-suspension.js"
+import type { HandoffRunState } from "./handoff-state.js"
 import type { SessionStore, Entry } from "../context/session.js"
 import type { Steering, Input } from "../turn/steering.js"
 import type { ToolContext } from "../tools/tool-context.js"
@@ -41,9 +42,10 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly structured: StructuredRunConfig<S> | undefined
   readonly validatedResume: SuspensionCheckpoint | undefined
   readonly seedSystem: string | undefined
-  readonly recallInitialPrompt: (prompt: Prompt.Prompt) => Effect.Effect<Prompt.Prompt, AgentError>
+  readonly recallInitialPrompt: (prompt: Prompt.Prompt) => Effect.Effect<Prompt.Prompt, RunError>
   readonly initialPrompt: Prompt.RawInput
   readonly toolState: Ref.Ref<ToolState>
+  readonly handoffStateRef?: Ref.Ref<HandoffRunState>
   readonly modelTurn: (
     turn: number,
     prompt: Prompt.RawInput,
@@ -60,7 +62,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly withAgentModel: <A, E, R2>(
     effect: Effect.Effect<A, E, R2>,
   ) => Effect.Effect<A, E | LanguageModelNotRegistered, R2>
-  readonly syncSession: (turn: number, transcript: Prompt.Prompt) => Effect.Effect<ReadonlyArray<Entry>, AgentError>
+  readonly syncSession: (turn: number, transcript: Prompt.Prompt) => Effect.Effect<ReadonlyArray<Entry>, RunError>
   readonly applyCompactionResult: (
     turn: number,
     result: CompactionResult,
@@ -92,12 +94,19 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     messages: ReadonlyArray<Prompt.Message>,
     registry: Registry,
   ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools>>
+  readonly resumeApproved: (
+    turn: number,
+    batch: Request["toolCallBatch"],
+    index: number,
+    call: AnyToolCall,
+    registry: Registry,
+  ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools>>
   readonly rememberTurn: (
     turn: number,
     transcript: Prompt.Prompt,
     terminal: boolean,
     path: ReadonlyArray<Entry>,
-  ) => Effect.Effect<void, AgentError>
+  ) => Effect.Effect<void, RunError>
   readonly withSystem: (system: string, prompt: Prompt.Prompt) => Prompt.Prompt
   readonly steeringDrainedEvent: (
     turn: number,

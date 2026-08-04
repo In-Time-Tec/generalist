@@ -15,7 +15,8 @@ import { Chat, Connection } from "@batonfx/foldkit"
 import { WorkingMemory } from "@batonfx/memory"
 import { Deterministic } from "@batonfx/providers"
 import { SkillLoader } from "@batonfx/skills"
-import { Wire } from "@batonfx/transport"
+import { AgentRef, RunEvent } from "@batonfx/runtime"
+import { Prompt } from "effect/unstable/ai"
 
 const researchFrontmatter: SkillSource.Frontmatter = {
   name: "research",
@@ -53,22 +54,38 @@ const key: Memory.Key = { agent: "capstone-assistant", subject: "local-user" }
 const filesystemSkillLayer = SkillLoader.layer({ cwd: ".", roots: ["fixtures/.agents/skills"] })
 const compactionLayer = Compaction.layer({ contextWindow: 64_000, reserveTokens: 1_024, keepRecentTokens: 8_000 })
 
-const chatFrames: ReadonlyArray<Wire.LooseServerFrameType> = [
-  { _tag: "Event", seq: 0, event: { _tag: "TurnStarted", turn: 0 } },
-  {
-    _tag: "Event",
-    seq: 1,
-    event: {
-      _tag: "ModelPart",
-      turn: 0,
-      modelCallId: "model-call-0",
-      modelAttemptId: "model-attempt-0",
-      attempt: 0,
-      part: Response.makePart("text-delta", { id: "assistant", delta: "deterministic response" }),
+const chatAgent = AgentRef.make({ id: "capstone-assistant", version: "1", digest: "sha256:capstone" })
+const runEvent = (sequence: number, fields: Record<string, unknown>): RunEvent.RunEvent =>
+  ({
+    specVersion: "1",
+    eventId: `capstone-run:${sequence}`,
+    runId: "capstone-run",
+    sequence,
+    agent: chatAgent,
+    rootRunId: "capstone-run",
+    occurredAt: "2026-08-03T00:00:00.000Z",
+    ...fields,
+  }) as RunEvent.RunEvent
+
+const chatFrames: ReadonlyArray<Connection.Incoming> = [
+  runEvent(0, { _tag: "TurnStarted", turn: 0 }),
+  runEvent(1, {
+    _tag: "ModelPart",
+    turn: 0,
+    modelCallId: "model-call-0",
+    modelAttemptId: "model-attempt-0",
+    attempt: 0,
+    part: Response.makePart("text-delta", { id: "assistant", delta: "deterministic response" }),
+  }),
+  runEvent(2, { _tag: "TurnCompleted", turn: 0, transcript: Prompt.empty }),
+  runEvent(3, {
+    _tag: "RunCompleted",
+    result: {
+      text: "deterministic response",
+      turns: 1,
+      transcript: Prompt.empty,
     },
-  },
-  { _tag: "Event", seq: 2, event: { _tag: "TurnCompleted", turn: 0 } },
-  { _tag: "Event", seq: 3, event: { _tag: "Completed", turns: 1, text: "deterministic response" } },
+  }),
 ]
 
 const [chatModel] = Chat.update(

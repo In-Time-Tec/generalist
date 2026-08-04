@@ -168,10 +168,13 @@ describe("OpenAI account authorization protocol", () => {
 
   it.effect("forces redirect rejection for every fetch-based authorization request", () => {
     const redirects: Array<RequestRedirect | undefined> = []
-    const fetch: typeof globalThis.fetch = (_input, init) => {
-      redirects.push(init?.redirect)
-      return Promise.resolve(new Response(JSON.stringify({ access_token: "access" }), { status: 200 }))
-    }
+    const fetch: typeof globalThis.fetch = Object.assign(
+      (_input: URL | RequestInfo, init?: BunFetchRequestInit | RequestInit) => {
+        redirects.push(init?.redirect)
+        return Promise.resolve(new Response(JSON.stringify({ access_token: "access" }), { status: 200 }))
+      },
+      { preconnect: () => {} },
+    )
     return Effect.gen(function* () {
       yield* (yield* OpenAiAccountAuthHttp).exchange({
         code: Redacted.make("code-secret"),

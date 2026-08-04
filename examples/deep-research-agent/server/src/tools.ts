@@ -7,6 +7,7 @@ export const webSearchTool = Tool.make("web_search", {
   parameters: Schema.Struct({ query: Schema.String }),
   success: Schema.Struct({ results: Schema.Array(SearchResult) }),
   failureMode: "return",
+  needsApproval: true,
   dependencies: [Service],
 })
 

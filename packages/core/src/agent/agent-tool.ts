@@ -1,6 +1,6 @@
-import { Cause, Effect, Function, Schema } from "effect"
+import { Cause, Effect, Function, Option, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
-import { type Agent, type Result, generate } from "./agent.js"
+import { type Agent, type Result, type RunOptions, generate } from "./agent.js"
 import {
   AgentError,
   AgentSuspended,
@@ -13,6 +13,9 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import { TurnPolicyError } from "../turn/turn-policy.js"
+import { reserveChildBudget, refundChildBudget } from "../durable/driver-run.js"
+import { DriverInterpreter } from "../durable/driver-interpreter.js"
+import { RunBudgetExhausted, RunBudgetGrantWidened } from "../durable/run-budget.js"
 import type { Registration } from "../policy/handoff.js"
 
 const defaultParameters = Schema.Struct({ prompt: Schema.String })
@@ -73,6 +76,12 @@ const errorMessage = (error: unknown): string => {
   }
   if (Schema.is(TurnPolicyError)(error)) {
     return `turn policy failed: ${error.message}`
+  }
+  if (Schema.is(RunBudgetExhausted)(error)) {
+    return `run budget exhausted (${error.dimension})`
+  }
+  if (Schema.is(RunBudgetGrantWidened)(error)) {
+    return `child budget grant widened (${error.dimension})`
   }
   if (Schema.is(MiddlewareViolation)(error)) {
     return `middleware violation on turn ${error.turn}: ${error.detail}`
@@ -185,16 +194,33 @@ export const asTool: {
     const handler = (params: unknown): Effect.Effect<unknown, string, R> =>
       Effect.gen(function* () {
         const prompt = yield* promptFor(options.parameters, options.toPrompt, params)
-        const execution: Effect.Effect<Result, unknown, R> =
-          "run" in agent ? agent.run({ prompt }) : generate(agent, { prompt })
-        const result = yield* execution.pipe(
-          Effect.catchCause((cause) => {
-            if (Cause.hasInterrupts(cause)) return Effect.interrupt
-            return Effect.fail(causeMessage(agent.name, cause))
-          }),
+        const runChild = (runOptions: RunOptions) => {
+          const execution = "run" in agent ? agent.run(runOptions) : generate(agent, runOptions)
+          return execution.pipe(
+            Effect.catchCause((cause) => {
+              if (Cause.hasInterrupts(cause)) return Effect.interrupt
+              return Effect.fail(causeMessage(agent.name, cause))
+            }),
+          )
+        }
+        const interpreter = yield* Effect.serviceOption(DriverInterpreter)
+        if (Option.isNone(interpreter)) {
+          const result = yield* runChild({ prompt })
+          return yield* resultFor(options.success, options.fromResult, result)
+        }
+        const grant = "budget" in agent && agent.budget !== undefined ? agent.budget : {}
+        const childBudget = yield* reserveChildBudget(grant).pipe(
+          Effect.mapError((error) =>
+            Schema.is(RunBudgetExhausted)(error) || Schema.is(RunBudgetGrantWidened)(error)
+              ? errorMessage(error)
+              : errorMessage(error),
+          ),
+        )
+        const result = yield* runChild({ prompt, inheritedBudget: childBudget }).pipe(
+          Effect.ensuring(refundChildBudget(childBudget)),
         )
         return yield* resultFor(options.success, options.fromResult, result)
-      })
+      }) as Effect.Effect<unknown, string, R>
     const tool: Tool.Any = Tool.make(name, {
       ...(options.description === undefined ? {} : { description: options.description }),
       parameters,

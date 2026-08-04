@@ -32,9 +32,9 @@ export const quickstart = definePage({
     codeBlock({ label: "Terminal", language: "bash", source: step1 }),
     p(
       "The install summary lists ",
-      code("@batonfx/core@0.4.0"),
+      code("@batonfx/core@0.14.0"),
       " and ",
-      code("@batonfx/providers@0.4.0"),
+      code("@batonfx/providers@0.14.0"),
       ". npm and pnpm work the same way; ",
       link("/docs/start/installation", "Installation"),
       " has the variants.",

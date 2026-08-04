@@ -27,6 +27,12 @@ import { makeToolExecution } from "./tool-execution.js"
 import { makeCompactionRuntime } from "./compaction-runtime.js"
 import { setupRun } from "./setup.js"
 import { makeRunLoop } from "./run-loop.js"
+import { layerForRun } from "../durable/driver-interpreter.js"
+import { resolve as resolveRunBudget } from "../durable/run-budget.js"
+import { operationKey } from "../durable/driver-interpreter.js"
+import { intercept, bindResume } from "../durable/driver-run.js"
+import { fromAgent } from "../durable/agent-ref.js"
+import { makeHandoffStateRef } from "./handoff-state.js"
 const providerOutputState = (): {
   textCharacters: number
   reasoningCharacters: number
@@ -76,7 +82,6 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         sessionService,
         persisted,
         validatedResume,
-        staticToolkit,
         executor,
         chain,
         progressPolicy,
@@ -200,6 +205,14 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         registry: initialRegistry,
         activatedSkillBodies: new Map<string, string>(),
       })
+      const hasSameRunHandoff = initialRegistry.entries.some((candidate) => candidate.dispatch === "Handoff")
+      const handoffStateRef = hasSameRunHandoff
+        ? yield* makeHandoffStateRef(
+            agent as unknown as import("./agent.js").Agent<Record<string, Tool.Any>, unknown>,
+            options.agentRef ??
+              fromAgent(agent as unknown as import("./agent.js").Agent<Record<string, Tool.Any>, unknown>, "inline"),
+          )
+        : undefined
       const restoreActivatedSkills = (history: Prompt.Prompt): Effect.Effect<void, AgentError | ToolNameCollision> =>
         Effect.gen(function* () {
           for (const message of history.content) {
@@ -278,29 +291,55 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           ? Prompt.fromMessages([first, memoryMessage, ...rest])
           : Prompt.fromMessages([memoryMessage, ...prompt.content])
       }
-      const recallInitialPrompt = (prompt: Prompt.Prompt): Effect.Effect<Prompt.Prompt, AgentError> =>
-        memoryRuntime === undefined
-          ? Effect.succeed(prompt)
-          : memoryRuntime.service.recall({ key: memoryRuntime.key, turn: 0, prompt }).pipe(
-              Effect.mapError((error) => memoryError(0, error as MemoryError)),
-              Effect.map((items: ReadonlyArray<Item>) => insertRecalledItems(prompt, items)),
-            )
+      const recallInitialPrompt = (prompt: Prompt.Prompt): Effect.Effect<Prompt.Prompt, RunError> =>
+        Effect.gen(function* () {
+          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+          const recallEffect =
+            memoryRuntime === undefined
+              ? Effect.succeed(prompt)
+              : memoryRuntime.service.recall({ key: memoryRuntime.key, turn: 0, prompt }).pipe(
+                  Effect.mapError((error) => memoryError(0, error as MemoryError)),
+                  Effect.map((items: ReadonlyArray<Item>) => insertRecalledItems(prompt, items)),
+                )
+          return yield* intercept(
+            {
+              kind: "memory",
+              key: operationKey(logicalId, "memory", "recall", 0),
+              input: { turn: 0, key: memoryRuntime?.key },
+              replayPolicy: "pure",
+            },
+            recallEffect,
+          )
+        })
       const rememberTurn = (
         turn: number,
         transcript: Prompt.Prompt,
         terminal: boolean,
         path: ReadonlyArray<Entry>,
-      ): Effect.Effect<void, AgentError> =>
-        memoryRuntime === undefined
-          ? Effect.void
-          : memoryRuntime.service
-              .remember({
-                key: memoryRuntime.key,
-                turn,
-                transcript: Option.isSome(activeSession) ? buildMemoryContext(path) : projectTranscript(transcript),
-                terminal,
-              })
-              .pipe(Effect.mapError((error) => memoryError(turn, error as MemoryError)))
+      ): Effect.Effect<void, RunError> =>
+        Effect.gen(function* () {
+          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+          const rememberEffect =
+            memoryRuntime === undefined
+              ? Effect.void
+              : memoryRuntime.service
+                  .remember({
+                    key: memoryRuntime.key,
+                    turn,
+                    transcript: Option.isSome(activeSession) ? buildMemoryContext(path) : projectTranscript(transcript),
+                    terminal,
+                  })
+                  .pipe(Effect.mapError((error) => memoryError(turn, error as MemoryError)))
+          yield* intercept(
+            {
+              kind: "memory",
+              key: operationKey(logicalId, "memory", "remember", turn, terminal ? 1 : 0),
+              input: { turn, terminal, key: memoryRuntime?.key },
+              replayPolicy: "pure",
+            },
+            rememberEffect,
+          )
+        })
       const compactionRuntime = makeCompactionRuntime({
         activeSession,
         sessionService,
@@ -330,21 +369,25 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         state,
         isSkillActivationCall,
         agent,
+        chat,
         sessionId,
-        staticToolkit,
         executor,
         authorizer,
         skillRuntime,
         toolState,
+        ...(handoffStateRef === undefined ? {} : { handoffState: handoffStateRef }),
         progressPolicy,
         activeSession,
         memoryRuntime,
         errorMessage,
         skillError,
       })
-      const { toolCallEvents } = toolRuntime
+      const { resumeApproved, toolCallEvents } = toolRuntime
       const modelRuntime = makeModelTurn<Tools, R>({
         agent,
+        ...(handoffStateRef === undefined ? {} : { handoffStateRef }),
+        agentModel,
+        agentModelRegistry,
         resilienceService,
         telemetryIdentity,
         instrumentModel,
@@ -358,14 +401,21 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         errorMessage,
         persisted,
         toolCallEvents,
-        agentModelRegistry,
-        agentModel,
       })
       const { modelTurn, captureStructuredUsage, withModelTelemetry, withAgentModel } = modelRuntime
       const baseInitialPrompt =
         seedSystem === undefined ? Prompt.make(options.prompt) : withSystem(seedSystem, Prompt.make(options.prompt))
+      const runBudget = options.inheritedBudget ?? resolveRunBudget(agent.budget, options.budget)
+      const interpreterLayer = layerForRun(agent, options, baseInitialPrompt, runBudget)
+      const withInterpreter = <A, E, RInner>(effect: Effect.Effect<A, E, RInner>) =>
+        effect.pipe(Effect.provide(interpreterLayer))
+      if (validatedResume !== undefined) {
+        yield* withInterpreter(bindResume(validatedResume.suspension.token))
+      }
       const initialPrompt =
-        options.resume === undefined ? yield* recallInitialPrompt(baseInitialPrompt) : baseInitialPrompt
+        options.resume === undefined
+          ? yield* withInterpreter(recallInitialPrompt(baseInitialPrompt))
+          : baseInitialPrompt
       return makeRunLoop<Tools, R, StructuredOutputSchema>({
         agent,
         options,
@@ -381,6 +431,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         recallInitialPrompt,
         initialPrompt,
         toolState,
+        ...(handoffStateRef === undefined ? {} : { handoffStateRef }),
         modelTurn,
         captureStructuredUsage,
         withModelTelemetry,
@@ -395,11 +446,12 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         checkpointSuspended,
         pendingResults,
         toolCallEvents,
+        resumeApproved,
         isTurnPolicyDecision,
         steeringDrainedEvent,
         withSystem,
         rememberTurn,
-      })
+      }).pipe(Stream.provide(interpreterLayer))
     }),
   ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } })) as RunStream<
     StructuredOutputSchema,

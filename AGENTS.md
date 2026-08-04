@@ -1,6 +1,6 @@
 # BatonFX
 
-BatonFX is a standalone, non-durable, Effect-native agent framework over `effect/unstable/ai`. It must never depend on Relay or another durable runtime.
+BatonFX is an Effect-native agent framework over `effect/unstable/ai` with an optional native durable Runtime. Core stays standalone and must never depend on Relay or another durable runtime.
 
 ## Contracts and docs
 
@@ -22,7 +22,7 @@ BatonFX is a standalone, non-durable, Effect-native agent framework over `effect
 
 ## Code and packages
 
-- Baton depends on `effect` only. Never import `@relayfx/*`; ast-grep enforces this.
+- Baton core depends on `effect` only. Never import `@relayfx/*`; ast-grep enforces this.
 - Use Effect AI `Prompt`, `Response`, `Tool`, and `Toolkit` directly. Do not add a second payload or tool format.
 - Follow the construction-verb canon: `make` constructs an in-memory value, `register` records it for later lookup, and `start` is reserved for beginning a durable host `Execution`. Do not use `create` as a synonym for `make` or `register`.
 - Name Layer constructors `layer` or with a noun after `layer` (`layerMemory`, `layerNoop`, `layerIdentity`, `layerConfig`). Put parameters in `layer(options)`; do not add Layer aliases or flag-in-a-name variants.

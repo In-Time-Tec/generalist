@@ -14,19 +14,21 @@ import { AgentError } from "../agent/agent-event.js"
 import { type AgentToolToolkit, asTool } from "../agent/agent-tool.js"
 import { type ClosedToolSet } from "../tools/tool-executor.js"
 import { type TurnPolicy } from "../turn/turn-policy.js"
+import { HandoffCatalog, layerCatalog, type HandoffTarget } from "./handoff-target.js"
+import { handoffToolSpec } from "./handoff-runtime.js"
+import { registerHandoffToolMeta } from "./handoff-tool-meta.js"
+import type { ContextProjection } from "./handoff-projection.js"
 
-const defaultTransferParameters = Schema.Struct({ prompt: Schema.String })
+const defaultDelegateParameters = Schema.Struct({ prompt: Schema.String })
 
-type DefaultTransferParameters = typeof defaultTransferParameters
+type DefaultDelegateParameters = typeof defaultDelegateParameters
 
-/** @experimental A failure while constructing the services for a registered agent. */
 export class RegistrationError extends Schema.TaggedErrorClass<RegistrationError>()("@batonfx/core/RegistrationError", {
   agent: Schema.String,
   message: Schema.String,
   cause: Schema.Unknown,
 }) {}
 
-/** @experimental A service-free, closed agent registration. */
 export interface Registration {
   readonly name: string
   readonly run: <O extends RunOptions>(
@@ -35,7 +37,6 @@ export interface Registration {
   readonly requirements: (value: never) => never
 }
 
-/** @experimental Register an agent with the complete service layer required by its runs. */
 export const register = <Tools extends Record<string, Tool.Any>, R, E>(
   agent: Agent<Tools, R>,
   layer: Layer.Layer<R, E, never>,
@@ -58,9 +59,8 @@ export const register = <Tools extends Record<string, Tool.Any>, R, E>(
   }
 }
 
-/** @experimental Options for a conventionally named transfer tool. */
-export interface TransferOptions<
-  Parameters extends Schema.Top = DefaultTransferParameters,
+export interface DelegateOptions<
+  Parameters extends Schema.Top = DefaultDelegateParameters,
   Success extends Schema.Top = typeof Schema.String,
 > {
   readonly nameOverride?: string
@@ -71,33 +71,36 @@ export interface TransferOptions<
   readonly fromResult?: (result: Result) => Success["Type"]
 }
 
-/** @experimental One child run in a bounded fan-out. */
+export interface HandoffToolOptions {
+  readonly nameOverride?: string
+  readonly description?: string
+  readonly projection?: ContextProjection
+  readonly maxRepeatedEdge?: number
+}
+
 export interface FanOutChild {
   readonly registration: Registration
   readonly prompt: Prompt.RawInput
   readonly options?: Omit<RunOptions, "prompt" | "output" | "memory" | "persistence">
 }
 
-/** @experimental Options for bounded same-process fan-out. */
 export interface FanOutOptions {
   readonly concurrency?: number
 }
 
-/** @experimental Built supervisor agent and handled toolkit for its transfer tools. */
 export interface Supervisor<R> {
   readonly agent: Agent<Record<string, Tool.Any>, R | LanguageModel.LanguageModel>
   readonly toolkit: ClosedToolSet<never, Tool.Any>
+  readonly catalog: Layer.Layer<HandoffCatalog>
 }
 
-/** @experimental Options for building a transfer-tool supervisor. */
 export interface SupervisorOptions {
   readonly name: string
   readonly instructions?: string
-  readonly specialists: ReadonlyArray<Registration>
+  readonly specialists: ReadonlyArray<HandoffTarget>
   readonly policy?: TurnPolicy
+  readonly handoffOptions?: HandoffToolOptions
 }
-
-const transferName = (agentName: string): string => `transfer_to_${agentName}`
 
 const positiveConcurrency = (value: number | undefined): Effect.Effect<number, AgentError> => {
   const concurrency = value ?? 4
@@ -111,28 +114,17 @@ const positiveConcurrency = (value: number | undefined): Effect.Effect<number, A
       )
 }
 
-type TransferToolkit<Parameters extends Schema.Top, Success extends Schema.Top> = AgentToolToolkit<
-  string,
-  Parameters,
-  Success,
-  never
->
-type TransferInvocation = Effect.Effect<unknown, string>
+type HandoffToolkit = {
+  readonly name: string
+  readonly tool: Tool.Any
+  readonly tools: Record<string, Tool.Any>
+  readonly invoke: (params: unknown) => Effect.Effect<unknown, string>
+}
 
-const mergeHandled = <Parameters extends Schema.Top, Success extends Schema.Top>(
-  toolkits: ReadonlyArray<TransferToolkit<Parameters, Success>>,
-): ClosedToolSet<never, Tool.Any> => {
-  const entries = new Map<
-    string,
-    { readonly tool: Tool.Any; readonly invoke: (params: unknown) => TransferInvocation }
-  >()
+const mergeHandoffTools = (toolkits: ReadonlyArray<HandoffToolkit>): ClosedToolSet<never, Tool.Any> => {
+  const entries = new Map<string, HandoffToolkit>()
   for (const toolkit of toolkits) {
-    for (const name of Object.keys(toolkit.tools)) {
-      const tool = toolkit.tools[name]
-      if (tool !== undefined && !entries.has(name)) {
-        entries.set(name, { tool, invoke: (params) => toolkit.invoke(params) })
-      }
-    }
+    if (!entries.has(toolkit.name)) entries.set(toolkit.name, toolkit)
   }
   const tools: Record<string, Tool.Any> = {}
   for (const [name, entry] of entries) tools[name] = entry.tool
@@ -145,24 +137,23 @@ const mergeHandled = <Parameters extends Schema.Top, Success extends Schema.Top>
   }
 }
 
-/** @experimental Build a `transfer_to_<agent.name>` same-process handoff tool. */
-export const transferTool: {
-  <Parameters extends Schema.Top = DefaultTransferParameters, Success extends Schema.Top = typeof Schema.String>(
-    options?: TransferOptions<Parameters, Success>,
+export const delegateTool: {
+  <Parameters extends Schema.Top = DefaultDelegateParameters, Success extends Schema.Top = typeof Schema.String>(
+    options?: DelegateOptions<Parameters, Success>,
   ): (target: Registration) => AgentToolToolkit<string, Parameters, Success, never>
-  <Parameters extends Schema.Top = DefaultTransferParameters, Success extends Schema.Top = typeof Schema.String>(
+  <Parameters extends Schema.Top = DefaultDelegateParameters, Success extends Schema.Top = typeof Schema.String>(
     target: Registration,
-    options?: TransferOptions<Parameters, Success>,
+    options?: DelegateOptions<Parameters, Success>,
   ): AgentToolToolkit<string, Parameters, Success, never>
 } = Function.dual(
   (args) => args.length !== 1 || "run" in args[0],
-  <Parameters extends Schema.Top = DefaultTransferParameters, Success extends Schema.Top = typeof Schema.String>(
-    target: Registration,
-    options: TransferOptions<Parameters, Success> = {},
+  <Parameters extends Schema.Top = DefaultDelegateParameters, Success extends Schema.Top = typeof Schema.String>(
+    registration: Registration,
+    options: DelegateOptions<Parameters, Success> = {},
   ): AgentToolToolkit<string, Parameters, Success, never> =>
-    asTool(target, {
-      name: options.nameOverride ?? transferName(target.name),
-      description: options.description ?? `Transfer to ${target.name}`,
+    asTool(registration, {
+      name: options.nameOverride ?? `delegate_to_${registration.name}`,
+      description: options.description ?? `Delegate to ${registration.name} as an inline child run`,
       ...(options.parameters === undefined ? {} : { parameters: options.parameters }),
       ...(options.success === undefined ? {} : { success: options.success }),
       ...(options.toPrompt === undefined ? {} : { toPrompt: options.toPrompt }),
@@ -170,7 +161,21 @@ export const transferTool: {
     }),
 )
 
-/** @experimental Run isolated registered agents concurrently and preserve input order. */
+export const sameRunHandoffTool = (handoffTarget: HandoffTarget, options: HandoffToolOptions = {}): HandoffToolkit => {
+  const spec = handoffToolSpec(handoffTarget, options)
+  registerHandoffToolMeta(spec.tool.name, {
+    specialist: spec.specialist,
+    ...(spec.projection === undefined ? {} : { projection: spec.projection }),
+    ...(spec.maxRepeatedEdge === undefined ? {} : { maxRepeatedEdge: spec.maxRepeatedEdge }),
+  })
+  return {
+    name: spec.tool.name,
+    tool: spec.tool,
+    tools: { [spec.tool.name]: spec.tool },
+    invoke: () => Effect.fail("Same-run handoff tools execute through the agent loop, not direct invocation"),
+  }
+}
+
 export const fanOut: {
   (
     options: FanOutOptions,
@@ -195,11 +200,10 @@ export const fanOut: {
     ),
 )
 
-/** @experimental Build a supervisor agent plus handled transfer-tool toolkit. */
 export const supervisor = (options: SupervisorOptions): Supervisor<never> => {
   const specialists = options.specialists
-  const transferTools = specialists.map((specialist) => transferTool(specialist))
-  const toolkit = mergeHandled(transferTools)
+  const handoffTools = specialists.map((specialist) => sameRunHandoffTool(specialist, options.handoffOptions ?? {}))
+  const toolkit = mergeHandoffTools(handoffTools)
   const agent = make({
     name: options.name,
     ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
@@ -209,13 +213,24 @@ export const supervisor = (options: SupervisorOptions): Supervisor<never> => {
   return {
     agent: {
       ...agent,
-      toolDeclarations: Array.zip(specialists, transferTools).flatMap(([specialist, transfer]) =>
-        Object.values(transfer.tools).map((tool) => ({
+      toolDeclarations: Array.zip(specialists, handoffTools).flatMap(([specialist, handoff]) =>
+        Object.values(handoff.tools).map((tool) => ({
           tool,
-          origin: { _tag: "Handoff" as const, specialist: specialist.name },
+          origin: { _tag: "Handoff" as const, specialist: specialist.name, mode: "same-run" as const },
         })),
       ),
     },
     toolkit,
+    catalog: layerCatalog(specialists),
   }
 }
+
+export { target, layerCatalog, HandoffCatalog, type HandoffTarget } from "./handoff-target.js"
+export {
+  HandoffInput,
+  HandoffOutput,
+  defaultContextProjection,
+  filterContextProjection,
+  HandoffProjectionInvalid,
+} from "./handoff-projection.js"
+export { executeSameRunHandoff, HandoffRejected } from "./handoff-runtime.js"

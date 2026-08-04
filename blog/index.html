@@ -1,0 +1,1273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Killing Relay: Baton Native Runtime</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --surface: #171a22;
+        --surface2: #1e222d;
+        --border: #2a3140;
+        --text: #e8ecf4;
+        --muted: #9aa6bd;
+        --accent: #6ea8fe;
+        --accent2: #7ee787;
+        --warn: #f0b86e;
+        --bad: #ff7b72;
+        --good: #7ee787;
+        --code-bg: #12151c;
+        --max: 44rem;
+        --toc-w: 16rem;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        -webkit-text-size-adjust: 100%;
+        overflow-x: hidden;
+      }
+      body {
+        margin: 0;
+        width: 100%;
+        overflow-x: hidden;
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        font-size: 18px;
+        line-height: 1.65;
+        color: var(--text);
+        background: var(--bg);
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .mobile-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        padding: 0.65rem 1rem;
+        padding-top: max(0.65rem, env(safe-area-inset-top));
+        background: rgba(15, 17, 23, 0.92);
+        border-bottom: 1px solid var(--border);
+        backdrop-filter: blur(8px);
+      }
+      .mobile-bar-title {
+        font-size: 0.82rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .toc-open {
+        flex-shrink: 0;
+        appearance: none;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        color: var(--text);
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 500;
+        padding: 0.45rem 0.75rem;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .toc-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        background: rgba(0, 0, 0, 0.55);
+      }
+      .toc-overlay.open {
+        display: block;
+      }
+      .toc-drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 50;
+        width: min(100vw, 20rem);
+        height: 100%;
+        height: 100dvh;
+        overflow: auto;
+        padding: 1rem 1rem 2rem;
+        padding-top: max(1rem, env(safe-area-inset-top));
+        background: var(--surface);
+        border-left: 1px solid var(--border);
+        transform: translateX(100%);
+        transition: transform 0.2s ease;
+      }
+      .toc-drawer.open {
+        transform: translateX(0);
+      }
+      .toc-drawer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+      }
+      .toc-drawer-head h2 {
+        margin: 0;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .toc-drawer ol {
+        margin: 0;
+        padding-left: 1.1rem;
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+      .toc-drawer li {
+        margin: 0.5rem 0;
+      }
+      .toc-drawer a {
+        color: var(--text);
+      }
+      .toc-close {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        font-size: 1.5rem;
+        line-height: 1;
+        padding: 0.25rem;
+        cursor: pointer;
+      }
+      .layout {
+        display: block;
+        width: 100%;
+        min-height: 100vh;
+      }
+      @media (min-width: 960px) {
+        .mobile-bar,
+        .toc-overlay,
+        .toc-drawer {
+          display: none !important;
+        }
+        .layout {
+          display: grid;
+          grid-template-columns: var(--toc-w) 1fr;
+        }
+      }
+      nav.toc {
+        display: none;
+      }
+      @media (min-width: 960px) {
+        nav.toc {
+          display: block;
+          position: sticky;
+          top: 0;
+          align-self: start;
+          max-height: 100vh;
+          overflow: auto;
+          padding: 1.25rem 1rem 2rem;
+          border-right: 1px solid var(--border);
+          background: var(--surface);
+          font-size: 0.82rem;
+        }
+      }
+      nav.toc h2 {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin: 0 0 0.75rem;
+      }
+      nav.toc ol {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+      nav.toc li {
+        margin: 0.35rem 0;
+      }
+      nav.toc a {
+        color: var(--muted);
+      }
+      nav.toc a:hover {
+        color: var(--text);
+      }
+      main {
+        width: 100%;
+        max-width: 100%;
+        padding: 1rem 1rem 4rem;
+        padding-bottom: max(4rem, env(safe-area-inset-bottom));
+      }
+      @media (min-width: 640px) {
+        main {
+          padding: 2rem 1.5rem 5rem;
+        }
+      }
+      @media (min-width: 960px) {
+        main {
+          max-width: calc(var(--max) + 2.5rem);
+          padding: 2.5rem 2rem 5rem;
+        }
+      }
+      header.hero {
+        margin-bottom: 2.5rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid var(--border);
+      }
+      header.hero .eyebrow {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--accent);
+        margin-bottom: 0.5rem;
+      }
+      header.hero h1 {
+        font-size: clamp(1.75rem, 5vw, 2.35rem);
+        line-height: 1.15;
+        margin: 0 0 1rem;
+        font-weight: 700;
+      }
+      header.hero p.lede {
+        font-size: 1.05rem;
+        color: var(--muted);
+        margin: 0;
+        max-width: none;
+      }
+      @media (min-width: 960px) {
+        header.hero p.lede {
+          max-width: 38rem;
+        }
+      }
+      header.hero .meta {
+        margin-top: 1.25rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      h2 {
+        font-size: 1.45rem;
+        margin: 2.75rem 0 1rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--border);
+        scroll-margin-top: 3.5rem;
+      }
+      @media (min-width: 960px) {
+        h2 {
+          scroll-margin-top: 1rem;
+        }
+      }
+      h3 {
+        font-size: 1.12rem;
+        margin: 1.75rem 0 0.65rem;
+        color: var(--text);
+      }
+      h4 {
+        font-size: 0.95rem;
+        margin: 1.25rem 0 0.5rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      p {
+        margin: 0 0 1rem;
+      }
+      ul,
+      ol {
+        margin: 0 0 1rem;
+        padding-left: 1.35rem;
+      }
+      li {
+        margin: 0.35rem 0;
+      }
+      strong {
+        font-weight: 600;
+        color: #fff;
+      }
+      .callout {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        padding: 1rem 1.1rem;
+        margin: 1.25rem 0;
+        border-radius: 0 6px 6px 0;
+        font-size: 0.95rem;
+      }
+      .callout.warn {
+        border-left-color: var(--warn);
+      }
+      .callout.good {
+        border-left-color: var(--good);
+      }
+      .callout.bad {
+        border-left-color: var(--bad);
+      }
+      .compare {
+        display: grid;
+        gap: 1rem;
+        margin: 1.25rem 0;
+      }
+      @media (min-width: 720px) {
+        .compare {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .compare > div {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem;
+      }
+      .compare h4 {
+        margin-top: 0;
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 0.88rem;
+        color: var(--accent);
+      }
+      .compare.bad h4 {
+        color: var(--bad);
+      }
+      .compare.good h4 {
+        color: var(--good);
+      }
+      pre {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.85rem;
+        overflow-x: auto;
+        max-width: 100%;
+        margin: 1rem 0 1.25rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.72rem;
+        line-height: 1.5;
+        tab-size: 2;
+        -webkit-overflow-scrolling: touch;
+      }
+      @media (min-width: 640px) {
+        pre {
+          padding: 1rem;
+          font-size: 0.78rem;
+          line-height: 1.55;
+        }
+      }
+      code {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.84em;
+      }
+      p code,
+      li code {
+        background: var(--code-bg);
+        padding: 0.12em 0.35em;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+      }
+      .kw {
+        color: #ff7b72;
+      }
+      .ty {
+        color: #79c0ff;
+      }
+      .fn {
+        color: #d2a8ff;
+      }
+      .st {
+        color: #a5d6ff;
+      }
+      .cm {
+        color: #8b949e;
+      }
+      .op {
+        color: #ffa657;
+      }
+      .table-wrap {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        margin: 1rem 0 1.5rem;
+        -webkit-overflow-scrolling: touch;
+      }
+      table {
+        width: 100%;
+        min-width: 28rem;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.65rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--surface2);
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .diagram {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin: 1.25rem 0;
+        overflow-x: auto;
+        max-width: 100%;
+        -webkit-overflow-scrolling: touch;
+      }
+      .diagram .mermaid {
+        display: flex;
+        justify-content: flex-start;
+        min-width: min-content;
+      }
+      .diagram svg {
+        max-width: none;
+        height: auto;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 0.72rem;
+        padding: 0.15em 0.45em;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        margin-right: 0.35rem;
+        vertical-align: middle;
+      }
+      .tag.done {
+        border-color: #238636;
+        color: var(--good);
+      }
+      .tag.plan {
+        border-color: #8957e5;
+        color: #d2a8ff;
+      }
+      footer {
+        margin-top: 3rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border);
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mobile-bar">
+      <div class="mobile-bar-title">Baton Native Runtime</div>
+      <button type="button" class="toc-open" id="toc-open" aria-expanded="false" aria-controls="toc-drawer">
+        Contents
+      </button>
+    </div>
+    <div class="toc-overlay" id="toc-overlay"></div>
+    <aside class="toc-drawer" id="toc-drawer" aria-label="Table of contents">
+      <div class="toc-drawer-head">
+        <h2>Contents</h2>
+        <button type="button" class="toc-close" id="toc-close" aria-label="Close contents">×</button>
+      </div>
+      <ol id="toc-drawer-list"></ol>
+    </aside>
+    <div class="layout">
+      <nav class="toc" aria-label="Table of contents">
+        <h2>Contents</h2>
+        <ol>
+          <li><a href="#summary">Executive summary</a></li>
+          <li><a href="#story">The story so far</a></li>
+          <li><a href="#relay-problems">What went wrong with Relay</a></li>
+          <li><a href="#three-vocabularies">Three vocabularies</a></li>
+          <li><a href="#target">The target architecture</a></li>
+          <li><a href="#decisions">Decision log</a></li>
+          <li><a href="#alternatives">Alternatives we rejected</a></li>
+          <li><a href="#sql-kernel">The SQL kernel</a></li>
+          <li><a href="#interfaces">Interface catalog</a></li>
+          <li><a href="#old-vs-new">Old vs new code</a></li>
+          <li><a href="#multi-agent">Multi-agent model</a></li>
+          <li><a href="#events">One event stream</a></li>
+          <li><a href="#driver">Durable driver</a></li>
+          <li><a href="#rika">Rika migration</a></li>
+          <li><a href="#invariants">Non-negotiable invariants</a></li>
+          <li><a href="#status">Implementation status</a></li>
+          <li><a href="#phases">Phases ahead</a></li>
+        </ol>
+      </nav>
+
+      <main>
+        <header class="hero">
+          <div class="eyebrow">Architecture · August 2026</div>
+          <h1>Killing Relay: Building a Baton-Native Runtime</h1>
+          <p class="lede">
+            A long-form decision record on why Relay became too big, what we learned, and how Baton becomes the only
+            durable agent framework Rika builds on — with fewer concepts, one authority, and Effect-native semantics end
+            to end.
+          </p>
+          <p class="meta">Branch <code>feat/native-runtime</code> · Baton 0.13.1 · Effect 4.0.0-beta.98</p>
+        </header>
+
+        <section id="summary">
+          <h2>Executive summary</h2>
+          <p>
+            <strong>Relay</strong> started as the durable, addressable agent layer on top of Baton. It grew into a full
+            platform: address books, envelopes, executions, workflows, fan-out hosts, session registries, cluster
+            topology, and dozens of Postgres tables — plus a fat SDK and a fat Rika adapter on top.
+          </p>
+          <p>
+            <strong>The fix</strong> is not Relay v2 in a new repo. The fix is to fold durability into Baton itself as
+            <code>@batonfx/runtime</code>, keep the agent loop in <code>@batonfx/core</code>, delete Relay, and rebuild
+            Rika on a thin <code>TurnExecution</code> seam — not another Relay-shaped adapter.
+          </p>
+          <div class="callout good">
+            <strong>North star:</strong> Baton is the AI agent framework in the Effect ecosystem — single agent,
+            multi-agent, and addressable agent-to-agent — with memory, SQLite, Postgres, and MySQL backends. One event
+            log. One Run authority. No second scheduler.
+          </div>
+        </section>
+
+        <section id="story">
+          <h2>The story so far</h2>
+          <div class="diagram">
+            <pre class="mermaid">
+flowchart TB
+  subgraph today["Today (being removed)"]
+    R1[Rika TUI / CLI]
+    RS[rika-server]
+    EB[ExecutionBackend ~20 methods]
+    SDK["@relayfx/sdk Client"]
+    RT[Relay runtime]
+    CL[Effect Cluster + Workflow]
+    PG[(Postgres)]
+    B1[Baton Agent loop]
+    R1 --> RS --> EB --> SDK --> RT --> CL --> PG
+    RT --> B1
+  end
+
+  subgraph target["Target"]
+    R2[Rika client]
+    RS2[rika-server]
+    TE[TurnExecution 5 methods]
+    RUN["@batonfx/runtime"]
+    CORE["@batonfx/core"]
+    SQL[(Memory / SQLite / Postgres)]
+    R2 --> RS2 --> TE --> RUN --> SQL
+    RUN --> CORE
+  end
+          </pre
+            >
+          </div>
+          <p>
+            Rika was always meant to be a product: threads, turns, TUI, workspace policy. Baton was always meant to be
+            the agent framework: loop, tools, models, budgets. Relay sat in the middle and eventually
+            <em>owned</em> durability, addressing, multi-agent orchestration, transport framing, and half the vocabulary
+            Rika needed to translate anyway.
+          </p>
+          <p>
+            Every bug, every performance investigation, every "why does restart do X?" question had to cross three
+            layers. That is the core failure mode we are fixing.
+          </p>
+        </section>
+
+        <section id="relay-problems">
+          <h2>What went wrong with Relay</h2>
+          <p>
+            Relay is not "bad code." It is <strong>too many independent concepts</strong> for what we actually need.
+          </p>
+
+          <h3>Concept sprawl</h3>
+          <p>Relay currently owns all of this as separate domains:</p>
+          <ul>
+            <li>Address book and route attempts</li>
+            <li>Envelopes (fire-and-forget messages)</li>
+            <li>Executions (durable runs)</li>
+            <li>Event log and cursors</li>
+            <li>Waits and approvals</li>
+            <li>Workflows and activities</li>
+            <li>Child executions and fan-out state</li>
+            <li>Tool calls, attempts, placement, results</li>
+            <li>Sessions and session entries</li>
+            <li>Context epochs, durable memory, permissions</li>
+            <li>Steering, compaction, skills, schedules</li>
+            <li>Workspaces and cluster topology</li>
+          </ul>
+
+          <h3>Two recovery authorities</h3>
+          <p>
+            Relay built on Effect Cluster and Workflow. Baton has its own agent loop with nondeterministic operations
+            (model calls, tools, compaction). Cluster gives you shards and RPC mailboxes; Workflow gives you activities
+            — but neither gives you:
+          </p>
+          <ul>
+            <li>Monotonic worker fencing the way Baton needs</li>
+            <li>Explicit <code>unknown</code> outcomes for non-idempotent external effects</li>
+            <li>Independent multi-client cursors on one Run stream</li>
+            <li>FIFO per <code>(Address, Session)</code> without control deadlock</li>
+          </ul>
+          <p>
+            Using Cluster would mean <strong>two recovery journals</strong>: Cluster/Workflow state plus everything
+            Baton still has to store for Run truth.
+          </p>
+
+          <h3>Adapter tax on Rika</h3>
+          <p>
+            Rika added <code>@rika/relay-execution</code> — a package whose job is translating product turns into Relay
+            executions, Relay events into product events, Relay IDs into turn IDs, and re-registering agents every turn.
+            The product contract ( <code>ExecutionBackend</code>) has ~20 methods because it mirrors Relay, not Rika.
+          </p>
+
+          <div class="callout bad">
+            <strong>Symptom:</strong> Resident idle CPU dominated by scheduler polling. Resident RSS in the hundreds of
+            MB. 208ms CPU per Relay event in benchmarks. Three vocabularies in every stack trace.
+          </div>
+        </section>
+
+        <section id="three-vocabularies">
+          <h2>Three vocabularies</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Layer</th>
+                  <th>Vocabulary</th>
+                  <th>Example identifiers</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Baton core</td>
+                  <td>Agent, Prompt, Tool, AgentEvent, suspension</td>
+                  <td>tool-call id, model attempt</td>
+                </tr>
+                <tr>
+                  <td>Relay</td>
+                  <td>Execution, Envelope, AddressBook, Workflow, Session</td>
+                  <td><code>execution_id</code>, <code>address_id</code>, cursors</td>
+                </tr>
+                <tr>
+                  <td>Rika product</td>
+                  <td>Turn, Thread, ExecutionBackend, TurnEvent</td>
+                  <td><code>turnId</code>, <code>threadId</code>, route snapshot</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Every feature required picking <em>which</em> vocabulary owns truth, then writing adapters to keep the
+            others consistent. The replacement keeps durable facts in one place:
+            <strong>Run + RunEvent + RunStore</strong>.
+          </p>
+        </section>
+
+        <section id="target">
+          <h2>The target architecture</h2>
+          <p>Three layers. Thin adapters on top. Relay archived.</p>
+
+          <div class="diagram">
+            <pre class="mermaid">
+flowchart LR
+  subgraph adapters["Thin adapters"]
+    SSE[SSE / WebSocket]
+    AGUI[AG-UI]
+    A2A[A2A v1]
+    RIKA[Rika TurnExecution]
+  end
+
+  subgraph runtime["@batonfx/runtime"]
+    ADDR[Address]
+    MSG[Message]
+    RUN[Run]
+    EVT[RunEvent]
+    STORE[RunStore]
+  end
+
+  subgraph core["@batonfx/core"]
+    AGENT[Agent loop]
+    REF[AgentRef]
+    BUD[RunBudget]
+    DRV[DurableAgentDriver]
+  end
+
+  adapters --> runtime --> core
+  STORE --> SQL[(SQL kernel)]
+          </pre
+            >
+          </div>
+
+          <h3>Package responsibilities</h3>
+          <ul>
+            <li>
+              <strong>@batonfx/core</strong> — Agent loop, tools, inline children, same-run handoffs, driver
+              checkpoints, budgets, typed approval/suspension. Can run without Runtime.
+            </li>
+            <li>
+              <strong>@batonfx/runtime</strong> — Address, Message, finite Run, RunEvent, durable children, waits,
+              signals, cancellation, joins, memory/SQLite/Postgres stores, worker claims.
+            </li>
+            <li>
+              <strong>Adapters</strong> — Transport (RunEvent SSE/WS), AG-UI, A2A, Rika <code>TurnExecution</code>.
+              Projections only — no second event log.
+            </li>
+          </ul>
+        </section>
+
+        <section id="decisions">
+          <h2>Decision log</h2>
+
+          <h3>1. Clean break, not Relay v2</h3>
+          <p>
+            We preserve <strong>product behavior</strong> (Rika turns, streaming, restart, subagents, review fan-out)
+            but not Relay APIs, schemas, migrations, cursors, or runtime composition. Migrate Rika atomically, then
+            delete Relay contracts and data paths.
+          </p>
+
+          <h3>2. One logical cluster, defer federation</h3>
+          <p>
+            Multi-cluster in v1 means: one logical cluster across many nodes, separate deployments isolated.
+            Cross-cluster federation is deferred.
+          </p>
+
+          <h3>3. Address = durable mailbox</h3>
+          <p>When a local agent address receives a message, it means:</p>
+          <ul>
+            <li>Persist every envelope</li>
+            <li>Serialize delivery per address/conversation</li>
+            <li>Start or resume finite runs</li>
+            <li>Support correlated replies</li>
+          </ul>
+
+          <h3>4. Baton-owned SQL kernel wins</h3>
+          <p>
+            Not Effect Cluster as canonical scheduler. Not Rivet Engine. Not DBOS/Restate/Temporal as a second backend.
+            A normalized six-table state machine Baton owns, with Effect SQL drivers for memory, SQLite, Postgres, and
+            eventually MySQL.
+          </p>
+
+          <h3>5. Strip Relay from Rika <em>before</em> building the Baton adapter</h3>
+          <p>
+            Do not shape Baton to fit Relay's substrate. Rip Relay out, define
+            <code>TurnExecution</code> from product needs only, ship test/unavailable layers, then compose Baton from
+            first principles.
+          </p>
+
+          <h3>6. Keep rika-server, delete resident naming</h3>
+          <p>
+            Rika still needs a local server process (profile owner, SQLite owner, background work, multi-client,
+            migrations). It becomes thin: composes <code>@batonfx/runtime</code> instead of Relay. Activity Monitor
+            shows <code>rika-server</code> and <code>rika-client</code>.
+          </p>
+        </section>
+
+        <section id="alternatives">
+          <h2>Alternatives we rejected</h2>
+
+          <h3>Effect Cluster + Workflow</h3>
+          <p><span class="tag">rejected</span> Would remain a second scheduler and second recovery journal.</p>
+          <ul>
+            <li><code>RunnerStorage.acquire</code> returns shard IDs, not monotonic ownership fences</li>
+            <li>Workflow engine correlates activities through process-local maps</li>
+            <li>No explicit unknown external outcome for replay safety</li>
+            <li>RPC chunks ≠ independent Run cursors for multiple clients</li>
+            <li>Baton would still need Run state, operations, waits, links, RunEvent history</li>
+          </ul>
+
+          <h3>Rivet Actors</h3>
+          <p>
+            <span class="tag">rejected</span> Strong ideas retained (keyed ownership, hibernation,
+            append-before-notify).
+          </p>
+          <ul>
+            <li>Local use still requires Rivet Engine</li>
+            <li>Multi-node adds Postgres + NATS</li>
+            <li>No MySQL backend</li>
+            <li>Queue entries removed on receive, not ack-after-process</li>
+            <li>Realtime events are not a durable cursor log</li>
+          </ul>
+
+          <h3>DBOS / Restate / Temporal</h3>
+          <p><span class="tag">rejected</span> Best if we changed product constraints.</p>
+          <ul>
+            <li>DBOS: best if Postgres-only forever</li>
+            <li>Restate: best if service-first forever</li>
+            <li>Neither preserves memory + SQLite + Postgres + MySQL + Effect streaming + exact RunEvent contract</li>
+          </ul>
+
+          <h3>Three-table JSON blob design</h3>
+          <p>
+            <span class="tag">rejected</span> Waits, links, timers, and worker claims need independent constraints and
+            indexes across dialects.
+          </p>
+        </section>
+
+        <section id="sql-kernel">
+          <h2>The SQL kernel</h2>
+          <p>Six normalized correctness tables. Migration metadata is separate.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Table</th>
+                  <th>Purpose</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>baton_lanes</code></td>
+                  <td>FIFO admission per (Address, Session)</td>
+                </tr>
+                <tr>
+                  <td><code>baton_runs</code></td>
+                  <td>Run identity, status, pinned AgentRef, fence</td>
+                </tr>
+                <tr>
+                  <td><code>baton_run_events</code></td>
+                  <td>Canonical append-only RunEvent stream</td>
+                </tr>
+                <tr>
+                  <td><code>baton_run_operations</code></td>
+                  <td>Driver operations for replay</td>
+                </tr>
+                <tr>
+                  <td><code>baton_run_waits</code></td>
+                  <td>Approvals, external waits, request/reply CAS</td>
+                </tr>
+                <tr>
+                  <td><code>baton_run_links</code></td>
+                  <td>Parent/child, fan-out membership</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="diagram">
+            <pre class="mermaid">
+stateDiagram-v2
+  [*] --> Pending: Message accepted
+  Pending --> Running: Worker claims head
+  Running --> Waiting: Suspend / approval / external wait
+  Waiting --> Running: respond / signal / reply
+  Running --> Completed: terminal success
+  Running --> Failed: terminal failure
+  Running --> Cancelled: cancel
+  Waiting --> Cancelled: cancel
+          </pre
+            >
+          </div>
+
+          <h3>Migration posture</h3>
+          <ul>
+            <li><strong>SQLite:</strong> automatic migration at layer acquisition (embedded, single-process)</li>
+            <li>
+              <strong>Postgres / MySQL:</strong> verify-only at startup; explicit predeploy
+              <code>plan/check/apply</code>
+            </li>
+          </ul>
+        </section>
+
+        <section id="interfaces">
+          <h2>Interface catalog</h2>
+
+          <h3>Runtime <span class="tag done">implemented</span></h3>
+          <pre><code><span class="kw">export interface</span> <span class="ty">Interface</span> {
+  <span class="kw">readonly</span> <span class="fn">send</span>: (input: <span class="ty">SendInput</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="ty">RunReceipt</span>, <span class="ty">SendError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">spawn</span>: (input: <span class="ty">SpawnInput</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="ty">RunReceipt</span>, <span class="ty">SpawnError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">events</span>: (input: <span class="ty">EventsInput</span>) =&gt; <span class="ty">Stream</span>.<span class="ty">Stream</span>&lt;<span class="ty">RunEvent</span>, <span class="ty">EventsError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">respond</span>: (input: <span class="ty">RespondInput</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="kw">void</span>, <span class="ty">RespondError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">signal</span>: (input: <span class="ty">SignalInput</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="kw">void</span>, <span class="ty">SignalError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">cancel</span>: (input: <span class="ty">CancelInput</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="kw">void</span>, <span class="ty">CancelError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">inspect</span>: (runId: <span class="ty">string</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="ty">RunInspection</span>, <span class="ty">InspectError</span>&gt;
+}</code></pre>
+          <p>No blocking <code>ask</code>. Request/reply is nonblocking: sender opens a wait on its own Run.</p>
+
+          <h3>TurnExecution (Rika) <span class="tag plan">planned</span></h3>
+          <pre><code><span class="kw">export interface</span> <span class="ty">TurnExecution</span> {
+  <span class="kw">readonly</span> <span class="fn">start</span>: (input: <span class="ty">StartTurnInput</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="ty">TurnRun</span>, <span class="ty">TurnExecutionError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">follow</span>: (input: <span class="ty">FollowTurnInput</span>) =&gt; <span class="ty">Stream</span>.<span class="ty">Stream</span>&lt;<span class="ty">TurnEvent</span>, <span class="ty">TurnExecutionError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">cancel</span>: (turnId: <span class="ty">string</span>, reason?: <span class="ty">string</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="kw">void</span>, <span class="ty">TurnExecutionError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">steer</span>: (turnId: <span class="ty">string</span>, prompt: <span class="ty">Prompt</span>.<span class="ty">Prompt</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="kw">void</span>, <span class="ty">TurnExecutionError</span>&gt;
+  <span class="kw">readonly</span> <span class="fn">inspect</span>: (turnId: <span class="ty">string</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="ty">TurnRun</span> | <span class="kw">undefined</span>, <span class="ty">TurnExecutionError</span>&gt;
+}</code></pre>
+
+          <h3>AgentRef <span class="tag done">implemented</span></h3>
+          <pre><code><span class="kw">const</span> ref = <span class="ty">AgentRef</span>.<span class="fn">fromAgent</span>(assistant, <span class="st">"2026-08-03"</span>)
+<span class="kw">const</span> encoded = <span class="kw">yield</span>* <span class="ty">AgentRef</span>.<span class="fn">encode</span>(ref)
+<span class="kw">yield</span>* <span class="ty">AgentRef</span>.<span class="fn">requireMatch</span>(ref, decoded)</code></pre>
+          <p>
+            Every durable Run pins manifest digest, model, tools, TurnPolicy, budget. Same version + changed manifest
+            fails before acceptance.
+          </p>
+
+          <h3>Address messaging <span class="tag plan">request/reply planned</span></h3>
+          <pre><code><span class="kw">const</span> request = <span class="kw">yield</span>* <span class="ty">AddressMessaging</span>.<span class="fn">request</span>({
+  senderRunId,
+  to: <span class="ty">Address</span>.<span class="fn">make</span>(<span class="st">"agent:researcher"</span>),
+  sessionId: <span class="st">"session:task:42"</span>,
+  idempotencyKey: <span class="st">"task:42:request:1"</span>,
+  correlationId: <span class="st">"task:42"</span>,
+  prompt: <span class="st">"Find primary sources."</span>,
+  timeout: <span class="st">"10 minutes"</span>,
+})
+
+<span class="kw">yield</span>* <span class="ty">AddressMessaging</span>.<span class="fn">reply</span>({
+  recipientRunId,
+  toRunId: request.senderRunId,
+  waitId: request.waitId,
+  idempotencyKey: <span class="st">"task:42:reply:1"</span>,
+  prompt: <span class="st">"Sources attached."</span>,
+})</code></pre>
+        </section>
+
+        <section id="old-vs-new">
+          <h2>Old vs new code</h2>
+
+          <h3>Starting work</h3>
+          <div class="compare">
+            <div class="compare bad">
+              <h4>Relay (today)</h4>
+              <pre><code><span class="kw">yield</span>* client.agents.<span class="fn">register</span>({
+  id: agentId,
+  address: addressId,
+  model, tools, permissions,
+  child_run_presets, ...
+})
+
+<span class="kw">yield</span>* client.executions
+  .<span class="fn">startByAgentDefinition</span>({
+    agent_id: agentId,
+    agent_revision: registered.revision,
+    idempotency_key: turnId,
+    execution_id: id,
+    ...
+  })</code></pre>
+            </div>
+            <div class="compare good">
+              <h4>Baton runtime</h4>
+              <pre><code><span class="kw">const</span> receipt = <span class="kw">yield</span>* runtime.<span class="fn">send</span>({
+  to: <span class="ty">Address</span>.<span class="fn">make</span>(<span class="st">"agent:rika"</span>),
+  sessionId: <span class="st">"thread:1"</span>,
+  idempotencyKey: <span class="st">"turn:abc"</span>,
+  prompt: userPrompt,
+})
+
+<span class="kw">yield</span>* runtime.<span class="fn">events</span>({
+  runId: receipt.runId
+}).<span class="fn">pipe</span>(Stream.runCollect)</code></pre>
+            </div>
+          </div>
+
+          <h3>Agent-to-agent</h3>
+          <div class="compare">
+            <div class="compare bad">
+              <h4>Relay</h4>
+              <pre><code><span class="kw">yield</span>* Client.<span class="fn">registerAddressBookRoute</span>({
+  address_id: to,
+  route: { kind: <span class="st">"local-agent"</span>, ... }
+})
+
+<span class="kw">yield</span>* Client.<span class="fn">send</span>({
+  from, to,
+  content: [Content.<span class="fn">text</span>(<span class="st">"..."</span>)],
+  correlation_key: <span class="st">"task:42"</span>,
+})
+
+<span class="kw">yield</span>* Client.<span class="fn">startExecutionByAddress</span>({
+  address_id: to,
+  idempotency_key: <span class="st">"task:42:1"</span>,
+})</code></pre>
+            </div>
+            <div class="compare good">
+              <h4>Baton</h4>
+              <pre><code><span class="kw">yield</span>* runtime.<span class="fn">send</span>({
+  from: <span class="ty">Address</span>.<span class="fn">make</span>(<span class="st">"agent:planner"</span>),
+  to: <span class="ty">Address</span>.<span class="fn">make</span>(<span class="st">"agent:researcher"</span>),
+  sessionId: <span class="st">"session:task:42"</span>,
+  idempotencyKey: <span class="st">"task:42:research:1"</span>,
+  correlationId: <span class="st">"task:42"</span>,
+  prompt: <span class="st">"Find sources."</span>,
+})</code></pre>
+            </div>
+          </div>
+
+          <h3>Following events</h3>
+          <div class="compare">
+            <div class="compare bad">
+              <h4>Relay + transport frames</h4>
+              <pre><code>Client.<span class="fn">streamExecution</span>({
+  execution_id,
+  after_cursor,
+})
+
+<span class="cm">// Plus SessionRegistry</span>
+<span class="cm">// ServerFrame / ClientFrame</span>
+<span class="cm">// Relay ExecutionEvent tags</span></code></pre>
+            </div>
+            <div class="compare good">
+              <h4>One RunEvent stream</h4>
+              <pre><code>runtime.<span class="fn">events</span>({
+  runId,
+  after: cursor,
+}).<span class="fn">pipe</span>(
+  Stream.runForEach(handleRunEvent)
+)
+
+<span class="cm">// SSE/WS replay same stream</span>
+<span class="cm">// AG-UI / A2A = projections</span></code></pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="multi-agent">
+          <h2>Multi-agent model</h2>
+          <p>Four distinct patterns — no longer folded into Relay workflows and child presets.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pattern</th>
+                  <th>Mechanism</th>
+                  <th>Durable?</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Inline child</td>
+                  <td><code>AgentTool</code> in same process</td>
+                  <td>No</td>
+                </tr>
+                <tr>
+                  <td>Same-run handoff</td>
+                  <td><code>Handoff.sameRunHandoffTool</code></td>
+                  <td>Yes (one Run)</td>
+                </tr>
+                <tr>
+                  <td>Durable child</td>
+                  <td><code>runtime.spawn</code></td>
+                  <td>Yes (child Run)</td>
+                </tr>
+                <tr>
+                  <td>Independent A2A</td>
+                  <td><code>send</code> / <code>request</code> / <code>reply</code></td>
+                  <td>Yes (separate Runs)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Fan-out and join</h3>
+          <pre><code><span class="kw">const</span> children = <span class="kw">yield</span>* <span class="ty">ChildRuns</span>.<span class="fn">spawnAll</span>({
+  parentRunId,
+  groupId: <span class="st">"fanout:research"</span>,
+  concurrency: <span class="op">4</span>,
+  children: tasks.<span class="fn">map</span>((task, ordinal) =&gt; ({
+    ordinal,
+    agent: researcherRef,
+    prompt: task,
+    idempotencyKey: <span class="st">`research:${ordinal}`</span>,
+  })),
+})
+
+<span class="kw">yield</span>* <span class="ty">ChildRuns</span>.<span class="fn">join</span>({
+  parentRunId,
+  groupId: <span class="st">"fanout:research"</span>,
+  children: children.<span class="fn">map</span>(c =&gt; c.runId),
+  mode: { _tag: <span class="st">"AllSettled"</span> },
+  remainder: <span class="st">"await"</span>,
+})</code></pre>
+        </section>
+
+        <section id="events">
+          <h2>One event stream</h2>
+          <p>
+            <code>RunEvent</code> extends <code>AgentEvent</code> with run lifecycle, waits, child links, handoffs.
+            Strict per-Run sequence. Stable event IDs. Parent streams contain link/join/ terminal projection facts only
+            — child detail stays in the child stream.
+          </p>
+          <div class="callout">
+            <strong>Transport replacement:</strong> Drop SessionRegistry + parallel frame lifecycle. Direct RunEvent
+            SSE/WebSocket with <code>Last-Event-ID</code>, typed <code>CursorExpired</code>, snapshot recovery, bounded
+            subscriber queues, lag disconnect. No disconnect-implies-cancel.
+          </div>
+        </section>
+
+        <section id="driver">
+          <h2>Durable driver inside the loop</h2>
+          <p>
+            Every nondeterministic operation crosses <code>DurableAgentDriver</code> / <code>DriverInterpreter</code>:
+          </p>
+          <ul>
+            <li>Model attempts</li>
+            <li>Tool execution</li>
+            <li>Compaction (proactive + apply)</li>
+            <li>Memory recall / remember</li>
+            <li>Session sync, structured output</li>
+            <li>Suspension, resume, same-run handoff</li>
+          </ul>
+          <p>
+            Each operation ends as <strong>succeeded</strong>, <strong>failed</strong>, or <strong>unknown</strong>.
+            Unknown non-idempotent operations do not auto-retry.
+          </p>
+
+          <div class="callout good">
+            <strong>Honest guarantee:</strong> Once a Message is durably accepted, exactly one stable RunId is
+            associated with its idempotency key. Run attempts may repeat. Committed state and terminal outcome are
+            linearized once. External effects are effect-once only when the destination honors Baton's stable
+            idempotency key.
+          </div>
+        </section>
+
+        <section id="rika">
+          <h2>Rika migration</h2>
+          <p>Two deliberate stages. Do not skip stage one.</p>
+
+          <div class="diagram">
+            <pre class="mermaid">
+flowchart TD
+  A[Stage 1: Relay-free Rika] --> B[TurnExecution + layerTest]
+  B --> C[Delete relay-execution]
+  C --> D[Delete execution-v2.db paths]
+  D --> E[Production fails typed unavailable]
+  E --> F[Stage 2: Baton adapter]
+  F --> G[Compose Runtime in rika-server]
+  G --> H[Project RunEvent to TurnEvent]
+  H --> I[Archive Relay repo]
+          </pre
+            >
+          </div>
+
+          <h3>Process naming</h3>
+          <ul>
+            <li><code>rika-server</code> — local profile server (<code>bin/rika-server</code>)</li>
+            <li><code>rika-client</code> — CLI/TUI client</li>
+            <li><code>rika-client:&lt;connectionId&gt;</code> — optional after handshake</li>
+          </ul>
+
+          <h3>What Rika product packages keep owning</h3>
+          <ul>
+            <li>Thread, Turn, workspace policy, configuration</li>
+            <li>Product tools, terminal UX, transcript projection</li>
+            <li>Server lifecycle — not Baton, not Relay</li>
+          </ul>
+        </section>
+
+        <section id="invariants">
+          <h2>Non-negotiable invariants</h2>
+          <ul>
+            <li>
+              <strong>One authority:</strong> RunStore only. No Cluster, Rivet, DBOS, Restate, Temporal as coequal
+              paths.
+            </li>
+            <li><strong>Stable RunId:</strong> Survives restart, worker takeover, retry, approval, wait, cancel.</li>
+            <li><strong>One stream per Run:</strong> Canonical RunEvent; adapters are projections.</li>
+            <li>
+              <strong>FIFO without control deadlock:</strong> Lane per (Address, Session); control inputs bypass lane.
+            </li>
+            <li><strong>Fenced ownership:</strong> Stale worker commits zero rows after takeover.</li>
+            <li>
+              <strong>Version pinning:</strong> Unsupported pinned versions fail typed — never silent behavior change.
+            </li>
+          </ul>
+        </section>
+
+        <section id="status">
+          <h2>Implementation status</h2>
+          <p>As of August 3, 2026 on <code>feat/native-runtime</code>.</p>
+
+          <h3><span class="tag done">done</span> Core durable contracts</h3>
+          <p>
+            AgentRef, RunBudget, DurableAgentDriver, DriverInterpreter, same-run handoff, fail-closed approval,
+            Agent.stream integration.
+          </p>
+
+          <h3><span class="tag done">done</span> Runtime package</h3>
+          <p>
+            Address, Message, Run, RunEvent, memory store, SQLite store (auto-migrate), PostgreSQL store (verify-only
+            startup, worker leases, fencing). 563 core tests + runtime suite passing.
+          </p>
+
+          <h3><span class="tag plan">planned</span> Still ahead</h3>
+          <ul>
+            <li>Runtime driver bridge (journal → RunStore → RunEvent emission)</li>
+            <li>Operation/timer workers, wait CAS, parent join, unknown-operation resolution</li>
+            <li>RunEvent SSE/WebSocket transport</li>
+            <li>MySQL parity</li>
+            <li>A2A + AG-UI adapters</li>
+            <li>Rika Relay strip + TurnExecution + Baton composition</li>
+            <li>Relay archive</li>
+          </ul>
+        </section>
+
+        <section id="phases">
+          <h2>Phases ahead</h2>
+          <ol>
+            <li>Stabilize current diff (handoff, formatting, checks)</li>
+            <li>Remove Relay from Rika (TurnExecution, layerTest, delete relay-execution)</li>
+            <li>Runtime driver bridge + kill/restart tests</li>
+            <li>Concurrency semantics (workers, waits, cancellation races)</li>
+            <li>Transport replacement (RunEvent SSE/WS)</li>
+            <li>MySQL backend</li>
+            <li>Protocol adapters (A2A, AG-UI)</li>
+            <li>Build Rika on Baton from first principles</li>
+            <li>Archive Relay</li>
+          </ol>
+
+          <div class="callout warn">
+            <strong>Read next:</strong> <code>PLAN.md</code> and <code>HANDOFF.md</code> in the
+            <code>baton-native-runtime</code> worktree for interface-level acceptance criteria and agent handoff detail.
+          </div>
+        </section>
+
+        <footer>Generated from the Baton native runtime plan · In-Time-Tec/batonfx · feat/native-runtime</footer>
+      </main>
+    </div>
+
+    <script>
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "dark",
+        themeVariables: {
+          primaryColor: "#1e222d",
+          primaryTextColor: "#e8ecf4",
+          primaryBorderColor: "#2a3140",
+          lineColor: "#6ea8fe",
+          secondaryColor: "#171a22",
+          tertiaryColor: "#12151c",
+          fontSize: "14px",
+        },
+        flowchart: { useMaxWidth: true, htmlLabels: true, curve: "basis" },
+      })
+
+      const tocOpen = document.getElementById("toc-open")
+      const tocClose = document.getElementById("toc-close")
+      const tocOverlay = document.getElementById("toc-overlay")
+      const tocDrawer = document.getElementById("toc-drawer")
+      const tocDrawerList = document.getElementById("toc-drawer-list")
+      const desktopToc = document.querySelector("nav.toc ol")
+
+      if (desktopToc && tocDrawerList) {
+        tocDrawerList.innerHTML = desktopToc.innerHTML
+      }
+
+      const setTocOpen = (open) => {
+        tocDrawer.classList.toggle("open", open)
+        tocOverlay.classList.toggle("open", open)
+        tocOpen.setAttribute("aria-expanded", open ? "true" : "false")
+        document.body.style.overflow = open ? "hidden" : ""
+      }
+
+      tocOpen.addEventListener("click", () => setTocOpen(true))
+      tocClose.addEventListener("click", () => setTocOpen(false))
+      tocOverlay.addEventListener("click", () => setTocOpen(false))
+      tocDrawerList.addEventListener("click", (event) => {
+        if (event.target.closest("a")) setTocOpen(false)
+      })
+    </script>
+  </body>
+</html>

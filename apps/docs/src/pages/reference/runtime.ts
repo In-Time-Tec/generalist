@@ -1,0 +1,51 @@
+import { code, command, definePage, h2, lead, link, p, table } from "../../prose"
+
+export const runtimeReference = definePage({
+  path: "/docs/reference/runtime",
+  title: "@batonfx/runtime",
+  navTitle: "runtime",
+  group: "Reference",
+  description: "Addressable Run admission, canonical events, inspection, waits, stores, and workers.",
+  content: [
+    lead("@batonfx/runtime owns the authoritative lifecycle for addressable Baton runs."),
+    command("Install", "bun add @batonfx/core @batonfx/runtime"),
+    p("Published on npm at 0.14.0. All Runtime events and protocol adapters project from this package."),
+    h2("surface", "Core surface"),
+    table(
+      ["Namespace", "Role"],
+      [
+        [[code("Runtime")], "Admission, events, history, listing, waits, signals, cancellation, and inspection"],
+        [[code("RunEvent")], "Canonical persisted lifecycle and agent-loop event schema"],
+        [[code("RunStore")], "Memory and SQLite storage seam"],
+        [[code("RunSchema")], "PostgreSQL schema plan, check, and predeploy apply operations"],
+        [[code("MysqlRunSchema")], "MySQL schema plan, check, predeploy apply, and dirty-state operations"],
+        [[code("RunClaims"), " / ", code("RuntimeWorker")], "Multi-worker claims, leases, and worker loops"],
+        [[code("Address"), " / ", code("AgentRef"), " / ", code("Cursor")], "Schema-backed boundary identities"],
+      ],
+    ),
+    h2("layers", "Runtime layers"),
+    p(
+      code("Runtime.layerMemory"),
+      " is volatile and loses state when its process exits. ",
+      code("Runtime.layerSqlite"),
+      " is durable for one process. ",
+      code("Runtime.layerPostgres"),
+      " and ",
+      code("Runtime.layerMysql"),
+      " support multi-worker claims and require the schema to be applied before Runtime startup. PostgreSQL uses ",
+      code("RunSchema"),
+      "; MySQL 8+ uses ",
+      code("MysqlRunSchema"),
+      ".",
+    ),
+    p(
+      "See ",
+      link("/docs/reference/transport", "transport"),
+      ", ",
+      link("/docs/reference/a2a", "A2A"),
+      ", and ",
+      link("/docs/reference/ag-ui", "AG-UI"),
+      " for projections.",
+    ),
+  ],
+})

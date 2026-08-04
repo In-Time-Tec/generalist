@@ -2,22 +2,17 @@ import { Cause, Context, Effect, Layer, Option, Ref, Result, Schema, Scope, Stre
 import { Socket } from "effect/unstable/socket"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
+import { RunEvent } from "@batonfx/runtime"
 import { Client, Errors, Wire } from "@batonfx/transport"
 
 /** @experimental */
 export const ConnectionOpened: CallableTaggedStruct<"ConnectionOpened", {}> = m("ConnectionOpened")
-
 /** @experimental */
 export const ConnectionLost: CallableTaggedStruct<"ConnectionLost", {}> = m("ConnectionLost")
-
 /** @experimental */
 export const ConnectionFailed: CallableTaggedStruct<
   "ConnectionFailed",
-  {
-    operation: Schema.Literal<"connect">
-    error: typeof Errors.TransportError
-    reason: typeof Schema.String
-  }
+  { operation: Schema.Literal<"connect">; error: typeof Errors.TransportError; reason: typeof Schema.String }
 > = m("ConnectionFailed", {
   operation: Schema.Literal("connect"),
   error: Errors.TransportError,
@@ -26,14 +21,13 @@ export const ConnectionFailed: CallableTaggedStruct<
 
 /** @experimental */
 export type Incoming =
-  | Wire.LooseServerFrameType
+  | RunEvent.RunEvent
   | typeof ConnectionOpened.Type
   | typeof ConnectionLost.Type
   | typeof ConnectionFailed.Type
-
 /** @experimental */
 export const Incoming: Schema.Schema<Incoming> = Schema.Union([
-  Wire.LooseServerFrame,
+  Wire.ObserverRunEvent,
   ConnectionOpened,
   ConnectionLost,
   ConnectionFailed,
@@ -43,28 +37,40 @@ export const Incoming: Schema.Schema<Incoming> = Schema.Union([
 export class SendFailed extends Schema.TaggedErrorClass<SendFailed>()("@batonfx/foldkit/SendFailed", {
   reason: Schema.String,
 }) {}
-
 /** @experimental */
 export const AgentCommandError = Schema.Union([Errors.TransportError, SendFailed])
-
 /** @experimental */
 export type AgentCommandError = typeof AgentCommandError.Type
-
 /** @experimental */
 export const CommandOperation = Schema.Literals(["send", "cancel", "resolveApproval"])
-
 /** @experimental */
 export type CommandOperation = typeof CommandOperation.Type
+
+/** @experimental Commands retained by the UI boundary; canonical transport currently accepts Cancel only. */
+export const AgentCommand = Schema.Union([
+  Schema.Struct({ _tag: Schema.tag("SendMessage"), sessionId: Schema.String, prompt: Schema.String }),
+  Schema.Struct({
+    _tag: Schema.tag("ResolveApproval"),
+    sessionId: Schema.String,
+    token: Schema.String,
+    decision: Schema.Union([
+      Schema.Struct({ _tag: Schema.tag("Approved") }),
+      Schema.Struct({ _tag: Schema.tag("Denied"), reason: Schema.optionalKey(Schema.String) }),
+    ]),
+  }),
+  Schema.Struct({ _tag: Schema.tag("Cancel"), sessionId: Schema.String }),
+])
+/** @experimental */
+export type AgentCommand = typeof AgentCommand.Type
+/** @experimental */
+export type ClientApproval = Extract<AgentCommand, { readonly _tag: "ResolveApproval" }>["decision"]
 
 /** @experimental */
 export interface SessionConnection {
   readonly sessionId: string
   readonly frames: Stream.Stream<Incoming, never>
-  readonly send: (
-    frame: Exclude<Wire.ClientFrameType, { readonly _tag: "Attach" }>,
-  ) => Effect.Effect<void, AgentCommandError>
+  readonly send: (command: AgentCommand) => Effect.Effect<void, AgentCommandError>
 }
-
 /** @experimental */
 export interface Interface {
   readonly session: (options: {
@@ -75,25 +81,18 @@ export interface Interface {
     readonly sessionId: string
     readonly afterSeq?: number
   }) => Stream.Stream<Incoming, never>
-  readonly send: (frame: Wire.ClientFrameType) => Effect.Effect<void, AgentCommandError>
+  readonly send: (command: AgentCommand) => Effect.Effect<void, AgentCommandError>
 }
-
 /** @experimental */
 export class AgentConnection extends Context.Service<AgentConnection, Interface>()(
   "@batonfx/foldkit/AgentConnection",
 ) {}
 
 interface ActiveConnection {
-  readonly sessionId: string
+  readonly runId: string
   readonly connection: Client.Connection
 }
-
 type LegacyInterface = Omit<Interface, "session">
-
-const sendThrough = (
-  connection: Client.Connection,
-  frame: Wire.ClientFrameType,
-): Effect.Effect<void, AgentCommandError> => connection.send(frame)
 
 const unexpectedCause = <E>(cause: Cause.Cause<E>): Option.Option<Cause.Cause<never>> => {
   const reasons: Array<Cause.Reason<never>> = []
@@ -124,14 +123,7 @@ export const layerTest = (implementation: Interface | LegacyInterface): Layer.La
           Effect.succeed<SessionConnection>({
             sessionId: options.sessionId,
             frames: implementation.frames(options),
-            send: (frame) =>
-              frame.sessionId === options.sessionId
-                ? implementation.send(frame)
-                : Effect.fail(
-                    SendFailed.make({
-                      reason: `Session ${options.sessionId} cannot send a command for ${frame.sessionId}`,
-                    }),
-                  ),
+            send: implementation.send,
           })
   return Layer.succeed(AgentConnection, AgentConnection.of({ ...implementation, session }))
 }
@@ -143,39 +135,39 @@ export const layerWebSocket = (options: {
   Layer.effect(
     AgentConnection,
     Effect.gen(function* () {
-      const client = yield* Client.AgentClient
+      const client = yield* Client.RunClient
       const active = yield* Ref.make<ReadonlyMap<string, ActiveConnection>>(new Map())
 
-      const clearActive = (owner: ActiveConnection) =>
-        Ref.update(active, (current) => {
-          if (current.get(owner.sessionId) !== owner) return current
-          const updated = new Map(current)
-          updated.delete(owner.sessionId)
-          return updated
-        })
+      const sendThrough = (owner: ActiveConnection, command: AgentCommand): Effect.Effect<void, AgentCommandError> =>
+        command._tag === "Cancel"
+          ? owner.connection.cancel()
+          : Effect.fail(SendFailed.make({ reason: `${command._tag} requires a Runtime host command adapter` }))
 
-      const session = ({ sessionId }: { readonly sessionId: string; readonly afterSeq?: number }) =>
+      const session = ({ sessionId, afterSeq }: { readonly sessionId: string; readonly afterSeq?: number }) =>
         Effect.gen(function* () {
-          const connection = yield* client.connect({ url: options.url, sessionId })
-          const owner: ActiveConnection = { sessionId, connection }
+          const connection = yield* client.connect({
+            url: options.url,
+            runId: sessionId,
+            ...(afterSeq === undefined ? {} : { cursor: afterSeq }),
+          })
+          const owner = { runId: sessionId, connection }
           yield* Effect.acquireRelease(
-            Ref.update(active, (current) => {
-              const updated = new Map(current)
-              updated.set(sessionId, owner)
-              return updated
-            }),
-            () => clearActive(owner),
+            Ref.update(active, (current) => new Map(current).set(sessionId, owner)),
+            () =>
+              Ref.update(active, (current) => {
+                if (current.get(sessionId) !== owner) return current
+                const updated = new Map(current)
+                updated.delete(sessionId)
+                return updated
+              }),
           )
           const statuses = connection.status.pipe(
             Stream.filterMap((status) =>
-              Option.match(statusIncoming(status), {
-                onNone: () => Result.fail(undefined),
-                onSome: Result.succeed,
-              }),
+              Option.match(statusIncoming(status), { onNone: () => Result.fail(undefined), onSome: Result.succeed }),
             ),
           )
-          const frames = connection.frames.pipe(
-            Stream.map((frame): Incoming => frame),
+          const events = connection.events.pipe(
+            Stream.map((event): Incoming => event),
             Stream.catchCause((cause) =>
               Option.match(unexpectedCause(cause), {
                 onNone: () =>
@@ -190,26 +182,24 @@ export const layerWebSocket = (options: {
           )
           return {
             sessionId,
-            frames: statuses.pipe(Stream.merge(frames)),
-            send: (frame: Exclude<Wire.ClientFrameType, { readonly _tag: "Attach" }>) =>
-              frame.sessionId === sessionId
-                ? sendThrough(connection, frame)
-                : Effect.fail(
-                    SendFailed.make({ reason: `Session ${sessionId} cannot send a command for ${frame.sessionId}` }),
-                  ),
+            frames: statuses.pipe(Stream.merge(events)),
+            send: (command: AgentCommand) =>
+              command.sessionId === sessionId
+                ? sendThrough(owner, command)
+                : Effect.fail(SendFailed.make({ reason: `Run ${sessionId} cannot command Run ${command.sessionId}` })),
           }
         })
 
       return AgentConnection.of({
         session,
         frames: (sessionOptions) => Stream.unwrap(session(sessionOptions).pipe(Effect.map((owned) => owned.frames))),
-        send: (frame) =>
+        send: (command) =>
           Ref.get(active).pipe(
             Effect.flatMap((current) => {
-              const owner = current.get(frame.sessionId)
+              const owner = current.get(command.sessionId)
               return owner === undefined
-                ? Effect.fail(SendFailed.make({ reason: `No active agent connection for session ${frame.sessionId}` }))
-                : sendThrough(owner.connection, frame)
+                ? Effect.fail(SendFailed.make({ reason: `No active Run connection for ${command.sessionId}` }))
+                : sendThrough(owner, command)
             }),
           ),
       })

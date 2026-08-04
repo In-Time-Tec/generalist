@@ -121,6 +121,7 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
+    "types": ["bun"],
     "verbatimModuleSyntax": true
   },
   "include": ["packages/**/*.ts"],

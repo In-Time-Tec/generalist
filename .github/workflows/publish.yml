@@ -52,7 +52,7 @@ jobs:
           tag="v$version"
           source_commit=$(git rev-parse HEAD)
           [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]]
-          for manifest in package.json packages/{core,test,skills,memory,providers,mcp,transport,foldkit}/package.json; do
+          for manifest in package.json packages/{a2a,ag-ui,core,foldkit,mcp,memory,providers,runtime,skills,test,transport}/package.json; do
             [[ "$(jq -r .version "$manifest")" == "$version" ]]
           done
           if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
@@ -129,11 +129,14 @@ jobs:
           set -euo pipefail
           cd release
           package_assets=(
+            "batonfx-a2a-${VERSION}.tgz"
+            "batonfx-ag-ui-${VERSION}.tgz"
             "batonfx-core-${VERSION}.tgz"
             "batonfx-foldkit-${VERSION}.tgz"
             "batonfx-mcp-${VERSION}.tgz"
             "batonfx-memory-${VERSION}.tgz"
             "batonfx-providers-${VERSION}.tgz"
+            "batonfx-runtime-${VERSION}.tgz"
             "batonfx-skills-${VERSION}.tgz"
             "batonfx-test-${VERSION}.tgz"
             "batonfx-transport-${VERSION}.tgz"
@@ -150,11 +153,11 @@ jobs:
           sha256sum --check SHA256SUMS
           jq -e --arg commit "$SOURCE_COMMIT" --arg version "$VERSION" '
             .schemaVersion == 1 and .sourceCommit == $commit and
-            (.packages | length) == 8 and all(.packages[]; .version == $version)
+            (.packages | length) == 11 and all(.packages[]; .version == $version)
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '@batonfx/%s\n' core foldkit mcp memory providers skills test transport)
+          mapfile -t expected_packages < <(printf '@batonfx/%s\n' a2a ag-ui core foldkit mcp memory providers runtime skills test transport)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do
@@ -213,11 +216,14 @@ jobs:
           set -euo pipefail
           cd release
           package_assets=(
+            "batonfx-a2a-${VERSION}.tgz"
+            "batonfx-ag-ui-${VERSION}.tgz"
             "batonfx-core-${VERSION}.tgz"
             "batonfx-foldkit-${VERSION}.tgz"
             "batonfx-mcp-${VERSION}.tgz"
             "batonfx-memory-${VERSION}.tgz"
             "batonfx-providers-${VERSION}.tgz"
+            "batonfx-runtime-${VERSION}.tgz"
             "batonfx-skills-${VERSION}.tgz"
             "batonfx-test-${VERSION}.tgz"
             "batonfx-transport-${VERSION}.tgz"
@@ -234,11 +240,11 @@ jobs:
           sha256sum --check SHA256SUMS
           jq -e --arg commit "$SOURCE_COMMIT" --arg version "$VERSION" '
             .schemaVersion == 1 and .sourceCommit == $commit and
-            (.packages | length) == 8 and all(.packages[]; .version == $version)
+            (.packages | length) == 11 and all(.packages[]; .version == $version)
           ' release-evidence.json >/dev/null
           mapfile -t evidence_names < <(jq -r '.packages[] | .filename' release-evidence.json | sort)
           [[ "${evidence_names[*]}" == "${package_assets[*]}" ]]
-          mapfile -t expected_packages < <(printf '@batonfx/%s\n' core foldkit mcp memory providers skills test transport)
+          mapfile -t expected_packages < <(printf '@batonfx/%s\n' a2a ag-ui core foldkit mcp memory providers runtime skills test transport)
           mapfile -t evidence_packages < <(jq -r '.packages[] | .name' release-evidence.json | sort)
           [[ "${evidence_packages[*]}" == "${expected_packages[*]}" ]]
           while IFS=$'\t' read -r filename digest; do

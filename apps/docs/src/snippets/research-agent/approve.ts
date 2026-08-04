@@ -1,27 +1,11 @@
-import { Client } from "@batonfx/transport"
-import { Console, Effect, Stream } from "effect"
-import { Socket } from "effect/unstable/socket"
+import { Console, Effect } from "effect"
+import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 
-const sessionId = "research-1"
-const token = "approve-search-1"
-
-const program = Effect.scoped(
-  Effect.gen(function* () {
-    const client = yield* Client.AgentClient
-    const connection = yield* client.connect({ url: "ws://localhost:4000/ws", sessionId })
-    yield* connection.status.pipe(
-      Stream.takeUntil((status) => status._tag === "Connected"),
-      Stream.runDrain,
-    )
-    yield* connection.send({ _tag: "ResolveApproval", sessionId, token, decision: { _tag: "Approved" } })
-    yield* connection.frames.pipe(
-      Stream.dropUntil((frame) => frame._tag === "Ended"),
-      Stream.takeUntil((frame) => frame._tag === "Ended"),
-      Stream.runForEach((frame) =>
-        frame._tag === "Event" ? Console.log(`Event ${frame.event._tag}`) : Console.log(frame._tag),
-      ),
-    )
-  }),
-).pipe(Effect.provide(Client.layerWebSocket), Effect.provide(Socket.layerWebSocketConstructorGlobal))
+const program = Effect.gen(function* () {
+  const response = yield* HttpClient.post("http://localhost:4000/runs/research-run-1/respond", {
+    body: HttpBody.jsonUnsafe({ waitId: "search-1", resolution: { _tag: "Approved" } }),
+  })
+  yield* Console.log(`approval response: ${response.status}`)
+}).pipe(Effect.provide(FetchHttpClient.layer))
 
 await Effect.runPromise(program)

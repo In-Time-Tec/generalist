@@ -36,7 +36,7 @@ export const comparisons = definePage({
       ],
       [
         strong("You are streaming a run to a browser."),
-        " The in-memory session registry serves the event stream over SSE and WebSocket, with a headless FoldKit chat model on the client (",
+        " @batonfx/transport projects Runtime-owned RunEvents over SSE and WebSocket, with a headless FoldKit chat model on the client (",
         link("/docs/guides/serve-transport", "Serve over a transport"),
         ").",
       ],
@@ -55,10 +55,10 @@ export const comparisons = definePage({
       ],
       [
         strong("Runs must survive deploys, crashes, or multi-day waits."),
-        " Batonfx is single-process and persists nothing. That workload is ",
-        link("https://relayfx-docs.up.railway.app", "Relayfx"),
-        ", which runs the same agents inside durable executions on your Postgres (",
-        link("/docs/learn/baton-and-relay", "where durability lives"),
+        " Add ",
+        code("@batonfx/runtime"),
+        ", which hosts the same core agents as durable, addressable runs on SQLite, PostgreSQL, or MySQL (",
+        link("/docs/learn/native-runtime", "where durability lives"),
         ").",
       ],
       [
@@ -72,7 +72,7 @@ export const comparisons = definePage({
     ),
     h2("the-shape-of-the-decision", "The shape of the decision"),
     p(
-      "Count the turns and count the processes. One turn, one process: use the primitives. Many turns, one process: Batonfx. Many turns, and the run must outlive the process: Batonfx inside Relayfx. The fastest way to test the fit is ",
+      "Count the turns and decide whether execution state must survive the process. One model call: use Effect AI directly. For a process-local agent loop, use @batonfx/core. For addressable runs that need replay or recovery, add @batonfx/runtime. The fastest way to test the core fit is ",
       link("/docs/start/quickstart", "the quickstart"),
       ", which builds a tool-calling agent and a CI eval in about five minutes, no API key required.",
     ),

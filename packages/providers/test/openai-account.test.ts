@@ -359,15 +359,18 @@ describe("OpenAI account Responses registration", () => {
 
   it.effect("forces redirect rejection when composed with FetchHttpClient.layer", () => {
     const requests: Array<{ readonly url: string; readonly redirect: RequestRedirect | undefined }> = []
-    const fetch: typeof globalThis.fetch = (input, init) => {
-      requests.push({ url: String(input), redirect: init?.redirect })
-      return Promise.resolve(
-        new Response("", {
-          status: 302,
-          headers: { location: "https://attacker.invalid/responses" },
-        }),
-      )
-    }
+    const fetch: typeof globalThis.fetch = Object.assign(
+      (input: URL | RequestInfo, init?: BunFetchRequestInit | RequestInit) => {
+        requests.push({ url: String(input), redirect: init?.redirect })
+        return Promise.resolve(
+          new Response("", {
+            status: 302,
+            headers: { location: "https://attacker.invalid/responses" },
+          }),
+        )
+      },
+      { preconnect: () => {} },
+    )
     const layer = Layer.provide(
       layerAccount({ model: "gpt-test", credentials: credentials(Effect.succeed(credential("current"))) }),
       FetchHttpClient.layer,

@@ -1,7 +1,8 @@
 import { layer } from "@effect/platform-bun/BunHttpServer"
 import { runMain } from "@effect/platform-bun/BunRuntime"
-import { Approvals, Chat, ModelMiddleware } from "@batonfx/core"
-import { SessionRegistry, Sse, Ws } from "@batonfx/transport"
+import { Approvals, Chat, ModelMiddleware, ToolExecutor } from "@batonfx/core"
+import { Address, AgentHost, AgentRef, RunStore, Runtime } from "@batonfx/runtime"
+import { Sse, Ws } from "@batonfx/transport"
 import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Persistence } from "effect/unstable/persistence"
@@ -10,83 +11,103 @@ import { layerOrDeterministic } from "./model"
 import { searchProviderLayer } from "./search-provider"
 import { toolkit, toolkitLayer } from "./tools"
 
-const OpenSessionInput = Schema.Struct({
-  body: Schema.Struct({ sessionId: Schema.optionalKey(Schema.String) }),
-})
+const agentRef = AgentRef.make({ id: "deep-research-agent", version: "1", digest: "sha256:deep-research-agent" })
+const agentAddress = Address.make("agent:deep-research")
 
 const SendMessageInput = Schema.Struct({
-  pathParams: Schema.Struct({ id: Schema.String }),
-  body: Schema.Struct({ prompt: Schema.String }),
+  body: Schema.Struct({
+    runId: Schema.optionalKey(Schema.String),
+    sessionId: Schema.String,
+    idempotencyKey: Schema.String,
+    prompt: Schema.String,
+  }),
 })
 
-const CancelInput = Schema.Struct({
+const RunPathInput = Schema.Struct({ pathParams: Schema.Struct({ id: Schema.String }) })
+
+const RespondInput = Schema.Struct({
   pathParams: Schema.Struct({ id: Schema.String }),
+  body: Schema.Struct({
+    waitId: Schema.String,
+    resolution: Schema.Union([
+      Schema.TaggedStruct("Approved", {}),
+      Schema.TaggedStruct("Denied", { reason: Schema.optionalKey(Schema.String) }),
+    ]),
+  }),
 })
 
-const SessionPathInput = Schema.Struct({
-  pathParams: Schema.Struct({ id: Schema.String }),
-})
+const errorResponse = (status: number) => (error: unknown) =>
+  Effect.succeed(HttpServerResponse.jsonUnsafe({ message: String(error) }, { status }))
 
-const errorResponse = (status: number) => (error: { readonly message: string }) =>
-  Effect.succeed(HttpServerResponse.jsonUnsafe({ message: error.message }, { status }))
+const executeRun = (runId: string) =>
+  Effect.gen(function* () {
+    const store = yield* RunStore.RunStore
+    const host = yield* AgentHost.AgentHost
+    const claim = yield* store.claimExecution({ runId, ownerId: "deep-research-server" })
+    yield* host.execute(claim)
+  })
 
 /** @experimental */
-export const routesLayer = HttpRouter.use((router) =>
+const routesLayer = HttpRouter.use((router) =>
   Effect.gen(function* () {
-    yield* router.add("GET", "/ws", Ws.handle(toolkit))
+    yield* router.add("GET", "/ws", Ws.handle)
 
     yield* router.add(
       "GET",
-      "/sessions/:id/events",
-      HttpRouter.schemaNoBody(SessionPathInput).pipe(
+      "/runs/:id/events",
+      HttpRouter.schemaNoBody(RunPathInput).pipe(
         Effect.flatMap(({ pathParams }) =>
           Effect.gen(function* () {
             const request = yield* HttpServerRequest.HttpServerRequest
-            return yield* Sse.respond(toolkit)({ sessionId: pathParams.id, request, keepAlive: "5 seconds" })
+            return yield* Sse.respond({ runId: pathParams.id, request, keepAlive: "5 seconds" })
           }),
         ),
-        Effect.catchTag("@batonfx/transport/SessionError", errorResponse(400)),
+        Effect.catchTag("@batonfx/transport/InvalidCursor", errorResponse(400)),
       ),
     )
 
     yield* router.add(
       "POST",
-      "/sessions",
-      HttpRouter.schemaJson(OpenSessionInput).pipe(
+      "/runs",
+      HttpRouter.schemaJson(SendMessageInput).pipe(
         Effect.flatMap(({ body }) =>
-          SessionRegistry.SessionRegistry.use((registry) =>
-            registry.open(body.sessionId === undefined ? {} : { sessionId: body.sessionId }),
+          Runtime.Runtime.use((runtime) =>
+            runtime.send({
+              ...(body.runId === undefined ? {} : { runId: body.runId }),
+              to: agentAddress,
+              sessionId: body.sessionId,
+              idempotencyKey: body.idempotencyKey,
+              prompt: body.prompt,
+            }),
           ),
         ),
-        Effect.map((info) => HttpServerResponse.jsonUnsafe(info)),
-        Effect.catchTag("@batonfx/transport/SessionError", errorResponse(400)),
+        Effect.tap((receipt) => (receipt.duplicate ? Effect.void : executeRun(receipt.runId))),
+        Effect.map((receipt) => HttpServerResponse.jsonUnsafe(receipt, { status: 202 })),
+        Effect.catch(errorResponse(400)),
       ),
     )
 
     yield* router.add(
       "POST",
-      "/sessions/:id/messages",
-      HttpRouter.schemaJson(SendMessageInput).pipe(
+      "/runs/:id/respond",
+      HttpRouter.schemaJson(RespondInput).pipe(
         Effect.flatMap(({ pathParams, body }) =>
-          SessionRegistry.SessionRegistry.use((registry) => registry.send(pathParams.id, body.prompt)),
+          Runtime.Runtime.use((runtime) =>
+            runtime.respond({ runId: pathParams.id, waitId: body.waitId, resolution: body.resolution }),
+          ).pipe(Effect.andThen(executeRun(pathParams.id))),
         ),
-        Effect.map(() => HttpServerResponse.jsonUnsafe({ status: "accepted" })),
-        Effect.catchTag("@batonfx/transport/SessionError", errorResponse(400)),
-        Effect.catchTag("@batonfx/transport/SessionBusy", (error) =>
-          errorResponse(409)({ message: `Session ${error.sessionId} is busy` }),
-        ),
+        Effect.map(() => HttpServerResponse.jsonUnsafe({ status: "accepted" }, { status: 202 })),
+        Effect.catch(errorResponse(400)),
       ),
     )
 
     yield* router.add(
       "POST",
-      "/sessions/:id/cancel",
-      HttpRouter.schemaNoBody(CancelInput).pipe(
-        Effect.flatMap(({ pathParams }) =>
-          SessionRegistry.SessionRegistry.use((registry) => registry.interrupt(pathParams.id)),
-        ),
-        Effect.map(() => HttpServerResponse.jsonUnsafe({ status: "cancelled" })),
-        Effect.catchTag("@batonfx/transport/SessionError", errorResponse(400)),
+      "/runs/:id/cancel",
+      HttpRouter.schemaNoBody(RunPathInput).pipe(
+        Effect.flatMap(({ pathParams }) => Runtime.Runtime.use((runtime) => runtime.cancel({ runId: pathParams.id }))),
+        Effect.map(() => HttpServerResponse.jsonUnsafe({ status: "cancellation-requested" }, { status: 202 })),
+        Effect.catch(errorResponse(400)),
       ),
     )
   }),
@@ -99,37 +120,43 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "deep-research-agent" })
 /** @experimental */
 export const toolkitHandlersLayer = toolkitLayer.pipe(Layer.provideMerge(searchProviderLayer))
 
+const toolExecutorLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitHandlersLayer))
+    return ToolExecutor.layerToolkit(handledToolkit)
+  }),
+)
+
 /** @experimental */
 export const modelLayer = layerOrDeterministic({
   model: "openai/gpt-4o-mini",
   apiKey: Config.redacted("OPENROUTER_API_KEY"),
 })
 
-/** @experimental */
-export const sessionRegistryLayer = SessionRegistry.layerMemory({ agent }).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      modelLayer,
-      toolkitHandlersLayer,
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      persistenceLayer,
-    ),
-  ),
+const agentServices = Layer.mergeAll(
+  modelLayer,
+  toolExecutorLayer,
+  Approvals.layerTest({
+    resolve: (request) => Effect.succeed({ ...request, token: `approve-${request.call.id}` }),
+  }),
+  ModelMiddleware.layerIdentity,
+  persistenceLayer,
 )
 
 /** @experimental */
-export const appLayer = Layer.mergeAll(routesLayer, HttpRouter.cors())
+const runtimeLayer = Runtime.layerMemory({
+  agents: [{ ref: agentRef, agent, services: agentServices }],
+  addresses: [{ address: agentAddress, agent: agentRef }],
+})
 
-// `HttpRouter.add` wraps route-level requirements (SessionRegistry here) in
-// an internal marker type that only `HttpRouter.serve` unwraps back into a
-// plain service tag. Route-level dependencies are provided AFTER `serve`,
-// not on the raw route layer — mirrors relay's `server-app.ts`.
 /** @experimental */
-export const serverLayer = (port: number) =>
+const appLayer = Layer.mergeAll(routesLayer, HttpRouter.cors())
+
+/** @experimental */
+const serverLayer = (port: number) =>
   HttpRouter.serve(appLayer, { disableLogger: false }).pipe(
     Layer.provideMerge(layer({ port })),
-    Layer.provideMerge(sessionRegistryLayer),
+    Layer.provideMerge(runtimeLayer),
     Layer.provideMerge(FetchHttpClient.layer),
   )
 

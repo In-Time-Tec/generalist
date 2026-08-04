@@ -26,6 +26,7 @@ import { type Candidate, assemble } from "../tools/tool-registry.js"
 import type { Agent, ProgressOverflowPolicy, RunOptions } from "./agent.js"
 import { Runtime } from "./agent-persistence-lock.js"
 import { activateSkillTool, skillListingBudgetTokens } from "./agent-skill-tool.js"
+import { dispatchForOrigin } from "./tool-dispatch.js"
 import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "./agent-suspension.js"
 import { skillListingsInstructions } from "./agent-message.js"
 type StaticDeclaration = { readonly origin: import("./agent-event.js").ToolOrigin; readonly tool: Tool.Any }
@@ -162,7 +163,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
     const staticCandidates: ReadonlyArray<Candidate> = staticDeclarations.map(({ origin, tool }) => ({
       origin,
       tool,
-      dispatch: "Static",
+      dispatch: dispatchForOrigin(origin),
     }))
     const staticRegistry = yield* assemble(staticCandidates)
     const staticToolkit = staticRegistry.toolkit
@@ -340,9 +341,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
           permissions: Option.getOrElse(permissionsService, () =>
             Permissions.of({ evaluate: () => Effect.succeed({ _tag: "Allow" }) }),
           ),
-          approvals: Option.getOrElse(approvals, () =>
-            Approvals.of({ resolve: () => Effect.succeed({ _tag: "Approved" }) }),
-          ),
+          approvals: Option.getOrElse(approvals, () => Approvals.of({ resolve: (pending) => Effect.succeed(pending) })),
           ruleStore: Option.getOrElse(ruleStoreService, () =>
             RuleStore.of({
               rules: Ref.get(defaultRules),

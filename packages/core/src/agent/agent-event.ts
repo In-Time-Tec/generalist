@@ -46,6 +46,36 @@ export interface ToolProgress {
   readonly metadata?: Metadata
 }
 
+/** @experimental A same-run handoff was requested. */
+export interface HandoffRequested {
+  readonly _tag: "HandoffRequested"
+  readonly turn: number
+  readonly handoffId: string
+  readonly source: string
+  readonly target: string
+  readonly reason?: string
+  readonly metadata?: Metadata
+}
+
+/** @experimental A same-run handoff completed and switched the active agent. */
+export interface HandoffCompleted {
+  readonly _tag: "HandoffCompleted"
+  readonly turn: number
+  readonly handoffId: string
+  readonly source: string
+  readonly target: string
+  readonly metadata?: Metadata
+}
+
+/** @experimental A same-run handoff was rejected before switching agents. */
+export interface HandoffRejectedEvent {
+  readonly _tag: "HandoffRejected"
+  readonly turn: number
+  readonly handoffId: string
+  readonly reason: string
+  readonly metadata?: Metadata
+}
+
 /** @experimental A tool call finished; `result` is the part re-fed to the model. */
 export interface ToolExecutionCompleted {
   readonly _tag: "ToolExecutionCompleted"
@@ -82,7 +112,7 @@ export interface SteeringDrained {
 /**
  * @experimental Emitted after each model turn completes (after tool executions
  * for that turn). `transcript` is the full chat history at this point — hosts
- * that persist conversation state (e.g. Relay's durable chat export) read it
+ * that persist conversation state read it
  * from here.
  */
 export interface TurnCompleted {
@@ -148,6 +178,9 @@ export type Event =
   | ToolExecutionStarted
   | ToolProgress
   | ToolExecutionCompleted
+  | HandoffRequested
+  | HandoffCompleted
+  | HandoffRejectedEvent
   | ApprovalRequested
   | SteeringDrained
   | TurnCompleted
@@ -240,7 +273,10 @@ export const ToolOrigin = Schema.Union([
   Schema.TaggedStruct("Static", { agent: Schema.String }),
   Schema.TaggedStruct("Builtin", { builtin: Schema.Literal("activate_skill") }),
   Schema.TaggedStruct("Skill", { skill: Schema.String }),
-  Schema.TaggedStruct("Handoff", { specialist: Schema.String }),
+  Schema.TaggedStruct("Handoff", {
+    specialist: Schema.String,
+    mode: Schema.Literals(["same-run", "delegate"]),
+  }),
 ])
 
 /** @experimental */
@@ -277,6 +313,7 @@ export class AgentSuspended extends Schema.TaggedErrorClass<AgentSuspended>()("@
   ),
   active_tools: Schema.optional(Schema.Array(Schema.String)),
   activated_skills: Schema.optional(Schema.Array(Schema.String)),
+  invocation_path: Schema.optional(Schema.Array(Schema.String)),
 }) {}
 
 /** @experimental A resume identity did not match the current authoritative suspension checkpoint. */

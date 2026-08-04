@@ -1,9 +1,9 @@
 # HITL over SSE
 
-Run an in-process session registry example that produces an approval suspension as replayable transport frames. A real server would pass the same registry to `Sse.respond(toolkit)` for downstream UI streaming.
+Run an in-memory `@batonfx/runtime` example that produces an approval suspension as canonical `RunEvent` values and encodes them for SSE. A real server provides the same Runtime layer to `Sse.respond` for downstream UI streaming.
 
 ```bash
 bun --cwd examples/hitl-over-sse start
 ```
 
-Manual acceptance path: open a session, attach over SSE, send a prompt, observe `ApprovalRequested`, `Suspended`, and `Ended`, resolve the approval through a command route, then reattach with the last event id.
+Manual acceptance path: admit a message, attach to its Run over SSE, observe `ApprovalRequested` and `RunWaiting`, resolve the wait through a command route, then reattach with the last event id.

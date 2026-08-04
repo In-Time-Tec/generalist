@@ -14,15 +14,18 @@ import {
   Session,
   ToolOutput,
 } from "@batonfx/core"
+import { A2A } from "@batonfx/a2a"
+import { AgUi } from "@batonfx/ag-ui"
 import { VectorStore } from "@batonfx/memory"
 import { OAuth, McpToolSource } from "@batonfx/mcp"
 import { route as mcpRoute, type BatonTools, type Options as McpRouteOptions } from "@batonfx/mcp/baton"
 import { GitHubCatalog, HttpCatalog, S3Catalog } from "@batonfx/skills"
 import { AmazonBedrock, Catalog, OpenAi } from "@batonfx/providers"
 import { TestModel } from "@batonfx/test"
-import { SessionRegistry, Sse, Wire, Ws } from "@batonfx/transport"
+import { Cursor, Runtime, RunEvent } from "@batonfx/runtime"
+import { Client, Snapshot, Sse, Wire, Ws } from "@batonfx/transport"
 import { Config, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
-import { Tool, Toolkit } from "effect/unstable/ai"
+import { Tool } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
@@ -74,26 +77,16 @@ type PersistedRunRequirements = Assert<
     LanguageModel.LanguageModel | Memory.Memory | Chat.Persistence | Agent.Runtime
   >
 >
-const sessionRegistryLayer = SessionRegistry.layerMemory({ agent: Agent.make({ name: "package-smoke" }) })
-const sessionRegistryOptions: SessionRegistry.MemoryOptions<{}, LanguageModel.LanguageModel> = {
-  agent: Agent.make({ name: "annotated-package-smoke" }),
-}
-const annotatedSessionRegistryLayer = SessionRegistry.layerMemory(sessionRegistryOptions)
-type SessionRegistryCanonical = Assert<
-  Equal<
-    LayerShape<typeof sessionRegistryLayer>,
-    readonly [SessionRegistry.SessionRegistry, never, LanguageModel.LanguageModel | Chat.Persistence]
-  >
->
-type AnnotatedSessionRegistryCanonical = Assert<
-  Equal<
-    LayerShape<typeof annotatedSessionRegistryLayer>,
-    readonly [SessionRegistry.SessionRegistry, never, LanguageModel.LanguageModel | Chat.Persistence]
-  >
->
 void Handoff
 type ProviderRoot = typeof import("@batonfx/providers")
 type TransportRoot = typeof import("@batonfx/transport")
+type RuntimeRoot = typeof import("@batonfx/runtime")
+type A2ARoot = typeof import("@batonfx/a2a")
+type AgUiRoot = typeof import("@batonfx/ag-ui")
+type A2ACanonical = Assert<Equal<A2ARoot["A2A"], typeof A2A>>
+type AgUiCanonical = Assert<Equal<AgUiRoot["AgUi"], typeof AgUi>>
+type RuntimeCanonical = Assert<Equal<RuntimeRoot["Runtime"], typeof Runtime>>
+type RunEventCanonical = Assert<Equal<RuntimeRoot["RunEvent"], typeof RunEvent>>
 type ProviderCatalogSubpath = Assert<Equal<ProviderRoot["Catalog"], typeof import("@batonfx/providers/catalog")>>
 type ProviderOpenAiSubpath = Assert<Equal<ProviderRoot["OpenAi"], typeof import("@batonfx/providers/openai")>>
 type ProviderOpenAiAccountAuthSubpath = Assert<
@@ -120,39 +113,20 @@ type TransportErrorsSubpath = Assert<Equal<TransportRoot["Errors"], typeof impor
 type TransportSseSubpath = Assert<Equal<TransportRoot["Sse"], typeof import("@batonfx/transport/sse")>>
 type TransportWsSubpath = Assert<Equal<TransportRoot["Ws"], typeof import("@batonfx/transport/ws")>>
 type TransportWireSubpath = Assert<Equal<TransportRoot["Wire"], typeof import("@batonfx/transport/wire")>>
-type TransportSessionRegistrySubpath = Assert<
-  Equal<TransportRoot["SessionRegistry"], typeof import("@batonfx/transport/session-registry")>
->
-type LooseEventDerived = Assert<Equal<Wire.LooseEventType, typeof Wire.LooseEventSchema.Type>>
-type LooseServerFrameDerived = Assert<Equal<Wire.LooseServerFrameType, typeof Wire.LooseServerFrame.Type>>
-type LooseServerFrameIsDistinct = Assert<Equal<Equal<Wire.LooseServerFrameType, Wire.ServerFrameType>, false>>
-const fixedTransportToolkit = Toolkit.empty
-const explicitFixedCapability = { capability: "fixed", toolkit: fixedTransportToolkit } as const
-const runtimeDynamicCapability = { capability: "runtime-dynamic" } as const
-const fixedCodec = Wire.codec(fixedTransportToolkit)
-const explicitFixedCodec = Wire.codec(explicitFixedCapability)
-const fixedSseSchema = Sse.streamSuccess(fixedTransportToolkit)
-const explicitFixedSseSchema = Sse.streamSuccess(explicitFixedCapability)
-const fixedSseRespond = Sse.respond(fixedTransportToolkit)
-const explicitFixedSseRespond = Sse.respond(explicitFixedCapability)
-const fixedWsHandle = Ws.handle(fixedTransportToolkit)
-const explicitFixedWsHandle = Ws.handle(explicitFixedCapability)
-const runtimeDynamicCodec = Wire.codec(runtimeDynamicCapability)
-const runtimeDynamicSseSchema = Sse.streamSuccess(runtimeDynamicCapability)
-const runtimeDynamicSseRespond = Sse.respond(runtimeDynamicCapability)
-const runtimeDynamicWsHandle = Ws.handle(runtimeDynamicCapability)
-void fixedCodec
-void explicitFixedCodec
-void fixedSseSchema
-void explicitFixedSseSchema
-void fixedSseRespond
-void explicitFixedSseRespond
-void fixedWsHandle
-void explicitFixedWsHandle
-void runtimeDynamicCodec
-void runtimeDynamicSseSchema
-void runtimeDynamicSseRespond
-void runtimeDynamicWsHandle
+type TransportSnapshotSubpath = Assert<Equal<TransportRoot["Snapshot"], typeof import("@batonfx/transport/snapshot")>>
+const cursor: Cursor.Cursor = Cursor.origin
+const snapshot = Snapshot.get("run:package-smoke")
+const producerCodec = Wire.producerCodec
+const observerCodec = Wire.observerCodec
+const webSocketClient = Client.layerWebSocket
+void cursor
+void snapshot
+void producerCodec
+void observerCodec
+void webSocketClient
+void Sse.streamSuccess
+void Sse.respond
+void Ws.handle
 const reasoning: TestModel.ReasoningPart = TestModel.reasoning("package smoke")
 void reasoning
 const tokenStore: OAuth.TokenStoreInterface = {

@@ -52,14 +52,6 @@ export const callout = (tone: CalloutTone, label: string, ...content: ReadonlyAr
   content: toInlines(content),
 })
 
-export const inRepoCallout = (packageName: string): Node =>
-  callout(
-    "inRepo",
-    "In-repo package",
-    code(packageName),
-    " is not yet published to npm. It lives in the Relay repository and is planned for publishing; to use it today, work inside the repo or vendor it.",
-  )
-
 export const table = (
   head: ReadonlyArray<string>,
   rows: ReadonlyArray<ReadonlyArray<InlineInput | ReadonlyArray<InlineInput>>>,

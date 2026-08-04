@@ -10,6 +10,7 @@
   "dependencies": {
     "@batonfx/core": "workspace:*",
     "@batonfx/providers": "workspace:*",
+    "@batonfx/runtime": "workspace:*",
     "@batonfx/transport": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:"

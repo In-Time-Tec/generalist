@@ -1,8 +1,8 @@
 import { callout, code, codeBlock, definePage, h2, lead, link, p, table } from "../../prose"
-const bunInstall = `bun add @batonfx/core @batonfx/providers`
+const bunInstall = `bun add effect@4.0.0-beta.98 @batonfx/core@0.14.0 @batonfx/providers@0.14.0`
 
-const otherManagers = `npm install @batonfx/core @batonfx/providers
-pnpm add @batonfx/core @batonfx/providers`
+const otherManagers = `npm install effect@4.0.0-beta.98 @batonfx/core@0.14.0 @batonfx/providers@0.14.0
+pnpm add effect@4.0.0-beta.98 @batonfx/core@0.14.0 @batonfx/providers@0.14.0`
 
 export const installation = definePage({
   path: "/docs/start/installation",
@@ -10,7 +10,7 @@ export const installation = definePage({
   navTitle: "Installation",
   group: "Start",
   description:
-    "Install @batonfx/core and @batonfx/providers with the pinned Effect beta, plus the eight-package matrix.",
+    "Install @batonfx/core and @batonfx/providers with the pinned Effect beta, plus the eleven-package matrix.",
   content: [
     lead(
       "Batonfx ships a coordinated package train. Most projects start with the core loop and provider helpers, then add focused packages such as the deterministic test kit.",
@@ -21,7 +21,7 @@ export const installation = definePage({
     callout(
       "warning",
       "Pin the Effect beta",
-      "Batonfx 0.6.x is built and tested against ",
+      "Batonfx 0.14.x is built and tested against ",
       code("effect@4.0.0-beta.98"),
       ". The ",
       code("effect/unstable/ai"),
@@ -34,28 +34,31 @@ export const installation = definePage({
       [
         [
           [code("@batonfx/core")],
-          "0.6.1",
+          "0.14.0",
           "The agent loop: events, typed suspension, turn policy, tools, approvals, permissions, steering, compaction",
         ],
         [
           [code("@batonfx/providers")],
-          "0.6.1",
+          "0.14.0",
           "Model registration for OpenAI, Anthropic, OpenRouter, and OpenAI-compatible APIs, plus the deterministic local model",
         ],
-        [[code("@batonfx/mcp")], "0.6.1", "MCP discovery and the Baton ToolExecutor adapter"],
-        [[code("@batonfx/skills")], "0.6.1", "SKILL.md and instruction-file sources"],
-        [[code("@batonfx/memory")], "0.6.1", "Working memory, vector store, semantic recall"],
-        [[code("@batonfx/test")], "0.6.1", "Scripted model fixtures and normalized request capture"],
+        [[code("@batonfx/runtime")], "0.14.0", "Addressable runs, replay, inspection, waits, and stores"],
+        [[code("@batonfx/mcp")], "0.14.0", "MCP discovery and the Baton ToolExecutor adapter"],
+        [[code("@batonfx/skills")], "0.14.0", "SKILL.md and instruction-file sources"],
+        [[code("@batonfx/memory")], "0.14.0", "Working memory, vector store, semantic recall"],
+        [[code("@batonfx/test")], "0.14.0", "Scripted model fixtures and normalized request capture"],
         [
           [code("@batonfx/transport")],
-          "0.6.1",
-          "Wire frames, in-memory session registry, SSE and WebSocket serving, client adapters",
+          "0.14.0",
+          "Runtime wire codecs, snapshots, SSE and WebSocket serving, client adapters",
         ],
-        [[code("@batonfx/foldkit")], "0.6.1", "FoldKit connection service and headless chat model"],
+        [[code("@batonfx/foldkit")], "0.14.0", "FoldKit connection service and headless chat model"],
+        [[code("@batonfx/a2a")], "0.14.0", "A2A v1 server projection over Runtime"],
+        [[code("@batonfx/ag-ui")], "0.14.0", "AG-UI event projection over Runtime"],
       ],
     ),
     h2("effect-compatibility", "Effect compatibility"),
-    table(["Batonfx release", "Tested Effect version"], [[[code("0.6.x")], [code("effect@4.0.0-beta.98")]]]),
+    table(["Batonfx release", "Tested Effect version"], [[[code("0.14.x")], [code("effect@4.0.0-beta.98")]]]),
     p(
       code("@batonfx/foldkit"),
       " additionally declares peer ranges ",
@@ -72,7 +75,7 @@ export const installation = definePage({
       code("effect/unstable/ai"),
       " remains unstable, every public Batonfx export carries the ",
       code("@experimental"),
-      " tag: APIs can change in any 0.x release. The eight packages release in lockstep, so keep them on the same version.",
+      " tag: APIs can change in any 0.x release. The eleven packages release in lockstep, so keep them on the same version.",
     ),
     p(
       "Installed? ",

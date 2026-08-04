@@ -44,9 +44,9 @@ const cannedTopics: ReadonlyArray<CannedTopic> = [
     keywords: ["baton", "agent sdk", "agent framework"],
     results: [
       {
-        title: "Baton: a standalone Effect-native agent SDK",
+        title: "Baton: an Effect-native agent framework",
         url: "https://github.com/batonfx/batonfx",
-        snippet: "Baton is a non-durable, Effect-native framework for building tool-using LLM agents.",
+        snippet: "Baton combines the process-local @batonfx/core agent loop with an optional native durable Runtime.",
       },
       {
         title: "Baton docs - the agent loop",
@@ -79,9 +79,9 @@ const defaultResults: ReadonlyArray<SearchResult> = [
     snippet: "No EXA_API_KEY was configured, so this canned result stands in for a live web search over this question.",
   },
   {
-    title: "Baton - transport and session registry",
+    title: "Baton - Runtime transport",
     url: "https://github.com/batonfx/batonfx/blob/main/docs/features/transport.md",
-    snippet: "The wire protocol and in-process session registry that stream this run to the browser.",
+    snippet: "SSE and WebSocket adapters project the Runtime-owned RunEvent stream to the browser.",
   },
 ]
 

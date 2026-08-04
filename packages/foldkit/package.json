@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@batonfx/foldkit",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "private": false,
   "type": "module",
   "exports": {
@@ -13,10 +13,11 @@
   "scripts": {
     "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
     "lint": "bun --cwd ../.. oxlint packages/foldkit/src packages/foldkit/test",
-    "test": "bun --cwd ../.. vitest run packages/foldkit/test",
+    "test": "bun --bun --cwd ../.. vitest run packages/foldkit/test",
     "typecheck": "bun tsc --noEmit"
   },
   "dependencies": {
+    "@batonfx/runtime": "workspace:*",
     "@batonfx/transport": "workspace:*"
   },
   "peerDependencies": {
@@ -31,7 +32,7 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "description": "FoldKit adapter for Baton transport sessions and chat UI",
+  "description": "FoldKit chat projection and connection adapter for Baton RunEvents",
   "sideEffects": false,
   "files": [
     "dist",

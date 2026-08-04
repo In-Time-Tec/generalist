@@ -1,5 +1,5 @@
-# Process-local transport
+# Runtime-owned transport state
 
-An in-memory registry gives cheap replay, bounded queues, and straightforward Effect-scoped ownership. The cost is that frames, queued prompts, and suspended run state disappear with the process.
+Transport projects the canonical `@batonfx/runtime` event stream instead of owning parallel execution state. This keeps SSE, WebSocket, snapshots, and reconnect cursors aligned with the Run store, at the cost of requiring a Runtime layer wherever transport is served.
 
-Adding hidden durability was rejected. Hosts that need recovery provide a durable `SessionRegistry` implementation instead.
+Hidden transport durability was rejected. `Runtime.layerMemory` is explicitly volatile; hosts that need recovery choose `Runtime.layerSqlite`, `Runtime.layerPostgres`, or `Runtime.layerMysql`, and transport uses that same Runtime service.

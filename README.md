@@ -1,6 +1,6 @@
 # BatonFX
 
-BatonFX is the **Effect-native agent framework**: a standalone, non-durable model-turn loop over `effect/unstable/ai` with typed tools, typed suspension, provider layers, memory, skills, transport, and UI adapters that compose as Effect services. `@batonfx/core` directly re-exports Effect AI primitives such as `Tool`, `Toolkit`, `LanguageModel`, `Prompt`, `Response`, `Chat`, and `Tokenizer`; those exports are the upstream Effect AI values, not Baton wrappers.
+BatonFX is the **Effect-native agent framework**: a standalone model-turn loop over `effect/unstable/ai` plus an optional native durable Runtime, typed tools and suspension, provider layers, memory, skills, transport, and UI adapters that compose as Effect services. `@batonfx/core` directly re-exports Effect AI primitives such as `Tool`, `Toolkit`, `LanguageModel`, `Prompt`, `Response`, `Chat`, and `Tokenizer`; those exports are the upstream Effect AI values, not Baton wrappers.
 
 ```ts
 import { Effect, Layer, Schema } from "effect"
@@ -29,30 +29,34 @@ const program = ModelRegistry.operate(
 )
 ```
 
-Baton is the agent; a durable runtime such as [Relay](https://github.com/In-Time-Tec/relayfx) is the durable race it runs in. Use Baton alone for process-local agents and chat streaming. Compose it behind Relay when you need durable, addressable suspend/resume executions.
+Use `@batonfx/core` directly for process-local agents and chat streaming. Add `@batonfx/runtime` when Runs need stable addresses, replayable events, durable waits, cancellation, children, or restart recovery.
 
 ## Install
 
 ```bash
 bun add effect @batonfx/core
 bun add @batonfx/providers @batonfx/mcp @batonfx/skills @batonfx/memory
-bun add @batonfx/transport @batonfx/foldkit @batonfx/test
+bun add @batonfx/runtime @batonfx/transport @batonfx/foldkit @batonfx/test
+bun add @batonfx/a2a @batonfx/ag-ui
 ```
 
 GitHub releases and npm contain the same versioned package tarballs with compiled ESM and declarations for Node 22+ and Bun 1.3+.
 
 ## Capability matrix
 
-| Capability                                                          | Package              | Stable tier for 0.1.0                         |
-| ------------------------------------------------------------------- | -------------------- | --------------------------------------------- |
-| Agent loop, events, typed suspension, turn policy, tools, approvals | `@batonfx/core`      | stable core tags; APIs marked `@experimental` |
-| Provider registration, deterministic local model, model catalog     | `@batonfx/providers` | experimental                                  |
-| MCP discovery and Baton `ToolExecutor` adapter                      | `@batonfx/mcp`       | experimental                                  |
-| SKILL.md and instruction-file sources                               | `@batonfx/skills`    | experimental                                  |
-| Working memory, vector store, semantic recall                       | `@batonfx/memory`    | experimental                                  |
-| Scripted models and normalized request capture                      | `@batonfx/test`      | experimental                                  |
-| SSE, WebSocket, wire frames, in-memory session registry             | `@batonfx/transport` | experimental                                  |
-| FoldKit connection, subscription, commands, headless chat model     | `@batonfx/foldkit`   | experimental                                  |
+| Capability                                                          | Package              | Status       |
+| ------------------------------------------------------------------- | -------------------- | ------------ |
+| Agent loop, events, typed suspension, turn policy, tools, approvals | `@batonfx/core`      | experimental |
+| Addressable runs, replay, inspection, waits, and durable stores     | `@batonfx/runtime`   | experimental |
+| Provider registration, deterministic local model, model catalog     | `@batonfx/providers` | experimental |
+| MCP discovery and Baton `ToolExecutor` adapter                      | `@batonfx/mcp`       | experimental |
+| SKILL.md and instruction-file sources                               | `@batonfx/skills`    | experimental |
+| Working memory, vector store, semantic recall                       | `@batonfx/memory`    | experimental |
+| Scripted models and normalized request capture                      | `@batonfx/test`      | experimental |
+| SSE, WebSocket, wire codecs, snapshots, and reconnecting clients    | `@batonfx/transport` | experimental |
+| FoldKit connection, subscription, commands, headless chat model     | `@batonfx/foldkit`   | experimental |
+| A2A v1 server projection over Runtime                               | `@batonfx/a2a`       | experimental |
+| AG-UI event projection over Runtime                                 | `@batonfx/ag-ui`     | experimental |
 
 ## A plugin is a Layer
 
@@ -75,7 +79,7 @@ const clientTools = ToolExecutor.layerRouter([
 
 | Baton release | Tested Effect range                               | Notes                                                                               |
 | ------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `0.10.x`      | `effect@4.0.0-beta.98` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
+| `0.14.x`      | `effect@4.0.0-beta.98` from the workspace catalog | Every public export remains `@experimental` while `effect/unstable/ai` is unstable. |
 
 ## Start here
 
@@ -88,21 +92,24 @@ const clientTools = ToolExecutor.layerRouter([
 
 ## Repository layout
 
-| Path                 | Purpose                                                                             |
-| -------------------- | ----------------------------------------------------------------------------------- |
-| `packages/core`      | `@batonfx/core` — the Effect-native agent loop.                                     |
-| `packages/providers` | `@batonfx/providers` — provider helpers and deterministic local models.             |
-| `packages/mcp`       | `@batonfx/mcp` — MCP client bridge and Baton adapter.                               |
-| `packages/skills`    | `@batonfx/skills` — SKILL.md and instruction-file sources.                          |
-| `packages/memory`    | `@batonfx/memory` — non-durable memory implementations.                             |
-| `packages/test`      | `@batonfx/test` — scripted model fixtures and normalized request capture.           |
-| `packages/transport` | `@batonfx/transport` — wire frames, session registry, SSE, WS, and client adapters. |
-| `packages/foldkit`   | `@batonfx/foldkit` — FoldKit adapter and headless chat model.                       |
-| `docs/features`      | Current behavior and rules relied on by the code.                                   |
-| `docs/decisions`     | Important choices and why they were made.                                           |
-| `docs/tradeoffs`     | Useful notes about meaningful gains and costs.                                      |
-| `docs/site`          | Consumer-facing guides, recipes, API stability, and positioning.                    |
-| `examples`           | Private Bun workspaces typechecked in CI.                                           |
+| Path                 | Purpose                                                                      |
+| -------------------- | ---------------------------------------------------------------------------- |
+| `packages/core`      | `@batonfx/core` — the Effect-native agent loop.                              |
+| `packages/runtime`   | `@batonfx/runtime` — addressable Run lifecycle, stores, and workers.         |
+| `packages/providers` | `@batonfx/providers` — provider helpers and deterministic local models.      |
+| `packages/mcp`       | `@batonfx/mcp` — MCP client bridge and Baton adapter.                        |
+| `packages/skills`    | `@batonfx/skills` — SKILL.md and instruction-file sources.                   |
+| `packages/memory`    | `@batonfx/memory` — non-durable memory implementations.                      |
+| `packages/test`      | `@batonfx/test` — scripted model fixtures and normalized request capture.    |
+| `packages/transport` | `@batonfx/transport` — Runtime wire codecs, SSE, WS, snapshots, and clients. |
+| `packages/foldkit`   | `@batonfx/foldkit` — FoldKit adapter and headless chat model.                |
+| `packages/a2a`       | `@batonfx/a2a` — A2A v1 server projection over Runtime.                      |
+| `packages/ag-ui`     | `@batonfx/ag-ui` — AG-UI projection over Runtime.                            |
+| `docs/features`      | Current behavior and rules relied on by the code.                            |
+| `docs/decisions`     | Important choices and why they were made.                                    |
+| `docs/tradeoffs`     | Useful notes about meaningful gains and costs.                               |
+| `docs/site`          | Consumer-facing guides, recipes, API stability, and positioning.             |
+| `examples`           | Private Bun workspaces typechecked in CI.                                    |
 
 ## Verification
 
@@ -112,10 +119,10 @@ bun run check
 bun run package
 ```
 
-`bun run package` builds once, verifies clean Bun and npm consumers, and writes eight tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification; manual workflow runs only produce and attest artifacts.
+`bun run package` builds once, verifies clean Bun and npm consumers, and writes eleven tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification and publish the same tarballs to npm.
 
 The npm smoke uses `--legacy-peer-deps` only because the currently pinned external `foldkit@0.122.0` declares `effect@4.0.0-beta.88` while Baton uses beta.98. The installed graph is still checked for one physical Effect package; Bun installation and both runtimes use beta.98.
 
 ## Provenance
 
-Baton was developed by [In Time Tec](https://intimetec.com) and is composed inside [Relay](https://github.com/In-Time-Tec/relayfx). Relay owns durability, addressability, event logs, and hosted execution. Baton owns the standalone non-durable primitives.
+Baton was developed by [In Time Tec](https://intimetec.com). Applications compose its process-local agent primitives and optional durable Runtime directly through Effect layers.

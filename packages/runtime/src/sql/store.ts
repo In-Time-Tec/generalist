@@ -1,0 +1,182 @@
+import { Effect, Layer } from "effect"
+import type { Scope } from "effect"
+import { SqlClient } from "effect/unstable/sql"
+import { CursorExpired, RunNotFound } from "../errors.js"
+import type { LayerOptions } from "../runtime.js"
+import { RunStore, type Interface as RunStoreInterface } from "../run-store.js"
+import { agentKey } from "../memory/state.js"
+import {
+  MultiWorkerUnsupported,
+  SchemaChecksumMismatch,
+  SchemaDirty,
+  SchemaMigrationFailed,
+  SchemaVersionUnsupported,
+} from "./errors.js"
+import { migrate } from "./migrate.js"
+import { admitSend, admitSpawn } from "./store-admit.js"
+import {
+  cancel,
+  complete,
+  emitAgentEvent,
+  fail,
+  markOperationUnknown,
+  respond,
+  resume,
+  signal,
+  wait,
+} from "./store-control.js"
+import {
+  expireRunningOperation,
+  failOperation,
+  getOperation,
+  getOperationByKey,
+  recordOperation,
+  startOperation,
+  succeedOperation,
+} from "./store-operations.js"
+import { decodeRun, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
+import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
+import { withSql } from "./sql-effect.js"
+import { makeEventHub } from "./subscribers.js"
+
+export interface SqliteStoreOptions extends LayerOptions {
+  readonly filename: string
+  readonly multiWorker?: boolean
+  readonly workers?: number
+}
+
+export type SqliteStoreError =
+  | SchemaDirty
+  | SchemaChecksumMismatch
+  | SchemaVersionUnsupported
+  | SchemaMigrationFailed
+  | MultiWorkerUnsupported
+
+export const makeSqliteRunStore = (
+  options: SqliteStoreOptions,
+): Effect.Effect<RunStoreInterface, SqliteStoreError, SqlClient.SqlClient | Scope.Scope> =>
+  Effect.gen(function* () {
+    if (options.multiWorker === true || (options.workers !== undefined && options.workers > 1)) {
+      return yield* MultiWorkerUnsupported.make({
+        backend: "sqlite",
+        message: "SQLite RunStore is single-process only",
+      })
+    }
+    const agentRefs = new Map(options.agents.map((entry) => [agentKey(entry.ref), entry.ref] as const))
+    const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.agent] as const))
+    for (const binding of options.addresses) {
+      if (!agentRefs.has(agentKey(binding.agent))) {
+        return yield* Effect.die(new Error(`address ${binding.address} binds unregistered agent`))
+      }
+    }
+    yield* migrate(options.filename)
+    const hub = yield* makeEventHub()
+    yield* Effect.addFinalizer(() => hub.shutdown)
+    const capacity = options.subscriberQueueCapacity ?? 64
+    const sql = yield* SqlClient.SqlClient
+    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, sql.withTransaction(effect))
+    const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
+    const fenced = <A, E>(
+      input: import("../run-store.js").ExecutionClaim,
+      effect: Effect.Effect<A, E, SqlClient.SqlClient>,
+    ) => run(requireExecutionClaim(input).pipe(Effect.andThen(effect)))
+
+    return RunStore.of({
+      info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
+      admitSend: (input) => run(admitSend(hub, agentRefs, addressBindings, input)),
+      admitSpawn: (input) => run(admitSpawn(hub, agentRefs, input)),
+      events: (input) =>
+        hub.subscribe({
+          runId: input.runId,
+          cursor: input.cursor,
+          loadReplay: runNoTxn(
+            Effect.gen(function* () {
+              const loaded = yield* loadRun(input.runId)
+              if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
+              const replay = yield* loadEventsAfter(input.runId, input.cursor)
+              return { replay, lastSequence: loaded.lastSequence }
+            }),
+          ),
+          capacity,
+        }),
+      respond: (input) => run(respond(hub, input)),
+      signal: (input) => run(signal(hub, input)),
+      cancel: (input) => run(cancel(hub, input)),
+      inspect: (runId) =>
+        runNoTxn(
+          Effect.gen(function* () {
+            const loaded = yield* loadRun(runId)
+            if (loaded === undefined) return yield* RunNotFound.make({ runId })
+            const activeWait = yield* loadRunWait(runId, loaded.activeWaitId)
+            return {
+              runId: loaded.runId,
+              status: loaded.status,
+              agent: loaded.agent,
+              lastSequence: loaded.lastSequence,
+              durability: "durable" as const,
+              ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
+              ...(activeWait === undefined ? {} : { wait: activeWait }),
+            }
+          }),
+        ),
+      history: (input) =>
+        runNoTxn(
+          Effect.gen(function* () {
+            const loaded = yield* loadRun(input.runId)
+            if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
+            if (input.cursor < -1 || input.cursor > loaded.lastSequence) {
+              return yield* CursorExpired.make({ runId: input.runId, cursor: input.cursor, earliestSequence: 0 })
+            }
+            return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
+          }),
+        ),
+      list: (input) =>
+        runNoTxn(
+          Effect.gen(function* () {
+            const rows =
+              input.status === undefined
+                ? yield* sql<
+                    import("./rows.js").RunRow
+                  >`SELECT * FROM baton_runs ORDER BY created_at DESC LIMIT ${input.limit}`
+                : yield* sql<
+                    import("./rows.js").RunRow
+                  >`SELECT * FROM baton_runs WHERE status = ${input.status} ORDER BY created_at DESC LIMIT ${input.limit}`
+            return yield* Effect.forEach(rows, (row) =>
+              Effect.gen(function* () {
+                const loaded = decodeRun(row)
+                const activeWait = yield* loadRunWait(loaded.runId, loaded.activeWaitId)
+                return {
+                  runId: loaded.runId,
+                  status: loaded.status,
+                  agent: loaded.agent,
+                  lastSequence: loaded.lastSequence,
+                  durability: "durable" as const,
+                  ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
+                  ...(activeWait === undefined ? {} : { wait: activeWait }),
+                }
+              }),
+            )
+          }),
+        ),
+      complete: (input) => fenced(input, complete(hub, input)),
+      fail: (input) => fenced(input, fail(hub, input)),
+      wait: (input) => fenced(input, wait(hub, input)),
+      resume: (input) => run(resume(hub, input)),
+      emitAgentEvent: (input) => fenced(input, emitAgentEvent(hub, input)),
+      markOperationUnknown: (input) => fenced(input, markOperationUnknown(hub, input)),
+      recordOperation: (input) => fenced(input, recordOperation(input)),
+      startOperation: (input) => fenced(input, startOperation(input)),
+      succeedOperation: (input) => fenced(input, succeedOperation(input)),
+      failOperation: (input) => fenced(input, failOperation(input)),
+      expireRunningOperation: (input) => fenced(input, expireRunningOperation(hub, input)),
+      getOperation: (input) => runNoTxn(getOperation(input)),
+      getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
+      claimExecution: (input) => run(claimExecution(input)),
+      loadExecution: (runId) => runNoTxn(loadExecution(runId)),
+      saveExecution: (input) => run(saveExecution(input)),
+    })
+  })
+
+export const layerSqliteStore = (
+  options: SqliteStoreOptions,
+): Layer.Layer<RunStore, SqliteStoreError, SqlClient.SqlClient> => Layer.effect(RunStore, makeSqliteRunStore(options))

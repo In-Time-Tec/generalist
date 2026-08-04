@@ -109,8 +109,8 @@ export interface LayerOrDeterministicOptions extends OpenRouter.LayerOptions {}
  * OpenRouter: try to build a real OpenRouter model layer from `options`, and
  * fall back to the scripted deterministic model above when the API key
  * config does not resolve. Unlike the packaged helper this returns a closed
- * `LanguageModel` directly (not a `ModelRegistry` registration), which is
- * what `SessionRegistry.layerMemory` needs for its single-agent server.
+ * `LanguageModel` directly (not a `ModelRegistry` registration), ready to be
+ * provided with this server's Runtime agent registration.
  */
 export const layerOrDeterministic = (options: LayerOrDeterministicOptions): Layer.Layer<LanguageModel.LanguageModel> =>
   Layer.unwrap(

@@ -81,9 +81,9 @@ export const suspension = definePage({
     ),
     h2("why-the-shape-mirrors-a-tool-call", "Why the shape mirrors a tool call"),
     p(
-      "The field shape (id, name, params) is deliberately the shape of a tool call, because that is what a durable host must persist to re-enter later. Store those three fields plus the token and the transcript, and a resume days later reconstructs the exact call identity the model emitted. Relayfx does precisely this, persisting the suspension as a durable wait row keyed by the tool call id; see ",
-      link("/docs/learn/baton-and-relay", "where durability lives"),
-      ". Batonfx itself never persists suspensions: it defines the contract and leaves storage to the host.",
+      "The field shape (id, name, params) is deliberately the shape of a tool call, because that is what a durable host must persist to re-enter later. Store those three fields plus the token and the transcript, and a resume days later reconstructs the exact call identity the model emitted. @batonfx/runtime persists that suspension as a durable Run wait and applies its resolution to the authoritative core suspension on re-entry; see ",
+      link("/docs/learn/native-runtime", "where durability lives"),
+      ". @batonfx/core defines the suspension contract but does not persist it.",
     ),
     h2("why-an-error-and-not-a-callback", "Why an error and not a callback"),
     p(

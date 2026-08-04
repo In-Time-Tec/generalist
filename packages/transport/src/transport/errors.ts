@@ -6,13 +6,18 @@ export class TransportError extends Schema.TaggedErrorClass<TransportError>()("@
   kind: Schema.optional(Schema.Literals(["socket", "protocol", "encoding", "not-open"])),
 }) {}
 
-/** @experimental A WebSocket command was received before the socket attached to a session. */
+/** @experimental A replay cursor supplied at the transport boundary is malformed. */
+export class InvalidCursor extends Schema.TaggedErrorClass<InvalidCursor>()("@batonfx/transport/InvalidCursor", {
+  value: Schema.String,
+}) {}
+
+/** @experimental A WebSocket command was received before the socket attached to a Run. */
 export class NotAttached extends Schema.TaggedErrorClass<NotAttached>()("@batonfx/transport/NotAttached", {}) {}
 
-/** @experimental A WebSocket frame named a session other than the socket's attached session. */
-export class SessionMismatch extends Schema.TaggedErrorClass<SessionMismatch>()("@batonfx/transport/SessionMismatch", {
-  attachedSessionId: Schema.String,
-  requestedSessionId: Schema.String,
+/** @experimental A WebSocket command named a Run other than the socket's attached Run. */
+export class RunMismatch extends Schema.TaggedErrorClass<RunMismatch>()("@batonfx/transport/RunMismatch", {
+  attachedRunId: Schema.String,
+  requestedRunId: Schema.String,
 }) {}
 
 /** @experimental Reconnection stopped after the configured schedule was exhausted. */

@@ -1,15 +1,18 @@
 import { Cause, Channel, Effect, Exit, HashMap, Option, Ref, Schema, Stream } from "effect"
-import { AiError, LanguageModel, Prompt, Response, Telemetry, Tool, Toolkit } from "effect/unstable/ai"
-import { addUsage, AgentError, type Event } from "./agent-event.js"
+import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { AgentError, type Event } from "./agent-event.js"
 import { coalesceAdjacentText } from "../context/session-sync.js"
 import { applyPartChain, applyPromptChain } from "./agent-message.js"
 import { type Registry, select } from "../tools/tool-registry.js"
 import { type Request } from "../tools/tool-executor.js"
-import { classify as classifyContextOverflow } from "../model/context-overflow.js"
-import { classifyFailure as classifyModelFailure, type LanguageModelNotRegistered } from "../model/model-registry.js"
+import {
+  classifyFailure as classifyModelFailure,
+  type LanguageModelNotRegistered,
+  type ModelSelection,
+} from "../model/model-registry.js"
 import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../model/model-telemetry.js"
 import { type AnyToolCall, type ToolCallIdState } from "./agent-tool-result.js"
-import type { RuntimeContext } from "./model-turn-context.js"
+import type { RuntimeContext, StaticToolServices } from "./model-turn-context.js"
 import {
   InvalidToolCallParameters,
   isInvalidToolCallParameters,
@@ -17,16 +20,18 @@ import {
   ToolJsonSchemaCompilerMissing,
   validateDecodedToolCall,
 } from "../model/model-tool-call-validation.js"
-import { DuplicateToolCallId, MiddlewareViolation, ToolNameCollision } from "./agent-event.js"
+import { DuplicateToolCallId, MiddlewareViolation } from "./agent-event.js"
 import type { RunError } from "./agent.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
-const classifyOtherFailure = (error: unknown) => classifyContextOverflow(error)
-const isToolNameCollision = Schema.is(ToolNameCollision)
-const attemptText = (parts: ReadonlyArray<Response.StreamPart<Record<string, Tool.Any>>>): string =>
-  parts.reduce((text, part) => (part.type === "text-delta" ? `${text}${part.delta}` : text), "")
+import { wrapDriverAttempt } from "./model-turn-driver.js"
+import { captureFinishPart, captureStructuredUsage, chargeAttemptUsage } from "./model-turn-finish.js"
+import { attemptText, classifyOtherFailure, isToolNameCollision } from "./model-turn-parts.js"
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
     agent,
+    handoffStateRef,
+    agentModel,
+    agentModelRegistry,
     resilienceService,
     telemetryIdentity,
     instrumentModel,
@@ -38,63 +43,35 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     compactionService,
     state,
     errorMessage,
-    agentModelRegistry,
-    agentModel,
     persisted,
     toolCallEvents,
   } = context
+  const activeAgentName = (_turn: number): Effect.Effect<string> =>
+    handoffStateRef === undefined
+      ? Effect.succeed(agent.name)
+      : Ref.get(handoffStateRef).pipe(
+          Effect.map((handoffRun) => handoffRun.active.name),
+          Effect.orElseSucceed(() => agent.name),
+        )
+  const activeModelSelection = (): Effect.Effect<ModelSelection | undefined> =>
+    handoffStateRef === undefined
+      ? Effect.succeed(agentModel)
+      : Ref.get(handoffStateRef).pipe(
+          Effect.map((handoffRun) => handoffRun.active.agent.model ?? agentModel),
+          Effect.orElseSucceed(() => agentModel),
+        )
+  const activeToolConcurrency = (): Effect.Effect<number | "unbounded"> =>
+    handoffStateRef === undefined
+      ? Effect.succeed(agent.toolExecution?.concurrency ?? 1)
+      : Ref.get(handoffStateRef).pipe(
+          Effect.map((handoffRun) => handoffRun.active.agent.toolExecution?.concurrency ?? 1),
+          Effect.orElseSucceed(() => agent.toolExecution?.concurrency ?? 1),
+        )
   const captureProviderOutput = (part: Response.StreamPart<Record<string, Tool.Any>>): void => {
     if (part.type === "text-delta") state.providerOutput.textCharacters += part.delta.length
     if (part.type === "reasoning-delta") state.providerOutput.reasoningCharacters += part.delta.length
     if (part.type === "finish") state.providerOutput.finishReason = part.reason
   }
-  const captureFinishPart = (part: Response.FinishPart): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      const span = yield* Effect.currentSpan
-      state.finish = {
-        usage: state.finish === undefined ? part.usage : addUsage(state.finish.usage, part.usage),
-        reason: part.reason,
-      }
-      state.usage = state.usage === undefined ? part.usage : addUsage(state.usage, part.usage)
-      const reportedTokens = part.usage.inputTokens.total
-      if (state.currentContextTokens !== undefined && state.currentContext !== undefined) {
-        state.reportedContextUsage =
-          reportedTokens !== undefined && Number.isSafeInteger(reportedTokens) && reportedTokens >= 0
-            ? {
-                prompt: state.currentContext,
-                estimatedTokens: state.currentContextTokens,
-                reportedTokens,
-              }
-            : undefined
-      }
-      Telemetry.addGenAIAnnotations(span, {
-        operation: { name: "chat" },
-        usage: {
-          inputTokens: part.usage.inputTokens.total,
-          outputTokens: part.usage.outputTokens.total,
-        },
-        response: { finishReasons: [part.reason] },
-      })
-    }).pipe(Effect.orDie)
-  const captureStructuredUsage = (
-    content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
-  ): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      const span = yield* Effect.currentSpan
-      for (const part of content) {
-        if (part.type === "finish") {
-          state.usage = state.usage === undefined ? part.usage : addUsage(state.usage, part.usage)
-          Telemetry.addGenAIAnnotations(span, {
-            operation: { name: "chat" },
-            usage: {
-              inputTokens: part.usage.inputTokens.total,
-              outputTokens: part.usage.outputTokens.total,
-            },
-            response: { finishReasons: [part.reason] },
-          })
-        }
-      }
-    }).pipe(Effect.orDie)
   const withModelTelemetry =
     (turn: number, purpose: ModelCallPurpose) =>
     <A, E, R2>(effect: Effect.Effect<A, E, R2>) =>
@@ -110,18 +87,6 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     agentModelRegistry === undefined || agentModel === undefined
       ? effect
       : agentModelRegistry.operate(agentModel, effect)
-  function provideAgentModel<A, E, R2>(stream: Stream.Stream<A, E, R2>): Stream.Stream<A, E | AgentError, R2>
-  function provideAgentModel<A, E, R2>(stream: Stream.Stream<A, E, R2>): Stream.Stream<A, E | AgentError, R2> {
-    return agentModelRegistry === undefined || agentModel === undefined
-      ? stream
-      : agentModelRegistry
-          .stream(agentModel, stream)
-          .pipe(
-            Stream.catchTag("@batonfx/core/LanguageModelNotRegistered", (error) =>
-              Stream.fail(AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error })),
-            ),
-          )
-  }
   const partEvents = (
     turn: number,
     part: Response.StreamPart<Record<string, Tool.Any>>,
@@ -145,7 +110,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
       },
     ])
     if (part.type === "finish") {
-      return modelPart.pipe(Stream.tap(() => captureFinishPart(part)))
+      return modelPart.pipe(Stream.tap(() => captureFinishPart(state, part)))
     }
     return modelPart
   }
@@ -221,8 +186,33 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
       ),
     )
   }
-  const modelTurn = (turn: number, prompt: Prompt.RawInput, registry: Registry, overrides?: TurnOverrides) => {
-    const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
+  const modelTurn = (turn: number, prompt: Prompt.RawInput, registry: Registry, overrides?: TurnOverrides) =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        const agentName = yield* activeAgentName(turn)
+        const selection = yield* activeModelSelection()
+        const concurrency = yield* activeToolConcurrency()
+        const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
+        const parts = modelTurnBody(turn, prompt, activeRegistry, overrides, agentName, concurrency)
+        if (overrides?.model !== undefined) return parts.pipe(Stream.provide(overrides.model))
+        if (selection === undefined || agentModelRegistry === undefined) return parts
+        return agentModelRegistry
+          .stream(selection, parts)
+          .pipe(
+            Stream.catchTag("@batonfx/core/LanguageModelNotRegistered", (error) =>
+              Stream.fail(AgentError.make({ message: errorMessage(error), turn: state.turn, cause: error })),
+            ),
+          )
+      }),
+    )
+  const modelTurnBody = (
+    turn: number,
+    prompt: Prompt.RawInput,
+    activeRegistry: Registry,
+    overrides: TurnOverrides | undefined,
+    agentName: string,
+    concurrency: number | "unbounded",
+  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<T>> => {
     const instrumentTurnStream = <A, E>(
       stream: Stream.Stream<A, E, LanguageModel.LanguageModel>,
     ): Stream.Stream<
@@ -253,7 +243,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
           ),
         ),
       )
-    const attempt = (
+    const attemptBody = (
       activePrompt: Prompt.Prompt,
       retryOverflow: boolean,
       compactOverflow = false,
@@ -395,6 +385,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                     ),
                   )
                 }).pipe(
+                  Effect.andThen(chargeAttemptUsage(state)),
                   Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
                   Effect.orDie,
                   Effect.asVoid,
@@ -404,7 +395,12 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         Stream.catchCause((cause) => {
           if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
           if (retryableOverflow(cause, emitted)) {
-            return attempt(preparedState?.preparedPrompt ?? activePrompt, false, true, cause as Cause.Cause<RunError>)
+            return attemptBody(
+              preparedState?.preparedPrompt ?? activePrompt,
+              false,
+              true,
+              cause as Cause.Cause<RunError>,
+            )
           }
           return Stream.failCause(cause)
         }),
@@ -416,8 +412,9 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         }),
       )
     }
+    const driverAttempt = wrapDriverAttempt(turn, attemptBody)
     const parts = Stream.unwrap(
-      applyPromptChain(chain, Prompt.make(prompt), { agentName: agent.name, turn }).pipe(
+      applyPromptChain(chain, Prompt.make(prompt), { agentName, turn }).pipe(
         Effect.map((transformedPrompt) => {
           let nextToolCallIndex = 0
           const calls = new Array<AnyToolCall>()
@@ -427,7 +424,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
             readonly toolCallIndex: number
           }>()
           const toolCallBatch: Request["toolCallBatch"] = { calls }
-          const accepted = instrumentTurnStream(attempt(transformedPrompt, true)).pipe(
+          const accepted = instrumentTurnStream(driverAttempt(transformedPrompt, true)).pipe(
             Stream.mapEffect(({ accept, part, messages }) => accept.pipe(Effect.as({ part, messages }))),
             Stream.map(({ part, messages }) => {
               const toolCallIndex = nextToolCallIndex
@@ -446,7 +443,6 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
             Stream.suspend(() => {
               Object.freeze(calls)
               Object.freeze(toolCallBatch)
-              const concurrency = agent.toolExecution?.concurrency ?? 1
               const executionStreams = Stream.fromIterable(executions)
               return concurrency === 1
                 ? executionStreams.pipe(
@@ -492,7 +488,13 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         }),
       ),
     )
-    return overrides?.model === undefined ? provideAgentModel(parts) : parts.pipe(Stream.provide(overrides.model))
+    return parts
   }
-  return { modelTurn, captureStructuredUsage, withModelTelemetry, withAgentModel }
+  return {
+    modelTurn,
+    captureStructuredUsage: (content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>) =>
+      captureStructuredUsage(state, content),
+    withModelTelemetry,
+    withAgentModel,
+  }
 }

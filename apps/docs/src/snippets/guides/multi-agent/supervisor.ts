@@ -27,7 +27,8 @@ const modelLayer = Layer.effect(
   }),
 )
 
-const billing = Handoff.register(Agent.make({ name: "billing", instructions: "Resolve billing requests." }), modelLayer)
+const billingAgent = Agent.make({ name: "billing", instructions: "Resolve billing requests." })
+const billing = Handoff.target(billingAgent)
 
 const supervisor = Handoff.supervisor({
   name: "front-desk",
@@ -41,6 +42,7 @@ const program = Agent.generate(supervisor.agent, { prompt: "I want a refund for 
     Layer.mergeAll(
       modelLayer,
       ToolExecutor.layerToolkit(supervisor.toolkit),
+      supervisor.catalog,
       Approvals.layerAutoApprove,
       ModelMiddleware.layerIdentity,
     ),

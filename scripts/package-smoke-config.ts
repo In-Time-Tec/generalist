@@ -1,22 +1,40 @@
-export const packages = ["core", "test", "skills", "memory", "providers", "mcp", "transport", "foldkit"] as const
+export const packages = [
+  "a2a",
+  "ag-ui",
+  "core",
+  "test",
+  "skills",
+  "memory",
+  "providers",
+  "mcp",
+  "runtime",
+  "transport",
+  "foldkit",
+] as const
 export const compressedSizeLimits: Record<(typeof packages)[number], number> = {
-  core: 125_000,
+  a2a: 50_000,
+  "ag-ui": 30_000,
+  core: 145_000,
   test: 8_000,
   skills: 13_000,
   memory: 10_000,
   providers: 35_000,
   mcp: 12_000,
+  runtime: 80_000,
   transport: 30_000,
   foldkit: 16_000,
 }
 
 export const packedEffectDependencies: Record<(typeof packages)[number], ReadonlyArray<string>> = {
+  a2a: [],
+  "ag-ui": [],
   core: [],
   test: [],
   skills: [],
   memory: [],
   providers: ["@effect/ai-anthropic", "@effect/ai-openai", "@effect/ai-openai-compat", "@effect/ai-openrouter"],
   mcp: [],
+  runtime: ["@effect/sql-pg", "@effect/sql-sqlite-bun"],
   transport: [],
   foldkit: [],
 }

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.14.0
+
+- Add `@batonfx/runtime` as the authoritative addressable Run lifecycle with replay, inspection, waits, cancellation, memory, SQLite, and PostgreSQL stores.
+- Add `@batonfx/a2a` and `@batonfx/ag-ui` as protocol projections over Runtime-owned runs, and move transport and FoldKit onto the same canonical `RunEvent` stream.
+- Add the durable model-turn driver, tree run budgets, and same-run agent handoffs with deterministic operation identities and typed suspension propagation.
+- Expand the lockstep release train from eight to eleven public packages, publishing thirteen checksummed GitHub assets and the exact package tarballs to npm.
+
 ## 0.13.1
 
 - Bound inline-image token estimates across fallback thresholding, recent-context cutting, and post-microcompaction fit checks while preserving text-only estimates.

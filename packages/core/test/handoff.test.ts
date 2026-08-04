@@ -68,83 +68,80 @@ layer(Layer.empty)("Handoff", (it) => {
     })
   })
 
-  it("names transfer tools by registered specialist", () => {
+  it("names delegate tools by registered specialist", () => {
     const registration = Handoff.register(
       Agent.make({ name: "math" }),
       modelLayer(() => Stream.make(textDelta("done"))),
     )
-    const transfer = Handoff.transferTool(registration)
+    const delegate = Handoff.delegateTool(registration)
     expect(registration.name).toBe("math")
-    expect(Object.keys(transfer.tools)).toEqual(["transfer_to_math"])
+    expect(Object.keys(delegate.tools)).toEqual(["delegate_to_math"])
   })
 
-  ItLayer.make(it, "builds a supervisor that routes through registered specialists", () => {
+  ItLayer.make(it, "builds a supervisor that same-run handoffs to specialists", () => {
     let supervisorCalls = 0
-    const math = Handoff.register(
-      Agent.make({ name: "math" }),
-      modelLayer((options) => {
-        const content = promptText(options.prompt)
-        return content.includes("math child task") ? Stream.make(textDelta("42")) : Stream.make(textDelta("unused"))
-      }),
-    )
+    let mathCalls = 0
+    const mathTarget = Handoff.target(Agent.make({ name: "math" }))
+    const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
-        modelLayer(() => {
+        modelLayer((options) => {
+          const content = promptText(options.prompt)
+          if (content.includes("math child task")) {
+            mathCalls += 1
+            return Stream.make(textDelta("42"))
+          }
           supervisorCalls += 1
           return supervisorCalls === 1
-            ? Stream.make(toolCallPart("call-transfer", "transfer_to_math", { prompt: "math child task" }))
+            ? Stream.make(toolCallPart("call-handoff", "handoff_to_math", { prompt: "math child task" }))
             : Stream.make(textDelta("supervisor got 42"))
         }),
-        ToolExecutor.layerToolkit(Handoff.supervisor({ name: "supervisor", specialists: [math] }).toolkit),
+        ToolExecutor.layerToolkit(supervisorSetup.toolkit),
+        supervisorSetup.catalog,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const supervisor = Handoff.supervisor({ name: "supervisor", specialists: [math] })
-        const events = yield* Stream.runCollect(Agent.stream(supervisor.agent, { prompt: "solve" }))
+        const events = yield* Stream.runCollect(
+          Agent.stream(supervisorSetup.agent, {
+            prompt: "solve",
+            sessionId: "session-handoff-1",
+            logicalOperationId: "op-handoff-1",
+          }),
+        )
         const started = events.find((event) => event._tag === "ToolExecutionStarted")
-        expect(started?._tag === "ToolExecutionStarted" && started.call.name).toBe("transfer_to_math")
+        expect(started?._tag === "ToolExecutionStarted" && started.call.name).toBe("handoff_to_math")
+        expect(mathCalls).toBe(1)
         const completed = events.at(-1)
-        expect(completed?._tag === "Completed" && completed.text).toBe("supervisor got 42")
+        expect(completed?._tag === "Completed" && completed.text).toBe("42")
       }),
     ] as const
   })
 
   ItLayer.make(it, "rejects duplicate registered names", () => {
-    const math = (suffix: string) =>
-      Handoff.register(
-        Agent.make({ name: `math${suffix}` }),
-        modelLayer(() => Stream.make(textDelta("unused"))),
-      )
-    const first = Handoff.register(
-      Agent.make({ name: "math" }),
-      modelLayer(() => Stream.make(textDelta("unused"))),
-    )
-    const second = Handoff.register(
-      Agent.make({ name: "math" }),
-      modelLayer(() => Stream.make(textDelta("unused"))),
-    )
-    void math
+    const first = Handoff.target(Agent.make({ name: "math" }))
+    const second = Handoff.target(Agent.make({ name: "math" }))
     let modelCalls = 0
+    const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [first, second] })
     return [
       Layer.mergeAll(
         modelLayer(() => {
           modelCalls += 1
           return Stream.make(textDelta("unexpected"))
         }),
-        ToolExecutor.layerToolkit(Handoff.supervisor({ name: "supervisor", specialists: [first, second] }).toolkit),
+        ToolExecutor.layerToolkit(supervisorSetup.toolkit),
+        supervisorSetup.catalog,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const supervisor = Handoff.supervisor({ name: "supervisor", specialists: [first, second] })
-        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisor.agent, { prompt: "solve" })))
+        const failure = yield* Effect.flip(Stream.runDrain(Agent.stream(supervisorSetup.agent, { prompt: "solve" })))
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
-            name: "transfer_to_math",
+            name: "handoff_to_math",
             origins: [
-              { _tag: "Handoff", specialist: "math" },
-              { _tag: "Handoff", specialist: "math" },
+              { _tag: "Handoff", specialist: "math", mode: "same-run" },
+              { _tag: "Handoff", specialist: "math", mode: "same-run" },
             ],
           }),
         )

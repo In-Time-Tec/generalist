@@ -3,6 +3,8 @@ import { Prompt, Response } from "effect/unstable/ai"
 import { AgentSuspended } from "./agent-event.js"
 import type { AnyToolCall } from "./agent-tool-result.js"
 import type { Request } from "../tools/tool-executor.js"
+import type { ResumeResolution } from "./agent.js"
+import { domainFailureResult, successResult } from "./agent-tool-result.js"
 
 export interface SuspensionCheckpoint {
   readonly call: Prompt.ToolCallPart
@@ -20,6 +22,7 @@ export const suspensionMetadata = Schema.Struct({
   tool_call_batch_ids: Schema.Array(Schema.String),
   active_tools: Schema.optional(Schema.Array(Schema.String)),
   activated_skills: Schema.optional(Schema.Array(Schema.String)),
+  invocation_path: Schema.optional(Schema.Array(Schema.String)),
 })
 
 export const canonicalSuspensionCall = (
@@ -152,7 +155,21 @@ export const sameSuspension = (left: AgentSuspended, right: AgentSuspended): boo
   left.tool_name === right.tool_name &&
   Equal.equals(left.tool_params, right.tool_params) &&
   Equal.equals(left.active_tools, right.active_tools) &&
-  Equal.equals(left.activated_skills, right.activated_skills)
+  Equal.equals(left.activated_skills, right.activated_skills) &&
+  Equal.equals(left.invocation_path, right.invocation_path)
+
+export const resolvedToolResult = (
+  call: AnyToolCall,
+  resolution: Exclude<ResumeResolution, { readonly _tag: "Approved" }>,
+) => {
+  if (resolution._tag === "Denied") {
+    const failure = { reason: "denied", message: resolution.reason ?? "Denied" }
+    return domainFailureResult(call, { _tag: "DomainFailure", failure, encodedFailure: failure })
+  }
+  return resolution._tag === "Signal"
+    ? successResult(call, { _tag: "Success", result: resolution.payload, encodedResult: resolution.payload })
+    : successResult(call, { _tag: "Success", result: resolution.result, encodedResult: resolution.encodedResult })
+}
 
 export const suspended = (
   call: AnyToolCall,
@@ -160,6 +177,11 @@ export const suspended = (
   toolCallIndex: number,
   token: string,
   reason: "tool-wait" | "approval",
+  options: {
+    readonly active_tools?: ReadonlyArray<string>
+    readonly activated_skills?: ReadonlyArray<string>
+    readonly invocation_path?: ReadonlyArray<string>
+  } = {},
 ) =>
   AgentSuspended.make({
     token,
@@ -169,4 +191,7 @@ export const suspended = (
     tool_name: call.name,
     tool_params: call.params,
     tool_call_batch: toolCallBatch.calls.map(canonicalSuspensionCall),
+    ...(options.active_tools === undefined ? {} : { active_tools: [...options.active_tools] }),
+    ...(options.activated_skills === undefined ? {} : { activated_skills: [...options.activated_skills] }),
+    ...(options.invocation_path === undefined ? {} : { invocation_path: [...options.invocation_path] }),
   })

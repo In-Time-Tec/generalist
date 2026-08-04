@@ -18,7 +18,7 @@ import {
 } from "./chat.js"
 import { chatUpdateRuntime } from "./chat-update.js"
 
-const { applyFrame, isServerFrame } = chatUpdateRuntime
+const { applyRunEvent, isRunEvent } = chatUpdateRuntime
 
 /** @experimental */
 export const update: {
@@ -27,8 +27,8 @@ export const update: {
 } = dual(2, (model: Model, action: Action) => {
   switch (action._tag) {
     case "ReceivedAgent":
-      if (isServerFrame(action.incoming)) {
-        const [next, output] = applyFrame(model, action.incoming)
+      if (isRunEvent(action.incoming)) {
+        const [next, output] = applyRunEvent(model, action.incoming)
         return [next, [], output]
       }
       switch (action.incoming._tag) {

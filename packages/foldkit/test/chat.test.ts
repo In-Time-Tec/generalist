@@ -1,454 +1,79 @@
-import { describe, expect, it } from "@effect/vitest"
-import { Cause, Effect, Exit, Layer, Option, Schema, Stream } from "effect"
+import { describe, expect, it } from "vitest"
+import { Option } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
-import { Errors, Wire } from "@batonfx/transport"
-import { Chat, Connection } from "../src/index"
+import { AgentRef, RunEvent } from "@batonfx/runtime"
+import { Chat, Connection } from "../src/index.js"
 
-const eventFrame = (seq: number, event: Wire.LooseEventType): Wire.LooseServerFrameType => ({
-  _tag: "Event",
-  seq,
-  event,
-})
+const agent = AgentRef.make({ id: "assistant", version: "1", digest: "sha256:assistant" })
+const runEvent = (sequence: number, fields: Record<string, unknown>): RunEvent.RunEvent =>
+  ({
+    specVersion: "1",
+    eventId: `run-1:${sequence}`,
+    runId: "run-1",
+    sequence,
+    agent,
+    rootRunId: "run-1",
+    occurredAt: "2026-08-03T00:00:00.000Z",
+    ...fields,
+  }) as RunEvent.RunEvent
 
 const updateWith = (model: Chat.Model, incoming: Connection.Incoming) =>
   Chat.update(model, Chat.ReceivedAgent({ incoming }))
 
-const provideTestLayer =
-  <R, E, RIn>(testLayer: Layer.Layer<R, E, RIn>) =>
-  <A, E2, R2>(effect: Effect.Effect<A, E2, R | R2>) =>
-    Layer.build(testLayer).pipe(Effect.flatMap((context) => Effect.provide(effect, context)))
-
-describe("Chat", () => {
-  it("folds a full run into display entries and a completion output", () => {
-    let model = Chat.initialModel("s-chat")
+describe("Chat RunEvent projection", () => {
+  it("folds canonical model events and the single persisted terminal event", () => {
+    let model = Chat.initialModel("run-1")
     let output: Option.Option<Chat.Output> = Option.none()
 
-    ;[model, , output] = updateWith(model, eventFrame(0, { _tag: "TurnStarted", turn: 0 }))
-    expect(model.run).toEqual({ _tag: "Running", turn: 0 })
-    expect(model.streaming).toEqual({ turn: 0, text: "", reasoning: "" })
-    expect(Option.isNone(output)).toBe(true)
+    ;[model] = updateWith(model, runEvent(0, { _tag: "TurnStarted", turn: 0 }))
     ;[model] = updateWith(
       model,
-      eventFrame(1, {
+      runEvent(1, {
         _tag: "ModelPart",
         turn: 0,
         modelCallId: "model-call-0",
-        modelAttemptId: "model-attempt-0",
+        modelAttemptId: "attempt-0",
         attempt: 0,
-        part: Response.makePart("text-delta", { id: "text-1", delta: "Hello " }),
+        part: Response.makePart("text-delta", { id: "text-1", delta: "Hello" }),
       }),
     )
-    ;[model] = updateWith(
-      model,
-      eventFrame(2, {
-        _tag: "ModelPart",
-        turn: 0,
-        modelCallId: "model-call-0",
-        modelAttemptId: "model-attempt-0",
-        attempt: 0,
-        part: Response.makePart("text-delta", { id: "text-1", delta: "world" }),
-      }),
-    )
-
-    const call = Response.makePart("tool-call", {
-      id: "call-1",
-      name: "lookup",
-      params: { q: "baton" },
-      providerExecuted: false,
-    })
-    ;[model] = updateWith(
-      model,
-      eventFrame(3, {
-        _tag: "ModelPart",
-        turn: 0,
-        modelCallId: "model-call-0",
-        modelAttemptId: "model-attempt-0",
-        attempt: 0,
-        part: call,
-      }),
-    )
-    expect(model.entries).toEqual([
-      {
-        _tag: "ToolEntry",
-        callId: "call-1",
-        name: "lookup",
-        params: { q: "baton" },
-        phase: "called",
-        outcome: { _tag: "Pending" },
-        progress: [],
-      },
-    ])
-    const pendingTool = model.entries[0]
-    if (pendingTool?._tag !== "ToolEntry") throw new Error("expected pending tool entry")
-    expect(Chat.toolStatusOf(pendingTool)).toBe("input-streaming")
-
-    const result = Response.makePart("tool-result", {
-      id: "call-1",
-      name: "lookup",
-      result: { ok: true },
-      encodedResult: { ok: true },
-      isFailure: false,
-      providerExecuted: false,
-      preliminary: false,
-    })
-    ;[model] = updateWith(model, eventFrame(4, { _tag: "ToolExecutionCompleted", turn: 0, call, result }))
-    expect(model.entries[0]).toMatchObject({
-      _tag: "ToolEntry",
-      phase: "executing",
-      outcome: { _tag: "Completed", isFailure: false, result: { ok: true } },
-    })
-    const completedTool = model.entries[0]
-    if (completedTool?._tag !== "ToolEntry") throw new Error("expected completed tool entry")
-    expect(Chat.toolStatusOf(completedTool)).toBe("output-available")
-    ;[model] = updateWith(model, eventFrame(5, { _tag: "TurnCompleted", turn: 0 }))
-    expect(model.streaming).toBeNull()
-    expect(model.entries[1]).toEqual({ _tag: "AssistantEntry", text: "Hello world", reasoning: null })
-    ;[model, , output] = updateWith(model, eventFrame(6, { _tag: "Completed", turns: 1, text: "Done" }))
-    expect(model.run).toEqual({ _tag: "Idle" })
-    expect(Option.getOrUndefined(output)).toEqual({ _tag: "RunCompleted", text: "Done" })
-  })
-
-  it("advances past model telemetry events without changing display state", () => {
-    let model = Chat.initialModel("s-chat")
-    ;[model] = updateWith(model, eventFrame(0, { _tag: "TurnStarted", turn: 0 }))
-    const afterTurnStarted = model
-
-    const telemetryEvents: ReadonlyArray<Wire.LooseEventType> = [
-      {
-        _tag: "ModelCallStarted",
-        deliveryId: "delivery-0",
-        turn: 0,
-        modelCallId: "model-call-0",
-        purpose: "conversation",
-        startedAt: 1,
-      },
-      {
-        _tag: "ModelAttemptStarted",
-        deliveryId: "delivery-1",
-        turn: 0,
-        modelCallId: "model-call-0",
-        modelAttemptId: "model-attempt-0",
-        attempt: 0,
-        startedAt: 2,
-      },
-      {
-        _tag: "ModelAttemptFirstOutput",
-        deliveryId: "delivery-2",
-        turn: 0,
-        modelCallId: "model-call-0",
-        modelAttemptId: "model-attempt-0",
-        attempt: 0,
-        kind: "text",
-        at: 3,
-      },
-      {
-        _tag: "ModelAttemptFailed",
-        deliveryId: "delivery-3",
-        turn: 0,
-        modelCallId: "model-call-0",
-        modelAttemptId: "model-attempt-0",
-        attempt: 0,
-        failedAt: 4,
-        category: "rate-limit",
-        classification: "transient",
-      },
-      {
-        _tag: "ModelRetryScheduled",
-        deliveryId: "delivery-4",
-        turn: 0,
-        modelCallId: "model-call-0",
-        attempt: 0,
-        reason: "provider-resilience",
-        category: "rate-limit",
-        delayMillis: 100,
-        at: 5,
-      },
-      {
-        _tag: "ModelAttemptCompleted",
-        deliveryId: "delivery-5",
-        turn: 0,
-        modelCallId: "model-call-0",
-        modelAttemptId: "model-attempt-1",
-        attempt: 1,
-        completedAt: 6,
-        usage: Response.Usage.make({
-          inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
-          outputTokens: { total: undefined, text: undefined, reasoning: undefined },
-        }),
-        usageAt: 6,
-        finishReason: "stop",
-      },
-      {
-        _tag: "ModelCallCompleted",
-        deliveryId: "delivery-6",
-        turn: 0,
-        modelCallId: "model-call-0",
-        purpose: "conversation",
-        attempts: 2,
-        completedAt: 7,
-      },
-      {
-        _tag: "ModelCallFailed",
-        deliveryId: "delivery-7",
-        turn: 0,
-        modelCallId: "model-call-1",
-        purpose: "structured-output",
-        attempts: 1,
-        failedAt: 8,
-        category: "authentication",
-        classification: "terminal",
-      },
-      {
-        _tag: "CompactionStarted",
-        deliveryId: "delivery-8",
-        turn: 0,
-        compactionId: "compaction-0",
-        trigger: "threshold",
-        startedAt: 9,
-      },
-      {
-        _tag: "CompactionCompleted",
-        deliveryId: "delivery-9",
-        turn: 0,
-        compactionId: "compaction-0",
-        kind: "summarize",
-        completedAt: 10,
-      },
-      {
-        _tag: "CompactionFailed",
-        deliveryId: "delivery-10",
-        turn: 0,
-        compactionId: "compaction-1",
-        failedAt: 11,
-      },
-    ]
-
-    let seq = 1
-    for (const event of telemetryEvents) {
-      const [next, commands, output] = updateWith(model, eventFrame(seq, event))
-      expect(commands).toEqual([])
-      expect(Option.isNone(output)).toBe(true)
-      expect(next).toEqual({ ...afterTurnStarted, lastSeq: seq })
-      model = next
-      seq += 1
-    }
-  })
-
-  it("drops replayed frames whose seq is not newer than lastSeq", () => {
-    const model = { ...Chat.initialModel("s-chat"), lastSeq: 5, entries: [Chat.UserEntry({ text: "already" })] }
-    const [next, commands, output] = updateWith(model, eventFrame(5, { _tag: "TurnStarted", turn: 1 }))
-
-    expect(next).toEqual(model)
-    expect(commands).toEqual([])
-    expect(Option.isNone(output)).toBe(true)
-  })
-
-  it("applies authoritative snapshots before ordinary sequence deduplication", () => {
-    const initial = Chat.initialModel("s-chat")
-    const [fromInitial] = updateWith(initial, {
-      _tag: "Snapshot",
-      seq: -1,
-      transcript: Prompt.make("persisted history"),
-    })
-    expect(fromInitial.entries).toEqual([Chat.UserEntry({ text: "persisted history" })])
-
-    const future = { ...fromInitial, lastSeq: 5 }
-    const [recovered] = updateWith(future, {
-      _tag: "Snapshot",
-      seq: 2,
-      transcript: Prompt.make("authoritative history"),
-    })
-    expect(recovered.lastSeq).toBe(2)
-    expect(recovered.entries).toEqual([Chat.UserEntry({ text: "authoritative history" })])
-  })
-
-  it("surfaces framework failures from terminal frames and session status", () => {
-    const failure = {
-      _tag: "@batonfx/core/FrameworkFailure" as const,
-      stage: "placement" as const,
-      tool: "lookup",
-      message: "worker unavailable",
-    }
-    const failedFrame = Schema.decodeUnknownSync(Wire.LooseServerFrame)({
-      _tag: "Failed",
-      seq: 0,
-      error: failure,
-    })
-    const [failedModel, , failedOut] = updateWith(Chat.initialModel("s-chat"), failedFrame)
-
-    expect(failedModel.run).toEqual({ _tag: "Failed", message: "lookup placement: worker unavailable" })
-    expect(Option.getOrUndefined(failedOut)).toEqual({
-      _tag: "RunFailed",
-      message: "lookup placement: worker unavailable",
-    })
-
-    const statusFrame = Schema.decodeUnknownSync(Wire.LooseServerFrame)({
-      _tag: "SessionStatus",
-      seq: 1,
-      status: { _tag: "Failed", error: failure },
-    })
-    const [statusModel, , statusOut] = updateWith(Chat.initialModel("s-chat"), statusFrame)
-
-    expect(statusModel.run).toEqual({ _tag: "Failed", message: "lookup placement: worker unavailable" })
-    expect(Option.getOrUndefined(statusOut)).toEqual({
-      _tag: "RunFailed",
-      message: "lookup placement: worker unavailable",
-    })
-  })
-
-  it("surfaces approval suspension and emits approval commands", () => {
-    let model = Chat.initialModel("s-chat")
-    let output: Option.Option<Chat.Output> = Option.none()
+    ;[model] = updateWith(model, runEvent(2, { _tag: "TurnCompleted", turn: 0, transcript: Prompt.empty }))
     ;[model, , output] = updateWith(
       model,
-      Schema.decodeUnknownSync(Wire.LooseServerFrame)({
-        _tag: "Suspended",
-        seq: 0,
-        suspension: {
-          _tag: "@batonfx/core/AgentSuspended",
-          token: "approval-token",
+      runEvent(3, {
+        _tag: "RunCompleted",
+        result: { text: "Hello", turns: 1, transcript: Prompt.empty },
+      }),
+    )
+
+    expect(model.lastSeq).toBe(3)
+    expect(model.entries).toEqual([{ _tag: "AssistantEntry", text: "Hello", reasoning: null }])
+    expect(model.run).toEqual({ _tag: "Idle" })
+    expect(Option.getOrUndefined(output)).toEqual({ _tag: "RunCompleted", text: "Hello" })
+  })
+
+  it("projects waits and failures without synthetic status or ended frames", () => {
+    let model = Chat.initialModel("run-1")
+    let output: Option.Option<Chat.Output>
+    ;[model, , output] = updateWith(
+      model,
+      runEvent(4, {
+        _tag: "RunWaiting",
+        wait: {
+          waitId: "wait-1",
           reason: "approval",
-          tool_call_id: "call-approval",
-          tool_name: "lookup",
-          tool_params: { q: "baton" },
-          tool_call_batch: [
-            {
-              type: "tool-call",
-              id: "call-approval",
-              name: "lookup",
-              params: { q: "baton" },
-              providerExecuted: false,
-              metadata: {},
-            },
-          ],
+          status: "open",
+          openedAt: "2026-08-03T00:00:00.000Z",
         },
       }),
     )
+    expect(model.run._tag).toBe("AwaitingApproval")
+    expect(Option.getOrUndefined(output)?._tag).toBe("ApprovalRequired")
+    ;[model, , output] = updateWith(model, runEvent(5, { _tag: "RunFailed", error: { message: "failed" } }))
+    expect(model.run).toEqual({ _tag: "Failed", message: "failed" })
+    expect(Option.getOrUndefined(output)).toEqual({ _tag: "RunFailed", message: "failed" })
 
-    expect(model.run).toEqual({
-      _tag: "AwaitingApproval",
-      token: "approval-token",
-      toolName: "lookup",
-      params: { q: "baton" },
-    })
-    expect(Option.getOrUndefined(output)).toEqual({ _tag: "ApprovalRequired" })
-
-    const [, commands] = Chat.update(model, Chat.ClickedApprove())
-    expect(commands).toHaveLength(1)
-    expect(commands[0]?.name).toBe("ResolveApproval")
-    expect(commands[0]?.args).toEqual({
-      sessionId: "s-chat",
-      token: "approval-token",
-      approved: true,
-      reason: null,
-    })
-  })
-
-  it("submitting a message emits the send command", () => {
-    let model = Chat.initialModel("s-chat")
-    ;[model] = Chat.update(model, Chat.ChangedDraft({ text: "hello" }))
-    const [next, commands] = Chat.update(model, Chat.SubmittedMessage())
-
-    expect(next.draft).toBe("")
-    expect(next.entries).toEqual([Chat.UserEntry({ text: "hello" })])
-    expect(commands).toHaveLength(1)
-    expect(commands[0]).toMatchObject({ name: "SendUserMessage", args: { sessionId: "s-chat", text: "hello" } })
-  })
-
-  it.effect("preserves a typed command failure as a structured action", () => {
-    const error = Connection.SendFailed.make({ reason: "command rejected" })
-    const command: Chat.ChatCommand = Chat.CancelRun({ sessionId: "s-chat" })
-
-    return Effect.gen(function* () {
-      const action = yield* command.effect
-
-      expect(action).toEqual(Chat.FailedAgentCommand({ operation: "cancel", error, reason: "command rejected" }))
-      expect(Schema.is(Chat.Action)(action)).toBe(true)
-    }).pipe(
-      provideTestLayer(
-        Connection.layerTest({
-          frames: () => Stream.empty,
-          send: () => Effect.fail(error),
-        }),
-      ),
-    )
-  })
-
-  it.effect("retains transport command error tags and fields", () => {
-    const error = Errors.TransportError.make({ message: "socket closed" })
-    return Effect.gen(function* () {
-      const action = yield* Chat.SendUserMessage({ sessionId: "s-chat", text: "hello" }).effect
-
-      expect(action).toEqual(Chat.FailedAgentCommand({ operation: "send", error, reason: "socket closed" }))
-    }).pipe(
-      provideTestLayer(
-        Connection.layerTest({
-          frames: () => Stream.empty,
-          send: () => Effect.fail(error),
-        }),
-      ),
-    )
-  })
-
-  it.effect("labels approval command failures", () => {
-    const error = Connection.SendFailed.make({ reason: "approval rejected" })
-    return Effect.gen(function* () {
-      const action = yield* Chat.ResolveApproval({
-        sessionId: "s-chat",
-        token: "approval-token",
-        approved: false,
-        reason: null,
-      }).effect
-
-      expect(action).toEqual(
-        Chat.FailedAgentCommand({ operation: "resolveApproval", error, reason: "approval rejected" }),
-      )
-    }).pipe(
-      provideTestLayer(
-        Connection.layerTest({
-          frames: () => Stream.empty,
-          send: () => Effect.fail(error),
-        }),
-      ),
-    )
-  })
-
-  it.effect("keeps command defects and interruption out of UI actions", () => {
-    const commandExit = (send: Connection.Interface["send"]) =>
-      Chat.CancelRun({ sessionId: "s-chat" }).effect.pipe(
-        provideTestLayer(
-          Connection.layerTest({
-            frames: () => Stream.empty,
-            send,
-          }),
-        ),
-        Effect.exit,
-      )
-
-    return Effect.gen(function* () {
-      const defectExit = yield* commandExit(() => Effect.die("command defect"))
-      const interruptExit = yield* commandExit(() => Effect.interrupt)
-
-      expect(Exit.isFailure(defectExit) && Cause.hasDies(defectExit.cause)).toBe(true)
-      expect(Exit.isFailure(interruptExit) && Cause.hasInterrupts(interruptExit.cause)).toBe(true)
-    })
-  })
-
-  it.effect("preserves unexpected reasons in a composite command cause", () => {
-    const error = Connection.SendFailed.make({ reason: "command rejected" })
-    const cause = Cause.combine(Cause.fail(error), Cause.die("command defect"))
-    return Effect.gen(function* () {
-      const exit = yield* Effect.exit(Chat.CancelRun({ sessionId: "s-chat" }).effect)
-
-      expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true)
-      expect(Exit.isFailure(exit) && Cause.hasFails(exit.cause)).toBe(false)
-    }).pipe(
-      provideTestLayer(
-        Connection.layerTest({
-          frames: () => Stream.empty,
-          send: () => Effect.failCause(cause),
-        }),
-      ),
-    )
+    const unchanged = updateWith(model, runEvent(5, { _tag: "RunCancelled" }))[0]
+    expect(unchanged).toEqual(model)
   })
 })

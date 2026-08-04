@@ -1,2 +1,2 @@
-suspended on deploy with token deploy-token-1
+waiting for approval on deploy-1
 Deployed api to production.

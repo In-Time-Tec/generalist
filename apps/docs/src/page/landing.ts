@@ -120,22 +120,20 @@ const pairSection = (): Html =>
           h.div(
             [h.Class("rounded-lg border border-gray-300 bg-cream/60 p-6 dark:border-gray-700 dark:bg-gray-850")],
             [
-              h.p([h.Class("font-medium text-gray-900 dark:text-white")], ["Two packages, one agent."]),
+              h.p([h.Class("font-medium text-gray-900 dark:text-white")], ["One agent, two execution modes."]),
               h.p(
                 [h.Class("mt-2 text-gray-600 dark:text-gray-400")],
                 [
-                  h.strong([h.Class("text-gray-900 dark:text-white")], ["Batonfx"]),
-                  " builds agents that run in your process, with storage and delivery owned by you. Start here. ",
+                  h.strong([h.Class("text-gray-900 dark:text-white")], ["@batonfx/core"]),
+                  " defines the agent loop and its Effect services. Run it directly for process-local work, or add ",
                   h.a(
                     [
-                      h.Href("https://relayfx-docs.up.railway.app"),
-                      h.Target("_blank"),
-                      h.Rel("noreferrer"),
+                      h.Href("/docs/learn/native-runtime"),
                       h.Class("font-medium text-accent-600 underline underline-offset-4 dark:text-accent-400"),
                     ],
-                    ["Relayfx"],
+                    ["@batonfx/runtime"],
                   ),
-                  " makes their runs durable on your Postgres. Add it when runs must survive deploys, crashes, and multi-day waits.",
+                  " for addressable runs, canonical event replay, durable waits, and memory, SQLite, PostgreSQL, or MySQL storage.",
                 ],
               ),
             ],
@@ -180,8 +178,8 @@ const promiseSection = (): Html =>
                 "ToolExecutor, Approvals, TurnPolicy, and ModelRegistry are Effect services with test layers.",
               ),
               pillarCard(
-                "Host-owned durability",
-                "Batonfx emits an ordered event stream. What persists, and where, is your decision.",
+                "Native durability",
+                "@batonfx/runtime persists addressable runs and their canonical event streams in the store you choose.",
               ),
             ],
           ),
@@ -407,21 +405,19 @@ const honestySection = (): Html =>
               h.p(
                 [h.Class("mt-4 text-gray-600 dark:text-gray-400")],
                 [
-                  "Batonfx persists nothing by design; bring your own store. It runs in one process, with no distribution and no replay. If a run must survive a deploy, a crash, or a multi-day wait, that durability lives above it.",
+                  "The @batonfx/core agent loop is process-local. Durable execution is explicit rather than hidden: add @batonfx/runtime and choose SQLite for one process or PostgreSQL/MySQL for multi-worker execution.",
                 ],
               ),
               h.p(
                 [h.Class("mt-4 text-gray-600 dark:text-gray-400")],
                 [
-                  "Need durable runs over Postgres? See ",
+                  "For addressable runs, replay, waits, recovery, and store choices, see ",
                   h.a(
                     [
-                      h.Href("https://relayfx-docs.up.railway.app"),
-                      h.Target("_blank"),
-                      h.Rel("noreferrer"),
+                      h.Href("/docs/learn/native-runtime"),
                       h.Class("font-medium text-accent-600 underline underline-offset-4 dark:text-accent-400"),
                     ],
-                    ["Relayfx"],
+                    ["the native Runtime"],
                   ),
                   ".",
                 ],
@@ -435,9 +431,9 @@ const honestySection = (): Html =>
               h.ul(
                 [h.Class("mt-4 space-y-3")],
                 [
-                  checkItem("Effect apps that need an agent loop inside the process"),
-                  checkItem("Teams that already own storage and want seams, not a platform"),
-                  crossItem("Durable, multi-node orchestration"),
+                  checkItem("Effect apps that need a composable agent loop"),
+                  checkItem("Teams that need durable, addressable agent runs without a hosted platform"),
+                  crossItem("A general-purpose workflow engine"),
                   crossItem("Non-Effect codebases"),
                 ],
               ),

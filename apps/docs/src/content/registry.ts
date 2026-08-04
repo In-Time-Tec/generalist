@@ -17,7 +17,7 @@ import { structuredOutput } from "../pages/guides/structured-output"
 import { testingEvals } from "../pages/guides/testing-evals"
 import { turnPolicy } from "../pages/guides/turn-policy"
 import { agentLoop } from "../pages/learn/agent-loop"
-import { batonAndRelay } from "../pages/learn/baton-and-relay"
+import { nativeRuntime } from "../pages/learn/native-runtime"
 import { comparisons } from "../pages/learn/comparisons"
 import { onePayloadVocabulary } from "../pages/learn/one-payload-vocabulary"
 import { seamsAsServices } from "../pages/learn/seams-as-services"
@@ -29,10 +29,13 @@ import { coreEventsReference } from "../pages/reference/core-events"
 import { coreModelsReference } from "../pages/reference/core-models"
 import { corePoliciesReference } from "../pages/reference/core-policies"
 import { coreToolsReference } from "../pages/reference/core-tools"
+import { a2aReference } from "../pages/reference/a2a"
+import { agUiReference } from "../pages/reference/ag-ui"
 import { foldkitReference } from "../pages/reference/foldkit"
 import { mcpReference } from "../pages/reference/mcp"
 import { memoryReference } from "../pages/reference/memory"
 import { providersReference } from "../pages/reference/providers"
+import { runtimeReference } from "../pages/reference/runtime"
 import { skillsReference } from "../pages/reference/skills"
 import { testReference } from "../pages/reference/test"
 import { transportReference } from "../pages/reference/transport"
@@ -56,7 +59,7 @@ export const allPages: ReadonlyArray<DocsPage> = [
   seamsAsServices,
   suspension,
   sessionsAndHistory,
-  batonAndRelay,
+  nativeRuntime,
   comparisons,
   defineTools,
   approvals,
@@ -81,6 +84,9 @@ export const allPages: ReadonlyArray<DocsPage> = [
   corePoliciesReference,
   coreModelsReference,
   coreContextReference,
+  runtimeReference,
+  a2aReference,
+  agUiReference,
   providersReference,
   mcpReference,
   skillsReference,
@@ -114,6 +120,9 @@ export const legacyRedirects: ReadonlyMap<string, string> = new Map([
   ["/docs/core/steering", "/docs/guides/steering"],
   ["/docs/core/compaction", "/docs/guides/compaction"],
   ["/docs/core/multi-agent", "/docs/guides/multi-agent"],
+  ["/docs/packages/a2a", "/docs/reference/a2a"],
+  ["/docs/packages/ag-ui", "/docs/reference/ag-ui"],
+  ["/docs/packages/runtime", "/docs/reference/runtime"],
   ["/docs/packages/skills", "/docs/guides/skills"],
   ["/docs/packages/providers", "/docs/guides/providers"],
   ["/docs/packages/memory", "/docs/guides/memory"],
@@ -192,7 +201,7 @@ export const searchDocs = (query: string, limit = 8): ReadonlyArray<SearchResult
 }
 
 const siteTagline =
-  "Batonfx: a TypeScript framework for building AI agents on Effect. Agents are plain values, runs are typed event streams, and every seam is an Effect service with a deterministic test layer, with durability left to the host."
+  "Batonfx: an Effect-native TypeScript agent framework with plain-value agents, typed event streams, deterministic service seams, and an optional native durable Runtime."
 
 export const llmsIndex = (): string => {
   const header: ReadonlyArray<string> = ["# Batonfx", "", `> ${siteTagline}`, ""]

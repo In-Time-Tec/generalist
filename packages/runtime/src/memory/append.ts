@@ -1,0 +1,193 @@
+import { DateTime, Effect, Option, Queue } from "effect"
+import type { Address } from "../address.js"
+import { RuntimeUnavailable, SubscriberLagged } from "../errors.js"
+import { isTerminal, type RunStatus } from "../run.js"
+import type { AgentLoopEvent, AgentResult } from "../agent-event.js"
+import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run-event.js"
+import type { MemoryState, StoredRun, SubscriberQueue } from "./state.js"
+
+const occurredAt = DateTime.now.pipe(Effect.map(DateTime.formatIso))
+
+const baseFields = (run: StoredRun, sequence: number, occurredAtValue: string): RunEventBase => ({
+  specVersion: "1",
+  eventId: eventIdFor(run.runId, sequence),
+  runId: run.runId,
+  sequence,
+  agent: run.agent,
+  rootRunId: run.rootRunId,
+  occurredAt: occurredAtValue,
+  ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
+  ...(run.message.causationId === undefined ? {} : { causationId: run.message.causationId }),
+  ...(run.message.correlationId === undefined ? {} : { correlationId: run.message.correlationId }),
+  ...(run.attempt > 0 ? { attemptId: `${run.runId}:attempt:${run.attempt}` } : {}),
+})
+
+export const appendEvent = (
+  state: MemoryState,
+  runId: string,
+  build: (base: RunEventBase, run: StoredRun) => RunEvent,
+  nextStatus?: RunStatus,
+): Effect.Effect<readonly [RunEvent, MemoryState], RuntimeUnavailable> =>
+  Effect.gen(function* () {
+    if (state.closed) {
+      return yield* RuntimeUnavailable.make({ message: "runtime store released" })
+    }
+    const run = state.runs.get(runId)
+    if (run === undefined) {
+      return yield* RuntimeUnavailable.make({ message: `run ${runId} missing during append` })
+    }
+    const sequence = run.lastSequence + 1
+    const at = yield* occurredAt
+    const event = build(baseFields(run, sequence, at), run)
+    const subscribers = new Map(run.subscribers)
+    for (const [subscriberId, queue] of run.subscribers) {
+      const offered = yield* Queue.offer(queue, event)
+      if (!offered) {
+        yield* Queue.fail(queue, SubscriberLagged.make({ runId, lastDeliveredSequence: run.lastSequence }))
+        subscribers.delete(subscriberId)
+      }
+    }
+    const updated: StoredRun = {
+      ...run,
+      runId: run.runId,
+      status: nextStatus ?? run.status,
+      agent: run.agent,
+      address: run.address,
+      message: run.message,
+      rootRunId: run.rootRunId,
+      respondedWaitIds: run.respondedWaitIds,
+      lastSequence: sequence,
+      attempt: event._tag === "RunAttemptStarted" ? event.attempt : run.attempt,
+      cancellationRequested: event._tag === "RunCancellationRequested" ? true : run.cancellationRequested,
+      children: run.children,
+      events: [...run.events, event],
+      subscribers,
+      ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
+      ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
+      ...(event._tag === "RunWaiting"
+        ? { activeWaitId: event.wait.waitId, wait: event.wait }
+        : event._tag === "RunResumed"
+          ? run.wait === undefined
+            ? {}
+            : { wait: run.wait }
+          : run.activeWaitId === undefined
+            ? {}
+            : { activeWaitId: run.activeWaitId }),
+      ...(event._tag === "RunCancellationRequested"
+        ? event.reason === undefined
+          ? run.cancelReason === undefined
+            ? {}
+            : { cancelReason: run.cancelReason }
+          : { cancelReason: event.reason }
+        : run.cancelReason === undefined
+          ? {}
+          : { cancelReason: run.cancelReason }),
+      ...(event._tag === "RunCancelled" || event._tag === "RunCompleted" || event._tag === "RunFailed"
+        ? { terminalEventId: event.eventId }
+        : run.terminalEventId === undefined
+          ? {}
+          : { terminalEventId: run.terminalEventId }),
+    }
+    const runs = new Map(state.runs)
+    runs.set(runId, updated)
+    return [event, { ...state, runs }] as const
+  })
+
+export const appendLifecycle = (
+  state: MemoryState,
+  runId: string,
+  event: Omit<LifecycleEvent, keyof RunEventBase> & { readonly _tag: LifecycleEvent["_tag"] },
+  nextStatus?: RunStatus,
+): Effect.Effect<readonly [RunEvent, MemoryState], RuntimeUnavailable> =>
+  appendEvent(state, runId, (base) => ({ ...base, ...event }) as RunEvent, nextStatus)
+
+export const appendAgentEvent = (
+  state: MemoryState,
+  runId: string,
+  event: AgentLoopEvent,
+): Effect.Effect<readonly [RunEvent, MemoryState], RuntimeUnavailable> =>
+  appendEvent(state, runId, (base) => ({ ...base, ...event }))
+
+export const makeAccepted = (address: Address, messageId: string) =>
+  ({
+    _tag: "RunAccepted" as const,
+    messageId,
+    address,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunAccepted" }>, keyof RunEventBase>
+
+export const makeAttemptStarted = (attempt: number) =>
+  ({
+    _tag: "RunAttemptStarted" as const,
+    attempt,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunAttemptStarted" }>, keyof RunEventBase>
+
+export const makeWaiting = (wait: import("../run-wait.js").RunWait) =>
+  ({
+    _tag: "RunWaiting" as const,
+    wait,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunWaiting" }>, keyof RunEventBase>
+
+export const makeResumed = (waitId: string, resolution: import("../run-wait.js").WaitResolution) =>
+  ({
+    _tag: "RunResumed" as const,
+    waitId,
+    resolution,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunResumed" }>, keyof RunEventBase>
+
+export const makeUnknown = (operationId: string) =>
+  ({
+    _tag: "OperationUnknown" as const,
+    operationId,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "OperationUnknown" }>, keyof RunEventBase>
+
+export const makeChildLinked = (childRunId: string, invocationId: string) =>
+  ({
+    _tag: "ChildLinked" as const,
+    childRunId,
+    invocationId,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
+
+export const makeChildSettled = (childRunId: string, terminalEventId: string) =>
+  ({
+    _tag: "ChildSettled" as const,
+    childRunId,
+    terminalEventId,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildSettled" }>, keyof RunEventBase>
+
+export const makeCompleted = (
+  result: AgentResult,
+): Omit<Extract<LifecycleEvent, { _tag: "RunCompleted" }>, keyof RunEventBase> =>
+  ({
+    _tag: "RunCompleted" as const,
+    result,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunCompleted" }>, keyof RunEventBase>
+
+export const makeFailed = (error: RunFailure) =>
+  ({
+    _tag: "RunFailed" as const,
+    error,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunFailed" }>, keyof RunEventBase>
+
+export const makeCancellationRequested = (reason?: string) =>
+  ({
+    _tag: "RunCancellationRequested" as const,
+    ...(reason === undefined ? {} : { reason }),
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunCancellationRequested" }>, keyof RunEventBase>
+
+export const makeCancelled = (reason?: string) =>
+  ({
+    _tag: "RunCancelled" as const,
+    ...(reason === undefined ? {} : { reason }),
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunCancelled" }>, keyof RunEventBase>
+
+export const requireOpenRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, RuntimeUnavailable> => {
+  if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
+  const run = state.runs.get(runId)
+  if (run === undefined) return Effect.fail(RuntimeUnavailable.make({ message: `run ${runId} missing` }))
+  return Effect.succeed(run)
+}
+
+export const rejectIfTerminal = (run: StoredRun): Option.Option<"succeeded" | "failed" | "cancelled"> =>
+  isTerminal(run.status) ? Option.some(run.status) : Option.none()
+
+export type { SubscriberQueue }

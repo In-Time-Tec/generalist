@@ -13,6 +13,8 @@ import {
 } from "./package-smoke-config.js"
 
 const exports = [
+  "@batonfx/a2a",
+  "@batonfx/ag-ui",
   "@batonfx/core",
   "@batonfx/test",
   "@batonfx/skills",
@@ -31,13 +33,14 @@ const exports = [
   "@batonfx/providers/embedding",
   "@batonfx/mcp",
   "@batonfx/mcp/baton",
+  "@batonfx/runtime",
   "@batonfx/transport",
   "@batonfx/transport/client",
   "@batonfx/transport/errors",
   "@batonfx/transport/sse",
   "@batonfx/transport/ws",
   "@batonfx/transport/wire",
-  "@batonfx/transport/session-registry",
+  "@batonfx/transport/snapshot",
   "@batonfx/foldkit",
 ] as const
 
@@ -336,15 +339,22 @@ server.listen(0, "127.0.0.1", () => {
     path.join(consumerDirectory, "runtime.mjs"),
     `const specifiers = ${JSON.stringify(exports)}
 for (const specifier of specifiers) await import(specifier)
+const { A2A } = await import("@batonfx/a2a")
+const { AgUi } = await import("@batonfx/ag-ui")
 const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("@batonfx/core")
 const { VectorStore } = await import("@batonfx/memory")
 const { McpToolSource } = await import("@batonfx/mcp")
 const { Catalog, OpenAi } = await import("@batonfx/providers")
 const skills = await import("@batonfx/skills")
 const { TestModel } = await import("@batonfx/test")
+const { Runtime, RunEvent } = await import("@batonfx/runtime")
+const { Snapshot, Wire } = await import("@batonfx/transport")
 const { Config, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
+for (const value of [A2A.layer, AgUi.layer, Runtime.layerMemory, RunEvent.RunEvent, Snapshot.get, Wire.observerCodec]) {
+  if (value === undefined) throw new Error("Runtime adapter package export is missing")
+}
 const tool = Tool.make("identity_proof", { parameters: Schema.Struct({ value: Schema.String }) })
 const agent = Agent.make({ name: "identity-proof", toolkit: Toolkit.make(tool) })
 const layers = [

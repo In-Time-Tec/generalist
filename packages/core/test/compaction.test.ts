@@ -187,13 +187,11 @@ describe("Compaction", () => {
       const secondArray = ["value"]
       Object.defineProperty(firstArray, "1.5", { value: "first", enumerable: true })
       Object.defineProperty(secondArray, "1.5", { value: "second", enumerable: true })
-      class LossyArray extends Array<string> {
-        toJSON() {
-          return ["constant"]
-        }
-      }
+      class LossyArray extends Array<string> {}
       const firstSubclass = new LossyArray("first")
       const secondSubclass = new LossyArray("second")
+      Object.defineProperty(firstSubclass, "toJSON", { value: () => ["constant"] })
+      Object.defineProperty(secondSubclass, "toJSON", { value: () => ["constant"] })
       expect(firstSubclass[0]).not.toBe(secondSubclass[0])
       expect(JSON.stringify(firstSubclass)).toBe(JSON.stringify(secondSubclass))
       const values = [

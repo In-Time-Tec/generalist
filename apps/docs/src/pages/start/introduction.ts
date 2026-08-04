@@ -10,9 +10,9 @@ export const introduction = definePage({
     "Batonfx is a TypeScript framework for building AI agents on Effect: agents are plain values, runs are typed event streams, and every seam is an Effect service with a deterministic test layer.",
   content: [
     p(
-      "Batonfx is a TypeScript framework for building AI agents on Effect. It is standalone and non-durable, built on ",
+      "Batonfx is a TypeScript framework for building AI agents on Effect, built on ",
       code("effect/unstable/ai"),
-      ", and it covers what an agent needs beyond a model call: turn iteration, permissions, human approval as typed suspension, steering, and deterministic test seams. An agent is a plain value: a name, instructions, a toolkit, and a turn policy. A run is an Effect stream of typed events (the model call, each tool execution, each turn boundary) that you fold, observe, or forward to a browser. There is no runtime process to operate and no storage Batonfx owns: durability, persistence, and identity stay with the host application.",
+      ", and it covers what an agent needs beyond a model call: turn iteration, permissions, human approval as typed suspension, steering, and deterministic test seams. An agent is a plain value: a name, instructions, a toolkit, and a turn policy. Run it directly through @batonfx/core for process-local work, or use @batonfx/runtime for addressable runs, durable waits, canonical event replay, and database-backed recovery.",
     ),
     p(
       "Every capability is an Effect service. A run always needs a language model; local tools add their Effect AI handler layer; placement, approvals, middleware, permissions, memory, skills, compaction, and steering are optional seams discovered at runtime. Absent means default behavior, and every behavior-bearing seam ships a test layer, so agents run deterministically in CI with zero credentials.",
@@ -24,22 +24,20 @@ export const introduction = definePage({
     codeBlock({ label: "eval.ts", source: evalSource, expectedOutput: evalExpected }),
     h2("when-to-use-batonfx", "When to use Batonfx"),
     bullets(
-      "In-process agents: CLIs, scripts, servers, and tests that need a tool-calling loop without external infrastructure.",
+      "Process-local agents: CLIs, scripts, servers, and tests can run @batonfx/core without external infrastructure.",
       "Human-in-the-loop flows: approval-gated tools suspend the run as a typed error carrying a resume token.",
-      "Streaming chat: an in-memory session registry serves the event stream over SSE and WebSocket, with a headless FoldKit chat model for the browser.",
+      "Streaming chat: @batonfx/transport projects Runtime-owned RunEvents over SSE and WebSocket, with a headless FoldKit chat model for the browser.",
       "Deterministic CI: scripted models and test layers on every seam make agent behavior assertable.",
     ),
     h2("non-goals", "Non-goals"),
     p(
-      "Batonfx will not grow a workflow engine, a database, a project scaffold, or a hosted platform. Multi-step orchestration, persistence, and deployment belong to your application, or to Relayfx when they must be durable. A framework that owns only the agent stays small enough to read, swap, and leave.",
+      "Batonfx is not a general-purpose workflow engine, project scaffold, or hosted platform. @batonfx/runtime owns agent-run durability and storage adapters; wider application orchestration and deployment remain yours.",
     ),
-    h2("where-relayfx-fits", "Where Relayfx fits"),
+    h2("where-runtime-fits", "Where @batonfx/runtime fits"),
     p(
-      "Batonfx deliberately does not own durable state: no event-log storage, no database schema, no addressable executions. That is the domain of ",
-      link("https://relayfx-docs.up.railway.app", "Relayfx"),
-      ", the durable agent runtime that composes Batonfx for turn iteration inside crash-proof executions on your own Postgres. Batonfx is the agent; Relayfx is the durable race it runs in. Use Batonfx alone for process-local agents; run it inside Relayfx when runs must survive restarts and multi-day waits. ",
-      link("/docs/learn/baton-and-relay", "Baton and Relay: where durability lives"),
-      " covers the split in depth.",
+      "@batonfx/runtime composes the core agent loop into finite, addressable runs. It owns idempotent admission, persisted RunEvents, waits and signals, cancellation, inspection, and recovery. Use its memory layer for local development, SQLite for durable single-process execution, or PostgreSQL/MySQL for durable multi-worker execution. ",
+      link("/docs/learn/native-runtime", "Core and Runtime: where durability lives"),
+      " covers the package boundary in depth.",
     ),
     h2("next-steps", "Next steps"),
     bullets(

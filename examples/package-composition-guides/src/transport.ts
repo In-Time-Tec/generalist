@@ -1,25 +1,39 @@
-import { Console, Effect, Layer } from "effect"
+import { Console, Effect, Layer, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Chat } from "@batonfx/core"
+import { Address, AgentHost, AgentRef, RunStore, Runtime } from "@batonfx/runtime"
 import { TestModel } from "@batonfx/test"
-import { SessionRegistry } from "@batonfx/transport"
+import { Sse } from "@batonfx/transport"
 
+const agent = Agent.make({ name: "transport-agent" })
+const agentRef = AgentRef.make({ id: "transport-agent", version: "1", digest: "sha256:transport-agent" })
+const agentAddress = Address.make("agent:transport-guide")
 const agentServices = Layer.mergeAll(
   TestModel.layer([TestModel.text("Hello from transport.")]),
   Chat.layerPersisted({ storeId: "composition-guide-sessions" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
 )
 
-const registryLayer = SessionRegistry.layerMemory({
-  agent: Agent.make({ name: "transport-agent" }),
-  onConcurrentMessage: "enqueue",
-  pendingMessageCapacity: 16,
-  maxConcurrentRuns: 4,
-}).pipe(Layer.provide(agentServices))
+const runtimeLayer = Runtime.layerMemory({
+  agents: [{ ref: agentRef, agent, services: agentServices }],
+  addresses: [{ address: agentAddress, agent: agentRef }],
+  subscriberQueueCapacity: 16,
+})
 
-const program = SessionRegistry.SessionRegistry.use((registry) =>
-  registry
-    .open({ sessionId: "guide-session" })
-    .pipe(Effect.flatMap((session) => Console.log(`opened ${session.sessionId}`))),
-).pipe(Effect.provide(registryLayer))
+const program = Effect.gen(function* () {
+  const runtime = yield* Runtime.Runtime
+  const receipt = yield* runtime.send({
+    to: agentAddress,
+    sessionId: "guide-session",
+    idempotencyKey: "guide-message-1",
+    prompt: "Say hello",
+  })
+  const store = yield* RunStore.RunStore
+  const host = yield* AgentHost.AgentHost
+  yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "composition-guide" }))
+  const first = yield* runtime.events({ runId: receipt.runId }).pipe(Stream.take(1), Stream.runCollect)
+  yield* Console.log(
+    `admitted ${receipt.runId}; first event: ${Array.from(first)[0]?._tag}; SSE schema: ${Sse.streamSuccess._tag}`,
+  )
+}).pipe(Effect.provide(runtimeLayer))
 
 await Effect.runPromise(program)

@@ -52,7 +52,20 @@ describe("release workflows", () => {
     expect(source).toContain('npm publish "$filename" "${publish_args[@]}"')
     expect(source).toContain('[[ "$registry_integrity" == "$local_integrity" ]]')
     expect(source.match(/'\.packages\[\] \| \.name'/g)).toHaveLength(2)
-    for (const packageName of ["core", "foldkit", "mcp", "memory", "providers", "skills", "test", "transport"]) {
+    expect(source.match(/\(\.packages \| length\) == 11/g)).toHaveLength(2)
+    for (const packageName of [
+      "a2a",
+      "ag-ui",
+      "core",
+      "foldkit",
+      "mcp",
+      "memory",
+      "providers",
+      "runtime",
+      "skills",
+      "test",
+      "transport",
+    ]) {
       expect(source).toContain(`batonfx-${packageName}-\${VERSION}.tgz`)
     }
     expect(source).not.toMatch(/bun publish|Rewrite package manifests/)

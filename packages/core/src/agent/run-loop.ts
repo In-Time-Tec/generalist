@@ -18,18 +18,27 @@ import {
 import { TurnPolicyError } from "../turn/turn-policy.js"
 import type { LanguageModelNotRegistered } from "../model/model-registry.js"
 import type { AnyToolCall } from "./agent-tool-result.js"
-import type { SuspensionCheckpoint } from "./agent-suspension.js"
-import type { RunError } from "./agent.js"
+import { resolvedToolResult, type SuspensionCheckpoint } from "./agent-suspension.js"
+import type { ResumeResolution, RunError } from "./agent.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
 import type { Input } from "../turn/steering.js"
-import type { Completed, Event, StructuredOutput, TurnCompleted } from "./agent-event.js"
+import type { Event, StructuredOutput } from "./agent-event.js"
 import { applyPromptChain } from "./agent-message.js"
 import type { ObjectSchema, RunLoopContext, StructuredRunConfig } from "./run-loop-context.js"
 import type { Request } from "../tools/tool-executor.js"
 import { select } from "../tools/tool-registry.js"
+import {
+  checkpoint as driverCheckpoint,
+  intercept,
+  logicalOperationId,
+  recordSuspension,
+} from "../durable/driver-run.js"
+import { operationKey } from "../durable/driver-interpreter.js"
+import { LoopDriverState } from "../durable/loop-driver-state.js"
+import { DriverStateInvalid } from "../durable/durable-driver.js"
+import { terminalCompletedEvent, turnCompletedEvent } from "./model-turn-finish.js"
 const providerOutputState = () => ({ textCharacters: 0, reasoningCharacters: 0, finishReason: undefined })
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
-
 export const makeRunLoop = <
   Tools extends Record<string, Tool.Any>,
   R,
@@ -39,6 +48,7 @@ export const makeRunLoop = <
 ): Stream.Stream<Event, RunError, R | StructuredOutputSchema["DecodingServices"]> => {
   const {
     agent,
+    options,
     state,
     chat,
     chain,
@@ -62,24 +72,13 @@ export const makeRunLoop = <
     checkpointSuspended,
     pendingResults,
     toolCallEvents,
+    resumeApproved,
     rememberTurn,
     withSystem,
     steeringDrainedEvent,
     isTurnPolicyDecision,
+    handoffStateRef,
   } = context
-  const turnCompletedEvent = (turn: number, transcript: Prompt.Prompt): TurnCompleted => ({
-    _tag: "TurnCompleted",
-    turn,
-    transcript,
-    ...(state.finish === undefined ? {} : { usage: state.finish.usage, finishReason: state.finish.reason }),
-  })
-  const terminalCompletedEvent = (turn: number, transcript: Prompt.Prompt): Completed => ({
-    _tag: "Completed",
-    turns: turn + 1,
-    text: state.text,
-    transcript,
-    ...(state.usage === undefined ? {} : { usage: state.usage }),
-  })
   const structuredFinalEvents = (
     structuredTurn: number,
     config: StructuredRunConfig<StructuredOutputSchema>,
@@ -91,27 +90,40 @@ export const makeRunLoop = <
           turn: structuredTurn,
         })
         const history = yield* Ref.get(chat.history)
-        const response = yield* LanguageModel.generateObject({
-          prompt: Prompt.concat(history, transformedPrompt),
-          schema: config.schema,
-          objectName: config.objectName,
-          toolChoice: "none",
-        }).pipe(
-          withModelTelemetry(structuredTurn, "structured-output"),
-          withAgentModel,
-          Effect.catchCause(
-            (cause): Effect.Effect<never, AgentError | AiError.AiError | LanguageModelNotRegistered> => {
-              const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
-              return reason !== undefined && Cause.isFailReason(reason)
-                ? Effect.fail(
-                    AgentError.make({
-                      message: errorMessage(reason.error),
-                      turn: structuredTurn,
-                      cause: reason.error,
-                    }),
-                  )
-                : Effect.failCause(cause)
-            },
+        const logicalId = yield* logicalOperationId
+        const current = yield* driverCheckpoint
+        const driverState = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
+          Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+        )
+        const response = yield* intercept(
+          {
+            kind: "structured-output",
+            key: operationKey(logicalId, "structured-output", structuredTurn, driverState.modelCallOrdinal),
+            input: { turn: structuredTurn, modelCallOrdinal: driverState.modelCallOrdinal },
+            replayPolicy: "provider-idempotent",
+          },
+          LanguageModel.generateObject({
+            prompt: Prompt.concat(history, transformedPrompt),
+            schema: config.schema,
+            objectName: config.objectName,
+            toolChoice: "none",
+          }).pipe(
+            withModelTelemetry(structuredTurn, "structured-output"),
+            withAgentModel,
+            Effect.catchCause(
+              (cause): Effect.Effect<never, AgentError | AiError.AiError | LanguageModelNotRegistered> => {
+                const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
+                return reason !== undefined && Cause.isFailReason(reason)
+                  ? Effect.fail(
+                      AgentError.make({
+                        message: errorMessage(reason.error),
+                        turn: structuredTurn,
+                        cause: reason.error,
+                      }),
+                    )
+                  : Effect.failCause(cause)
+              },
+            ),
           ),
         )
         yield* captureStructuredUsage(response.content)
@@ -137,7 +149,7 @@ export const makeRunLoop = <
           value: response.value,
           content: response.content as ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
         }
-        return [structuredOutput, terminalCompletedEvent(structuredTurn, transcript)]
+        return [structuredOutput, terminalCompletedEvent(state, structuredTurn, transcript)]
       }),
     ).pipe(Stream.flatMap((events) => Stream.fromIterable<Event>(events)))
   const promptFromSteeringInputs = (inputs: ReadonlyArray<Input>): Prompt.Prompt =>
@@ -152,6 +164,10 @@ export const makeRunLoop = <
       onNone: () => Effect.succeed([]),
       onSome: (service) => service.takeFollowUp,
     })
+  const policyAgent = (): Effect.Effect<typeof agent, never, never> =>
+    handoffStateRef === undefined
+      ? Effect.succeed(agent)
+      : Ref.get(handoffStateRef).pipe(Effect.map((handoffRun) => handoffRun.active.agent as unknown as typeof agent))
   const afterTurn = (
     turn: number,
   ): Effect.Effect<
@@ -167,7 +183,7 @@ export const makeRunLoop = <
       }
       readonly structuredTurn?: number
     },
-    AgentError | TurnPolicyError,
+    AgentError | TurnPolicyError | RunError,
     R
   > =>
     Effect.gen(function* () {
@@ -175,7 +191,7 @@ export const makeRunLoop = <
       const transcript = yield* checkpointPending(turn, pending)
       const path = yield* syncSession(turn, transcript)
       yield* rememberTurn(turn, transcript, pending.length === 0, path)
-      const completed: Event = turnCompletedEvent(turn, transcript)
+      const completed: Event = turnCompletedEvent(state, turn, transcript)
       if (pending.length === 0) {
         const followUp = yield* takeFollowUp()
         if (followUp.length > 0) {
@@ -209,10 +225,11 @@ export const makeRunLoop = <
         }
         yield* savePersisted(turn)
         return {
-          events: Stream.fromIterable<Event>([completed, terminalCompletedEvent(turn, transcript)]),
+          events: Stream.fromIterable<Event>([completed, terminalCompletedEvent(state, turn, transcript)]),
         }
       }
-      const evaluated = yield* agent.policy.decide({
+      const activeAgent = yield* policyAgent()
+      const evaluated = yield* activeAgent.policy.decide({
         turn: turn + 1,
         history: transcript,
         pendingToolResults: pending,
@@ -251,15 +268,34 @@ export const makeRunLoop = <
       state.pending.clear()
       const steering = yield* takeSteering()
       const basePrompt = steering.length === 0 ? Prompt.empty : promptFromSteeringInputs(steering)
+      let continuationOverrides = decision.overrides
+      let continuationPrompt = basePrompt
+      if (handoffStateRef !== undefined) {
+        const handoffState = yield* Ref.get(handoffStateRef)
+        if (handoffState.pendingContinuation !== undefined) {
+          continuationPrompt =
+            steering.length === 0
+              ? Prompt.make(handoffState.pendingContinuation.prompt)
+              : Prompt.concat(basePrompt, Prompt.make(handoffState.pendingContinuation.prompt))
+          continuationOverrides = {
+            ...decision.overrides,
+            ...handoffState.pendingContinuation.overrides,
+          }
+          yield* Ref.set(handoffStateRef, { ...handoffState, pendingContinuation: undefined })
+        }
+      }
       const prompt =
-        decision.overrides?.instructions === undefined
-          ? basePrompt
-          : withSystem(decision.overrides.instructions, basePrompt)
+        continuationOverrides?.instructions === undefined
+          ? continuationPrompt
+          : withSystem(continuationOverrides.instructions, continuationPrompt)
       return {
         events: Stream.fromIterable<Event>(
           steering.length === 0 ? [completed] : [completed, steeringDrainedEvent(turn, "steering", steering)],
         ),
-        next: { prompt, ...(decision.overrides === undefined ? {} : { overrides: decision.overrides }) },
+        next: {
+          prompt,
+          ...(continuationOverrides === undefined ? {} : { overrides: continuationOverrides }),
+        },
       }
     })
   const resetTurnState = (turn: number) =>
@@ -358,7 +394,23 @@ export const makeRunLoop = <
               }: {
                 readonly call: AnyToolCall
                 readonly toolCallIndex: number
-              }) => toolCallEvents(0, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
+              }): ReturnType<typeof toolCallEvents> => {
+                const resolution = options.resume?.resolution
+                return toolCallIndex === suspendedIndex && resolution?._tag === "Approved"
+                  ? resumeApproved(0, toolCallBatch, toolCallIndex, call, registry)
+                  : toolCallIndex === suspendedIndex && resolution !== undefined
+                    ? (Stream.fromEffect(
+                        Effect.sync(() => {
+                          const result = resolvedToolResult(
+                            call,
+                            resolution as Exclude<ResumeResolution, { readonly _tag: "Approved" }>,
+                          )
+                          state.pending.set(toolCallIndex, result)
+                          return { _tag: "ToolExecutionCompleted" as const, turn: 0, call, result }
+                        }),
+                      ) as ReturnType<typeof toolCallEvents>)
+                    : toolCallEvents(0, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
+              }
               const concurrency = agent.toolExecution?.concurrency ?? 1
               return concurrency === 1
                 ? executions.pipe(Stream.flatMap(execute))
@@ -401,9 +453,14 @@ export const makeRunLoop = <
         return Stream.unwrap(
           Effect.gen(function* () {
             const checkpoint = yield* checkpointSuspended(state.turn, pendingResults(), suspension)
+            yield* recordSuspension({
+              waitId: suspension.tool_call_id,
+              reason: suspension.reason,
+              token: suspension.token,
+            })
             yield* syncSession(state.turn, checkpoint)
             return Stream.concat(
-              Stream.fromIterable<Event>([turnCompletedEvent(state.turn, checkpoint)]),
+              Stream.fromIterable<Event>([turnCompletedEvent(state, state.turn, checkpoint)]),
               Stream.failCause<RunError>(cause),
             )
           }),

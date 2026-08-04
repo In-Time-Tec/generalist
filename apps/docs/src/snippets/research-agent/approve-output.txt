@@ -1,12 +1,1 @@
-SessionStatus
-Event ApprovalRequested
-Event ToolExecutionStarted
-Event ToolExecutionCompleted
-Event TurnCompleted
-SessionStatus
-Event TurnStarted
-Event ModelPart
-Event TurnCompleted
-Event Completed
-SessionStatus
-Ended
+approval response: 202

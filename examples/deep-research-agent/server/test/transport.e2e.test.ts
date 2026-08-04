@@ -1,34 +1,42 @@
 import { connect, createServer } from "node:net"
 import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
 import { describe, expect, live } from "@effect/vitest"
-import { Effect, Fiber, Schema, Stream } from "effect"
-import { Sse } from "effect/unstable/encoding"
+import { Effect, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
-import { Wire } from "@batonfx/transport"
-import { toolkit } from "../src/tools"
+import { Cursor } from "@batonfx/runtime"
+import { Client } from "@batonfx/transport"
 
-const OpenSessionResponse = Schema.Struct({
-  sessionId: Schema.String,
-  chatId: Schema.String,
+const RunReceipt = Schema.Struct({
+  runId: Schema.String,
+  duplicate: Schema.Boolean,
+  acceptedSequence: Schema.Int,
 })
 
 class TransportTestError extends Schema.TaggedErrorClass<TransportTestError>()("TransportTestError", {
   message: Schema.String,
 }) {}
 
-const ServerFrameJson = Schema.fromJsonString(Wire.ServerFrame(toolkit))
-
 const postJson = (url: string, body: unknown) =>
   HttpClient.post(url, { body: HttpBody.jsonUnsafe(body) }).pipe(Effect.flatMap(HttpClientResponse.filterStatusOk))
 
-const openSession = (baseUrl: string, sessionId: string) =>
-  postJson(`${baseUrl}/sessions`, { sessionId }).pipe(
-    Effect.flatMap(HttpClientResponse.schemaBodyJson(OpenSessionResponse)),
+const admitRun = (
+  baseUrl: string,
+  attempts: number,
+): Effect.Effect<typeof RunReceipt.Type, unknown, HttpClient.HttpClient> =>
+  postJson(`${baseUrl}/runs`, {
+    runId: "deep-research-e2e-run",
+    sessionId: "deep-research-e2e-session",
+    idempotencyKey: "question-1",
+    prompt: "What makes Baton agent framework standalone?",
+  }).pipe(
+    Effect.flatMap(HttpClientResponse.schemaBodyJson(RunReceipt)),
+    Effect.catch((error) =>
+      attempts <= 0
+        ? Effect.fail(error)
+        : Effect.sleep("100 millis").pipe(Effect.andThen(admitRun(baseUrl, attempts - 1))),
+    ),
   )
-
-const sendMessage = (baseUrl: string, sessionId: string, prompt: string) =>
-  postJson(`${baseUrl}/sessions/${sessionId}/messages`, { prompt })
 
 const freePort = Effect.tryPromise({
   try: () =>
@@ -84,57 +92,9 @@ const waitForServerReady = (port: number, attempts: number): Effect.Effect<void,
     ),
   )
 
-const openSessionWithRetry = (
-  baseUrl: string,
-  sessionId: string,
-  attempts: number,
-): Effect.Effect<typeof OpenSessionResponse.Type, unknown, HttpClient.HttpClient> =>
-  openSession(baseUrl, sessionId).pipe(
-    Effect.catch((error) =>
-      attempts <= 0
-        ? Effect.fail(error)
-        : Effect.sleep("100 millis").pipe(Effect.andThen(openSessionWithRetry(baseUrl, sessionId, attempts - 1))),
-    ),
-  )
-
-const collectSseFrames = (response: HttpClientResponse.HttpClientResponse) =>
-  Effect.sync(() => {
-    const frames: Array<Wire.LooseServerFrameType> = []
-    const parser = Sse.makeParser((event) => {
-      if (event._tag === "Event") {
-        frames.push(Schema.decodeUnknownSync(ServerFrameJson)(event.data))
-      }
-    })
-    return { frames, parser }
-  }).pipe(
-    Effect.flatMap(({ frames, parser }) =>
-      response.stream.pipe(
-        Stream.decodeText,
-        Stream.runForEachWhile((chunk) =>
-          Effect.sync(() => {
-            parser.feed(chunk)
-            return frames.at(-1)?._tag !== "Ended"
-          }),
-        ),
-        Effect.as(frames),
-      ),
-    ),
-  )
-
-const frameLabel = (frame: Wire.LooseServerFrameType): string => {
-  switch (frame._tag) {
-    case "Event":
-      return `Event:${frame.event._tag}`
-    case "SessionStatus":
-      return `SessionStatus:${frame.status._tag}`
-    default:
-      return frame._tag
-  }
-}
-
 describe("deep-research-agent Baton transport e2e", () => {
   live(
-    "starts a deterministic research run over HTTP and streams replayable SSE frames",
+    "admits a deterministic run, resolves its approval, and replays canonical SSE events",
     () =>
       Effect.scoped(
         Effect.gen(function* () {
@@ -142,82 +102,52 @@ describe("deep-research-agent Baton transport e2e", () => {
           yield* startServer(port)
           const baseUrl = `http://127.0.0.1:${port}`
           yield* waitForServerReady(port, 200)
-          const sessionId = "deep-research-transport-e2e"
-          const opened = yield* openSessionWithRetry(baseUrl, sessionId, 50)
-          const response = yield* HttpClient.get(`${baseUrl}/sessions/${sessionId}/events`)
-          const fiber = yield* collectSseFrames(response).pipe(Effect.forkChild)
-
-          yield* sendMessage(baseUrl, sessionId, "What makes Baton agent framework standalone?")
-          const frames = yield* Fiber.join(fiber)
-          const labels = frames.map(frameLabel)
-          const toolCall = frames.find(
-            (frame) =>
-              frame._tag === "Event" && frame.event._tag === "ModelPart" && frame.event.part.type === "tool-call",
+          const receipt = yield* admitRun(baseUrl, 50)
+          const eventsUrl = `${baseUrl}/runs/${receipt.runId}/events`
+          const first = yield* Client.sseEvents({ url: eventsUrl }).pipe(
+            Stream.takeUntil(
+              (event) =>
+                event._tag === "RunWaiting" ||
+                event._tag === "RunCompleted" ||
+                event._tag === "RunFailed" ||
+                event._tag === "RunCancelled",
+            ),
+            Stream.runCollect,
           )
-          const completedTool = frames.find(
-            (frame) => frame._tag === "Event" && frame.event._tag === "ToolExecutionCompleted",
-          )
-          const completed = frames.find((frame) => frame._tag === "Event" && frame.event._tag === "Completed")
+          const waiting = Array.from(first).find((event) => event._tag === "RunWaiting")
+          if (waiting === undefined || waiting._tag !== "RunWaiting") {
+            return yield* Effect.die(`expected RunWaiting: ${JSON.stringify(Array.from(first))}`)
+          }
 
-          expect(opened.sessionId).toBe(sessionId)
-          expect(labels).toEqual([
-            "SessionStatus:Running",
-            "SessionStatus:Running",
-            "Event:TurnStarted",
-            "Event:ModelCallStarted",
-            "Event:ModelAttemptStarted",
-            "Event:ModelAttemptFirstOutput",
-            "Event:ModelPart",
-            "Event:ModelPart",
-            "Event:ModelAttemptCompleted",
-            "Event:ModelCallCompleted",
-            "Event:ToolExecutionStarted",
-            "Event:ToolExecutionCompleted",
-            "Event:TurnCompleted",
-            "SessionStatus:Running",
-            "Event:TurnStarted",
-            "Event:ModelCallStarted",
-            "Event:ModelAttemptStarted",
-            "Event:ModelAttemptFirstOutput",
-            "Event:ModelPart",
-            "Event:ModelPart",
-            "Event:ModelAttemptCompleted",
-            "Event:ModelCallCompleted",
-            "Event:TurnCompleted",
-            "Event:Completed",
-            "SessionStatus:Idle",
-            "Ended",
-          ])
+          yield* postJson(`${baseUrl}/runs/${receipt.runId}/respond`, {
+            waitId: waiting.wait.waitId,
+            resolution: { _tag: "Approved" },
+          })
+          const second = yield* Client.sseEvents({ url: eventsUrl, cursor: Cursor.make(waiting.sequence) }).pipe(
+            Stream.takeUntil((event) => event._tag === "RunCompleted"),
+            Stream.runCollect,
+          )
+          const all = [...first, ...second]
+          const toolCall = all.find((event) => event._tag === "ModelPart" && event.part.type === "tool-call")
+          const completedTool = all.find((event) => event._tag === "ToolExecutionCompleted")
+          const completed = all.find((event) => event._tag === "RunCompleted")
+
+          expect(receipt.duplicate).toBe(false)
+          expect(waiting.wait.reason).toBe("approval")
           expect(toolCall).toMatchObject({
-            _tag: "Event",
-            event: {
-              _tag: "ModelPart",
-              part: {
-                type: "tool-call",
-                name: "web_search",
-                params: { query: "What makes Baton agent framework standalone?" },
-              },
+            _tag: "ModelPart",
+            part: {
+              type: "tool-call",
+              name: "web_search",
+              params: { query: "What makes Baton agent framework standalone?" },
             },
           })
           expect(completedTool).toMatchObject({
-            _tag: "Event",
-            event: {
-              _tag: "ToolExecutionCompleted",
-              result: {
-                name: "web_search",
-                result: {
-                  results: [
-                    { title: "Baton: a standalone Effect-native agent SDK" },
-                    { title: "Baton docs - the agent loop" },
-                  ],
-                },
-              },
-            },
+            _tag: "ToolExecutionCompleted",
+            result: { name: "web_search" },
           })
-          expect(completed?._tag === "Event" && completed.event._tag === "Completed" && completed.event.text).toContain(
-            "Based on 2 sources",
-          )
-          expect(completed?._tag === "Event" && completed.event._tag === "Completed" && completed.event.text).toContain(
+          expect(completed?._tag === "RunCompleted" && completed.result.text).toContain("Based on 2 sources")
+          expect(completed?._tag === "RunCompleted" && completed.result.text).toContain(
             "https://github.com/batonfx/batonfx",
           )
         }),

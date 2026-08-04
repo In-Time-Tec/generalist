@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@batonfx/runtime",
+  "version": "0.14.0",
+  "private": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
+    "lint": "bun --cwd ../.. oxlint packages/runtime/src packages/runtime/test",
+    "test": "bun --bun --cwd ../.. vitest run packages/runtime/test --no-file-parallelism",
+    "test:tracer": "bun --bun --cwd ../.. vitest run packages/runtime/test/sqlite-phase0-tracer.test.ts",
+    "tracer": "bun scripts/phase0-tracer.ts",
+    "typecheck": "bun tsc --noEmit",
+    "test:postgres": "bun --bun --cwd ../.. vitest run packages/runtime/test/postgres --no-file-parallelism --maxWorkers=1",
+    "test:tracer:postgres": "bun --bun --cwd ../.. vitest run packages/runtime/test/postgres/postgres-tracer.test.ts --maxWorkers=1",
+    "tracer:postgres": "bun scripts/postgres-tracer.ts",
+    "test:mysql": "bun --bun --cwd ../.. vitest run packages/runtime/test/mysql --no-file-parallelism --maxWorkers=1",
+    "test:tracer:mysql": "bun --bun --cwd ../.. vitest run packages/runtime/test/mysql/mysql-tracer.test.ts --maxWorkers=1",
+    "tracer:mysql": "bun scripts/mysql-tracer.ts"
+  },
+  "dependencies": {
+    "@batonfx/core": "workspace:*",
+    "@effect/sql-mysql2": "catalog:",
+    "@effect/sql-sqlite-bun": "catalog:",
+    "@effect/sql-pg": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:",
+    "@types/bun": "catalog:",
+    "bun-types": "1.3.13",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "description": "Addressable memory, SQLite, PostgreSQL, and MySQL runtime for Baton agent runs",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/In-Time-Tec/batonfx.git",
+    "directory": "packages/runtime"
+  },
+  "homepage": "https://github.com/In-Time-Tec/batonfx#readme",
+  "bugs": {
+    "url": "https://github.com/In-Time-Tec/batonfx/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

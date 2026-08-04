@@ -1,2 +1,2 @@
-live:   0:SessionStatus 1:SessionStatus 2:Event 3:Event 4:Event 5:Event 6:Event 7:Event 8:Event 9:Event 10:Event 11:SessionStatus 12:Ended
-replay: 3:Event 4:Event 5:Event 6:Event 7:Event 8:Event 9:Event 10:Event 11:SessionStatus 12:Ended
+live:   0:RunAccepted 1:RunAttemptStarted 2:TurnStarted 3:ModelCallStarted 4:ModelAttemptStarted 5:ModelAttemptFirstOutput 6:ModelPart 7:ModelPart 8:ModelAttemptCompleted 9:ModelCallCompleted 10:TurnCompleted 11:RunCompleted
+replay: 3:ModelCallStarted 4:ModelAttemptStarted 5:ModelAttemptFirstOutput 6:ModelPart 7:ModelPart 8:ModelAttemptCompleted 9:ModelCallCompleted 10:TurnCompleted 11:RunCompleted

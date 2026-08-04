@@ -16,6 +16,8 @@ import type { RunError, RunOptions } from "./agent.js"
 import type { AgentRunState } from "./agent-run-state.js"
 import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
 import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../context/session.js"
+import { intercept } from "../durable/driver-run.js"
+import { operationKey } from "../durable/driver-interpreter.js"
 
 import type { MemoryError } from "../context/memory.js"
 import type { SkillSourceError } from "../context/skill-source.js"
@@ -84,7 +86,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     return matches.length === 1 ? Option.some(matches[0] as number) : Option.none()
   }
 
-  const syncSession = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, AgentError> =>
+  const syncSessionBody = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, AgentError> =>
     Option.match(activeSession, {
       onNone: () => Effect.succeed([]),
       onSome: (session) =>
@@ -125,6 +127,19 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           return path
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
     })
+
+  const syncSession = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, RunError> => {
+    const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+    return intercept(
+      {
+        kind: "memory",
+        key: operationKey(logicalId, "memory", "sync", turn, transcript.content.length),
+        input: { turn, messageCount: transcript.content.length },
+        replayPolicy: "pure",
+      },
+      syncSessionBody(turn, transcript),
+    )
+  }
 
   const countTokens = (turn: number, prompt: Prompt.Prompt): Effect.Effect<number, AgentError> =>
     Option.match(tokenizerService, {
@@ -212,7 +227,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       : Effect.fail(AgentError.make({ message: "Compaction projection contains an unresolved tool call", turn }))
   }
 
-  const applyCompactionResult = (
+  const applyCompactionResultBody = (
     turn: number,
     result: CompactionResult,
     parentId: string | null,
@@ -304,6 +319,29 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
     })
 
+  const applyCompactionResult = (
+    turn: number,
+    result: CompactionResult,
+    parentId: string | null,
+    commitData?: Omit<CompactionCommit, "checkpointId" | "summaryModelCallId">,
+  ): Effect.Effect<void, RunError> => {
+    const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+    const applyKey = commitData?.compactionId ?? "apply"
+    return intercept(
+      {
+        kind: "compaction",
+        key: operationKey(logicalId, "compaction", "apply", turn, applyKey),
+        input: {
+          turn,
+          tag: result._tag,
+          ...(commitData === undefined ? {} : { compactionId: commitData.compactionId }),
+        },
+        replayPolicy: "pure",
+      },
+      applyCompactionResultBody(turn, result, parentId, commitData),
+    )
+  }
+
   const preparePrompt = (
     turn: number,
     prompt: Prompt.Prompt,
@@ -340,7 +378,8 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             Effect.mapError((error) => AgentError.make({ message: error.message, turn, cause: error })),
           )
           const compactionId = yield* generateId
-          const compacted = yield* Effect.scoped(
+          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+          const compactEffect = Effect.scoped(
             compaction.maybeCompact({
               compactionId,
               agentName: agent.name,
@@ -354,6 +393,17 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
               ...(options.toolOutputMaxBytes === undefined ? {} : { toolOutputMaxBytes: options.toolOutputMaxBytes }),
             }),
           ).pipe(Effect.mapError((error) => compactionError(turn, error)))
+          const compacted = overflow
+            ? yield* compactEffect
+            : yield* intercept(
+                {
+                  kind: "compaction",
+                  key: operationKey(logicalId, "compaction", turn, compactionId),
+                  input: { turn, compactionId, agentName: agent.name, sessionId },
+                  replayPolicy: "pure",
+                },
+                compactEffect,
+              )
           if (Option.isNone(compacted)) return { prompt, changed: false }
           const changed =
             !Equal.equals(originalHistory.content, compacted.value.history.content) ||
@@ -385,6 +435,10 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           })
           return { prompt: compacted.value.prompt, changed: true }
         }),
-    })
+    }) as Effect.Effect<
+      { readonly prompt: Prompt.Prompt; readonly changed: boolean },
+      RunError,
+      LanguageModel.LanguageModel
+    >
   return { preparePrompt, applyCompactionResult, compactionUsage, countTokens, syncSession }
 }

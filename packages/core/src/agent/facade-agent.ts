@@ -7,6 +7,7 @@ import {
   generate as Agent_generate,
   Runtime as Agent_Runtime,
   layerRuntime as Agent_layerRuntime,
+  ResumeResolution as Agent_ResumeResolution,
 } from "./agent.js"
 export const Agent = {
   make: Agent_make,
@@ -15,6 +16,7 @@ export const Agent = {
   generate: Agent_generate,
   Runtime: Agent_Runtime,
   layerRuntime: Agent_layerRuntime,
+  ResumeResolution: Agent_ResumeResolution,
 } as AgentFacade
 export namespace Agent {
   export type make = typeof import("./agent.js").make
@@ -45,6 +47,7 @@ export namespace Agent {
   export type Requirements<A> = import("./agent.js").Requirements<A>
   export type Result = import("./agent.js").Result
   export type Resume = import("./agent.js").Resume
+  export type ResumeResolution = import("./agent.js").ResumeResolution
   export type RunError = import("./agent.js").RunError
   export type RunOptions = import("./agent.js").RunOptions
   export type RunRequirements<R, O> = import("./agent.js").RunRequirements<R, O>

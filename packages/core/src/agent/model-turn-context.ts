@@ -3,6 +3,7 @@ import type { Chat, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import type { AgentRunState } from "./agent-run-state.js"
 import type { AgentError, Event } from "./agent-event.js"
 import type { AnyToolCall } from "./agent-tool-result.js"
+import type { HandoffRunState } from "./handoff-state.js"
 import type { RunError } from "./agent.js"
 import type { Middleware } from "../model/model-middleware.js"
 import type { ModelSelection, ModelRegistry } from "../model/model-registry.js"
@@ -20,7 +21,9 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   readonly agent: {
     readonly name: string
     readonly toolExecution?: { readonly concurrency: number | "unbounded" }
+    readonly model?: import("../model/model-registry.js").ModelSelection
   }
+  readonly handoffStateRef?: import("effect").Ref.Ref<HandoffRunState>
   readonly agentModelRegistry: typeof ModelRegistry.Service | undefined
   readonly agentModel: ModelSelection | undefined
   readonly resilienceService: Option.Option<typeof ModelResilience.Service>

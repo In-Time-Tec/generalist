@@ -1,5 +1,7 @@
 # Baton package and GitHub release modernization
 
+Superseded by the current contract in `docs/features/package-distribution.md`. This document records the historical eight-package, GitHub-only plan and is not current release guidance.
+
 ## Product-shaped contract
 
 Baton releases eight lockstep, platform-neutral ESM libraries. It has no executable installer, native addon, bundled runtime, or platform-specific build. The release artifact is therefore the exact set of npm-compatible package tarballs consumed by Node 22+ and Bun 1.3+, not a Rika-style OS/architecture archive matrix. npm publication remains out of scope.

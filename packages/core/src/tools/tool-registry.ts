@@ -4,7 +4,7 @@ import { Tool, Toolkit } from "effect/unstable/ai"
 import { ToolNameCollision, type ToolOrigin } from "../agent/agent-event.js"
 
 /** @experimental */
-export type Dispatch = "Static" | "Builtin" | "Skill"
+export type Dispatch = "Static" | "Builtin" | "Skill" | "Handoff"
 
 /** @experimental */
 export interface Candidate {

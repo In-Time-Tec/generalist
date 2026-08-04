@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@batonfx/core": "workspace:*",
+    "@batonfx/runtime": "workspace:*",
     "@batonfx/transport": "workspace:*",
     "effect": "catalog:"
   },

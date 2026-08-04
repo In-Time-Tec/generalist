@@ -17,6 +17,11 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import type { DeliveryFailed, InvocationCoordinationFailed } from "../model/model-telemetry.js"
+import type { BudgetLimits, RunBudget } from "../durable/run-budget.js"
+import type { DriverCheckpoint } from "../durable/driver-contract.js"
+import { RunBudgetExhausted } from "../durable/run-budget.js"
+import type { DriverError, DriverStateInvalid } from "../durable/durable-driver.js"
+import type { DriverUnknownReplay } from "../durable/driver-interpreter.js"
 import type { ModelResilienceMisconfigured } from "../model/model-resilience.js"
 import type { InvalidToolCallParameters, ToolJsonSchemaCompilerMissing } from "../model/model-tool-call-validation.js"
 import { type Key, Memory } from "../context/memory.js"
@@ -24,6 +29,9 @@ import { type LanguageModelNotRegistered, type ModelSelection, ModelRegistry } f
 import type { ToolAuthorizer } from "../tools/tool-authorization.js"
 import { ToolContext } from "../tools/tool-context.js"
 import { FrameworkFailure } from "../tools/tool-executor.js"
+import { HandoffLimitExceeded, HandoffRequirementsMissing, HandoffTargetMissing } from "./handoff-state.js"
+import { HandoffProjectionInvalid } from "../policy/handoff-projection.js"
+import { HandoffRejected } from "../policy/handoff-runtime.js"
 import { defaultPolicy, type TurnPolicy, TurnPolicyError } from "../turn/turn-policy.js"
 
 import { streamInternal } from "./agent-run.js"
@@ -59,6 +67,7 @@ export interface Agent<
   readonly authorization?: ToolAuthorizer<AuthorizationServices>
   readonly toolExecution?: ToolExecutionPolicy
   readonly metadata?: Readonly<Record<string, unknown>>
+  readonly budget?: BudgetLimits
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
 }
 
@@ -97,6 +106,7 @@ export interface MakeOptions<
   readonly authorization?: ToolAuthorizer<AuthorizationServices>
   readonly toolExecution?: ToolExecutionPolicy
   readonly metadata?: Readonly<Record<string, unknown>>
+  readonly budget?: BudgetLimits
 }
 
 /** @experimental Agent options with ordered static declarations instead of a pre-built toolkit. */
@@ -174,6 +184,7 @@ export function make<
     ...(options.authorization === undefined ? {} : { authorization: options.authorization }),
     ...(options.toolExecution === undefined ? {} : { toolExecution: options.toolExecution }),
     ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
+    ...(options.budget === undefined ? {} : { budget: options.budget }),
     toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map(
       (tool): ToolDeclaration => ({
         tool,
@@ -200,8 +211,17 @@ export function make<
 }
 
 /** @experimental Re-entry bound to an authoritative `AgentSuspended` checkpoint. */
+export const ResumeResolution = Schema.Union([
+  Schema.TaggedStruct("Approved", {}),
+  Schema.TaggedStruct("Denied", { reason: Schema.optionalKey(Schema.String) }),
+  Schema.TaggedStruct("ToolResult", { result: Schema.Unknown, encodedResult: Schema.Unknown }),
+  Schema.TaggedStruct("Signal", { name: Schema.String, payload: Schema.optionalKey(Schema.Unknown) }),
+])
+export type ResumeResolution = typeof ResumeResolution.Type
+
 export interface Resume {
   readonly suspension: AgentSuspended
+  readonly resolution?: ResumeResolution
 }
 
 /** @experimental Bounded buffering behavior for tool progress events. */
@@ -230,6 +250,10 @@ export interface RunOptions {
   readonly logicalOperationId?: string
   /** @experimental First model-call ordinal for a host resuming from a durable checkpoint. */
   readonly modelCallOrdinalStart?: number
+  /** @experimental Runtime-owned checkpoint used to reconstruct the same durable driver. */
+  readonly driverCheckpoint?: DriverCheckpoint
+  /** @experimental Pinned identity admitted by a durable host. */
+  readonly agentRef?: import("../durable/agent-ref.js").AgentRef
   /** @experimental Opaque host-assigned write-ownership token, forwarded on every Session append and checkpoint so durable hosts can fence stale writers. */
   readonly sessionOwnerToken?: string
   /** @experimental Spill successful tool outputs whose encoded size exceeds this byte limit. */
@@ -240,6 +264,11 @@ export interface RunOptions {
   readonly compaction?: {
     readonly contextWindow?: number
   }
+  /** @experimental Per-run budget narrowing; dimensions omitted inherit the agent default. */
+  readonly budget?: BudgetLimits
+  /** @experimental Pre-reserved child grant from a parent run; not for direct caller use. */
+  readonly inheritedBudget?: RunBudget
+  readonly suspensionPropagation?: "propagate" | "collapse-to-domain-failure"
   /** @experimental Consult the Memory service for this run. */
   readonly memory?: {
     readonly key: Key
@@ -284,6 +313,15 @@ export type RunError =
   | AiError.AiError
   | LanguageModelNotRegistered
   | FrameworkFailure
+  | DriverError
+  | DriverStateInvalid
+  | DriverUnknownReplay
+  | RunBudgetExhausted
+  | HandoffTargetMissing
+  | HandoffLimitExceeded
+  | HandoffRequirementsMissing
+  | HandoffProjectionInvalid
+  | HandoffRejected
 
 /** @experimental Result of a non-streaming run. */
 export interface Result {

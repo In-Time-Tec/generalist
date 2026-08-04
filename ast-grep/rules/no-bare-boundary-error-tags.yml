@@ -7,6 +7,6 @@ rule:
 constraints:
   TAG:
     not:
-      regex: '^"@batonfx/[a-z-]+/[A-Z][A-Za-z]*"$'
+      regex: '^"@batonfx/[a-z0-9-]+/[A-Z][A-Za-z0-9]*"$'
 files:
   - "packages/*/src/**/*.ts"

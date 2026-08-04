@@ -2,8 +2,8 @@ import { Effect, Schema } from "effect"
 import { define, type Command } from "foldkit/command"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
-import { Wire } from "@batonfx/transport"
 import { AgentCommandError, AgentConnection, CommandOperation, Incoming } from "./connection.js"
+import type { ClientApproval } from "./connection.js"
 import { chatUpdateRuntime } from "./chat-update.js"
 
 const { catchCommandFailure, Completed, Pending } = chatUpdateRuntime
@@ -374,7 +374,7 @@ export const ResolveApproval = define(
   ResolvedApproval,
   FailedAgentCommand,
 )(({ sessionId, token, approved, reason }) => {
-  const decision: Wire.ClientApproval = approved
+  const decision: ClientApproval = approved
     ? { _tag: "Approved" }
     : reason === null
       ? { _tag: "Denied" }
