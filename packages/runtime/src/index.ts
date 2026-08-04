@@ -81,10 +81,15 @@ export namespace Message {
 }
 
 import {
+  AgentResult as AgentResult_AgentResult,
+  RunFailure as RunFailure_RunFailure,
   RunStatus as Run_RunStatus,
   RunId as Run_RunId,
   RunReceipt as Run_RunReceipt,
   RunInspection as Run_RunInspection,
+  RunOutcome as Run_RunOutcome,
+  RawUsageFact as Run_RawUsageFact,
+  CompactionInspection as Run_CompactionInspection,
   RunSnapshot as Run_RunSnapshot,
   Run as Run_Run,
   isTerminal as Run_isTerminal,
@@ -92,12 +97,33 @@ import {
   decodeReceipt as Run_decodeReceipt,
   encodeInspection as Run_encodeInspection,
   decodeInspection as Run_decodeInspection,
+  encodeSnapshot as Run_encodeSnapshot,
+  decodeSnapshot as Run_decodeSnapshot,
 } from "./run.js"
+export const AgentResult = {
+  AgentResult: AgentResult_AgentResult,
+} as const
+export namespace AgentResult {
+  export type AgentResult = import("./run.js").AgentResult
+}
+
+export const RunFailure = {
+  RunFailure: RunFailure_RunFailure,
+} as const
+export namespace RunFailure {
+  export type RunFailure = import("./run.js").RunFailure
+}
+
 export const Run = {
+  AgentResult: AgentResult_AgentResult,
+  RunFailure: RunFailure_RunFailure,
   RunStatus: Run_RunStatus,
   RunId: Run_RunId,
   RunReceipt: Run_RunReceipt,
   RunInspection: Run_RunInspection,
+  RunOutcome: Run_RunOutcome,
+  RawUsageFact: Run_RawUsageFact,
+  CompactionInspection: Run_CompactionInspection,
   RunSnapshot: Run_RunSnapshot,
   Run: Run_Run,
   isTerminal: Run_isTerminal,
@@ -105,12 +131,19 @@ export const Run = {
   decodeReceipt: Run_decodeReceipt,
   encodeInspection: Run_encodeInspection,
   decodeInspection: Run_decodeInspection,
+  encodeSnapshot: Run_encodeSnapshot,
+  decodeSnapshot: Run_decodeSnapshot,
 } as typeof import("./run.js")
 export namespace Run {
+  export type AgentResult = import("./run.js").AgentResult
+  export type RunFailure = import("./run.js").RunFailure
   export type RunStatus = import("./run.js").RunStatus
   export type RunId = import("./run.js").RunId
   export type RunReceipt = import("./run.js").RunReceipt
   export type RunInspection = import("./run.js").RunInspection
+  export type RunOutcome = import("./run.js").RunOutcome
+  export type RawUsageFact = import("./run.js").RawUsageFact
+  export type CompactionInspection = import("./run.js").CompactionInspection
   export type RunSnapshot = import("./run.js").RunSnapshot
   export type Run = import("./run.js").Run
   export type isTerminal = typeof import("./run.js").isTerminal
@@ -424,11 +457,27 @@ export namespace AgentHost {
   export type Options = import("./agent-host.js").Options
 }
 
-import { events as RunTree_events, history as RunTree_history, TreeCursor as RunTree_TreeCursor } from "./tree.js"
+import {
+  awaitTerminal as RunTree_awaitTerminal,
+  events as RunTree_events,
+  history as RunTree_history,
+  inspect as RunTree_inspect,
+  TreeCursor as RunTree_TreeCursor,
+  Inspection as RunTree_Inspection,
+  TreeRunInspection as RunTree_TreeRunInspection,
+  encodeInspection as RunTree_encodeInspection,
+  decodeInspection as RunTree_decodeInspection,
+} from "./tree.js"
 export const RunTree = {
   events: RunTree_events,
   history: RunTree_history,
+  inspect: RunTree_inspect,
+  awaitTerminal: RunTree_awaitTerminal,
   TreeCursor: RunTree_TreeCursor,
+  Inspection: RunTree_Inspection,
+  TreeRunInspection: RunTree_TreeRunInspection,
+  encodeInspection: RunTree_encodeInspection,
+  decodeInspection: RunTree_decodeInspection,
 } as typeof import("./tree.js")
 export namespace RunTree {
   export type TreeCursor = import("./tree.js").TreeCursor
@@ -436,6 +485,8 @@ export namespace RunTree {
   export type TreePage = import("./tree.js").TreePage
   export type EventsInput = import("./tree.js").EventsInput
   export type HistoryInput = import("./tree.js").HistoryInput
+  export type Inspection = import("./tree.js").Inspection
+  export type TreeRunInspection = import("./tree.js").TreeRunInspection
   export type events = typeof import("./tree.js").events
   export type history = typeof import("./tree.js").history
 }

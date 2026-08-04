@@ -11,6 +11,8 @@ import {
   RunTree,
   Runtime,
   AgentHost,
+  AgentResult,
+  RunFailure,
 } from "../src/index.js"
 
 describe("@batonfx/runtime public surface", () => {
@@ -25,6 +27,10 @@ describe("@batonfx/runtime public surface", () => {
     expect(typeof RunStore.layerMemory).toBe("function")
     expect(typeof AgentHost.AgentHost).toBe("function")
     expect(typeof RunTree.events).toBe("function")
+    expect(AgentResult.AgentResult).toBeDefined()
+    expect(RunFailure.RunFailure).toBeDefined()
+    expect(Run.AgentResult).toBe(AgentResult.AgentResult)
+    expect(Run.RunFailure).toBe(RunFailure.RunFailure)
     expect(Errors.AddressNotFound).toBeDefined()
     expect(Errors.IdempotencyConflict).toBeDefined()
     expect(Errors.SteeringConflict).toBeDefined()

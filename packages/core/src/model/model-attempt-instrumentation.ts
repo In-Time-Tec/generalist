@@ -29,7 +29,7 @@ export interface InstrumentOptions {
   readonly identity?: IdentityCell
   readonly resilience?: Resilience
   readonly logicalOperationId?: string
-  readonly nextCallOrdinal?: () => number
+  readonly nextCallOrdinal?: (persisted?: number) => number
   readonly coordinator?: InvocationCoordinatorInterface
 }
 

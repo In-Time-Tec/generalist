@@ -6,6 +6,7 @@ import {
   IdempotencyConflict,
   RunIdConflict,
   RunNotFound,
+  RunTerminal,
   RuntimeUnavailable,
 } from "../errors.js"
 import type { AgentRef } from "../agent-ref.js"
@@ -125,6 +126,9 @@ export const admitSpawn = (
     const sql = yield* SqlClient.SqlClient
     const parent = yield* loadRun(input.parentRunId)
     if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
+    if (parent.status === "succeeded" || parent.status === "failed" || parent.status === "cancelled") {
+      return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
+    }
     if (!agentRefs.has(agentKey(input.agent))) {
       return yield* AgentVersionUnavailable.make({ agent: input.agent })
     }

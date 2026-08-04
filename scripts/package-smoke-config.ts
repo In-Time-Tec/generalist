@@ -20,7 +20,7 @@ export const compressedSizeLimits: Record<(typeof packages)[number], number> = {
   memory: 10_000,
   providers: 35_000,
   mcp: 12_000,
-  runtime: 80_000,
+  runtime: 100_000,
   transport: 30_000,
   foldkit: 16_000,
 }
@@ -34,7 +34,7 @@ export const packedEffectDependencies: Record<(typeof packages)[number], Readonl
   memory: [],
   providers: ["@effect/ai-anthropic", "@effect/ai-openai", "@effect/ai-openai-compat", "@effect/ai-openrouter"],
   mcp: [],
-  runtime: ["@effect/sql-pg", "@effect/sql-sqlite-bun"],
+  runtime: ["@effect/sql-mysql2", "@effect/sql-pg", "@effect/sql-sqlite-bun"],
   transport: [],
   foldkit: [],
 }

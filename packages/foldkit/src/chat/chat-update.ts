@@ -221,7 +221,7 @@ const applyEvent = (model: Model, event: RunEvent.RunEvent): readonly [Model, Op
     case "ModelCallCompleted":
     case "ModelCallFailed":
     case "CompactionStarted":
-    case "CompactionCompleted":
+    case "CompactionApplied":
     case "CompactionFailed":
       return [model, Option.none()]
     case "TurnCompleted":

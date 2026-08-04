@@ -32,6 +32,8 @@ import type { WaitResolution } from "../../run-wait.js"
 import { fanOutStoreMethods } from "./store-fan-out.js"
 import { deferCancelledFanOutParent, makeCancelRun } from "./store-cancel.js"
 import { loadTreeHistory } from "../tree-history.js"
+import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
+import { withConsistentSnapshot } from "../inspection-transaction.js"
 import {
   afterTerminal,
   appendEvent,
@@ -40,6 +42,7 @@ import {
   insertRun,
   loadEventsAfter,
   loadRun,
+  lockSpawnParent,
   settleParent,
 } from "./pg-helpers.js"
 export interface PostgresStoreOptions extends LayerOptions {
@@ -68,6 +71,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       withSql(sql, sql.withTransaction(effect.pipe(Effect.provideService(PgClient.PgClient, pg))))
     const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient | PgClient.PgClient>) =>
       withSql(sql, effect.pipe(Effect.provideService(PgClient.PgClient, pg)))
+    const runInspection = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
+      withSql(sql, withConsistentSnapshot(sql, "postgres", effect))
     const requireRun = (runId: string) =>
       loadRun(runId).pipe(
         Effect.flatMap((loaded) =>
@@ -166,7 +171,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       admitSpawn: (input) =>
         run(
           Effect.gen(function* () {
-            const parent = yield* requireRun(input.parentRunId)
+            const parent = yield* lockSpawnParent(input.parentRunId)
             if (!agentRefs.has(agentKey(input.agent))) {
               return yield* AgentVersionUnavailable.make({ agent: input.agent })
             }
@@ -343,6 +348,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             }
           }),
         ),
+      snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
+      inspectTree: (rootRunId) => runInspection(loadTreeInspection(rootRunId)),
       history: (input) =>
         runNoTxn(
           Effect.gen(function* () {

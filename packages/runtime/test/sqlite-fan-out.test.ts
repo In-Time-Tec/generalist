@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { Runtime, RunStore, RunTree } from "../src/index.js"
+import { Errors, Runtime, RunStore, RunTree } from "../src/index.js"
 import { assistantAddress, completedResult, researcherRef } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
@@ -129,4 +129,30 @@ it.live("keeps SQLite fan-out cancellation pending for a claimed member", () =>
     expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("cancelled")
     expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
   }).pipe(Effect.provide(sqliteLayer(tempDbPath("fan-out-cancel-claimed"))), Effect.scoped),
+)
+
+it.live("rejects SQLite fan-out admission after the parent is terminal", () =>
+  Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    const parent = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "sqlite:terminal-parent-fan-out",
+      idempotencyKey: "parent",
+      prompt: "parent",
+    })
+    const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+    yield* store.complete({ ...claim, result: completedResult("done") })
+    const failure = yield* runtime
+      .fanOut({
+        parentRunId: parent.runId,
+        idempotencyKey: "late",
+        members: [{ key: "late", agent: researcherRef, prompt: "late" }],
+        concurrency: 1,
+        join: { _tag: "AllSuccess" },
+        remainder: "await",
+      })
+      .pipe(Effect.flip)
+    expect(failure).toBeInstanceOf(Errors.RunTerminal)
+  }).pipe(Effect.provide(sqliteLayer(tempDbPath("terminal-parent-fan-out"))), Effect.scoped),
 )

@@ -144,12 +144,13 @@ describe("ModelTelemetry", () => {
         entriesBefore: 12,
       },
       {
-        _tag: "CompactionCompleted",
+        _tag: "CompactionApplied",
         turn: 2,
         compactionId: "compaction-1",
         kind: "summarize",
-        completedAt: 8,
-        summaryModelCallId: "call-3",
+        checkpointId: "checkpoint-1",
+        appliedAt: 8,
+        commit: { compactionId: "compaction-1", checkpointId: "checkpoint-1", summaryModelCallId: "call-3" },
       },
       { _tag: "CompactionFailed", turn: 3, compactionId: "compaction-2", failedAt: 9 },
     ]

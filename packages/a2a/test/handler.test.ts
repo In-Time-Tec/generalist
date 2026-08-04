@@ -129,13 +129,19 @@ const makeRuntime = (acceptedSequence = 0) => {
     },
     snapshot: (runId) => {
       const run = runs.get(runId)!
-      return Effect.succeed({ run: inspection(runId, run), cursor: run.events.at(-1)?.sequence ?? -1 })
+      return Effect.succeed({
+        run: inspection(runId, run),
+        cursor: run.events.at(-1)?.sequence ?? -1,
+        usage: [],
+        compactions: [],
+      })
     },
     history: ({ runId, cursor = -1, limit }) => {
       const run = runs.get(runId)!
       return Effect.succeed(run.events.filter((event) => event.sequence > cursor).slice(0, limit))
     },
     treeHistory: () => Effect.die("not used"),
+    inspectTree: () => Effect.die("not used"),
     list: ({ status, limit }) =>
       Effect.succeed(
         [...runs]

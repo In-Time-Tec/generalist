@@ -1368,6 +1368,11 @@
       "test": false
     },
     {
+      "path": "packages/core/src/durable/operation-context.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
       "path": "packages/core/src/durable/run-budget.ts",
       "package": "@batonfx/core",
       "test": false
@@ -2158,6 +2163,11 @@
       "test": false
     },
     {
+      "path": "packages/runtime/src/inspection.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
       "path": "packages/runtime/src/memory/append.ts",
       "package": "@batonfx/runtime",
       "test": false
@@ -2274,6 +2284,16 @@
     },
     {
       "path": "packages/runtime/src/sql/errors.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/inspection-transaction.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/sql/inspection.ts",
       "package": "@batonfx/runtime",
       "test": false
     },
@@ -7625,6 +7645,10 @@
     },
     {
       "source": "packages/core/src/agent/setup.ts",
+      "specifier": "../durable/loop-driver-state.js"
+    },
+    {
+      "source": "packages/core/src/agent/setup.ts",
       "specifier": "../model/model-instrumentation.js"
     },
     {
@@ -7897,6 +7921,10 @@
     },
     {
       "source": "packages/core/src/durable/driver-interpreter.ts",
+      "specifier": "./operation-context.js"
+    },
+    {
+      "source": "packages/core/src/durable/driver-interpreter.ts",
       "specifier": "./run-budget.js"
     },
     {
@@ -8013,6 +8041,10 @@
     },
     {
       "source": "packages/core/src/durable/loop-driver.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/operation-context.ts",
       "specifier": "effect"
     },
     {
@@ -8226,6 +8258,10 @@
     {
       "source": "packages/core/src/model/model-call-correction.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/src/model/model-instrumentation.ts",
+      "specifier": "../durable/operation-context.js"
     },
     {
       "source": "packages/core/src/model/model-instrumentation.ts",
@@ -10864,6 +10900,18 @@
       "specifier": "./tree.js"
     },
     {
+      "source": "packages/runtime/src/inspection.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/inspection.ts",
+      "specifier": "./run.js"
+    },
+    {
+      "source": "packages/runtime/src/inspection.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/runtime/src/memory/append.ts",
       "specifier": "../errors.js"
     },
@@ -11109,6 +11157,10 @@
     },
     {
       "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "../inspection.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
       "specifier": "../run-store.js"
     },
     {
@@ -11234,7 +11286,16 @@
     },
     {
       "source": "packages/runtime/src/run.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/run.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/run.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/runtime/src/runtime.ts",
@@ -11299,6 +11360,42 @@
     {
       "source": "packages/runtime/src/sql/errors.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/inspection-transaction.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/inspection-transaction.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/inspection.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/inspection.ts",
+      "specifier": "../inspection.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/inspection.ts",
+      "specifier": "../tree-cursor.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/inspection.ts",
+      "specifier": "./codecs.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/inspection.ts",
+      "specifier": "./store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/inspection.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/inspection.ts",
+      "specifier": "effect/unstable/sql"
     },
     {
       "source": "packages/runtime/src/sql/migrate.ts",
@@ -11419,6 +11516,14 @@
     {
       "source": "packages/runtime/src/sql/mysql/store.ts",
       "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../inspection-transaction.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../inspection.js"
     },
     {
       "source": "packages/runtime/src/sql/mysql/store.ts",
@@ -11723,6 +11828,14 @@
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
       "specifier": "../../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../inspection-transaction.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../inspection.js"
     },
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
@@ -12070,6 +12183,10 @@
     },
     {
       "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./inspection.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
       "specifier": "./migrate.js"
     },
     {
@@ -12183,6 +12300,10 @@
     {
       "source": "packages/runtime/src/tree-parse.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/tree.ts",
+      "specifier": "./run.js"
     },
     {
       "source": "packages/runtime/src/tree.ts",
@@ -12537,6 +12658,10 @@
     {
       "source": "packages/runtime/test/runtime-inspection.test.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-inspection.test.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/runtime/test/runtime-send.test.ts",

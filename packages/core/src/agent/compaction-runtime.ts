@@ -1,4 +1,4 @@
-import { Effect, Equal, Option, Ref, Schema } from "effect"
+import { Clock, Effect, Equal, Exit, Option, Ref, Schema } from "effect"
 import { Chat, LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { AgentError, MiddlewareViolation } from "./agent-event.js"
 import {
@@ -21,7 +21,6 @@ import { operationKey } from "../durable/driver-interpreter.js"
 
 import type { MemoryError } from "../context/memory.js"
 import type { SkillSourceError } from "../context/skill-source.js"
-
 type CompactionContext = {
   readonly activeSession: Option.Option<typeof SessionStore.Service>
   readonly sessionService: Option.Option<typeof SessionStore.Service>
@@ -40,6 +39,9 @@ type CompactionContext = {
   readonly deliverPending: () => Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed>
   readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
   readonly undeliveredTelemetry: Array<ModelTelemetryEvent>
+  readonly emitTelemetry: (event: import("../model/model-telemetry.js").EventPayload) => Effect.Effect<void>
+  readonly prepareTelemetry: (event: import("../model/model-telemetry.js").EventPayload) => ModelTelemetryEvent
+  readonly publishTelemetry: (event: ModelTelemetryEvent) => void
   readonly errorMessage: (error: unknown) => string
   readonly agent: { readonly name: string }
   readonly memoryRuntime: unknown | undefined
@@ -63,6 +65,9 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     deliverPending,
     savePersisted,
     undeliveredTelemetry,
+    emitTelemetry,
+    prepareTelemetry,
+    publishTelemetry,
     errorMessage,
     agent,
     compactionError,
@@ -226,49 +231,72 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       ? Effect.void
       : Effect.fail(AgentError.make({ message: "Compaction projection contains an unresolved tool call", turn }))
   }
-
   const applyCompactionResultBody = (
     turn: number,
     result: CompactionResult,
     parentId: string | null,
     commitData?: Omit<CompactionCommit, "checkpointId" | "summaryModelCallId">,
+    onCommitted?: () => void,
   ): Effect.Effect<void, RunError> =>
     Option.match(activeSession, {
-      onNone: () =>
-        deliverPending().pipe(
-          Effect.andThen(Ref.set(chat.history, result.history)),
+      onNone: () => {
+        const checkpointId = commitData?.compactionId ?? "compaction"
+        const commit = commitData === undefined ? undefined : { ...commitData, checkpointId }
+        return Ref.set(chat.history, result.history).pipe(
           Effect.tap(() =>
             Effect.sync(() => {
               state.reportedContextUsage = undefined
             }),
           ),
-        ),
+          Effect.andThen(
+            commit === undefined
+              ? Effect.void
+              : Effect.flatMap(Clock.currentTimeMillis, (appliedAt) =>
+                  emitTelemetry({
+                    _tag: "CompactionApplied",
+                    turn,
+                    compactionId: commit.compactionId,
+                    checkpointId,
+                    kind: result._tag === "Summarize" ? "summarize" : "microcompact",
+                    appliedAt,
+                    commit,
+                  }),
+                ),
+          ),
+          Effect.andThen(deliverPending()),
+        )
+      },
       onSome: (session) =>
         Effect.gen(function* () {
           const id = yield* session.reserveEntryId
-          const telemetry = Object.freeze([...undeliveredTelemetry])
-          const completed: Extract<ModelTelemetryEvent, { readonly _tag: "CompactionCompleted" }> | undefined =
+          const telemetryBeforeApplied = Object.freeze([...undeliveredTelemetry])
+          const summaryCall: Extract<ModelTelemetryEvent, { readonly _tag: "ModelCallStarted" }> | undefined =
             commitData === undefined
               ? undefined
-              : (telemetry.findLast(
-                  (event) => event._tag === "CompactionCompleted" && event.compactionId === commitData.compactionId,
-                ) as Extract<ModelTelemetryEvent, { readonly _tag: "CompactionCompleted" }> | undefined)
-          if (commitData !== undefined && completed === undefined) {
-            return yield* AgentError.make({
-              message: `Changed custom compaction ${commitData.compactionId} did not emit CompactionCompleted`,
-              turn,
-            })
-          }
+              : (telemetryBeforeApplied.findLast(
+                  (event) => event._tag === "ModelCallStarted" && event.compactionId === commitData.compactionId,
+                ) as Extract<ModelTelemetryEvent, { readonly _tag: "ModelCallStarted" }> | undefined)
           const compactionCommit =
             commitData === undefined
               ? undefined
               : {
                   ...commitData,
                   checkpointId: id,
-                  ...(completed?.summaryModelCallId === undefined
-                    ? {}
-                    : { summaryModelCallId: completed.summaryModelCallId }),
+                  ...(summaryCall?.modelCallId === undefined ? {} : { summaryModelCallId: summaryCall.modelCallId }),
                 }
+          const applied =
+            compactionCommit === undefined
+              ? undefined
+              : prepareTelemetry({
+                  _tag: "CompactionApplied",
+                  turn,
+                  compactionId: compactionCommit.compactionId,
+                  checkpointId: id,
+                  kind: result._tag === "Summarize" ? "summarize" : "microcompact",
+                  appliedAt: yield* Clock.currentTimeMillis,
+                  commit: compactionCommit,
+                })
+          const telemetry = Object.freeze([...telemetryBeforeApplied, ...(applied === undefined ? [] : [applied])])
           yield* Effect.uninterruptibleMask((restore) =>
             restore(
               session
@@ -302,7 +330,9 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             ).pipe(
               Effect.tap(() =>
                 Effect.sync(() => {
-                  undeliveredTelemetry.splice(0, telemetry.length)
+                  undeliveredTelemetry.splice(0, telemetryBeforeApplied.length)
+                  if (applied !== undefined) publishTelemetry(applied)
+                  onCommitted?.()
                 }),
               ),
               Effect.flatMap((appended) => restore(session.path(appended.leafId))),
@@ -324,6 +354,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     result: CompactionResult,
     parentId: string | null,
     commitData?: Omit<CompactionCommit, "checkpointId" | "summaryModelCallId">,
+    onCommitted?: () => void,
   ): Effect.Effect<void, RunError> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
     const applyKey = commitData?.compactionId ?? "apply"
@@ -338,10 +369,9 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
         },
         replayPolicy: "pure",
       },
-      applyCompactionResultBody(turn, result, parentId, commitData),
+      applyCompactionResultBody(turn, result, parentId, commitData, onCommitted),
     )
   }
-
   const preparePrompt = (
     turn: number,
     prompt: Prompt.Prompt,
@@ -405,35 +435,58 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                 compactEffect,
               )
           if (Option.isNone(compacted)) return { prompt, changed: false }
-          const changed =
-            !Equal.equals(originalHistory.content, compacted.value.history.content) ||
-            !Equal.equals(originalPrompt.content, compacted.value.prompt.content)
-          if (!changed) return { prompt, changed: false }
-          const allowed = [...historyRecalled, ...promptRecalled]
-          const required = Option.isSome(activeSession) ? promptRecalled : allowed
-          if (
-            !preservesRecalledMessages(
-              allowed,
-              required,
-              Prompt.concat(compacted.value.history, compacted.value.prompt),
-            )
-          ) {
-            return yield* MiddlewareViolation.make({
+          let applicationCommitted = false
+          return yield* Effect.gen(function* () {
+            const changed =
+              !Equal.equals(originalHistory.content, compacted.value.history.content) ||
+              !Equal.equals(originalPrompt.content, compacted.value.prompt.content)
+            if (!changed) {
+              const skippedAt = yield* Clock.currentTimeMillis
+              yield* emitTelemetry({ _tag: "CompactionSkipped", turn, compactionId, skippedAt })
+              return { prompt, changed: false }
+            }
+            const allowed = [...historyRecalled, ...promptRecalled]
+            const required = Option.isSome(activeSession) ? promptRecalled : allowed
+            if (
+              !preservesRecalledMessages(
+                allowed,
+                required,
+                Prompt.concat(compacted.value.history, compacted.value.prompt),
+              )
+            ) {
+              return yield* MiddlewareViolation.make({
+                turn,
+                detail: "Compaction must preserve recalled-memory message lineage outside the lossless Session path",
+              })
+            }
+            yield* validateCompactionProjection(turn, compacted.value)
+            const after = Prompt.concat(compacted.value.history, compacted.value.prompt)
+            const contextTokensAfter = yield* Effect.option(countTokens(turn, after))
+            yield* applyCompactionResult(
               turn,
-              detail: "Compaction must preserve recalled-memory message lineage outside the lossless Session path",
-            })
-          }
-          yield* validateCompactionProjection(turn, compacted.value)
-          const after = Prompt.concat(compacted.value.history, compacted.value.prompt)
-          const contextTokensAfter = yield* Effect.option(countTokens(turn, after))
-          yield* applyCompactionResult(turn, compacted.value, path.at(-1)?.id ?? null, {
-            compactionId,
-            contextTokensBefore: usage.contextTokens,
-            ...(Option.isSome(contextTokensAfter) ? { contextTokensAfter: contextTokensAfter.value } : {}),
-            entriesBefore: Prompt.concat(history, prompt).content.length,
-            entriesAfter: after.content.length,
-          })
-          return { prompt: compacted.value.prompt, changed: true }
+              compacted.value,
+              path.at(-1)?.id ?? null,
+              {
+                compactionId,
+                contextTokensBefore: usage.contextTokens,
+                ...(Option.isSome(contextTokensAfter) ? { contextTokensAfter: contextTokensAfter.value } : {}),
+                entriesBefore: Prompt.concat(history, prompt).content.length,
+                entriesAfter: after.content.length,
+              },
+              () => {
+                applicationCommitted = true
+              },
+            )
+            return { prompt: compacted.value.prompt, changed: true }
+          }).pipe(
+            Effect.onExit((exit) =>
+              Exit.isSuccess(exit) || applicationCommitted
+                ? Effect.void
+                : Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
+                    emitTelemetry({ _tag: "CompactionFailed", turn, compactionId, failedAt }),
+                  ),
+            ),
+          )
         }),
     }) as Effect.Effect<
       { readonly prompt: Prompt.Prompt; readonly changed: boolean },

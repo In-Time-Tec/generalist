@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { AgentRef } from "./agent-ref.js"
 import type { AgentLoopEvent, AgentResult } from "./agent-event.js"
-import { RunId } from "./run.js"
+import { AgentResult as AgentResultSchema, RunFailure as RunFailureSchema, RunId } from "./run.js"
 import { RunWait, WaitResolution } from "./run-wait.js"
 import { Address } from "./address.js"
 import { ModelTelemetry } from "@batonfx/core"
@@ -34,17 +34,9 @@ export const RunEventBase = Schema.Struct({
 })
 export type RunEventBase = typeof RunEventBase.Type
 
-export const AgentResultSchema = Schema.Struct({
-  text: Schema.String,
-  turns: Schema.Finite,
-  transcript: Prompt.Prompt,
-})
-
-export const RunFailure = Schema.Struct({
-  message: Schema.String,
-  cause: Schema.optionalKey(Schema.Defect()),
-})
-export type RunFailure = typeof RunFailure.Type
+export { AgentResultSchema }
+export const RunFailure = RunFailureSchema
+export type RunFailure = import("./run.js").RunFailure
 
 export type RunAccepted = RunEventBase & {
   readonly _tag: "RunAccepted"
@@ -233,7 +225,8 @@ const ModelTelemetryEventSchema = Schema.Union([
   }),
   ModelTelemetry.ModelCallFailed,
   ModelTelemetry.CompactionStarted,
-  ModelTelemetry.CompactionCompleted,
+  ModelTelemetry.CompactionSkipped,
+  ModelTelemetry.CompactionApplied,
   ModelTelemetry.CompactionFailed,
 ])
 const AgentLoopEventSchema = Schema.Union([

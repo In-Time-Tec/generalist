@@ -58,15 +58,6 @@ export const ModelFirstOutputKind = Schema.Literals(["reasoning", "text", "tool-
 /** @experimental */
 export type ModelFirstOutputKind = typeof ModelFirstOutputKind.Type
 
-/** @experimental Provider-reported cost. Absent means unknown; Baton never estimates. */
-export const ModelCost = Schema.Struct({
-  amount: Schema.Finite,
-  currency: Schema.String,
-})
-
-/** @experimental */
-export type ModelCost = typeof ModelCost.Type
-
 /** @experimental What caused a compaction pass to run. */
 export const CompactionTrigger = Schema.Literals(["threshold", "overflow"])
 
@@ -203,7 +194,7 @@ export type ModelAttemptFirstOutput = typeof ModelAttemptFirstOutput.Type
  * carries the provider's terminal `finish` part, so usage, `usageAt`, and
  * `finishReason` are required; an attempt whose stream ended without one is
  * reported as `ModelAttemptFailed` with category `truncated-stream`. Absent
- * request correlation, service tier, and cost fields mean unknown, never zero.
+ * request correlation and service tier fields mean unknown, never zero.
  * `usageAt` is sampled when provider-reported usage was received, which can
  * precede stream completion.
  */
@@ -221,7 +212,6 @@ export const ModelAttemptCompleted = Schema.Struct({
   requestId: Schema.optionalKey(Schema.String),
   responseModel: Schema.optionalKey(Schema.String),
   serviceTier: Schema.optionalKey(Schema.String),
-  cost: Schema.optionalKey(ModelCost),
 })
 
 /** @experimental */
@@ -243,6 +233,20 @@ export const ModelAttemptFailed = Schema.Struct({
 
 /** @experimental */
 export type ModelAttemptFailed = typeof ModelAttemptFailed.Type
+
+/** @experimental Atomic checkpoint record joining a compaction pass to its telemetry and projection. */
+export const CompactionCommit = Schema.Struct({
+  compactionId: Schema.String,
+  checkpointId: Schema.String,
+  summaryModelCallId: Schema.optionalKey(Schema.String),
+  contextTokensBefore: Schema.optionalKey(Schema.Finite),
+  contextTokensAfter: Schema.optionalKey(Schema.Finite),
+  entriesBefore: Schema.optionalKey(Schema.Finite),
+  entriesAfter: Schema.optionalKey(Schema.Finite),
+})
+
+/** @experimental */
+export type CompactionCommit = typeof CompactionCommit.Type
 
 /**
  * @experimental A retry of the model call was accepted. `attempt` is the
@@ -320,24 +324,37 @@ export const CompactionStarted = Schema.Struct({
 /** @experimental */
 export type CompactionStarted = typeof CompactionStarted.Type
 
+/** @experimental A started compaction pass found no projection change to apply. */
+export const CompactionSkipped = Schema.Struct({
+  _tag: Schema.tag("CompactionSkipped"),
+  deliveryId: Schema.String,
+  turn: Schema.Finite,
+  compactionId: Schema.String,
+  skippedAt: Schema.Finite,
+})
+
+/** @experimental */
+export type CompactionSkipped = typeof CompactionSkipped.Type
+
 /**
  * @experimental A compaction pass produced its result. Session checkpoint and
  * projection application follow, and their failure fails the run typed.
  * `summaryModelCallId` names the summary model call when one ran; that call
  * also carries this pass's `compactionId` on its `ModelCallStarted` event.
  */
-export const CompactionCompleted = Schema.Struct({
-  _tag: Schema.tag("CompactionCompleted"),
+export const CompactionApplied = Schema.Struct({
+  _tag: Schema.tag("CompactionApplied"),
   deliveryId: Schema.String,
   turn: Schema.Finite,
   compactionId: Schema.String,
-  kind: CompactionKind,
-  completedAt: Schema.Finite,
-  summaryModelCallId: Schema.optionalKey(Schema.String),
+  checkpointId: Schema.String,
+  kind: Schema.Literals(["microcompact", "summarize"]),
+  appliedAt: Schema.Finite,
+  commit: CompactionCommit,
 })
 
 /** @experimental */
-export type CompactionCompleted = typeof CompactionCompleted.Type
+export type CompactionApplied = typeof CompactionApplied.Type
 
 /** @experimental A compaction pass failed or was interrupted after work began. */
 export const CompactionFailed = Schema.Struct({
@@ -367,7 +384,8 @@ export const Event = Schema.Union([
   ModelCallCompleted,
   ModelCallFailed,
   CompactionStarted,
-  CompactionCompleted,
+  CompactionSkipped,
+  CompactionApplied,
   CompactionFailed,
 ])
 
@@ -387,20 +405,6 @@ type WithoutDeliveryId<T> = T extends Event ? Omit<T, "deliveryId"> : never
 
 /** @experimental Lifecycle payload before the run assigns its stable delivery identifier. */
 export type EventPayload = WithoutDeliveryId<Event>
-
-/** @experimental Atomic checkpoint record joining a compaction pass to its telemetry and projection. */
-export const CompactionCommit = Schema.Struct({
-  compactionId: Schema.String,
-  checkpointId: Schema.String,
-  summaryModelCallId: Schema.optionalKey(Schema.String),
-  contextTokensBefore: Schema.optionalKey(Schema.Finite),
-  contextTokensAfter: Schema.optionalKey(Schema.Finite),
-  entriesBefore: Schema.optionalKey(Schema.Finite),
-  entriesAfter: Schema.optionalKey(Schema.Finite),
-})
-
-/** @experimental */
-export type CompactionCommit = typeof CompactionCommit.Type
 
 /** @experimental Host telemetry delivery failure. A remote failure can be ambiguous; reconcile with the sink. */
 export class DeliveryFailed extends Schema.TaggedErrorClass<DeliveryFailed>()("@batonfx/core/DeliveryFailed", {

@@ -313,6 +313,77 @@ const captureJournal = () => {
 }
 
 describe("DurableDriver Agent.stream integration", () => {
+  for (const kind of ["model", "structured-output"] as const) {
+    it.effect(`reconciles a pending ${kind} without recharging its ordinal or budget`, () =>
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: `${kind}-replay-agent` })
+        const agentRef = AgentRef.fromAgent(agent, "inline")
+        const allocated = RunBudget.allocate({ modelCalls: 3 })
+        const charged = yield* RunBudget.charge(allocated, { modelCalls: 1 })
+        const logicalOperationId = `${kind}-replay`
+        const input = { turn: 0, modelCallOrdinal: 0 }
+        const pendingKey = `${logicalOperationId}:${kind}:0:0`
+        const driver = DurableDriver.makeLoopDriver({ logicalOperationId, sessionId: logicalOperationId })
+        const checkpoint: DurableDriver.DriverCheckpoint = {
+          driverVersion: DurableDriver.currentDriverVersion,
+          agent: agentRef,
+          turn: 0,
+          budget: charged,
+          execution: {
+            agent: agentRef,
+            driverVersion: DurableDriver.currentDriverVersion,
+            checkpointCodecVersion: "1",
+            eventCodecVersion: "1",
+            toolSchemaDigests: {},
+            rootBudget: allocated,
+          },
+          state: {
+            logicalOperationId,
+            sessionId: logicalOperationId,
+            modelCallOrdinal: 1,
+            modelCallOrdinalStart: 0,
+            pending: { kind, key: pendingKey, input, replayPolicy: "provider-idempotent" },
+          },
+        }
+        const scheduled: Array<string> = []
+        const interpreter = yield* DurableDriver.makeInline({
+          driver,
+          initial: checkpoint,
+          journal: {
+            onScheduled: (operation) =>
+              Effect.sync(() => {
+                scheduled.push(operation.key)
+                return operation.key === pendingKey ? ({ _tag: "Succeeded", value: "replayed" } as const) : undefined
+              }),
+            onCompleted: () => Effect.void,
+            onCheckpoint: () => Effect.void,
+          },
+        })
+
+        expect(
+          yield* interpreter.run(
+            { kind, key: pendingKey, input, replayPolicy: "provider-idempotent" },
+            Effect.die("replayed operation must not execute"),
+          ),
+        ).toBe("replayed")
+        expect((yield* interpreter.checkpoint).budget.remaining.modelCalls).toBe(2)
+
+        const nextKey = `${logicalOperationId}:${kind}:0:1`
+        yield* interpreter.run(
+          {
+            kind,
+            key: nextKey,
+            input: { turn: 0, modelCallOrdinal: 1 },
+            replayPolicy: "provider-idempotent",
+          },
+          Effect.void,
+        )
+        expect(scheduled).toEqual([pendingKey, nextKey])
+        expect((yield* interpreter.checkpoint).budget.remaining.modelCalls).toBe(1)
+      }),
+    )
+  }
+
   it.effect("records model and tool operations through the driver journal seam", () =>
     Effect.gen(function* () {
       const { scheduled, journalLayer } = captureJournal()

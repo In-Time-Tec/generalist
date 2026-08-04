@@ -2,7 +2,7 @@ import { Cause, Effect, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { checkpoint, interceptStream, logicalOperationId } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
-import { LoopDriverState } from "../durable/loop-driver-state.js"
+import { LoopDriverState, modelCallOrdinal } from "../durable/loop-driver-state.js"
 import { DriverStateInvalid } from "../durable/durable-driver.js"
 import type { DuplicateToolCallId } from "./agent-event.js"
 import type { RunError } from "./agent.js"
@@ -30,11 +30,12 @@ export const wrapDriverAttempt =
         const driverState = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
           Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
         )
+        const ordinal = modelCallOrdinal(driverState)
         return interceptStream(
           {
             kind: "model",
-            key: operationKey(logicalId, "model", turn, driverState.modelCallOrdinal, "conversation"),
-            input: { turn, modelCallOrdinal: driverState.modelCallOrdinal, purpose: "conversation" },
+            key: operationKey(logicalId, "model", turn, ordinal, "conversation"),
+            input: { turn, modelCallOrdinal: ordinal, purpose: "conversation" },
             replayPolicy: "provider-idempotent",
           },
           attemptBody(activePrompt, retryOverflow, compactOverflow, overflowCause),

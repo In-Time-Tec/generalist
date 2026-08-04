@@ -34,7 +34,7 @@ import {
   recordSuspension,
 } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
-import { LoopDriverState } from "../durable/loop-driver-state.js"
+import { LoopDriverState, modelCallOrdinal } from "../durable/loop-driver-state.js"
 import { DriverStateInvalid } from "../durable/durable-driver.js"
 import { terminalCompletedEvent, turnCompletedEvent } from "./model-turn-finish.js"
 const providerOutputState = () => ({ textCharacters: 0, reasoningCharacters: 0, finishReason: undefined })
@@ -95,11 +95,12 @@ export const makeRunLoop = <
         const driverState = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
           Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
         )
+        const ordinal = modelCallOrdinal(driverState)
         const response = yield* intercept(
           {
             kind: "structured-output",
-            key: operationKey(logicalId, "structured-output", structuredTurn, driverState.modelCallOrdinal),
-            input: { turn: structuredTurn, modelCallOrdinal: driverState.modelCallOrdinal },
+            key: operationKey(logicalId, "structured-output", structuredTurn, ordinal),
+            input: { turn: structuredTurn, modelCallOrdinal: ordinal },
             replayPolicy: "provider-idempotent",
           },
           LanguageModel.generateObject({

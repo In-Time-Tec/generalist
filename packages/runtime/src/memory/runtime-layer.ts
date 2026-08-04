@@ -115,7 +115,7 @@ export const makeRuntime = (
           runId: input.runId,
           cursor: input.cursor ?? cursorOrigin,
         }),
-      snapshot: (runId) => store.inspect(runId).pipe(Effect.map((run) => ({ run, cursor: run.lastSequence }))),
+      snapshot: (runId) => store.snapshot(runId),
       history: (input) =>
         store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
       treeHistory: (input) =>
@@ -123,6 +123,7 @@ export const makeRuntime = (
           const position = yield* parseCursor(input.rootRunId, input.cursor)
           return yield* store.treeHistory({ rootRunId: input.rootRunId, position, limit: input.limit })
         }),
+      inspectTree: (rootRunId) => store.inspectTree(rootRunId),
       list: (input) => store.list(input),
       respond: (input) => store.respond(input),
       signal: (input) => store.signal(input),

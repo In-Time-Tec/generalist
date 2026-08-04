@@ -38,6 +38,7 @@ import { admitSteering, readSteering } from "./store-steering.js"
 import { Prompt } from "effect/unstable/ai"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { makeCursor } from "../tree-cursor.js"
+import { projectRunSnapshot, projectTreeInspection, type InspectionRun } from "../inspection.js"
 
 const registrationMaps = (options: LayerOptions) => {
   const agentRefs = new Map(options.agents.map((entry) => [agentKey(entry.ref), entry.ref] as const))
@@ -109,6 +110,50 @@ export const makeRunStore = (options: LayerOptions) =>
           ),
         ),
       inspect: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectRun(state, runId))),
+      snapshot: (runId) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) =>
+            Effect.gen(function* () {
+              const run = state.runs.get(runId)
+              if (run === undefined) return yield* RunNotFound.make({ runId })
+              return yield* projectRunSnapshot({
+                inspection: toInspection(run),
+                rootRunId: run.rootRunId,
+                ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
+                ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
+                ...(run.terminalEventId === undefined ? {} : { terminalEventId: run.terminalEventId }),
+                events: run.events,
+                firstTreePosition: 0,
+              })
+            }),
+          ),
+        ),
+      inspectTree: (rootRunId) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) =>
+            Effect.gen(function* () {
+              const root = state.treeRoots.get(rootRunId)
+              if (root === undefined) return yield* RunNotFound.make({ runId: rootRunId })
+              const first = new Map<string, number>()
+              for (const [position, event] of root.events.entries())
+                if (!first.has(event.runId)) first.set(event.runId, position)
+              const runs: Array<InspectionRun> = []
+              for (const run of state.runs.values()) {
+                if (run.rootRunId !== rootRunId) continue
+                runs.push({
+                  inspection: toInspection(run),
+                  rootRunId,
+                  ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
+                  ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
+                  ...(run.terminalEventId === undefined ? {} : { terminalEventId: run.terminalEventId }),
+                  events: run.events,
+                  firstTreePosition: first.get(run.runId) ?? -1,
+                })
+              }
+              return yield* projectTreeInspection(rootRunId, makeCursor(rootRunId, root.lastPosition), runs)
+            }),
+          ),
+        ),
       history: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>

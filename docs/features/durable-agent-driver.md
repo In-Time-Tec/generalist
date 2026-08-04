@@ -42,7 +42,7 @@ Inline runs interpret operations immediately through existing Effect services. T
 
 `DurableDriver.guardUnknownNeverReplay` rejects `Unknown` outcomes for operations with `never` replay policy before re-execution, failing typed as `DriverUnknownReplay`.
 
-Runtime hosts journal `DriverOperation` records and reconstruct `layerForRun` from the last fenced checkpoint. The journal also receives checkpoint-only budget mutations so every safe boundary is persisted. Durable persistence, Agent event projection, waits, same-Run resume, and worker orchestration live in `@batonfx/runtime`, not core.
+Runtime hosts journal `DriverOperation` records and reconstruct `layerForRun` from the last fenced checkpoint. Core restores instrumentation's next model-call ordinal from that checkpoint's durable loop state, so model call and attempt IDs remain stable across restart and replay without an AgentHost-specific override. The journal also receives checkpoint-only budget mutations so every safe boundary is persisted. Durable persistence, Agent event projection, waits, same-Run resume, and worker orchestration live in `@batonfx/runtime`, not core.
 
 ## Not yet intercepted
 

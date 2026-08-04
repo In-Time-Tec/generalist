@@ -29,10 +29,13 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
         Effect.succeed({
           run: { runId, status: "running", agent, lastSequence: 2, durability: "durable" },
           cursor: 2,
+          usage: [],
+          compactions: [],
         }),
       history: ({ cursor }) =>
         Effect.succeed([event(0), event(1), event(2)].filter((item) => item.sequence > (cursor ?? -1))),
       treeHistory: () => Effect.die("unused treeHistory"),
+      inspectTree: () => Effect.die("unused inspectTree"),
       list: () => Effect.succeed([]),
       respond: () => Effect.die("unused respond"),
       signal: () => Effect.die("unused signal"),

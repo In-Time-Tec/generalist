@@ -41,6 +41,7 @@ import { admitSteering, readSteering, saveCompletionContinuation } from "./store
 import { makeEventHub } from "./subscribers.js"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { loadTreeHistory } from "./tree-history.js"
+import { loadRunSnapshot, loadTreeInspection } from "./inspection.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly filename: string
@@ -135,6 +136,8 @@ export const makeSqliteRunStore = (
             }
           }),
         ),
+      snapshot: (runId) => run(loadRunSnapshot(runId)),
+      inspectTree: (rootRunId) => run(loadTreeInspection(rootRunId)),
       history: (input) =>
         runNoTxn(
           Effect.gen(function* () {

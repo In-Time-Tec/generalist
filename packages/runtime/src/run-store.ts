@@ -21,7 +21,7 @@ import type {
   TreeCursorInvalid,
 } from "./errors.js"
 import type { Message } from "./message.js"
-import type { RunInspection, RunReceipt, RunStatus } from "./run.js"
+import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunWait, WaitResolution } from "./run-wait.js"
 import type { AgentLoopEvent, AgentResult } from "./agent-event.js"
 import type { RunEvent, RunFailure } from "./run-event.js"
@@ -107,7 +107,7 @@ export interface Interface {
     input: SpawnInput & { readonly message: Message; readonly agent: AgentRef; readonly parentRunId: string },
   ) => Effect.Effect<
     RunReceipt,
-    RunNotFound | AgentVersionUnavailable | AgentNotRegistered | IdempotencyConflict | RuntimeUnavailable
+    RunNotFound | RunTerminal | AgentVersionUnavailable | AgentNotRegistered | IdempotencyConflict | RuntimeUnavailable
   >
   readonly events: (input: {
     readonly runId: string
@@ -123,6 +123,10 @@ export interface Interface {
   ) => Effect.Effect<void, RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable>
   readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
+  readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, RunNotFound | RuntimeUnavailable>
+  readonly inspectTree: (
+    rootRunId: string,
+  ) => Effect.Effect<import("./tree.js").Inspection, RunNotFound | RuntimeUnavailable>
   readonly history: (input: {
     readonly runId: string
     readonly cursor: Cursor

@@ -46,6 +46,7 @@ const mockRuntime = (implementation: Partial<Runtime.Interface>): Runtime.Interf
     snapshot: () => unused(),
     history: () => unused(),
     treeHistory: () => unused(),
+    inspectTree: () => unused(),
     list: () => unused(),
     respond: () => unused(),
     signal: () => unused(),
@@ -135,6 +136,8 @@ describe("AgUi", () => {
         durability: "ephemeral" as const,
       },
       cursor: 3,
+      usage: [],
+      compactions: [],
     }
     const runtime = mockRuntime({
       snapshot: () => Effect.succeed(snapshot),
@@ -180,6 +183,8 @@ describe("AgUi", () => {
         durability: "ephemeral" as const,
       },
       cursor: 8,
+      usage: [],
+      compactions: [],
     }
     const runtime = mockRuntime({
       send: () =>
@@ -213,6 +218,8 @@ describe("AgUi", () => {
         durability: "durable" as const,
       },
       cursor: 12,
+      usage: [],
+      compactions: [],
     }
     const runtime = mockRuntime({
       send: () =>

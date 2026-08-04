@@ -115,6 +115,7 @@ export interface SteerInput {
 export type SendError = AddressNotFound | IdempotencyConflict | RunIdConflict | AgentNotRegistered | RuntimeUnavailable
 export type SpawnError =
   | RunNotFound
+  | RunTerminal
   | AgentVersionUnavailable
   | AgentNotRegistered
   | IdempotencyConflict
@@ -147,6 +148,7 @@ export interface Interface {
   readonly treeHistory: (
     input: import("./tree.js").HistoryInput,
   ) => Effect.Effect<import("./tree.js").TreePage, TreeEventsError>
+  readonly inspectTree: (rootRunId: string) => Effect.Effect<import("./tree.js").Inspection, InspectError>
   readonly list: (input: ListInput) => Effect.Effect<ReadonlyArray<RunInspection>, RuntimeUnavailable>
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>

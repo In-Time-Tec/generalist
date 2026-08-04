@@ -37,6 +37,16 @@ export const loadRun = (runId: string) =>
     return row === undefined ? undefined : decodeRun(row)
   })
 
+export const lockSpawnParent = (runId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${runId} FOR UPDATE`
+    const parent = yield* loadRun(runId)
+    if (parent === undefined) return yield* RunNotFound.make({ runId })
+    if (isTerminal(parent.status)) return yield* RunTerminal.make({ runId, status: parent.status })
+    return parent
+  })
+
 export const emitAgentEvent = (hub: EventHub, input: ExecutionClaim & { readonly event: AgentLoopEvent }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient

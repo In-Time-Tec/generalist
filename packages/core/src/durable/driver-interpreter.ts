@@ -21,6 +21,7 @@ import {
   RunBudgetExhausted,
   type RunBudgetGrantWidened,
 } from "./run-budget.js"
+import { CurrentModelCallOrdinal } from "./operation-context.js"
 import { LoopDriverState } from "./loop-driver-state.js"
 import {
   chargeScheduled,
@@ -141,6 +142,30 @@ export const makeInline = (input: {
     const schedule = (spec: OperationSpec) =>
       Effect.gen(function* () {
         let before = yield* Ref.get(checkpointRef)
+        const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(before.state).pipe(
+          Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+        )
+        if (state.pending !== undefined) {
+          const pending = makeOperation(state.pending)
+          const requested = makeOperation(spec)
+          const matches =
+            pending.key !== requested.key ||
+            pending.kind !== requested.kind ||
+            pending.inputDigest !== requested.inputDigest ||
+            pending.replayPolicy !== requested.replayPolicy
+          if (matches) {
+            const replay = yield* journal.onScheduled(requested, before)
+            return { operation: requested, replay, nested: true }
+          }
+          const decision = yield* input.driver.decide(before)
+          if (decision._tag !== "Execute") {
+            return yield* DriverStateInvalid.make({
+              message: `Expected Execute decision for ${spec.key}, received ${decision._tag}`,
+            })
+          }
+          const replay = yield* journal.onScheduled(decision.operation, before)
+          return { operation: decision.operation, replay, nested: false }
+        }
         const nowIso = new Date(yield* Clock.currentTimeMillis).toISOString()
         yield* assertNotExpired(before.budget, nowIso)
         before = yield* chargeScheduled(before, spec.kind)
@@ -159,15 +184,21 @@ export const makeInline = (input: {
           })
         }
         const replay = yield* journal.onScheduled(decision.operation, scheduled)
-        return { operation: decision.operation, replay }
+        return { operation: decision.operation, replay, nested: false }
       })
     const commit = (
       operation: DriverOperation,
       outcome: OperationOutcome,
+      nested = false,
     ): Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay> =>
       Effect.gen(function* () {
         yield* guardUnknownNeverReplay(operation, outcome)
         const before = yield* Ref.get(checkpointRef)
+        if (nested) {
+          yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: before }])
+          yield* journal.onCompleted(operation, outcome, before)
+          return
+        }
         const after = yield* input.driver.apply(before, outcome)
         yield* Ref.set(checkpointRef, after)
         yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: after }])
@@ -183,20 +214,30 @@ export const makeInline = (input: {
       effect: Effect.Effect<A, E, R>,
     ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R> =>
       Effect.gen(function* () {
-        const { operation, replay } = yield* schedule(spec)
+        const { operation, replay, nested } = yield* schedule(spec)
         if (replay !== undefined) {
           yield* guardUnknownNeverReplay(operation, replay)
-          const before = yield* Ref.get(checkpointRef)
-          const after = yield* input.driver.apply(before, replay)
-          yield* Ref.set(checkpointRef, after)
+          if (!nested) {
+            const before = yield* Ref.get(checkpointRef)
+            const after = yield* input.driver.apply(before, replay)
+            yield* Ref.set(checkpointRef, after)
+          }
           return yield* replay._tag === "Succeeded"
             ? Effect.succeed(replay.value as A)
             : replay._tag === "Failed"
               ? Effect.fail(replay.error as E)
               : DriverUnknownReplay.make({ operationKey: operation.key, operationId: replay.operationId })
         }
-        const exit = yield* effect.pipe(Effect.exit)
-        yield* commit(operation, outcomeFromExit(exit))
+        const ordinal =
+          (spec.kind === "model" || spec.kind === "structured-output") &&
+          typeof spec.input === "object" &&
+          spec.input !== null &&
+          "modelCallOrdinal" in spec.input &&
+          typeof spec.input.modelCallOrdinal === "number"
+            ? spec.input.modelCallOrdinal
+            : undefined
+        const exit = yield* effect.pipe(Effect.provideService(CurrentModelCallOrdinal, ordinal), Effect.exit)
+        yield* commit(operation, outcomeFromExit(exit), nested)
         return yield* Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause)
       })
     const interpreter: Interface = {
@@ -205,7 +246,7 @@ export const makeInline = (input: {
       runStream: <A, E, R>(spec: OperationSpec, stream: Stream.Stream<A, E, R>) =>
         Stream.unwrap(
           Effect.gen(function* () {
-            const { operation, replay } = yield* schedule(spec)
+            const { operation, replay, nested } = yield* schedule(spec)
             if (replay !== undefined) {
               yield* guardUnknownNeverReplay(operation, replay)
               return (
@@ -218,7 +259,18 @@ export const makeInline = (input: {
                       )
               ) as Stream.Stream<A, E | DriverUnknownReplay, R>
             }
-            return stream.pipe(Stream.onExit((exit) => commit(operation, outcomeFromExit(exit)).pipe(Effect.orDie)))
+            const ordinal =
+              (spec.kind === "model" || spec.kind === "structured-output") &&
+              typeof spec.input === "object" &&
+              spec.input !== null &&
+              "modelCallOrdinal" in spec.input &&
+              typeof spec.input.modelCallOrdinal === "number"
+                ? spec.input.modelCallOrdinal
+                : undefined
+            return stream.pipe(
+              Stream.provideService(CurrentModelCallOrdinal, ordinal),
+              Stream.onExit((exit) => commit(operation, outcomeFromExit(exit), nested).pipe(Effect.orDie)),
+            )
           }),
         ) as Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>,
       recordSuspension: (suspension) =>

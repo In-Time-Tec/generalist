@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
-import { Runtime, RunStore, RunTree } from "../src/index.js"
+import { Errors, Runtime, RunStore, RunTree } from "../src/index.js"
 import { assistantAddress, completedResult, memoryLayer, researcherRef, textPrompt } from "./helpers.js"
 
 layer(memoryLayer)("Runtime children", (it) => {
@@ -85,6 +85,32 @@ layer(memoryLayer)("Runtime children", (it) => {
       )
       expect(tree.some((item) => item.runId === parent.runId && item.event._tag === "ChildLinked")).toBe(true)
       expect(tree.some((item) => item.runId === child.runId && item.event._tag === "RunCompleted")).toBe(true)
+    }),
+  )
+
+  it.effect("rejects child admission after the parent is terminal and leaves the tree stable", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:terminal-parent",
+        idempotencyKey: "parent",
+        prompt: textPrompt("parent"),
+      })
+      const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "test" })
+      yield* store.complete({ ...claim, result: completedResult("done") })
+      const before = yield* RunTree.inspect(parent.runId)
+      const failure = yield* runtime
+        .spawn({
+          parentRunId: parent.runId,
+          invocationId: "too-late",
+          agent: researcherRef,
+          prompt: textPrompt("child"),
+        })
+        .pipe(Effect.flip)
+      expect(failure).toBeInstanceOf(Errors.RunTerminal)
+      expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
     }),
   )
 })

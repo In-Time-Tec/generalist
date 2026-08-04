@@ -2,16 +2,12 @@ import { Clock, Effect, Exit, Function, Option } from "effect"
 import { LanguageModel } from "effect/unstable/ai"
 import { type Request, type Result, type Usage } from "./compaction.js"
 import {
-  type CompactionKind,
   CurrentCompactionId,
   CurrentInstrumentation,
   CurrentPurpose,
   CurrentSummaryCall,
   type SummaryCallCell,
 } from "../model/model-telemetry.js"
-
-const resultKind = (result: Option.Option<Result>): CompactionKind =>
-  Option.isNone(result) ? "unchanged" : result.value._tag === "Summarize" ? "summarize" : "microcompact"
 
 /** @experimental Emit the compaction lifecycle around one pass that decided to do work. */
 export const withCompactionLifecycle: {
@@ -37,33 +33,31 @@ export const withCompactionLifecycle: {
       const turn = input.turn
       const compactionId = input.compactionId
       const startedAt = yield* Clock.currentTimeMillis
-      yield* instrumentation.emit({
-        _tag: "CompactionStarted",
+      const started = {
+        _tag: "CompactionStarted" as const,
         turn,
         compactionId,
-        trigger: input.overflow ? "overflow" : "threshold",
+        trigger: input.overflow ? ("overflow" as const) : ("threshold" as const),
         startedAt,
         contextTokensBefore: usage.contextTokens,
         entriesBefore: input.history.content.length + input.prompt.content.length,
-      })
+      }
       const summaryCell: SummaryCallCell = { current: undefined }
+      yield* instrumentation.emit(started)
       return yield* work.pipe(
         Effect.provideService(CurrentCompactionId, compactionId),
         Effect.provideService(CurrentPurpose, "compaction-summary"),
         Effect.provideService(CurrentSummaryCall, summaryCell),
         Effect.onExit((exit) =>
-          Effect.flatMap(Clock.currentTimeMillis, (at) =>
-            Exit.isSuccess(exit)
-              ? instrumentation.emit({
-                  _tag: "CompactionCompleted",
-                  turn,
-                  compactionId,
-                  kind: resultKind(exit.value),
-                  completedAt: at,
-                  ...(summaryCell.current === undefined ? {} : { summaryModelCallId: summaryCell.current }),
-                })
-              : instrumentation.emit({ _tag: "CompactionFailed", turn, compactionId, failedAt: at }),
-          ),
+          Exit.isSuccess(exit)
+            ? Option.isNone(exit.value)
+              ? Effect.flatMap(Clock.currentTimeMillis, (skippedAt) =>
+                  instrumentation.emit({ _tag: "CompactionSkipped", turn, compactionId, skippedAt }),
+                )
+              : Effect.void
+            : Effect.flatMap(Clock.currentTimeMillis, (failedAt) =>
+                instrumentation.emit({ _tag: "CompactionFailed", turn, compactionId, failedAt }),
+              ),
         ),
       )
     }),

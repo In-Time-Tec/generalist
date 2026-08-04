@@ -23,6 +23,7 @@ import { Steering } from "../turn/steering.js"
 import { ToolAuthorizerService, make as makeToolAuthorizer } from "../tools/tool-authorization.js"
 import { ToolExecutor } from "../tools/tool-executor.js"
 import { type Candidate, assemble } from "../tools/tool-registry.js"
+import { LoopDriverState, modelCallOrdinal as checkpointModelCallOrdinal } from "../durable/loop-driver-state.js"
 import type { Agent, ProgressOverflowPolicy, RunOptions } from "./agent.js"
 import { Runtime } from "./agent-persistence-lock.js"
 import { activateSkillTool, skillListingBudgetTokens } from "./agent-skill-tool.js"
@@ -185,7 +186,6 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
     const chain = yield* Effect.serviceOption(ModelMiddleware).pipe(
       Effect.map(Option.match({ onNone: () => [], onSome: (service) => service })),
     )
-
     if (
       options.toolOutputMaxBytes !== undefined &&
       (!Number.isFinite(options.toolOutputMaxBytes) || options.toolOutputMaxBytes < 0)
@@ -297,11 +297,25 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
     let telemetrySequence = 0
     const pendingTelemetry: Array<ModelTelemetryEvent> = []
     const undeliveredTelemetry: Array<ModelTelemetryEvent> = []
+    const prepareTelemetry = (payload: ModelTelemetryEventPayload): ModelTelemetryEvent =>
+      ({ ...payload, deliveryId: `${telemetryRunId}:${telemetrySequence++}` }) as ModelTelemetryEvent
+    const publishTelemetry = (event: ModelTelemetryEvent): void => {
+      if (undeliveredTelemetry.some((current) => current.deliveryId === event.deliveryId)) return
+      pendingTelemetry.push(event)
+      undeliveredTelemetry.push(event)
+    }
+    if (options.driverCheckpoint !== undefined && Option.isSome(sessionService)) {
+      const path = yield* sessionService.value
+        .path()
+        .pipe(Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })))
+      const checkpoint = path.findLast((entry) => entry._tag === "Compaction" && entry.version === 2)
+      if (checkpoint?._tag === "Compaction" && checkpoint.version === 2) {
+        for (const event of checkpoint.telemetry) publishTelemetry(event)
+      }
+    }
     const emitTelemetry = (payload: ModelTelemetryEventPayload): Effect.Effect<void> =>
       Effect.sync(() => {
-        const event = { ...payload, deliveryId: `${telemetryRunId}:${telemetrySequence++}` } as ModelTelemetryEvent
-        pendingTelemetry.push(event)
-        undeliveredTelemetry.push(event)
+        publishTelemetry(prepareTelemetry(payload))
       })
     const flushTelemetry = (): ReadonlyArray<AgentEvent> => pendingTelemetry.splice(0, pendingTelemetry.length)
     const deliverPending = (): Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed> => {
@@ -321,13 +335,26 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       )
     }
     const telemetryIdentity = makeIdentityCell()
-    let modelCallOrdinal = options.modelCallOrdinalStart ?? 0
+    const restoredModelCallOrdinal =
+      options.driverCheckpoint === undefined
+        ? undefined
+        : yield* Schema.decodeUnknownEffect(LoopDriverState)(options.driverCheckpoint.state).pipe(
+            Effect.map(checkpointModelCallOrdinal),
+            Effect.mapError((error) =>
+              AgentError.make({ message: `Invalid model call ordinal checkpoint: ${error}`, turn: 0 }),
+            ),
+          )
+    let modelCallOrdinal = restoredModelCallOrdinal ?? options.modelCallOrdinalStart ?? 0
     const instrumentModel = (model: LanguageModel.Service, turn: number): LanguageModel.Service =>
       instrument(model, {
         emit: emitTelemetry,
         turn,
         identity: telemetryIdentity,
-        nextCallOrdinal: () => modelCallOrdinal++,
+        nextCallOrdinal: (persistedOrdinal) => {
+          if (persistedOrdinal === undefined) return modelCallOrdinal++
+          modelCallOrdinal = Math.max(modelCallOrdinal, persistedOrdinal + 1)
+          return persistedOrdinal
+        },
         ...(options.logicalOperationId === undefined ? {} : { logicalOperationId: options.logicalOperationId }),
         ...(Option.isSome(invocationCoordinator) ? { coordinator: invocationCoordinator.value } : {}),
         ...(Option.isSome(resilienceService) ? { resilience: resilienceService.value } : {}),
@@ -394,8 +421,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
               onSome: Effect.succeed,
             }),
           }
-    // On a persisted chat with no stored history, seed the system message into
-    // the first turn's prompt; on a non-empty history it is already stored.
+    // Seed an empty persisted chat; a non-empty history already stores the system message.
     const seedSystem =
       persisted !== undefined && system !== undefined && (yield* Ref.get(persisted.history)).content.length === 0
         ? system
@@ -447,6 +473,8 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       pendingTelemetry,
       undeliveredTelemetry,
       emitTelemetry,
+      prepareTelemetry,
+      publishTelemetry,
       flushTelemetry,
       deliverPending,
       telemetryIdentity,

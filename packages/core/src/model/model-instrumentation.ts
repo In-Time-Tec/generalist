@@ -6,6 +6,7 @@ import {
   type StreamTextPart,
 } from "./model-call-correction.js"
 import type { IdentityCell } from "./model-attempt-identity.js"
+import { CurrentModelCallOrdinal } from "../durable/operation-context.js"
 import { attemptModel, type CallContext, type InstrumentOptions } from "./model-attempt-instrumentation.js"
 import { memoized, singleFailure, tapRetryTelemetry } from "./model-attempt-observation.js"
 import { classifyFailure } from "./model-registry.js"
@@ -45,7 +46,8 @@ const beginCall = (
 > =>
   Effect.gen(function* () {
     const purpose = yield* CurrentPurpose
-    const callOrdinal = options.nextCallOrdinal?.() ?? 0
+    const persistedOrdinal = yield* CurrentModelCallOrdinal
+    const callOrdinal = options.nextCallOrdinal?.(persistedOrdinal) ?? persistedOrdinal ?? 0
     if (!Number.isSafeInteger(callOrdinal) || callOrdinal < 0) {
       return yield* InvocationCoordinationFailed.make({
         message: "model call ordinal is outside the safe integer range",

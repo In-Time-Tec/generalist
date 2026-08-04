@@ -7,7 +7,6 @@ import {
   ModelFailureClassification as ModelTelemetry_ModelFailureClassification,
   ModelRetryReason as ModelTelemetry_ModelRetryReason,
   ModelFirstOutputKind as ModelTelemetry_ModelFirstOutputKind,
-  ModelCost as ModelTelemetry_ModelCost,
   CompactionTrigger as ModelTelemetry_CompactionTrigger,
   CompactionKind as ModelTelemetry_CompactionKind,
   ModelInvocationMethod as ModelTelemetry_ModelInvocationMethod,
@@ -27,7 +26,8 @@ import {
   ModelCallCompleted as ModelTelemetry_ModelCallCompleted,
   ModelCallFailed as ModelTelemetry_ModelCallFailed,
   CompactionStarted as ModelTelemetry_CompactionStarted,
-  CompactionCompleted as ModelTelemetry_CompactionCompleted,
+  CompactionSkipped as ModelTelemetry_CompactionSkipped,
+  CompactionApplied as ModelTelemetry_CompactionApplied,
   CompactionFailed as ModelTelemetry_CompactionFailed,
   Event as ModelTelemetry_Event,
   DeliveryBatch as ModelTelemetry_DeliveryBatch,
@@ -49,7 +49,6 @@ export const ModelTelemetry = {
   ModelFailureClassification: ModelTelemetry_ModelFailureClassification,
   ModelRetryReason: ModelTelemetry_ModelRetryReason,
   ModelFirstOutputKind: ModelTelemetry_ModelFirstOutputKind,
-  ModelCost: ModelTelemetry_ModelCost,
   CompactionTrigger: ModelTelemetry_CompactionTrigger,
   CompactionKind: ModelTelemetry_CompactionKind,
   ModelInvocationMethod: ModelTelemetry_ModelInvocationMethod,
@@ -69,7 +68,8 @@ export const ModelTelemetry = {
   ModelCallCompleted: ModelTelemetry_ModelCallCompleted,
   ModelCallFailed: ModelTelemetry_ModelCallFailed,
   CompactionStarted: ModelTelemetry_CompactionStarted,
-  CompactionCompleted: ModelTelemetry_CompactionCompleted,
+  CompactionSkipped: ModelTelemetry_CompactionSkipped,
+  CompactionApplied: ModelTelemetry_CompactionApplied,
   CompactionFailed: ModelTelemetry_CompactionFailed,
   Event: ModelTelemetry_Event,
   DeliveryBatch: ModelTelemetry_DeliveryBatch,
@@ -91,7 +91,6 @@ export namespace ModelTelemetry {
   export type ModelFailureClassification = import("./model-telemetry.js").ModelFailureClassification
   export type ModelRetryReason = import("./model-telemetry.js").ModelRetryReason
   export type ModelFirstOutputKind = import("./model-telemetry.js").ModelFirstOutputKind
-  export type ModelCost = import("./model-telemetry.js").ModelCost
   export type CompactionTrigger = import("./model-telemetry.js").CompactionTrigger
   export type CompactionKind = import("./model-telemetry.js").CompactionKind
   export type ModelInvocationMethod = import("./model-telemetry.js").ModelInvocationMethod
@@ -111,7 +110,8 @@ export namespace ModelTelemetry {
   export type ModelCallCompleted = import("./model-telemetry.js").ModelCallCompleted
   export type ModelCallFailed = import("./model-telemetry.js").ModelCallFailed
   export type CompactionStarted = import("./model-telemetry.js").CompactionStarted
-  export type CompactionCompleted = import("./model-telemetry.js").CompactionCompleted
+  export type CompactionSkipped = import("./model-telemetry.js").CompactionSkipped
+  export type CompactionApplied = import("./model-telemetry.js").CompactionApplied
   export type CompactionFailed = import("./model-telemetry.js").CompactionFailed
   export type Event = import("./model-telemetry.js").Event
   export type DeliveryBatch = import("./model-telemetry.js").DeliveryBatch

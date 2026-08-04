@@ -12,7 +12,7 @@ import {
 } from "../src/sql/schema.js"
 import { markDirty } from "../src/sql/migrate.js"
 import { layer as sqliteClientLayer } from "../src/sql/bun-client.js"
-import { assistantAddress, completedResult, openWait, textPrompt } from "./helpers.js"
+import { assistantAddress, completedResult, openWait, researcherRef, textPrompt } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
 it.live("migrates and reopens a durable sqlite store", () =>
@@ -30,13 +30,84 @@ it.live("migrates and reopens a durable sqlite store", () =>
       const info = yield* store.info
       expect(info).toEqual({ durability: "durable", backend: "sqlite", multiWorker: false })
       expect((yield* runtime.inspect(receipt.runId)).durability).toBe("durable")
+      const child = yield* runtime.spawn({
+        parentRunId: receipt.runId,
+        invocationId: "reopen-child",
+        agent: researcherRef,
+        prompt: textPrompt("child"),
+      })
+      const childClaim = yield* store.claimExecution({ runId: child.runId, ownerId: "child" })
+      yield* store.complete({ ...childClaim, result: completedResult("child") })
+      const rootClaim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "root" })
+      yield* store.emitAgentEvent({
+        ...rootClaim,
+        event: {
+          _tag: "ModelCallStarted",
+          deliveryId: "reopen-call",
+          turn: 0,
+          modelCallId: "reopen-call",
+          purpose: "conversation",
+          startedAt: 1,
+        },
+      })
+      yield* store.emitAgentEvent({
+        ...rootClaim,
+        event: {
+          _tag: "ModelAttemptCompleted",
+          deliveryId: "reopen-attempt",
+          turn: 0,
+          modelCallId: "reopen-call",
+          modelAttemptId: "reopen-attempt",
+          attempt: 0,
+          completedAt: 2,
+          usageAt: 2,
+          usage: {
+            inputTokens: { total: 2, uncached: 2, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 1, text: 1, reasoning: 0 },
+          },
+          finishReason: "stop",
+        },
+      })
+      yield* store.emitAgentEvent({
+        ...rootClaim,
+        event: {
+          _tag: "CompactionStarted",
+          deliveryId: "reopen-compaction-start",
+          turn: 0,
+          compactionId: "reopen-compaction",
+          trigger: "threshold",
+          startedAt: 3,
+          entriesBefore: 4,
+        },
+      })
+      yield* store.emitAgentEvent({
+        ...rootClaim,
+        event: {
+          _tag: "CompactionApplied",
+          deliveryId: "reopen-compaction-applied",
+          turn: 0,
+          compactionId: "reopen-compaction",
+          checkpointId: "checkpoint:reopen",
+          kind: "microcompact",
+          appliedAt: 4,
+          commit: { compactionId: "reopen-compaction", checkpointId: "checkpoint:reopen" },
+        },
+      })
+      yield* store.complete({ ...rootClaim, result: completedResult("root") })
       return receipt.runId
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
 
     const second = yield* Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const inspection = yield* runtime.inspect(first)
-      expect(inspection.status).toBe("running")
+      expect(inspection.status).toBe("succeeded")
+      const snapshot = yield* runtime.snapshot(first)
+      expect(snapshot.outcome?._tag).toBe("Succeeded")
+      expect(snapshot.usage.map((fact) => fact.modelAttemptId)).toEqual(["reopen-attempt"])
+      expect(snapshot.compactions.map((compaction) => compaction._tag)).toEqual(["Applied"])
+      const tree = yield* RunTree.inspect(first)
+      expect(tree._tag).toBe("Terminal")
+      expect(tree.runs.map(({ outcome }) => outcome?._tag)).toEqual(["Succeeded", "Succeeded"])
       const tags = yield* runtime.events({ runId: first, cursor: -1 }).pipe(
         Stream.take(2),
         Stream.runCollect,
@@ -557,6 +628,34 @@ it.live("first terminal wins", () =>
       const again = yield* driver.fail({ ...claim, error: { message: "nope" } }).pipe(Effect.flip)
       expect(again).toBeInstanceOf(Errors.RunTerminal)
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  }).pipe(Effect.asVoid),
+)
+
+it.live("rejects child admission after a terminal parent", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("terminal-parent-spawn")
+    yield* Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:terminal-parent-spawn",
+        idempotencyKey: "parent",
+        prompt: textPrompt("parent"),
+      })
+      const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "test" })
+      yield* store.complete({ ...claim, result: completedResult("done") })
+      const failure = yield* runtime
+        .spawn({
+          parentRunId: parent.runId,
+          invocationId: "too-late",
+          agent: researcherRef,
+          prompt: textPrompt("child"),
+        })
+        .pipe(Effect.flip)
+      expect(failure).toBeInstanceOf(Errors.RunTerminal)
+      expect((yield* RunTree.inspect(parent.runId)).runs).toHaveLength(1)
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
   }).pipe(Effect.asVoid),
 )

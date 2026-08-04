@@ -6,6 +6,7 @@ import {
   IdempotencyConflict,
   RunIdConflict,
   RunNotFound,
+  RunTerminal,
   RuntimeUnavailable,
 } from "../errors.js"
 import type { Message } from "../message.js"
@@ -111,7 +112,7 @@ export const admitSpawn = (
   input: SpawnInput & { readonly message: Message; readonly agent: AgentRef; readonly parentRunId: string },
 ): Effect.Effect<
   readonly [RunReceipt, MemoryState],
-  RunNotFound | AgentVersionUnavailable | AgentNotRegistered | IdempotencyConflict | RuntimeUnavailable
+  RunNotFound | RunTerminal | AgentVersionUnavailable | AgentNotRegistered | IdempotencyConflict | RuntimeUnavailable
 > =>
   Effect.gen(function* () {
     if (state.closed) {
@@ -119,6 +120,9 @@ export const admitSpawn = (
     }
     const parent = state.runs.get(input.parentRunId)
     if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
+    if (parent.status === "succeeded" || parent.status === "failed" || parent.status === "cancelled") {
+      return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
+    }
     if (!state.agentRefs.has(agentKey(input.agent))) {
       return yield* AgentVersionUnavailable.make({ agent: input.agent })
     }

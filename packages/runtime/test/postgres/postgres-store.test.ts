@@ -202,6 +202,32 @@ describePostgres("postgres run store", () => {
     ),
   )
 
+  it.live("locks admission and rejects spawning from a terminal parent", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const parent = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("terminal-parent"),
+          idempotencyKey: "parent",
+          prompt: textPrompt("parent"),
+        })
+        const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "terminal-parent" })
+        yield* store.complete({ ...claim, result: completedResult("done") })
+        const failure = yield* runtime
+          .spawn({
+            parentRunId: parent.runId,
+            invocationId: "too-late",
+            agent: researcherRef,
+            prompt: textPrompt("child"),
+          })
+          .pipe(Effect.flip)
+        expect(failure).toBeInstanceOf(Errors.RunTerminal)
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
   it.live("fifo blocks successors until head terminals after claim", () =>
     withSchema(
       Effect.gen(function* () {
@@ -503,6 +529,40 @@ describePostgres("postgres run store", () => {
         })
         const second = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
         expect(second.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[1]])
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("rejects fan-out from a terminal parent", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const claims = yield* RunClaims.RunClaims
+        const parent = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("terminal-parent-fan-out"),
+          idempotencyKey: "parent",
+          prompt: "parent",
+        })
+        const [claim] = yield* claims.claimReadyRuns({ workerId: "parent", limit: 1 })
+        yield* claims.commitWithClaim({
+          runId: parent.runId,
+          workerId: "parent",
+          attemptFence: claim!.attemptFence,
+          transition: "complete",
+          result: completedResult("done"),
+        })
+        const failure = yield* runtime
+          .fanOut({
+            parentRunId: parent.runId,
+            idempotencyKey: "late",
+            members: [{ key: "late", agent: researcherRef, prompt: "late" }],
+            concurrency: 1,
+            join: { _tag: "AllSuccess" },
+            remainder: "await",
+          })
+          .pipe(Effect.flip)
+        expect(failure).toBeInstanceOf(Errors.RunTerminal)
       }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
     ),
   )

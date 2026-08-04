@@ -33,3 +33,16 @@ export const LoopDriverState = Schema.Struct({
 
 /** @experimental */
 export type LoopDriverState = typeof LoopDriverState.Type
+
+/** @internal The active call keeps its scheduled ordinal; safe checkpoints expose the next ordinal. */
+export const modelCallOrdinal = (state: LoopDriverState): number => {
+  const pending = state.pending
+  if (pending?.kind !== "model" && pending?.kind !== "structured-output") return state.modelCallOrdinal
+  const input = pending.input
+  return typeof input === "object" &&
+    input !== null &&
+    "modelCallOrdinal" in input &&
+    typeof input.modelCallOrdinal === "number"
+    ? input.modelCallOrdinal
+    : state.modelCallOrdinal
+}

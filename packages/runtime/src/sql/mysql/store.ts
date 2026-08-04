@@ -43,6 +43,8 @@ import { check as checkSchema } from "./run-schema.js"
 import { makeMysqlClaims } from "./store-claims.js"
 import { admitFanOut, inspectFanOut } from "../store-fan-out.js"
 import { loadTreeHistory } from "../tree-history.js"
+import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
+import { withConsistentSnapshot } from "../inspection-transaction.js"
 
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
@@ -137,6 +139,8 @@ export const makeMysqlServices = (
       )
     const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, transaction(effect))
     const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
+    const runInspection = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
+      withSql(sql, withConsistentSnapshot(sql, "mysql", effect))
     const lockRun = (runId: string) => sql`SELECT run_id FROM baton_runs WHERE run_id = ${runId} FOR UPDATE`
     const lockParent = (runId: string) =>
       sql<{ parent_run_id: string | null }>`SELECT parent_run_id FROM baton_runs WHERE run_id = ${runId}`.pipe(
@@ -263,6 +267,8 @@ export const makeMysqlServices = (
             }
           }),
         ),
+      snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
+      inspectTree: (rootRunId) => runInspection(loadTreeInspection(rootRunId)),
       history: (input) =>
         runNoTxn(
           Effect.gen(function* () {

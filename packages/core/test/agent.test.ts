@@ -4,9 +4,11 @@ import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Option, Schedule,
 import { AiError, Chat, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
+  AgentRef,
   AgentEvent,
   Approvals,
   Compaction,
+  DurableDriver,
   Instructions,
   Memory,
   ModelRegistry,
@@ -15,6 +17,7 @@ import {
   ModelStreamTermination,
   ModelTelemetry,
   Permissions,
+  RunBudget,
   Session,
   SkillSource,
   Steering,
@@ -7443,6 +7446,104 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "restores the next model identity from a durable checkpoint", () => [
+    Layer.mergeAll(
+      modelLayer(() => Stream.make(textDelta("done"), finishPart("stop", usage({ total: 2 }, { total: 1 })))),
+      ModelMiddleware.layerIdentity,
+    ),
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "checkpoint-identity-agent" })
+      const agentRef = AgentRef.fromAgent(agent, "inline")
+      const budget = RunBudget.allocate({})
+      const checkpoint: DurableDriver.DriverCheckpoint = {
+        driverVersion: DurableDriver.currentDriverVersion,
+        agent: agentRef,
+        turn: 0,
+        budget,
+        execution: {
+          agent: agentRef,
+          driverVersion: DurableDriver.currentDriverVersion,
+          checkpointCodecVersion: "1",
+          eventCodecVersion: "1",
+          toolSchemaDigests: {},
+          rootBudget: budget,
+        },
+        state: {
+          logicalOperationId: "operation:restored",
+          sessionId: "session:restored",
+          modelCallOrdinal: 9,
+          modelCallOrdinalStart: 0,
+        },
+      }
+      const events = yield* Stream.runCollect(
+        Agent.stream(agent, {
+          prompt: "continue",
+          logicalOperationId: "operation:restored",
+          driverCheckpoint: checkpoint,
+        }),
+      )
+      const call = events.find((event) => event._tag === "ModelCallStarted")
+      const attempt = events.find((event) => event._tag === "ModelAttemptStarted")
+      expect(call?._tag === "ModelCallStarted" ? call.modelCallId : undefined).toBe(
+        "operation:restored:model-call:9:conversation",
+      )
+      expect(attempt?._tag === "ModelAttemptStarted" ? attempt.modelAttemptId : undefined).toBe(
+        "operation:restored:model-call:9:conversation:attempt:0",
+      )
+    }),
+  ])
+
+  ItLayer.make(it, "reconciles a journaled pending model operation with the same identity after restart", () => [
+    Layer.mergeAll(
+      modelLayer(() => Stream.make(textDelta("done"), finishPart("stop", usage({ total: 2 }, { total: 1 })))),
+      ModelMiddleware.layerIdentity,
+    ),
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "journal-restart-agent" })
+      let pending: DurableDriver.DriverCheckpoint | undefined
+      const crashingJournal: DurableDriver.DriverJournal = {
+        onScheduled: (operation, checkpoint) =>
+          operation.kind !== "model"
+            ? Effect.succeed(undefined)
+            : Effect.sync(() => {
+                pending = checkpoint
+              }).pipe(Effect.andThen(Effect.interrupt)),
+        onCompleted: () => Effect.void,
+        onCheckpoint: () => Effect.void,
+      }
+      yield* Agent.stream(agent, { prompt: "continue", logicalOperationId: "journal-restart" }).pipe(
+        Stream.runDrain,
+        Effect.provide(Layer.succeed(DurableDriver.DriverJournalService, crashingJournal)),
+        Effect.exit,
+      )
+      expect(pending).toBeDefined()
+
+      const scheduled: Array<string> = []
+      const resumedJournal: DurableDriver.DriverJournal = {
+        onScheduled: (operation) =>
+          Effect.sync(() => {
+            scheduled.push(operation.key)
+          }).pipe(Effect.as(undefined)),
+        onCompleted: () => Effect.void,
+        onCheckpoint: () => Effect.void,
+      }
+      const events = yield* Agent.stream(agent, {
+        prompt: "continue",
+        logicalOperationId: "journal-restart",
+        driverCheckpoint: pending!,
+      }).pipe(Stream.runCollect, Effect.provide(Layer.succeed(DurableDriver.DriverJournalService, resumedJournal)))
+      expect(scheduled.find((key) => key.includes(":model:"))).toContain(":model:0:0:conversation")
+      const call = events.find((event) => event._tag === "ModelCallStarted")
+      const attempt = events.find((event) => event._tag === "ModelAttemptStarted")
+      expect(call?._tag === "ModelCallStarted" ? call.modelCallId : undefined).toBe(
+        "journal-restart:model-call:0:conversation",
+      )
+      expect(attempt?._tag === "ModelAttemptStarted" ? attempt.modelAttemptId : undefined).toBe(
+        "journal-restart:model-call:0:conversation:attempt:0",
+      )
+    }),
+  ])
+
   ItLayer.make(it, "joins model telemetry and ModelPart identity across a tool-call run", () => {
     let calls = 0
     return [
@@ -7821,29 +7922,27 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "old context" }))
 
         const compactionStarted = events.filter((event) => event._tag === "CompactionStarted")
-        const compactionCompleted = events.filter((event) => event._tag === "CompactionCompleted")
+        const compactionSkipped = events.filter((event) => event._tag === "CompactionSkipped")
+        const compactionCompleted = events.filter((event) => event._tag === "CompactionApplied")
         const summaryCalls = events.filter(
           (event) => event._tag === "ModelCallStarted" && event.purpose === "compaction-summary",
         )
 
         expect(compactionStarted).toHaveLength(2)
+        expect(compactionSkipped).toHaveLength(1)
+        expect(compactionSkipped[0]?.compactionId).toBe(compactionStarted[0]?.compactionId)
         expect(compactionStarted.every((event) => event.trigger === "threshold")).toBe(true)
         expect(compactionStarted.every((event) => (event.contextTokensBefore ?? 0) > 0)).toBe(true)
-        expect(compactionCompleted.map((event) => event.kind)).toEqual(["unchanged", "summarize"])
-        expect(compactionCompleted.map((event) => event.compactionId)).toEqual(
-          compactionStarted.map((event) => event.compactionId),
-        )
-        const summarize = compactionCompleted[1]
+        expect(compactionCompleted.map((event) => event.kind)).toEqual(["summarize"])
+        expect(compactionStarted.map((event) => event.compactionId)).toContain(compactionCompleted[0]?.compactionId)
+        const summarize = compactionCompleted[0]
         expect(summaryCalls).toHaveLength(1)
         expect(summaryCalls[0]?._tag === "ModelCallStarted" && summaryCalls[0].compactionId).toBe(
           summarize?.compactionId,
         )
-        expect(summarize?._tag === "CompactionCompleted" && summarize.summaryModelCallId).toBe(
+        expect(summarize?._tag === "CompactionApplied" && summarize.commit.summaryModelCallId).toBe(
           summaryCalls[0]?._tag === "ModelCallStarted" ? summaryCalls[0].modelCallId : undefined,
         )
-        expect(
-          compactionCompleted[0]?._tag === "CompactionCompleted" && "summaryModelCallId" in compactionCompleted[0],
-        ).toBe(false)
         const summaryCompleted = events.find(
           (event) =>
             event._tag === "ModelCallCompleted" &&
@@ -7914,7 +8013,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelAttemptStarted",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
-          "CompactionCompleted",
+          "CompactionApplied",
         ])
         for (const durable of checkpoint.telemetry) {
           expect(events.find((event) => "deliveryId" in event && event.deliveryId === durable.deliveryId)).toEqual(
@@ -7928,11 +8027,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const summaryStarted = checkpoint.telemetry.find(
           (event) => event._tag === "ModelCallStarted" && event.modelCallId === commit.summaryModelCallId,
         )
-        const completed = checkpoint.telemetry.find(
-          (event) => event._tag === "CompactionCompleted" && event.compactionId === commit.compactionId,
+        const completed = events.find(
+          (event) => event._tag === "CompactionApplied" && event.compactionId === commit.compactionId,
         )
         expect(commit.compactionId).toBe(started?._tag === "CompactionStarted" ? started.compactionId : undefined)
-        expect(commit.compactionId).toBe(completed?._tag === "CompactionCompleted" ? completed.compactionId : undefined)
+        expect(commit.compactionId).toBe(completed?._tag === "CompactionApplied" ? completed.compactionId : undefined)
         expect(commit.compactionId).toBe(
           summaryStarted?._tag === "ModelCallStarted" ? summaryStarted.compactionId : undefined,
         )
@@ -8003,14 +8102,44 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(checkpoint.compactionCommit.entriesAfter).toBe(checkpoint.projectedHistory.content.length)
         const completed = events.find(
           (event) =>
-            event._tag === "CompactionCompleted" && event.compactionId === checkpoint.compactionCommit?.compactionId,
+            event._tag === "CompactionApplied" && event.compactionId === checkpoint.compactionCommit?.compactionId,
         )
-        expect(completed?._tag === "CompactionCompleted" && completed.kind).toBe("microcompact")
+        expect(completed?._tag === "CompactionApplied" && completed.kind).toBe("microcompact")
       }),
     ] as const
   })
 
-  ItLayer.make(it, "keeps CompactionCompleted distinct when checkpoint append fails", () => {
+  ItLayer.make(it, "emits one terminal failure when started compaction work fails", () => [
+    Layer.mergeAll(
+      modelLayer(() => Stream.make(textDelta("unreachable"))),
+      Layer.succeed(
+        Compaction.Compaction,
+        Compaction.Compaction.of({
+          willCompact: () => true,
+          maybeCompact: (request) =>
+            Effect.fail(Compaction.CompactionError.make({ message: "compaction work failed" })).pipe(
+              Compaction.withLifecycle(request),
+            ),
+        }),
+      ),
+      ModelMiddleware.layerIdentity,
+    ),
+    Effect.gen(function* () {
+      const seen: Array<AgentEvent.Event> = []
+      const failure = yield* Agent.stream(Agent.make({ name: "failed-compaction-work-agent" }), {
+        prompt: "compact",
+      }).pipe(
+        Stream.tap((event) => Effect.sync(() => seen.push(event))),
+        Stream.runDrain,
+        Effect.flip,
+      )
+      expect(failure._tag).toBe("@batonfx/core/AgentError")
+      expect(seen.filter((event) => event._tag === "CompactionStarted")).toHaveLength(1)
+      expect(seen.filter((event) => event._tag === "CompactionFailed")).toHaveLength(1)
+    }),
+  ])
+
+  ItLayer.make(it, "does not apply compaction when checkpoint append fails", () => {
     let calls = 0
     let successfulCheckpoints = 0
     const failingSession = Layer.effect(
@@ -8053,9 +8182,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           Effect.flip,
         )
         expect(failure._tag).toBe("@batonfx/core/AgentError")
-        const completedIndex = seen.findIndex((event) => event._tag === "CompactionCompleted")
-        expect(completedIndex).toBeGreaterThanOrEqual(0)
-        expect(seen.slice(completedIndex + 1).some((event) => event._tag === "CompactionFailed")).toBe(false)
+        const completedIndex = seen.findIndex((event) => event._tag === "CompactionApplied")
+        expect(completedIndex).toBe(-1)
+        expect(seen.filter((event) => event._tag === "CompactionFailed")).toHaveLength(1)
         expect(successfulCheckpoints).toBe(0)
       }),
     ] as const

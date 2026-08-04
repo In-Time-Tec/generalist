@@ -4,9 +4,69 @@ import { TestClock } from "effect/testing"
 import { Response } from "effect/unstable/ai"
 import { RunStore, RunTree, Runtime } from "../src/index.js"
 import { makeCursor } from "../src/tree-cursor.js"
-import { assistantAddress, memoryLayer, researcherRef, textPrompt } from "./helpers.js"
+import { assistantAddress, completedResult, memoryLayer, researcherRef, textPrompt } from "./helpers.js"
 
 layer(memoryLayer)("RunTree", (it) => {
+  it.effect("inspects exact active Runs and stable mixed terminal outcomes", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const root = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "tree:inspection",
+        idempotencyKey: "root",
+        prompt: textPrompt("root"),
+      })
+      const child = yield* runtime.spawn({
+        parentRunId: root.runId,
+        invocationId: "invoke:child",
+        agent: researcherRef,
+        prompt: textPrompt("child"),
+      })
+      const grandchild = yield* runtime.spawn({
+        parentRunId: child.runId,
+        invocationId: "invoke:grandchild",
+        agent: researcherRef,
+        prompt: textPrompt("grandchild"),
+      })
+      const rootClaim = yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })
+      yield* store.complete({ ...rootClaim, result: completedResult("root result") })
+
+      const active = yield* RunTree.inspect(root.runId)
+      expect(active._tag).toBe("Active")
+      if (active._tag !== "Active") return
+      expect(active.activeRunIds).toEqual([child.runId, grandchild.runId])
+      expect(active.runs.map(({ run }) => run.runId)).toEqual([root.runId, child.runId, grandchild.runId])
+
+      const childClaim = yield* store.claimExecution({ runId: child.runId, ownerId: "child-worker" })
+      yield* store.fail({ ...childClaim, error: { message: "child failed" } })
+      yield* runtime.cancel({ runId: grandchild.runId, reason: "not needed" })
+      const terminal = yield* RunTree.inspect(root.runId)
+      expect(terminal._tag).toBe("Terminal")
+      expect(terminal.runs.map(({ outcome }) => outcome?._tag)).toEqual(["Succeeded", "Failed", "Cancelled"])
+      expect(yield* RunTree.decodeInspection(yield* RunTree.encodeInspection(terminal))).toEqual(terminal)
+      expect(yield* RunTree.inspect(root.runId)).toEqual(terminal)
+    }),
+  )
+
+  it.effect("awaits terminal from an inspection cursor without losing the transition", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const root = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "tree:await",
+        idempotencyKey: "root",
+        prompt: textPrompt("root"),
+      })
+      const waiting = yield* RunTree.awaitTerminal(root.runId).pipe(Effect.forkChild({ startImmediately: true }))
+      const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "await-worker" })
+      yield* store.complete({ ...claim, result: completedResult("done") })
+      yield* TestClock.adjust("50 millis")
+      expect((yield* Fiber.join(waiting))._tag).toBe("Terminal")
+    }),
+  )
+
   it.effect("reads an arbitrary-depth tree in one deterministic projection", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
