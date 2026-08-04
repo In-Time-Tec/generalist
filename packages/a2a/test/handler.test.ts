@@ -102,6 +102,9 @@ const makeRuntime = (acceptedSequence = 0) => {
       return Effect.succeed({ runId, messageId: input.messageId!, acceptedSequence, duplicate: false })
     },
     spawn: () => Effect.die("not used"),
+    fanOut: () => Effect.die("not used"),
+    inspectFanOut: () => Effect.die("not used"),
+    awaitFanOut: () => Effect.die("not used"),
     events: ({ runId, cursor = -1 }) => {
       observedCursors.push(cursor)
       const run = runs.get(runId)!

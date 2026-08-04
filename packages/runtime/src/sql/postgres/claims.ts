@@ -26,6 +26,10 @@ export const claimReadyRuns = (options: ClaimOptions) =>
             OR EXISTS (SELECT 1 FROM baton_lanes l WHERE l.head_run_id = r.run_id)
           )
           AND (
+            NOT EXISTS (SELECT 1 FROM baton_fan_out_members fm WHERE fm.child_run_id = r.run_id)
+            OR EXISTS (SELECT 1 FROM baton_fan_out_members fm WHERE fm.child_run_id = r.run_id AND fm.status = 'running')
+          )
+          AND (
             r.owner_worker_id IS NULL
             OR r.lease_expires_at IS NULL
             OR r.lease_expires_at < NOW()
@@ -82,6 +86,7 @@ export const refreshLease = (input: {
       WHERE run_id = ${input.runId}
         AND owner_worker_id = ${input.workerId}
         AND attempt_fence = ${input.attemptFence}
+        AND cancellation_requested = FALSE
         AND status NOT IN ('succeeded', 'failed', 'cancelled')
       RETURNING run_id
     `

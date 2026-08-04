@@ -107,6 +107,7 @@ layer(memoryLayer)("Runtime durable steering memory contract", (test) => {
       expect(yield* store.readSteering(claim)).toHaveLength(1)
 
       yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+      yield* store.fail({ ...claim, error: { message: "execution interrupted" } })
 
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
       const tags = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag)

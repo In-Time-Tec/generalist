@@ -32,6 +32,13 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
     const store = yield* RunStore
     const active = yield* ActiveExecutions
     const registrations = new Map(options.agents.map((entry) => [registrationKey(entry.ref), entry] as const))
+    const interruptCancellationRequests = Effect.gen(function* () {
+      const cancelling = yield* store.list({ status: "cancelling", limit: Number.MAX_SAFE_INTEGER })
+      yield* Effect.forEach(cancelling, (run) => active.interrupt(run.runId), {
+        concurrency: "unbounded",
+        discard: true,
+      })
+    })
 
     const execute = (claim: ExecutionClaim): Effect.Effect<void> =>
       Effect.gen(function* () {
@@ -225,6 +232,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                       if (outcome._tag === "SteeringPending") {
                         yield* Ref.set(pendingCompletion, outcome.continuation)
                       }
+                      yield* interruptCancellationRequests
                     })
                   : Effect.gen(function* () {
                       if ((yield* Ref.get(observed)).length > 0) {
@@ -244,7 +252,12 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               const latest = yield* store.loadExecution(runId)
               return yield* runAgent(next.prompt, next.history, latest.checkpoint, next)
             }
-            if (Cause.hasInterruptsOnly(exit.cause)) return
+            if (Cause.hasInterruptsOnly(exit.cause)) {
+              yield* store
+                .fail({ ...claim, error: { message: "execution interrupted" } })
+                .pipe(Effect.catch((error) => (Schema.is(RunTerminal)(error) ? Effect.void : Effect.fail(error))))
+              return
+            }
             const reason = exit.cause.reasons.length === 1 ? exit.cause.reasons[0] : undefined
             if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(RunTerminal)(reason.error)) return
             if (
@@ -264,6 +277,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
             yield* store
               .fail({ ...claim, error: { message: failureMessage(exit.cause) } })
               .pipe(Effect.catch((error) => (Schema.is(RunTerminal)(error) ? Effect.void : Effect.fail(error))))
+            yield* interruptCancellationRequests
           }).pipe(Effect.orDie) as Effect.Effect<void>
 
         const continuation = claimed.continuation

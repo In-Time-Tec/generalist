@@ -1,5 +1,6 @@
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 import { PgClient } from "@effect/sql-pg"
 import { eventIdFor, type RunEvent } from "../../run-event.js"
 import type { AgentRef } from "../../agent-ref.js"
@@ -16,6 +17,7 @@ import {
   encodeQueue,
 } from "../codecs.js"
 import type { EventHub } from "../subscribers.js"
+import { reconcileFanOutWith } from "../store-fan-out.js"
 import type { DecodedRun, EventRow, OperationRow, RunRow } from "../rows.js"
 import type { OperationRecord } from "../operations.js"
 import { decodeRun } from "../store-helpers.js"
@@ -80,7 +82,7 @@ export const allocateSequence = (runId: string) =>
     return Number(rows[0]!.last_sequence)
   })
 
-export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus) =>
+export const appendEvent = (_hub: EventHub, run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const pg = yield* PgClient.PgClient
@@ -147,7 +149,6 @@ export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartia
         WHERE run_id = ${run.runId}
       `
     }
-    yield* hub.publish(run.runId, event)
     yield* pg.notify(NOTIFY_CHANNEL, run.runId)
     return event
   })
@@ -203,12 +204,17 @@ export const afterTerminal = (hub: EventHub, run: DecodedRun) =>
     yield* promoteHead(hub, run.address, run.sessionId)
   })
 
-export const settleParent = (hub: EventHub, child: DecodedRun, terminalEventId: string) =>
+export const settleParent = (
+  hub: EventHub,
+  child: DecodedRun,
+  terminalEventId: string,
+): Effect.Effect<void, SqlError, SqlClient.SqlClient | PgClient.PgClient> =>
   Effect.gen(function* () {
     if (child.parentRunId === undefined) return
     const sql = yield* SqlClient.SqlClient
+    yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${child.parentRunId} FOR UPDATE`
     const parent = yield* loadRun(child.parentRunId)
-    if (parent === undefined || isTerminal(parent.status)) return
+    if (parent === undefined) return
     const existing = yield* sql<{ child_run_id: string }>`
       SELECT child_run_id FROM baton_run_links
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId} AND terminal_event_id IS NOT NULL
@@ -219,11 +225,32 @@ export const settleParent = (hub: EventHub, child: DecodedRun, terminalEventId: 
       SET terminal_event_id = ${terminalEventId}, settled_at = NOW()
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId}
     `
-    yield* appendEvent(hub, parent, {
-      _tag: "ChildSettled",
-      childRunId: child.runId,
-      terminalEventId,
-    })
+    if (!isTerminal(parent.status)) {
+      yield* appendEvent(hub, parent, {
+        _tag: "ChildSettled",
+        childRunId: child.runId,
+        terminalEventId,
+      })
+    }
+    yield* reconcileFanOutWith(hub, child.runId, terminalEventId, appendEvent)
+    const currentParent = yield* loadRun(parent.runId)
+    if (currentParent?.status !== "cancelling" || currentParent.ownerWorkerId !== undefined) return
+    const running = yield* sql<{ fan_out_id: string }>`
+      SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${parent.runId} AND status = 'running' LIMIT 1
+    `
+    if (running.length > 0) return
+    const cancelled = yield* appendEvent(
+      hub,
+      currentParent,
+      {
+        _tag: "RunCancelled",
+        ...(currentParent.cancelReason === undefined ? {} : { reason: currentParent.cancelReason }),
+      },
+      "cancelled",
+    )
+    const settledParent = (yield* loadRun(parent.runId))!
+    yield* settleParent(hub, settledParent, cancelled.eventId)
+    yield* afterTerminal(hub, settledParent)
   })
 
 export const insertRun = (input: {

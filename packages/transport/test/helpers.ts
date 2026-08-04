@@ -38,6 +38,9 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
       steer: () => Effect.die("unused steer"),
       cancel: () => Effect.void,
       inspect: (runId) => Effect.succeed({ runId, status: "running", agent, lastSequence: 2, durability: "durable" }),
+      fanOut: () => Effect.die("unused fanOut"),
+      inspectFanOut: () => Effect.die("unused inspectFanOut"),
+      awaitFanOut: () => Effect.die("unused awaitFanOut"),
       ...implementation,
     }),
   )

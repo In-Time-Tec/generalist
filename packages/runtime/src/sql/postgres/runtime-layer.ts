@@ -5,11 +5,24 @@ import { makeRuntime } from "../../memory/runtime-layer.js"
 import { Runtime } from "../../runtime.js"
 import { RunStore } from "../../run-store.js"
 import { RunClaims } from "../run-claims.js"
-import { makePostgresServices, type PostgresStoreError, type PostgresStoreOptions } from "./store.js"
+import { makePostgresServices, type PostgresStoreOptions } from "./store.js"
 import { AgentHost, make as makeAgentHost } from "../../agent-host.js"
 import { layer as activeExecutionsLayer } from "../../active-executions.js"
+import type {
+  SchemaChecksumMismatch,
+  SchemaDirty,
+  SchemaMigrationFailed,
+  SchemaUpgradeRequired,
+  SchemaVersionUnsupported,
+} from "../errors.js"
 
 export type { PostgresStoreOptions }
+export type PostgresStoreError =
+  | SchemaDirty
+  | SchemaChecksumMismatch
+  | SchemaVersionUnsupported
+  | SchemaUpgradeRequired
+  | SchemaMigrationFailed
 
 export const layerPostgres = (
   options: PostgresStoreOptions,

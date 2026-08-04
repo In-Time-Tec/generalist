@@ -3,12 +3,14 @@ import { Effect, Exit, Layer, Redacted, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { Errors, MysqlRunSchema, RunClaims, Runtime, RuntimeWorker, RunStore } from "../../src/index.js"
-import { SCHEMA_VERSION, schemaChecksum } from "../../src/sql/mysql/schema.js"
-import { assistantAddress, completedResult, openWait, textPrompt } from "../helpers.js"
+import { SCHEMA_VERSION, schemaChecksum, steeringSchemaChecksum } from "../../src/sql/mysql/schema.js"
+import { assistantAddress, completedResult, openWait, researcherRef, textPrompt } from "../helpers.js"
 import { mysqlAvailable, mysqlClient, mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "./helpers.js"
 
 const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
 const url = mysqlUrl!
+
+expect(steeringSchemaChecksum()).toBe("8db779640c0b84515867e96dea8709a53b2ae369152b425408194f24501ea996")
 
 const withSchema = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
@@ -191,6 +193,15 @@ describeMysql("mysql run store", () => {
             lease: "10 seconds",
           }),
         ).toBe(true)
+        yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+        expect(
+          yield* (yield* RunClaims.RunClaims).refreshLease({
+            runId: receipt.runId,
+            workerId: "mysql-worker",
+            attemptFence: claimed.attemptFence,
+            lease: "10 seconds",
+          }),
+        ).toBe(false)
       }).pipe(
         Effect.provide(
           RuntimeWorker.layerWorker({
@@ -339,6 +350,45 @@ describeMysql("mysql run store", () => {
         const tags = (yield* runtime.history({ runId: parent.runId, cursor: -1, limit: 20 })).map((event) => event._tag)
         expect(tags).toContain("ChildLinked")
         expect(tags).toContain("ChildSettled")
+      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("enforces durable fan-out concurrency through claims", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const claims = yield* RunClaims.RunClaims
+        const parent = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("fan-out"),
+          idempotencyKey: "parent",
+          prompt: "parent",
+        })
+        yield* claims.claimReadyRuns({ workerId: "parent", limit: 1 })
+        const receipt = yield* runtime.fanOut({
+          parentRunId: parent.runId,
+          idempotencyKey: "reviews",
+          members: [0, 1, 2].map((ordinal) => ({
+            key: `review-${ordinal}`,
+            agent: researcherRef,
+            prompt: `review-${ordinal}`,
+          })),
+          concurrency: 1,
+          join: { _tag: "AllSuccess" },
+          remainder: "await",
+        })
+        const first = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
+        expect(first.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[0]])
+        yield* claims.commitWithClaim({
+          runId: first[0]!.run.runId,
+          workerId: "fan-out",
+          attemptFence: first[0]!.attemptFence,
+          transition: "complete",
+          result: completedResult("first"),
+        })
+        const second = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
+        expect(second.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[1]])
       }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
     ),
   )

@@ -160,6 +160,8 @@ export namespace RunEvent {
   export type OperationUnknown = import("./run-event.js").OperationUnknown
   export type ChildLinked = import("./run-event.js").ChildLinked
   export type ChildSettled = import("./run-event.js").ChildSettled
+  export type FanOutAdmitted = import("./run-event.js").FanOutAdmitted
+  export type FanOutJoined = import("./run-event.js").FanOutJoined
   export type RunCompleted = import("./run-event.js").RunCompleted
   export type RunFailed = import("./run-event.js").RunFailed
   export type RunCancellationRequested = import("./run-event.js").RunCancellationRequested
@@ -183,6 +185,10 @@ import {
   RuntimeUnavailable as Errors_RuntimeUnavailable,
   AgentBindingConflict as Errors_AgentBindingConflict,
   AgentNotRegistered as Errors_AgentNotRegistered,
+  FanOutConflict as Errors_FanOutConflict,
+  FanOutNotFound as Errors_FanOutNotFound,
+  FanOutInvalid as Errors_FanOutInvalid,
+  FanOutRemainderUnsupported as Errors_FanOutRemainderUnsupported,
 } from "./errors.js"
 import {
   SchemaDirty as Errors_SchemaDirty,
@@ -208,6 +214,10 @@ export const Errors = {
   RuntimeUnavailable: Errors_RuntimeUnavailable,
   AgentBindingConflict: Errors_AgentBindingConflict,
   AgentNotRegistered: Errors_AgentNotRegistered,
+  FanOutConflict: Errors_FanOutConflict,
+  FanOutNotFound: Errors_FanOutNotFound,
+  FanOutInvalid: Errors_FanOutInvalid,
+  FanOutRemainderUnsupported: Errors_FanOutRemainderUnsupported,
   SchemaDirty: Errors_SchemaDirty,
   SchemaChecksumMismatch: Errors_SchemaChecksumMismatch,
   SchemaVersionUnsupported: Errors_SchemaVersionUnsupported,
@@ -231,6 +241,10 @@ export namespace Errors {
   export type RuntimeUnavailable = import("./errors.js").RuntimeUnavailable
   export type AgentBindingConflict = import("./errors.js").AgentBindingConflict
   export type AgentNotRegistered = import("./errors.js").AgentNotRegistered
+  export type FanOutConflict = import("./errors.js").FanOutConflict
+  export type FanOutNotFound = import("./errors.js").FanOutNotFound
+  export type FanOutInvalid = import("./errors.js").FanOutInvalid
+  export type FanOutRemainderUnsupported = import("./errors.js").FanOutRemainderUnsupported
   export type SchemaDirty = import("./sql/errors.js").SchemaDirty
   export type SchemaChecksumMismatch = import("./sql/errors.js").SchemaChecksumMismatch
   export type SchemaVersionUnsupported = import("./sql/errors.js").SchemaVersionUnsupported
@@ -280,6 +294,10 @@ export namespace Runtime {
   export type CancelError = import("./runtime.js").CancelError
   export type SteerError = import("./runtime.js").SteerError
   export type InspectError = import("./runtime.js").InspectError
+  export type FanOutInput = import("./fan-out.js").FanOutInput
+  export type FanOutMemberInput = import("./fan-out.js").FanOutMemberInput
+  export type FanOutError = import("./runtime.js").FanOutError
+  export type InspectFanOutError = import("./runtime.js").InspectFanOutError
   export type layer = typeof import("./memory/runtime-layer.js").layer
   export type layerMemory = typeof import("./memory/runtime-layer.js").layerMemory
   export type layerSqlite = typeof import("./platform-layers.js").layerSqlite
@@ -288,6 +306,34 @@ export namespace Runtime {
   export type SqliteStoreOptions = import("./platform-layers.js").SqliteStoreOptions
   export type PostgresStoreOptions = import("./sql/postgres/runtime-layer.js").PostgresStoreOptions
   export type MysqlStoreOptions = import("./sql/mysql/runtime-layer.js").MysqlStoreOptions
+}
+
+import {
+  FanOutJoin as FanOut_FanOutJoin,
+  FanOutRemainder as FanOut_FanOutRemainder,
+  FanOutStatus as FanOut_FanOutStatus,
+  FanOutMemberStatus as FanOut_FanOutMemberStatus,
+  FanOutReceipt as FanOut_FanOutReceipt,
+  FanOutMemberResult as FanOut_FanOutMemberResult,
+  FanOutInspection as FanOut_FanOutInspection,
+} from "./fan-out.js"
+export const FanOut = {
+  FanOutJoin: FanOut_FanOutJoin,
+  FanOutRemainder: FanOut_FanOutRemainder,
+  FanOutStatus: FanOut_FanOutStatus,
+  FanOutMemberStatus: FanOut_FanOutMemberStatus,
+  FanOutReceipt: FanOut_FanOutReceipt,
+  FanOutMemberResult: FanOut_FanOutMemberResult,
+  FanOutInspection: FanOut_FanOutInspection,
+} as typeof import("./fan-out.js")
+export namespace FanOut {
+  export type FanOutJoin = import("./fan-out.js").FanOutJoin
+  export type FanOutRemainder = import("./fan-out.js").FanOutRemainder
+  export type FanOutStatus = import("./fan-out.js").FanOutStatus
+  export type FanOutMemberStatus = import("./fan-out.js").FanOutMemberStatus
+  export type FanOutReceipt = import("./fan-out.js").FanOutReceipt
+  export type FanOutMemberResult = import("./fan-out.js").FanOutMemberResult
+  export type FanOutInspection = import("./fan-out.js").FanOutInspection
 }
 
 import { RunStore as RunStore_RunStore } from "./run-store.js"

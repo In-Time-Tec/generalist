@@ -1,9 +1,9 @@
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const NOTIFY_CHANNEL = "baton_run_events"
 
-export const MIGRATION_STATEMENTS: ReadonlyArray<string> = [
+export const LEGACY_MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   `CREATE TABLE IF NOT EXISTS baton_schema_meta (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   version INTEGER NOT NULL,
@@ -121,8 +121,42 @@ export const MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   `ALTER TABLE baton_runs ADD COLUMN continuation_json TEXT`,
 ]
 
-export const STEERING_MIGRATION_STATEMENTS = [...MIGRATION_STATEMENTS.slice(7, 9), MIGRATION_STATEMENTS.at(-1)!]
-export const KERNEL_MIGRATION_STATEMENTS = [...MIGRATION_STATEMENTS.slice(0, 7), ...MIGRATION_STATEMENTS.slice(9, -1)]
+export const FAN_OUT_MIGRATION_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS baton_fan_outs (
+  fan_out_id TEXT PRIMARY KEY,
+  parent_run_id TEXT NOT NULL REFERENCES baton_runs(run_id),
+  idempotency_key TEXT NOT NULL,
+  input_digest TEXT NOT NULL,
+  join_json TEXT NOT NULL,
+  remainder TEXT NOT NULL,
+  concurrency INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (parent_run_id, idempotency_key)
+)`,
+  `CREATE TABLE IF NOT EXISTS baton_fan_out_members (
+  fan_out_id TEXT NOT NULL REFERENCES baton_fan_outs(fan_out_id),
+  ordinal INTEGER NOT NULL,
+  member_key TEXT NOT NULL,
+  child_run_id TEXT NOT NULL UNIQUE REFERENCES baton_runs(run_id),
+  status TEXT NOT NULL,
+  terminal_event_id TEXT,
+  outcome_json TEXT,
+  PRIMARY KEY (fan_out_id, ordinal),
+  UNIQUE (fan_out_id, member_key)
+)`,
+  `CREATE INDEX IF NOT EXISTS baton_fan_out_members_status_idx ON baton_fan_out_members(fan_out_id, status, ordinal)`,
+]
+export const MIGRATION_STATEMENTS = [...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS]
+export const STEERING_MIGRATION_STATEMENTS = [
+  ...LEGACY_MIGRATION_STATEMENTS.slice(7, 9),
+  LEGACY_MIGRATION_STATEMENTS.at(-1)!,
+]
+export const KERNEL_MIGRATION_STATEMENTS = [
+  ...LEGACY_MIGRATION_STATEMENTS.slice(0, 7),
+  ...LEGACY_MIGRATION_STATEMENTS.slice(9, -1),
+]
 
 export const kernelSchemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
@@ -136,6 +170,14 @@ export const schemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
   hasher.update(MIGRATION_STATEMENTS.join("\n"))
   hasher.update(`\nversion=${SCHEMA_VERSION}`)
+  hasher.update("\ndialect=postgres")
+  return hasher.digest("hex")
+}
+
+export const steeringSchemaChecksum = (): string => {
+  const hasher = new Bun.CryptoHasher("sha256")
+  hasher.update(LEGACY_MIGRATION_STATEMENTS.join("\n"))
+  hasher.update("\nversion=2")
   hasher.update("\ndialect=postgres")
   return hasher.digest("hex")
 }

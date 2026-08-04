@@ -25,7 +25,8 @@ export const resetRuntimeTables = (url: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`
-      TRUNCATE baton_run_steering, baton_run_links, baton_run_waits, baton_run_operations, baton_run_events, baton_runs, baton_lanes
+      TRUNCATE baton_fan_out_members, baton_fan_outs, baton_run_steering, baton_run_links,
+        baton_run_waits, baton_run_operations, baton_run_events, baton_runs, baton_lanes
       RESTART IDENTITY CASCADE
     `
     yield* sql`

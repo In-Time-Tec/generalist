@@ -1,6 +1,6 @@
 # `@batonfx/runtime`
 
-Addressable Run admission, durable idempotent steering, canonical `RunEvent` streams, finite inspection reads, and memory, SQLite, PostgreSQL, or MySQL Runtime stores for Baton agents.
+Addressable Run admission, durable steering, bounded fan-out and joins, canonical `RunEvent` streams, finite inspection reads, and memory, SQLite, PostgreSQL, or MySQL Runtime stores for Baton agents.
 
 ## Install
 
@@ -58,11 +58,37 @@ RuntimeWorker.layerWorker({ workerId, concurrency, lease, pollInterval })
 | Admission / idempotency / FIFO            | Same contracts             | Same contracts                                      | Same contracts; only lane head is claimable                               | Same contracts; only lane head is claimable                               |
 | Control-input bypass                      | Same                       | Same                                                | Same                                                                      | Same                                                                      |
 | First terminal wins                       | Same                       | Same                                                | Same                                                                      | Same                                                                      |
+| Fan-out admission, joins, and bounds      | Process-bound parity       | Restart-safe                                        | Transactional multi-worker claims                                         | Transactional multi-worker claims                                         |
 | Operation unknown on non-idempotent crash | Same                       | Same                                                | Same                                                                      | Same                                                                      |
 | Live event followers                      | Process-local              | Process-local over durable history                  | Process-local + LISTEN/NOTIFY hint; replay and polling are authoritative  | Process-local + polling; replay is authoritative                          |
 | Multi-worker                              | Not claimed                | Rejected at construction (`MultiWorkerUnsupported`) | `FOR UPDATE SKIP LOCKED` claims, DB-time leases, monotonic attempt fences | `FOR UPDATE SKIP LOCKED` claims, DB-time leases, monotonic attempt fences |
 | Schema at Runtime startup                 | None                       | Automatic migrate + verify                          | **Verify-only**; Runtime credentials need no DDL                          | **Verify-only**; Runtime credentials need no DDL                          |
 | Predeploy schema job                      | n/a                        | n/a                                                 | `RunSchema.plan` / `check` / `apply`                                      | `MysqlRunSchema.plan` / `check` / `apply`                                 |
+
+## Fan-out
+
+`Runtime.fanOut` atomically records an immutable ordered member set and child Runs. `Runtime.awaitFanOut` waits on committed child events until the durable join decision is available; `Runtime.inspectFanOut` remains the non-blocking inspection operation. Both return member outcomes in input ordinal order.
+
+```ts
+const reviews =
+  yield *
+  runtime.fanOut({
+    parentRunId,
+    idempotencyKey: "reviews:1",
+    members: reviewers.map((agent, ordinal) => ({
+      key: `review-${ordinal}`,
+      agent,
+      prompt: "Review the proposed change",
+    })),
+    concurrency: 2,
+    join: { _tag: "Quorum", required: 2 },
+    remainder: "request-cancel",
+  })
+
+const joined = yield * runtime.awaitFanOut(reviews.fanOutId)
+```
+
+Join modes are `AllSuccess`, `AllSettled`, `FirstSuccess`, `Quorum`, and `BestEffort`. Remainder policies are `await`, `request-cancel`, and `abandon`. `terminate` is rejected until a host can prove that all member effects terminated.
 
 ## PostgreSQL migrations
 

@@ -38,10 +38,29 @@ const runtimeLayer = (runtime: Runtime.Interface) => Layer.succeed(Runtime.Runti
 
 const unused = <A>(): Effect.Effect<A, never> => Effect.die("unused Runtime method")
 
+const mockRuntime = (implementation: Partial<Runtime.Interface>): Runtime.Interface =>
+  Runtime.Runtime.of({
+    send: () => unused(),
+    spawn: () => unused(),
+    events: () => Stream.empty,
+    snapshot: () => unused(),
+    history: () => unused(),
+    list: () => unused(),
+    respond: () => unused(),
+    signal: () => unused(),
+    cancel: () => unused(),
+    steer: () => unused(),
+    inspect: () => unused(),
+    fanOut: () => unused(),
+    inspectFanOut: () => unused(),
+    awaitFanOut: () => unused(),
+    ...implementation,
+  })
+
 describe("AgUi", () => {
   it.effect("preserves runId, maps threadId, and admits only the final user message", () => {
     let sent: Runtime.SendInput | undefined
-    const runtime = Runtime.Runtime.of({
+    const runtime = mockRuntime({
       send: (value) => {
         sent = value
         return Effect.succeed({
@@ -52,15 +71,6 @@ describe("AgUi", () => {
         })
       },
       events: () => Stream.make(accepted),
-      snapshot: () => unused(),
-      history: () => unused(),
-      list: () => unused(),
-      spawn: () => unused(),
-      respond: () => unused(),
-      signal: () => unused(),
-      cancel: () => unused(),
-      steer: () => unused(),
-      inspect: () => unused(),
     })
     return Effect.gen(function* () {
       const service = yield* AgUi.AgUi
@@ -78,19 +88,7 @@ describe("AgUi", () => {
   })
 
   it.effect("rejects malformed input, authority roles, client tools, and non-user final messages", () => {
-    const runtime = Runtime.Runtime.of({
-      send: () => unused(),
-      events: () => Stream.empty,
-      snapshot: () => unused(),
-      history: () => unused(),
-      list: () => unused(),
-      spawn: () => unused(),
-      respond: () => unused(),
-      signal: () => unused(),
-      cancel: () => unused(),
-      steer: () => unused(),
-      inspect: () => unused(),
-    })
+    const runtime = mockRuntime({})
     const layer = AgUi.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime)))
     return Effect.gen(function* () {
       const service = yield* AgUi.AgUi
@@ -137,21 +135,12 @@ describe("AgUi", () => {
       },
       cursor: 3,
     }
-    const runtime = Runtime.Runtime.of({
-      send: () => unused(),
-      events: () => Stream.empty,
+    const runtime = mockRuntime({
       snapshot: () => Effect.succeed(snapshot),
-      history: () => unused(),
-      list: () => unused(),
-      spawn: () => unused(),
       respond: (value) => {
         response = value
         return Effect.void
       },
-      signal: () => unused(),
-      cancel: () => unused(),
-      steer: () => unused(),
-      inspect: () => unused(),
     })
     return Effect.gen(function* () {
       const service = yield* AgUi.AgUi
@@ -191,7 +180,7 @@ describe("AgUi", () => {
       },
       cursor: 8,
     }
-    const runtime = Runtime.Runtime.of({
+    const runtime = mockRuntime({
       send: () =>
         Effect.succeed({ runId: "client-run-1", messageId: "message-1", acceptedSequence: 0, duplicate: false }),
       events: ({ cursor }) => {
@@ -201,14 +190,6 @@ describe("AgUi", () => {
           : Stream.empty
       },
       snapshot: () => Effect.succeed(snapshot),
-      history: () => unused(),
-      list: () => unused(),
-      spawn: () => unused(),
-      respond: () => unused(),
-      signal: () => unused(),
-      cancel: () => unused(),
-      steer: () => unused(),
-      inspect: () => unused(),
     })
     return Effect.gen(function* () {
       const service = yield* AgUi.AgUi
@@ -232,7 +213,7 @@ describe("AgUi", () => {
       },
       cursor: 12,
     }
-    const runtime = Runtime.Runtime.of({
+    const runtime = mockRuntime({
       send: () =>
         Effect.succeed({
           runId: "client-run-1",
@@ -247,14 +228,6 @@ describe("AgUi", () => {
           : Stream.empty
       },
       snapshot: () => Effect.succeed(snapshot),
-      history: () => unused(),
-      list: () => unused(),
-      spawn: () => unused(),
-      respond: () => unused(),
-      signal: () => unused(),
-      cancel: () => unused(),
-      steer: () => unused(),
-      inspect: () => unused(),
     })
     return Effect.gen(function* () {
       const service = yield* AgUi.AgUi

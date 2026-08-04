@@ -19,14 +19,6 @@ import type { LayerOptions } from "../../runtime.js"
 import { isTerminal } from "../../run.js"
 import { RunStore } from "../../run-store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
-import {
-  SchemaChecksumMismatch,
-  SchemaDirty,
-  SchemaMigrationFailed,
-  SchemaUpgradeRequired,
-  SchemaVersionUnsupported,
-  StaleClaim,
-} from "../errors.js"
 import type { RunRow } from "../rows.js"
 import { withSql } from "../sql-effect.js"
 import { makeEventHub } from "../subscribers.js"
@@ -34,9 +26,11 @@ import { check as checkSchema } from "./run-schema.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
 import { makePostgresClaims } from "./store-claims.js"
 import { postgresOperations } from "./store-ops.js"
-import { claimExecution, loadExecution, saveExecution } from "../store-execution.js"
+import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "../store-execution.js"
 import { decodeRun, loadRunWait } from "../store-helpers.js"
 import type { WaitResolution } from "../../run-wait.js"
+import { fanOutStoreMethods } from "./store-fan-out.js"
+import { deferCancelledFanOutParent, makeCancelRun } from "./store-cancel.js"
 import {
   afterTerminal,
   appendEvent,
@@ -51,12 +45,6 @@ export interface PostgresStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
 }
-export type PostgresStoreError =
-  | SchemaDirty
-  | SchemaChecksumMismatch
-  | SchemaVersionUnsupported
-  | SchemaUpgradeRequired
-  | SchemaMigrationFailed
 const nextId = (prefix: string) => Effect.sync(() => `${prefix}_${Math.random().toString(36).slice(2)}`)
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
@@ -71,6 +59,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
     yield* checkSchema(source)
     const hub = yield* makeEventHub()
     yield* Effect.addFinalizer(() => hub.shutdown)
+    const transactionHub: typeof hub = { ...hub, publish: () => Effect.void }
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
     const pg = yield* PgClient.PgClient
@@ -84,47 +73,16 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           loaded === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(loaded),
         ),
       )
-    const requireClaim = (claim: import("../../run-store.js").ExecutionClaim) =>
-      requireRun(claim.runId).pipe(
-        Effect.flatMap((loaded) =>
-          loaded.ownerWorkerId === claim.ownerId && loaded.attemptFence === claim.attemptFence
-            ? Effect.void
-            : StaleClaim.make({
-                runId: claim.runId,
-                workerId: claim.ownerId,
-                attemptFence: claim.attemptFence,
-              }),
-        ),
-      )
-    const cancelRun = (runId: string, reason: string | undefined) =>
-      Effect.gen(function* () {
-        let current = yield* requireRun(runId)
-        if (isTerminal(current.status)) return
-        if (!current.cancellationRequested) {
-          yield* appendEvent(
-            hub,
-            current,
-            { _tag: "RunCancellationRequested", ...(reason === undefined ? {} : { reason }) },
-            "cancelling",
-          )
-          current = (yield* loadRun(runId))!
-        }
-        if (isTerminal(current.status)) return
-        const event = yield* appendEvent(
-          hub,
-          current,
-          { _tag: "RunCancelled", ...(reason === undefined ? {} : { reason }) },
-          "cancelled",
-        )
-        const settled = (yield* loadRun(runId))!
-        yield* settleParent(hub, settled, event.eventId)
-        yield* afterTerminal(hub, settled)
-        yield* sql`
-          UPDATE baton_run_waits SET status = 'cancelled', closed_at = NOW()
-          WHERE run_id = ${runId} AND status = 'open'
-        `
-      })
-    const operations = postgresOperations({ sql, hub, run, runNoTxn, requireRun, requireClaim, nextId })
+    const cancelRun = makeCancelRun({ sql, hub: transactionHub })
+    const operations = postgresOperations({
+      sql,
+      hub: transactionHub,
+      run,
+      runNoTxn,
+      requireRun,
+      requireClaim: requireExecutionClaim,
+      nextId,
+    })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "postgres", multiWorker: true }),
       admitSend: (input) =>
@@ -265,7 +223,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             )
             const started = (yield* loadRun(runId))!
             yield* sql`UPDATE baton_runs SET attempt_fence = 1, attempt = 1, status = 'running' WHERE run_id = ${runId}`
-            yield* appendEvent(hub, { ...started, attempt: 1 }, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
+            yield* appendEvent(
+              transactionHub,
+              { ...started, attempt: 1 },
+              { _tag: "RunAttemptStarted", attempt: 1 },
+              "running",
+            )
             return { runId, messageId: input.message.id, acceptedSequence: 0, duplicate: false }
           }),
         ),
@@ -362,7 +325,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             Effect.andThen(admitSteering(input)),
           ),
         ),
-      readSteering: (input) => run(requireClaim(input).pipe(Effect.andThen(readSteering(input)))),
+      readSteering: (input) => run(requireExecutionClaim(input).pipe(Effect.andThen(readSteering(input)))),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {
@@ -417,46 +380,76 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
         run(
           Effect.gen(function* () {
             yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`steering:${input.runId}`}))`
-            yield* requireClaim(input)
+            yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${input.runId} FOR UPDATE`
+            yield* requireExecutionClaim(input)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status)) {
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
             }
             if (loaded.cancellationRequested) {
-              yield* cancelRun(loaded.runId, loaded.cancelReason)
+              if (yield* deferCancelledFanOutParent(sql, loaded.runId)) return { _tag: "Completed" as const }
+              const event = yield* appendEvent(
+                transactionHub,
+                loaded,
+                { _tag: "RunCancelled", ...(loaded.cancelReason === undefined ? {} : { reason: loaded.cancelReason }) },
+                "cancelled",
+              )
+              const settled = (yield* loadRun(loaded.runId))!
+              yield* settleParent(transactionHub, settled, event.eventId)
+              yield* afterTerminal(transactionHub, settled)
               return { _tag: "Completed" as const }
             }
             const continuation = yield* saveCompletionContinuation(input.runId, input.result)
             if (continuation !== undefined) return { _tag: "SteeringPending" as const, continuation }
-            const event = yield* appendEvent(hub, loaded, { _tag: "RunCompleted", result: input.result }, "succeeded")
+            const event = yield* appendEvent(
+              transactionHub,
+              loaded,
+              { _tag: "RunCompleted", result: input.result },
+              "succeeded",
+            )
             const settled = (yield* loadRun(loaded.runId))!
-            yield* settleParent(hub, settled, event.eventId)
-            yield* afterTerminal(hub, settled)
+            yield* settleParent(transactionHub, settled, event.eventId)
+            yield* afterTerminal(transactionHub, settled)
             return { _tag: "Completed" as const }
           }),
         ),
       fail: (input) =>
         run(
           Effect.gen(function* () {
-            yield* requireClaim(input)
+            yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${input.runId} FOR UPDATE`
+            yield* requireExecutionClaim(input)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status)) {
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
             }
             if (loaded.cancellationRequested) {
-              yield* cancelRun(loaded.runId, loaded.cancelReason)
+              if (yield* deferCancelledFanOutParent(sql, loaded.runId)) return
+              const event = yield* appendEvent(
+                transactionHub,
+                loaded,
+                { _tag: "RunCancelled", ...(loaded.cancelReason === undefined ? {} : { reason: loaded.cancelReason }) },
+                "cancelled",
+              )
+              const settled = (yield* loadRun(loaded.runId))!
+              yield* settleParent(transactionHub, settled, event.eventId)
+              yield* afterTerminal(transactionHub, settled)
               return
             }
-            const event = yield* appendEvent(hub, loaded, { _tag: "RunFailed", error: input.error }, "failed")
+            const event = yield* appendEvent(
+              transactionHub,
+              loaded,
+              { _tag: "RunFailed", error: input.error },
+              "failed",
+            )
             const settled = (yield* loadRun(loaded.runId))!
-            yield* settleParent(hub, settled, event.eventId)
-            yield* afterTerminal(hub, settled)
+            yield* settleParent(transactionHub, settled, event.eventId)
+            yield* afterTerminal(transactionHub, settled)
           }),
         ),
       wait: (input) =>
         run(
           Effect.gen(function* () {
-            yield* requireClaim(input)
+            yield* requireExecutionClaim(input)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status)) {
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
@@ -486,12 +479,13 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             yield* appendEvent(hub, loaded, { _tag: "RunResumed", waitId: input.waitId }, "running")
           }),
         ),
-      emitAgentEvent: (input) => run(emitAgentEvent(hub, input)),
+      emitAgentEvent: (input) => run(emitAgentEvent(transactionHub, input)),
       claimExecution: (input) => run(claimExecution(input)),
       loadExecution: (runId) => run(loadExecution(runId)),
       saveExecution: (input) => run(saveExecution(input)),
+      ...fanOutStoreMethods({ sql, pg, hub: transactionHub, run, runNoTxn }),
       ...operations,
     })
-    const claims = makePostgresClaims({ sql, hub, run, cancelRun })
+    const claims = makePostgresClaims({ sql, hub: transactionHub, run, cancelRun })
     return { store, claims }
   })

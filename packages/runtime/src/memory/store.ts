@@ -28,6 +28,7 @@ import {
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
 import { admitSteering, readSteering } from "./store-steering.js"
 import { Prompt } from "effect/unstable/ai"
+import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 
 const registrationMaps = (options: LayerOptions) => {
   const agentRefs = new Map(options.agents.map((entry) => [agentKey(entry.ref), entry.ref] as const))
@@ -179,6 +180,9 @@ export const makeRunStore = (options: LayerOptions) =>
       loadExecution: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadExecution(state, runId))),
       saveExecution: (input) => update((state) => saveExecution(state, input)),
+      admitFanOut: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitFanOut(state, input)),
+      inspectFanOut: (fanOutId) =>
+        SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectFanOut(state, fanOutId))),
     })
   })
 

@@ -1,11 +1,20 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "../src/index"
 import { ItLayer } from "./it-layer"
 import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
+
+const fanOutWithUnionOptions = (children: ReadonlyArray<Handoff.FanOutChild>, options: Handoff.FanOutOptions) => {
+  const result: Effect.Effect<
+    ReadonlyArray<Agent.Result> | ReadonlyArray<Handoff.FanOutMemberResult>,
+    Agent.RunError | Handoff.RegistrationError | Handoff.FanOutUnsatisfied
+  > = Handoff.fanOut(children, options)
+  return result
+}
+void fanOutWithUnionOptions
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
   Layer.effect(
@@ -20,6 +29,15 @@ const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text
 const toolCallPart = (id: string, name: string, params: unknown) =>
   Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 const promptText = (prompt: Prompt.Prompt): string => JSON.stringify(prompt.content)
+const directResult = (text: string): Agent.Result => ({ text, turns: 1, transcript: Prompt.fromMessages([]) })
+const directRegistration = (
+  name: string,
+  run: Effect.Effect<Agent.Result, Agent.RunError | Handoff.RegistrationError>,
+): Handoff.Registration => ({
+  name,
+  run: (() => run) as Handoff.Registration["run"],
+  requirements: (value) => value,
+})
 
 layer(Layer.empty)("Handoff", (it) => {
   it("requires an explicit layer and closes full run options", () => {
@@ -175,16 +193,20 @@ layer(Layer.empty)("Handoff", (it) => {
     return [
       Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
       Effect.gen(function* () {
-        const results = yield* Handoff.fanOut(children)
-        expect(results.map((result) => result.text)).toEqual([
-          "done task 0",
-          "done task 1",
-          "done task 2",
-          "done task 3",
-          "done task 4",
-          "done task 5",
-        ])
-        expect(maxActive).toBeLessThanOrEqual(4)
+        for (const concurrency of [1, 3, 6]) {
+          active = 0
+          maxActive = 0
+          const results = yield* Handoff.fanOut(children, { concurrency })
+          expect(results.map((result) => result.text)).toEqual([
+            "done task 0",
+            "done task 1",
+            "done task 2",
+            "done task 3",
+            "done task 4",
+            "done task 5",
+          ])
+          expect(maxActive).toBe(concurrency)
+        }
       }),
     ] as const
   })
@@ -213,4 +235,207 @@ layer(Layer.empty)("Handoff", (it) => {
       }),
     ] as const
   })
+
+  ItLayer.make(it, "collects all-settled and best-effort outcomes in ordinal order", () => {
+    const children = [
+      {
+        registration: Handoff.register(
+          Agent.make({ name: "settled-0" }),
+          modelLayer(() => Stream.make(textDelta("zero"))),
+        ),
+        prompt: "zero",
+      },
+      {
+        registration: Handoff.register(
+          Agent.make({ name: "settled-1" }),
+          modelLayer(() => Stream.fail(new Error("failed") as never)),
+        ),
+        prompt: "one",
+      },
+      {
+        registration: Handoff.register(
+          Agent.make({ name: "settled-2" }),
+          modelLayer(() => Stream.make(textDelta("two"))),
+        ),
+        prompt: "two",
+      },
+    ]
+    return [
+      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+      Effect.gen(function* () {
+        for (const join of [{ _tag: "AllSettled" }, { _tag: "BestEffort" }] as const) {
+          const outcomes = yield* Handoff.fanOut(children, { join })
+          expect(outcomes.map((outcome) => outcome.ordinal)).toEqual([0, 1, 2])
+          expect(outcomes.map((outcome) => outcome.status)).toEqual(["succeeded", "failed", "succeeded"])
+        }
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "returns first success and interrupts unnecessary members", () => [
+    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+    Effect.gen(function* () {
+      for (const remainder of ["request-cancel", "terminate"] as const) {
+        const firstStarted = yield* Deferred.make<void>()
+        const lastStarted = yield* Deferred.make<void>()
+        let interruptions = 0
+        const blocked = (name: string, started: Deferred.Deferred<void>) => ({
+          registration: directRegistration(
+            name,
+            Deferred.succeed(started, undefined).pipe(
+              Effect.andThen(Effect.never),
+              Effect.onInterrupt(() => Effect.sync(() => interruptions++)),
+            ),
+          ),
+          prompt: name,
+        })
+        const winner = {
+          registration: directRegistration(
+            `winner-${remainder}`,
+            Effect.all([Deferred.await(firstStarted), Deferred.await(lastStarted)]).pipe(
+              Effect.as(directResult("winner")),
+            ),
+          ),
+          prompt: "winner",
+        }
+        const outcomes = yield* Handoff.fanOut(
+          [blocked(`first-${remainder}`, firstStarted), winner, blocked(`last-${remainder}`, lastStarted)],
+          { join: { _tag: "FirstSuccess" }, remainder, concurrency: 3 },
+        )
+        expect(outcomes.map((outcome) => outcome.status)).toEqual(["cancelled", "succeeded", "cancelled"])
+        expect(interruptions).toBe(2)
+      }
+    }),
+  ])
+
+  ItLayer.make(it, "awaits the remainder after first-success satisfaction", () => [
+    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+    Effect.gen(function* () {
+      const release = yield* Deferred.make<void>()
+      const completed = yield* Deferred.make<void>()
+      const children = [
+        {
+          registration: Handoff.register(
+            Agent.make({ name: "await-winner" }),
+            modelLayer(() => Stream.make(textDelta("winner"))),
+          ),
+          prompt: "winner",
+        },
+        {
+          registration: Handoff.register(
+            Agent.make({ name: "await-remainder" }),
+            modelLayer(() =>
+              Stream.unwrap(Deferred.await(release).pipe(Effect.as(Stream.make(textDelta("remainder"))))),
+            ),
+          ),
+          prompt: "remainder",
+        },
+      ]
+      const fiber = yield* Effect.forkChild(
+        Handoff.fanOut(children, { join: { _tag: "FirstSuccess" } }).pipe(
+          Effect.ensuring(Deferred.succeed(completed, undefined)),
+        ),
+      )
+      yield* Effect.yieldNow
+      expect(yield* Deferred.isDone(completed)).toBe(false)
+      yield* Deferred.succeed(release, undefined)
+      const outcomes = yield* Fiber.join(fiber)
+      expect(outcomes.map((outcome) => outcome.status)).toEqual(["succeeded", "succeeded"])
+    }),
+  ])
+
+  ItLayer.make(it, "interrupts every owned member when the parent is interrupted", () => [
+    Layer.empty,
+    Effect.gen(function* () {
+      const firstStarted = yield* Deferred.make<void>()
+      const secondStarted = yield* Deferred.make<void>()
+      let interruptions = 0
+      const blocked = (name: string, started: Deferred.Deferred<void>) => ({
+        registration: directRegistration(
+          name,
+          Deferred.succeed(started, undefined).pipe(
+            Effect.andThen(Effect.never),
+            Effect.onInterrupt(() => Effect.sync(() => interruptions++)),
+          ),
+        ),
+        prompt: name,
+      })
+      const parent = yield* Effect.forkChild(
+        Handoff.fanOut([blocked("parent-child-0", firstStarted), blocked("parent-child-1", secondStarted)], {
+          concurrency: 2,
+        }),
+      )
+      yield* Effect.all([Deferred.await(firstStarted), Deferred.await(secondStarted)])
+      yield* Fiber.interrupt(parent)
+      expect(interruptions).toBe(2)
+    }),
+  ])
+
+  ItLayer.make(it, "continues scheduling after a member interrupts itself", () => [
+    Layer.empty,
+    Effect.gen(function* () {
+      let secondStarted = false
+      const outcomes = yield* Handoff.fanOut(
+        [
+          {
+            registration: directRegistration("self-interrupted", Effect.interrupt),
+            prompt: "interrupt",
+          },
+          {
+            registration: directRegistration(
+              "after-interrupt",
+              Effect.sync(() => {
+                secondStarted = true
+                return directResult("continued")
+              }),
+            ),
+            prompt: "continue",
+          },
+        ],
+        { join: { _tag: "AllSettled" }, concurrency: 1 },
+      )
+      expect(outcomes.map((outcome) => outcome.status)).toEqual(["cancelled", "succeeded"])
+      expect(secondStarted).toBe(true)
+    }),
+  ])
+
+  ItLayer.make(it, "completes quorum and fails as soon as quorum is impossible", () => [
+    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
+    Effect.gen(function* () {
+      const success = (name: string) => ({
+        registration: directRegistration(name, Effect.succeed(directResult(name))),
+        prompt: name,
+      })
+      const failure = (name: string) => ({
+        registration: directRegistration(name, Effect.fail(AgentEvent.AgentError.make({ message: name, turn: 0 }))),
+        prompt: name,
+      })
+      const quorum = yield* Handoff.fanOut([success("quorum-0"), failure("quorum-1"), success("quorum-2")], {
+        join: { _tag: "Quorum", required: 2 },
+      })
+      expect(quorum.map((outcome) => outcome.status)).toEqual(["succeeded", "failed", "succeeded"])
+
+      let interrupted = false
+      const blocked = {
+        registration: directRegistration(
+          "impossible-blocked",
+          Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(() => (interrupted = true)))),
+        ),
+        prompt: "blocked",
+      }
+      const impossible = yield* Effect.flip(
+        Handoff.fanOut([failure("impossible-0"), failure("impossible-1"), blocked], {
+          join: { _tag: "Quorum", required: 2 },
+          remainder: "await",
+          concurrency: 3,
+        }),
+      )
+      expect(impossible).toBeInstanceOf(Handoff.FanOutUnsatisfied)
+      if (Schema.is(Handoff.FanOutUnsatisfied)(impossible)) {
+        expect(impossible.succeeded).toBe(0)
+        expect(impossible.settled).toBe(2)
+      }
+      expect(interrupted).toBe(true)
+    }),
+  ])
 })

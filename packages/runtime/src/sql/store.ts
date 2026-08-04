@@ -39,6 +39,7 @@ import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } f
 import { withSql } from "./sql-effect.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "./store-steering.js"
 import { makeEventHub } from "./subscribers.js"
+import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly filename: string
@@ -77,6 +78,17 @@ export const makeSqliteRunStore = (
     const sql = yield* SqlClient.SqlClient
     const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, sql.withTransaction(effect))
     const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
+    const runBuffered = <A, E>(makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>) =>
+      Effect.gen(function* () {
+        const events: Array<readonly [string, import("../run-event.js").RunEvent]> = []
+        const transactionHub: typeof hub = {
+          ...hub,
+          publish: (runId, event) => Effect.sync(() => void events.push([runId, event])),
+        }
+        const result = yield* run(makeEffect(transactionHub))
+        yield* Effect.forEach(events, ([runId, event]) => hub.publish(runId, event), { discard: true })
+        return result
+      })
     const fenced = <A, E>(
       input: import("../run-store.js").ExecutionClaim,
       effect: Effect.Effect<A, E, SqlClient.SqlClient>,
@@ -102,7 +114,7 @@ export const makeSqliteRunStore = (
         }),
       respond: (input) => run(respond(hub, input)),
       signal: (input) => run(signal(hub, input)),
-      cancel: (input) => run(cancel(hub, input)),
+      cancel: (input) => runBuffered((transactionHub) => cancel(transactionHub, input)),
       admitSteering: (input) => run(admitSteering(input)),
       readSteering: (input) => fenced(input, readSteering(input)),
       inspect: (runId) =>
@@ -162,12 +174,12 @@ export const makeSqliteRunStore = (
           }),
         ),
       complete: (input) =>
-        fenced(
-          input,
-          saveCompletionContinuation(input.runId, input.result).pipe(
+        runBuffered((transactionHub) =>
+          requireExecutionClaim(input).pipe(
+            Effect.andThen(saveCompletionContinuation(input.runId, input.result)),
             Effect.flatMap((continuation) =>
               continuation === undefined
-                ? complete(hub, input).pipe(
+                ? complete(transactionHub, input).pipe(
                     Effect.as({ _tag: "Completed" } as import("../run-store.js").CompletionOutcome),
                   )
                 : Effect.succeed({
@@ -177,7 +189,8 @@ export const makeSqliteRunStore = (
             ),
           ),
         ),
-      fail: (input) => fenced(input, fail(hub, input)),
+      fail: (input) =>
+        runBuffered((transactionHub) => requireExecutionClaim(input).pipe(Effect.andThen(fail(transactionHub, input)))),
       wait: (input) => fenced(input, wait(hub, input)),
       resume: (input) => run(resume(hub, input)),
       emitAgentEvent: (input) => fenced(input, emitAgentEvent(hub, input)),
@@ -192,6 +205,8 @@ export const makeSqliteRunStore = (
       claimExecution: (input) => run(claimExecution(input)),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
       saveExecution: (input) => run(saveExecution(input)),
+      admitFanOut: (input) => runBuffered((transactionHub) => admitFanOut(transactionHub, input)),
+      inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
     })
   })
 

@@ -14,6 +14,7 @@ import {
   SCHEMA_META_TABLE,
   SCHEMA_VERSION,
   schemaChecksum,
+  steeringSchemaChecksum,
 } from "./schema.js"
 
 export interface SchemaPlan {
@@ -103,19 +104,30 @@ export const apply = (source: string) =>
           VALUES (1, 0, '', 1, NOW(3))
           ON DUPLICATE KEY UPDATE dirty = 1
         `
-            for (const statement of MIGRATION_STATEMENTS.slice(1)) yield* sql.unsafe(statement)
             for (const migration of MIGRATION_MANIFEST) {
+              const applied = yield* sql<{ migration_id: number }>`
+                SELECT migration_id FROM baton_sql_migrations WHERE migration_id = ${migration.id}
+              `
+              if (applied.length > 0) continue
+              for (const statement of migration.statements) yield* sql.unsafe(statement)
               yield* sql`
                 INSERT INTO baton_sql_migrations (migration_id, name, applied_at)
                 VALUES (${migration.id}, ${migration.name}, NOW(3))
-                ON DUPLICATE KEY UPDATE name = VALUES(name)
               `
+              if (migration.id === 2) {
+                yield* sql`
+                  UPDATE baton_schema_meta
+                  SET version = 2, checksum = ${steeringSchemaChecksum()}, dirty = 0, applied_at = NOW(3)
+                  WHERE id = 1
+                `
+              } else if (migration.id === 3) {
+                yield* sql`
+                  UPDATE baton_schema_meta
+                  SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0, applied_at = NOW(3)
+                  WHERE id = 1
+                `
+              }
             }
-            yield* sql`
-          UPDATE baton_schema_meta
-          SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0, applied_at = NOW(3)
-          WHERE id = 1
-        `
             yield* check(source)
           }).pipe(Effect.mapError(migrationFailure(source, "migration failed"))),
         () => sql`SELECT RELEASE_LOCK(${MIGRATION_LOCK})`.pipe(Effect.ignore),

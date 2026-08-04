@@ -17,8 +17,10 @@ import {
   SCHEMA_META_TABLE,
   SCHEMA_VERSION,
   STEERING_MIGRATION_STATEMENTS,
+  FAN_OUT_MIGRATION_STATEMENTS,
   kernelSchemaChecksum,
   schemaChecksum,
+  steeringSchemaChecksum,
 } from "./schema.js"
 
 export interface SchemaPlan {
@@ -91,6 +93,17 @@ const steeringMigrationEffect = Effect.gen(function* () {
   const now = yield* DateTime.nowAsDate
   yield* sql`
     UPDATE ${sql(SCHEMA_META_TABLE)}
+    SET version = 2, checksum = ${steeringSchemaChecksum()}, dirty = FALSE, applied_at = ${now}
+    WHERE id = 1
+  `
+})
+
+const fanOutMigrationEffect = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  for (const statement of FAN_OUT_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
+  const now = yield* DateTime.nowAsDate
+  yield* sql`
+    UPDATE ${sql(SCHEMA_META_TABLE)}
     SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = FALSE, applied_at = ${now}
     WHERE id = 1
   `
@@ -153,6 +166,7 @@ export const apply = (
       loader: Migrator.fromRecord({
         "0001_baton_runtime_postgres_kernel": migrationEffect,
         "0002_baton_runtime_postgres_steering": steeringMigrationEffect,
+        "0003_baton_runtime_postgres_fan_out": fanOutMigrationEffect,
       }),
       table: MIGRATIONS_TABLE,
     }).pipe(

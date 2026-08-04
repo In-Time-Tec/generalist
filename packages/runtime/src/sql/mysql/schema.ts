@@ -1,9 +1,9 @@
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const MIGRATION_LOCK = "baton_runtime_schema"
 
-export const MIGRATION_STATEMENTS: ReadonlyArray<string> = [
+export const LEGACY_MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   `CREATE TABLE IF NOT EXISTS baton_schema_meta (
   id INT PRIMARY KEY,
   version INT NOT NULL,
@@ -132,15 +132,57 @@ export const MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   `ALTER TABLE baton_runs ADD COLUMN continuation_json LONGTEXT`,
 ]
 
+export const FAN_OUT_MIGRATION_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS baton_fan_outs (
+  fan_out_id VARCHAR(255) PRIMARY KEY,
+  parent_run_id VARCHAR(255) NOT NULL,
+  idempotency_key VARCHAR(255) NOT NULL,
+  input_digest VARCHAR(128) NOT NULL,
+  join_json LONGTEXT NOT NULL,
+  remainder VARCHAR(32) NOT NULL,
+  concurrency INT NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  created_at VARCHAR(30) NOT NULL,
+  updated_at VARCHAR(30) NOT NULL,
+  UNIQUE KEY baton_fan_out_idempotency_key (parent_run_id, idempotency_key),
+  CONSTRAINT baton_fan_out_parent_fk FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id)
+) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS baton_fan_out_members (
+  fan_out_id VARCHAR(255) NOT NULL,
+  ordinal INT NOT NULL,
+  member_key VARCHAR(255) NOT NULL,
+  child_run_id VARCHAR(255) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  terminal_event_id VARCHAR(255),
+  outcome_json LONGTEXT,
+  PRIMARY KEY (fan_out_id, ordinal),
+  UNIQUE KEY baton_fan_out_member_key (fan_out_id, member_key),
+  UNIQUE KEY baton_fan_out_child_key (child_run_id),
+  KEY baton_fan_out_members_status_idx (fan_out_id, status, ordinal),
+  CONSTRAINT baton_fan_out_member_fan_out_fk FOREIGN KEY (fan_out_id) REFERENCES baton_fan_outs(fan_out_id),
+  CONSTRAINT baton_fan_out_member_child_fk FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
+) ENGINE=InnoDB`,
+]
+export const MIGRATION_STATEMENTS = [...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS]
+
 export const MIGRATION_MANIFEST = [
-  { id: 1, name: "baton_runtime_mysql_kernel", statements: MIGRATION_STATEMENTS.slice(0, -2) },
-  { id: 2, name: "baton_runtime_mysql_steering", statements: MIGRATION_STATEMENTS.slice(-2) },
+  { id: 1, name: "baton_runtime_mysql_kernel", statements: LEGACY_MIGRATION_STATEMENTS.slice(0, -2) },
+  { id: 2, name: "baton_runtime_mysql_steering", statements: LEGACY_MIGRATION_STATEMENTS.slice(-2) },
+  { id: 3, name: "baton_runtime_mysql_fan_out", statements: FAN_OUT_MIGRATION_STATEMENTS },
 ] as const
 
 export const schemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
   hasher.update(MIGRATION_STATEMENTS.join("\n"))
   hasher.update(`\nversion=${SCHEMA_VERSION}`)
+  hasher.update("\ndialect=mysql")
+  return hasher.digest("hex")
+}
+
+export const steeringSchemaChecksum = (): string => {
+  const hasher = new Bun.CryptoHasher("sha256")
+  hasher.update(LEGACY_MIGRATION_STATEMENTS.join("\n"))
+  hasher.update("\nversion=2")
   hasher.update("\ndialect=mysql")
   return hasher.digest("hex")
 }

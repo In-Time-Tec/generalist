@@ -87,3 +87,22 @@ export class AgentNotRegistered extends Schema.TaggedErrorClass<AgentNotRegister
     agent: AgentRef,
   },
 ) {}
+
+export class FanOutConflict extends Schema.TaggedErrorClass<FanOutConflict>()("@batonfx/runtime/FanOutConflict", {
+  parentRunId: RunId,
+  idempotencyKey: Schema.String,
+  existingFanOutId: Schema.String,
+}) {}
+
+export class FanOutNotFound extends Schema.TaggedErrorClass<FanOutNotFound>()("@batonfx/runtime/FanOutNotFound", {
+  fanOutId: Schema.String,
+}) {}
+
+export class FanOutInvalid extends Schema.TaggedErrorClass<FanOutInvalid>()("@batonfx/runtime/FanOutInvalid", {
+  message: Schema.String,
+}) {}
+
+export class FanOutRemainderUnsupported extends Schema.TaggedErrorClass<FanOutRemainderUnsupported>()(
+  "@batonfx/runtime/FanOutRemainderUnsupported",
+  { remainder: Schema.Literal("terminate"), durability: Schema.Literals(["ephemeral", "durable"]) },
+) {}

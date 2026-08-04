@@ -8,8 +8,10 @@ import {
   SCHEMA_META_TABLE,
   SCHEMA_VERSION,
   STEERING_MIGRATION_STATEMENTS,
+  FAN_OUT_MIGRATION_STATEMENTS,
   kernelSchemaChecksum,
   schemaChecksum,
+  steeringSchemaChecksum,
 } from "./schema.js"
 import { mapSqlError } from "./sql-effect.js"
 
@@ -35,6 +37,17 @@ const migrationEffect = Effect.gen(function* () {
 const steeringMigrationEffect = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   for (const statement of STEERING_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
+  const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
+  yield* sql`
+    UPDATE ${sql(SCHEMA_META_TABLE)}
+    SET version = 2, checksum = ${steeringSchemaChecksum()}, dirty = 0, applied_at = ${now}
+    WHERE id = 1
+  `
+})
+
+const fanOutMigrationEffect = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  for (const statement of FAN_OUT_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
   const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
   yield* sql`
     UPDATE ${sql(SCHEMA_META_TABLE)}
@@ -121,6 +134,7 @@ export const migrate = (
       loader: SqliteMigrator.fromRecord({
         "0001_baton_runtime_kernel": migrationEffect,
         "0002_baton_runtime_steering": steeringMigrationEffect,
+        "0003_baton_runtime_fan_out": fanOutMigrationEffect,
       }),
       table: MIGRATIONS_TABLE,
     }).pipe(

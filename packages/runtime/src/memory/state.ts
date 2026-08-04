@@ -10,6 +10,7 @@ import type { AgentEvent, DurableDriver } from "@batonfx/core"
 import type { Prompt } from "effect/unstable/ai"
 import type { RunWait } from "../run-wait.js"
 import type { ExecutionContinuation, SteeringEntry } from "../steering.js"
+import type { FanOutJoin, FanOutMemberResult, FanOutRemainder, FanOutStatus } from "../fan-out.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -62,10 +63,23 @@ export interface MemoryState {
   readonly runs: ReadonlyMap<string, StoredRun>
   readonly lanes: ReadonlyMap<string, Lane>
   readonly idempotency: ReadonlyMap<string, IdempotencyEntry>
+  readonly fanOuts: ReadonlyMap<string, StoredFanOut>
   readonly operations: ReadonlyMap<string, OperationRecord>
   readonly agentRefs: ReadonlyMap<string, AgentRef>
   readonly addressBindings: ReadonlyMap<string, AgentRef>
   readonly subscriberQueueCapacity: number
+}
+
+export interface StoredFanOut {
+  readonly fanOutId: string
+  readonly parentRunId: string
+  readonly idempotencyKey: string
+  readonly digest: string
+  readonly status: FanOutStatus
+  readonly join: FanOutJoin
+  readonly remainder: FanOutRemainder
+  readonly concurrency: number
+  readonly members: ReadonlyArray<FanOutMemberResult>
 }
 
 export const laneKey = (address: Address, sessionId: string): string => `${address}\0${sessionId}`
@@ -88,6 +102,7 @@ export const emptyState = (input: {
   runs: new Map(),
   lanes: new Map(),
   idempotency: new Map(),
+  fanOuts: new Map(),
   operations: new Map(),
   agentRefs: input.agentRefs,
   addressBindings: input.addressBindings,

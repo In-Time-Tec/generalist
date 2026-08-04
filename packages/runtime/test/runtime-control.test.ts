@@ -16,8 +16,7 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
       })
       const claim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
       yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-      const error = yield* driver.complete({ ...claim, result: completedResult("too-late") }).pipe(Effect.flip)
-      expect(error).toBeInstanceOf(Errors.RunTerminal)
+      expect(yield* driver.complete({ ...claim, result: completedResult("too-late") })).toEqual({ _tag: "Completed" })
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
       const inspection = yield* runtime.inspect(receipt.runId)
       const tags = yield* runtime.events({ runId: receipt.runId }).pipe(

@@ -3,8 +3,13 @@ import { Effect, Exit, Redacted, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import { Errors, RunClaims, RunSchema, Runtime, RuntimeWorker, RunStore } from "../../src/index.js"
-import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../src/sql/postgres/schema.js"
-import { assistantAddress, completedResult, openWait, textPrompt } from "../helpers.js"
+import {
+  SCHEMA_META_TABLE,
+  SCHEMA_VERSION,
+  schemaChecksum,
+  steeringSchemaChecksum,
+} from "../../src/sql/postgres/schema.js"
+import { assistantAddress, completedResult, openWait, researcherRef, textPrompt } from "../helpers.js"
 import {
   postgresAvailable,
   postgresLayer,
@@ -17,6 +22,8 @@ import {
 const describePostgres = postgresAvailable ? describe.sequential : describe.skip
 
 const url = postgresUrl!
+
+expect(steeringSchemaChecksum()).toBe("3536918f55414098259ef8aac4aa0dd4dd327aa5daf5a8ed5926f15137e92a40")
 
 const withSchema = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
@@ -273,10 +280,20 @@ describePostgres("postgres run store", () => {
           prompt: textPrompt("w"),
         })
         const claimed = yield* worker.tick
-        expect(claimed.some((item) => item.run.runId === receipt.runId)).toBe(true)
+        const claim = claimed.find((item) => item.run.runId === receipt.runId)!
+        expect(claim).toBeDefined()
         const again = yield* worker.tick
         expect(again.some((item) => item.run.runId === receipt.runId)).toBe(true)
         expect(again).toHaveLength(1)
+        yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+        expect(
+          yield* (yield* RunClaims.RunClaims).refreshLease({
+            runId: receipt.runId,
+            workerId: "tick-worker",
+            attemptFence: claim.attemptFence,
+            lease: "10 seconds",
+          }),
+        ).toBe(false)
       }).pipe(Effect.provide(postgresWithWorker(url, "tick-worker", 2)), Effect.scoped),
     ),
   )
@@ -407,6 +424,45 @@ describePostgres("postgres run store", () => {
         yield* runtime.cancel({ runId: parent.runId, reason: "parent-stop" })
         expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
         expect((yield* runtime.inspect(child.runId)).status).toBe("succeeded")
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("enforces and recovers durable fan-out concurrency", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const claims = yield* RunClaims.RunClaims
+        const parent = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("fan-out"),
+          idempotencyKey: "parent",
+          prompt: "parent",
+        })
+        yield* claims.claimReadyRuns({ workerId: "parent", limit: 1 })
+        const receipt = yield* runtime.fanOut({
+          parentRunId: parent.runId,
+          idempotencyKey: "reviews",
+          members: [0, 1, 2].map((ordinal) => ({
+            key: `review-${ordinal}`,
+            agent: researcherRef,
+            prompt: `review-${ordinal}`,
+          })),
+          concurrency: 1,
+          join: { _tag: "Quorum", required: 2 },
+          remainder: "abandon",
+        })
+        const first = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
+        expect(first.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[0]])
+        yield* claims.commitWithClaim({
+          runId: first[0]!.run.runId,
+          workerId: "fan-out",
+          attemptFence: first[0]!.attemptFence,
+          transition: "complete",
+          result: completedResult("first"),
+        })
+        const second = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
+        expect(second.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[1]])
       }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
     ),
   )

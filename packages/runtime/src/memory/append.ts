@@ -159,6 +159,41 @@ export const makeChildSettled = (childRunId: string, terminalEventId: string) =>
     terminalEventId,
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildSettled" }>, keyof RunEventBase>
 
+export const makeFanOutAdmitted = (
+  fanOutId: string,
+  memberCount: number,
+  concurrency: number,
+  join: import("../fan-out.js").FanOutJoin,
+  remainder: import("../fan-out.js").FanOutRemainder,
+) =>
+  ({
+    _tag: "FanOutAdmitted" as const,
+    fanOutId,
+    memberCount,
+    concurrency,
+    join,
+    remainder,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "FanOutAdmitted" }>, keyof RunEventBase>
+
+export const makeFanOutJoined = (
+  fanOutId: string,
+  status: "succeeded" | "failed" | "cancelled",
+  counts: {
+    readonly succeeded: number
+    readonly failed: number
+    readonly cancelled: number
+    readonly abandoned: number
+  },
+  remainder: ReadonlyArray<{
+    readonly childRunId: string
+    readonly action: "cancellation-requested" | "abandoned"
+  }>,
+) =>
+  ({ _tag: "FanOutJoined" as const, fanOutId, status, ...counts, remainder }) satisfies Omit<
+    Extract<LifecycleEvent, { _tag: "FanOutJoined" }>,
+    keyof RunEventBase
+  >
+
 export const makeCompleted = (
   result: AgentResult,
 ): Omit<Extract<LifecycleEvent, { _tag: "RunCompleted" }>, keyof RunEventBase> =>

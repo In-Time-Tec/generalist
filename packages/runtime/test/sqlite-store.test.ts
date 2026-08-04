@@ -3,7 +3,7 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Exit, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Errors, Runtime, RunStore } from "../src/index.js"
-import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../src/sql/schema.js"
+import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum, steeringSchemaChecksum } from "../src/sql/schema.js"
 import { markDirty } from "../src/sql/migrate.js"
 import { layer as sqliteClientLayer } from "../src/sql/bun-client.js"
 import { assistantAddress, completedResult, openWait, textPrompt } from "./helpers.js"
@@ -40,6 +40,38 @@ it.live("migrates and reopens a durable sqlite store", () =>
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
     void second
   }).pipe(Effect.asVoid),
+)
+
+it.live("upgrades an immutable version 2 SQLite fixture through migration 3", () =>
+  Effect.gen(function* () {
+    expect(steeringSchemaChecksum()).toBe("01852e12f9feec6a47b4aad61a90b3b6061e032d870b763718df813c969000f7")
+    const filename = tempDbPath("migrate-v2-v3")
+    yield* Effect.scoped(Effect.provide(Runtime.Runtime, sqliteLayer(filename)))
+    const fixture = new Database(filename)
+    fixture.run("DROP TABLE baton_fan_out_members")
+    fixture.run("DROP TABLE baton_fan_outs")
+    fixture.run("DELETE FROM baton_sql_migrations WHERE migration_id = 3")
+    fixture.run(`UPDATE ${SCHEMA_META_TABLE} SET version = 2, checksum = ?, dirty = 0 WHERE id = 1`, [
+      steeringSchemaChecksum(),
+    ])
+    fixture.close()
+
+    yield* Effect.scoped(Effect.provide(Runtime.Runtime, sqliteLayer(filename)))
+    const upgraded = new Database(filename)
+    const meta = upgraded
+      .query<
+        { version: number; checksum: string },
+        []
+      >(`SELECT version, checksum FROM ${SCHEMA_META_TABLE} WHERE id = 1`)
+      .get()
+    expect(meta).toEqual({ version: SCHEMA_VERSION, checksum: schemaChecksum() })
+    expect(
+      upgraded
+        .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'baton_fan_outs'")
+        .get(),
+    ).toEqual({ name: "baton_fan_outs" })
+    upgraded.close()
+  }),
 )
 
 it.live("persists decoded finish parts that omit an undefined response", () =>
@@ -316,8 +348,8 @@ it.live("response signal and cancel bypass the lane", () =>
       yield* runtime.signal({ runId: waiting.runId, name: "signal-me" })
       expect((yield* runtime.inspect(waiting.runId)).status).toBe("running")
       yield* runtime.cancel({ runId: waiting.runId, reason: "stop" })
-      expect((yield* runtime.inspect(waiting.runId)).status).toBe("cancelled")
-      expect((yield* runtime.inspect(successor.runId)).status).toBe("running")
+      expect((yield* runtime.inspect(waiting.runId)).status).toBe("cancelling")
+      expect((yield* runtime.inspect(successor.runId)).status).toBe("queued")
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
   }).pipe(Effect.asVoid),
 )

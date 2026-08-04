@@ -15,6 +15,7 @@ import {
   HandoffProjectionInvalid as Handoff_ProjectionInvalid,
   executeSameRunHandoff as Handoff_executeSameRunHandoff,
   HandoffRejected as Handoff_Rejected,
+  FanOutUnsatisfied as Handoff_FanOutUnsatisfied,
 } from "./handoff.js"
 export const Handoff = {
   register: Handoff_register,
@@ -33,6 +34,7 @@ export const Handoff = {
   HandoffProjectionInvalid: Handoff_ProjectionInvalid,
   executeSameRunHandoff: Handoff_executeSameRunHandoff,
   HandoffRejected: Handoff_Rejected,
+  FanOutUnsatisfied: Handoff_FanOutUnsatisfied,
 } as typeof import("./handoff.js")
 export namespace Handoff {
   export type register = typeof import("./handoff.js").register
@@ -47,6 +49,12 @@ export namespace Handoff {
   export type RegistrationError = import("./handoff.js").RegistrationError
   export type FanOutChild = import("./handoff.js").FanOutChild
   export type FanOutOptions = import("./handoff.js").FanOutOptions
+  export type FanOutAllSuccessOptions = import("./handoff.js").FanOutAllSuccessOptions
+  export type FanOutCollectOptions = import("./handoff.js").FanOutCollectOptions
+  export type FanOutJoin = import("./handoff.js").FanOutJoin
+  export type FanOutRemainder = import("./handoff.js").FanOutRemainder
+  export type FanOutMemberResult = import("./handoff.js").FanOutMemberResult
+  export type FanOutUnsatisfied = import("./handoff.js").FanOutUnsatisfied
   export type Supervisor<R> = import("./handoff.js").Supervisor<R>
   export type SupervisorOptions = import("./handoff.js").SupervisorOptions
   export type HandoffTarget = import("./handoff.js").HandoffTarget

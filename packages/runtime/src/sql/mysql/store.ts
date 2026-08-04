@@ -41,6 +41,7 @@ import {
 } from "../errors.js"
 import { check as checkSchema } from "./run-schema.js"
 import { makeMysqlClaims } from "./store-claims.js"
+import { admitFanOut, inspectFanOut } from "../store-fan-out.js"
 
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
@@ -332,6 +333,14 @@ export const makeMysqlServices = (
       claimExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(claimExecution(input)))),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
       saveExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(saveExecution(input)))),
+      admitFanOut: (input) =>
+        run(
+          lockNamed(
+            `baton:fanout:${input.parentRunId}`,
+            lockRun(input.parentRunId).pipe(Effect.andThen(admitFanOut(transactionHub, input))),
+          ),
+        ),
+      inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
     })
     return { store, claims: makeMysqlClaims({ sql, hub: transactionHub, run, lockParent, clearClaim }) }
   })

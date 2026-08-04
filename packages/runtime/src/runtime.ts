@@ -18,11 +18,16 @@ import type {
   RuntimeUnavailable,
   SubscriberLagged,
   WaitNotOpen,
+  FanOutConflict,
+  FanOutInvalid,
+  FanOutNotFound,
+  FanOutRemainderUnsupported,
 } from "./errors.js"
 import type { Metadata } from "./message.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunEvent } from "./run-event.js"
 import type { WaitResolution } from "./run-wait.js"
+import type { FanOutInput, FanOutInspection, FanOutReceipt } from "./fan-out.js"
 
 export interface AgentRegistration {
   readonly ref: AgentRef
@@ -118,6 +123,17 @@ export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable
 export type CancelError = RunNotFound | RuntimeUnavailable
 export type SteerError = RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
+export type FanOutError =
+  | RunNotFound
+  | RunTerminal
+  | AgentVersionUnavailable
+  | AgentNotRegistered
+  | FanOutConflict
+  | FanOutInvalid
+  | FanOutRemainderUnsupported
+  | RuntimeUnavailable
+export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable
+export type AwaitFanOutError = InspectFanOutError | EventsError
 
 export interface Interface {
   readonly send: (input: SendInput) => Effect.Effect<RunReceipt, SendError>
@@ -131,6 +147,9 @@ export interface Interface {
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
   readonly steer: (input: SteerInput) => Effect.Effect<void, SteerError>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
+  readonly fanOut: (input: FanOutInput) => Effect.Effect<FanOutReceipt, FanOutError>
+  readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, InspectFanOutError>
+  readonly awaitFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, AwaitFanOutError>
 }
 
 export class Runtime extends Context.Service<Runtime, Interface>()("@batonfx/runtime/Runtime") {}

@@ -36,6 +36,10 @@ export const makeMysqlClaims = (input: {
                   WHERE JSON_UNQUOTE(JSON_EXTRACT(l.queue_json, '$[0]')) = r.run_id
                 )
               )
+              AND (
+                NOT EXISTS (SELECT 1 FROM baton_fan_out_members fm WHERE fm.child_run_id = r.run_id)
+                OR EXISTS (SELECT 1 FROM baton_fan_out_members fm WHERE fm.child_run_id = r.run_id AND fm.status = 'running')
+              )
               AND r.status IN ('queued', 'running', 'needs-resolution', 'cancelling')
               AND r.cancellation_requested = 0
               AND (r.owner_worker_id IS NULL OR r.lease_expires_at IS NULL OR r.lease_expires_at < NOW(3))
@@ -89,6 +93,7 @@ export const makeMysqlClaims = (input: {
             SELECT run_id FROM baton_runs
             WHERE run_id = ${leaseInput.runId} AND owner_worker_id = ${leaseInput.workerId}
               AND attempt_fence = ${leaseInput.attemptFence}
+              AND cancellation_requested = 0
               AND status NOT IN ('succeeded', 'failed', 'cancelled')
             FOR UPDATE
           `

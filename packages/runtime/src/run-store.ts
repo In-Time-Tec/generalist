@@ -14,6 +14,9 @@ import type {
   SubscriberLagged,
   SteeringConflict,
   WaitNotOpen,
+  FanOutConflict,
+  FanOutInvalid,
+  FanOutNotFound,
 } from "./errors.js"
 import type { Message } from "./message.js"
 import type { RunInspection, RunReceipt, RunStatus } from "./run.js"
@@ -26,6 +29,7 @@ import type { OperationKind, OperationRecord, OperationStatus, ReplayPolicy } fr
 import type { AgentEvent, DurableDriver } from "@batonfx/core"
 import type { ExecutionContinuation, SteeringEntry } from "./steering.js"
 import type { Prompt } from "effect/unstable/ai"
+import type { AdmitFanOutInput, FanOutInspection, FanOutReceipt } from "./fan-out.js"
 
 export type Durability = "ephemeral" | "durable"
 export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
@@ -213,6 +217,13 @@ export interface Interface {
       readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
     },
   ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | import("./sql/errors.js").StaleClaim>
+  readonly admitFanOut: (
+    input: AdmitFanOutInput,
+  ) => Effect.Effect<
+    FanOutReceipt,
+    RunNotFound | RunTerminal | AgentVersionUnavailable | FanOutConflict | FanOutInvalid | RuntimeUnavailable
+  >
+  readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, FanOutNotFound | RuntimeUnavailable>
 }
 
 export class RunStore extends Context.Service<RunStore, Interface>()("@batonfx/runtime/RunStore") {}

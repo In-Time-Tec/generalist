@@ -6,6 +6,7 @@ import { RunId } from "./run.js"
 import { RunWait, WaitResolution } from "./run-wait.js"
 import { Address } from "./address.js"
 import { ModelTelemetry } from "@batonfx/core"
+import { FanOutJoin, FanOutRemainder } from "./fan-out.js"
 
 export type { AgentLoopEvent, AgentResult }
 
@@ -77,6 +78,27 @@ export type ChildSettled = RunEventBase & {
   readonly childRunId: string
   readonly terminalEventId: string
 }
+export type FanOutAdmitted = RunEventBase & {
+  readonly _tag: "FanOutAdmitted"
+  readonly fanOutId: string
+  readonly memberCount: number
+  readonly concurrency: number
+  readonly join: FanOutJoin
+  readonly remainder: FanOutRemainder
+}
+export type FanOutJoined = RunEventBase & {
+  readonly _tag: "FanOutJoined"
+  readonly fanOutId: string
+  readonly status: "succeeded" | "failed" | "cancelled"
+  readonly succeeded: number
+  readonly failed: number
+  readonly cancelled: number
+  readonly abandoned: number
+  readonly remainder: ReadonlyArray<{
+    readonly childRunId: string
+    readonly action: "cancellation-requested" | "abandoned"
+  }>
+}
 export type RunCompleted = RunEventBase & {
   readonly _tag: "RunCompleted"
   readonly result: AgentResult
@@ -102,6 +124,8 @@ export type LifecycleEvent =
   | OperationUnknown
   | ChildLinked
   | ChildSettled
+  | FanOutAdmitted
+  | FanOutJoined
   | RunCompleted
   | RunFailed
   | RunCancellationRequested
@@ -117,6 +141,8 @@ export const LifecycleTag = Schema.Literals([
   "OperationUnknown",
   "ChildLinked",
   "ChildSettled",
+  "FanOutAdmitted",
+  "FanOutJoined",
   "RunCompleted",
   "RunFailed",
   "RunCancellationRequested",
@@ -288,6 +314,27 @@ const LifecycleEventSchema = Schema.Union([
   Schema.TaggedStruct("OperationUnknown", { operationId: Schema.String }),
   Schema.TaggedStruct("ChildLinked", { childRunId: RunId, invocationId: Schema.String }),
   Schema.TaggedStruct("ChildSettled", { childRunId: RunId, terminalEventId: Schema.String }),
+  Schema.TaggedStruct("FanOutAdmitted", {
+    fanOutId: Schema.String,
+    memberCount: Schema.Finite,
+    concurrency: Schema.Finite,
+    join: FanOutJoin,
+    remainder: FanOutRemainder,
+  }),
+  Schema.TaggedStruct("FanOutJoined", {
+    fanOutId: Schema.String,
+    status: Schema.Literals(["succeeded", "failed", "cancelled"]),
+    succeeded: Schema.Finite,
+    failed: Schema.Finite,
+    cancelled: Schema.Finite,
+    abandoned: Schema.Finite,
+    remainder: Schema.Array(
+      Schema.Struct({
+        childRunId: RunId,
+        action: Schema.Literals(["cancellation-requested", "abandoned"]),
+      }),
+    ),
+  }),
   Schema.TaggedStruct("RunCompleted", { result: AgentResultSchema }),
   Schema.TaggedStruct("RunFailed", { error: RunFailure }),
   Schema.TaggedStruct("RunCancellationRequested", { reason: Schema.optionalKey(Schema.String) }),

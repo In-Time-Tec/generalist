@@ -26,7 +26,7 @@ export const layer: Layer.Layer<ActiveExecutions> = Layer.effect(
         SynchronizedRef.get(active).pipe(
           Effect.flatMap((current) => {
             const fiber = current.get(runId)
-            return fiber === undefined ? Effect.void : Effect.sync(() => fiber.interruptUnsafe())
+            return fiber === undefined ? Effect.void : Fiber.interrupt(fiber).pipe(Effect.asVoid)
           }),
         ),
     })

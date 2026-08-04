@@ -1,3 +1,4 @@
+/* oxlint-disable no-accumulating-spread */
 import { DateTime, Effect, Equal, Option } from "effect"
 import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../errors.js"
 import { isTerminal } from "../run.js"
@@ -20,6 +21,7 @@ import {
 } from "./append.js"
 import { afterTerminal } from "./lanes.js"
 import type { MemoryState, StoredRun } from "./state.js"
+import { reconcileFanOut } from "./store-fan-out.js"
 
 const getRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -40,6 +42,29 @@ const settleParentChild = (
     if (already) return state
     const [, next] = yield* appendLifecycle(state, parent.runId, makeChildSettled(child.runId, terminalEventId))
     return next
+  })
+
+const hasRunningOwnedFanOut = (state: MemoryState, runId: string): boolean =>
+  [...state.fanOuts.values()].some((fanOut) => fanOut.parentRunId === runId && fanOut.status === "running")
+
+const finalizeCancellingParent = (state: MemoryState, runId: string): Effect.Effect<MemoryState, RuntimeUnavailable> =>
+  Effect.gen(function* () {
+    const run = state.runs.get(runId)
+    if (
+      run === undefined ||
+      run.status !== "cancelling" ||
+      run.ownerId !== undefined ||
+      hasRunningOwnedFanOut(state, runId)
+    ) {
+      return state
+    }
+    const [event, cancelled] = yield* appendLifecycle(state, runId, makeCancelled(run.cancelReason), "cancelled")
+    let next = cancelled
+    const settled = next.runs.get(runId)!
+    next = yield* settleParentChild(next, settled, event.eventId)
+    next = yield* reconcileFanOut(next, settled, event)
+    next = yield* afterTerminal(next, settled)
+    return settled.parentRunId === undefined ? next : yield* finalizeCancellingParent(next, settled.parentRunId)
   })
 
 export const respond = (
@@ -120,13 +145,24 @@ export const cancel = (
         next,
         run.runId,
         makeCancellationRequested(input.reason),
-        run.status === "queued" ? "cancelling" : "cancelling",
+        "cancelling",
       )
       next = requested
     }
+    for (const fanOut of next.fanOuts.values()) {
+      if (fanOut.parentRunId !== run.runId || fanOut.status !== "running") continue
+      for (const member of fanOut.members) {
+        if (member.status === "abandoned") continue
+        const child = next.runs.get(member.childRunId)
+        if (child !== undefined && !isTerminal(child.status)) {
+          next = yield* cancel(next, { runId: child.runId, reason: input.reason ?? "parent cancelled" })
+        }
+      }
+    }
+    if (run.ownerId !== undefined && (run.status === "running" || run.status === "cancelling")) return next
     const current = next.runs.get(run.runId)
-    if (current === undefined || isTerminal(current.status)) return next
-    const [, cancelled] = yield* appendLifecycle(
+    if (current === undefined || isTerminal(current.status) || hasRunningOwnedFanOut(next, run.runId)) return next
+    const [event, cancelled] = yield* appendLifecycle(
       next,
       run.runId,
       makeCancelled(input.reason ?? current.cancelReason),
@@ -136,6 +172,8 @@ export const cancel = (
     const settled = next.runs.get(run.runId)
     if (settled?.terminalEventId !== undefined) {
       next = yield* settleParentChild(next, settled, settled.terminalEventId)
+      next = yield* reconcileFanOut(next, settled, event)
+      if (settled.parentRunId !== undefined) next = yield* finalizeCancellingParent(next, settled.parentRunId)
     }
     if (settled !== undefined) {
       next = yield* afterTerminal(next, settled)
@@ -152,16 +190,27 @@ export const complete = (
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
     if (run.cancellationRequested) {
-      return yield* cancel(state, {
-        runId: run.runId,
-        ...(run.cancelReason === undefined ? {} : { reason: run.cancelReason }),
-      })
+      if (hasRunningOwnedFanOut(state, run.runId)) {
+        const runs = new Map(state.runs)
+        const { ownerId: _, ...released } = run
+        runs.set(run.runId, released)
+        return { ...state, runs }
+      }
+      const [event, cancelled] = yield* appendLifecycle(state, run.runId, makeCancelled(run.cancelReason), "cancelled")
+      let next = cancelled
+      const settled = next.runs.get(run.runId)!
+      next = yield* settleParentChild(next, settled, event.eventId)
+      next = yield* reconcileFanOut(next, settled, event)
+      if (settled.parentRunId !== undefined) next = yield* finalizeCancellingParent(next, settled.parentRunId)
+      return yield* afterTerminal(next, settled)
     }
     const [event, completed] = yield* appendLifecycle(state, run.runId, makeCompleted(input.result), "succeeded")
     let next = completed
     const settled = next.runs.get(run.runId)
     if (settled !== undefined) {
       next = yield* settleParentChild(next, settled, event.eventId)
+      next = yield* reconcileFanOut(next, settled, event)
+      if (settled.parentRunId !== undefined) next = yield* finalizeCancellingParent(next, settled.parentRunId)
       next = yield* afterTerminal(next, settled)
     }
     return next
@@ -176,16 +225,27 @@ export const fail = (
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
     if (run.cancellationRequested) {
-      return yield* cancel(state, {
-        runId: run.runId,
-        ...(run.cancelReason === undefined ? {} : { reason: run.cancelReason }),
-      })
+      if (hasRunningOwnedFanOut(state, run.runId)) {
+        const runs = new Map(state.runs)
+        const { ownerId: _, ...released } = run
+        runs.set(run.runId, released)
+        return { ...state, runs }
+      }
+      const [event, cancelled] = yield* appendLifecycle(state, run.runId, makeCancelled(run.cancelReason), "cancelled")
+      let next = cancelled
+      const settled = next.runs.get(run.runId)!
+      next = yield* settleParentChild(next, settled, event.eventId)
+      next = yield* reconcileFanOut(next, settled, event)
+      if (settled.parentRunId !== undefined) next = yield* finalizeCancellingParent(next, settled.parentRunId)
+      return yield* afterTerminal(next, settled)
     }
     const [event, failed] = yield* appendLifecycle(state, run.runId, makeFailed(input.error), "failed")
     let next = failed
     const settled = next.runs.get(run.runId)
     if (settled !== undefined) {
       next = yield* settleParentChild(next, settled, event.eventId)
+      next = yield* reconcileFanOut(next, settled, event)
+      if (settled.parentRunId !== undefined) next = yield* finalizeCancellingParent(next, settled.parentRunId)
       next = yield* afterTerminal(next, settled)
     }
     return next

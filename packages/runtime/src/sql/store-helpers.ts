@@ -1,5 +1,6 @@
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 import { eventIdFor, type AgentLoopEvent, type AgentResult, type RunEvent, type RunFailure } from "../run-event.js"
 import type { AgentRef } from "../agent-ref.js"
 import type { Message } from "../message.js"
@@ -21,6 +22,7 @@ import { WaitResolution, type RunWait } from "../run-wait.js"
 import { Schema } from "effect"
 import type { OperationRecord } from "./operations.js"
 import { decodeContinuation } from "../steering.js"
+import { reconcileFanOut } from "./store-fan-out.js"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -232,12 +234,16 @@ export const afterTerminal = (hub: EventHub, run: DecodedRun) =>
     yield* promoteHead(hub, run.address, run.sessionId)
   })
 
-export const settleParent = (hub: EventHub, child: DecodedRun, terminalEventId: string) =>
+export const settleParent = (
+  hub: EventHub,
+  child: DecodedRun,
+  terminalEventId: string,
+): Effect.Effect<void, SqlError, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     if (child.parentRunId === undefined) return
     const sql = yield* SqlClient.SqlClient
     const parent = yield* loadRun(child.parentRunId)
-    if (parent === undefined || isTerminal(parent.status)) return
+    if (parent === undefined) return
     const existing = yield* sql<{ child_run_id: string }>`
       SELECT child_run_id FROM baton_run_links
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId} AND terminal_event_id IS NOT NULL
@@ -249,11 +255,32 @@ export const settleParent = (hub: EventHub, child: DecodedRun, terminalEventId: 
       SET terminal_event_id = ${terminalEventId}, settled_at = ${settledAt}
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId}
     `
-    yield* appendEvent(hub, parent, {
-      _tag: "ChildSettled",
-      childRunId: child.runId,
-      terminalEventId,
-    })
+    if (!isTerminal(parent.status)) {
+      yield* appendEvent(hub, parent, {
+        _tag: "ChildSettled",
+        childRunId: child.runId,
+        terminalEventId,
+      })
+    }
+    yield* reconcileFanOut(hub, child.runId, terminalEventId)
+    const currentParent = yield* loadRun(parent.runId)
+    if (currentParent?.status !== "cancelling" || currentParent.ownerWorkerId !== undefined) return
+    const running = yield* sql<{ fan_out_id: string }>`
+      SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${parent.runId} AND status = 'running' LIMIT 1
+    `
+    if (running.length > 0) return
+    const cancelled = yield* appendEvent(
+      hub,
+      currentParent,
+      {
+        _tag: "RunCancelled",
+        ...(currentParent.cancelReason === undefined ? {} : { reason: currentParent.cancelReason }),
+      },
+      "cancelled",
+    )
+    const settledParent = (yield* loadRun(parent.runId))!
+    yield* settleParent(hub, settledParent, cancelled.eventId)
+    yield* afterTerminal(hub, settledParent)
   })
 
 export const insertRun = (input: {
