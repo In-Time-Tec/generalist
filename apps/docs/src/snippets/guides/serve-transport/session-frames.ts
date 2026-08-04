@@ -1,10 +1,10 @@
 import { Console, Effect, Layer, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Approvals, Chat, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
-import { Address, AgentHost, AgentRef, Cursor, RunStore, Runtime } from "@batonfx/runtime"
+import { Address, AgentHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "@batonfx/runtime"
 
 const agent = Agent.make({ name: "chat-agent" })
-const agentRef = AgentRef.make({ id: "chat-agent", version: "1", digest: "sha256:chat-agent" })
+const executable = ExecutableManifest.makeTest("chat-agent", "1")
 const agentAddress = Address.make("agent:chat")
 const usage = Response.Usage.make({
   inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
@@ -36,8 +36,8 @@ const agentServices = Layer.mergeAll(
 )
 
 const runtimeLayer = Runtime.layerMemory({
-  agents: [{ ref: agentRef, agent, services: agentServices }],
-  addresses: [{ address: agentAddress, agent: agentRef }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
+  addresses: [{ address: agentAddress, executable }],
 })
 
 const collectRun = (runId: string, cursor?: number) =>

@@ -1,19 +1,30 @@
 import { Schema } from "effect"
 import { Address } from "./address.js"
 import { Cursor } from "./cursor.js"
-import { AgentRef } from "./agent-ref.js"
-import { RunId } from "./run.js"
+import { ExecutableRef } from "./executable-manifest.js"
 import { TreeCursor } from "./tree-cursor.js"
 
 export class AddressNotFound extends Schema.TaggedErrorClass<AddressNotFound>()("@batonfx/runtime/AddressNotFound", {
   address: Address,
 }) {}
 
-export class AgentVersionUnavailable extends Schema.TaggedErrorClass<AgentVersionUnavailable>()(
-  "@batonfx/runtime/AgentVersionUnavailable",
+export class ExecutablePinMissing extends Schema.TaggedErrorClass<ExecutablePinMissing>()(
+  "@batonfx/runtime/ExecutablePinMissing",
+  { runId: Schema.String, ref: ExecutableRef },
+) {}
+
+export class ExecutableIdentityMismatch extends Schema.TaggedErrorClass<ExecutableIdentityMismatch>()(
+  "@batonfx/runtime/ExecutableIdentityMismatch",
   {
-    agent: AgentRef,
+    runId: Schema.String,
+    expectedRef: ExecutableRef,
+    actualRef: ExecutableRef,
   },
+) {}
+
+export class AgentExecutionFailure extends Schema.TaggedErrorClass<AgentExecutionFailure>()(
+  "@batonfx/runtime/AgentExecutionFailure",
+  { message: Schema.String, cause: Schema.optionalKey(Schema.Defect()) },
 ) {}
 
 export class IdempotencyConflict extends Schema.TaggedErrorClass<IdempotencyConflict>()(
@@ -27,8 +38,8 @@ export class IdempotencyConflict extends Schema.TaggedErrorClass<IdempotencyConf
 ) {}
 
 export class RunIdConflict extends Schema.TaggedErrorClass<RunIdConflict>()("@batonfx/runtime/RunIdConflict", {
-  runId: RunId,
-  existingRunId: RunId,
+  runId: Schema.String,
+  existingRunId: Schema.String,
 }) {}
 
 export class RunNotFound extends Schema.TaggedErrorClass<RunNotFound>()("@batonfx/runtime/RunNotFound", {
@@ -40,8 +51,13 @@ export class RunTerminal extends Schema.TaggedErrorClass<RunTerminal>()("@batonf
   status: Schema.Literals(["succeeded", "failed", "cancelled"]),
 }) {}
 
+export class ChildSelectionMissing extends Schema.TaggedErrorClass<ChildSelectionMissing>()(
+  "@batonfx/runtime/ChildSelectionMissing",
+  { parentRunId: Schema.String, selection: Schema.String },
+) {}
+
 export class SteeringConflict extends Schema.TaggedErrorClass<SteeringConflict>()("@batonfx/runtime/SteeringConflict", {
-  runId: RunId,
+  runId: Schema.String,
   idempotencyKey: Schema.String,
 }) {}
 
@@ -55,6 +71,11 @@ export class ResponseConflict extends Schema.TaggedErrorClass<ResponseConflict>(
   waitId: Schema.String,
 }) {}
 
+export class OperationResolutionConflict extends Schema.TaggedErrorClass<OperationResolutionConflict>()(
+  "@batonfx/runtime/OperationResolutionConflict",
+  { runId: Schema.String, operationId: Schema.String, idempotencyKey: Schema.String },
+) {}
+
 export class CursorExpired extends Schema.TaggedErrorClass<CursorExpired>()("@batonfx/runtime/CursorExpired", {
   runId: Schema.String,
   cursor: Cursor,
@@ -63,12 +84,12 @@ export class CursorExpired extends Schema.TaggedErrorClass<CursorExpired>()("@ba
 
 export class TreeCursorInvalid extends Schema.TaggedErrorClass<TreeCursorInvalid>()(
   "@batonfx/runtime/TreeCursorInvalid",
-  { rootRunId: RunId, cursor: TreeCursor, message: Schema.String },
+  { rootRunId: Schema.String, cursor: TreeCursor, message: Schema.String },
 ) {}
 
 export class TreeCursorExpired extends Schema.TaggedErrorClass<TreeCursorExpired>()(
   "@batonfx/runtime/TreeCursorExpired",
-  { rootRunId: RunId, cursor: TreeCursor, earliestCursor: TreeCursor },
+  { rootRunId: Schema.String, cursor: TreeCursor, earliestCursor: TreeCursor },
 ) {}
 
 export class SubscriberLagged extends Schema.TaggedErrorClass<SubscriberLagged>()("@batonfx/runtime/SubscriberLagged", {
@@ -83,24 +104,8 @@ export class RuntimeUnavailable extends Schema.TaggedErrorClass<RuntimeUnavailab
   },
 ) {}
 
-export class AgentBindingConflict extends Schema.TaggedErrorClass<AgentBindingConflict>()(
-  "@batonfx/runtime/AgentBindingConflict",
-  {
-    address: Address,
-    existing: AgentRef,
-    attempted: AgentRef,
-  },
-) {}
-
-export class AgentNotRegistered extends Schema.TaggedErrorClass<AgentNotRegistered>()(
-  "@batonfx/runtime/AgentNotRegistered",
-  {
-    agent: AgentRef,
-  },
-) {}
-
 export class FanOutConflict extends Schema.TaggedErrorClass<FanOutConflict>()("@batonfx/runtime/FanOutConflict", {
-  parentRunId: RunId,
+  parentRunId: Schema.String,
   idempotencyKey: Schema.String,
   existingFanOutId: Schema.String,
 }) {}

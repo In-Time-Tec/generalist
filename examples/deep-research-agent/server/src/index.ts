@@ -1,7 +1,7 @@
 import { layer } from "@effect/platform-bun/BunHttpServer"
 import { runMain } from "@effect/platform-bun/BunRuntime"
-import { Approvals, Chat, ModelMiddleware, ToolExecutor } from "@batonfx/core"
-import { Address, AgentHost, AgentRef, RunStore, Runtime } from "@batonfx/runtime"
+import { AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "@batonfx/core"
+import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { Sse, Ws } from "@batonfx/transport"
 import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
@@ -9,9 +9,18 @@ import { Persistence } from "effect/unstable/persistence"
 import { agent } from "./agent"
 import { layerOrDeterministic } from "./model"
 import { searchProviderLayer } from "./search-provider"
-import { toolkit, toolkitLayer } from "./tools"
+import { toolkit, toolkitLayer, webSearchTool } from "./tools"
 
-const agentRef = AgentRef.make({ id: "deep-research-agent", version: "1", digest: "sha256:deep-research-agent" })
+const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
+  model: Pins.makeModel({ provider: "openrouter", model: "openai/gpt-4o-mini" }),
+  tools: [{ name: webSearchTool.name, pin: Pins.makeCapability({ tool: webSearchTool.name, version: "1" }) }],
+  skills: [],
+  services: [],
+  policy: { _tag: "Portable", policy: agent.policy.snapshot! },
+  budget: agent.budget ?? {},
+  children: [],
+})
+const executable = ExecutableManifest.make({ root: pinnedAgent.pin, agents: [pinnedAgent] })
 const agentAddress = Address.make("agent:deep-research")
 
 const SendMessageInput = Schema.Struct({
@@ -145,8 +154,8 @@ const agentServices = Layer.mergeAll(
 
 /** @experimental */
 const runtimeLayer = Runtime.layerMemory({
-  agents: [{ ref: agentRef, agent, services: agentServices }],
-  addresses: [{ address: agentAddress, agent: agentRef }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
+  addresses: [{ address: agentAddress, executable }],
 })
 
 /** @experimental */

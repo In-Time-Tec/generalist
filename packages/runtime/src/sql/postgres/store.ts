@@ -4,18 +4,15 @@ import { PgClient } from "@effect/sql-pg"
 import {
   AddressNotFound,
   CursorExpired,
-  AgentVersionUnavailable,
   IdempotencyConflict,
   RunIdConflict,
   ResponseConflict,
-  RunNotFound,
   RunTerminal,
-  RuntimeUnavailable,
   WaitNotOpen,
+  ChildSelectionMissing,
 } from "../../errors.js"
-import { messageDigest } from "../../memory/digest.js"
-import { agentKey } from "../../memory/state.js"
-import type { LayerOptions } from "../../runtime.js"
+import { childDigest, messageDigest } from "../../memory/digest.js"
+import { equals, resolveChild } from "../../executable-manifest.js"
 import { isTerminal } from "../../run.js"
 import { RunStore } from "../../run-store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
@@ -27,13 +24,15 @@ import { NOTIFY_CHANNEL } from "./schema.js"
 import { makePostgresClaims } from "./store-claims.js"
 import { postgresOperations } from "./store-ops.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "../store-execution.js"
-import { decodeRun, loadRunWait } from "../store-helpers.js"
+import { decodeRunEffect, loadRunWait } from "../store-helpers.js"
 import type { WaitResolution } from "../../run-wait.js"
 import { fanOutStoreMethods } from "./store-fan-out.js"
 import { deferCancelledFanOutParent, makeCancelRun } from "./store-cancel.js"
 import { loadTreeHistory } from "../tree-history.js"
 import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
 import { withConsistentSnapshot } from "../inspection-transaction.js"
+import { decodePinnedEffect, decodeStoredPinnedEffect } from "../codecs.js"
+import { suspend } from "./store-suspend.js"
 import {
   afterTerminal,
   appendEvent,
@@ -43,23 +42,15 @@ import {
   loadEventsAfter,
   loadRun,
   lockSpawnParent,
+  requireRun,
   settleParent,
 } from "./pg-helpers.js"
-export interface PostgresStoreOptions extends LayerOptions {
-  readonly url: string
-  readonly source?: string
-}
+import type { PostgresStoreOptions } from "./runtime-layer.js"
 const nextId = (prefix: string) => Effect.sync(() => `${prefix}_${Math.random().toString(36).slice(2)}`)
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
-    const agentRefs = new Map(options.agents.map((entry) => [agentKey(entry.ref), entry.ref] as const))
-    const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.agent] as const))
-    for (const binding of options.addresses) {
-      if (!agentRefs.has(agentKey(binding.agent))) {
-        return yield* Effect.die(new Error(`address ${binding.address} binds unregistered agent`))
-      }
-    }
+    const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     yield* checkSchema(source)
     const hub = yield* makeEventHub()
     yield* Effect.addFinalizer(() => hub.shutdown)
@@ -73,12 +64,6 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       withSql(sql, effect.pipe(Effect.provideService(PgClient.PgClient, pg)))
     const runInspection = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
       withSql(sql, withConsistentSnapshot(sql, "postgres", effect))
-    const requireRun = (runId: string) =>
-      loadRun(runId).pipe(
-        Effect.flatMap((loaded) =>
-          loaded === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(loaded),
-        ),
-      )
     const cancelRun = makeCancelRun({ sql, hub: transactionHub })
     const operations = postgresOperations({
       sql,
@@ -96,15 +81,13 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           Effect.gen(function* () {
             const bound = addressBindings.get(input.message.to)
             if (bound === undefined) return yield* AddressNotFound.make({ address: input.message.to })
-            if (
-              bound.id !== input.agent.id ||
-              bound.version !== input.agent.version ||
-              bound.digest !== input.agent.digest
-            ) {
+            const admitted = yield* decodePinnedEffect({
+              ref: input.executableRef,
+              manifest: input.executableManifest,
+            })
+            const binding = yield* decodePinnedEffect(bound)
+            if (!equals(binding, admitted)) {
               return yield* AddressNotFound.make({ address: input.message.to })
-            }
-            if (!agentRefs.has(agentKey(input.agent))) {
-              return yield* RuntimeUnavailable.make({ message: "agent not registered" })
             }
             yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`admit:${input.message.to}:${input.message.sessionId}:${input.message.idempotencyKey}`}))`
             if (input.runId !== undefined) {
@@ -122,7 +105,11 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               if (input.runId !== undefined && input.runId !== prior.run_id) {
                 return yield* RunIdConflict.make({ runId: input.runId, existingRunId: prior.run_id })
               }
-              if (prior.message_digest !== digest) {
+              const priorExecutable = yield* decodeStoredPinnedEffect(
+                prior.executable_ref_json,
+                prior.executable_manifest_json,
+              )
+              if (prior.message_digest !== digest || !equals(priorExecutable, admitted)) {
                 return yield* IdempotencyConflict.make({
                   address: input.message.to,
                   sessionId: input.message.sessionId,
@@ -149,7 +136,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               status: "queued",
               message: input.message,
               digest,
-              agent: input.agent,
+              executableRef: input.executableRef,
+              executableManifest: input.executableManifest,
               rootRunId: runId,
               acceptedSequence: enqueued.acceptedSequence,
             })
@@ -172,10 +160,15 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
         run(
           Effect.gen(function* () {
             const parent = yield* lockSpawnParent(input.parentRunId)
-            if (!agentRefs.has(agentKey(input.agent))) {
-              return yield* AgentVersionUnavailable.make({ agent: input.agent })
+            const executableRef = resolveChild(parent.executableRef, parent.executableManifest, input.selection)
+            if (executableRef === undefined) {
+              return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: input.selection })
             }
-            const digest = messageDigest(input.message)
+            const digest = childDigest(input.message, executableRef)
+            const executable = yield* decodePinnedEffect({
+              ref: executableRef,
+              manifest: parent.executableManifest,
+            })
             const existing = yield* sql<RunRow>`
               SELECT * FROM baton_runs
               WHERE address = ${input.message.to}
@@ -184,7 +177,11 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             `
             const prior = existing[0]
             if (prior !== undefined) {
-              if (prior.message_digest !== digest) {
+              const priorExecutable = yield* decodeStoredPinnedEffect(
+                prior.executable_ref_json,
+                prior.executable_manifest_json,
+              )
+              if (prior.message_digest !== digest || !equals(priorExecutable, executable)) {
                 return yield* IdempotencyConflict.make({
                   address: input.message.to,
                   sessionId: input.message.sessionId,
@@ -205,7 +202,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               status: "queued",
               message: input.message,
               digest,
-              agent: input.agent,
+              executableRef,
+              executableManifest: parent.executableManifest,
               rootRunId: parent.rootRunId,
               parentRunId: parent.runId,
               invocationId: input.invocationId,
@@ -340,7 +338,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             return {
               runId: loaded.runId,
               status: loaded.status,
-              agent: loaded.agent,
+              executableRef: loaded.executableRef,
+              executableManifest: loaded.executableManifest,
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
               ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
@@ -370,12 +369,13 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
                 : yield* sql<RunRow>`SELECT * FROM baton_runs WHERE status = ${input.status} ORDER BY created_at DESC LIMIT ${input.limit}`
             return yield* Effect.forEach(rows, (row) =>
               Effect.gen(function* () {
-                const loaded = decodeRun(row)
+                const loaded = yield* decodeRunEffect(row)
                 const wait = yield* loadRunWait(loaded.runId, loaded.activeWaitId)
                 return {
                   runId: loaded.runId,
                   status: loaded.status,
-                  agent: loaded.agent,
+                  executableRef: loaded.executableRef,
+                  executableManifest: loaded.executableManifest,
                   lastSequence: loaded.lastSequence,
                   durability: "durable" as const,
                   ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
@@ -455,26 +455,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             yield* afterTerminal(transactionHub, settled)
           }),
         ),
-      wait: (input) =>
-        run(
-          Effect.gen(function* () {
-            yield* requireExecutionClaim(input)
-            const loaded = yield* requireRun(input.runId)
-            if (isTerminal(loaded.status)) {
-              return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
-            }
-            yield* sql`
-              INSERT INTO baton_run_waits (
-                run_id, wait_id, reason, status, response_json, due_at, owner_worker_id, lease_expires_at, opened_at, closed_at
-              ) VALUES (
-                ${loaded.runId}, ${input.wait.waitId}, ${input.wait.reason}, 'open', NULL, NULL, NULL, NULL, NOW(), NULL
-              )
-              ON CONFLICT (run_id, wait_id) DO UPDATE SET
-                status = 'open', reason = EXCLUDED.reason, response_json = NULL, opened_at = EXCLUDED.opened_at, closed_at = NULL
-            `
-            yield* appendEvent(hub, loaded, { _tag: "RunWaiting", wait: input.wait }, "waiting")
-          }),
-        ),
+      suspend: (input) => run(suspend(transactionHub, input)),
       resume: (input) =>
         run(
           Effect.gen(function* () {
@@ -485,7 +466,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             if (loaded.activeWaitId !== input.waitId) {
               return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
             }
-            yield* appendEvent(hub, loaded, { _tag: "RunResumed", waitId: input.waitId }, "running")
+            yield* appendEvent(
+              hub,
+              loaded,
+              { _tag: "RunResumed", waitId: input.waitId, resolution: input.resolution },
+              "running",
+            )
           }),
         ),
       emitAgentEvent: (input) => run(emitAgentEvent(transactionHub, input)),

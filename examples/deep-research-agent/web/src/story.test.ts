@@ -2,7 +2,7 @@
 
 import { Response } from "@batonfx/core"
 import { Chat, Connection } from "@batonfx/foldkit"
-import { AgentRef, RunEvent } from "@batonfx/runtime"
+import { ExecutableManifest, RunEvent } from "@batonfx/runtime"
 import { Prompt } from "effect/unstable/ai"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
@@ -10,14 +10,14 @@ import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } 
 
 const sessionId = "deep-research-story"
 
-const agent = AgentRef.make({ id: "deep-research", version: "1", digest: "sha256:deep-research" })
+const agent = ExecutableManifest.makeTest("deep-research", "1").ref
 const eventFrame = (sequence: number, fields: Record<string, unknown>): RunEvent.RunEvent =>
   ({
     specVersion: "1",
     eventId: `${sessionId}:${sequence}`,
     runId: sessionId,
     sequence,
-    agent,
+    executableRef: agent,
     rootRunId: sessionId,
     occurredAt: "2026-08-03T00:00:00.000Z",
     ...fields,

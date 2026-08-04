@@ -1,6 +1,5 @@
 import { Cause, Clock, Context, Effect, Exit, Layer, Option, Ref, Schema, Stream } from "effect"
-import { type Prompt, Tool } from "effect/unstable/ai"
-import { fromAgent } from "./agent-ref.js"
+import type { Prompt } from "effect/unstable/ai"
 import {
   type DriverCheckpoint,
   type DriverOperation,
@@ -25,14 +24,16 @@ import { CurrentModelCallOrdinal } from "./operation-context.js"
 import { LoopDriverState } from "./loop-driver-state.js"
 import {
   chargeScheduled,
+  applyHandoffCommit,
   chargeUsage as chargeCheckpointUsage,
   makeLoopDriver,
   withBudget,
+  withHandoffState,
   withPending,
 } from "./loop-driver.js"
 import type { Agent } from "../agent/agent.js"
 import type { RunOptions } from "../agent/agent.js"
-import { of as canonicalDigest } from "./canonical-digest.js"
+import type { HandoffControlState } from "../agent/handoff-state.js"
 
 /** @experimental Operation scheduled at one agent-loop effect boundary. */
 export interface OperationSpec {
@@ -93,6 +94,7 @@ export interface Interface {
   readonly setBudget: (budget: RunBudget) => Effect.Effect<void>
   readonly reserveChild: (grant: BudgetLimits) => Effect.Effect<RunBudget, RunBudgetExhausted | RunBudgetGrantWidened>
   readonly refundChild: (child: RunBudget) => Effect.Effect<void>
+  readonly setHandoffState: (state: HandoffControlState) => Effect.Effect<void, DriverStateInvalid>
 }
 
 /** @experimental */
@@ -138,6 +140,7 @@ export const makeInline = (input: {
   Effect.gen(function* () {
     const checkpointRef = yield* Ref.make(input.initial)
     const recordedRef = yield* Ref.make<ReadonlyArray<RecordedOperation>>([])
+    const activePendingRef = yield* Ref.make<string | undefined>(undefined)
     const journal = input.journal ?? noopJournal
     const schedule = (spec: OperationSpec) =>
       Effect.gen(function* () {
@@ -149,11 +152,17 @@ export const makeInline = (input: {
           const pending = makeOperation(state.pending)
           const requested = makeOperation(spec)
           const matches =
-            pending.key !== requested.key ||
-            pending.kind !== requested.kind ||
-            pending.inputDigest !== requested.inputDigest ||
-            pending.replayPolicy !== requested.replayPolicy
-          if (matches) {
+            pending.key === requested.key &&
+            pending.kind === requested.kind &&
+            pending.inputDigest === requested.inputDigest &&
+            pending.replayPolicy === requested.replayPolicy
+          if (!matches) {
+            const activePending = yield* Ref.get(activePendingRef)
+            if (activePending !== pending.key && pending.kind === requested.kind) {
+              return yield* DriverStateInvalid.make({
+                message: `Pending operation ${pending.key} does not match requested operation ${requested.key}`,
+              })
+            }
             const replay = yield* journal.onScheduled(requested, before)
             return { operation: requested, replay, nested: true }
           }
@@ -164,6 +173,7 @@ export const makeInline = (input: {
             })
           }
           const replay = yield* journal.onScheduled(decision.operation, before)
+          if (replay === undefined) yield* Ref.set(activePendingRef, decision.operation.key)
           return { operation: decision.operation, replay, nested: false }
         }
         const nowIso = new Date(yield* Clock.currentTimeMillis).toISOString()
@@ -184,6 +194,7 @@ export const makeInline = (input: {
           })
         }
         const replay = yield* journal.onScheduled(decision.operation, scheduled)
+        if (replay === undefined) yield* Ref.set(activePendingRef, decision.operation.key)
         return { operation: decision.operation, replay, nested: false }
       })
     const commit = (
@@ -193,8 +204,12 @@ export const makeInline = (input: {
     ): Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay> =>
       Effect.gen(function* () {
         yield* guardUnknownNeverReplay(operation, outcome)
-        const before = yield* Ref.get(checkpointRef)
+        let before = yield* Ref.get(checkpointRef)
         if (nested) {
+          if (outcome._tag === "Succeeded" && operation.kind === "handoff") {
+            before = yield* applyHandoffCommit(before, outcome.value)
+            yield* Ref.set(checkpointRef, before)
+          }
           yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: before }])
           yield* journal.onCompleted(operation, outcome, before)
           return
@@ -203,6 +218,7 @@ export const makeInline = (input: {
         yield* Ref.set(checkpointRef, after)
         yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: after }])
         yield* journal.onCompleted(operation, outcome, after)
+        yield* Ref.set(activePendingRef, undefined)
         if (outcome._tag === "Unknown") {
           return yield* DriverError.make({
             message: `Operation ${operation.key} ended unknown and requires host resolution`,
@@ -217,10 +233,11 @@ export const makeInline = (input: {
         const { operation, replay, nested } = yield* schedule(spec)
         if (replay !== undefined) {
           yield* guardUnknownNeverReplay(operation, replay)
-          if (!nested) {
-            const before = yield* Ref.get(checkpointRef)
-            const after = yield* input.driver.apply(before, replay)
-            yield* Ref.set(checkpointRef, after)
+          const before = yield* Ref.get(checkpointRef)
+          if (nested && replay._tag === "Succeeded" && operation.kind === "handoff") {
+            yield* Ref.set(checkpointRef, yield* applyHandoffCommit(before, replay.value))
+          } else if (!nested) {
+            yield* Ref.set(checkpointRef, yield* input.driver.apply(before, replay))
           }
           return yield* replay._tag === "Succeeded"
             ? Effect.succeed(replay.value as A)
@@ -342,6 +359,13 @@ export const makeInline = (input: {
           yield* Ref.set(checkpointRef, after)
           yield* journal.onCheckpoint(after)
         }),
+      setHandoffState: (handoff) =>
+        Effect.gen(function* () {
+          const before = yield* Ref.get(checkpointRef)
+          const after = yield* withHandoffState(before, handoff)
+          yield* Ref.set(checkpointRef, after)
+          yield* journal.onCheckpoint(after)
+        }),
       recorded: Ref.get(recordedRef),
     }
     return interpreter
@@ -376,46 +400,24 @@ export const layerForRun = <Tools extends Record<string, import("effect/unstable
     sessionId,
     ...(options.modelCallOrdinalStart === undefined ? {} : { modelCallOrdinalStart: options.modelCallOrdinalStart }),
   })
-  const agentRef = options.agentRef ?? fromAgent(agent, "inline")
-  const toolSchemaDigests = Effect.try({
-    try: () =>
-      Object.fromEntries(
-        Object.values(agent.toolkit.tools)
-          .map((tool) => [tool.name, canonicalDigest(Tool.getJsonSchema(tool))] as const)
-          .toSorted(([left], [right]) => left.localeCompare(right)),
-      ),
-    catch: (error): DriverStateInvalid =>
-      DriverStateInvalid.make({ message: `Unable to digest Agent tool schemas: ${String(error)}` }),
-  })
   const initial: Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid> = Effect.gen(function* () {
-    const digests = yield* toolSchemaDigests
     if (options.driverCheckpoint === undefined) {
       return yield* driver.initial({
-        agent: agentRef,
+        ...(options.executableRef === undefined ? {} : { executable: options.executableRef }),
         prompt,
         budget: budget ?? allocate({}),
-        execution: {
-          agent: agentRef,
-          driverVersion: currentDriverVersion,
-          checkpointCodecVersion: "1",
-          eventCodecVersion: "1",
-          toolSchemaDigests: digests,
-          ...(agent.model === undefined ? {} : { model: agent.model }),
-          ...(agent.policy.snapshot === undefined ? {} : { portablePolicy: agent.policy.snapshot }),
-          rootBudget: budget ?? allocate({}),
-        },
       })
     }
     const checkpoint = options.driverCheckpoint
+    if (options.executableRef === undefined || checkpoint.executable === undefined) {
+      return yield* DriverStateInvalid.make({
+        message: "Persisted driver checkpoints require an explicit executable identity",
+      })
+    }
     if (
       checkpoint.driverVersion !== currentDriverVersion ||
-      checkpoint.agent.id !== agentRef.id ||
-      checkpoint.agent.version !== agentRef.version ||
-      checkpoint.agent.digest !== agentRef.digest ||
-      checkpoint.execution.driverVersion !== currentDriverVersion ||
-      checkpoint.execution.checkpointCodecVersion !== "1" ||
-      checkpoint.execution.eventCodecVersion !== "1" ||
-      canonicalDigest(checkpoint.execution.toolSchemaDigests) !== canonicalDigest(digests)
+      checkpoint.executable?.executable !== options.executableRef?.executable ||
+      checkpoint.executable?.active !== options.executableRef?.active
     ) {
       return yield* DriverStateInvalid.make({ message: "Persisted driver checkpoint does not match the active Agent" })
     }

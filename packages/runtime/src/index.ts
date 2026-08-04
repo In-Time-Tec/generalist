@@ -12,28 +12,56 @@ export const Address = {
 } as typeof import("./address.js")
 export namespace Address {
   export type Address = import("./address.js").Address
-  export type make = typeof import("./address.js").make
-  export type encode = typeof import("./address.js").encode
-  export type decode = typeof import("./address.js").decode
 }
 
 import {
-  AgentRef as AgentRef_AgentRef,
-  make as AgentRef_make,
-  encode as AgentRef_encode,
-  decode as AgentRef_decode,
-} from "./agent-ref.js"
-export const AgentRef = {
-  AgentRef: AgentRef_AgentRef,
-  make: AgentRef_make,
-  encode: AgentRef_encode,
-  decode: AgentRef_decode,
-} as typeof import("./agent-ref.js")
-export namespace AgentRef {
-  export type AgentRef = import("./agent-ref.js").AgentRef
-  export type make = typeof import("./agent-ref.js").make
-  export type encode = typeof import("./agent-ref.js").encode
-  export type decode = typeof import("./agent-ref.js").decode
+  ExecutableManifest as ExecutableManifest_ExecutableManifest,
+  ExecutableRef as ExecutableManifest_ExecutableRef,
+  PinnedExecutable as ExecutableManifest_PinnedExecutable,
+  make as ExecutableManifest_make,
+  makeTest as ExecutableManifest_makeTest,
+  encode as ExecutableManifest_encode,
+  decode as ExecutableManifest_decode,
+} from "./executable-manifest.js"
+export const ExecutableManifest: Pick<
+  typeof import("./executable-manifest.js"),
+  "ExecutableManifest" | "ExecutableRef" | "PinnedExecutable" | "make" | "makeTest" | "encode" | "decode"
+> = {
+  ExecutableManifest: ExecutableManifest_ExecutableManifest,
+  ExecutableRef: ExecutableManifest_ExecutableRef,
+  PinnedExecutable: ExecutableManifest_PinnedExecutable,
+  make: ExecutableManifest_make,
+  makeTest: ExecutableManifest_makeTest,
+  encode: ExecutableManifest_encode,
+  decode: ExecutableManifest_decode,
+}
+export namespace ExecutableManifest {
+  export type ExecutableManifest = import("./executable-manifest.js").ExecutableManifest
+  export type ExecutableRef = import("./executable-manifest.js").ExecutableRef
+  export type PinnedExecutable = import("./executable-manifest.js").PinnedExecutable
+}
+
+import {
+  ExecutableResolver as ExecutableResolver_ExecutableResolver,
+  Input as ExecutableResolver_Input,
+  Attestation as ExecutableResolver_Attestation,
+  makeStatic as ExecutableResolver_makeStatic,
+  layerTest as ExecutableResolver_layerTest,
+} from "./executable-resolver.js"
+export const ExecutableResolver = {
+  ExecutableResolver: ExecutableResolver_ExecutableResolver,
+  Input: ExecutableResolver_Input,
+  Attestation: ExecutableResolver_Attestation,
+  makeStatic: ExecutableResolver_makeStatic,
+  layerTest: ExecutableResolver_layerTest,
+}
+export namespace ExecutableResolver {
+  export type ExecutableResolver = import("./executable-resolver.js").ExecutableResolver
+  export type Interface = import("./executable-resolver.js").Interface
+  export type Input = import("./executable-resolver.js").Input
+  export type Attestation = import("./executable-resolver.js").Attestation
+  export type Resolution = import("./executable-resolver.js").Resolution
+  export type StaticExecutable = import("./executable-resolver.js").StaticExecutable
 }
 
 import {
@@ -52,10 +80,6 @@ export const Cursor = {
 } as typeof import("./cursor.js")
 export namespace Cursor {
   export type Cursor = import("./cursor.js").Cursor
-  export type origin = typeof import("./cursor.js").origin
-  export type make = typeof import("./cursor.js").make
-  export type encode = typeof import("./cursor.js").encode
-  export type decode = typeof import("./cursor.js").decode
 }
 
 import {
@@ -75,9 +99,6 @@ export const Message = {
 export namespace Message {
   export type Message = import("./message.js").Message
   export type Metadata = import("./message.js").Metadata
-  export type make = typeof import("./message.js").make
-  export type encode = typeof import("./message.js").encode
-  export type decode = typeof import("./message.js").decode
 }
 
 import {
@@ -100,14 +121,13 @@ import {
   encodeSnapshot as Run_encodeSnapshot,
   decodeSnapshot as Run_decodeSnapshot,
 } from "./run.js"
-export const AgentResult = {
+export const AgentResult: { readonly AgentResult: typeof import("./run.js").AgentResult } = {
   AgentResult: AgentResult_AgentResult,
 } as const
 export namespace AgentResult {
   export type AgentResult = import("./run.js").AgentResult
 }
-
-export const RunFailure = {
+export const RunFailure: { readonly RunFailure: typeof import("./run.js").RunFailure } = {
   RunFailure: RunFailure_RunFailure,
 } as const
 export namespace RunFailure {
@@ -146,7 +166,6 @@ export namespace Run {
   export type CompactionInspection = import("./run.js").CompactionInspection
   export type RunSnapshot = import("./run.js").RunSnapshot
   export type Run = import("./run.js").Run
-  export type isTerminal = typeof import("./run.js").isTerminal
 }
 
 import { RunWait as RunWait_RunWait, WaitResolution as RunWait_WaitResolution } from "./run-wait.js"
@@ -205,7 +224,9 @@ export namespace RunEvent {
 
 import {
   AddressNotFound as Errors_AddressNotFound,
-  AgentVersionUnavailable as Errors_AgentVersionUnavailable,
+  ExecutablePinMissing as Errors_ExecutablePinMissing,
+  ExecutableIdentityMismatch as Errors_ExecutableIdentityMismatch,
+  AgentExecutionFailure as Errors_AgentExecutionFailure,
   IdempotencyConflict as Errors_IdempotencyConflict,
   RunIdConflict as Errors_RunIdConflict,
   RunNotFound as Errors_RunNotFound,
@@ -218,12 +239,12 @@ import {
   TreeCursorExpired as Errors_TreeCursorExpired,
   SubscriberLagged as Errors_SubscriberLagged,
   RuntimeUnavailable as Errors_RuntimeUnavailable,
-  AgentBindingConflict as Errors_AgentBindingConflict,
-  AgentNotRegistered as Errors_AgentNotRegistered,
   FanOutConflict as Errors_FanOutConflict,
   FanOutNotFound as Errors_FanOutNotFound,
   FanOutInvalid as Errors_FanOutInvalid,
   FanOutRemainderUnsupported as Errors_FanOutRemainderUnsupported,
+  ChildSelectionMissing as Errors_ChildSelectionMissing,
+  OperationResolutionConflict as Errors_OperationResolutionConflict,
 } from "./errors.js"
 import {
   SchemaDirty as Errors_SchemaDirty,
@@ -236,7 +257,9 @@ import {
 } from "./sql/errors.js"
 export const Errors = {
   AddressNotFound: Errors_AddressNotFound,
-  AgentVersionUnavailable: Errors_AgentVersionUnavailable,
+  ExecutablePinMissing: Errors_ExecutablePinMissing,
+  ExecutableIdentityMismatch: Errors_ExecutableIdentityMismatch,
+  AgentExecutionFailure: Errors_AgentExecutionFailure,
   IdempotencyConflict: Errors_IdempotencyConflict,
   RunIdConflict: Errors_RunIdConflict,
   RunNotFound: Errors_RunNotFound,
@@ -249,12 +272,12 @@ export const Errors = {
   TreeCursorExpired: Errors_TreeCursorExpired,
   SubscriberLagged: Errors_SubscriberLagged,
   RuntimeUnavailable: Errors_RuntimeUnavailable,
-  AgentBindingConflict: Errors_AgentBindingConflict,
-  AgentNotRegistered: Errors_AgentNotRegistered,
   FanOutConflict: Errors_FanOutConflict,
   FanOutNotFound: Errors_FanOutNotFound,
   FanOutInvalid: Errors_FanOutInvalid,
   FanOutRemainderUnsupported: Errors_FanOutRemainderUnsupported,
+  ChildSelectionMissing: Errors_ChildSelectionMissing,
+  OperationResolutionConflict: Errors_OperationResolutionConflict,
   SchemaDirty: Errors_SchemaDirty,
   SchemaChecksumMismatch: Errors_SchemaChecksumMismatch,
   SchemaVersionUnsupported: Errors_SchemaVersionUnsupported,
@@ -265,7 +288,9 @@ export const Errors = {
 } as typeof import("./errors.js") & typeof import("./sql/errors.js")
 export namespace Errors {
   export type AddressNotFound = import("./errors.js").AddressNotFound
-  export type AgentVersionUnavailable = import("./errors.js").AgentVersionUnavailable
+  export type ExecutablePinMissing = import("./errors.js").ExecutablePinMissing
+  export type ExecutableIdentityMismatch = import("./errors.js").ExecutableIdentityMismatch
+  export type AgentExecutionFailure = import("./errors.js").AgentExecutionFailure
   export type IdempotencyConflict = import("./errors.js").IdempotencyConflict
   export type RunIdConflict = import("./errors.js").RunIdConflict
   export type RunNotFound = import("./errors.js").RunNotFound
@@ -278,12 +303,12 @@ export namespace Errors {
   export type TreeCursorExpired = import("./errors.js").TreeCursorExpired
   export type SubscriberLagged = import("./errors.js").SubscriberLagged
   export type RuntimeUnavailable = import("./errors.js").RuntimeUnavailable
-  export type AgentBindingConflict = import("./errors.js").AgentBindingConflict
-  export type AgentNotRegistered = import("./errors.js").AgentNotRegistered
   export type FanOutConflict = import("./errors.js").FanOutConflict
   export type FanOutNotFound = import("./errors.js").FanOutNotFound
   export type FanOutInvalid = import("./errors.js").FanOutInvalid
   export type FanOutRemainderUnsupported = import("./errors.js").FanOutRemainderUnsupported
+  export type ChildSelectionMissing = import("./errors.js").ChildSelectionMissing
+  export type OperationResolutionConflict = import("./errors.js").OperationResolutionConflict
   export type SchemaDirty = import("./sql/errors.js").SchemaDirty
   export type SchemaChecksumMismatch = import("./sql/errors.js").SchemaChecksumMismatch
   export type SchemaVersionUnsupported = import("./sql/errors.js").SchemaVersionUnsupported
@@ -292,7 +317,6 @@ export namespace Errors {
   export type SchemaMigrationFailed = import("./sql/errors.js").SchemaMigrationFailed
   export type StaleClaim = import("./sql/errors.js").StaleClaim
 }
-
 import { Runtime as Runtime_Runtime } from "./runtime.js"
 import { layer as Runtime_layer, layerMemory as Runtime_layerMemory } from "./memory/runtime-layer.js"
 import { layerSqlite as Runtime_layerSqlite } from "./platform-layers.js"
@@ -314,7 +338,6 @@ export namespace Runtime {
   export type Runtime = import("./runtime.js").Runtime
   export type Interface = import("./runtime.js").Interface
   export type LayerOptions = import("./runtime.js").LayerOptions
-  export type AgentRegistration = import("./runtime.js").AgentRegistration
   export type AddressBinding = import("./runtime.js").AddressBinding
   export type SendInput = import("./runtime.js").SendInput
   export type SpawnInput = import("./runtime.js").SpawnInput
@@ -337,16 +360,11 @@ export namespace Runtime {
   export type FanOutMemberInput = import("./fan-out.js").FanOutMemberInput
   export type FanOutError = import("./runtime.js").FanOutError
   export type InspectFanOutError = import("./runtime.js").InspectFanOutError
-  export type layer = typeof import("./memory/runtime-layer.js").layer
-  export type layerMemory = typeof import("./memory/runtime-layer.js").layerMemory
-  export type layerSqlite = typeof import("./platform-layers.js").layerSqlite
-  export type layerPostgres = typeof import("./sql/postgres/runtime-layer.js").layerPostgres
-  export type layerMysql = typeof import("./sql/mysql/runtime-layer.js").layerMysql
   export type SqliteStoreOptions = import("./platform-layers.js").SqliteStoreOptions
   export type PostgresStoreOptions = import("./sql/postgres/runtime-layer.js").PostgresStoreOptions
   export type MysqlStoreOptions = import("./sql/mysql/runtime-layer.js").MysqlStoreOptions
 }
-
+export * as OperationResolution from "./operation-resolution.js"
 import {
   FanOutJoin as FanOut_FanOutJoin,
   FanOutRemainder as FanOut_FanOutRemainder,
@@ -396,27 +414,17 @@ export namespace RunStore {
   export type CompletionOutcome = import("./run-store.js").CompletionOutcome
   export type SteeringEntry = import("./steering.js").SteeringEntry
   export type ExecutionContinuation = import("./steering.js").ExecutionContinuation
-  export type layerMemory = typeof import("./memory/store.js").layerMemory
-  export type layerSqlite = typeof import("./platform-layers.js").layerSqliteStore
 }
-
 import { RunSchema as RunSchema_RunSchema } from "./sql/postgres/run-schema.js"
 export const RunSchema = RunSchema_RunSchema
 export namespace RunSchema {
   export type SchemaPlan = import("./sql/postgres/run-schema.js").SchemaPlan
-  export type plan = typeof import("./sql/postgres/run-schema.js").plan
-  export type check = typeof import("./sql/postgres/run-schema.js").check
-  export type apply = typeof import("./sql/postgres/run-schema.js").apply
 }
 
 import { MysqlRunSchema as MysqlRunSchema_MysqlRunSchema } from "./sql/mysql/run-schema.js"
 export const MysqlRunSchema = MysqlRunSchema_MysqlRunSchema
 export namespace MysqlRunSchema {
   export type SchemaPlan = import("./sql/mysql/run-schema.js").SchemaPlan
-  export type plan = typeof import("./sql/mysql/run-schema.js").plan
-  export type check = typeof import("./sql/mysql/run-schema.js").check
-  export type apply = typeof import("./sql/mysql/run-schema.js").apply
-  export type markDirty = typeof import("./sql/mysql/run-schema.js").markDirty
 }
 
 import { RunClaims as RunClaims_RunClaims } from "./sql/run-claims.js"

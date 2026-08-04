@@ -10,7 +10,8 @@ export const toInspection = (
 ): RunInspection => ({
   runId: run.runId,
   status: run.status,
-  agent: run.agent,
+  executableRef: run.executableRef,
+  executableManifest: run.executableManifest,
   lastSequence: run.lastSequence,
   durability: "ephemeral",
   ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),

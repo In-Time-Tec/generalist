@@ -75,16 +75,15 @@ const withState = (
   budget: RunBudget = checkpoint.budget,
 ): DriverCheckpoint => ({
   driverVersion: checkpoint.driverVersion,
-  agent: checkpoint.agent,
+  ...(checkpoint.executable === undefined ? {} : { executable: checkpoint.executable }),
   turn: checkpoint.turn,
   budget,
-  execution: checkpoint.execution,
   state,
 })
 
 const modelOperation = (checkpoint: DriverCheckpoint, input: unknown) =>
   makeOperation({
-    key: operationKey(["tracer", checkpoint.turn, "model", checkpoint.agent.id]),
+    key: operationKey(["tracer", checkpoint.turn, "model", checkpoint.executable?.active ?? "standalone"]),
     kind: "model",
     input,
     replayPolicy: "provider-idempotent",
@@ -128,17 +127,9 @@ export const makeTracer = (script: ReadonlyArray<TracerModelStep>): DurableAgent
   initial: (input: DriverInput) =>
     Effect.succeed({
       driverVersion: currentDriverVersion,
-      agent: input.agent,
+      ...(input.executable === undefined ? {} : { executable: input.executable }),
       turn: 0,
       budget: input.budget,
-      execution: input.execution ?? {
-        agent: input.agent,
-        driverVersion: currentDriverVersion,
-        checkpointCodecVersion: "1",
-        eventCodecVersion: "1",
-        toolSchemaDigests: {},
-        rootBudget: input.budget,
-      },
       state: {
         promptText: promptText(input.prompt),
         text: "",

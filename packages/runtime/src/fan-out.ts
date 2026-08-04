@@ -1,7 +1,7 @@
+import { Pins } from "@batonfx/core"
 import { Schema } from "effect"
-import { createHash } from "node:crypto"
 import { Prompt } from "effect/unstable/ai"
-import { AgentRef } from "./agent-ref.js"
+import { ExecutableRef } from "./executable-manifest.js"
 import { RunId } from "./run.js"
 
 export const FanOutJoin = Schema.Union([
@@ -31,7 +31,7 @@ export type FanOutMemberStatus = typeof FanOutMemberStatus.Type
 
 export interface FanOutMemberInput {
   readonly key: string
-  readonly agent: AgentRef
+  readonly selection: string
   readonly prompt: Prompt.Prompt | Prompt.RawInput
   readonly sessionId?: string
   readonly metadata?: Readonly<Record<string, unknown>>
@@ -81,7 +81,7 @@ export interface StoredFanOutMember {
   readonly ordinal: number
   readonly key: string
   readonly childRunId: string
-  readonly agent: AgentRef
+  readonly executableRef: ExecutableRef
   readonly prompt: Prompt.Prompt
   readonly sessionId: string
   readonly metadata: Readonly<Record<string, unknown>>
@@ -89,40 +89,40 @@ export interface StoredFanOutMember {
 
 export interface AdmitFanOutInput {
   readonly fanOutId: string
-  readonly digest: string
+  readonly parentRunId: string
+  readonly idempotencyKey: string
+  readonly members: ReadonlyArray<Omit<StoredFanOutMember, "executableRef"> & { readonly selection: string }>
+  readonly concurrency: number
+  readonly join: FanOutJoin
+  readonly remainder: FanOutRemainder
+}
+
+export const fanOutIdFor = (parentRunId: string, idempotencyKey: string): string =>
+  `fanout_${Pins.digest([parentRunId, idempotencyKey]).slice(0, 48)}`
+
+export const childRunIdFor = (fanOutId: string, ordinal: number): string => `${fanOutId}_${ordinal}`
+
+export const digestFanOut = (input: {
   readonly parentRunId: string
   readonly idempotencyKey: string
   readonly members: ReadonlyArray<StoredFanOutMember>
   readonly concurrency: number
   readonly join: FanOutJoin
   readonly remainder: FanOutRemainder
-}
-
-const sha256 = (value: string): string => {
-  return createHash("sha256").update(value).digest("hex")
-}
-
-export const fanOutIdFor = (parentRunId: string, idempotencyKey: string): string =>
-  `fanout_${sha256(JSON.stringify([parentRunId, idempotencyKey])).slice(0, 48)}`
-
-export const childRunIdFor = (fanOutId: string, ordinal: number): string => `${fanOutId}_${ordinal}`
-
-export const digestFanOut = (input: Omit<AdmitFanOutInput, "fanOutId" | "digest">): string =>
-  sha256(
-    JSON.stringify({
-      parentRunId: input.parentRunId,
-      idempotencyKey: input.idempotencyKey,
-      concurrency: input.concurrency,
-      join: input.join,
-      remainder: input.remainder,
-      members: input.members.map((member) => ({
-        ordinal: member.ordinal,
-        key: member.key,
-        childRunId: member.childRunId,
-        agent: member.agent,
-        prompt: Schema.encodeSync(Prompt.Prompt)(member.prompt),
-        sessionId: member.sessionId,
-        metadata: member.metadata,
-      })),
-    }),
-  )
+}): string =>
+  Pins.digest({
+    parentRunId: input.parentRunId,
+    idempotencyKey: input.idempotencyKey,
+    concurrency: input.concurrency,
+    join: input.join,
+    remainder: input.remainder,
+    members: input.members.map((member) => ({
+      ordinal: member.ordinal,
+      key: member.key,
+      childRunId: member.childRunId,
+      executableRef: member.executableRef,
+      prompt: Schema.encodeSync(Prompt.Prompt)(member.prompt),
+      sessionId: member.sessionId,
+      metadata: member.metadata,
+    })),
+  })

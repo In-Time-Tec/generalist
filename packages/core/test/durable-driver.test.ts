@@ -2,11 +2,15 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, AgentRef, DurableDriver, RunBudget, ToolExecutor, TurnPolicy } from "../src/index"
+import { Agent, AgentManifest, DurableDriver, ExecutableManifest, Pins, RunBudget, ToolExecutor } from "../src/index"
 
 import { Json } from "./json.js"
 import { withProviderFinish } from "./provider-finish.js"
 import { unusedToolHandlerLayer } from "./tool-handler-layer.js"
+import { sha256Text } from "../src/durable/canonical-json.js"
+import { edgeCount, incrementEdge } from "../src/agent/handoff-state.js"
+import { applyHandoffCommit } from "../src/durable/loop-driver.js"
+import { makeAgent, makeExecutable } from "../src/durable/pin.js"
 
 const persistenceLayer = Chat.layerPersisted({ storeId: "durable-driver-test" }).pipe(
   Layer.provide(Persistence.layerBackingMemory),
@@ -14,58 +18,309 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "durable-driver-test" })
 
 const roundTrip = (value: unknown): unknown => Json.parse(Json.stringify(value))
 
-describe("AgentRef", () => {
-  it("pins manifest digest and round-trips through JSON", () => {
-    const manifest = AgentRef.manifestFromAgent(
-      Agent.make({
-        name: "assistant",
-        instructions: "Be concise.",
-        toolkit: Toolkit.make(
-          Tool.make("weather", {
-            parameters: Schema.Struct({ city: Schema.String }),
-            success: Schema.String,
-          }),
-        ),
-        policy: TurnPolicy.recurs(3),
-        model: { provider: "openai", model: "gpt-test" },
-        metadata: { team: "core" },
-      }),
-    )
-    const ref = AgentRef.make({ id: "assistant", version: "1", manifest })
-    expect(ref.digest).toHaveLength(8)
-    expect(roundTrip(ref)).toEqual(ref)
-    expect(roundTrip(manifest)).toEqual(manifest)
+describe("executable identity", () => {
+  it("counts handoff edges by structural source and target identity", () => {
+    let counts = new Map<string, ReadonlyMap<string, number>>()
+    counts = new Map(incrementEdge(counts, "a:b", "c"))
+    counts = new Map(incrementEdge(counts, "a", "b:c"))
+    expect(edgeCount(counts, "a:b", "c")).toBe(1)
+    expect(edgeCount(counts, "a", "b:c")).toBe(1)
   })
 
-  it.effect("fromAgent and requireMatch accept identical refs", () =>
+  it.effect("applies an exact handoff commit to control state and active pin together", () => {
+    const root = makeAgent({ name: "a" })
+    const child = makeAgent({ name: "b" })
+    const executable = makeExecutable({ root, child })
+    const transcript = Prompt.make("committed transcript")
+    const commit = {
+      _tag: "HandoffCommit" as const,
+      state: {
+        root: "a",
+        active: "b",
+        path: [{ handoffId: "h1", source: "a", target: "b", turn: 0 }],
+        edgeCounts: [{ source: "a", target: "b", count: 1 }],
+        handoffCount: 1,
+        pendingContinuation: { prompt: Prompt.make("continue"), instructions: "Act as B." },
+      },
+      transcript,
+      targetAgentPin: child,
+    }
+    return Effect.gen(function* () {
+      const checkpoint = yield* applyHandoffCommit(
+        {
+          driverVersion: "1",
+          executable: { executable, active: root },
+          turn: 0,
+          budget: { allocation: { handoffs: 2 }, remaining: { handoffs: 1 }, depth: 0 },
+          state: {
+            logicalOperationId: "run",
+            sessionId: "session",
+            modelCallOrdinal: 0,
+            modelCallOrdinalStart: 0,
+          },
+        },
+        roundTrip(commit),
+      )
+      expect(checkpoint.executable?.active).toBe(child)
+      expect(checkpoint.state).toMatchObject({ handoff: commit.state })
+      expect(checkpoint.budget.remaining.handoffs).toBe(1)
+    })
+  })
+
+  it("matches known SHA-256 vectors", () => {
+    expect(sha256Text("")).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+    expect(sha256Text("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+  })
+  const model = Pins.makeModel({ implementation: "test-model", revision: 1 })
+  const weather = Pins.makeCapability({ implementation: "weather", schema: 1 })
+  const base = (overrides: Partial<Parameters<typeof AgentManifest.make>[0]> = {}) =>
+    AgentManifest.make({
+      name: "assistant",
+      instructions: "Be concise.",
+      model,
+      tools: [{ name: "weather", pin: weather }],
+      skills: [],
+      services: [],
+      policy: { _tag: "Portable", policy: { _tag: "Recurs", count: 3 } },
+      budget: { modelCalls: 4 },
+      children: [],
+      ...overrides,
+    })
+
+  it("pins every manifest dimension and canonicalizes unordered inputs", () => {
+    const original = base()
+    const dimensions = [
+      base({ name: "other" }),
+      base({ instructions: "Other" }),
+      base({ model: Pins.makeModel({ implementation: "other" }) }),
+      base({ tools: [{ name: "weather", pin: Pins.makeCapability({ implementation: "other" }) }] }),
+      base({ skills: [{ name: "research", pin: Pins.makeCapability({ skill: "research" }) }] }),
+      base({ services: [{ name: "clock", pin: Pins.makeCapability({ service: "clock" }) }] }),
+      base({ policy: { _tag: "Portable", policy: { _tag: "Forever" } } }),
+      base({ budget: { modelCalls: 5 } }),
+      base({
+        children: [
+          {
+            selection: "delegate",
+            agent: Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"d".repeat(64)}`),
+          },
+        ],
+      }),
+    ]
+    for (const changed of dimensions) expect(changed.pin).not.toBe(original.pin)
+    const first = Pins.makeCapability({ tool: "first" })
+    const second = Pins.makeCapability({ tool: "second" })
+    expect(
+      base({
+        tools: [
+          { name: "z", pin: second },
+          { name: "a", pin: first },
+        ],
+      }).pin,
+    ).toBe(
+      base({
+        tools: [
+          { name: "a", pin: first },
+          { name: "z", pin: second },
+        ],
+      }).pin,
+    )
+  })
+
+  it("builds from a live Agent only with exact caller-supplied tool pins", () => {
+    const agent = Agent.make({
+      name: "assistant",
+      instructions: "Be concise.",
+      toolkit: Toolkit.make(Tool.make("weather", { parameters: Schema.Struct({ city: Schema.String }) })),
+    })
+    expect(
+      AgentManifest.fromLiveAgent(agent, {
+        model,
+        tools: [{ name: "weather", pin: weather }],
+        skills: [],
+        services: [],
+        policy: { _tag: "Portable", policy: { _tag: "Forever" } },
+        budget: {},
+        children: [],
+      }).manifest.name,
+    ).toBe("assistant")
+    expect(() =>
+      AgentManifest.fromLiveAgent(agent, {
+        model,
+        tools: [],
+        skills: [],
+        services: [],
+        policy: { _tag: "Portable", policy: { _tag: "Forever" } },
+        budget: {},
+        children: [],
+      }),
+    ).toThrow("exactly match")
+    expect(() =>
+      AgentManifest.fromLiveAgent(agent, {
+        model,
+        tools: [{ name: "weather", pin: weather }],
+        skills: [],
+        services: [],
+        policy: { _tag: "Portable", policy: { _tag: "Recurs", count: 1 } },
+        budget: {},
+        children: [],
+      }),
+    ).toThrow("policy snapshot")
+    expect(() =>
+      AgentManifest.fromLiveAgent(Agent.make({ name: "budgeted", budget: { modelCalls: 2 } }), {
+        model,
+        tools: [],
+        skills: [],
+        services: [],
+        policy: { _tag: "Portable", policy: { _tag: "Forever" } },
+        budget: { modelCalls: 3 },
+        children: [],
+      }),
+    ).toThrow("Budget")
+    expect(() =>
+      AgentManifest.fromLiveAgent(agent, {
+        model,
+        tools: [{ name: "weather", pin: weather }],
+        skills: [],
+        services: [],
+        policy: { _tag: "Pinned", pin: Pins.makeCapability("portable-policy") },
+        budget: {},
+        children: [],
+      }),
+    ).toThrow("opaque")
+  })
+
+  it("validates complete closures and rejects duplicate or dangling entries", () => {
+    const agent = base()
+    const executable = ExecutableManifest.make({ root: agent.pin, agents: [agent] })
+    expect(roundTrip(executable)).toEqual(executable)
+    expect(() => ExecutableManifest.make({ root: agent.pin, agents: [agent, agent] })).toThrow("Duplicate")
+    const missing = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"c".repeat(64)}`)
+    expect(() => ExecutableManifest.make({ root: missing, agents: [agent] })).toThrow("Root")
+    expect(() => ExecutableManifest.make({ root: agent.pin, active: missing, agents: [agent] })).toThrow("Active")
+    const dangling = base({ children: [{ selection: "child", agent: missing }] })
+    expect(() => ExecutableManifest.make({ root: dangling.pin, agents: [dangling] })).toThrow("Dangling")
+    expect(() =>
+      ExecutableManifest.make({ root: missing, agents: [{ pin: missing, manifest: agent.manifest }] }),
+    ).toThrow("digest mismatch")
+    const disconnected = base({ name: "disconnected", tools: [] })
+    expect(() => ExecutableManifest.make({ root: agent.pin, agents: [agent, disconnected] })).toThrow("disconnected")
+  })
+
+  it.effect("decodes only a fully verified pinned executable", () =>
     Effect.gen(function* () {
-      const agent = Agent.make({ name: "pin-agent", toolkit: Toolkit.empty })
-      const ref = AgentRef.fromAgent(agent, "7")
-      yield* AgentRef.requireMatch(ref, { ...ref })
-      expect(AgentRef.matches(ref, AgentRef.fromAgent(agent, "7"))).toBe(true)
+      const agent = base()
+      const executable = ExecutableManifest.make({ root: agent.pin, agents: [agent] })
+      expect(yield* ExecutableManifest.decode(roundTrip(executable))).toEqual(executable)
+      const wrongExecutable = {
+        ...executable,
+        ref: { ...executable.ref, executable: ExecutableManifest.makeTest("wrong").ref.executable },
+      }
+      yield* ExecutableManifest.decode(wrongExecutable).pipe(Effect.flip)
+      const altered = {
+        ...executable,
+        manifest: {
+          ...executable.manifest,
+          agents: [{ ...executable.manifest.agents[0]!, manifest: { ...agent.manifest, name: "altered" } }],
+        },
+      }
+      yield* ExecutableManifest.decode(altered).pipe(Effect.flip)
     }),
   )
 
-  it.effect("requireMatch fails typed on version mismatch", () =>
-    Effect.gen(function* () {
-      const agent = Agent.make({ name: "pin-agent", toolkit: Toolkit.empty })
-      const left = AgentRef.fromAgent(agent, "1")
-      const right = AgentRef.fromAgent(agent, "2")
-      const error = yield* AgentRef.requireMatch(left, right).pipe(Effect.flip)
-      expect(error._tag).toBe("@batonfx/core/AgentRefVersionMismatch")
-      expect(error.expected.version).toBe("1")
-      expect(error.actual.version).toBe("2")
-    }),
-  )
+  it("pins root and active selection, canonicalizes entries, and rejects cycles", () => {
+    const child = base({ name: "child", tools: [] })
+    const root = base({ children: [{ selection: "delegate", agent: child.pin }] })
+    const left = ExecutableManifest.make({ root: root.pin, agents: [root, child] })
+    const reordered = ExecutableManifest.make({ root: root.pin, agents: [child, root] })
+    const activeChild = ExecutableManifest.make({ root: root.pin, active: child.pin, agents: [root, child] })
+    expect(left.ref.executable).toBe(reordered.ref.executable)
+    expect(left.ref.executable).toBe(activeChild.ref.executable)
+    expect(activeChild.ref.active).toBe(child.pin)
+    expect("active" in left.manifest).toBe(false)
+    expect(() => ExecutableManifest.validateRef(activeChild.ref, left.manifest)).not.toThrow()
+    const absent = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"d".repeat(64)}`)
+    expect(() => ExecutableManifest.validateRef({ ...left.ref, active: absent }, left.manifest)).toThrow()
 
-  it("changes digest when manifest content changes", () => {
-    const base = Agent.make({ name: "assistant", toolkit: Toolkit.empty })
-    const changed = Agent.make({ name: "assistant", instructions: "new", toolkit: Toolkit.empty })
-    expect(AgentRef.fromAgent(base, "1").digest).not.toBe(AgentRef.fromAgent(changed, "1").digest)
+    const pinA = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"a".repeat(64)}`)
+    const pinB = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"b".repeat(64)}`)
+    const manifestA = { ...base({ name: "a" }).manifest, children: [{ selection: "b", agent: pinB }] }
+    const manifestB = { ...base({ name: "b" }).manifest, children: [{ selection: "a", agent: pinA }] }
+    expect(() =>
+      ExecutableManifest.make({
+        root: pinA,
+        agents: [
+          { pin: pinA, manifest: manifestA },
+          { pin: pinB, manifest: manifestB },
+        ],
+      }),
+    ).toThrow("Cyclic")
+  })
+
+  it("rejects malformed pin kinds, duplicate names and unsupported JSON", () => {
+    expect(() => Schema.decodeUnknownSync(Pins.AgentPin)(String(model))).toThrow()
+    expect(() =>
+      base({
+        tools: [
+          { name: "same", pin: weather },
+          { name: "same", pin: Pins.makeCapability("x") },
+        ],
+      }),
+    ).toThrow("Duplicate")
+    const child = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"e".repeat(64)}`)
+    expect(() =>
+      base({
+        children: [
+          { selection: "same", agent: child },
+          {
+            selection: "same",
+            agent: Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"f".repeat(64)}`),
+          },
+        ],
+      }),
+    ).toThrow("Duplicate child selection")
+    expect(() =>
+      base({
+        children: [
+          { selection: "one", agent: child },
+          { selection: "two", agent: child },
+        ],
+      }),
+    ).toThrow("Duplicate child pin")
+    expect(() => Pins.makeCapability({ invalid: () => undefined })).toThrow("Unsupported value")
+    expect(() => Pins.makeCapability(Symbol("invalid"))).toThrow("Unsupported value")
+    const hidden = { visible: true }
+    Object.defineProperty(hidden, "hidden", { value: true })
+    expect(() => Pins.makeCapability(hidden)).toThrow("Unsupported property")
+    const accessor = {}
+    Object.defineProperty(accessor, "value", { enumerable: true, get: () => true })
+    expect(() => Pins.makeCapability(accessor)).toThrow("Unsupported property")
+    const sparse: Array<unknown> = []
+    sparse.length = 1
+    expect(() => Pins.makeCapability(sparse)).toThrow("Sparse array")
+    const extra = [1]
+    Object.assign(extra, { extra: true })
+    expect(() => Pins.makeCapability(extra)).toThrow("extra array property")
+    const symbolKey = { value: true }
+    Object.defineProperty(symbolKey, Symbol("hidden"), { value: true })
+    expect(() => Pins.makeCapability(symbolKey)).toThrow("symbol property")
+    expect(() =>
+      Schema.decodeUnknownSync(AgentManifest.AgentManifest, { onExcessProperty: "error" })({
+        ...base().manifest,
+        extra: true,
+      }),
+    ).toThrow()
   })
 })
 
 describe("RunBudget", () => {
+  it("rejects negative, fractional, and unsafe dimensions", () => {
+    for (const modelCalls of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => RunBudget.allocate({ modelCalls })).toThrow()
+    }
+    expect(() => RunBudget.make({}, -1)).toThrow()
+  })
+
   it("round-trips through JSON", () => {
     const budget = RunBudget.allocate({ modelCalls: 4, toolCalls: 2, childRuns: 1, depth: 2 })
     expect(roundTrip(budget)).toEqual(budget)
@@ -140,17 +395,7 @@ describe("RunBudget", () => {
 })
 
 describe("DurableDriver tracer", () => {
-  const agentRef = AgentRef.make({
-    id: "tracer",
-    version: "1",
-    manifest: {
-      name: "tracer",
-      toolNames: [],
-    },
-  })
-
   const input = {
-    agent: agentRef,
     prompt: Prompt.make("hello"),
     budget: RunBudget.allocate({ modelCalls: 3, toolCalls: 2 }),
   }
@@ -174,7 +419,7 @@ describe("DurableDriver tracer", () => {
       expect(first._tag).toBe("Execute")
       if (first._tag !== "Execute") return
       expect(first.operation.kind).toBe("model")
-      expect(first.operation.key).toBe(DurableDriver.operationKey(["tracer", 0, "model", agentRef.id]))
+      expect(first.operation.key).toBe(DurableDriver.operationKey(["tracer", 0, "model", "standalone"]))
       const applied = yield* DurableDriver.applyOperation(driver, checkpoint, {
         _tag: "Succeeded",
         value: {},
@@ -234,7 +479,6 @@ describe("DurableDriver tracer", () => {
     Effect.gen(function* () {
       const checkpoint = {
         driverVersion: "0",
-        agent: agentRef,
         turn: 0,
         budget: input.budget,
         state: {},
@@ -313,11 +557,24 @@ const captureJournal = () => {
 }
 
 describe("DurableDriver Agent.stream integration", () => {
+  it.effect("rejects a checkpoint with no executable identity for another standalone Agent", () =>
+    Effect.gen(function* () {
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "first", sessionId: "first" })
+      const checkpoint = yield* driver.initial({ prompt: Prompt.make("first"), budget: RunBudget.allocate({}) })
+      const second = Agent.make({ name: "second" })
+      const failure = yield* Agent.stream(second, { prompt: "second", driverCheckpoint: checkpoint }).pipe(
+        Stream.runDrain,
+        Effect.provide(makeToolCallModelLayer()),
+        Effect.flip,
+      )
+      expect(failure._tag).toBe("@batonfx/core/DriverStateInvalid")
+      expect(failure.message).toContain("explicit executable identity")
+    }),
+  )
+
   for (const kind of ["model", "structured-output"] as const) {
     it.effect(`reconciles a pending ${kind} without recharging its ordinal or budget`, () =>
       Effect.gen(function* () {
-        const agent = Agent.make({ name: `${kind}-replay-agent` })
-        const agentRef = AgentRef.fromAgent(agent, "inline")
         const allocated = RunBudget.allocate({ modelCalls: 3 })
         const charged = yield* RunBudget.charge(allocated, { modelCalls: 1 })
         const logicalOperationId = `${kind}-replay`
@@ -326,17 +583,8 @@ describe("DurableDriver Agent.stream integration", () => {
         const driver = DurableDriver.makeLoopDriver({ logicalOperationId, sessionId: logicalOperationId })
         const checkpoint: DurableDriver.DriverCheckpoint = {
           driverVersion: DurableDriver.currentDriverVersion,
-          agent: agentRef,
           turn: 0,
           budget: charged,
-          execution: {
-            agent: agentRef,
-            driverVersion: DurableDriver.currentDriverVersion,
-            checkpointCodecVersion: "1",
-            eventCodecVersion: "1",
-            toolSchemaDigests: {},
-            rootBudget: allocated,
-          },
           state: {
             logicalOperationId,
             sessionId: logicalOperationId,
@@ -383,6 +631,45 @@ describe("DurableDriver Agent.stream integration", () => {
       }),
     )
   }
+
+  it.effect("rejects a different operation where the persisted pending operation is expected", () =>
+    Effect.gen(function* () {
+      const logicalOperationId = "pending-mismatch"
+      const pending = {
+        kind: "model" as const,
+        key: `${logicalOperationId}:model:0:0`,
+        input: { turn: 0, modelCallOrdinal: 0 },
+        replayPolicy: "provider-idempotent" as const,
+      }
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId, sessionId: logicalOperationId })
+      const interpreter = yield* DurableDriver.makeInline({
+        driver,
+        initial: {
+          driverVersion: DurableDriver.currentDriverVersion,
+          turn: 0,
+          budget: RunBudget.allocate({ modelCalls: 2 }),
+          state: {
+            logicalOperationId,
+            sessionId: logicalOperationId,
+            modelCallOrdinal: 1,
+            modelCallOrdinalStart: 0,
+            pending,
+          },
+        },
+      })
+      const failure = yield* interpreter
+        .run(
+          {
+            ...pending,
+            key: `${logicalOperationId}:model:0:1`,
+            input: { turn: 0, modelCallOrdinal: 1 },
+          },
+          Effect.void,
+        )
+        .pipe(Effect.flip)
+      expect(failure._tag).toBe("@batonfx/core/DriverStateInvalid")
+    }),
+  )
 
   it.effect("records model and tool operations through the driver journal seam", () =>
     Effect.gen(function* () {

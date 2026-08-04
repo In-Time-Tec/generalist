@@ -27,7 +27,7 @@ export const serveTransport = definePage({
     h2("run-in-memory", "1. Run an agent in memory"),
     p(
       code("Runtime.layerMemory"),
-      " registers versioned agents and binds addresses to them. The in-memory process claims admitted work through the provided ",
+      " resolves pinned executable manifests and binds addresses to them. The in-memory process claims admitted work through the provided ",
       code("RunStore"),
       " and executes it with ",
       code("AgentHost"),

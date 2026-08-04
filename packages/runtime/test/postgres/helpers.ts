@@ -1,21 +1,31 @@
 import { Effect, Layer, Redacted } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
-import { Runtime, RuntimeWorker, RunSchema } from "../../src/index.js"
+import { ExecutableResolver, Runtime, RuntimeWorker, RunSchema } from "../../src/index.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../src/sql/postgres/schema.js"
-import { assistant, assistantAddress, assistantRef, researcher, researcherAddress, researcherRef } from "../helpers.js"
+import {
+  analyst,
+  analystRef,
+  assistant,
+  assistantAddress,
+  assistantRef,
+  researcher,
+  researcherAddress,
+  researcherRef,
+} from "../helpers.js"
 
 export const postgresUrl = process.env.BATON_DATABASE_URL ?? process.env.DATABASE_URL
 
 export const postgresAvailable = typeof postgresUrl === "string" && postgresUrl.length > 0
 
-const agents = [
-  { ref: assistantRef, agent: assistant },
-  { ref: researcherRef, agent: researcher },
-]
+const resolver = ExecutableResolver.makeStatic([
+  { executable: assistantRef, agent: assistant },
+  { executable: researcherRef, agent: researcher },
+  { executable: analystRef, agent: analyst },
+])
 const addresses = [
-  { address: assistantAddress, agent: assistantRef },
-  { address: researcherAddress, agent: researcherRef },
+  { address: assistantAddress, executable: assistantRef },
+  { address: researcherAddress, executable: researcherRef },
 ]
 
 export const applySchema = (url: string) =>
@@ -46,7 +56,7 @@ export const postgresLayer = (url: string) =>
   Runtime.layerPostgres({
     url,
     source: "postgres-test",
-    agents,
+    resolver,
     addresses,
     subscriberQueueCapacity: 8,
   })

@@ -26,7 +26,7 @@ export const layerMysql = (
   ).pipe(Layer.provide(client))
   const dependencies = Layer.merge(services, activeExecutionsLayer)
   const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(AgentHost, makeAgentHost({ workerId: "mysql", agents: options.agents })).pipe(
+  const host = Layer.effect(AgentHost, makeAgentHost({ workerId: "mysql", resolver: options.resolver })).pipe(
     Layer.provide(dependencies),
   )
   return Layer.mergeAll(runtime, host, services)

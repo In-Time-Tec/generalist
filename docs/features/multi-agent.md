@@ -33,7 +33,7 @@ The durable driver records `handoff` operations with deterministic keys:
 - `…/handoff/completed/…`
 - `…/handoff/rejected/…`
 
-Each records `handoffId`, source/target `AgentRef` IDs, reason, and turn.
+Each records `handoffId`, source/target `ExecutableRef` IDs, reason, and turn.
 
 After handoff, the target agent's tool registry, permissions, and model selection apply without widening parent authority or budget. Missing catalog entries, projection failures, and missing target requirements fail typed (`HandoffTargetMissing`, `HandoffRejected`, `HandoffRequirementsMissing`, `HandoffProjectionInvalid`, `HandoffLimitExceeded`).
 

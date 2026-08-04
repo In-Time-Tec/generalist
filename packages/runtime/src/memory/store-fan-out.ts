@@ -5,6 +5,7 @@ import {
   FanOutConflict,
   FanOutInvalid,
   FanOutNotFound,
+  ChildSelectionMissing,
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
@@ -25,6 +26,8 @@ import {
   makeFanOutJoined,
 } from "./append.js"
 import type { MemoryState, StoredFanOut, StoredRun } from "./state.js"
+import { resolveChild } from "../executable-manifest.js"
+import { digestFanOut } from "../fan-out.js"
 
 const inspection = (fanOut: StoredFanOut): FanOutInspection => ({
   fanOutId: fanOut.fanOutId,
@@ -51,7 +54,7 @@ export const admitFanOut = (
   input: AdmitFanOutInput,
 ): Effect.Effect<
   readonly [FanOutReceipt, MemoryState],
-  FanOutConflict | FanOutInvalid | RunNotFound | RunTerminal | RuntimeUnavailable
+  FanOutConflict | FanOutInvalid | ChildSelectionMissing | RunNotFound | RunTerminal | RuntimeUnavailable
 > =>
   Effect.gen(function* () {
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
@@ -63,11 +66,21 @@ export const admitFanOut = (
     if (isTerminal(parent.status)) {
       return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
+    const members = [] as Array<import("../fan-out.js").StoredFanOutMember>
+    for (const member of input.members) {
+      const executableRef = resolveChild(parent.executableRef, parent.executableManifest, member.selection)
+      if (executableRef === undefined) {
+        return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: member.selection })
+      }
+      members.push({ ...member, executableRef })
+    }
+    const resolved = { ...input, members }
+    const digest = digestFanOut(resolved)
     const existing = [...state.fanOuts.values()].find(
       (fanOut) => fanOut.parentRunId === input.parentRunId && fanOut.idempotencyKey === input.idempotencyKey,
     )
     if (existing !== undefined) {
-      if (existing.digest !== input.digest) {
+      if (existing.digest !== digest) {
         return yield* FanOutConflict.make({
           parentRunId: input.parentRunId,
           idempotencyKey: input.idempotencyKey,
@@ -87,7 +100,7 @@ export const admitFanOut = (
 
     let next = state
     const memberResults: Array<FanOutMemberResult> = []
-    for (const member of input.members) {
+    for (const member of members) {
       const active = member.ordinal < input.concurrency
       const address = makeAddress(`fanout:${input.fanOutId}`)
       const message = makeMessage({
@@ -102,7 +115,8 @@ export const admitFanOut = (
       const child: StoredRun = {
         runId: member.childRunId,
         status: active ? "running" : "queued",
-        agent: member.agent,
+        executableRef: member.executableRef,
+        executableManifest: parent.executableManifest,
         address,
         message,
         rootRunId: parent.rootRunId,
@@ -149,7 +163,7 @@ export const admitFanOut = (
         status: active ? "running" : "pending",
       })
     }
-    const fanOut: StoredFanOut = { ...input, status: "running", members: memberResults }
+    const fanOut: StoredFanOut = { ...input, digest, status: "running", members: memberResults }
     const fanOuts = new Map(next.fanOuts)
     fanOuts.set(input.fanOutId, fanOut)
     next = { ...next, fanOuts }

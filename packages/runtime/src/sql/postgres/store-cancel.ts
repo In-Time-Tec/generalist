@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import type { PgClient } from "@effect/sql-pg"
 import type { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { RunNotFound } from "../../errors.js"
+import { RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { EventHub } from "../subscribers.js"
 import { afterTerminal, appendEvent, loadRun, settleParent } from "./pg-helpers.js"
@@ -22,7 +22,7 @@ export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readon
   const cancelRun = (
     runId: string,
     reason: string | undefined,
-  ): Effect.Effect<void, RunNotFound | SqlError, SqlClient.SqlClient | PgClient.PgClient> =>
+  ): Effect.Effect<void, RunNotFound | RuntimeUnavailable | SqlError, SqlClient.SqlClient | PgClient.PgClient> =>
     Effect.gen(function* () {
       let current = yield* loadRun(runId).pipe(
         Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))),

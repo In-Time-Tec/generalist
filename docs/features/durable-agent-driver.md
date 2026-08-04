@@ -1,10 +1,18 @@
 # Durable agent driver
 
-Core exposes a versioned durable agent driver contract, pinned `AgentRef` identity, and portable `RunBudget` limits that a future `@batonfx/runtime` host and inline `Agent.stream` can share without importing SQL or runtime types into `@batonfx/core`.
+Core exposes a versioned durable agent driver contract, pinned `ExecutableRef` identity, and portable `RunBudget` limits that a future `@batonfx/runtime` host and inline `Agent.stream` can share without importing SQL or runtime types into `@batonfx/core`.
 
-## AgentRef
+## Executable identity
 
-Every durable run pins an immutable `AgentRef { id, version, digest }`. The digest is a canonical hash of an `AgentManifest` projection: agent name, instructions, sorted tool names, portable turn-policy snapshot, model selection, and metadata. `AgentRef.fromAgent(agent, version)` builds the ref; `AgentRef.requireMatch(expected, actual)` fails typed with `AgentRefVersionMismatch` when id, version, or digest differ.
+Core uses opaque, schema-backed `AgentPin`, `ModelPin`, `CapabilityPin`, and `ExecutablePin` strings. Every pin includes its kind, contract version, algorithm, and digest. A pin of the wrong kind or with a malformed SHA-256 digest fails schema decoding.
+
+`AgentManifest` is the closed identity contract for one Agent. It covers exact instructions, one required opaque model pin, named tool, skill, and service capability pins, a closed portable policy or opaque policy pin, budget defaults, and named child-selection bindings. `AgentManifest.make` rejects duplicate names, capability pins, child selections, and child pins, sorts semantically unordered arrays, and owns the resulting `AgentPin`. `AgentManifest.fromLiveAgent` additionally verifies that caller-supplied tool pins exactly cover the live toolkit, portable policy data exactly matches the live policy snapshot, and budget data exactly matches the live Agent budget. A policy pin is accepted only when the live policy is opaque. Models, services, skills, and opaque policies remain explicit caller inputs because Agent introspection cannot prove their implementation identity.
+
+`ExecutableManifest` closes the complete graph with root and active Agent pins plus every pinned Agent entry. Its constructor verifies each Agent digest, canonical ordering and uniqueness, exact root reachability, active reachability, child closure, and acyclicity before owning the `ExecutablePin`. `ExecutableRef { executable, active }` is the only durable Runtime reference. The public decoder accepts the pinned `{ ref, manifest }` pair and reruns every constructor invariant and digest check; manifests and refs cannot be decoded separately as executable authority. Callers cannot supply a digest to either manifest constructor.
+
+Pinned same-run handoff targets carry their exact Agent pin. The completed handoff operation persists the new active pin in the same driver checkpoint commit, and restart requires that exact executable and active identity. Direct standalone Agent execution remains viable without pins, but a supplied durable checkpoint is never accepted without an explicit executable identity.
+
+Canonical identity uses synchronous pure TypeScript SHA-256 over canonical UTF-8 JSON. Effect's Crypto service and Web Crypto digest are asynchronous and environment-provided, while these constructors are synchronous and used by Core in browsers, Bun, and Node without adding a platform layer. Known empty-string and `abc` vectors protect the cross-runtime implementation; there is no weak fallback.
 
 ## RunBudget
 
@@ -16,7 +24,7 @@ Inline `AgentTool` children call `reserveChildBudget` before the nested run and 
 
 ## Driver contract
 
-`DurableAgentDriver` exposes `initial`, `decide`, and `apply` over schema-backed `DriverCheckpoint`, `DriverOperation`, `DriverDecision`, and `OperationOutcome` values. Checkpoints carry `driverVersion`, pinned `AgentRef`, turn, `RunBudget`, and opaque driver state. Operations carry a deterministic `key`, bounded `kind` (`model`, `tool`, `memory`, `compaction`, `send`, `wait`, `handoff`, `structured-output`), serializable `input`, `inputDigest`, and `replayPolicy` (`pure`, `provider-idempotent`, `never`). Outcomes are `Succeeded`, `Failed`, or `Unknown`. Decisions are `Execute`, `Wait`, `Continue`, or `Complete`.
+`DurableAgentDriver` exposes `initial`, `decide`, and `apply` over schema-backed `DriverCheckpoint`, `DriverOperation`, `DriverDecision`, and `OperationOutcome` values. Durable checkpoints carry `driverVersion`, the active `ExecutableRef`, turn, `RunBudget`, and opaque driver state; process-local standalone runs omit the durable reference. The checkpoint does not duplicate manifests, model coordinates, tool digests, or policy projections. Operations carry a deterministic `key`, bounded `kind` (`model`, `tool`, `memory`, `compaction`, `send`, `wait`, `handoff`, `structured-output`), serializable `input`, `inputDigest`, and `replayPolicy` (`pure`, `provider-idempotent`, `never`). Outcomes are `Succeeded`, `Failed`, or `Unknown`. Decisions are `Execute`, `Wait`, `Continue`, or `Complete`.
 
 `DurableDriver.makeTracer(script)` is the canonical in-memory driver used by core tests. It exercises model, tool, wait, budget charging, deterministic operation keys, and unknown-outcome rejection without touching the live agent loop.
 

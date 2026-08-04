@@ -2,8 +2,37 @@ import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { Errors, Runtime } from "../src/index.js"
 import { assistantAddress, memoryLayer, textPrompt } from "./helpers.js"
+import { alternateAssistantRef, assistantRef } from "./helpers.js"
+import { make as makeMessage } from "../src/message.js"
+import { admitSend } from "../src/memory/store-admit.js"
+import { emptyState } from "../src/memory/state.js"
+import { childDigest, messageDigest } from "../src/memory/digest.js"
 
 layer(memoryLayer)("Runtime idempotency", (it) => {
+  it("uses canonical SHA-256 digests without changing root and child identity inputs", () => {
+    const first = makeMessage({
+      id: "message:first",
+      to: assistantAddress,
+      sessionId: "session:digest",
+      idempotencyKey: "first",
+      correlationId: "correlation:digest",
+      prompt: textPrompt("digest"),
+      metadata: { outer: { second: 2, first: 1 } },
+    })
+    const replay = makeMessage({
+      ...first,
+      id: "message:replay",
+      idempotencyKey: "replay",
+      metadata: { outer: { first: 1, second: 2 } },
+    })
+
+    expect(messageDigest(first)).toMatch(/^[a-f0-9]{64}$/)
+    expect(messageDigest(replay)).toBe(messageDigest(first))
+    expect(childDigest(first, assistantRef.ref)).toMatch(/^[a-f0-9]{64}$/)
+    expect(childDigest(first, alternateAssistantRef.ref)).not.toBe(childDigest(first, assistantRef.ref))
+    expect(() => messageDigest({ ...first, metadata: { invalid: undefined } })).toThrow(/Unsupported value/)
+  })
+
   it.effect("returns the same receipt for an exact duplicate", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -47,6 +76,31 @@ layer(memoryLayer)("Runtime idempotency", (it) => {
       if (error instanceof Errors.IdempotencyConflict) {
         expect(error.existingRunId).toBe(first.runId)
       }
+    }),
+  )
+
+  it.effect("conflicts when an exact payload is replayed under changed executable authority", () =>
+    Effect.gen(function* () {
+      const message = makeMessage({
+        id: "message:authority",
+        to: assistantAddress,
+        sessionId: "session:authority",
+        idempotencyKey: "same",
+        correlationId: "message:authority",
+        prompt: textPrompt("hello"),
+      })
+      const initial = emptyState({ addressBindings: new Map(), subscriberQueueCapacity: 8 })
+      const [, admitted] = yield* admitSend(initial, {
+        message,
+        executableRef: assistantRef.ref,
+        executableManifest: assistantRef.manifest,
+      })
+      const conflict = yield* admitSend(admitted, {
+        message,
+        executableRef: alternateAssistantRef.ref,
+        executableManifest: alternateAssistantRef.manifest,
+      }).pipe(Effect.flip)
+      expect(conflict).toBeInstanceOf(Errors.IdempotencyConflict)
     }),
   )
 

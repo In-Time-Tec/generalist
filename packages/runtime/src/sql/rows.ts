@@ -1,4 +1,4 @@
-import type { AgentRef } from "../agent-ref.js"
+import type { ExecutableManifest, ExecutableRef } from "../executable-manifest.js"
 import type { Message } from "../message.js"
 import type { RunStatus } from "../run.js"
 import type { OperationKind, OperationStatus, ReplayPolicy } from "./operations.js"
@@ -12,7 +12,8 @@ export interface RunRow {
   readonly message_json: string
   readonly message_digest: string
   readonly idempotency_key: string
-  readonly agent_json: string
+  readonly executable_ref_json: string
+  readonly executable_manifest_json: string
   readonly root_run_id: string
   readonly parent_run_id: string | null
   readonly invocation_id: string | null
@@ -56,6 +57,8 @@ export interface OperationRow {
   readonly attempt: number
   readonly started_at: string | null
   readonly finished_at: string | null
+  readonly resolution_idempotency_key: string | null
+  readonly resolution_json: string | null
 }
 
 export interface LaneRow {
@@ -81,7 +84,8 @@ export interface DecodedRun {
   readonly sessionId: string
   readonly message: Message
   readonly messageDigest: string
-  readonly agent: AgentRef
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly rootRunId: string
   readonly parentRunId?: string
   readonly invocationId?: string

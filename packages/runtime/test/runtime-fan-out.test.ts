@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Ref } from "effect"
-import { Errors, Runtime, RunStore, RunTree } from "../src/index.js"
+import { Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../src/index.js"
 import { makeRuntime } from "../src/memory/runtime-layer.js"
 import { layer as activeExecutionsLayer } from "../src/active-executions.js"
 import {
@@ -36,8 +36,9 @@ const admit = (
       idempotencyKey: key,
       members: Array.from({ length: count }, (_, ordinal) => ({
         key: `member-${ordinal}`,
-        agent: researcherRef,
+        selection: "researcher",
         prompt: `member-${ordinal}`,
+        metadata: { routing: { priority: ordinal, region: "local" } },
       })),
       concurrency: options?.concurrency ?? count,
       join: options?.join ?? { _tag: "AllSuccess" },
@@ -60,7 +61,7 @@ const fail = (runId: string) =>
     const store = yield* RunStore.RunStore
     yield* store.fail({
       ...(yield* store.claimExecution({ runId, ownerId: `owner:${runId}` })),
-      error: { message: "failed" },
+      error: Errors.AgentExecutionFailure.make({ message: "failed" }),
     })
   })
 
@@ -83,13 +84,34 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
   it.effect("admits one immutable ordered aggregate idempotently", () =>
     Effect.gen(function* () {
       const { runtime, input, receipt } = yield* admit("idempotent")
-      const duplicate = yield* runtime.fanOut(input)
+      const reorderedMetadata = [...input.members]
+      reorderedMetadata[0] = {
+        ...reorderedMetadata[0]!,
+        metadata: { routing: { region: "local", priority: 0 } },
+      }
+      const duplicate = yield* runtime.fanOut({ ...input, members: reorderedMetadata })
       expect(duplicate).toEqual({ ...receipt, duplicate: true })
       expect((yield* runtime.inspectFanOut(receipt.fanOutId)).members.map((member) => member.ordinal)).toEqual([
         0, 1, 2,
       ])
       const conflict = yield* runtime.fanOut({ ...input, members: input.members.toReversed() }).pipe(Effect.flip)
       expect(conflict).toBeInstanceOf(Errors.FanOutConflict)
+      const changedMembers = [...input.members]
+      changedMembers[0] = { ...changedMembers[0]!, selection: "analyst" }
+      const changedBinding = yield* runtime
+        .fanOut({
+          ...input,
+          members: changedMembers,
+        })
+        .pipe(Effect.flip)
+      expect(changedBinding).toBeInstanceOf(Errors.FanOutConflict)
+      const changedMetadata = [...input.members]
+      changedMetadata[0] = {
+        ...changedMetadata[0]!,
+        metadata: { routing: { priority: 1, region: "local" } },
+      }
+      const metadataConflict = yield* runtime.fanOut({ ...input, members: changedMetadata }).pipe(Effect.flip)
+      expect(metadataConflict).toBeInstanceOf(Errors.FanOutConflict)
     }),
   )
 
@@ -154,11 +176,11 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
               ),
       })
       const racingRuntime = yield* makeRuntime({
-        agents: [
-          { ref: assistantRef, agent: assistant },
-          { ref: researcherRef, agent: researcher },
-        ],
-        addresses: [{ address: assistantAddress, agent: assistantRef }],
+        resolver: ExecutableResolver.makeStatic([
+          { executable: assistantRef, agent: assistant },
+          { executable: researcherRef, agent: researcher },
+        ]),
+        addresses: [{ address: assistantAddress, executable: assistantRef }],
       }).pipe(Effect.provideService(RunStore.RunStore, racingStore), Effect.provide(activeExecutionsLayer))
       expect((yield* racingRuntime.awaitFanOut(receipt.fanOutId)).status).toBe("succeeded")
     }),
@@ -270,7 +292,7 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
       expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelling")
       expect((yield* runtime.inspect(receipt.childRunIds[0]!)).status).toBe("cancelling")
       expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("running")
-      yield* store.fail({ ...claim, error: { message: "interrupted" } })
+      yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
       expect((yield* runtime.inspect(receipt.childRunIds[0]!)).status).toBe("cancelled")
       expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("cancelled")
       expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
@@ -289,7 +311,7 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
       const base: Runtime.FanOutInput = {
         parentRunId: parent.runId,
         idempotencyKey: "invalid",
-        members: [{ key: "one", agent: researcherRef, prompt: "one" }],
+        members: [{ key: "one", selection: "researcher", prompt: "one" }],
         concurrency: 1,
         join: { _tag: "AllSuccess" },
         remainder: "terminate",
@@ -303,6 +325,34 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
           yield* runtime.fanOut({ ...base, remainder: "await", join: { _tag: "Quorum", required } }).pipe(Effect.flip),
         ).toBeInstanceOf(Errors.FanOutInvalid)
       }
+    }),
+  )
+
+  it.effect("rejects an undeclared member atomically", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "fan-out:missing-selection",
+        idempotencyKey: "parent",
+        prompt: "parent",
+      })
+      const before = yield* RunTree.inspect(parent.runId)
+      const failure = yield* runtime
+        .fanOut({
+          parentRunId: parent.runId,
+          idempotencyKey: "missing",
+          members: [
+            { key: "valid", selection: "researcher", prompt: "valid" },
+            { key: "missing", selection: "undeclared", prompt: "missing" },
+          ],
+          concurrency: 2,
+          join: { _tag: "AllSuccess" },
+          remainder: "await",
+        })
+        .pipe(Effect.flip)
+      expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
+      expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
     }),
   )
 })

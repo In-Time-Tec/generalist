@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import {
   Address,
-  AgentRef,
+  ExecutableManifest,
   Cursor,
   Errors,
   Message,
@@ -13,12 +13,16 @@ import {
   AgentHost,
   AgentResult,
   RunFailure,
+  OperationResolution,
 } from "../src/index.js"
+
+const encodedVersion = (manifest: typeof ExecutableManifest.ExecutableManifest.Encoded): "1" => manifest.version
+const acceptResolutionConflict = (_error: Errors.OperationResolutionConflict): void => undefined
 
 describe("@batonfx/runtime public surface", () => {
   it("exports package-root namespaces", () => {
     expect(typeof Address.make).toBe("function")
-    expect(typeof AgentRef.make).toBe("function")
+    expect(ExecutableManifest.ExecutableRef).toBeDefined()
     expect(typeof Cursor.make).toBe("function")
     expect(typeof Message.make).toBe("function")
     expect(typeof Run.isTerminal).toBe("function")
@@ -35,6 +39,10 @@ describe("@batonfx/runtime public surface", () => {
     expect(Errors.IdempotencyConflict).toBeDefined()
     expect(Errors.SteeringConflict).toBeDefined()
     expect(Errors.SubscriberLagged).toBeDefined()
+    expect(Errors.OperationResolutionConflict).toBeDefined()
+    expect(OperationResolution.ResolveOperationInput).toBeDefined()
+    expect(encodedVersion).toBeTypeOf("function")
+    expect(acceptResolutionConflict).toBeTypeOf("function")
     expect(Cursor.origin).toBe(-1)
   })
 })

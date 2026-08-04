@@ -4,6 +4,7 @@ import { isTerminal } from "../run.js"
 import type { ExecutionClaim, ExecutionRecord } from "../run-store.js"
 import { StaleClaim } from "../sql/errors.js"
 import type { MemoryState } from "./state.js"
+import { checkpointRef } from "../executable-manifest.js"
 
 const requireRun = (state: MemoryState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -16,7 +17,8 @@ const executionRecord = (
 ): ExecutionRecord => ({
   runId: run.runId,
   message: run.message,
-  agent: run.agent,
+  executableRef: run.executableRef,
+  executableManifest: run.executableManifest,
   attempt: run.attempt,
   attemptFence: run.attemptFence,
   ...(run.checkpoint === undefined ? {} : { checkpoint: run.checkpoint }),
@@ -49,7 +51,7 @@ export const claimExecution = (
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    if (run.status === "waiting" || run.status === "queued") {
+    if (run.status === "waiting" || run.status === "queued" || run.status === "needs-resolution") {
       return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is ${run.status}` })
     }
     const claimed = {
@@ -83,9 +85,14 @@ export const saveExecution = (
         attemptFence: input.attemptFence,
       })
     }
+    const executableRef = yield* Effect.try({
+      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
     const runs = new Map(state.runs)
     runs.set(run.runId, {
       ...run,
+      executableRef,
       ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
       ...(input.suspension === undefined ? {} : { suspension: input.suspension }),
       ...(input.transcript === undefined ? {} : { transcript: input.transcript }),

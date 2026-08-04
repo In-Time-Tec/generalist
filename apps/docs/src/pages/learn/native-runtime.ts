@@ -12,14 +12,23 @@ export const nativeRuntime = definePage({
       code("@batonfx/core"),
       " owns the agent loop: model turns, tool execution, policies, approvals, and typed AgentEvents. It can run by itself and keeps no durable execution state. ",
       code("@batonfx/runtime"),
-      " is Baton's optional native durable host. It turns registered core agents into finite, addressable Runs with one canonical persisted RunEvent stream.",
+      " is Baton's optional native durable host. It persists a constructor-verified executable manifest and exact active reference with each finite, addressable Run, alongside one canonical RunEvent stream.",
     ),
     h2("runtime-owns", "What Runtime owns"),
     bullets(
       ["Idempotent admission through ", code("send"), " and child execution through ", code("spawn"), "."],
       ["Stable Run identity, ordered RunEvents, exclusive replay cursors, inspection, snapshots, and finite history."],
       ["Durable waits, responses, signals, cancellation, parent-child links, and operation recovery."],
-      ["Agent registration and address bindings, so each admitted message resolves to a pinned agent version."],
+      [
+        "Address bindings carry a pinned ",
+        code("{ ref, manifest }"),
+        " authority. Admission persists that pair without reconstructing live code.",
+      ],
+      [
+        "A caller-supplied ",
+        code("ExecutableResolver"),
+        " reconstructs the exact Agent and services only in the execution scope, then attests the persisted identity before work begins.",
+      ],
     ),
     h2("storage", "Choose the storage layer"),
     table(
@@ -40,7 +49,7 @@ export const nativeRuntime = definePage({
     ),
     h2("package-boundary", "The package boundary"),
     p(
-      "Core does not depend on Runtime, so the same agent value works in a script, deterministic test, or durable worker. Runtime depends on core, reconstructs the pinned agent, journals model and tool operations, and commits lifecycle state around the core driver. Transport then projects Runtime-owned events; it does not invent a second session or persistence model.",
+      "Core does not depend on Runtime, so the same agent value works in a script, deterministic test, or durable worker. Runtime depends on core, persists the closed executable manifest at admission, reconstructs its exact Agent and service Layers through a scoped resolver during execution, journals model and tool operations, and commits lifecycle state around the core driver. Transport then projects Runtime-owned events; it does not invent a second session or persistence model.",
     ),
     p(
       "See ",

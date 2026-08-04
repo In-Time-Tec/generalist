@@ -9,6 +9,8 @@ import {
 import { DriverError, DriverStateInvalid, type DurableAgentDriver, type DriverInput } from "./durable-driver.js"
 import { charge, type RunBudget, type RunBudgetExhausted, type BudgetLimits } from "./run-budget.js"
 import { LoopDriverState, type PendingOperation } from "./loop-driver-state.js"
+import { HandoffCommit } from "../agent/handoff-state.js"
+import type { HandoffControlState } from "../agent/handoff-state.js"
 
 /** @experimental */
 export interface LoopDriverOptions {
@@ -31,6 +33,26 @@ const encodeCheckpoint = (
   budget,
   state,
 })
+
+/** @internal Apply the exact successful handoff value to both durable authorities. */
+export const applyHandoffCommit = (
+  checkpoint: DriverCheckpoint,
+  value: unknown,
+): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
+  Effect.gen(function* () {
+    const state = yield* decodeState(checkpoint)
+    const commit = yield* Schema.decodeUnknownEffect(HandoffCommit)(value).pipe(
+      Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid handoff commit: ${error}` })),
+    )
+    const executable =
+      checkpoint.executable === undefined || commit.targetAgentPin === undefined
+        ? checkpoint.executable
+        : { ...checkpoint.executable, active: commit.targetAgentPin }
+    return encodeCheckpoint(
+      { ...checkpoint, ...(executable === undefined ? {} : { executable }) },
+      { ...state, handoff: commit.state },
+    )
+  })
 
 const chargeForKind = (budget: RunBudget, kind: DriverOperationKind): Effect.Effect<RunBudget, RunBudgetExhausted> => {
   if (kind === "model" || kind === "structured-output") {
@@ -75,23 +97,22 @@ export const withBudget = (checkpoint: DriverCheckpoint, budget: RunBudget): Dri
   budget,
 })
 
+/** @internal Replace the durable handoff control snapshot without scheduling an operation. */
+export const withHandoffState = (
+  checkpoint: DriverCheckpoint,
+  handoff: HandoffControlState,
+): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
+  decodeState(checkpoint).pipe(Effect.map((state) => encodeCheckpoint(checkpoint, { ...state, handoff })))
+
 /** @experimental Production durable driver backing inline Agent.stream runs. */
 export const makeLoopDriver = (options: LoopDriverOptions): DurableAgentDriver => ({
   version: currentDriverVersion,
   initial: (input: DriverInput) =>
     Effect.succeed({
       driverVersion: currentDriverVersion,
-      agent: input.agent,
+      ...(input.executable === undefined ? {} : { executable: input.executable }),
       turn: 0,
       budget: input.budget,
-      execution: input.execution ?? {
-        agent: input.agent,
-        driverVersion: currentDriverVersion,
-        checkpointCodecVersion: "1",
-        eventCodecVersion: "1",
-        toolSchemaDigests: {},
-        rootBudget: input.budget,
-      },
       state: {
         logicalOperationId: options.logicalOperationId,
         sessionId: options.sessionId,
@@ -171,6 +192,9 @@ export const makeLoopDriver = (options: LoopDriverOptions): DurableAgentDriver =
           }
         }
         return encodeCheckpoint(checkpoint, nextState, budget)
+      }
+      if (pending.kind === "handoff") {
+        return yield* applyHandoffCommit(encodeCheckpoint(checkpoint, nextState, budget), outcome.value)
       }
       return encodeCheckpoint({ ...checkpoint, turn: checkpoint.turn }, nextState, budget)
     }),

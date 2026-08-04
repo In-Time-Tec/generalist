@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import type { OperationResolution } from "../operation-resolution.js"
 
 export const OperationKind = Schema.Literals([
   "model",
@@ -30,6 +31,8 @@ export interface OperationRecord {
   readonly error?: unknown
   readonly replayPolicy: ReplayPolicy
   readonly attempt: number
+  readonly resolutionIdempotencyKey?: string
+  readonly resolution?: OperationResolution
 }
 
 export const canBlindRetry = (policy: ReplayPolicy): boolean => policy === "pure" || policy === "provider-idempotent"

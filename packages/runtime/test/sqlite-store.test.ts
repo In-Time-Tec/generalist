@@ -1,19 +1,29 @@
 import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
-import { Effect, Exit, Stream } from "effect"
-import { Response } from "effect/unstable/ai"
-import { Errors, Runtime, RunStore, RunTree } from "../src/index.js"
-import {
-  SCHEMA_META_TABLE,
-  SCHEMA_VERSION,
-  fanOutSchemaChecksum,
-  schemaChecksum,
-  steeringSchemaChecksum,
-} from "../src/sql/schema.js"
+import { Deferred, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect"
+import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
+import { Agent, ExecutableManifest, Handoff, ToolExecutor } from "@batonfx/core"
+import { Address, AgentHost, Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../src/index.js"
+import { layer as activeExecutionsLayer } from "../src/active-executions.js"
+import { make as makeAgentHost } from "../src/agent-host.js"
+import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../src/sql/schema.js"
 import { markDirty } from "../src/sql/migrate.js"
 import { layer as sqliteClientLayer } from "../src/sql/bun-client.js"
-import { assistantAddress, completedResult, openWait, researcherRef, textPrompt } from "./helpers.js"
+import {
+  alternateAssistantAddress,
+  alternateAssistantRef,
+  alternateResearcherRef,
+  assistantAddress,
+  assistantRef,
+  completedResult,
+  openWait,
+  suspension,
+  parentRelativeOptions,
+  researcherRef,
+  textPrompt,
+} from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
+import { pinnedTestAgent } from "./identity.js"
 
 it.live("migrates and reopens a durable sqlite store", () =>
   Effect.gen(function* () {
@@ -29,11 +39,14 @@ it.live("migrates and reopens a durable sqlite store", () =>
       })
       const info = yield* store.info
       expect(info).toEqual({ durability: "durable", backend: "sqlite", multiWorker: false })
-      expect((yield* runtime.inspect(receipt.runId)).durability).toBe("durable")
+      const admitted = yield* runtime.inspect(receipt.runId)
+      expect(admitted.durability).toBe("durable")
+      expect(admitted.executableRef).toEqual(assistantRef.ref)
+      expect(admitted.executableManifest).toEqual(assistantRef.manifest)
       const child = yield* runtime.spawn({
         parentRunId: receipt.runId,
         invocationId: "reopen-child",
-        agent: researcherRef,
+        selection: "researcher",
         prompt: textPrompt("child"),
       })
       const childClaim = yield* store.claimExecution({ runId: child.runId, ownerId: "child" })
@@ -101,6 +114,8 @@ it.live("migrates and reopens a durable sqlite store", () =>
       const runtime = yield* Runtime.Runtime
       const inspection = yield* runtime.inspect(first)
       expect(inspection.status).toBe("succeeded")
+      expect(inspection.executableRef).toEqual(assistantRef.ref)
+      expect(inspection.executableManifest).toEqual(assistantRef.manifest)
       const snapshot = yield* runtime.snapshot(first)
       expect(snapshot.outcome?._tag).toBe("Succeeded")
       expect(snapshot.usage.map((fact) => fact.modelAttemptId)).toEqual(["reopen-attempt"])
@@ -119,89 +134,46 @@ it.live("migrates and reopens a durable sqlite store", () =>
   }).pipe(Effect.asVoid),
 )
 
-it.live("upgrades an immutable version 2 SQLite fixture through migrations 3 and 4", () =>
+it.live("resolves SQLite child selections relative to each persisted parent closure", () =>
   Effect.gen(function* () {
-    expect(steeringSchemaChecksum()).toBe("01852e12f9feec6a47b4aad61a90b3b6061e032d870b763718df813c969000f7")
-    const filename = tempDbPath("migrate-v2-v3")
-    yield* Effect.scoped(Effect.provide(Runtime.Runtime, sqliteLayer(filename)))
-    const fixture = new Database(filename)
-    fixture.run("DROP TABLE baton_tree_event_index")
-    fixture.run("DROP TABLE baton_tree_roots")
-    fixture.run("DROP TABLE baton_fan_out_members")
-    fixture.run("DROP TABLE baton_fan_outs")
-    fixture.run("DELETE FROM baton_sql_migrations WHERE migration_id IN (3, 4)")
-    fixture.run(`UPDATE ${SCHEMA_META_TABLE} SET version = 2, checksum = ?, dirty = 0 WHERE id = 1`, [
-      steeringSchemaChecksum(),
-    ])
-    fixture.close()
+    const runtime = yield* Runtime.Runtime
+    const first = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "sqlite:relative:first",
+      idempotencyKey: "parent",
+      prompt: "first",
+    })
+    const second = yield* runtime.send({
+      to: alternateAssistantAddress,
+      sessionId: "sqlite:relative:second",
+      idempotencyKey: "parent",
+      prompt: "second",
+    })
+    const firstChild = yield* runtime.spawn({
+      parentRunId: first.runId,
+      invocationId: "child",
+      selection: "researcher",
+      prompt: "child",
+    })
+    const secondChild = yield* runtime.spawn({
+      parentRunId: second.runId,
+      invocationId: "child",
+      selection: "researcher",
+      prompt: "child",
+    })
+    expect((yield* runtime.inspect(firstChild.runId)).executableRef).toEqual(researcherRef.ref)
+    expect((yield* runtime.inspect(secondChild.runId)).executableRef).toEqual(alternateResearcherRef.ref)
 
-    yield* Effect.scoped(Effect.provide(Runtime.Runtime, sqliteLayer(filename)))
-    const upgraded = new Database(filename)
-    const meta = upgraded
-      .query<
-        { version: number; checksum: string },
-        []
-      >(`SELECT version, checksum FROM ${SCHEMA_META_TABLE} WHERE id = 1`)
-      .get()
-    expect(meta).toEqual({ version: SCHEMA_VERSION, checksum: schemaChecksum() })
-    expect(
-      upgraded
-        .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'baton_fan_outs'")
-        .get(),
-    ).toEqual({ name: "baton_fan_outs" })
-    upgraded.close()
-  }),
-)
-
-it.live("upgrades version 3 and deterministically backfills the tree index", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("migrate-v3-v4")
-    const receipt = yield* Effect.scoped(
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        return yield* runtime.send({
-          to: assistantAddress,
-          sessionId: "session:backfill",
-          idempotencyKey: "backfill",
-          prompt: textPrompt("backfill"),
-        })
-      }).pipe(Effect.provide(sqliteLayer(filename))),
-    )
-    const fixture = new Database(filename)
-    const template = fixture
-      .query<
-        { event_json: string },
-        [string]
-      >("SELECT event_json FROM baton_run_events WHERE run_id = ? ORDER BY sequence DESC LIMIT 1")
-      .get(receipt.runId)!
-    for (let sequence = 2; sequence < 12; sequence++) {
-      const event = JSON.parse(template.event_json) as Record<string, unknown>
-      event.eventId = `${receipt.runId}:${sequence}`
-      event.sequence = sequence
-      fixture.run("INSERT INTO baton_run_events (run_id, sequence, event_id, event_json) VALUES (?, ?, ?, ?)", [
-        receipt.runId,
-        sequence,
-        event.eventId as string,
-        JSON.stringify(event),
-      ])
-    }
-    fixture.run("UPDATE baton_runs SET last_sequence = 11 WHERE run_id = ?", [receipt.runId])
-    fixture.run("DROP TABLE baton_tree_event_index")
-    fixture.run("DROP TABLE baton_tree_roots")
-    fixture.run("DELETE FROM baton_sql_migrations WHERE migration_id = 4")
-    fixture.run(`UPDATE ${SCHEMA_META_TABLE} SET version = 3, checksum = ?, dirty = 0 WHERE id = 1`, [
-      fanOutSchemaChecksum(),
-    ])
-    fixture.close()
-
-    yield* Effect.scoped(
-      Effect.gen(function* () {
-        const page = yield* RunTree.history({ rootRunId: receipt.runId, limit: 20 })
-        expect(page.events.map((entry) => entry.event.sequence)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
-        expect(page.hasMore).toBe(false)
-      }).pipe(Effect.provide(sqliteLayer(filename))),
-    )
-  }),
+    const before = yield* RunTree.inspect(first.runId)
+    const failure = yield* runtime
+      .spawn({ parentRunId: first.runId, invocationId: "missing", selection: "undeclared", prompt: "missing" })
+      .pipe(Effect.flip)
+    expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
+    expect(yield* RunTree.inspect(first.runId)).toEqual(before)
+  }).pipe(
+    Effect.provide(Runtime.layerSqlite({ filename: tempDbPath("relative-selection"), ...parentRelativeOptions })),
+    Effect.scoped,
+  ),
 )
 
 it.live("resumes tree history from an opaque cursor after close and reopen", () =>
@@ -357,7 +329,7 @@ it.live("rejects multi-worker configuration", () =>
           Runtime.layerSqlite({
             filename,
             multiWorker: true,
-            agents: [],
+            resolver: ExecutableResolver.makeStatic([]),
             addresses: [],
           }),
         ),
@@ -400,6 +372,371 @@ it.live("exact duplicate admission and changed-payload conflict", () =>
   }).pipe(Effect.asVoid),
 )
 
+it.live("rejects an exact duplicate after the address binding changes", () => {
+  const filename = tempDbPath("idem-authority")
+  const send = {
+    to: assistantAddress,
+    sessionId: "session:authority",
+    idempotencyKey: "same",
+    prompt: textPrompt("same"),
+  } as const
+  const admit = Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    yield* runtime.send(send)
+  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  const reopen = Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const conflict = yield* runtime.send(send).pipe(Effect.flip)
+    expect(conflict).toBeInstanceOf(Errors.IdempotencyConflict)
+  }).pipe(
+    Effect.provide(
+      Runtime.layerSqlite({
+        filename,
+        resolver: ExecutableResolver.makeStatic([]),
+        addresses: [{ address: assistantAddress, executable: alternateAssistantRef }],
+      }),
+    ),
+    Effect.scoped,
+  )
+  return admit.pipe(Effect.andThen(reopen))
+})
+
+it.live("persists a handoff checkpoint and active pin atomically across reopen", () => {
+  const filename = tempDbPath("handoff-active-pin")
+  let runId = ""
+  let operationId = ""
+  const checkpoint = {
+    driverVersion: "1",
+    executable: researcherRef.ref,
+    turn: 1,
+    budget: { allocation: {}, remaining: {}, depth: 0 },
+    state: {},
+  } as const
+  const admit = Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    const receipt = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "session:handoff",
+      idempotencyKey: "handoff",
+      prompt: textPrompt("handoff"),
+    })
+    runId = receipt.runId
+    const claim = yield* store.claimExecution({ runId, ownerId: "handoff-a" })
+    const operation = yield* store.recordOperation({
+      ...claim,
+      operationKey: "handoff:completed:stable",
+      kind: "handoff",
+      inputDigest: "handoff:stable",
+      input: { targetAgentPin: researcherRef.ref.active },
+      replayPolicy: "pure",
+      attempt: claim.attempt,
+    })
+    operationId = operation.operationId
+    yield* store.startOperation({ ...claim, operationId })
+    expect((yield* store.getOperation({ runId, operationId })).status).toBe("running")
+    expect((yield* store.loadExecution(runId)).executableRef).toEqual(assistantRef.ref)
+    yield* store.completeOperation({
+      ...claim,
+      operationId,
+      outcome: { _tag: "Succeeded", value: undefined },
+      checkpoint,
+    })
+    const saved = yield* store.loadExecution(runId)
+    expect(saved.executableRef).toEqual(researcherRef.ref)
+    expect(saved.executableManifest).toEqual(assistantRef.manifest)
+  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  const reopen = Effect.gen(function* () {
+    const store = yield* RunStore.RunStore
+    const saved = yield* store.loadExecution(runId)
+    expect((yield* store.getOperation({ runId, operationId })).status).toBe("succeeded")
+    expect(saved.checkpoint).toEqual(checkpoint)
+    expect(saved.executableRef).toEqual(researcherRef.ref)
+    expect(saved.executableManifest).toEqual(assistantRef.manifest)
+  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  return admit.pipe(Effect.andThen(reopen))
+})
+
+it.live("recovers a committed AgentHost handoff through the active Agent after reopen", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("agent-host-handoff-reopen")
+    const childAgent = Agent.make({ name: "durable-specialist" })
+    const child = pinnedTestAgent(childAgent, "handoff-b")
+    const specialist = Handoff.target(childAgent, child.pin)
+    const supervisor = Handoff.supervisor({
+      name: "durable-supervisor",
+      specialists: [specialist],
+      handoffOptions: { maxRepeatedEdge: 2 },
+    })
+    const root = pinnedTestAgent(supervisor.agent, "handoff-a", [{ selection: childAgent.name, agent: child.pin }])
+    const admittedExecutable = ExecutableManifest.make({ root: root.pin, agents: [root, child] })
+    const activeExecutable = ExecutableManifest.make({
+      root: root.pin,
+      active: child.pin,
+      agents: [root, child],
+    })
+    const address = Address.make("agent:durable-handoff")
+    const continuation = Prompt.make("continue with committed context")
+    const finish = Response.makePart("finish", {
+      reason: "stop",
+      usage: Response.Usage.make({
+        inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
+        outputTokens: { total: 1, text: 1, reasoning: undefined },
+      }),
+      response: undefined,
+    })
+    const firstModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("tool-call", {
+              id: "handoff-a-to-b",
+              name: `handoff_to_${childAgent.name}`,
+              params: { prompt: "continue with committed context", reason: "specialist owns completion" },
+              providerExecuted: false,
+            }),
+            finish,
+          ]),
+      }),
+    )
+    const firstServices = Layer.mergeAll(firstModel, ToolExecutor.layerToolkit(supervisor.toolkit), supervisor.catalog)
+    const admittedRef = { ...admittedExecutable, ...admittedExecutable.ref }
+    const activeRef = { ...activeExecutable, ...activeExecutable.ref }
+    const firstResolver = ExecutableResolver.ExecutableResolver.of({
+      resolve: () => Effect.succeed({ agent: supervisor.agent, services: firstServices, attestation: admittedRef }),
+    })
+    const crashScope = yield* Scope.make()
+    const committed = yield* Effect.scoped(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const handoffCommitted = yield* Deferred.make<void>()
+        const crashStore = RunStore.RunStore.of({
+          ...store,
+          completeOperation: (input) =>
+            store
+              .completeOperation(input)
+              .pipe(
+                Effect.flatMap((record) =>
+                  record.kind === "handoff"
+                    ? Deferred.succeed(handoffCommitted, undefined).pipe(Effect.andThen(Effect.never))
+                    : Effect.succeed(record),
+                ),
+              ),
+        })
+        const crashHost = yield* makeAgentHost({ workerId: "before-reopen", resolver: firstResolver }).pipe(
+          Effect.provideService(RunStore.RunStore, crashStore),
+          Effect.provide(activeExecutionsLayer),
+        )
+        const receipt = yield* runtime.send({
+          to: address,
+          sessionId: "session:durable-handoff",
+          idempotencyKey: "durable-handoff",
+          prompt: "start with the supervisor",
+        })
+        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-reopen" })
+        const fiber = yield* crashHost.execute(claim).pipe(Effect.forkIn(crashScope))
+        yield* Deferred.await(handoffCommitted)
+        const execution = yield* store.loadExecution(receipt.runId)
+        const checkpointState = execution.checkpoint?.state as
+          | { readonly handoff?: { readonly path: ReadonlyArray<{ readonly handoffId: string }> } }
+          | undefined
+        const operation = yield* store.getOperationByKey({
+          runId: receipt.runId,
+          operationKey: checkpointState?.handoff?.path[0]?.handoffId ?? "missing",
+        })
+        return { runId: receipt.runId, fiber, execution, operation }
+      }).pipe(
+        Effect.provide(
+          Runtime.layerSqlite({
+            filename,
+            resolver: firstResolver,
+            addresses: [{ address, executable: admittedRef }],
+          }),
+        ),
+      ),
+    )
+
+    yield* Fiber.interrupt(committed.fiber)
+    expect(committed.operation?.status).toBe("succeeded")
+    expect(committed.execution.executableRef).toEqual(activeRef.ref)
+    expect(committed.execution.transcript).toBeDefined()
+    const committedState = committed.execution.checkpoint?.state as {
+      readonly handoff?: {
+        readonly active: string
+        readonly path: ReadonlyArray<{ readonly source: string; readonly target: string }>
+        readonly edgeCounts: ReadonlyArray<{ readonly source: string; readonly target: string; readonly count: number }>
+        readonly handoffCount: number
+        readonly pendingContinuation?: { readonly prompt: Prompt.Prompt }
+      }
+    }
+    expect(committedState.handoff).toMatchObject({
+      active: childAgent.name,
+      path: [{ source: supervisor.agent.name, target: childAgent.name }],
+      edgeCounts: [{ source: supervisor.agent.name, target: childAgent.name, count: 1 }],
+      handoffCount: 1,
+      pendingContinuation: { prompt: continuation },
+    })
+    let resolvedActive: string | undefined
+    let receivedByChild: Prompt.Prompt | undefined
+    const childModel = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: (options) => {
+          receivedByChild = options.prompt
+          return Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("text-delta", { id: "child-answer", delta: "completed by specialist" }),
+            finish,
+          ])
+        },
+      }),
+    )
+    const reopenResolver = ExecutableResolver.ExecutableResolver.of({
+      resolve: (input) =>
+        Effect.sync(() => {
+          resolvedActive = input.ref.active
+          return { agent: childAgent, services: childModel, attestation: activeRef }
+        }),
+    })
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const host = yield* AgentHost.AgentHost
+        const claim = yield* store.claimExecution({ runId: committed.runId, ownerId: "after-reopen" })
+        yield* host.execute(claim)
+        expect(resolvedActive).toBe(child.pin)
+        expect((yield* runtime.inspect(committed.runId)).status).toBe("succeeded")
+        const completed = yield* store.loadExecution(committed.runId)
+        const completedState = completed.checkpoint?.state as typeof committedState
+        expect(completedState.handoff).toMatchObject({
+          active: childAgent.name,
+          path: [{ source: supervisor.agent.name, target: childAgent.name }],
+          edgeCounts: [{ source: supervisor.agent.name, target: childAgent.name, count: 1 }],
+          handoffCount: 1,
+        })
+        expect(completedState.handoff?.pendingContinuation).toBeUndefined()
+        expect(receivedByChild).toEqual(Prompt.concat(committed.execution.transcript!, continuation))
+      }).pipe(
+        Effect.provide(
+          Runtime.layerSqlite({
+            filename,
+            resolver: reopenResolver,
+            addresses: [{ address, executable: admittedRef }],
+          }),
+        ),
+      ),
+    )
+  }),
+)
+
+it.live("rejects corrupted persisted executable authority with RuntimeUnavailable", () => {
+  const filename = tempDbPath("corrupt-authority")
+  let runId = ""
+  const admit = Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    runId = (yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "session:corrupt",
+      idempotencyKey: "corrupt",
+      prompt: textPrompt("corrupt"),
+    })).runId
+  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  const corrupt = Effect.sync(() => {
+    const db = new Database(filename)
+    db.run("UPDATE baton_runs SET executable_ref_json = ? WHERE run_id = ?", [
+      JSON.stringify(alternateAssistantRef.ref),
+      runId,
+    ])
+    db.close()
+  })
+  const reopen = Effect.gen(function* () {
+    const store = yield* RunStore.RunStore
+    const error = yield* store.loadExecution(runId).pipe(Effect.flip)
+    expect(error).toBeInstanceOf(Errors.RuntimeUnavailable)
+  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  return admit.pipe(Effect.andThen(corrupt), Effect.andThen(reopen))
+})
+
+it.live("persists only complete atomic failure, unknown, and suspension states across reopen", () => {
+  const filename = tempDbPath("atomic-crash-states")
+  const runIds: Record<string, string> = {}
+  const checkpoint = {
+    driverVersion: "1" as const,
+    executable: assistantRef.ref,
+    turn: 2,
+    budget: { allocation: {}, remaining: {}, depth: 0 },
+    state: { committed: true },
+  }
+  const write = Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    for (const outcome of [{ _tag: "Failed" as const, error: { message: "failed" } }, { _tag: "Unknown" as const }]) {
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: `session:sqlite:${outcome._tag}`,
+        idempotencyKey: outcome._tag,
+        prompt: outcome._tag,
+      })
+      runIds[outcome._tag] = receipt.runId
+      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "atomic" })
+      const operation = yield* store.recordOperation({
+        ...claim,
+        operationKey: `tool:${outcome._tag}`,
+        kind: "tool",
+        inputDigest: outcome._tag,
+        input: {},
+        replayPolicy: "never",
+        attempt: claim.attempt,
+      })
+      yield* store.startOperation({ ...claim, operationId: operation.operationId })
+      expect((yield* store.loadExecution(receipt.runId)).checkpoint).toBeUndefined()
+      yield* store.completeOperation({ ...claim, operationId: operation.operationId, outcome, checkpoint })
+    }
+    const suspended = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "session:sqlite:suspended",
+      idempotencyKey: "suspended",
+      prompt: "suspended",
+    })
+    runIds.Suspended = suspended.runId
+    const claim = yield* store.claimExecution({ runId: suspended.runId, ownerId: "atomic" })
+    yield* store.suspend({
+      ...claim,
+      checkpoint,
+      suspension: suspension("approval", "approval"),
+      wait: openWait("approval", "approval"),
+    })
+  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  const reopen = Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    for (const [tag, expectedStatus] of [
+      ["Failed", "failed"],
+      ["Unknown", "unknown"],
+    ] as const) {
+      const operation = yield* store.getOperationByKey({ runId: runIds[tag]!, operationKey: `tool:${tag}` })
+      expect(operation?.status).toBe(expectedStatus)
+      expect((yield* store.loadExecution(runIds[tag]!)).checkpoint).toEqual(checkpoint)
+    }
+    expect((yield* runtime.inspect(runIds.Unknown!)).status).toBe("needs-resolution")
+    const execution = yield* store.loadExecution(runIds.Suspended!)
+    expect(execution.checkpoint).toEqual(checkpoint)
+    expect(execution.suspension).toMatchObject({
+      _tag: "@batonfx/core/AgentSuspended",
+      token: "approval",
+      reason: "approval",
+      tool_call_id: "approval",
+    })
+    expect((yield* runtime.inspect(runIds.Suspended!)).wait?.waitId).toBe("approval")
+    expect((yield* runtime.inspect(runIds.Suspended!)).status).toBe("waiting")
+  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  return write.pipe(Effect.andThen(reopen))
+})
+
 it.live("persists caller RunId, wait resolution, and finite inspection reads across reopen", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("protocol-foundation")
@@ -414,10 +751,11 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
         prompt: textPrompt("wait"),
       })
       expect(receipt.runId).toBe("run:sqlite:caller")
-      yield* store.wait({
+      yield* store.suspend({
         ...(yield* store.claimExecution({ runId: receipt.runId, ownerId: "test" })),
         runId: receipt.runId,
         wait: openWait("wait:sqlite"),
+        suspension: suspension("wait:sqlite"),
       })
       yield* runtime.respond({
         runId: receipt.runId,
@@ -445,6 +783,37 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
       expect(conflict).toBeInstanceOf(Errors.RunIdConflict)
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
   }).pipe(Effect.asVoid),
+)
+
+it.live("persists and strictly replays the exact resolution supplied to RunStore.resume", () =>
+  Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    const receipt = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "session:sqlite:direct-resume",
+      idempotencyKey: "direct-resume",
+      prompt: textPrompt("wait"),
+    })
+    const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "direct-resume" })
+    yield* store.suspend({
+      ...claim,
+      wait: openWait("wait:direct-resume"),
+      suspension: suspension("wait:direct-resume"),
+    })
+    const resolution = {
+      _tag: "ToolResult" as const,
+      result: { approved: true, values: [1, 2, 3] },
+      encodedResult: { format: "json", value: "approved" },
+    }
+    const resumeInput = { runId: receipt.runId, waitId: "wait:direct-resume", resolution }
+    yield* store.resume(resumeInput)
+
+    const resumed = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 10 })).find(
+      (event) => event._tag === "RunResumed",
+    )
+    expect(resumed).toEqual(expect.objectContaining({ _tag: "RunResumed", waitId: "wait:direct-resume", resolution }))
+  }).pipe(Effect.provide(sqliteLayer(tempDbPath("direct-resume"))), Effect.scoped),
 )
 
 it.live("fifo blocks successors until head terminals", () =>
@@ -495,18 +864,20 @@ it.live("response signal and cancel bypass the lane", () =>
         idempotencyKey: "next",
         prompt: textPrompt("next"),
       })
-      yield* driver.wait({
+      yield* driver.suspend({
         ...(yield* driver.claimExecution({ runId: waiting.runId, ownerId: "test" })),
         runId: waiting.runId,
         wait: openWait("approval", "approval"),
+        suspension: suspension("approval", "approval"),
       })
       expect((yield* runtime.inspect(successor.runId)).status).toBe("queued")
       yield* runtime.respond({ runId: waiting.runId, waitId: "approval", resolution: { _tag: "Approved" } })
       expect((yield* runtime.inspect(waiting.runId)).status).toBe("running")
-      yield* driver.wait({
+      yield* driver.suspend({
         ...(yield* driver.claimExecution({ runId: waiting.runId, ownerId: "test" })),
         runId: waiting.runId,
         wait: openWait("signal-me", "signal"),
+        suspension: suspension("signal-me"),
       })
       yield* runtime.signal({ runId: waiting.runId, name: "signal-me" })
       expect((yield* runtime.inspect(waiting.runId)).status).toBe("running")
@@ -589,8 +960,58 @@ it.live("expired non-idempotent running operations become unknown", () =>
       expect(expired.outcome).toBe("unknown")
       expect(expired.record.status).toBe("unknown")
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+      expect((yield* driver.claimExecution({ runId: receipt.runId, ownerId: "other" }).pipe(Effect.flip))._tag).toBe(
+        "@batonfx/runtime/RuntimeUnavailable",
+      )
+      const resolution = {
+        _tag: "Failed" as const,
+        error: { message: "uncertain", details: { recoverable: false, source: "operator" } },
+      }
+      yield* runtime.resolveOperation({
+        runId: receipt.runId,
+        operationId: recorded.operationId,
+        idempotencyKey: "resolve:1",
+        resolution: {
+          _tag: "Failed",
+          error: { details: { source: "operator", recoverable: false }, message: "uncertain" },
+        },
+      })
+      yield* runtime.resolveOperation({
+        runId: receipt.runId,
+        operationId: recorded.operationId,
+        idempotencyKey: "resolve:1",
+        resolution,
+      })
+      const conflict = yield* runtime
+        .resolveOperation({
+          runId: receipt.runId,
+          operationId: recorded.operationId,
+          idempotencyKey: "resolve:1",
+          resolution: {
+            _tag: "Failed",
+            error: { message: "different", details: { recoverable: false, source: "operator" } },
+          },
+        })
+        .pipe(Effect.flip)
+      expect(conflict).toBeInstanceOf(Errors.OperationResolutionConflict)
+      const resolvedClaim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
+      const consumed = yield* driver.recordOperation({
+        ...resolvedClaim,
+        runId: receipt.runId,
+        operationKey: "tool:counter",
+        kind: "tool",
+        inputDigest: "digest:1",
+        input: { n: 1 },
+        replayPolicy: "never",
+        attempt: resolvedClaim.attempt,
+      })
+      expect(consumed.status).toBe("failed")
+      expect(consumed.error).toEqual({
+        message: "uncertain",
+        details: { recoverable: false, source: "operator" },
+      })
       const pure = yield* driver.recordOperation({
-        ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+        ...resolvedClaim,
         runId: receipt.runId,
         operationKey: "model:pure",
         kind: "model",
@@ -599,10 +1020,9 @@ it.live("expired non-idempotent running operations become unknown", () =>
         replayPolicy: "pure",
         attempt: 1,
       })
-      const retryClaim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
-      yield* driver.startOperation({ ...retryClaim, operationId: pure.operationId })
+      yield* driver.startOperation({ ...resolvedClaim, operationId: pure.operationId })
       const retried = yield* driver.expireRunningOperation({
-        ...retryClaim,
+        ...resolvedClaim,
         operationId: pure.operationId,
       })
       expect(retried.outcome).toBe("retried")
@@ -625,7 +1045,9 @@ it.live("first terminal wins", () =>
       })
       const claim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
       yield* driver.complete({ ...claim, result: completedResult("ok") })
-      const again = yield* driver.fail({ ...claim, error: { message: "nope" } }).pipe(Effect.flip)
+      const again = yield* driver
+        .fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "nope" }) })
+        .pipe(Effect.flip)
       expect(again).toBeInstanceOf(Errors.RunTerminal)
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
@@ -650,7 +1072,7 @@ it.live("rejects child admission after a terminal parent", () =>
         .spawn({
           parentRunId: parent.runId,
           invocationId: "too-late",
-          agent: researcherRef,
+          selection: "researcher",
           prompt: textPrompt("child"),
         })
         .pipe(Effect.flip)
@@ -675,7 +1097,7 @@ it.live("child link reconciliation and cursor replay after reopen", () =>
       const child = yield* runtime.spawn({
         parentRunId: parent.runId,
         invocationId: "inv-1",
-        agent: (yield* runtime.inspect(parent.runId)).agent,
+        selection: "researcher",
         prompt: textPrompt("child"),
       })
       yield* driver.complete({

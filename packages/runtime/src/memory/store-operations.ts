@@ -1,11 +1,13 @@
 import { Effect } from "effect"
-import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
+import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
-import type { RecordOperationInput } from "../run-store.js"
+import type { OperationCompletionOutcome, RecordOperationInput } from "../run-store.js"
 import { canBlindRetry, type OperationRecord, type OperationStatus } from "../sql/operations.js"
 import { makeUnknown, appendAgentEvent, appendLifecycle, rejectIfTerminal } from "./append.js"
 import { Option } from "effect"
 import { operationKeyMapKey, operationMapKey, type MemoryState } from "./state.js"
+import { checkpointRef } from "../executable-manifest.js"
+import { digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
 
 const getRun = (state: MemoryState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -38,6 +40,10 @@ export const recordOperation = (
       }
     }
     const operationId = `op_${state.nextOperationCounter}`
+    const executableRef = yield* Effect.try({
+      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
     const record: OperationRecord = {
       runId: input.runId,
       operationId,
@@ -55,6 +61,7 @@ export const recordOperation = (
     const runs = new Map(state.runs)
     const updatedRun = {
       ...run,
+      executableRef,
       ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
       ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
       ...(input.continuation === undefined || input.continuation === null ? {} : { continuation: input.continuation }),
@@ -104,9 +111,19 @@ export const startOperation = (
     return [record, { ...state, operations }] as const
   })
 
-export const succeedOperation = (
+export const completeOperation = (
   state: MemoryState,
-  input: { readonly runId: string; readonly operationId: string; readonly result: unknown },
+  input: {
+    readonly runId: string
+    readonly ownerId: string
+    readonly attemptFence: number
+    readonly operationId: string
+    readonly outcome: OperationCompletionOutcome
+    readonly checkpoint: import("@batonfx/core").DurableDriver.DriverCheckpoint
+    readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
+    readonly continuation?: import("../steering.js").ExecutionContinuation | null
+    readonly steeringEntryIds?: ReadonlyArray<string>
+  },
 ): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable> =>
   Effect.gen(function* () {
     yield* getRun(state, input.runId)
@@ -115,29 +132,44 @@ export const succeedOperation = (
     if (current.status === "succeeded" || current.status === "failed" || current.status === "unknown") {
       return [current, state] as const
     }
-    const record: OperationRecord = { ...current, status: "succeeded", result: input.result }
-    const operations = new Map(state.operations)
-    operations.set(operationMapKey(input.runId, input.operationId), record)
-    operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
-    return [record, { ...state, operations }] as const
-  })
-
-export const failOperation = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly operationId: string; readonly error: unknown },
-): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable> =>
-  Effect.gen(function* () {
-    yield* getRun(state, input.runId)
-    const current = state.operations.get(operationMapKey(input.runId, input.operationId))
-    if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-    if (current.status === "succeeded" || current.status === "failed" || current.status === "unknown") {
-      return [current, state] as const
+    const run = yield* getRun(state, input.runId)
+    for (const entryId of input.steeringEntryIds ?? []) {
+      const entry = run.steering.find((candidate) => candidate.entryId === entryId)
+      if (entry?.consumedOperationId !== input.operationId) {
+        return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} does not belong to operation` })
+      }
     }
-    const record: OperationRecord = { ...current, status: "failed", error: input.error }
+    const executableRef = yield* Effect.try({
+      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
+    const record: OperationRecord =
+      input.outcome._tag === "Succeeded"
+        ? { ...current, status: "succeeded", result: input.outcome.value }
+        : input.outcome._tag === "Failed"
+          ? { ...current, status: "failed", error: input.outcome.error }
+          : { ...current, status: "unknown" }
     const operations = new Map(state.operations)
     operations.set(operationMapKey(input.runId, input.operationId), record)
     operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
-    return [record, { ...state, operations }] as const
+    const updatedRun = {
+      ...run,
+      executableRef,
+      checkpoint: input.checkpoint,
+      ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
+      ...(input.continuation === undefined || input.continuation === null ? {} : { continuation: input.continuation }),
+    }
+    const runs = new Map(state.runs)
+    if (input.continuation === null) {
+      const { continuation: _, ...withoutContinuation } = updatedRun
+      runs.set(run.runId, withoutContinuation)
+    } else {
+      runs.set(run.runId, updatedRun)
+    }
+    const next = { ...state, operations, runs }
+    if (input.outcome._tag !== "Unknown") return [record, next] as const
+    const [, unknown] = yield* appendLifecycle(next, run.runId, makeUnknown(input.operationId), "needs-resolution")
+    return [record, unknown] as const
   })
 
 export const expireRunningOperation = (
@@ -204,4 +236,45 @@ export const getOperationByKey = (
   Effect.gen(function* () {
     yield* getRun(state, input.runId)
     return state.operations.get(operationKeyMapKey(input.runId, input.operationKey))
+  })
+
+export const resolveOperation = (
+  state: MemoryState,
+  input: ResolveOperationInput,
+): Effect.Effect<MemoryState, RunNotFound | OperationResolutionConflict | RuntimeUnavailable> =>
+  Effect.gen(function* () {
+    const run = yield* getRun(state, input.runId)
+    const current = state.operations.get(operationMapKey(input.runId, input.operationId))
+    const conflict = () =>
+      OperationResolutionConflict.make({
+        runId: input.runId,
+        operationId: input.operationId,
+        idempotencyKey: input.idempotencyKey,
+      })
+    if (current === undefined) return yield* conflict()
+    if (current.resolutionIdempotencyKey !== undefined) {
+      if (
+        current.resolutionIdempotencyKey === input.idempotencyKey &&
+        current.resolution !== undefined &&
+        resolutionDigest(current.resolution) === resolutionDigest(input.resolution)
+      ) {
+        return state
+      }
+      return yield* conflict()
+    }
+    if (run.status !== "needs-resolution" || current.status !== "unknown") return yield* conflict()
+    const resolved = { resolutionIdempotencyKey: input.idempotencyKey, resolution: input.resolution }
+    const record: OperationRecord =
+      input.resolution._tag === "Succeeded"
+        ? { ...current, ...resolved, status: "succeeded", result: input.resolution.value }
+        : input.resolution._tag === "Failed"
+          ? { ...current, ...resolved, status: "failed", error: input.resolution.error }
+          : { ...current, ...resolved, status: "requested" }
+    const operations = new Map(state.operations)
+    operations.set(operationMapKey(input.runId, input.operationId), record)
+    operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
+    const runs = new Map(state.runs)
+    const { ownerId: _, ...withoutOwner } = run
+    runs.set(run.runId, { ...withoutOwner, status: "running" })
+    return { ...state, operations, runs }
   })

@@ -20,7 +20,7 @@ export const runtimeReference = definePage({
         [[code("RunSchema")], "PostgreSQL schema plan, check, and predeploy apply operations"],
         [[code("MysqlRunSchema")], "MySQL schema plan, check, predeploy apply, and dirty-state operations"],
         [[code("RunClaims"), " / ", code("RuntimeWorker")], "Multi-worker claims, leases, and worker loops"],
-        [[code("Address"), " / ", code("AgentRef"), " / ", code("Cursor")], "Schema-backed boundary identities"],
+        [[code("Address"), " / ", code("ExecutableRef"), " / ", code("Cursor")], "Schema-backed boundary identities"],
       ],
     ),
     h2("layers", "Runtime layers"),

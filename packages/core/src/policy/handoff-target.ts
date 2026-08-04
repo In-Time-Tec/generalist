@@ -1,18 +1,18 @@
 import { Context, Layer } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import type { Agent } from "../agent/agent.js"
-import { fromAgent, type AgentRef } from "../durable/agent-ref.js"
+import type { AgentPin } from "../durable/pin.js"
 
 export interface HandoffTarget<R = any> {
   readonly name: string
   readonly agent: Agent<Record<string, Tool.Any>, R>
-  readonly ref: AgentRef
+  readonly pin?: AgentPin
 }
 
-export const target = <R>(agent: Agent<Record<string, Tool.Any>, R>, version = "1"): HandoffTarget<R> => ({
+export const target = <R>(agent: Agent<Record<string, Tool.Any>, R>, pin?: AgentPin): HandoffTarget<R> => ({
   name: agent.name,
   agent,
-  ref: fromAgent(agent, version),
+  ...(pin === undefined ? {} : { pin }),
 })
 
 export interface HandoffCatalogInterface {

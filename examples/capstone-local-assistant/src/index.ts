@@ -15,7 +15,7 @@ import { Chat, Connection } from "@batonfx/foldkit"
 import { WorkingMemory } from "@batonfx/memory"
 import { Deterministic } from "@batonfx/providers"
 import { SkillLoader } from "@batonfx/skills"
-import { AgentRef, RunEvent } from "@batonfx/runtime"
+import { ExecutableManifest, RunEvent } from "@batonfx/runtime"
 import { Prompt } from "effect/unstable/ai"
 
 const researchFrontmatter: SkillSource.Frontmatter = {
@@ -54,14 +54,14 @@ const key: Memory.Key = { agent: "capstone-assistant", subject: "local-user" }
 const filesystemSkillLayer = SkillLoader.layer({ cwd: ".", roots: ["fixtures/.agents/skills"] })
 const compactionLayer = Compaction.layer({ contextWindow: 64_000, reserveTokens: 1_024, keepRecentTokens: 8_000 })
 
-const chatAgent = AgentRef.make({ id: "capstone-assistant", version: "1", digest: "sha256:capstone" })
+const chatAgent = ExecutableManifest.makeTest("capstone-assistant", "1").ref
 const runEvent = (sequence: number, fields: Record<string, unknown>): RunEvent.RunEvent =>
   ({
     specVersion: "1",
     eventId: `capstone-run:${sequence}`,
     runId: "capstone-run",
     sequence,
-    agent: chatAgent,
+    executableRef: chatAgent,
     rootRunId: "capstone-run",
     occurredAt: "2026-08-03T00:00:00.000Z",
     ...fields,

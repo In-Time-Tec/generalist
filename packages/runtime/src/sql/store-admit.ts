@@ -2,20 +2,19 @@ import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import {
   AddressNotFound,
-  AgentVersionUnavailable,
   IdempotencyConflict,
   RunIdConflict,
   RunNotFound,
   RunTerminal,
+  ChildSelectionMissing,
   RuntimeUnavailable,
 } from "../errors.js"
-import type { AgentRef } from "../agent-ref.js"
-import type { Message } from "../message.js"
-import { messageDigest } from "../memory/digest.js"
-import { agentKey } from "../memory/state.js"
+import { decodePinned, equals, resolveChild, type PinnedExecutable } from "../executable-manifest.js"
+import { childDigest, messageDigest } from "../memory/digest.js"
 import type { AdmitSendInput } from "../run-store.js"
 import type { SpawnInput } from "../runtime.js"
-import { decodeQueue, encodeQueue } from "./codecs.js"
+import type { Message } from "../message.js"
+import { decodePinnedExecutable, decodeQueue, encodeQueue } from "./codecs.js"
 import type { RunRow } from "./rows.js"
 import { appendEvent, insertRun, loadRun, nowIso, promoteHead } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
@@ -25,8 +24,7 @@ const nextId = (prefix: string): Effect.Effect<string> =>
 
 export const admitSend = (
   hub: EventHub,
-  agentRefs: ReadonlyMap<string, AgentRef>,
-  addressBindings: ReadonlyMap<string, AgentRef>,
+  addressBindings: ReadonlyMap<string, PinnedExecutable>,
   input: AdmitSendInput,
   options?: { readonly promote?: boolean },
 ) =>
@@ -34,11 +32,16 @@ export const admitSend = (
     const sql = yield* SqlClient.SqlClient
     const bound = addressBindings.get(input.message.to)
     if (bound === undefined) return yield* AddressNotFound.make({ address: input.message.to })
-    if (bound.id !== input.agent.id || bound.version !== input.agent.version || bound.digest !== input.agent.digest) {
+    const admitted = yield* Effect.try({
+      try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
+    const binding = yield* Effect.try({
+      try: () => decodePinned(bound),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
+    if (!equals(binding, admitted)) {
       return yield* AddressNotFound.make({ address: input.message.to })
-    }
-    if (!agentRefs.has(agentKey(input.agent))) {
-      return yield* RuntimeUnavailable.make({ message: "agent not registered" })
     }
     const digest = messageDigest(input.message)
     const existing = yield* sql<RunRow>`
@@ -52,7 +55,11 @@ export const admitSend = (
       if (input.runId !== undefined && input.runId !== prior.run_id) {
         return yield* RunIdConflict.make({ runId: input.runId, existingRunId: prior.run_id })
       }
-      if (prior.message_digest !== digest) {
+      const priorExecutable = yield* Effect.try({
+        try: () => decodePinnedExecutable(prior.executable_ref_json, prior.executable_manifest_json),
+        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+      })
+      if (prior.message_digest !== digest || !equals(priorExecutable, admitted)) {
         return yield* IdempotencyConflict.make({
           address: input.message.to,
           sessionId: input.message.sessionId,
@@ -96,7 +103,8 @@ export const admitSend = (
       status: "queued",
       message: input.message,
       digest,
-      agent: input.agent,
+      executableRef: input.executableRef,
+      executableManifest: input.executableManifest,
       rootRunId: runId,
       acceptedSequence,
     })
@@ -119,8 +127,7 @@ export const admitSend = (
 
 export const admitSpawn = (
   hub: EventHub,
-  agentRefs: ReadonlyMap<string, AgentRef>,
-  input: SpawnInput & { readonly message: Message; readonly agent: AgentRef; readonly parentRunId: string },
+  input: SpawnInput & { readonly message: Message; readonly parentRunId: string },
 ) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
@@ -129,10 +136,15 @@ export const admitSpawn = (
     if (parent.status === "succeeded" || parent.status === "failed" || parent.status === "cancelled") {
       return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
-    if (!agentRefs.has(agentKey(input.agent))) {
-      return yield* AgentVersionUnavailable.make({ agent: input.agent })
+    const executableRef = resolveChild(parent.executableRef, parent.executableManifest, input.selection)
+    if (executableRef === undefined) {
+      return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: input.selection })
     }
-    const digest = messageDigest(input.message)
+    const digest = childDigest(input.message, executableRef)
+    const executable = yield* Effect.try({
+      try: () => decodePinned({ ref: executableRef, manifest: parent.executableManifest }),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
     const existing = yield* sql<RunRow>`
       SELECT * FROM baton_runs
       WHERE address = ${input.message.to}
@@ -141,7 +153,11 @@ export const admitSpawn = (
     `
     const prior = existing[0]
     if (prior !== undefined) {
-      if (prior.message_digest !== digest) {
+      const priorExecutable = yield* Effect.try({
+        try: () => decodePinnedExecutable(prior.executable_ref_json, prior.executable_manifest_json),
+        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+      })
+      if (prior.message_digest !== digest || !equals(priorExecutable, executable)) {
         return yield* IdempotencyConflict.make({
           address: input.message.to,
           sessionId: input.message.sessionId,
@@ -162,7 +178,8 @@ export const admitSpawn = (
       status: "queued",
       message: input.message,
       digest,
-      agent: input.agent,
+      executableRef,
+      executableManifest: parent.executableManifest,
       rootRunId: parent.rootRunId,
       parentRunId: parent.runId,
       invocationId: input.invocationId,

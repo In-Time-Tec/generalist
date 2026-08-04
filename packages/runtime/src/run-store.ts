@@ -2,8 +2,6 @@ import { Context, Effect, Stream } from "effect"
 import type { Cursor } from "./cursor.js"
 import type {
   AddressNotFound,
-  AgentNotRegistered,
-  AgentVersionUnavailable,
   CursorExpired,
   IdempotencyConflict,
   RunIdConflict,
@@ -17,16 +15,19 @@ import type {
   FanOutConflict,
   FanOutInvalid,
   FanOutNotFound,
+  ChildSelectionMissing,
   TreeCursorExpired,
   TreeCursorInvalid,
+  OperationResolutionConflict,
 } from "./errors.js"
 import type { Message } from "./message.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunWait, WaitResolution } from "./run-wait.js"
 import type { AgentLoopEvent, AgentResult } from "./agent-event.js"
 import type { RunEvent, RunFailure } from "./run-event.js"
-import type { AgentRef } from "./agent-ref.js"
+import type { ExecutableManifest, ExecutableRef } from "./executable-manifest.js"
 import type { CancelInput, RespondInput, SignalInput, SpawnInput } from "./runtime.js"
+import type { ResolveOperationInput } from "./operation-resolution.js"
 import type { OperationKind, OperationRecord, OperationStatus, ReplayPolicy } from "./sql/operations.js"
 import type { AgentEvent, DurableDriver } from "@batonfx/core"
 import type { ExecutionContinuation, SteeringEntry } from "./steering.js"
@@ -38,7 +39,8 @@ export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
 
 export interface AdmitSendInput {
   readonly message: Message
-  readonly agent: AgentRef
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly runId?: string
 }
 
@@ -74,10 +76,16 @@ export type CompletionOutcome =
   | { readonly _tag: "Completed" }
   | { readonly _tag: "SteeringPending"; readonly continuation: ExecutionContinuation }
 
+export type OperationCompletionOutcome =
+  | { readonly _tag: "Succeeded"; readonly value: unknown }
+  | { readonly _tag: "Failed"; readonly error: unknown }
+  | { readonly _tag: "Unknown" }
+
 export interface ExecutionRecord {
   readonly runId: string
   readonly message: Message
-  readonly agent: AgentRef
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly attempt: number
   readonly attemptFence: number
   readonly checkpoint?: DurableDriver.DriverCheckpoint
@@ -99,15 +107,15 @@ export interface Interface {
   readonly info: Effect.Effect<StoreInfo>
   readonly admitSend: (
     input: AdmitSendInput,
-  ) => Effect.Effect<
-    RunReceipt,
-    AddressNotFound | IdempotencyConflict | RunIdConflict | AgentNotRegistered | RuntimeUnavailable
-  >
+  ) => Effect.Effect<RunReceipt, AddressNotFound | IdempotencyConflict | RunIdConflict | RuntimeUnavailable>
   readonly admitSpawn: (
-    input: SpawnInput & { readonly message: Message; readonly agent: AgentRef; readonly parentRunId: string },
+    input: SpawnInput & {
+      readonly message: Message
+      readonly parentRunId: string
+    },
   ) => Effect.Effect<
     RunReceipt,
-    RunNotFound | RunTerminal | AgentVersionUnavailable | AgentNotRegistered | IdempotencyConflict | RuntimeUnavailable
+    RunNotFound | RunTerminal | ChildSelectionMissing | IdempotencyConflict | RuntimeUnavailable
   >
   readonly events: (input: {
     readonly runId: string
@@ -156,26 +164,25 @@ export interface Interface {
       readonly error: RunFailure
     },
   ) => Effect.Effect<void, WorkerMutationError>
-  readonly wait: (
+  readonly suspend: (
     input: ExecutionClaim & {
       readonly runId: string
       readonly wait: RunWait
+      readonly suspension: AgentEvent.AgentSuspended
+      readonly checkpoint?: DurableDriver.DriverCheckpoint
+      readonly transcript?: Prompt.Prompt
+      readonly continuation?: ExecutionContinuation | null
     },
   ) => Effect.Effect<void, WorkerMutationError>
   readonly resume: (input: {
     readonly runId: string
     readonly waitId: string
+    readonly resolution: WaitResolution
   }) => Effect.Effect<void, RunNotFound | WaitNotOpen | RunTerminal | RuntimeUnavailable>
   readonly emitAgentEvent: (
     input: ExecutionClaim & {
       readonly runId: string
       readonly event: AgentLoopEvent
-    },
-  ) => Effect.Effect<void, WorkerMutationError>
-  readonly markOperationUnknown: (
-    input: ExecutionClaim & {
-      readonly runId: string
-      readonly operationId: string
     },
   ) => Effect.Effect<void, WorkerMutationError>
   readonly recordOperation: (input: RecordOperationInput) => Effect.Effect<OperationRecord, WorkerMutationError>
@@ -185,18 +192,15 @@ export interface Interface {
       readonly operationId: string
     },
   ) => Effect.Effect<OperationRecord, WorkerMutationError>
-  readonly succeedOperation: (
+  readonly completeOperation: (
     input: ExecutionClaim & {
       readonly runId: string
       readonly operationId: string
-      readonly result: unknown
-    },
-  ) => Effect.Effect<OperationRecord, WorkerMutationError>
-  readonly failOperation: (
-    input: ExecutionClaim & {
-      readonly runId: string
-      readonly operationId: string
-      readonly error: unknown
+      readonly outcome: OperationCompletionOutcome
+      readonly checkpoint: DurableDriver.DriverCheckpoint
+      readonly transcript?: Prompt.Prompt
+      readonly continuation?: ExecutionContinuation | null
+      readonly steeringEntryIds?: ReadonlyArray<string>
     },
   ) => Effect.Effect<OperationRecord, WorkerMutationError>
   readonly expireRunningOperation: (
@@ -216,6 +220,9 @@ export interface Interface {
     readonly runId: string
     readonly operationKey: string
   }) => Effect.Effect<OperationRecord | undefined, RunNotFound | RuntimeUnavailable>
+  readonly resolveOperation: (
+    input: ResolveOperationInput,
+  ) => Effect.Effect<void, RunNotFound | OperationResolutionConflict | RuntimeUnavailable>
   readonly claimExecution: (input: {
     readonly runId: string
     readonly ownerId: string
@@ -235,7 +242,7 @@ export interface Interface {
     input: AdmitFanOutInput,
   ) => Effect.Effect<
     FanOutReceipt,
-    RunNotFound | RunTerminal | AgentVersionUnavailable | FanOutConflict | FanOutInvalid | RuntimeUnavailable
+    RunNotFound | RunTerminal | ChildSelectionMissing | FanOutConflict | FanOutInvalid | RuntimeUnavailable
   >
   readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, FanOutNotFound | RuntimeUnavailable>
 }

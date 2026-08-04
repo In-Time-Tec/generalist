@@ -1,6 +1,6 @@
 import type { Queue } from "effect"
 import type { Address } from "../address.js"
-import type { AgentRef } from "../agent-ref.js"
+import type { ExecutableManifest, ExecutableRef, PinnedExecutable } from "../executable-manifest.js"
 import type { Message } from "../message.js"
 import type { RunReceipt, RunStatus } from "../run.js"
 import type { RunEvent } from "../run-event.js"
@@ -18,13 +18,15 @@ export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
 
 export interface IdempotencyEntry {
   readonly digest: string
+  readonly executable: PinnedExecutable
   readonly receipt: RunReceipt
 }
 
 export interface StoredRun {
   readonly runId: string
   readonly status: RunStatus
-  readonly agent: AgentRef
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly address: Address
   readonly message: Message
   readonly rootRunId: string
@@ -67,8 +69,7 @@ export interface MemoryState {
   readonly idempotency: ReadonlyMap<string, IdempotencyEntry>
   readonly fanOuts: ReadonlyMap<string, StoredFanOut>
   readonly operations: ReadonlyMap<string, OperationRecord>
-  readonly agentRefs: ReadonlyMap<string, AgentRef>
-  readonly addressBindings: ReadonlyMap<string, AgentRef>
+  readonly addressBindings: ReadonlyMap<string, { readonly ref: ExecutableRef; readonly manifest: ExecutableManifest }>
   readonly subscriberQueueCapacity: number
 }
 
@@ -92,14 +93,11 @@ export interface StoredFanOut {
 
 export const laneKey = (address: Address, sessionId: string): string => `${address}\0${sessionId}`
 
-export const agentKey = (agent: AgentRef): string => `${agent.id}\0${agent.version}\0${agent.digest}`
-
 export const idempotencyKey = (address: Address, sessionId: string, key: string): string =>
   `${address}\0${sessionId}\0${key}`
 
 export const emptyState = (input: {
-  readonly agentRefs: ReadonlyMap<string, AgentRef>
-  readonly addressBindings: ReadonlyMap<string, AgentRef>
+  readonly addressBindings: MemoryState["addressBindings"]
   readonly subscriberQueueCapacity: number
 }): MemoryState => ({
   closed: false,
@@ -113,7 +111,6 @@ export const emptyState = (input: {
   idempotency: new Map(),
   fanOuts: new Map(),
   operations: new Map(),
-  agentRefs: input.agentRefs,
   addressBindings: input.addressBindings,
   subscriberQueueCapacity: input.subscriberQueueCapacity,
 })

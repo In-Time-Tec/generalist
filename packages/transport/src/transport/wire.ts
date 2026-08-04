@@ -21,7 +21,7 @@ export const ObserverRunEvent: Schema.Codec<RunEvent.RunEvent, RunEvent.RunEvent
     typeof value.sequence === "number" &&
     Number.isSafeInteger(value.sequence) &&
     value.sequence >= 0 &&
-    isRecord(value.agent) &&
+    isRecord(value.executableRef) &&
     typeof value.rootRunId === "string" &&
     typeof value.occurredAt === "string",
 )

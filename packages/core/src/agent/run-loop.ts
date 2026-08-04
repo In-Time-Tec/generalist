@@ -3,6 +3,8 @@ import { AiError, LanguageModel, Prompt, Response, Tool } from "effect/unstable/
 import {
   AgentError,
   AgentSuspended,
+  type Event,
+  type StructuredOutput,
   DuplicateToolCallId,
   RunEndedWithoutOutput,
   TurnLimitExceeded,
@@ -15,15 +17,13 @@ import {
   CurrentSummaryCall,
   DeliveryFailed,
 } from "../model/model-telemetry.js"
-import { TurnPolicyError } from "../turn/turn-policy.js"
+import { TurnPolicyError, type TurnOverrides } from "../turn/turn-policy.js"
 import type { LanguageModelNotRegistered } from "../model/model-registry.js"
 import type { AnyToolCall } from "./agent-tool-result.js"
 import { resolvedToolResult, type SuspensionCheckpoint } from "./agent-suspension.js"
 import type { ResumeResolution, RunError } from "./agent.js"
-import type { TurnOverrides } from "../turn/turn-policy.js"
 import type { Input } from "../turn/steering.js"
-import type { Event, StructuredOutput } from "./agent-event.js"
-import { applyPromptChain } from "./agent-message.js"
+import { applyPromptChain, errorMessage, providerOutputState } from "./agent-message.js"
 import type { ObjectSchema, RunLoopContext, StructuredRunConfig } from "./run-loop-context.js"
 import type { Request } from "../tools/tool-executor.js"
 import { select } from "../tools/tool-registry.js"
@@ -32,13 +32,13 @@ import {
   intercept,
   logicalOperationId,
   recordSuspension,
+  setHandoffState,
 } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
 import { LoopDriverState, modelCallOrdinal } from "../durable/loop-driver-state.js"
+import { takePendingContinuation } from "./handoff-state.js"
 import { DriverStateInvalid } from "../durable/durable-driver.js"
 import { terminalCompletedEvent, turnCompletedEvent } from "./model-turn-finish.js"
-const providerOutputState = () => ({ textCharacters: 0, reasoningCharacters: 0, finishReason: undefined })
-const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
 export const makeRunLoop = <
   Tools extends Record<string, Tool.Any>,
   R,
@@ -272,17 +272,19 @@ export const makeRunLoop = <
       let continuationOverrides = decision.overrides
       let continuationPrompt = basePrompt
       if (handoffStateRef !== undefined) {
-        const handoffState = yield* Ref.get(handoffStateRef)
-        if (handoffState.pendingContinuation !== undefined) {
+        const pendingContinuation = yield* takePendingContinuation(
+          handoffStateRef,
+          (handoff) => setHandoffState(handoff) as Effect.Effect<void, DriverStateInvalid, R>,
+        )
+        if (pendingContinuation !== undefined) {
           continuationPrompt =
             steering.length === 0
-              ? Prompt.make(handoffState.pendingContinuation.prompt)
-              : Prompt.concat(basePrompt, Prompt.make(handoffState.pendingContinuation.prompt))
+              ? Prompt.make(pendingContinuation.prompt)
+              : Prompt.concat(basePrompt, Prompt.make(pendingContinuation.prompt))
           continuationOverrides = {
             ...decision.overrides,
-            ...handoffState.pendingContinuation.overrides,
+            ...pendingContinuation.overrides,
           }
-          yield* Ref.set(handoffStateRef, { ...handoffState, pendingContinuation: undefined })
         }
       }
       const prompt =

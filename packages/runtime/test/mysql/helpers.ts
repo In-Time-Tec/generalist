@@ -1,20 +1,30 @@
 import { Effect, Redacted } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
-import { MysqlRunSchema, Runtime } from "../../src/index.js"
+import { ExecutableResolver, MysqlRunSchema, Runtime } from "../../src/index.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../src/sql/mysql/schema.js"
-import { assistant, assistantAddress, assistantRef, researcher, researcherAddress, researcherRef } from "../helpers.js"
+import {
+  analyst,
+  analystRef,
+  assistant,
+  assistantAddress,
+  assistantRef,
+  researcher,
+  researcherAddress,
+  researcherRef,
+} from "../helpers.js"
 
 export const mysqlUrl = process.env.BATON_MYSQL_URL ?? process.env.MYSQL_URL
 export const mysqlAvailable = typeof mysqlUrl === "string" && mysqlUrl.length > 0
 
-const agents = [
-  { ref: assistantRef, agent: assistant },
-  { ref: researcherRef, agent: researcher },
-]
+const resolver = ExecutableResolver.makeStatic([
+  { executable: assistantRef, agent: assistant },
+  { executable: researcherRef, agent: researcher },
+  { executable: analystRef, agent: analyst },
+])
 const addresses = [
-  { address: assistantAddress, agent: assistantRef },
-  { address: researcherAddress, agent: researcherRef },
+  { address: assistantAddress, executable: assistantRef },
+  { address: researcherAddress, executable: researcherRef },
 ]
 
 export const mysqlClient = (url: string) => MysqlClient.layer({ url: Redacted.make(url), maxConnections: 4 })
@@ -62,7 +72,7 @@ export const mysqlLayer = (url: string) =>
   Runtime.layerMysql({
     url,
     source: "mysql-test",
-    agents,
+    resolver,
     addresses,
     subscriberQueueCapacity: 8,
     maxConnections: 4,

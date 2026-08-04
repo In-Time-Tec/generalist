@@ -1,7 +1,16 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { Errors, Runtime, RunStore, RunTree } from "../src/index.js"
-import { assistantAddress, completedResult, memoryLayer, researcherRef, textPrompt } from "./helpers.js"
+import {
+  alternateAssistantAddress,
+  alternateResearcherRef,
+  assistantAddress,
+  completedResult,
+  memoryLayer,
+  parentRelativeLayer,
+  researcherRef,
+  textPrompt,
+} from "./helpers.js"
 
 layer(memoryLayer)("Runtime children", (it) => {
   it.effect("links a child on the parent and keeps child detail on the child stream", () =>
@@ -17,7 +26,7 @@ layer(memoryLayer)("Runtime children", (it) => {
       const child = yield* runtime.spawn({
         parentRunId: parent.runId,
         invocationId: "invocation:research",
-        agent: researcherRef,
+        selection: "researcher",
         prompt: textPrompt("research"),
       })
       yield* driver.emitAgentEvent({
@@ -51,6 +60,7 @@ layer(memoryLayer)("Runtime children", (it) => {
       expect(childTags.at(-1)).toBe("RunCompleted")
 
       const childInspection = yield* runtime.inspect(child.runId)
+      expect(childInspection.executableRef).toEqual(researcherRef.ref)
       expect(childInspection.parentRunId).toBe(parent.runId)
       expect(childInspection.status).toBe("succeeded")
       expect(parentInspection.status).toBe("running")
@@ -70,7 +80,7 @@ layer(memoryLayer)("Runtime children", (it) => {
       const child = yield* runtime.spawn({
         parentRunId: parent.runId,
         invocationId: "invocation:research",
-        agent: researcherRef,
+        selection: "researcher",
         prompt: textPrompt("research"),
       })
       yield* driver.complete({
@@ -105,11 +115,64 @@ layer(memoryLayer)("Runtime children", (it) => {
         .spawn({
           parentRunId: parent.runId,
           invocationId: "too-late",
-          agent: researcherRef,
+          selection: "researcher",
           prompt: textPrompt("child"),
         })
         .pipe(Effect.flip)
       expect(failure).toBeInstanceOf(Errors.RunTerminal)
+      expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
+    }),
+  )
+})
+
+layer(parentRelativeLayer)("parent-relative child selection", (it) => {
+  it.effect("resolves the same selection independently in two executable closures", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const first = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "relative:first",
+        idempotencyKey: "parent",
+        prompt: "first",
+      })
+      const second = yield* runtime.send({
+        to: alternateAssistantAddress,
+        sessionId: "relative:second",
+        idempotencyKey: "parent",
+        prompt: "second",
+      })
+      const firstChild = yield* runtime.spawn({
+        parentRunId: first.runId,
+        invocationId: "child",
+        selection: "researcher",
+        prompt: "child",
+      })
+      const secondChild = yield* runtime.spawn({
+        parentRunId: second.runId,
+        invocationId: "child",
+        selection: "researcher",
+        prompt: "child",
+      })
+      expect((yield* runtime.inspect(firstChild.runId)).executableRef).toEqual(researcherRef.ref)
+      expect((yield* runtime.inspect(secondChild.runId)).executableRef).toEqual(alternateResearcherRef.ref)
+      expect(researcherRef.active).not.toBe(alternateResearcherRef.active)
+    }),
+  )
+
+  it.effect("rejects an undeclared selection without changing the run tree", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "relative:missing",
+        idempotencyKey: "parent",
+        prompt: "parent",
+      })
+      const before = yield* RunTree.inspect(parent.runId)
+      const failure = yield* runtime
+        .spawn({ parentRunId: parent.runId, invocationId: "missing", selection: "undeclared", prompt: "child" })
+        .pipe(Effect.flip)
+      expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
       expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
     }),
   )

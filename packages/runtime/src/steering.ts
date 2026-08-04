@@ -1,8 +1,6 @@
+import { Pins } from "@batonfx/core"
 import { Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { createHash } from "node:crypto"
-
-const canonicalPrompt = (prompt: Prompt.Prompt): string => JSON.stringify(Schema.encodeSync(Prompt.Prompt)(prompt))
 
 /** @experimental Durable steering accepted for a Run. */
 export interface SteeringEntry {
@@ -33,5 +31,4 @@ export const decodeContinuation = (encoded: string): ExecutionContinuation =>
   Schema.decodeUnknownSync(ExecutionContinuation)(JSON.parse(encoded) as unknown)
 
 /** @experimental Stable digest used for steering idempotency. */
-export const digest = (prompt: Prompt.Prompt): string =>
-  createHash("sha256").update(canonicalPrompt(prompt)).digest("hex")
+export const digest = (prompt: Prompt.Prompt): string => Pins.digest(Schema.encodeSync(Prompt.Prompt)(prompt))

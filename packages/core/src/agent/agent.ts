@@ -255,7 +255,9 @@ export interface RunOptions {
   /** @experimental Runtime-owned checkpoint used to reconstruct the same durable driver. */
   readonly driverCheckpoint?: DriverCheckpoint
   /** @experimental Pinned identity admitted by a durable host. */
-  readonly agentRef?: import("../durable/agent-ref.js").AgentRef
+  readonly executableRef?: import("../durable/executable-manifest.js").ExecutableRef
+  /** @experimental Complete pinned closure used to resolve same-run handoffs exactly. */
+  readonly executableManifest?: import("../durable/executable-manifest.js").ExecutableManifest
   /** @experimental Opaque host-assigned write-ownership token, forwarded on every Session append and checkpoint so durable hosts can fence stale writers. */
   readonly sessionOwnerToken?: string
   /** @experimental Spill successful tool outputs whose encoded size exceeds this byte limit. */

@@ -2,9 +2,9 @@ import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Response } from "effect/unstable/ai"
-import { RunStore, RunTree, Runtime } from "../src/index.js"
+import { Errors, RunStore, RunTree, Runtime } from "../src/index.js"
 import { makeCursor } from "../src/tree-cursor.js"
-import { assistantAddress, completedResult, memoryLayer, researcherRef, textPrompt } from "./helpers.js"
+import { assistantAddress, completedResult, memoryLayer, textPrompt } from "./helpers.js"
 
 layer(memoryLayer)("RunTree", (it) => {
   it.effect("inspects exact active Runs and stable mixed terminal outcomes", () =>
@@ -20,13 +20,13 @@ layer(memoryLayer)("RunTree", (it) => {
       const child = yield* runtime.spawn({
         parentRunId: root.runId,
         invocationId: "invoke:child",
-        agent: researcherRef,
+        selection: "researcher",
         prompt: textPrompt("child"),
       })
       const grandchild = yield* runtime.spawn({
         parentRunId: child.runId,
         invocationId: "invoke:grandchild",
-        agent: researcherRef,
+        selection: "analyst",
         prompt: textPrompt("grandchild"),
       })
       const rootClaim = yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })
@@ -39,7 +39,7 @@ layer(memoryLayer)("RunTree", (it) => {
       expect(active.runs.map(({ run }) => run.runId)).toEqual([root.runId, child.runId, grandchild.runId])
 
       const childClaim = yield* store.claimExecution({ runId: child.runId, ownerId: "child-worker" })
-      yield* store.fail({ ...childClaim, error: { message: "child failed" } })
+      yield* store.fail({ ...childClaim, error: Errors.AgentExecutionFailure.make({ message: "child failed" }) })
       yield* runtime.cancel({ runId: grandchild.runId, reason: "not needed" })
       const terminal = yield* RunTree.inspect(root.runId)
       expect(terminal._tag).toBe("Terminal")
@@ -79,19 +79,19 @@ layer(memoryLayer)("RunTree", (it) => {
       const child = yield* runtime.spawn({
         parentRunId: root.runId,
         invocationId: "invoke:child",
-        agent: researcherRef,
+        selection: "researcher",
         prompt: textPrompt("child"),
       })
       const grandchild = yield* runtime.spawn({
         parentRunId: child.runId,
         invocationId: "invoke:grandchild",
-        agent: researcherRef,
+        selection: "analyst",
         prompt: textPrompt("grandchild"),
       })
       const sibling = yield* runtime.spawn({
         parentRunId: root.runId,
         invocationId: "invoke:sibling",
-        agent: researcherRef,
+        selection: "researcher",
         prompt: textPrompt("sibling"),
       })
 

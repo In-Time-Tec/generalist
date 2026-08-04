@@ -4,11 +4,11 @@ import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Option, Schedule,
 import { AiError, Chat, LanguageModel, Prompt, Response, Tokenizer, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
-  AgentRef,
   AgentEvent,
   Approvals,
   Compaction,
   DurableDriver,
+  ExecutableManifest,
   Instructions,
   Memory,
   ModelRegistry,
@@ -7453,21 +7453,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ),
     Effect.gen(function* () {
       const agent = Agent.make({ name: "checkpoint-identity-agent" })
-      const agentRef = AgentRef.fromAgent(agent, "inline")
+      const executable = ExecutableManifest.makeTest("checkpoint-identity-agent")
       const budget = RunBudget.allocate({})
       const checkpoint: DurableDriver.DriverCheckpoint = {
         driverVersion: DurableDriver.currentDriverVersion,
-        agent: agentRef,
+        executable: executable.ref,
         turn: 0,
         budget,
-        execution: {
-          agent: agentRef,
-          driverVersion: DurableDriver.currentDriverVersion,
-          checkpointCodecVersion: "1",
-          eventCodecVersion: "1",
-          toolSchemaDigests: {},
-          rootBudget: budget,
-        },
         state: {
           logicalOperationId: "operation:restored",
           sessionId: "session:restored",
@@ -7479,6 +7471,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         Agent.stream(agent, {
           prompt: "continue",
           logicalOperationId: "operation:restored",
+          executableRef: executable.ref,
           driverCheckpoint: checkpoint,
         }),
       )
@@ -7500,6 +7493,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ),
     Effect.gen(function* () {
       const agent = Agent.make({ name: "journal-restart-agent" })
+      const executable = ExecutableManifest.makeTest("journal-restart-agent")
       let pending: DurableDriver.DriverCheckpoint | undefined
       const crashingJournal: DurableDriver.DriverJournal = {
         onScheduled: (operation, checkpoint) =>
@@ -7511,7 +7505,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         onCompleted: () => Effect.void,
         onCheckpoint: () => Effect.void,
       }
-      yield* Agent.stream(agent, { prompt: "continue", logicalOperationId: "journal-restart" }).pipe(
+      yield* Agent.stream(agent, {
+        prompt: "continue",
+        logicalOperationId: "journal-restart",
+        executableRef: executable.ref,
+      }).pipe(
         Stream.runDrain,
         Effect.provide(Layer.succeed(DurableDriver.DriverJournalService, crashingJournal)),
         Effect.exit,
@@ -7530,6 +7528,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       const events = yield* Agent.stream(agent, {
         prompt: "continue",
         logicalOperationId: "journal-restart",
+        executableRef: executable.ref,
         driverCheckpoint: pending!,
       }).pipe(Stream.runCollect, Effect.provide(Layer.succeed(DurableDriver.DriverJournalService, resumedJournal)))
       expect(scheduled.find((key) => key.includes(":model:"))).toContain(":model:0:0:conversation")

@@ -2,7 +2,15 @@ import { expect, layer } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Errors, Run, RunEvent, Runtime, RunStore } from "../src/index.js"
-import { assistantAddress, emptyTranscript, memoryLayer, openWait, textPrompt } from "./helpers.js"
+import {
+  alternateAssistantRef,
+  assistantAddress,
+  emptyTranscript,
+  memoryLayer,
+  openWait,
+  suspension,
+  textPrompt,
+} from "./helpers.js"
 
 layer(memoryLayer)("Runtime inspection contracts", (it) => {
   it.effect("exposes canonical snapshot, finite history, list, and structured wait resolution", () =>
@@ -15,10 +23,11 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         idempotencyKey: "inspection:1",
         prompt: textPrompt("inspect"),
       })
-      yield* store.wait({
+      yield* store.suspend({
         ...(yield* store.claimExecution({ runId: receipt.runId, ownerId: "test" })),
         runId: receipt.runId,
         wait: openWait("wait:inspection"),
+        suspension: suspension("wait:inspection"),
       })
       expect((yield* runtime.inspect(receipt.runId)).wait).toEqual(openWait("wait:inspection"))
       yield* runtime.respond({
@@ -30,6 +39,18 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       expect(snapshot.cursor).toBe(snapshot.run.lastSequence)
       expect(snapshot.run.wait?.resolution?._tag).toBe("ToolResult")
       expect(yield* Run.decodeSnapshot(yield* Run.encodeSnapshot(snapshot))).toEqual(snapshot)
+      const mismatchedInspection = { ...snapshot.run, executableManifest: alternateAssistantRef.manifest }
+      expect(Schema.decodeUnknownExit(Run.RunInspection)(mismatchedInspection)._tag).toBe("Failure")
+      expect(Schema.decodeUnknownExit(Run.RunSnapshot)({ ...snapshot, run: mismatchedInspection })._tag).toBe("Failure")
+      expect(
+        Schema.decodeUnknownExit(Run.Run)({
+          ...mismatchedInspection,
+          messageId: receipt.messageId,
+          sessionId: "session:inspection",
+          rootRunId: receipt.runId,
+          attempt: 0,
+        })._tag,
+      ).toBe("Failure")
       const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 2 })
       expect(history).toHaveLength(2)
       const listed = yield* runtime.list({ status: "running", limit: 10 })

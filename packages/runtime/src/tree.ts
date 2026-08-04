@@ -34,13 +34,24 @@ export interface EventsInput {
   readonly cursor?: TreeCursorType
 }
 
-export const TreeRunInspection = Schema.Struct({
+export interface TreeRunInspection {
+  readonly run: RunInspection
+  readonly parentRunId?: string
+  readonly invocationId?: string
+  readonly outcome?: RunOutcome
+}
+
+interface TreeRunInspectionEncoded extends Omit<TreeRunInspection, "run" | "outcome"> {
+  readonly run: typeof RunInspection.Encoded
+  readonly outcome?: typeof RunOutcome.Encoded
+}
+
+export const TreeRunInspection: Schema.Codec<TreeRunInspection, TreeRunInspectionEncoded> = Schema.Struct({
   run: RunInspection,
   parentRunId: Schema.optionalKey(Schema.String),
   invocationId: Schema.optionalKey(Schema.String),
   outcome: Schema.optionalKey(RunOutcome),
 })
-export type TreeRunInspection = typeof TreeRunInspection.Type
 
 const InspectionBase = {
   rootRunId: Schema.String,
@@ -50,11 +61,33 @@ const InspectionBase = {
   compactions: Schema.Array(CompactionInspection),
 }
 
-export const Inspection = Schema.Union([
+interface InspectionBase {
+  readonly rootRunId: string
+  readonly cursor: TreeCursorType
+  readonly runs: ReadonlyArray<TreeRunInspection>
+  readonly usage: ReadonlyArray<RawUsageFact>
+  readonly compactions: ReadonlyArray<CompactionInspection>
+}
+
+export type Inspection =
+  | (InspectionBase & { readonly _tag: "Active"; readonly activeRunIds: ReadonlyArray<string> })
+  | (InspectionBase & { readonly _tag: "Terminal" })
+
+interface InspectionBaseEncoded extends Omit<InspectionBase, "cursor" | "runs" | "usage" | "compactions"> {
+  readonly cursor: typeof TreeCursor.Encoded
+  readonly runs: ReadonlyArray<TreeRunInspectionEncoded>
+  readonly usage: ReadonlyArray<typeof RawUsageFact.Encoded>
+  readonly compactions: ReadonlyArray<typeof CompactionInspection.Encoded>
+}
+
+type InspectionEncoded =
+  | (InspectionBaseEncoded & { readonly _tag: "Active"; readonly activeRunIds: ReadonlyArray<string> })
+  | (InspectionBaseEncoded & { readonly _tag: "Terminal" })
+
+export const Inspection: Schema.Codec<Inspection, InspectionEncoded> = Schema.Union([
   Schema.TaggedStruct("Active", { ...InspectionBase, activeRunIds: Schema.Array(Schema.String) }),
   Schema.TaggedStruct("Terminal", InspectionBase),
 ])
-export type Inspection = typeof Inspection.Type
 
 export const encodeInspection = Schema.encodeEffect(Inspection)
 export const decodeInspection = Schema.decodeEffect(Inspection)

@@ -6,6 +6,8 @@ import type { ExecutionClaim, ExecutionRecord } from "../run-store.js"
 import { StaleClaim } from "./errors.js"
 import { loadRun, loadRunWait, nowIso } from "./store-helpers.js"
 import type { DecodedRun } from "./rows.js"
+import { checkpointRef } from "../executable-manifest.js"
+import { encodeExecutableRef } from "./codecs.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))))
@@ -21,13 +23,15 @@ export const requireExecutionClaim = (input: ExecutionClaim) =>
 const executionRecord = (run: DecodedRun, resolution?: ExecutionRecord["resolution"]): ExecutionRecord => ({
   runId: run.runId,
   message: run.message,
-  agent: run.agent,
+  executableRef: run.executableRef,
+  executableManifest: run.executableManifest,
   attempt: run.attempt,
   attemptFence: run.attemptFence,
   ...(run.driverCheckpoint === undefined ? {} : { checkpoint: run.driverCheckpoint }),
   ...(run.suspension === undefined ? {} : { suspension: run.suspension }),
   ...(resolution === undefined ? {} : { resolution }),
   ...(run.transcript === undefined ? {} : { transcript: run.transcript }),
+  ...(run.continuation === undefined ? {} : { continuation: run.continuation }),
 })
 
 export const loadExecution = (runId: string) =>
@@ -42,7 +46,7 @@ export const claimExecution = (input: { readonly runId: string; readonly ownerId
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    if (run.status === "waiting" || run.status === "queued") {
+    if (run.status === "waiting" || run.status === "queued" || run.status === "needs-resolution") {
       return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is ${run.status}` })
     }
     const nextAttemptFence = run.attemptFence + 1
@@ -54,7 +58,7 @@ export const claimExecution = (input: { readonly runId: string; readonly ownerId
         status = 'running',
         updated_at = ${updated}
       WHERE run_id = ${input.runId}
-        AND status IN ('running', 'needs-resolution')
+        AND status = 'running'
         AND attempt_fence = ${run.attemptFence}
     `
     const claimed = yield* requireRun(input.runId)
@@ -74,10 +78,16 @@ export const saveExecution = (
 ) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const run = yield* requireRun(input.runId)
+    const executableRef = yield* Effect.try({
+      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
     const updated = yield* nowIso
     const rows = yield* sql<{ run_id: string }>`
       UPDATE baton_runs SET
         driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+        executable_ref_json = ${encodeExecutableRef(executableRef)},
         suspension_json = COALESCE(${input.suspension === undefined ? null : JSON.stringify(input.suspension)}, suspension_json),
         transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
         updated_at = ${updated}

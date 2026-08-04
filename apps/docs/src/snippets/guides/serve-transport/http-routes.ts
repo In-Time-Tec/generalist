@@ -12,7 +12,7 @@ import {
   ToolExecutor,
   Toolkit,
 } from "@batonfx/core"
-import { Address, AgentHost, AgentRef, RunStore, Runtime } from "@batonfx/runtime"
+import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { Sse, Ws } from "@batonfx/transport"
 
 const searchTool = Tool.make("web_search", {
@@ -24,7 +24,7 @@ const searchTool = Tool.make("web_search", {
 const toolkit = Toolkit.make(searchTool)
 
 const agent = Agent.make({ name: "research-agent", toolkit })
-const agentRef = AgentRef.make({ id: "research-agent", version: "1", digest: "sha256:research-agent" })
+const executable = ExecutableManifest.makeTest("research-agent", "1")
 const agentAddress = Address.make("agent:research")
 
 const modelLayer = Layer.effect(
@@ -145,8 +145,8 @@ const agentServices = Layer.mergeAll(
 )
 
 const runtimeLayer = Runtime.layerMemory({
-  agents: [{ ref: agentRef, agent, services: agentServices }],
-  addresses: [{ address: agentAddress, agent: agentRef }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
+  addresses: [{ address: agentAddress, executable }],
 })
 
 const appLayer = Layer.mergeAll(routesLayer, HttpRouter.cors())

@@ -1,7 +1,7 @@
 import { Duration, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { RuntimeUnavailable } from "../../errors.js"
+import { AgentExecutionFailure, RuntimeUnavailable } from "../../errors.js"
 import { RunClaims, type ClaimedRun, type Interface as ClaimsInterface } from "../run-claims.js"
 import type { RunRow } from "../rows.js"
 import { appendEvent, loadRun } from "../store-helpers.js"
@@ -40,7 +40,7 @@ export const makeMysqlClaims = (input: {
                 NOT EXISTS (SELECT 1 FROM baton_fan_out_members fm WHERE fm.child_run_id = r.run_id)
                 OR EXISTS (SELECT 1 FROM baton_fan_out_members fm WHERE fm.child_run_id = r.run_id AND fm.status = 'running')
               )
-              AND r.status IN ('queued', 'running', 'needs-resolution', 'cancelling')
+              AND r.status IN ('queued', 'running', 'cancelling')
               AND r.cancellation_requested = 0
               AND (r.owner_worker_id IS NULL OR r.lease_expires_at IS NULL OR r.lease_expires_at < NOW(3))
             ORDER BY r.accepted_sequence ASC
@@ -52,7 +52,7 @@ export const makeMysqlClaims = (input: {
             const locked = yield* sql<RunRow>`
               SELECT * FROM baton_runs
               WHERE run_id = ${candidate.run_id}
-                AND status IN ('queued', 'running', 'needs-resolution', 'cancelling')
+                AND status IN ('queued', 'running', 'cancelling')
                 AND cancellation_requested = 0
                 AND (owner_worker_id IS NULL OR lease_expires_at IS NULL OR lease_expires_at < NOW(3))
               FOR UPDATE SKIP LOCKED
@@ -138,7 +138,10 @@ export const makeMysqlClaims = (input: {
           } else if (commitInput.transition === "complete") {
             yield* complete(hub, { runId: commitInput.runId, result: commitInput.result as never })
           } else {
-            yield* fail(hub, { runId: commitInput.runId, error: commitInput.error ?? { message: "failed" } })
+            yield* fail(hub, {
+              runId: commitInput.runId,
+              error: AgentExecutionFailure.make({ message: commitInput.error?.message ?? "failed" }),
+            })
           }
           yield* clearClaim(commitInput.runId)
         }),

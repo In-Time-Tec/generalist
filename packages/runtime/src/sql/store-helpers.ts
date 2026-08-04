@@ -2,15 +2,16 @@ import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { eventIdFor, type AgentLoopEvent, type AgentResult, type RunEvent, type RunFailure } from "../run-event.js"
-import type { AgentRef } from "../agent-ref.js"
+import type { ExecutableManifest, ExecutableRef } from "../executable-manifest.js"
 import type { Message } from "../message.js"
 import { isTerminal, type RunStatus } from "../run.js"
 import {
-  decodeAgent,
+  decodePinnedExecutable,
   decodeEvent,
   decodeMessage,
   decodeQueue,
-  encodeAgent,
+  encodeExecutableManifest,
+  encodeExecutableRef,
   encodeEvent,
   encodeMessage,
   encodeQueue,
@@ -23,6 +24,9 @@ import { Schema } from "effect"
 import type { OperationRecord } from "./operations.js"
 import { decodeContinuation } from "../steering.js"
 import { reconcileFanOut } from "./store-fan-out.js"
+import { RuntimeUnavailable } from "../errors.js"
+import { DurableDriver } from "@batonfx/core"
+import { checkpointRef, decodePinned } from "../executable-manifest.js"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -33,64 +37,100 @@ const asIso = (value: string | Date | null | undefined): string | undefined => {
   return value instanceof Date ? value.toISOString() : value
 }
 
-export const decodeRun = (row: RunRow): DecodedRun => ({
-  runId: row.run_id,
-  status: row.status,
-  address: row.address,
-  sessionId: row.session_id,
-  message: decodeMessage(row.message_json),
-  messageDigest: row.message_digest,
-  agent: decodeAgent(row.agent_json),
-  rootRunId: row.root_run_id,
-  attempt: Number(row.attempt),
-  attemptFence: Number(row.attempt_fence),
-  lastSequence: Number(row.last_sequence),
-  cancellationRequested: asBool(row.cancellation_requested),
-  acceptedSequence: Number(row.accepted_sequence),
-  respondedWaitIds: new Set(JSON.parse(row.responded_wait_ids_json) as ReadonlyArray<string>),
-  ...(row.parent_run_id === null || row.parent_run_id === undefined ? {} : { parentRunId: row.parent_run_id }),
-  ...(row.invocation_id === null || row.invocation_id === undefined ? {} : { invocationId: row.invocation_id }),
-  ...(row.active_wait_id === null || row.active_wait_id === undefined ? {} : { activeWaitId: row.active_wait_id }),
-  ...(row.cancel_reason === null || row.cancel_reason === undefined ? {} : { cancelReason: row.cancel_reason }),
-  ...(row.terminal_event_id === null || row.terminal_event_id === undefined
-    ? {}
-    : { terminalEventId: row.terminal_event_id }),
-  ...(row.owner_worker_id === null || row.owner_worker_id === undefined ? {} : { ownerWorkerId: row.owner_worker_id }),
-  ...(row.driver_checkpoint_json === null || row.driver_checkpoint_json === undefined
-    ? {}
-    : { driverCheckpoint: JSON.parse(row.driver_checkpoint_json) }),
-  ...(row.suspension_json === null || row.suspension_json === undefined
-    ? {}
-    : { suspension: JSON.parse(row.suspension_json) }),
-  ...(row.transcript_json === null || row.transcript_json === undefined
-    ? {}
-    : { transcript: JSON.parse(row.transcript_json) }),
-  ...(row.continuation_json === null || row.continuation_json === undefined
-    ? {}
-    : { continuation: decodeContinuation(row.continuation_json) }),
-  ...(() => {
-    const lease = asIso(row.lease_expires_at)
-    return lease === undefined ? {} : { leaseExpiresAt: lease }
-  })(),
-})
+export const decodeRun = (row: RunRow): DecodedRun => {
+  const executable = decodePinnedExecutable(row.executable_ref_json, row.executable_manifest_json)
+  const checkpoint =
+    row.driver_checkpoint_json === null || row.driver_checkpoint_json === undefined
+      ? undefined
+      : Schema.decodeUnknownSync(DurableDriver.DriverCheckpoint)(JSON.parse(row.driver_checkpoint_json))
+  const checkpointExecutable = checkpointRef(executable.ref, executable.manifest, checkpoint)
+  if (
+    checkpointExecutable.executable !== executable.ref.executable ||
+    checkpointExecutable.active !== executable.ref.active
+  ) {
+    throw new TypeError("Persisted checkpoint executable does not match Run executable")
+  }
+  return {
+    runId: row.run_id,
+    status: row.status,
+    address: row.address,
+    sessionId: row.session_id,
+    message: decodeMessage(row.message_json),
+    messageDigest: row.message_digest,
+    executableRef: executable.ref,
+    executableManifest: executable.manifest,
+    rootRunId: row.root_run_id,
+    attempt: Number(row.attempt),
+    attemptFence: Number(row.attempt_fence),
+    lastSequence: Number(row.last_sequence),
+    cancellationRequested: asBool(row.cancellation_requested),
+    acceptedSequence: Number(row.accepted_sequence),
+    respondedWaitIds: new Set(JSON.parse(row.responded_wait_ids_json) as ReadonlyArray<string>),
+    ...(row.parent_run_id === null || row.parent_run_id === undefined ? {} : { parentRunId: row.parent_run_id }),
+    ...(row.invocation_id === null || row.invocation_id === undefined ? {} : { invocationId: row.invocation_id }),
+    ...(row.active_wait_id === null || row.active_wait_id === undefined ? {} : { activeWaitId: row.active_wait_id }),
+    ...(row.cancel_reason === null || row.cancel_reason === undefined ? {} : { cancelReason: row.cancel_reason }),
+    ...(row.terminal_event_id === null || row.terminal_event_id === undefined
+      ? {}
+      : { terminalEventId: row.terminal_event_id }),
+    ...(row.owner_worker_id === null || row.owner_worker_id === undefined
+      ? {}
+      : { ownerWorkerId: row.owner_worker_id }),
+    ...(checkpoint === undefined ? {} : { driverCheckpoint: checkpoint }),
+    ...(row.suspension_json === null || row.suspension_json === undefined
+      ? {}
+      : { suspension: JSON.parse(row.suspension_json) }),
+    ...(row.transcript_json === null || row.transcript_json === undefined
+      ? {}
+      : { transcript: JSON.parse(row.transcript_json) }),
+    ...(row.continuation_json === null || row.continuation_json === undefined
+      ? {}
+      : { continuation: decodeContinuation(row.continuation_json) }),
+    ...(() => {
+      const lease = asIso(row.lease_expires_at)
+      return lease === undefined ? {} : { leaseExpiresAt: lease }
+    })(),
+  }
+}
+
+export const decodeRunEffect = (row: RunRow): Effect.Effect<DecodedRun, RuntimeUnavailable> =>
+  Effect.try({
+    try: () => decodeRun(row),
+    catch: (error) => RuntimeUnavailable.make({ message: `invalid persisted Run ${row.run_id}: ${String(error)}` }),
+  })
 
 export const loadRun = (runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${runId}`
     const row = rows[0]
-    return row === undefined ? undefined : decodeRun(row)
+    return row === undefined ? undefined : yield* decodeRunEffect(row)
   })
+
+export const decodePersistedEvents = (rows: ReadonlyArray<EventRow>, manifest: ExecutableManifest) =>
+  Effect.forEach(rows, (row) =>
+    Effect.try({
+      try: () => {
+        const event = decodeEvent(row.event_json)
+        decodePinned({ ref: event.executableRef, manifest })
+        return event
+      },
+      catch: (error) =>
+        RuntimeUnavailable.make({ message: `invalid persisted Run event ${row.event_id}: ${String(error)}` }),
+    }),
+  )
 
 export const loadEventsAfter = (runId: string, cursor: number) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const run = yield* loadRun(runId)
+    if (run === undefined) return []
     const rows = yield* sql<EventRow>`
       SELECT * FROM baton_run_events
       WHERE run_id = ${runId} AND sequence > ${cursor}
       ORDER BY sequence ASC
     `
-    return rows.map((row) => decodeEvent(row.event_json))
+    return yield* decodePersistedEvents(rows, run.executableManifest)
   })
 
 export const loadRunWait = (runId: string, waitId?: string) =>
@@ -128,7 +168,7 @@ export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartia
       eventId: eventIdFor(run.runId, sequence),
       runId: run.runId,
       sequence,
-      agent: run.agent,
+      executableRef: run.executableRef,
       rootRunId: run.rootRunId,
       occurredAt,
       ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
@@ -246,7 +286,7 @@ export const settleParent = (
   hub: EventHub,
   child: DecodedRun,
   terminalEventId: string,
-): Effect.Effect<void, SqlError, SqlClient.SqlClient> =>
+): Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     if (child.parentRunId === undefined) return
     const sql = yield* SqlClient.SqlClient
@@ -296,7 +336,8 @@ export const insertRun = (input: {
   readonly status: RunStatus
   readonly message: Message
   readonly digest: string
-  readonly agent: AgentRef
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly rootRunId: string
   readonly parentRunId?: string
   readonly invocationId?: string
@@ -309,13 +350,14 @@ export const insertRun = (input: {
     yield* sql`
       INSERT INTO baton_runs (
         run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
-        agent_json, root_run_id, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
+        executable_ref_json, executable_manifest_json, root_run_id, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
         last_sequence, cancellation_requested, cancel_reason, terminal_event_id, accepted_sequence,
         responded_wait_ids_json, created_at, updated_at
       ) VALUES (
         ${input.runId}, ${input.status}, ${input.message.to}, ${input.message.sessionId}, ${input.message.id},
         ${encodeMessage(input.message)}, ${input.digest}, ${input.message.idempotencyKey},
-        ${encodeAgent(input.agent)}, ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
+        ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
+        ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
         NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, 0, NULL, NULL, ${input.acceptedSequence},
         ${JSON.stringify([])}, ${created}, ${created}
       )
@@ -337,6 +379,8 @@ export const toOperationRecord = (row: OperationRow): OperationRecord => ({
   attempt: Number(row.attempt),
   ...(row.result_json === null ? {} : { result: JSON.parse(row.result_json) as unknown }),
   ...(row.error_json === null ? {} : { error: JSON.parse(row.error_json) as unknown }),
+  ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
+  ...(row.resolution_json === null ? {} : { resolution: JSON.parse(row.resolution_json) }),
 })
 
 export type { AgentLoopEvent, AgentResult, RunFailure }

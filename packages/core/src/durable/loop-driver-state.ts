@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { ReplayPolicy } from "./driver-contract.js"
 import { WaitDefinition } from "./driver-contract.js"
 import { DriverOperationKind } from "./driver-contract.js"
+import { HandoffControlState } from "../agent/handoff-state.js"
 
 /** @experimental Pending operation the interpreter schedules before decide. */
 export const PendingOperation = Schema.Struct({
@@ -20,6 +21,7 @@ export const LoopDriverState = Schema.Struct({
   sessionId: Schema.String,
   modelCallOrdinal: Schema.Finite,
   modelCallOrdinalStart: Schema.Finite,
+  handoff: Schema.optionalKey(HandoffControlState),
   pending: Schema.optionalKey(PendingOperation),
   wait: Schema.optionalKey(WaitDefinition),
   suspensionToken: Schema.optionalKey(Schema.String),

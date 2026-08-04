@@ -1,11 +1,12 @@
 import { describe, expect, it } from "@effect/vitest"
 import type { RunAgentInput } from "@ag-ui/core"
 import { Effect, Layer, Stream } from "effect"
-import { Address, AgentRef, Errors as RuntimeErrors, Runtime } from "@batonfx/runtime"
+import { Address, ExecutableManifest, Errors as RuntimeErrors, Runtime } from "@batonfx/runtime"
 import { AgUi } from "../src/index.js"
 
 const address = Address.make("agent:assistant")
-const agent = AgentRef.make({ id: "assistant", version: "1", digest: "digest" })
+const executable = ExecutableManifest.makeTest("assistant", "1")
+const agent = executable.ref
 
 const input = (overrides: Partial<RunAgentInput> = {}): RunAgentInput => ({
   threadId: "thread-1",
@@ -26,7 +27,7 @@ const accepted = {
   eventId: "client-run-1:0",
   runId: "client-run-1",
   sequence: 0,
-  agent,
+  executableRef: agent,
   rootRunId: "client-run-1",
   occurredAt: "2026-08-03T00:00:00.000Z",
   _tag: "RunAccepted" as const,
@@ -52,6 +53,7 @@ const mockRuntime = (implementation: Partial<Runtime.Interface>): Runtime.Interf
     signal: () => unused(),
     cancel: () => unused(),
     steer: () => unused(),
+    resolveOperation: () => unused(),
     inspect: () => unused(),
     fanOut: () => unused(),
     inspectFanOut: () => unused(),
@@ -125,7 +127,8 @@ describe("AgUi", () => {
       run: {
         runId: "client-run-1",
         status: "waiting" as const,
-        agent,
+        executableRef: agent,
+        executableManifest: executable.manifest,
         wait: {
           waitId: "wait-1",
           reason: "approval" as const,
@@ -178,7 +181,8 @@ describe("AgUi", () => {
       run: {
         runId: "client-run-1",
         status: "running" as const,
-        agent,
+        executableRef: agent,
+        executableManifest: executable.manifest,
         lastSequence: 8,
         durability: "ephemeral" as const,
       },
@@ -213,7 +217,8 @@ describe("AgUi", () => {
       run: {
         runId: "client-run-1",
         status: "running" as const,
-        agent,
+        executableRef: agent,
+        executableManifest: executable.manifest,
         lastSequence: 12,
         durability: "durable" as const,
       },

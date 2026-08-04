@@ -30,9 +30,9 @@ import { makeRunLoop } from "./run-loop.js"
 import { layerForRun } from "../durable/driver-interpreter.js"
 import { resolve as resolveRunBudget } from "../durable/run-budget.js"
 import { operationKey } from "../durable/driver-interpreter.js"
-import { intercept, bindResume } from "../durable/driver-run.js"
-import { fromAgent } from "../durable/agent-ref.js"
-import { makeHandoffStateRef } from "./handoff-state.js"
+import { intercept, bindResume, setHandoffState } from "../durable/driver-run.js"
+import { makeHandoffStateRef, takePendingContinuation } from "./handoff-state.js"
+import { LoopDriverState } from "../durable/loop-driver-state.js"
 const providerOutputState = (): {
   textCharacters: number
   reasoningCharacters: number
@@ -208,13 +208,27 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         activatedSkillBodies: new Map<string, string>(),
       })
       const hasSameRunHandoff = initialRegistry.entries.some((candidate) => candidate.dispatch === "Handoff")
-      const handoffStateRef = hasSameRunHandoff
-        ? yield* makeHandoffStateRef(
-            agent as unknown as import("./agent.js").Agent<Record<string, Tool.Any>, unknown>,
-            options.agentRef ??
-              fromAgent(agent as unknown as import("./agent.js").Agent<Record<string, Tool.Any>, unknown>, "inline"),
-          )
-        : undefined
+      const restoredHandoff =
+        options.driverCheckpoint === undefined
+          ? undefined
+          : yield* Schema.decodeUnknownEffect(LoopDriverState)(options.driverCheckpoint.state).pipe(
+              Effect.map((driverState) => driverState.handoff),
+              Effect.mapError((error) => AgentError.make({ message: `Invalid handoff checkpoint: ${error}`, turn: 0 })),
+            )
+      if (restoredHandoff !== undefined && restoredHandoff.active !== agent.name) {
+        return yield* AgentError.make({
+          message: `Handoff checkpoint active Agent ${restoredHandoff.active} does not match ${agent.name}`,
+          turn: 0,
+        })
+      }
+      const handoffStateRef =
+        hasSameRunHandoff || restoredHandoff !== undefined
+          ? yield* makeHandoffStateRef(
+              agent as unknown as import("./agent.js").Agent<Record<string, Tool.Any>, unknown>,
+              options.executableRef?.active,
+              restoredHandoff,
+            )
+          : undefined
       const restoreActivatedSkills = (history: Prompt.Prompt): Effect.Effect<void, AgentError | ToolNameCollision> =>
         Effect.gen(function* () {
           for (const message of history.content) {
@@ -307,7 +321,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             {
               kind: "memory",
               key: operationKey(logicalId, "memory", "recall", 0),
-              input: { turn: 0, key: memoryRuntime?.key },
+              input: { turn: 0, ...(memoryRuntime === undefined ? {} : { key: memoryRuntime.key }) },
               replayPolicy: "pure",
             },
             recallEffect,
@@ -336,7 +350,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             {
               kind: "memory",
               key: operationKey(logicalId, "memory", "remember", turn, terminal ? 1 : 0),
-              input: { turn, terminal, key: memoryRuntime?.key },
+              input: { turn, terminal, ...(memoryRuntime === undefined ? {} : { key: memoryRuntime.key }) },
               replayPolicy: "pure",
             },
             rememberEffect,
@@ -421,42 +435,60 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         options.resume === undefined
           ? yield* withInterpreter(recallInitialPrompt(baseInitialPrompt))
           : baseInitialPrompt
-      return makeRunLoop<Tools, R, StructuredOutputSchema>({
-        agent,
-        options,
-        state,
-        chat,
-        chain,
-        activeSession,
-        memoryRuntime,
-        steeringService,
-        structured,
-        validatedResume,
-        seedSystem,
-        recallInitialPrompt,
-        initialPrompt,
-        toolState,
-        ...(handoffStateRef === undefined ? {} : { handoffStateRef }),
-        modelTurn,
-        captureStructuredUsage,
-        withModelTelemetry,
-        withAgentModel,
-        syncSession,
-        applyCompactionResult,
-        savePersisted,
-        deliverPending,
-        flushTelemetry,
-        telemetryIdentity,
-        checkpointPending,
-        checkpointSuspended,
-        pendingResults,
-        toolCallEvents,
-        resumeApproved,
-        isTurnPolicyDecision,
-        steeringDrainedEvent,
-        withSystem,
-        rememberTurn,
-      }).pipe(Stream.provide(interpreterLayer))
+      const runPrompt =
+        options.resume === undefined && options.driverCheckpoint !== undefined && handoffStateRef !== undefined
+          ? takePendingContinuation(handoffStateRef, setHandoffState).pipe(
+              Effect.map((continuation) =>
+                continuation === undefined
+                  ? initialPrompt
+                  : continuation.overrides?.instructions === undefined
+                    ? Prompt.make(continuation.prompt)
+                    : withSystem(continuation.overrides.instructions, Prompt.make(continuation.prompt)),
+              ),
+            )
+          : Effect.succeed(initialPrompt)
+      return Stream.unwrap(
+        runPrompt.pipe(
+          Effect.map((prompt) =>
+            makeRunLoop<Tools, R, StructuredOutputSchema>({
+              agent,
+              options,
+              state,
+              chat,
+              chain,
+              activeSession,
+              memoryRuntime,
+              steeringService,
+              structured,
+              validatedResume,
+              seedSystem,
+              recallInitialPrompt,
+              initialPrompt: prompt,
+              toolState,
+              ...(handoffStateRef === undefined ? {} : { handoffStateRef }),
+              modelTurn,
+              captureStructuredUsage,
+              withModelTelemetry,
+              withAgentModel,
+              syncSession,
+              applyCompactionResult,
+              savePersisted,
+              deliverPending,
+              flushTelemetry,
+              telemetryIdentity,
+              checkpointPending,
+              checkpointSuspended,
+              pendingResults,
+              toolCallEvents,
+              resumeApproved,
+              isTurnPolicyDecision,
+              steeringDrainedEvent,
+              withSystem,
+              rememberTurn,
+            }),
+          ),
+        ),
+      ).pipe(Stream.provide(interpreterLayer))
     }),
   ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } })) as RunStream<
     StructuredOutputSchema,

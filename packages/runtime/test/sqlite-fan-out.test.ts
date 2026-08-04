@@ -20,7 +20,7 @@ it.live("persists and resumes bounded fan-out across SQLite reopen", () =>
         idempotencyKey: "reviews",
         members: [0, 1, 2].map((ordinal) => ({
           key: `review-${ordinal}`,
-          agent: researcherRef,
+          selection: "researcher",
           prompt: `review-${ordinal}`,
         })),
         concurrency: 1,
@@ -29,6 +29,16 @@ it.live("persists and resumes bounded fan-out across SQLite reopen", () =>
       }
       const receipt = yield* runtime.fanOut(input)
       expect((yield* runtime.fanOut(input)).duplicate).toBe(true)
+      expect((yield* runtime.inspect(receipt.childRunIds[0]!)).executableRef).toEqual(researcherRef.ref)
+      const changedMembers = [...input.members]
+      changedMembers[0] = { ...changedMembers[0]!, selection: "analyst" }
+      const changed = yield* runtime
+        .fanOut({
+          ...input,
+          members: changedMembers,
+        })
+        .pipe(Effect.flip)
+      expect(changed).toBeInstanceOf(Errors.FanOutConflict)
       return { ...receipt, parentRunId: parent.runId }
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
 
@@ -69,6 +79,34 @@ it.live("persists and resumes bounded fan-out across SQLite reopen", () =>
   }).pipe(Effect.asVoid),
 )
 
+it.live("rejects an undeclared SQLite fan-out member without side effects", () =>
+  Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const parent = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "sqlite:fan-out-missing",
+      idempotencyKey: "parent",
+      prompt: "parent",
+    })
+    const before = yield* RunTree.inspect(parent.runId)
+    const failure = yield* runtime
+      .fanOut({
+        parentRunId: parent.runId,
+        idempotencyKey: "missing",
+        members: [
+          { key: "valid", selection: "researcher", prompt: "valid" },
+          { key: "missing", selection: "undeclared", prompt: "missing" },
+        ],
+        concurrency: 2,
+        join: { _tag: "AllSuccess" },
+        remainder: "await",
+      })
+      .pipe(Effect.flip)
+    expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
+    expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
+  }).pipe(Effect.provide(sqliteLayer(tempDbPath("fan-out-missing"))), Effect.scoped),
+)
+
 it.live("atomically reconciles SQLite parent cancellation across fan-out members", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("fan-out-cancel")
@@ -85,7 +123,7 @@ it.live("atomically reconciles SQLite parent cancellation across fan-out members
         idempotencyKey: "reviews",
         members: [0, 1].map((ordinal) => ({
           key: `review-${ordinal}`,
-          agent: researcherRef,
+          selection: "researcher",
           prompt: `review-${ordinal}`,
         })),
         concurrency: 1,
@@ -116,7 +154,7 @@ it.live("keeps SQLite fan-out cancellation pending for a claimed member", () =>
     const receipt = yield* runtime.fanOut({
       parentRunId: parent.runId,
       idempotencyKey: "reviews",
-      members: [{ key: "review", agent: researcherRef, prompt: "review" }],
+      members: [{ key: "review", selection: "researcher", prompt: "review" }],
       concurrency: 1,
       join: { _tag: "AllSuccess" },
       remainder: "await",
@@ -125,7 +163,7 @@ it.live("keeps SQLite fan-out cancellation pending for a claimed member", () =>
     yield* runtime.cancel({ runId: parent.runId, reason: "stop" })
     expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelling")
     expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("running")
-    yield* store.fail({ ...claim, error: { message: "interrupted" } })
+    yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
     expect((yield* runtime.inspectFanOut(receipt.fanOutId)).status).toBe("cancelled")
     expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
   }).pipe(Effect.provide(sqliteLayer(tempDbPath("fan-out-cancel-claimed"))), Effect.scoped),
@@ -147,7 +185,7 @@ it.live("rejects SQLite fan-out admission after the parent is terminal", () =>
       .fanOut({
         parentRunId: parent.runId,
         idempotencyKey: "late",
-        members: [{ key: "late", agent: researcherRef, prompt: "late" }],
+        members: [{ key: "late", selection: "researcher", prompt: "late" }],
         concurrency: 1,
         join: { _tag: "AllSuccess" },
         remainder: "await",

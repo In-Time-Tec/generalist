@@ -1,8 +1,9 @@
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, AgentRef, DurableDriver, ToolExecutor } from "@batonfx/core"
-import { Address, AgentHost, Errors, Runtime, RunStore } from "../src/index.js"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, DurableDriver, ToolExecutor } from "@batonfx/core"
+import { testExecutable } from "./identity.js"
+import { Address, AgentHost, Errors, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
 import { assistantAddress, assistantRef, completedResult, memoryLayer } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
@@ -29,11 +30,32 @@ const verifyInbox = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
   const store = yield* RunStore.RunStore
   const receipt = yield* admitRun
-  yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:1", prompt: "first" })
-  yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:1", prompt: "first" })
+  const first = Prompt.fromMessages([
+    Prompt.makeMessage("user", {
+      content: [Prompt.makePart("text", { text: "first" })],
+      options: { baton: { priority: 1, region: "local" } },
+    }),
+  ])
+  const reordered = Prompt.fromMessages([
+    Prompt.makeMessage("user", {
+      content: [Prompt.makePart("text", { text: "first" })],
+      options: { baton: { region: "local", priority: 1 } },
+    }),
+  ])
+  yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:1", prompt: first })
+  yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:1", prompt: reordered })
   yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:2", prompt: "second" })
   const conflict = yield* runtime
-    .steer({ runId: receipt.runId, idempotencyKey: "steer:1", prompt: "changed" })
+    .steer({
+      runId: receipt.runId,
+      idempotencyKey: "steer:1",
+      prompt: Prompt.fromMessages([
+        Prompt.makeMessage("user", {
+          content: [Prompt.makePart("text", { text: "first" })],
+          options: { baton: { priority: 2, region: "local" } },
+        }),
+      ]),
+    })
     .pipe(Effect.flip)
   expect(conflict).toBeInstanceOf(Errors.SteeringConflict)
 
@@ -107,7 +129,10 @@ layer(memoryLayer)("Runtime durable steering memory contract", (test) => {
       expect(yield* store.readSteering(claim)).toHaveLength(1)
 
       yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-      yield* store.fail({ ...claim, error: { message: "execution interrupted" } })
+      yield* store.fail({
+        ...claim,
+        error: Errors.AgentExecutionFailure.make({ message: "execution interrupted" }),
+      })
 
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
       const tags = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag)
@@ -146,17 +171,9 @@ it.live("atomically persists steering consumption and model scheduling before SQ
   }
   const checkpoint = {
     driverVersion: "1",
-    agent: assistantRef,
+    executable: assistantRef.ref,
     turn: 0,
     budget,
-    execution: {
-      agent: assistantRef,
-      driverVersion: "1",
-      checkpointCodecVersion: "1",
-      eventCodecVersion: "1",
-      toolSchemaDigests: {},
-      rootBudget: budget,
-    },
     state: { phase: "model-scheduled" },
   } satisfies DurableDriver.DriverCheckpoint
   let runId = ""
@@ -197,25 +214,32 @@ it.live("atomically persists steering consumption and model scheduling before SQ
 
 it.effect("AgentHost delivers durable steering in the next model operation", () => {
   const requests: Array<string> = []
+  let serviceAcquisitions = 0
   const agent = Agent.make({ name: "steered-host" })
-  const ref = AgentRef.fromAgent(agent, "1")
+  const ref = testExecutable(agent, "1")
   const address = Address.make("agent:steered-host")
   const model = Layer.effect(
     LanguageModel.LanguageModel,
-    LanguageModel.make({
-      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-      streamText: (request) => {
-        requests.push(JSON.stringify(request.prompt))
-        return Stream.fromIterable<Response.StreamPartEncoded>([
-          Response.makePart("text-delta", { id: `text:${requests.length}`, delta: `answer ${requests.length}` }),
-          finish,
-        ])
-      },
-    }),
+    Effect.sync(() => {
+      serviceAcquisitions += 1
+    }).pipe(
+      Effect.andThen(
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: (request) => {
+            requests.push(JSON.stringify(request.prompt))
+            return Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("text-delta", { id: `text:${requests.length}`, delta: `answer ${requests.length}` }),
+              finish,
+            ])
+          },
+        }),
+      ),
+    ),
   )
   const runtimeLayer = Runtime.layerMemory({
-    agents: [{ ref, agent, services: model }],
-    addresses: [{ address, agent: ref }],
+    resolver: ExecutableResolver.makeStatic([{ executable: ref, agent, services: model }]),
+    addresses: [{ address, executable: ref }],
   })
   return Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
@@ -237,6 +261,7 @@ it.effect("AgentHost delivers durable steering in the next model operation", () 
       throw new Error(failure?._tag === "RunFailed" ? failure.error.message : "host failed")
     }
     expect(requests).toHaveLength(2)
+    expect(serviceAcquisitions).toBe(1)
     expect(requests[1]).toContain("new direction")
     expect(inspection.status).toBe("succeeded")
     expect(yield* store.readSteering(claim)).toEqual([])
@@ -257,7 +282,7 @@ it.effect("steering admitted during model streaming does not interrupt it and re
     let passedStreamingGate = false
     const requests: Array<string> = []
     const agent = Agent.make({ name: "streaming-steering" })
-    const ref = AgentRef.fromAgent(agent, "1")
+    const ref = testExecutable(agent, "1")
     const address = Address.make("agent:streaming-steering")
     const model = Layer.effect(
       LanguageModel.LanguageModel,
@@ -286,8 +311,8 @@ it.effect("steering admitted during model streaming does not interrupt it and re
       }),
     )
     const runtimeLayer = Runtime.layerMemory({
-      agents: [{ ref, agent, services: model }],
-      addresses: [{ address, agent: ref }],
+      resolver: ExecutableResolver.makeStatic([{ executable: ref, agent, services: model }]),
+      addresses: [{ address, executable: ref }],
     })
 
     yield* Effect.gen(function* () {
@@ -330,7 +355,7 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
     const toolkit = Toolkit.make(tool)
     const requests: Array<string> = []
     const agent = Agent.make({ name: `tool-steering-${concurrency}`, toolkit, toolExecution: { concurrency } })
-    const ref = AgentRef.fromAgent(agent, "1")
+    const ref = testExecutable(agent, "1")
     const address = Address.make(`agent:tool-steering-${concurrency}`)
     const model = Layer.effect(
       LanguageModel.LanguageModel,
@@ -372,8 +397,10 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
     })
     const handlers = toolkit.toLayer({ batch_tool: () => Effect.die("ToolExecutor test layer owns execution") })
     const runtimeLayer = Runtime.layerMemory({
-      agents: [{ ref, agent, services: Layer.mergeAll(model, executor, handlers) }],
-      addresses: [{ address, agent: ref }],
+      resolver: ExecutableResolver.makeStatic([
+        { executable: ref, agent, services: Layer.mergeAll(model, executor, handlers) },
+      ]),
+      addresses: [{ address, executable: ref }],
     })
 
     yield* Effect.gen(function* () {

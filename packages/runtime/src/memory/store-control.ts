@@ -6,6 +6,7 @@ import type { CancelInput, RespondInput, SignalInput } from "../runtime.js"
 import type { AgentLoopEvent, AgentResult } from "../agent-event.js"
 import type { RunFailure } from "../run-event.js"
 import type { RunWait, WaitResolution } from "../run-wait.js"
+import { checkpointRef } from "../executable-manifest.js"
 import {
   appendAgentEvent,
   appendLifecycle,
@@ -15,7 +16,6 @@ import {
   makeCompleted,
   makeFailed,
   makeResumed,
-  makeUnknown,
   makeWaiting,
   rejectIfTerminal,
 } from "./append.js"
@@ -251,23 +251,45 @@ export const fail = (
     return next
   })
 
-export const wait = (
+export const suspend = (
   state: MemoryState,
-  input: { readonly runId: string; readonly wait: RunWait },
+  input: import("../run-store.js").ExecutionClaim & {
+    readonly wait: RunWait
+    readonly suspension: import("@batonfx/core").AgentEvent.AgentSuspended
+    readonly checkpoint?: import("@batonfx/core").DurableDriver.DriverCheckpoint
+    readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
+    readonly continuation?: import("../steering.js").ExecutionContinuation | null
+  },
 ): Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable> =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
+    const executableRef = yield* Effect.try({
+      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
     const runs = new Map(state.runs)
-    runs.set(run.runId, { ...run, wait: input.wait })
+    const updated = {
+      ...run,
+      executableRef,
+      wait: input.wait,
+      suspension: input.suspension,
+      ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
+      ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
+      ...(input.continuation === undefined || input.continuation === null ? {} : { continuation: input.continuation }),
+    }
+    if (input.continuation === null) {
+      const { continuation: _, ...withoutContinuation } = updated
+      runs.set(run.runId, withoutContinuation)
+    } else runs.set(run.runId, updated)
     const [, next] = yield* appendLifecycle({ ...state, runs }, run.runId, makeWaiting(input.wait), "waiting")
     return next
   })
 
 export const resume = (
   state: MemoryState,
-  input: { readonly runId: string; readonly waitId: string },
+  input: { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution },
 ): Effect.Effect<MemoryState, RunNotFound | WaitNotOpen | RunTerminal | RuntimeUnavailable> =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
@@ -276,9 +298,7 @@ export const resume = (
     if (run.activeWaitId !== input.waitId) {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
-    const resolution = run.wait?.resolution
-    if (resolution === undefined) return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
-    const [, next] = yield* appendLifecycle(state, run.runId, makeResumed(input.waitId, resolution), "running")
+    const [, next] = yield* appendLifecycle(state, run.runId, makeResumed(input.waitId, input.resolution), "running")
     return next
   })
 
@@ -296,16 +316,4 @@ export const emitAgentEvent = (
     const { continuation: _, ...withoutContinuation } = next.runs.get(run.runId)!
     runs.set(run.runId, { ...withoutContinuation, transcript: input.event.transcript })
     return { ...next, runs }
-  })
-
-export const markOperationUnknown = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly operationId: string },
-): Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable> =>
-  Effect.gen(function* () {
-    const run = yield* getRun(state, input.runId)
-    const terminal = rejectIfTerminal(run)
-    if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
-    const [, next] = yield* appendLifecycle(state, run.runId, makeUnknown(input.operationId), "needs-resolution")
-    return next
   })

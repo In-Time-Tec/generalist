@@ -2,15 +2,17 @@ import { describe, expect, it } from "@effect/vitest"
 import { EventSchemas } from "@ag-ui/core"
 import { Effect, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
-import { RunEvent } from "@batonfx/runtime"
+import { Errors, ExecutableManifest, RunEvent } from "@batonfx/runtime"
 import { makeState, project, stateSnapshot } from "../src/projection.js"
+
+const executableRef = ExecutableManifest.makeTest("assistant", "1").ref
 
 const base = {
   specVersion: "1",
   eventId: "run-1:1",
   runId: "run-1",
   sequence: 1,
-  agent: { id: "assistant", version: "1", digest: "digest" },
+  executableRef,
   rootRunId: "run-1",
   occurredAt: "2026-08-03T00:00:00.000Z",
 }
@@ -112,9 +114,14 @@ describe("AG-UI event projection", () => {
           _tag: "RunWaiting",
           wait: { waitId: "tool-1", reason: "approval", status: "open", openedAt: "2026-08-03T00:00:00.000Z" },
         },
-        { ...base, _tag: "RunFailed", error: { message: "failed" } },
+        {
+          ...base,
+          _tag: "RunFailed",
+          error: Errors.AgentExecutionFailure.make({ message: "failed" }),
+        },
         { ...base, _tag: "RunCancelled", reason: "stopped" },
       ]
+      expect(inputs.findIndex((input) => !Schema.is(RunEvent.RunEvent)(input))).toBe(-1)
       const batches = yield* Effect.forEach(inputs, (input) => project(makeState(), input, "thread-1"))
       expect(batches.flat().map((event) => event.type)).toEqual([
         "CUSTOM",

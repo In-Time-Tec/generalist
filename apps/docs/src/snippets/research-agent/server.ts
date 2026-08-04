@@ -1,5 +1,5 @@
 import { Approvals, Chat, ModelMiddleware, ToolExecutor } from "@batonfx/core"
-import { Address, AgentHost, AgentRef, RunStore, Runtime } from "@batonfx/runtime"
+import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { Sse, Ws } from "@batonfx/transport"
 import { Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
@@ -9,7 +9,7 @@ import { modelLayer } from "./model"
 import { cannedLayer } from "./search-provider"
 import { toolkit, toolkitLayer } from "./tools"
 
-const agentRef = AgentRef.make({ id: "research-agent", version: "1", digest: "sha256:research-agent" })
+const executable = ExecutableManifest.makeTest("research-agent", "1")
 const agentAddress = Address.make("agent:research")
 
 const SendMessageInput = Schema.Struct({
@@ -126,8 +126,8 @@ const agentServices = Layer.mergeAll(
 
 export const runtimeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | AgentHost.AgentHost> = Runtime.layerMemory(
   {
-    agents: [{ ref: agentRef, agent, services: agentServices }],
-    addresses: [{ address: agentAddress, agent: agentRef }],
+    resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
+    addresses: [{ address: agentAddress, executable }],
   },
 )
 

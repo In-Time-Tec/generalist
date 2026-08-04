@@ -1,14 +1,15 @@
 import type { AgentCard, Message, SendMessageRequest } from "@a2a-js/sdk"
 import { Role, TaskState } from "@a2a-js/sdk"
 import { ServerCallContext } from "@a2a-js/sdk/server"
-import { Address, AgentRef, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
+import { Address, ExecutableManifest, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { makeHandler } from "../src/adapter.js"
 
 const address = Address.make("agent:test")
-const agent = AgentRef.make({ id: "test", version: "1", digest: "sha256:test" })
+const executable = ExecutableManifest.makeTest("test", "1")
+const agent = executable.ref
 
 const card: AgentCard = {
   name: "Test",
@@ -32,7 +33,7 @@ const base = (runId: string, sequence: number) => ({
   eventId: `${runId}:${sequence}`,
   runId,
   sequence,
-  agent,
+  executableRef: agent,
   rootRunId: runId,
   correlationId: `context:${runId}`,
   occurredAt: `2026-08-03T00:00:0${sequence}.000Z`,
@@ -83,7 +84,8 @@ const makeRuntime = (acceptedSequence = 0) => {
   const inspection = (runId: string, run: StoredRun): Run.RunInspection => ({
     runId,
     status: run.status,
-    agent,
+    executableRef: agent,
+    executableManifest: executable.manifest,
     ...(run.wait === undefined ? {} : { wait: run.wait }),
     lastSequence: run.events.at(-1)?.sequence ?? -1,
     durability: "ephemeral",
@@ -157,6 +159,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     },
     signal: () => Effect.void,
     steer: () => Effect.void,
+    resolveOperation: () => Effect.die("not used"),
     cancel: ({ runId, reason }) => {
       const run = runs.get(runId)!
       const next = run.events.at(-1)!.sequence + 1

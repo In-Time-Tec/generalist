@@ -9,7 +9,7 @@ const event = (sequence: number): RunEvent => ({
   eventId: `run:hub:${sequence}`,
   runId: "run:hub",
   sequence,
-  agent: assistantRef,
+  executableRef: assistantRef.ref,
   rootRunId: "run:hub",
   occurredAt: "2026-08-03T00:00:00.000Z",
   _tag: "RunAccepted",

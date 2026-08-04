@@ -1308,12 +1308,12 @@
       "test": false
     },
     {
-      "path": "packages/core/src/durable/agent-ref.ts",
+      "path": "packages/core/src/durable/agent-manifest.ts",
       "package": "@batonfx/core",
       "test": false
     },
     {
-      "path": "packages/core/src/durable/canonical-digest.ts",
+      "path": "packages/core/src/durable/canonical-json.ts",
       "package": "@batonfx/core",
       "test": false
     },
@@ -1343,7 +1343,7 @@
       "test": false
     },
     {
-      "path": "packages/core/src/durable/facade-agentRef.ts",
+      "path": "packages/core/src/durable/executable-manifest.ts",
       "package": "@batonfx/core",
       "test": false
     },
@@ -1369,6 +1369,11 @@
     },
     {
       "path": "packages/core/src/durable/operation-context.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
+      "path": "packages/core/src/durable/pin.ts",
       "package": "@batonfx/core",
       "test": false
     },
@@ -2138,17 +2143,22 @@
       "test": false
     },
     {
-      "path": "packages/runtime/src/agent-ref.ts",
-      "package": "@batonfx/runtime",
-      "test": false
-    },
-    {
       "path": "packages/runtime/src/cursor.ts",
       "package": "@batonfx/runtime",
       "test": false
     },
     {
       "path": "packages/runtime/src/errors.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/executable-manifest.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/executable-resolver.ts",
       "package": "@batonfx/runtime",
       "test": false
     },
@@ -2239,6 +2249,11 @@
     },
     {
       "path": "packages/runtime/src/message.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/operation-resolution.ts",
       "package": "@batonfx/runtime",
       "test": false
     },
@@ -2378,6 +2393,11 @@
       "test": false
     },
     {
+      "path": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
       "path": "packages/runtime/src/sql/postgres/store.ts",
       "package": "@batonfx/runtime",
       "test": false
@@ -2498,7 +2518,17 @@
       "test": true
     },
     {
+      "path": "packages/runtime/test/executable-resolver.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
       "path": "packages/runtime/test/helpers.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/identity.ts",
       "package": "@batonfx/runtime",
       "test": true
     },
@@ -2518,6 +2548,11 @@
       "test": true
     },
     {
+      "path": "packages/runtime/test/mysql/mysql-migration.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
       "path": "packages/runtime/test/mysql/mysql-store.test.ts",
       "package": "@batonfx/runtime",
       "test": true
@@ -2529,6 +2564,11 @@
     },
     {
       "path": "packages/runtime/test/postgres/helpers.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/postgres/postgres-migration.test.ts",
       "package": "@batonfx/runtime",
       "test": true
     },
@@ -2614,6 +2654,11 @@
     },
     {
       "path": "packages/runtime/test/sqlite-helpers.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/sqlite-migration.test.ts",
       "package": "@batonfx/runtime",
       "test": true
     },
@@ -7189,15 +7234,15 @@
     },
     {
       "source": "packages/core/src/agent/agent-run.ts",
-      "specifier": "../durable/agent-ref.js"
-    },
-    {
-      "source": "packages/core/src/agent/agent-run.ts",
       "specifier": "../durable/driver-interpreter.js"
     },
     {
       "source": "packages/core/src/agent/agent-run.ts",
       "specifier": "../durable/driver-run.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-run.ts",
+      "specifier": "../durable/loop-driver-state.js"
     },
     {
       "source": "packages/core/src/agent/agent-run.ts",
@@ -7441,7 +7486,15 @@
     },
     {
       "source": "packages/core/src/agent/handoff-state.ts",
+      "specifier": "../durable/pin.js"
+    },
+    {
+      "source": "packages/core/src/agent/handoff-state.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/agent/handoff-state.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/core/src/agent/handoff-tool-execution.ts",
@@ -7614,6 +7667,10 @@
     {
       "source": "packages/core/src/agent/run-loop.ts",
       "specifier": "./agent-suspension.js"
+    },
+    {
+      "source": "packages/core/src/agent/run-loop.ts",
+      "specifier": "./handoff-state.js"
     },
     {
       "source": "packages/core/src/agent/run-loop.ts",
@@ -7868,24 +7925,28 @@
       "specifier": "effect/unstable/ai"
     },
     {
-      "source": "packages/core/src/durable/agent-ref.ts",
-      "specifier": "./canonical-digest.js"
+      "source": "packages/core/src/durable/agent-manifest.ts",
+      "specifier": "./canonical-json.js"
     },
     {
-      "source": "packages/core/src/durable/agent-ref.ts",
-      "specifier": "effect"
+      "source": "packages/core/src/durable/agent-manifest.ts",
+      "specifier": "./pin.js"
     },
     {
-      "source": "packages/core/src/durable/canonical-digest.ts",
+      "source": "packages/core/src/durable/agent-manifest.ts",
+      "specifier": "./run-budget.js"
+    },
+    {
+      "source": "packages/core/src/durable/agent-manifest.ts",
       "specifier": "effect"
     },
     {
       "source": "packages/core/src/durable/driver-contract.ts",
-      "specifier": "./agent-ref.js"
+      "specifier": "./canonical-json.js"
     },
     {
       "source": "packages/core/src/durable/driver-contract.ts",
-      "specifier": "./canonical-digest.js"
+      "specifier": "./executable-manifest.js"
     },
     {
       "source": "packages/core/src/durable/driver-contract.ts",
@@ -7894,14 +7955,6 @@
     {
       "source": "packages/core/src/durable/driver-contract.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/core/src/durable/driver-interpreter.ts",
-      "specifier": "./agent-ref.js"
-    },
-    {
-      "source": "packages/core/src/durable/driver-interpreter.ts",
-      "specifier": "./canonical-digest.js"
     },
     {
       "source": "packages/core/src/durable/driver-interpreter.ts",
@@ -7930,10 +7983,6 @@
     {
       "source": "packages/core/src/durable/driver-interpreter.ts",
       "specifier": "effect"
-    },
-    {
-      "source": "packages/core/src/durable/driver-interpreter.ts",
-      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/core/src/durable/driver-run.ts",
@@ -7984,8 +8033,16 @@
       "specifier": "effect/unstable/ai"
     },
     {
-      "source": "packages/core/src/durable/facade-agentRef.ts",
-      "specifier": "./agent-ref.js"
+      "source": "packages/core/src/durable/executable-manifest.ts",
+      "specifier": "./agent-manifest.js"
+    },
+    {
+      "source": "packages/core/src/durable/executable-manifest.ts",
+      "specifier": "./pin.js"
+    },
+    {
+      "source": "packages/core/src/durable/executable-manifest.ts",
+      "specifier": "effect"
     },
     {
       "source": "packages/core/src/durable/facade-durableDriver.ts",
@@ -8017,11 +8074,19 @@
     },
     {
       "source": "packages/core/src/durable/loop-driver-state.ts",
+      "specifier": "../agent/handoff-state.js"
+    },
+    {
+      "source": "packages/core/src/durable/loop-driver-state.ts",
       "specifier": "./driver-contract.js"
     },
     {
       "source": "packages/core/src/durable/loop-driver-state.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/loop-driver.ts",
+      "specifier": "../agent/handoff-state.js"
     },
     {
       "source": "packages/core/src/durable/loop-driver.ts",
@@ -8045,6 +8110,14 @@
     },
     {
       "source": "packages/core/src/durable/operation-context.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/durable/pin.ts",
+      "specifier": "./canonical-json.js"
+    },
+    {
+      "source": "packages/core/src/durable/pin.ts",
       "specifier": "effect"
     },
     {
@@ -8085,7 +8158,15 @@
     },
     {
       "source": "packages/core/src/index.ts",
-      "specifier": "./durable/facade-agentRef.js"
+      "specifier": "./durable/agent-manifest.js"
+    },
+    {
+      "source": "packages/core/src/index.ts",
+      "specifier": "./durable/canonical-json.js"
+    },
+    {
+      "source": "packages/core/src/index.ts",
+      "specifier": "./durable/executable-manifest.js"
     },
     {
       "source": "packages/core/src/index.ts",
@@ -8094,6 +8175,10 @@
     {
       "source": "packages/core/src/index.ts",
       "specifier": "./durable/facade-runBudget.js"
+    },
+    {
+      "source": "packages/core/src/index.ts",
+      "specifier": "./durable/pin.js"
     },
     {
       "source": "packages/core/src/index.ts",
@@ -8489,11 +8574,11 @@
     },
     {
       "source": "packages/core/src/policy/handoff-runtime.ts",
-      "specifier": "../model/model-registry.js"
+      "specifier": "../durable/executable-manifest.js"
     },
     {
       "source": "packages/core/src/policy/handoff-runtime.ts",
-      "specifier": "../model/model-telemetry.js"
+      "specifier": "../model/model-registry.js"
     },
     {
       "source": "packages/core/src/policy/handoff-runtime.ts",
@@ -8517,10 +8602,6 @@
     },
     {
       "source": "packages/core/src/policy/handoff-target.ts",
-      "specifier": "../durable/agent-ref.js"
-    },
-    {
-      "source": "packages/core/src/policy/handoff-target.ts",
       "specifier": "effect"
     },
     {
@@ -8534,6 +8615,10 @@
     {
       "source": "packages/core/src/policy/handoff.ts",
       "specifier": "../agent/agent.js"
+    },
+    {
+      "source": "packages/core/src/policy/handoff.ts",
+      "specifier": "../agent/handoff-state.js"
     },
     {
       "source": "packages/core/src/policy/handoff.ts",
@@ -8957,6 +9042,22 @@
     {
       "source": "packages/core/test/context-overflow.test.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "../src/agent/handoff-state.js"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "../src/durable/canonical-json.js"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "../src/durable/loop-driver.js"
+    },
+    {
+      "source": "packages/core/test/durable-driver.test.ts",
+      "specifier": "../src/durable/pin.js"
     },
     {
       "source": "packages/core/test/durable-driver.test.ts",
@@ -10735,6 +10836,14 @@
     },
     {
       "source": "packages/runtime/src/agent-host.ts",
+      "specifier": "./executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/agent-host.ts",
+      "specifier": "./executable-resolver.js"
+    },
+    {
+      "source": "packages/runtime/src/agent-host.ts",
       "specifier": "./run-store.js"
     },
     {
@@ -10751,15 +10860,6 @@
       "specifier": "effect/unstable/ai"
     },
     {
-      "source": "packages/runtime/src/agent-ref.ts",
-      "specifier": "@batonfx/core",
-      "package": "@batonfx/core"
-    },
-    {
-      "source": "packages/runtime/src/agent-ref.ts",
-      "specifier": "effect"
-    },
-    {
       "source": "packages/runtime/src/cursor.ts",
       "specifier": "effect"
     },
@@ -10769,15 +10869,11 @@
     },
     {
       "source": "packages/runtime/src/errors.ts",
-      "specifier": "./agent-ref.js"
-    },
-    {
-      "source": "packages/runtime/src/errors.ts",
       "specifier": "./cursor.js"
     },
     {
       "source": "packages/runtime/src/errors.ts",
-      "specifier": "./run.js"
+      "specifier": "./executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/errors.ts",
@@ -10788,12 +10884,47 @@
       "specifier": "effect"
     },
     {
+      "source": "packages/runtime/src/executable-manifest.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/executable-manifest.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/executable-resolver.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/executable-resolver.ts",
+      "specifier": "./executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/executable-resolver.ts",
+      "specifier": "./run.js"
+    },
+    {
+      "source": "packages/runtime/src/executable-resolver.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/executable-resolver.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/runtime/src/fan-out.ts",
-      "specifier": "./agent-ref.js"
+      "specifier": "./executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/fan-out.ts",
       "specifier": "./run.js"
+    },
+    {
+      "source": "packages/runtime/src/fan-out.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
     },
     {
       "source": "packages/runtime/src/fan-out.ts",
@@ -10802,10 +10933,6 @@
     {
       "source": "packages/runtime/src/fan-out.ts",
       "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/runtime/src/fan-out.ts",
-      "specifier": "node:crypto"
     },
     {
       "source": "packages/runtime/src/index.ts",
@@ -10817,15 +10944,19 @@
     },
     {
       "source": "packages/runtime/src/index.ts",
-      "specifier": "./agent-ref.js"
-    },
-    {
-      "source": "packages/runtime/src/index.ts",
       "specifier": "./cursor.js"
     },
     {
       "source": "packages/runtime/src/index.ts",
       "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./executable-resolver.js"
     },
     {
       "source": "packages/runtime/src/index.ts",
@@ -10842,6 +10973,10 @@
     {
       "source": "packages/runtime/src/index.ts",
       "specifier": "./message.js"
+    },
+    {
+      "source": "packages/runtime/src/index.ts",
+      "specifier": "./operation-resolution.js"
     },
     {
       "source": "packages/runtime/src/index.ts",
@@ -10933,6 +11068,11 @@
     },
     {
       "source": "packages/runtime/src/memory/digest.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/memory/digest.ts",
       "specifier": "effect"
     },
     {
@@ -11009,10 +11149,6 @@
     },
     {
       "source": "packages/runtime/src/memory/runtime-layer.ts",
-      "specifier": "./state.js"
-    },
-    {
-      "source": "packages/runtime/src/memory/runtime-layer.ts",
       "specifier": "./store.js"
     },
     {
@@ -11022,6 +11158,10 @@
     {
       "source": "packages/runtime/src/memory/store-admit.ts",
       "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-admit.ts",
+      "specifier": "../executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/memory/store-admit.ts",
@@ -11046,6 +11186,10 @@
     {
       "source": "packages/runtime/src/memory/store-control.ts",
       "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-control.ts",
+      "specifier": "../executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/memory/store-control.ts",
@@ -11081,6 +11225,10 @@
     },
     {
       "source": "packages/runtime/src/memory/store-execution.ts",
+      "specifier": "../executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-execution.ts",
       "specifier": "../run.js"
     },
     {
@@ -11101,6 +11249,14 @@
     },
     {
       "source": "packages/runtime/src/memory/store-fan-out.ts",
+      "specifier": "../executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-fan-out.ts",
+      "specifier": "../fan-out.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-fan-out.ts",
       "specifier": "../message.js"
     },
     {
@@ -11118,6 +11274,14 @@
     {
       "source": "packages/runtime/src/memory/store-operations.ts",
       "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-operations.ts",
+      "specifier": "../executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-operations.ts",
+      "specifier": "../operation-resolution.js"
     },
     {
       "source": "packages/runtime/src/memory/store-operations.ts",
@@ -11154,6 +11318,10 @@
     {
       "source": "packages/runtime/src/memory/store.ts",
       "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "../executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/memory/store.ts",
@@ -11220,6 +11388,15 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/runtime/src/operation-resolution.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/operation-resolution.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/runtime/src/platform-layers.ts",
       "specifier": "./sql/runtime-layer.js"
     },
@@ -11237,7 +11414,7 @@
     },
     {
       "source": "packages/runtime/src/run-event.ts",
-      "specifier": "./agent-ref.js"
+      "specifier": "./executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/run-event.ts",
@@ -11274,11 +11451,15 @@
     },
     {
       "source": "packages/runtime/src/run.ts",
-      "specifier": "./agent-ref.js"
+      "specifier": "./cursor.js"
     },
     {
       "source": "packages/runtime/src/run.ts",
-      "specifier": "./cursor.js"
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/run.ts",
+      "specifier": "./executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/run.ts",
@@ -11339,7 +11520,11 @@
     },
     {
       "source": "packages/runtime/src/sql/codecs.ts",
-      "specifier": "../agent-ref.js"
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/codecs.ts",
+      "specifier": "../executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/sql/codecs.ts",
@@ -11507,11 +11692,19 @@
     },
     {
       "source": "packages/runtime/src/sql/mysql/store.ts",
-      "specifier": "../../memory/state.js"
+      "specifier": "../../executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/sql/mysql/store.ts",
       "specifier": "../../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../../steering.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../codecs.js"
     },
     {
       "source": "packages/runtime/src/sql/mysql/store.ts",
@@ -11783,6 +11976,14 @@
     },
     {
       "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "../../executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "../../operation-resolution.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
       "specifier": "../../run.js"
     },
     {
@@ -11810,16 +12011,52 @@
       "specifier": "effect/unstable/sql"
     },
     {
+      "source": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "specifier": "../../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "specifier": "../../executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "specifier": "../../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "specifier": "../../steering.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "specifier": "../codecs.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "specifier": "../store-execution.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "specifier": "./pg-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-suspend.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
       "source": "packages/runtime/src/sql/postgres/store.ts",
       "specifier": "../../errors.js"
     },
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
-      "specifier": "../../memory/digest.js"
+      "specifier": "../../executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
-      "specifier": "../../memory/state.js"
+      "specifier": "../../memory/digest.js"
     },
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
@@ -11828,6 +12065,10 @@
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
       "specifier": "../../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../codecs.js"
     },
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
@@ -11888,6 +12129,10 @@
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
       "specifier": "./store-ops.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "./store-suspend.js"
     },
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
@@ -11971,11 +12216,11 @@
     },
     {
       "source": "packages/runtime/src/sql/store-admit.ts",
-      "specifier": "../memory/digest.js"
+      "specifier": "../executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/sql/store-admit.ts",
-      "specifier": "../memory/state.js"
+      "specifier": "../memory/digest.js"
     },
     {
       "source": "packages/runtime/src/sql/store-admit.ts",
@@ -11999,7 +12244,19 @@
     },
     {
       "source": "packages/runtime/src/sql/store-control.ts",
+      "specifier": "../executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-control.ts",
       "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-control.ts",
+      "specifier": "../steering.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-control.ts",
+      "specifier": "./codecs.js"
     },
     {
       "source": "packages/runtime/src/sql/store-control.ts",
@@ -12019,7 +12276,15 @@
     },
     {
       "source": "packages/runtime/src/sql/store-execution.ts",
+      "specifier": "../executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-execution.ts",
       "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-execution.ts",
+      "specifier": "./codecs.js"
     },
     {
       "source": "packages/runtime/src/sql/store-execution.ts",
@@ -12044,6 +12309,10 @@
     {
       "source": "packages/runtime/src/sql/store-fan-out.ts",
       "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-fan-out.ts",
+      "specifier": "../executable-manifest.js"
     },
     {
       "source": "packages/runtime/src/sql/store-fan-out.ts",
@@ -12075,6 +12344,14 @@
     },
     {
       "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "../executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
       "specifier": "../run-event.js"
     },
     {
@@ -12099,6 +12376,11 @@
     },
     {
       "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
       "specifier": "effect"
     },
     {
@@ -12108,6 +12390,14 @@
     {
       "source": "packages/runtime/src/sql/store-operations.ts",
       "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "../executable-manifest.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "../operation-resolution.js"
     },
     {
       "source": "packages/runtime/src/sql/store-operations.ts",
@@ -12168,10 +12458,6 @@
     {
       "source": "packages/runtime/src/sql/store.ts",
       "specifier": "../errors.js"
-    },
-    {
-      "source": "packages/runtime/src/sql/store.ts",
-      "specifier": "../memory/state.js"
     },
     {
       "source": "packages/runtime/src/sql/store.ts",
@@ -12271,15 +12557,16 @@
     },
     {
       "source": "packages/runtime/src/steering.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/steering.ts",
       "specifier": "effect"
     },
     {
       "source": "packages/runtime/src/steering.ts",
       "specifier": "effect/unstable/ai"
-    },
-    {
-      "source": "packages/runtime/src/steering.ts",
-      "specifier": "node:crypto"
     },
     {
       "source": "packages/runtime/src/tree-cursor.ts",
@@ -12335,6 +12622,14 @@
     },
     {
       "source": "packages/runtime/test/agent-host.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/agent-host.test.ts",
+      "specifier": "./identity.js"
+    },
+    {
+      "source": "packages/runtime/test/agent-host.test.ts",
       "specifier": "@batonfx/core",
       "package": "@batonfx/core"
     },
@@ -12351,8 +12646,37 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/runtime/test/executable-resolver.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/executable-resolver.test.ts",
+      "specifier": "./identity.js"
+    },
+    {
+      "source": "packages/runtime/test/executable-resolver.test.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/test/executable-resolver.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/executable-resolver.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/executable-resolver.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
       "source": "packages/runtime/test/helpers.ts",
       "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/helpers.ts",
+      "specifier": "./identity.js"
     },
     {
       "source": "packages/runtime/test/helpers.ts",
@@ -12362,6 +12686,11 @@
     {
       "source": "packages/runtime/test/helpers.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/test/identity.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
     },
     {
       "source": "packages/runtime/test/index.test.ts",
@@ -12409,6 +12738,34 @@
     },
     {
       "source": "packages/runtime/test/mysql/helpers.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-migration.test.ts",
+      "specifier": "../../src/sql/errors.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-migration.test.ts",
+      "specifier": "../../src/sql/mysql/run-schema.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-migration.test.ts",
+      "specifier": "../../src/sql/mysql/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-migration.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-migration.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-migration.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/mysql/mysql-migration.test.ts",
       "specifier": "effect/unstable/sql"
     },
     {
@@ -12485,6 +12842,38 @@
     },
     {
       "source": "packages/runtime/test/postgres/helpers.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-migration.test.ts",
+      "specifier": "../../src/sql/errors.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-migration.test.ts",
+      "specifier": "../../src/sql/postgres/run-schema.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-migration.test.ts",
+      "specifier": "../../src/sql/postgres/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-migration.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-migration.test.ts",
+      "specifier": "@effect/sql-pg"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-migration.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-migration.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-migration.test.ts",
       "specifier": "effect/unstable/sql"
     },
     {
@@ -12633,6 +13022,22 @@
     },
     {
       "source": "packages/runtime/test/runtime-idempotency.test.ts",
+      "specifier": "../src/memory/digest.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-idempotency.test.ts",
+      "specifier": "../src/memory/state.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-idempotency.test.ts",
+      "specifier": "../src/memory/store-admit.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-idempotency.test.ts",
+      "specifier": "../src/message.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-idempotency.test.ts",
       "specifier": "./helpers.js"
     },
     {
@@ -12686,6 +13091,10 @@
     {
       "source": "packages/runtime/test/runtime-steering.test.ts",
       "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-steering.test.ts",
+      "specifier": "./identity.js"
     },
     {
       "source": "packages/runtime/test/runtime-steering.test.ts",
@@ -12821,6 +13230,38 @@
       "specifier": "./helpers.js"
     },
     {
+      "source": "packages/runtime/test/sqlite-migration.test.ts",
+      "specifier": "../src/sql/bun-client.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-migration.test.ts",
+      "specifier": "../src/sql/errors.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-migration.test.ts",
+      "specifier": "../src/sql/migrate.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-migration.test.ts",
+      "specifier": "../src/sql/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-migration.test.ts",
+      "specifier": "./sqlite-helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-migration.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-migration.test.ts",
+      "specifier": "bun:sqlite"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-migration.test.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
       "specifier": "../src/index.js"
     },
@@ -12839,6 +13280,14 @@
     {
       "source": "packages/runtime/test/sqlite-phase0-tracer.test.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "../src/active-executions.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "../src/agent-host.js"
     },
     {
       "source": "packages/runtime/test/sqlite-store.test.ts",
@@ -12862,7 +13311,16 @@
     },
     {
       "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "./identity.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
       "specifier": "./sqlite-helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
     },
     {
       "source": "packages/runtime/test/sqlite-store.test.ts",
@@ -13824,8 +14282,18 @@
       "kind": "same-stem"
     },
     {
+      "source": "packages/runtime/test/executable-resolver.test.ts",
+      "test": "packages/runtime/test/executable-resolver.test.ts",
+      "kind": "same-stem"
+    },
+    {
       "source": "packages/runtime/test/helpers.ts",
       "test": "packages/runtime/test/helpers.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/identity.ts",
+      "test": "packages/runtime/test/identity.ts",
       "kind": "same-stem"
     },
     {
@@ -13844,6 +14312,11 @@
       "kind": "same-stem"
     },
     {
+      "source": "packages/runtime/test/mysql/mysql-migration.test.ts",
+      "test": "packages/runtime/test/mysql/mysql-migration.test.ts",
+      "kind": "same-stem"
+    },
+    {
       "source": "packages/runtime/test/mysql/mysql-store.test.ts",
       "test": "packages/runtime/test/mysql/mysql-store.test.ts",
       "kind": "same-stem"
@@ -13856,6 +14329,11 @@
     {
       "source": "packages/runtime/test/postgres/helpers.ts",
       "test": "packages/runtime/test/postgres/helpers.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/postgres/postgres-migration.test.ts",
+      "test": "packages/runtime/test/postgres/postgres-migration.test.ts",
       "kind": "same-stem"
     },
     {
@@ -13941,6 +14419,11 @@
     {
       "source": "packages/runtime/test/sqlite-helpers.ts",
       "test": "packages/runtime/test/sqlite-helpers.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/sqlite-migration.test.ts",
+      "test": "packages/runtime/test/sqlite-migration.test.ts",
       "kind": "same-stem"
     },
     {

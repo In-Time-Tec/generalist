@@ -422,3 +422,4 @@ export {
   HandoffProjectionInvalid,
 } from "./handoff-projection.js"
 export { executeSameRunHandoff, HandoffRejected } from "./handoff-runtime.js"
+export { HandoffCommit, HandoffControlState } from "../agent/handoff-state.js"

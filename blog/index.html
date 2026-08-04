@@ -689,7 +689,7 @@ flowchart LR
 
   subgraph core["@batonfx/core"]
     AGENT[Agent loop]
-    REF[AgentRef]
+    REF[ExecutableManifest]
     BUD[RunBudget]
     DRV[DurableAgentDriver]
   end
@@ -824,7 +824,7 @@ flowchart LR
                 </tr>
                 <tr>
                   <td><code>baton_runs</code></td>
-                  <td>Run identity, status, pinned AgentRef, fence</td>
+                  <td>Run identity, status, persisted ExecutableRef and manifest, fence</td>
                 </tr>
                 <tr>
                   <td><code>baton_run_events</code></td>
@@ -895,13 +895,17 @@ stateDiagram-v2
   <span class="kw">readonly</span> <span class="fn">inspect</span>: (turnId: <span class="ty">string</span>) =&gt; <span class="ty">Effect</span>.<span class="ty">Effect</span>&lt;<span class="ty">TurnRun</span> | <span class="kw">undefined</span>, <span class="ty">TurnExecutionError</span>&gt;
 }</code></pre>
 
-          <h3>AgentRef <span class="tag done">implemented</span></h3>
-          <pre><code><span class="kw">const</span> ref = <span class="ty">AgentRef</span>.<span class="fn">fromAgent</span>(assistant, <span class="st">"2026-08-03"</span>)
-<span class="kw">const</span> encoded = <span class="kw">yield</span>* <span class="ty">AgentRef</span>.<span class="fn">encode</span>(ref)
-<span class="kw">yield</span>* <span class="ty">AgentRef</span>.<span class="fn">requireMatch</span>(ref, decoded)</code></pre>
+          <h3>Executable identity <span class="tag done">implemented</span></h3>
+          <pre><code><span class="kw">const</span> executable = <span class="ty">ExecutableManifest</span>.<span class="fn">make</span>({
+  root: assistantManifest.pin,
+  agents: [assistantManifest],
+})
+<span class="kw">const</span> resolver = <span class="ty">ExecutableResolver</span>.<span class="fn">makeStatic</span>([
+  { executable, agent: assistant },
+])</code></pre>
           <p>
-            Every durable Run pins manifest digest, model, tools, TurnPolicy, budget. Same version + changed manifest
-            fails before acceptance.
+            Every durable Run persists its constructor-verified manifest and exact active reference. A scoped resolver
+            reconstructs live Agent resources for execution and attests that exact identity before work begins.
           </p>
 
           <h3>Address messaging <span class="tag plan">request/reply planned</span></h3>
@@ -1182,8 +1186,8 @@ flowchart TD
 
           <h3><span class="tag done">done</span> Core durable contracts</h3>
           <p>
-            AgentRef, RunBudget, DurableAgentDriver, DriverInterpreter, same-run handoff, fail-closed approval,
-            Agent.stream integration.
+            AgentManifest, ExecutableManifest, RunBudget, DurableAgentDriver, DriverInterpreter, same-run handoff,
+            fail-closed approval, Agent.stream integration.
           </p>
 
           <h3><span class="tag done">done</span> Runtime package</h3>

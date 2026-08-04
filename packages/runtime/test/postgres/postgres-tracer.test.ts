@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { RunClaims, Runtime, RunStore } from "../../src/index.js"
-import { assistantAddress, completedResult, openWait, textPrompt } from "../helpers.js"
+import { assistantAddress, completedResult, openWait, suspension, textPrompt } from "../helpers.js"
 import { postgresAvailable, postgresLayer, postgresUrl, preparePostgres, uniqueSession } from "./helpers.js"
 
 const describePostgres = postgresAvailable ? describe.sequential : describe.skip
@@ -38,11 +38,12 @@ describePostgres("postgres process tracer", () => {
         const a = yield* claims.claimReadyRuns({ workerId: "tracer-a", limit: 1, lease: "10 seconds" })
         expect(a).toHaveLength(1)
         expect(a[0]!.run.runId).toBe(first.runId)
-        yield* driver.wait({
+        yield* driver.suspend({
           runId: first.runId,
           ownerId: "tracer-a",
           attemptFence: a[0]!.attemptFence,
           wait: openWait("gate", "external"),
+          suspension: suspension("gate"),
         })
         yield* runtime.signal({ runId: first.runId, name: "gate" })
         yield* claims.commitWithClaim({

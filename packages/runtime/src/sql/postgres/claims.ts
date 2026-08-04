@@ -2,7 +2,7 @@ import { Duration, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { StaleClaim } from "../errors.js"
 import type { ClaimedRun } from "../run-claims.js"
-import { decodeRun, loadRun } from "../store-helpers.js"
+import { decodeRunEffect, loadRun } from "../store-helpers.js"
 import type { RunRow } from "../rows.js"
 
 export interface ClaimOptions {
@@ -19,7 +19,7 @@ export const claimReadyRuns = (options: ClaimOptions) =>
       WITH candidates AS (
         SELECT r.run_id
         FROM baton_runs r
-        WHERE r.status IN ('queued', 'running', 'needs-resolution', 'cancelling')
+        WHERE r.status IN ('queued', 'running', 'cancelling')
           AND r.cancellation_requested = FALSE
           AND (
             r.parent_run_id IS NOT NULL
@@ -58,7 +58,7 @@ export const claimReadyRuns = (options: ClaimOptions) =>
     `
     const out: Array<ClaimedRun> = []
     for (const row of claimed) {
-      const run = decodeRun(row)
+      const run = yield* decodeRunEffect(row)
       out.push({
         run,
         workerId: options.workerId,

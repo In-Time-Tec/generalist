@@ -5,6 +5,7 @@ import { LoopDriverState } from "./loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "./durable-driver.js"
 import { DriverUnknownReplay } from "./driver-interpreter.js"
 import { RunBudgetExhausted } from "./run-budget.js"
+import type { HandoffControlState } from "../agent/handoff-state.js"
 
 /** @experimental */
 export const checkpoint = Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.checkpoint)
@@ -68,6 +69,10 @@ export const reserveChildBudget = (grant: BudgetLimits) =>
 /** @experimental */
 export const refundChildBudget = (child: RunBudget) =>
   Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.refundChild(child))
+
+/** @internal Persist a live handoff control transition in the owning checkpoint. */
+export const setHandoffState = (state: HandoffControlState) =>
+  Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.setHandoffState(state))
 
 /** @experimental */
 export const recorded = Effect.flatMap(DriverInterpreter, (interpreter) => interpreter.recorded)

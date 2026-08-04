@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
-import { AgentRef } from "./agent-ref.js"
+import { ExecutableRef } from "./executable-manifest.js"
 import type { AgentLoopEvent, AgentResult } from "./agent-event.js"
 import { AgentResult as AgentResultSchema, RunFailure as RunFailureSchema, RunId } from "./run.js"
 import { RunWait, WaitResolution } from "./run-wait.js"
@@ -24,7 +24,7 @@ export const RunEventBase = Schema.Struct({
   eventId: Schema.String,
   runId: RunId,
   sequence: Sequence,
-  agent: AgentRef,
+  executableRef: ExecutableRef,
   attemptId: Schema.optionalKey(Schema.String),
   rootRunId: RunId,
   parentRunId: Schema.optionalKey(RunId),

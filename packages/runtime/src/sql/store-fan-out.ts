@@ -1,8 +1,23 @@
 import { Effect, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { make as makeAddress } from "../address.js"
-import { FanOutConflict, FanOutInvalid, FanOutNotFound, RunNotFound, RunTerminal } from "../errors.js"
-import { FanOutJoin, type AdmitFanOutInput, type FanOutInspection, type FanOutMemberResult } from "../fan-out.js"
+import {
+  ChildSelectionMissing,
+  FanOutConflict,
+  FanOutInvalid,
+  FanOutNotFound,
+  RunNotFound,
+  RunTerminal,
+} from "../errors.js"
+import {
+  digestFanOut,
+  FanOutJoin,
+  type AdmitFanOutInput,
+  type FanOutInspection,
+  type FanOutMemberResult,
+  type StoredFanOutMember,
+} from "../fan-out.js"
+import { resolveChild } from "../executable-manifest.js"
 import { make as makeMessage } from "../message.js"
 import { isTerminal } from "../run.js"
 import type { RunEvent } from "../run-event.js"
@@ -81,12 +96,21 @@ export const admitFanOut = (hub: EventHub, input: AdmitFanOutInput) =>
     if (isTerminal(parent.status)) {
       return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
+    const members: Array<StoredFanOutMember> = []
+    for (const member of input.members) {
+      const executableRef = resolveChild(parent.executableRef, parent.executableManifest, member.selection)
+      if (executableRef === undefined) {
+        return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: member.selection })
+      }
+      members.push({ ...member, executableRef })
+    }
+    const digest = digestFanOut({ ...input, members })
     const prior = (yield* sql<FanOutRow>`
       SELECT * FROM baton_fan_outs
       WHERE parent_run_id = ${input.parentRunId} AND idempotency_key = ${input.idempotencyKey}
     `)[0]
     if (prior !== undefined) {
-      if (prior.input_digest !== input.digest) {
+      if (prior.input_digest !== digest) {
         return yield* FanOutConflict.make({
           parentRunId: input.parentRunId,
           idempotencyKey: input.idempotencyKey,
@@ -107,11 +131,11 @@ export const admitFanOut = (hub: EventHub, input: AdmitFanOutInput) =>
         fan_out_id, parent_run_id, idempotency_key, input_digest, join_json, remainder,
         concurrency, status, created_at, updated_at
       ) VALUES (
-        ${input.fanOutId}, ${input.parentRunId}, ${input.idempotencyKey}, ${input.digest},
+        ${input.fanOutId}, ${input.parentRunId}, ${input.idempotencyKey}, ${digest},
         ${JSON.stringify(input.join)}, ${input.remainder}, ${input.concurrency}, 'running', ${created}, ${created}
       )
     `
-    for (const member of input.members) {
+    for (const member of members) {
       const active = member.ordinal < input.concurrency
       const address = makeAddress(`fanout:${input.fanOutId}`)
       const message = makeMessage({
@@ -127,8 +151,9 @@ export const admitFanOut = (hub: EventHub, input: AdmitFanOutInput) =>
         runId: member.childRunId,
         status: active ? "running" : "queued",
         message,
-        digest: input.digest,
-        agent: member.agent,
+        digest,
+        executableRef: member.executableRef,
+        executableManifest: parent.executableManifest,
         rootRunId: parent.rootRunId,
         parentRunId: parent.runId,
         invocationId: `${input.fanOutId}:${member.key}`,

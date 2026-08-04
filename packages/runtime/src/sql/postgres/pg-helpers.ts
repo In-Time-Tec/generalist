@@ -3,15 +3,14 @@ import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { PgClient } from "@effect/sql-pg"
 import { eventIdFor, type RunEvent } from "../../run-event.js"
-import type { AgentRef } from "../../agent-ref.js"
+import type { ExecutableManifest, ExecutableRef } from "../../executable-manifest.js"
 import type { Message } from "../../message.js"
 import { isTerminal, type RunStatus } from "../../run.js"
 import {
-  decodeAgent,
-  decodeEvent,
   decodeMessage,
   decodeQueue,
-  encodeAgent,
+  encodeExecutableManifest,
+  encodeExecutableRef,
   encodeEvent,
   encodeMessage,
   encodeQueue,
@@ -20,11 +19,11 @@ import type { EventHub } from "../subscribers.js"
 import { reconcileFanOutWith } from "../store-fan-out.js"
 import type { DecodedRun, EventRow, OperationRow, RunRow } from "../rows.js"
 import type { OperationRecord } from "../operations.js"
-import { decodeRun } from "../store-helpers.js"
+import { decodePersistedEvents, decodeRunEffect } from "../store-helpers.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
 import type { AgentLoopEvent } from "../../agent-event.js"
 import type { ExecutionClaim } from "../../run-store.js"
-import { RunNotFound, RunTerminal } from "../../errors.js"
+import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
 
 export type EventPartial = { readonly _tag: string } & Record<string, unknown>
@@ -34,8 +33,15 @@ export const loadRun = (runId: string) =>
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${runId}`
     const row = rows[0]
-    return row === undefined ? undefined : decodeRun(row)
+    return row === undefined ? undefined : yield* decodeRunEffect(row)
   })
+
+export const requireRun = (runId: string) =>
+  loadRun(runId).pipe(
+    Effect.flatMap((loaded) =>
+      loaded === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(loaded),
+    ),
+  )
 
 export const lockSpawnParent = (runId: string) =>
   Effect.gen(function* () {
@@ -50,6 +56,7 @@ export const lockSpawnParent = (runId: string) =>
 export const emitAgentEvent = (hub: EventHub, input: ExecutionClaim & { readonly event: AgentLoopEvent }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${input.runId} FOR UPDATE`
     const loaded = yield* loadRun(input.runId)
     if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
     if (loaded.ownerWorkerId !== input.ownerId || loaded.attemptFence !== input.attemptFence) {
@@ -72,12 +79,14 @@ export const emitAgentEvent = (hub: EventHub, input: ExecutionClaim & { readonly
 export const loadEventsAfter = (runId: string, cursor: number) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const run = yield* loadRun(runId)
+    if (run === undefined) return []
     const rows = yield* sql<EventRow>`
       SELECT * FROM baton_run_events
       WHERE run_id = ${runId} AND sequence > ${cursor}
       ORDER BY sequence ASC
     `
-    return rows.map((row) => decodeEvent(row.event_json))
+    return yield* decodePersistedEvents(rows, run.executableManifest)
   })
 
 export const allocateSequence = (runId: string) =>
@@ -103,7 +112,7 @@ export const appendEvent = (_hub: EventHub, run: DecodedRun, partial: EventParti
       eventId: eventIdFor(run.runId, sequence),
       runId: run.runId,
       sequence,
-      agent: run.agent,
+      executableRef: run.executableRef,
       rootRunId: run.rootRunId,
       occurredAt,
       ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
@@ -226,7 +235,7 @@ export const settleParent = (
   hub: EventHub,
   child: DecodedRun,
   terminalEventId: string,
-): Effect.Effect<void, SqlError, SqlClient.SqlClient | PgClient.PgClient> =>
+): Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient | PgClient.PgClient> =>
   Effect.gen(function* () {
     if (child.parentRunId === undefined) return
     const sql = yield* SqlClient.SqlClient
@@ -276,7 +285,8 @@ export const insertRun = (input: {
   readonly status: RunStatus
   readonly message: Message
   readonly digest: string
-  readonly agent: AgentRef
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly rootRunId: string
   readonly parentRunId?: string
   readonly invocationId?: string
@@ -288,13 +298,14 @@ export const insertRun = (input: {
     yield* sql`
       INSERT INTO baton_runs (
         run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
-        agent_json, root_run_id, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
+        executable_ref_json, executable_manifest_json, root_run_id, parent_run_id, invocation_id, active_wait_id, attempt, attempt_fence,
         last_sequence, cancellation_requested, cancel_reason, terminal_event_id, accepted_sequence,
         responded_wait_ids_json, owner_worker_id, lease_expires_at, created_at, updated_at
       ) VALUES (
         ${input.runId}, ${input.status}, ${input.message.to}, ${input.message.sessionId}, ${input.message.id},
         ${encodeMessage(input.message)}, ${input.digest}, ${input.message.idempotencyKey},
-        ${encodeAgent(input.agent)}, ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
+        ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
+        ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
         NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, FALSE, NULL, NULL, ${input.acceptedSequence},
         ${JSON.stringify([])}, NULL, NULL, NOW(), NOW()
       )
@@ -343,6 +354,8 @@ export const toOperationRecord = (row: OperationRow): OperationRecord => ({
   attempt: Number(row.attempt),
   ...(row.result_json === null ? {} : { result: JSON.parse(row.result_json) as unknown }),
   ...(row.error_json === null ? {} : { error: JSON.parse(row.error_json) as unknown }),
+  ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
+  ...(row.resolution_json === null ? {} : { resolution: JSON.parse(row.resolution_json) }),
 })
 
-export { decodeAgent, decodeMessage, encodeQueue, decodeQueue }
+export { decodeMessage, encodeQueue, decodeQueue }

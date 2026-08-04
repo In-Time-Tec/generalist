@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 6
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const NOTIFY_CHANNEL = "baton_run_events"
@@ -176,10 +176,22 @@ SELECT root_run_id, position, run_id, sequence, event_id FROM (
   SELECT MAX(position) FROM baton_tree_event_index i WHERE i.root_run_id = roots.root_run_id
 ), -1)`,
 ]
+export const EXECUTABLE_MIGRATION_STATEMENTS = [
+  `DO $$ BEGIN IF EXISTS (SELECT 1 FROM baton_runs) THEN RAISE EXCEPTION 'cannot migrate nonempty baton_runs to executable manifests'; END IF; END $$`,
+  `ALTER TABLE baton_runs ADD COLUMN executable_ref_json TEXT NOT NULL`,
+  `ALTER TABLE baton_runs ADD COLUMN executable_manifest_json TEXT NOT NULL`,
+  `ALTER TABLE baton_runs DROP COLUMN agent_json`,
+]
+export const OPERATION_RESOLUTION_MIGRATION_STATEMENTS = [
+  `ALTER TABLE baton_run_operations ADD COLUMN resolution_idempotency_key TEXT`,
+  `ALTER TABLE baton_run_operations ADD COLUMN resolution_json TEXT`,
+]
 export const MIGRATION_STATEMENTS = [
   ...LEGACY_MIGRATION_STATEMENTS,
   ...FAN_OUT_MIGRATION_STATEMENTS,
   ...TREE_MIGRATION_STATEMENTS,
+  ...EXECUTABLE_MIGRATION_STATEMENTS,
+  ...OPERATION_RESOLUTION_MIGRATION_STATEMENTS,
 ]
 export const STEERING_MIGRATION_STATEMENTS = [
   ...LEGACY_MIGRATION_STATEMENTS.slice(7, 9),
@@ -206,6 +218,21 @@ export const schemaChecksum = (): string => {
   return hasher.digest("hex")
 }
 
+export const executableSchemaChecksum = (): string => {
+  const hasher = new Bun.CryptoHasher("sha256")
+  hasher.update(
+    [
+      ...LEGACY_MIGRATION_STATEMENTS,
+      ...FAN_OUT_MIGRATION_STATEMENTS,
+      ...TREE_MIGRATION_STATEMENTS,
+      ...EXECUTABLE_MIGRATION_STATEMENTS,
+    ].join("\n"),
+  )
+  hasher.update("\nversion=5")
+  hasher.update("\ndialect=postgres")
+  return hasher.digest("hex")
+}
+
 export const steeringSchemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
   hasher.update(LEGACY_MIGRATION_STATEMENTS.join("\n"))
@@ -218,6 +245,16 @@ export const fanOutSchemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
   hasher.update([...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS].join("\n"))
   hasher.update("\nversion=3")
+  hasher.update("\ndialect=postgres")
+  return hasher.digest("hex")
+}
+
+export const treeSchemaChecksum = (): string => {
+  const hasher = new Bun.CryptoHasher("sha256")
+  hasher.update(
+    [...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS, ...TREE_MIGRATION_STATEMENTS].join("\n"),
+  )
+  hasher.update("\nversion=4")
   hasher.update("\ndialect=postgres")
   return hasher.digest("hex")
 }

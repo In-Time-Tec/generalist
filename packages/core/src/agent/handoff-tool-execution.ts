@@ -37,6 +37,7 @@ export const runHandoffTool = (input: {
     yield* HandoffCatalog
     const accepted = yield* executeSameRunHandoff({
       turn: input.turn,
+      toolCallId: input.call.id,
       specialist: meta.specialist,
       params: input.call.params,
       options: input.options,

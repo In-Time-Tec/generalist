@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 6
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const MIGRATION_LOCK = "baton_runtime_schema"
@@ -196,10 +196,21 @@ SELECT root_run_id, position, run_id, sequence, event_id FROM (
 ) indexed ON indexed.root_run_id = roots.root_run_id
 SET roots.last_position = COALESCE(indexed.last_position, -1)`,
 ]
+export const EXECUTABLE_MIGRATION_STATEMENTS = [
+  `ALTER TABLE baton_runs ADD COLUMN executable_ref_json LONGTEXT NOT NULL`,
+  `ALTER TABLE baton_runs ADD COLUMN executable_manifest_json LONGTEXT NOT NULL`,
+  `ALTER TABLE baton_runs DROP COLUMN agent_json`,
+]
+export const OPERATION_RESOLUTION_MIGRATION_STATEMENTS = [
+  `ALTER TABLE baton_run_operations ADD COLUMN resolution_idempotency_key VARCHAR(255)`,
+  `ALTER TABLE baton_run_operations ADD COLUMN resolution_json LONGTEXT`,
+]
 export const MIGRATION_STATEMENTS = [
   ...LEGACY_MIGRATION_STATEMENTS,
   ...FAN_OUT_MIGRATION_STATEMENTS,
   ...TREE_MIGRATION_STATEMENTS,
+  ...EXECUTABLE_MIGRATION_STATEMENTS,
+  ...OPERATION_RESOLUTION_MIGRATION_STATEMENTS,
 ]
 
 export const MIGRATION_MANIFEST = [
@@ -207,12 +218,29 @@ export const MIGRATION_MANIFEST = [
   { id: 2, name: "baton_runtime_mysql_steering", statements: LEGACY_MIGRATION_STATEMENTS.slice(-2) },
   { id: 3, name: "baton_runtime_mysql_fan_out", statements: FAN_OUT_MIGRATION_STATEMENTS },
   { id: 4, name: "baton_runtime_mysql_tree_projection", statements: TREE_MIGRATION_STATEMENTS },
+  { id: 5, name: "baton_runtime_mysql_executable_manifest", statements: EXECUTABLE_MIGRATION_STATEMENTS },
+  { id: 6, name: "baton_runtime_mysql_operation_resolution", statements: OPERATION_RESOLUTION_MIGRATION_STATEMENTS },
 ] as const
 
 export const schemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
   hasher.update(MIGRATION_STATEMENTS.join("\n"))
   hasher.update(`\nversion=${SCHEMA_VERSION}`)
+  hasher.update("\ndialect=mysql")
+  return hasher.digest("hex")
+}
+
+export const executableSchemaChecksum = (): string => {
+  const hasher = new Bun.CryptoHasher("sha256")
+  hasher.update(
+    [
+      ...LEGACY_MIGRATION_STATEMENTS,
+      ...FAN_OUT_MIGRATION_STATEMENTS,
+      ...TREE_MIGRATION_STATEMENTS,
+      ...EXECUTABLE_MIGRATION_STATEMENTS,
+    ].join("\n"),
+  )
+  hasher.update("\nversion=5")
   hasher.update("\ndialect=mysql")
   return hasher.digest("hex")
 }
@@ -229,6 +257,16 @@ export const fanOutSchemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
   hasher.update([...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS].join("\n"))
   hasher.update("\nversion=3")
+  hasher.update("\ndialect=mysql")
+  return hasher.digest("hex")
+}
+
+export const treeSchemaChecksum = (): string => {
+  const hasher = new Bun.CryptoHasher("sha256")
+  hasher.update(
+    [...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS, ...TREE_MIGRATION_STATEMENTS].join("\n"),
+  )
+  hasher.update("\nversion=4")
   hasher.update("\ndialect=mysql")
   return hasher.digest("hex")
 }

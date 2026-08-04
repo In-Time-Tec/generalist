@@ -2,32 +2,23 @@ import { Duration, Effect, Ref, Schedule, Stream } from "effect"
 import type { Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError"
-import { CursorExpired, RunNotFound } from "../../errors.js"
-import { agentKey } from "../../memory/state.js"
+import { CursorExpired, RunNotFound, RuntimeUnavailable } from "../../errors.js"
+import { checkpointRef } from "../../executable-manifest.js"
 import type { LayerOptions } from "../../runtime.js"
 import { RunStore, type Interface as RunStoreInterface } from "../../run-store.js"
 import { admitSend, admitSpawn } from "../store-admit.js"
-import {
-  cancel,
-  complete,
-  emitAgentEvent,
-  fail,
-  markOperationUnknown,
-  respond,
-  resume,
-  signal,
-} from "../store-control.js"
+import { cancel, complete, emitAgentEvent, fail, respond, resume, signal } from "../store-control.js"
 import {
   expireRunningOperation,
-  failOperation,
   getOperation,
   getOperationByKey,
   recordOperation,
   startOperation,
-  succeedOperation,
+  completeOperation,
+  resolveOperation,
 } from "../store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim } from "../store-execution.js"
-import { appendEvent, decodeRun, loadEventsAfter, loadRun, loadRunWait, nowIso } from "../store-helpers.js"
+import { appendEvent, decodeRunEffect, loadEventsAfter, loadRun, loadRunWait, nowIso } from "../store-helpers.js"
 import type { RunRow } from "../rows.js"
 import { withSql } from "../sql-effect.js"
 import { makeEventHub } from "../subscribers.js"
@@ -44,6 +35,8 @@ import { makeMysqlClaims } from "./store-claims.js"
 import { admitFanOut, inspectFanOut } from "../store-fan-out.js"
 import { loadTreeHistory } from "../tree-history.js"
 import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
+import { encodeExecutableRef } from "../codecs.js"
+import { encodeContinuation } from "../../steering.js"
 import { withConsistentSnapshot } from "../inspection-transaction.js"
 
 export interface MysqlStoreOptions extends LayerOptions {
@@ -91,13 +84,7 @@ export const makeMysqlServices = (
 > =>
   Effect.gen(function* () {
     const source = options.source ?? "mysql"
-    const agentRefs = new Map(options.agents.map((entry) => [agentKey(entry.ref), entry.ref] as const))
-    const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.agent] as const))
-    for (const binding of options.addresses) {
-      if (!agentRefs.has(agentKey(binding.agent))) {
-        return yield* Effect.die(new Error(`address ${binding.address} binds unregistered agent`))
-      }
-    }
+    const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     yield* checkSchema(source)
     const hub = yield* makeEventHub()
     yield* Effect.addFinalizer(() => hub.shutdown)
@@ -164,11 +151,27 @@ export const makeMysqlServices = (
         Effect.andThen(sql`SELECT lock_key FROM baton_runtime_locks WHERE lock_key = ${key} FOR UPDATE`),
         Effect.andThen(effect),
       )
-    const wait = (input: Parameters<RunStoreInterface["wait"]>[0]) =>
+    const suspend = (input: Parameters<RunStoreInterface["suspend"]>[0]) =>
       Effect.gen(function* () {
         const loaded = yield* loadRun(input.runId)
         if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
         const opened = yield* nowIso
+        const executableRef = yield* Effect.try({
+          try: () => checkpointRef(loaded.executableRef, loaded.executableManifest, input.checkpoint),
+          catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+        })
+        yield* sql`
+          UPDATE baton_runs SET
+            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+            executable_ref_json = ${encodeExecutableRef(executableRef)},
+            suspension_json = ${JSON.stringify(input.suspension)},
+            transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+            continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
+              THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
+              ELSE continuation_json END,
+            updated_at = ${opened}
+          WHERE run_id = ${input.runId}
+        `
         yield* sql`
           INSERT INTO baton_run_waits (run_id, wait_id, reason, status, response_json, opened_at, closed_at)
           VALUES (${loaded.runId}, ${input.wait.waitId}, ${input.wait.reason}, 'open', NULL, ${opened}, NULL)
@@ -185,9 +188,16 @@ export const makeMysqlServices = (
     const saveExecution = (input: Parameters<RunStoreInterface["saveExecution"]>[0]) =>
       Effect.gen(function* () {
         yield* requireExecutionClaim(input)
+        const loaded = yield* loadRun(input.runId)
+        if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
+        const executableRef = yield* Effect.try({
+          try: () => checkpointRef(loaded.executableRef, loaded.executableManifest, input.checkpoint),
+          catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+        })
         yield* sql`
           UPDATE baton_runs SET
             driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+            executable_ref_json = ${encodeExecutableRef(executableRef)},
             suspension_json = COALESCE(${input.suspension === undefined ? null : JSON.stringify(input.suspension)}, suspension_json),
             transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
             updated_at = ${yield* nowIso}
@@ -201,11 +211,10 @@ export const makeMysqlServices = (
         run(
           lockNamed(
             `baton:admit:${input.message.to}:${input.message.sessionId}`,
-            admitSend(transactionHub, agentRefs, addressBindings, input, { promote: false }),
+            admitSend(transactionHub, addressBindings, input, { promote: false }),
           ),
         ),
-      admitSpawn: (input) =>
-        run(lockRun(input.parentRunId).pipe(Effect.andThen(admitSpawn(transactionHub, agentRefs, input)))),
+      admitSpawn: (input) => run(lockRun(input.parentRunId).pipe(Effect.andThen(admitSpawn(transactionHub, input)))),
       events: (input) =>
         Stream.unwrap(
           Effect.gen(function* () {
@@ -259,7 +268,8 @@ export const makeMysqlServices = (
             return {
               runId: loaded.runId,
               status: loaded.status,
-              agent: loaded.agent,
+              executableRef: loaded.executableRef,
+              executableManifest: loaded.executableManifest,
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
               ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
@@ -289,12 +299,13 @@ export const makeMysqlServices = (
                 : yield* sql<RunRow>`SELECT * FROM baton_runs WHERE status = ${input.status} ORDER BY created_at DESC LIMIT ${input.limit}`
             return yield* Effect.forEach(rows, (row) =>
               Effect.gen(function* () {
-                const loaded = decodeRun(row)
+                const loaded = yield* decodeRunEffect(row)
                 const activeWait = yield* loadRunWait(loaded.runId, loaded.activeWaitId)
                 return {
                   runId: loaded.runId,
                   status: loaded.status,
-                  agent: loaded.agent,
+                  executableRef: loaded.executableRef,
+                  executableManifest: loaded.executableManifest,
                   lastSequence: loaded.lastSequence,
                   durability: "durable" as const,
                   ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
@@ -327,17 +338,17 @@ export const makeMysqlServices = (
             Effect.andThen(clearClaim(input.runId)),
           ),
         ),
-      wait: (input) => fenced(input, wait(input)),
+      suspend: (input) => fenced(input, suspend(input)),
       resume: (input) => run(lockRun(input.runId).pipe(Effect.andThen(resume(transactionHub, input)))),
       emitAgentEvent: (input) => fenced(input, emitAgentEvent(transactionHub, input)),
-      markOperationUnknown: (input) => fenced(input, markOperationUnknown(transactionHub, input)),
       recordOperation: (input) => fenced(input, recordOperation(transactionHub, input)),
       startOperation: (input) => fenced(input, startOperation(input)),
-      succeedOperation: (input) => fenced(input, succeedOperation(input)),
-      failOperation: (input) => fenced(input, failOperation(input)),
+      completeOperation: (input) => fenced(input, completeOperation(transactionHub, input)),
       expireRunningOperation: (input) => fenced(input, expireRunningOperation(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
+      resolveOperation: (input) =>
+        run(lockRun(input.runId).pipe(Effect.andThen(resolveOperation(input, "queued", true)))),
       claimExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(claimExecution(input)))),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
       saveExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(saveExecution(input)))),

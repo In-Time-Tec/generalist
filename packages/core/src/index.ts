@@ -1,4 +1,24 @@
-import { AgentRef } from "./durable/facade-agentRef.js"
+import {
+  AgentManifest as AgentManifestSchema,
+  ChildBinding,
+  NamedCapability,
+  PolicyIdentity,
+  PortablePolicy,
+  fromLiveAgent,
+  make as makeAgentManifest,
+} from "./durable/agent-manifest.js"
+import {
+  AgentEntry,
+  ExecutableManifest as ExecutableManifestSchema,
+  ExecutableRef,
+  decode as decodeExecutableManifest,
+  encode as encodeExecutableManifest,
+  make as makeExecutableManifest,
+  makeTest as makeTestExecutableManifest,
+  validateRef,
+} from "./durable/executable-manifest.js"
+import { AgentPin, CapabilityPin, ExecutablePin, ModelPin, makeCapability, makeModel } from "./durable/pin.js"
+import { digest } from "./durable/canonical-json.js"
 import { DurableDriver } from "./durable/facade-durableDriver.js"
 import { RunBudget } from "./durable/facade-runBudget.js"
 import { Agent } from "./agent/facade-agent.js"
@@ -29,10 +49,56 @@ import { ToolOutput } from "./tools/facade-toolOutput.js"
 import { ToolPlacement } from "./tools/facade-toolPlacement.js"
 import { TurnPolicy } from "./turn/facade-turnPolicy.js"
 
+export const Pins = { AgentPin, ModelPin, CapabilityPin, ExecutablePin, digest, makeModel, makeCapability }
+export namespace Pins {
+  export type AgentPin = import("./durable/pin.js").AgentPin
+  export type ModelPin = import("./durable/pin.js").ModelPin
+  export type CapabilityPin = import("./durable/pin.js").CapabilityPin
+  export type ExecutablePin = import("./durable/pin.js").ExecutablePin
+}
+
+type AgentManifestFacade = typeof import("./durable/agent-manifest.js")
+
+export const AgentManifest = {
+  AgentManifest: AgentManifestSchema,
+  ChildBinding,
+  NamedCapability,
+  PolicyIdentity,
+  PortablePolicy,
+  fromLiveAgent,
+  make: makeAgentManifest,
+} as AgentManifestFacade
+export namespace AgentManifest {
+  export type AgentManifest = import("./durable/agent-manifest.js").AgentManifest
+  export type PinnedAgent = import("./durable/agent-manifest.js").PinnedAgent
+  export type NamedCapability = import("./durable/agent-manifest.js").NamedCapability
+  export type ChildBinding = import("./durable/agent-manifest.js").ChildBinding
+  export type PolicyIdentity = import("./durable/agent-manifest.js").PolicyIdentity
+  export type PortablePolicy = import("./durable/agent-manifest.js").PortablePolicy
+}
+
+type ExecutableManifestFacade = typeof import("./durable/executable-manifest.js")
+
+export const ExecutableManifest = {
+  AgentEntry,
+  ExecutableManifest: ExecutableManifestSchema,
+  ExecutableRef,
+  decode: decodeExecutableManifest,
+  encode: encodeExecutableManifest,
+  make: makeExecutableManifest,
+  makeTest: makeTestExecutableManifest,
+  validateRef,
+} as ExecutableManifestFacade
+export namespace ExecutableManifest {
+  export type ExecutableManifest = import("./durable/executable-manifest.js").ExecutableManifest
+  export type ExecutableRef = import("./durable/executable-manifest.js").ExecutableRef
+  export type PinnedExecutable = import("./durable/executable-manifest.js").PinnedExecutable
+  export type AgentEntry = import("./durable/executable-manifest.js").AgentEntry
+}
+
 export {
   Agent,
   AgentEvent,
-  AgentRef,
   AgentTool,
   Approvals,
   Compaction,

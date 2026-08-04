@@ -1,8 +1,9 @@
 import { Effect, Layer, Stream } from "effect"
-import { AgentRef, Runtime } from "@batonfx/runtime"
+import { ExecutableManifest, Runtime } from "@batonfx/runtime"
 import type { RunEvent } from "@batonfx/runtime"
 
-export const agent = AgentRef.make({ id: "assistant", version: "1", digest: "sha256:assistant" })
+export const executable: ExecutableManifest.PinnedExecutable = ExecutableManifest.makeTest("assistant", "1")
+export const agent = executable.ref
 
 export const event = (sequence: number, tag = "RunAttemptStarted"): RunEvent.RunEvent =>
   ({
@@ -11,7 +12,7 @@ export const event = (sequence: number, tag = "RunAttemptStarted"): RunEvent.Run
     eventId: `run-1:${sequence}`,
     runId: "run-1",
     sequence,
-    agent,
+    executableRef: agent,
     rootRunId: "run-1",
     occurredAt: "2026-08-03T00:00:00.000Z",
     attempt: 1,
@@ -27,7 +28,14 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
         Stream.fromIterable([event(0), event(1), event(2)].filter((item) => item.sequence > (cursor ?? -1))),
       snapshot: (runId) =>
         Effect.succeed({
-          run: { runId, status: "running", agent, lastSequence: 2, durability: "durable" },
+          run: {
+            runId,
+            status: "running",
+            executableRef: agent,
+            executableManifest: executable.manifest,
+            lastSequence: 2,
+            durability: "durable",
+          },
           cursor: 2,
           usage: [],
           compactions: [],
@@ -40,8 +48,17 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
       respond: () => Effect.die("unused respond"),
       signal: () => Effect.die("unused signal"),
       steer: () => Effect.die("unused steer"),
+      resolveOperation: () => Effect.die("unused resolveOperation"),
       cancel: () => Effect.void,
-      inspect: (runId) => Effect.succeed({ runId, status: "running", agent, lastSequence: 2, durability: "durable" }),
+      inspect: (runId) =>
+        Effect.succeed({
+          runId,
+          status: "running",
+          executableRef: agent,
+          executableManifest: executable.manifest,
+          lastSequence: 2,
+          durability: "durable",
+        }),
       fanOut: () => Effect.die("unused fanOut"),
       inspectFanOut: () => Effect.die("unused inspectFanOut"),
       awaitFanOut: () => Effect.die("unused awaitFanOut"),

@@ -1,0 +1,188 @@
+import { Schema } from "effect"
+import type { Tool } from "effect/unstable/ai"
+import type { Agent } from "../agent/agent.js"
+import { BudgetLimits } from "./run-budget.js"
+import { AgentPin, CapabilityPin, makeAgent, ModelPin } from "./pin.js"
+import { digest } from "./canonical-json.js"
+
+const compareText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0)
+
+/** @experimental One named capability required by an Agent. */
+export interface NamedCapability {
+  readonly name: string
+  readonly pin: CapabilityPin
+}
+
+/** @experimental One named child selection bound to an exact Agent. */
+export interface ChildBinding {
+  readonly selection: string
+  readonly agent: AgentPin
+}
+
+export interface PortablePolicy {
+  readonly _tag: "Forever" | "Recurs" | "UntilToolCall" | "Both"
+  readonly count?: number
+  readonly name?: string
+  readonly first?: PortablePolicy
+  readonly second?: PortablePolicy
+}
+
+/** @experimental Exact identity of either a portable policy or an opaque policy capability. */
+export type PolicyIdentity =
+  | { readonly _tag: "Portable"; readonly policy: PortablePolicy }
+  | { readonly _tag: "Pinned"; readonly pin: CapabilityPin }
+
+/** @experimental Closed, reconstructable identity contract for one Agent. */
+export interface AgentManifest {
+  readonly version: "1"
+  readonly name: string
+  readonly instructions?: string
+  readonly model: ModelPin
+  readonly tools: ReadonlyArray<NamedCapability>
+  readonly skills: ReadonlyArray<NamedCapability>
+  readonly services: ReadonlyArray<NamedCapability>
+  readonly policy: PolicyIdentity
+  readonly budget: typeof BudgetLimits.Type
+  readonly children: ReadonlyArray<ChildBinding>
+}
+
+export interface NamedCapabilityEncoded extends Omit<NamedCapability, "pin"> {
+  readonly pin: string
+}
+
+export interface ChildBindingEncoded extends Omit<ChildBinding, "agent"> {
+  readonly agent: string
+}
+
+export type PolicyIdentityEncoded =
+  | { readonly _tag: "Portable"; readonly policy: PortablePolicy }
+  | { readonly _tag: "Pinned"; readonly pin: string }
+
+export interface AgentManifestEncoded
+  extends Omit<AgentManifest, "model" | "tools" | "skills" | "services" | "policy" | "children"> {
+  readonly model: string
+  readonly tools: ReadonlyArray<NamedCapabilityEncoded>
+  readonly skills: ReadonlyArray<NamedCapabilityEncoded>
+  readonly services: ReadonlyArray<NamedCapabilityEncoded>
+  readonly policy: PolicyIdentityEncoded
+  readonly children: ReadonlyArray<ChildBindingEncoded>
+}
+
+/** @experimental One named capability required by an Agent. */
+export const NamedCapability: Schema.Codec<NamedCapability, NamedCapabilityEncoded> = Schema.Struct({
+  name: Schema.String,
+  pin: CapabilityPin,
+})
+
+/** @experimental One named child selection bound to an exact Agent. */
+export const ChildBinding: Schema.Codec<ChildBinding, ChildBindingEncoded> = Schema.Struct({
+  selection: Schema.String,
+  agent: AgentPin,
+})
+
+/** @experimental Closed portable turn-policy constructor data. */
+export const PortablePolicy: Schema.Codec<PortablePolicy, PortablePolicy> = Schema.suspend(() =>
+  Schema.Union([
+    Schema.Struct({ _tag: Schema.Literal("Forever") }),
+    Schema.Struct({ _tag: Schema.Literal("Recurs"), count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
+    Schema.Struct({ _tag: Schema.Literal("UntilToolCall"), name: Schema.String }),
+    Schema.Struct({ _tag: Schema.Literal("Both"), first: PortablePolicy, second: PortablePolicy }),
+  ]),
+)
+
+/** @experimental Exact identity of either a portable policy or an opaque policy capability. */
+export const PolicyIdentity: Schema.Codec<PolicyIdentity, PolicyIdentityEncoded> = Schema.Union([
+  Schema.Struct({ _tag: Schema.Literal("Portable"), policy: PortablePolicy }),
+  Schema.Struct({ _tag: Schema.Literal("Pinned"), pin: CapabilityPin }),
+])
+/** @experimental Closed, reconstructable identity contract for one Agent. */
+export const AgentManifest: Schema.Codec<AgentManifest, AgentManifestEncoded> = Schema.Struct({
+  version: Schema.Literal("1"),
+  name: Schema.String,
+  instructions: Schema.optionalKey(Schema.String),
+  model: ModelPin,
+  tools: Schema.Array(NamedCapability),
+  skills: Schema.Array(NamedCapability),
+  services: Schema.Array(NamedCapability),
+  policy: PolicyIdentity,
+  budget: BudgetLimits,
+  children: Schema.Array(ChildBinding),
+})
+/** @experimental An Agent manifest paired with its constructor-owned digest. */
+export interface PinnedAgent {
+  readonly pin: AgentPin
+  readonly manifest: AgentManifest
+}
+
+const uniqueSorted = <A>(
+  values: ReadonlyArray<A>,
+  orderOf: (value: A) => string,
+  identityOf: (value: A) => string,
+  labels: readonly [string, string],
+): Array<A> => {
+  const sorted = [...values].toSorted((left, right) => compareText(orderOf(left), orderOf(right)))
+  const orders = new Set<string>()
+  const identities = new Set<string>()
+  for (const value of sorted) {
+    const order = orderOf(value)
+    const identity = identityOf(value)
+    if (orders.has(order)) throw new TypeError(`Duplicate ${labels[0]}: ${order}`)
+    if (identities.has(identity)) throw new TypeError(`Duplicate ${labels[1]}: ${identity}`)
+    orders.add(order)
+    identities.add(identity)
+  }
+  return sorted
+}
+
+const capabilityOrder = (value: NamedCapability): string => value.name
+const capabilityIdentity = (value: NamedCapability): string => value.pin
+const childOrder = (value: ChildBinding): string => value.selection
+const childIdentity = (value: ChildBinding): string => value.agent
+
+/** @experimental Construct and pin a canonical closed Agent manifest. */
+export const make = (input: Omit<AgentManifest, "version"> & { readonly version?: "1" }): PinnedAgent => {
+  const manifest = Schema.decodeUnknownSync(AgentManifest, { onExcessProperty: "error" })({
+    ...input,
+    version: "1",
+    tools: uniqueSorted(input.tools, capabilityOrder, capabilityIdentity, ["tool name", "tool pin"]),
+    skills: uniqueSorted(input.skills, capabilityOrder, capabilityIdentity, ["skill name", "skill pin"]),
+    services: uniqueSorted(input.services, capabilityOrder, capabilityIdentity, ["service name", "service pin"]),
+    children: uniqueSorted(input.children, childOrder, childIdentity, ["child selection", "child pin"]),
+  })
+  return { manifest, pin: makeAgent(manifest) }
+}
+
+/** @experimental Build an exact manifest for a live Agent using explicitly supplied opaque dependencies. */
+export const fromLiveAgent = <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(
+  agent: Agent<Tools, R, PolicyServices, AuthorizationServices>,
+  identity: {
+    readonly model: ModelPin
+    readonly tools: ReadonlyArray<NamedCapability>
+    readonly skills: ReadonlyArray<NamedCapability>
+    readonly services: ReadonlyArray<NamedCapability>
+    readonly policy: PolicyIdentity
+    readonly budget: typeof BudgetLimits.Type
+    readonly children: ReadonlyArray<ChildBinding>
+  },
+): PinnedAgent => {
+  const actualTools = Object.keys(agent.toolkit.tools).toSorted()
+  const pinnedTools = identity.tools.map(({ name }) => name).toSorted()
+  if (actualTools.length !== pinnedTools.length || actualTools.some((name, index) => name !== pinnedTools[index])) {
+    throw new TypeError("Tool pins must exactly match the live Agent toolkit")
+  }
+  if (identity.policy._tag === "Portable") {
+    if (agent.policy.snapshot === undefined || digest(agent.policy.snapshot) !== digest(identity.policy.policy)) {
+      throw new TypeError("Portable policy must exactly match the live Agent policy snapshot")
+    }
+  } else if (agent.policy.snapshot !== undefined) {
+    throw new TypeError("Pinned policy identity is only valid for an opaque live Agent policy")
+  }
+  if (digest(agent.budget ?? {}) !== digest(identity.budget)) {
+    throw new TypeError("Budget must exactly match the live Agent budget")
+  }
+  return make({
+    name: agent.name,
+    ...(agent.instructions === undefined ? {} : { instructions: agent.instructions }),
+    ...identity,
+  })
+}

@@ -1,13 +1,15 @@
 import { Effect, Schema } from "effect"
 
 /** @experimental Finite resource limits for one run or child grant. */
+const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+
 export const BudgetLimits = Schema.Struct({
-  modelCalls: Schema.optionalKey(Schema.Finite),
-  toolCalls: Schema.optionalKey(Schema.Finite),
-  totalTokens: Schema.optionalKey(Schema.Finite),
-  childRuns: Schema.optionalKey(Schema.Finite),
-  handoffs: Schema.optionalKey(Schema.Finite),
-  depth: Schema.optionalKey(Schema.Finite),
+  modelCalls: Schema.optionalKey(Count),
+  toolCalls: Schema.optionalKey(Count),
+  totalTokens: Schema.optionalKey(Count),
+  childRuns: Schema.optionalKey(Count),
+  handoffs: Schema.optionalKey(Count),
+  depth: Schema.optionalKey(Count),
   deadline: Schema.optionalKey(Schema.String),
 })
 
@@ -18,7 +20,7 @@ export type BudgetLimits = typeof BudgetLimits.Type
 export const RunBudget = Schema.Struct({
   allocation: BudgetLimits,
   remaining: BudgetLimits,
-  depth: Schema.Finite,
+  depth: Count,
 })
 
 /** @experimental */
@@ -158,11 +160,11 @@ const subtractLimits = (
   })
 
 /** @experimental */
-export const make = (allocation: BudgetLimits, depth = 0): RunBudget => ({
-  allocation,
-  remaining: { ...allocation },
-  depth,
-})
+export const make = (allocation: BudgetLimits, depth = 0): RunBudget => {
+  const validAllocation = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(allocation)
+  const validDepth = Schema.decodeUnknownSync(Count)(depth)
+  return { allocation: validAllocation, remaining: { ...validAllocation }, depth: validDepth }
+}
 
 /** @experimental */
 export const allocate = make
@@ -170,16 +172,17 @@ export const allocate = make
 /** @experimental */
 export const charge = (budget: RunBudget, usage: BudgetLimits): Effect.Effect<RunBudget, RunBudgetExhausted> =>
   Effect.gen(function* () {
+    const validUsage = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(usage)
     const remaining: Record<string, number | string | undefined> = { ...budget.remaining }
     for (const dimension of chargeDimensions) {
-      const amount = usage[dimension]
+      const amount = validUsage[dimension]
       if (amount === undefined || amount === 0) continue
       remaining[dimension] = yield* subtractFinite(limitValue(remaining as BudgetLimits, dimension), amount, dimension)
     }
-    if (usage.handoffs !== undefined && usage.handoffs !== 0) {
+    if (validUsage.handoffs !== undefined && validUsage.handoffs !== 0) {
       remaining.handoffs = yield* subtractFinite(
         limitValue(remaining as BudgetLimits, "handoffs"),
-        usage.handoffs,
+        validUsage.handoffs,
         "handoffs",
       )
     }
@@ -195,6 +198,7 @@ export const reserveChild = (
   RunBudgetExhausted | RunBudgetGrantWidened
 > =>
   Effect.gen(function* () {
+    grant = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(grant)
     const maxDepth = parent.allocation.depth
     const childDepth = parent.depth + 1
     if (maxDepth !== undefined && childDepth > maxDepth) {
@@ -262,6 +266,7 @@ export const narrowChild = (
   narrower: BudgetLimits,
 ): Effect.Effect<{ readonly parent: RunBudget; readonly child: RunBudget }, RunBudgetGrantWidened> =>
   Effect.gen(function* () {
+    narrower = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(narrower)
     for (const dimension of [...chargeDimensions, "childRuns", "depth"] as const) {
       const next = narrower[dimension]
       if (next === undefined) continue

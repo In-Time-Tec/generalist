@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest"
 import { Option } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
-import { AgentRef, RunEvent } from "@batonfx/runtime"
+import { ExecutableManifest, RunEvent } from "@batonfx/runtime"
 import { Chat, Connection } from "../src/index.js"
 
-const agent = AgentRef.make({ id: "assistant", version: "1", digest: "sha256:assistant" })
+const agent = ExecutableManifest.makeTest("assistant", "1").ref
 const runEvent = (sequence: number, fields: Record<string, unknown>): RunEvent.RunEvent =>
   ({
     specVersion: "1",
     eventId: `run-1:${sequence}`,
     runId: "run-1",
     sequence,
-    agent,
+    executableRef: agent,
     rootRunId: "run-1",
     occurredAt: "2026-08-03T00:00:00.000Z",
     ...fields,

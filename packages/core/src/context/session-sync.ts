@@ -87,7 +87,7 @@ const canonicalValue = (value: unknown): unknown => {
     return Object.fromEntries(
       Object.entries(record.value)
         .filter(([, item]) => item !== undefined)
-        .toSorted(([left], [right]) => left.localeCompare(right))
+        .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
         .map(([key, item]) => [key, canonicalValue(item)]),
     )
   }

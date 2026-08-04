@@ -1,8 +1,17 @@
 import { expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { Runtime, RunStore } from "../src/index.js"
+import type { ExecutableRef } from "../src/executable-manifest.js"
 import { assistantAddress, textPrompt } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
+
+const checkpoint = (executable: ExecutableRef) => ({
+  driverVersion: "1" as const,
+  executable,
+  turn: 0,
+  budget: { allocation: {}, remaining: {}, depth: 0 },
+  state: {},
+})
 
 it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
   Effect.gen(function* () {
@@ -113,11 +122,13 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
         operationId: op.operationId,
       })
       externalCounter += 1
-      const succeeded = yield* driver.succeedOperation({
-        ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+      const completionClaim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
+      const succeeded = yield* driver.completeOperation({
+        ...completionClaim,
         runId: receipt.runId,
         operationId: op.operationId,
-        result: { count: externalCounter },
+        outcome: { _tag: "Succeeded", value: { count: externalCounter } },
+        checkpoint: checkpoint(completionClaim.executableRef),
       })
       const sameKey = yield* driver.recordOperation({
         ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
@@ -197,11 +208,13 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
         runId: receipt.runId,
         operationId: op.operationId,
       })
-      const done = yield* driver.succeedOperation({
-        ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
+      const completionClaim = yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })
+      const done = yield* driver.completeOperation({
+        ...completionClaim,
         runId: receipt.runId,
         operationId: op.operationId,
-        result: { ok: true },
+        outcome: { _tag: "Succeeded", value: { ok: true } },
+        checkpoint: checkpoint(completionClaim.executableRef),
       })
       expect(done.status).toBe("succeeded")
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)

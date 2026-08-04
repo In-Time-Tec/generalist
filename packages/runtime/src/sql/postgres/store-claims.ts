@@ -4,9 +4,10 @@ import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
+import { AgentExecutionFailure } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
 import type { RunRow } from "../rows.js"
-import { decodeRun } from "../store-helpers.js"
+import { decodeRunEffect } from "../store-helpers.js"
 import type { EventHub } from "../subscribers.js"
 import { claimReadyRuns, refreshLease, releaseClaim } from "./claims.js"
 import { RunClaims, type Interface as ClaimsInterface } from "../run-claims.js"
@@ -24,7 +25,7 @@ export const makePostgresClaims = (input: {
   readonly cancelRun: (
     runId: string,
     reason: string | undefined,
-  ) => Effect.Effect<void, RunNotFound | RunTerminal | SqlError, SqlR>
+  ) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable | SqlError, SqlR>
 }): ClaimsInterface => {
   const { sql, hub, run, cancelRun } = input
   return RunClaims.of({
@@ -84,7 +85,7 @@ export const makePostgresClaims = (input: {
               attemptFence: commitInput.attemptFence,
             })
           }
-          const loaded = decodeRun(row)
+          const loaded = yield* decodeRunEffect(row)
           if (commitInput.transition === "cancel") {
             yield* cancelRun(commitInput.runId, commitInput.reason)
             return
@@ -107,7 +108,10 @@ export const makePostgresClaims = (input: {
           const event = yield* appendEvent(
             hub,
             loaded,
-            { _tag: "RunFailed", error: commitInput.error ?? { message: "failed" } },
+            {
+              _tag: "RunFailed",
+              error: AgentExecutionFailure.make({ message: commitInput.error?.message ?? "failed" }),
+            },
             "failed",
           )
           const settled = (yield* loadRun(loaded.runId))!

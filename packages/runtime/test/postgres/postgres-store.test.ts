@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Redacted, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Redacted, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import { Errors, RunClaims, RunSchema, Runtime, RuntimeWorker, RunStore } from "../../src/index.js"
@@ -10,7 +10,17 @@ import {
   schemaChecksum,
   steeringSchemaChecksum,
 } from "../../src/sql/postgres/schema.js"
-import { assistantAddress, completedResult, openWait, researcherRef, textPrompt } from "../helpers.js"
+import {
+  alternateAssistantRef,
+  assistantAddress,
+  assistantRef,
+  completedResult,
+  emptyTranscript,
+  openWait,
+  suspension,
+  researcherRef,
+  textPrompt,
+} from "../helpers.js"
 import {
   postgresAvailable,
   postgresLayer,
@@ -52,6 +62,20 @@ const corruptChecksum = () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`UPDATE ${sql(SCHEMA_META_TABLE)} SET checksum = 'deadbeef' WHERE id = 1`
+  }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+
+const corruptEventExecutableRef = (runId: string, executableRef: unknown) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const row = (yield* sql<{ event_json: string }>`
+      SELECT event_json FROM baton_run_events WHERE run_id = ${runId} ORDER BY sequence LIMIT 1
+    `)[0]!
+    const event = JSON.parse(row.event_json) as Record<string, unknown>
+    event.executableRef = executableRef
+    yield* sql`
+      UPDATE baton_run_events SET event_json = ${JSON.stringify(event)}
+      WHERE run_id = ${runId} AND sequence = 0
+    `
   }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
 
 const markDirty = () =>
@@ -104,6 +128,37 @@ describePostgres("postgres run store", () => {
         const info = yield* store.info
         expect(info).toEqual({ durability: "durable", backend: "postgres", multiWorker: true })
         expect(schemaChecksum().length).toBe(64)
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("persists the exact resolution supplied to RunStore.resume", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("direct-resume"),
+          idempotencyKey: "direct-resume",
+          prompt: "wait",
+        })
+        const claimed = (yield* claims.claimReadyRuns({ workerId: "direct-resume", limit: 1, lease: "10 seconds" }))[0]!
+        yield* store.suspend({
+          runId: receipt.runId,
+          ownerId: claimed.workerId,
+          attemptFence: claimed.attemptFence,
+          wait: openWait("wait:direct-resume"),
+          suspension: suspension("wait:direct-resume"),
+        })
+        const resolution = { _tag: "Denied" as const, reason: "postgres exact resolution" }
+        const resumeInput = { runId: receipt.runId, waitId: "wait:direct-resume", resolution }
+        yield* store.resume(resumeInput)
+        const resumed = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 10 })).find(
+          (event) => event._tag === "RunResumed",
+        )
+        expect(resumed).toEqual(expect.objectContaining({ resolution }))
       }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
     ),
   )
@@ -179,6 +234,19 @@ describePostgres("postgres run store", () => {
         expect(dup.duplicate).toBe(true)
         expect(dup.runId).toBe(first.runId)
         expect(first.runId).toBe(runId)
+        yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* sql`
+            UPDATE baton_runs SET
+              executable_ref_json = ${JSON.stringify(alternateAssistantRef.ref)},
+              executable_manifest_json = ${JSON.stringify(alternateAssistantRef.manifest)}
+            WHERE run_id = ${runId}
+          `
+        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        const authorityConflict = yield* runtime
+          .send({ runId, to: assistantAddress, sessionId, idempotencyKey: "same", prompt: textPrompt("one") })
+          .pipe(Effect.flip)
+        expect(authorityConflict).toBeInstanceOf(Errors.IdempotencyConflict)
         const runIdConflict = yield* runtime
           .send({
             runId: `${runId}:other`,
@@ -219,7 +287,7 @@ describePostgres("postgres run store", () => {
           .spawn({
             parentRunId: parent.runId,
             invocationId: "too-late",
-            agent: researcherRef,
+            selection: "researcher",
             prompt: textPrompt("child"),
           })
           .pipe(Effect.flip)
@@ -333,6 +401,102 @@ describePostgres("postgres run store", () => {
     ),
   )
 
+  it.live("rejects emitAgentEvent after a concurrent lease takeover without changing newer state", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("agent-event-takeover"),
+          idempotencyKey: "agent-event-takeover",
+          prompt: textPrompt("agent-event-takeover"),
+        })
+        const [claimed] = yield* claims.claimReadyRuns({ workerId: "owner-a", limit: 1, lease: "10 seconds" })
+        const claim = {
+          runId: receipt.runId,
+          ownerId: claimed!.workerId,
+          attemptFence: claimed!.attemptFence,
+        }
+        const newerTranscript = textPrompt("owner-b transcript")
+        const locked = yield* Deferred.make<void>()
+        const takeover = Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* sql.withTransaction(
+            Effect.gen(function* () {
+              const pid = (yield* sql<{ readonly pid: number }>`SELECT pg_backend_pid() AS pid`)[0]!.pid
+              yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
+              yield* Deferred.succeed(locked, undefined)
+              let blocked = false
+              for (let attempt = 0; attempt < 200 && !blocked; attempt++) {
+                const [waiting] = yield* sql<{ readonly blocked: boolean }>`
+                  SELECT EXISTS (
+                    SELECT 1 FROM pg_stat_activity
+                    WHERE ${pid} = ANY(pg_blocking_pids(pid))
+                  ) AS blocked
+                `
+                blocked = waiting?.blocked === true
+                if (!blocked) yield* Effect.sleep("10 millis")
+              }
+              expect(blocked).toBe(true)
+              yield* sql`
+                UPDATE baton_runs
+                SET owner_worker_id = 'owner-b', attempt_fence = attempt_fence + 1,
+                  transcript_json = ${JSON.stringify(newerTranscript)},
+                  lease_expires_at = NOW() + INTERVAL '10 seconds', updated_at = NOW()
+                WHERE run_id = ${receipt.runId}
+              `
+            }),
+          )
+        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+
+        const takeoverFiber = yield* Effect.forkScoped(takeover)
+        yield* Deferred.await(locked)
+        const staleFiber = yield* Effect.forkScoped(
+          store.emitAgentEvent({
+            ...claim,
+            event: {
+              _tag: "TurnCompleted",
+              turn: 0,
+              transcript: emptyTranscript,
+              usage: {
+                inputTokens: { total: 0, uncached: 0, cacheRead: undefined, cacheWrite: undefined },
+                outputTokens: { total: 0, text: 0, reasoning: 0 },
+              },
+            },
+          }),
+        )
+        yield* Fiber.join(takeoverFiber)
+        const stale = yield* Fiber.join(staleFiber).pipe(Effect.flip)
+        expect(stale).toBeInstanceOf(Errors.StaleClaim)
+
+        const state = yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          const [run] = yield* sql<{
+            readonly owner_worker_id: string | null
+            readonly attempt_fence: number
+            readonly transcript_json: string | null
+          }>`
+            SELECT owner_worker_id, attempt_fence, transcript_json
+            FROM baton_runs WHERE run_id = ${receipt.runId}
+          `
+          const [events] = yield* sql<{ readonly count: string }>`
+            SELECT COUNT(*) AS count FROM baton_run_events
+            WHERE run_id = ${receipt.runId} AND event_json LIKE '%"TurnCompleted"%'
+          `
+          return { run, eventCount: Number(events!.count) }
+        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        expect(state.run).toEqual({
+          owner_worker_id: "owner-b",
+          attempt_fence: claim.attemptFence + 1,
+          transcript_json: JSON.stringify(newerTranscript),
+        })
+        expect(state.eventCount).toBe(0)
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
   it.live("worker layer ticks claim and refresh leases", () =>
     withSchema(
       Effect.gen(function* () {
@@ -396,6 +560,121 @@ describePostgres("postgres run store", () => {
         })
         expect(expired.outcome).toBe("unknown")
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+        expect(yield* claims.claimReadyRuns({ workerId: "blocked", limit: 1, lease: "10 seconds" })).toEqual([])
+        expect(
+          (yield* driver.claimExecution({ runId: receipt.runId, ownerId: "blocked" }).pipe(Effect.flip))._tag,
+        ).toBe("@batonfx/runtime/RuntimeUnavailable")
+        yield* runtime.resolveOperation({
+          runId: receipt.runId,
+          operationId: recorded.operationId,
+          idempotencyKey: "resolve:postgres",
+          resolution: { _tag: "Succeeded", value: "recovered" },
+        })
+        const [resumed] = yield* claims.claimReadyRuns({ workerId: "resumed", limit: 1, lease: "10 seconds" })
+        expect(resumed?.run.runId).toBe(receipt.runId)
+        expect((yield* driver.getOperation({ runId: receipt.runId, operationId: recorded.operationId })).result).toBe(
+          "recovered",
+        )
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("rejects stale operation completion after a concurrent lease takeover", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("operation-takeover"),
+          idempotencyKey: "operation-takeover",
+          prompt: textPrompt("operation-takeover"),
+        })
+        const [claimed] = yield* claims.claimReadyRuns({ workerId: "owner-a", limit: 1, lease: "10 seconds" })
+        const claim = {
+          runId: receipt.runId,
+          ownerId: claimed!.workerId,
+          attemptFence: claimed!.attemptFence,
+        }
+        const operation = yield* store.recordOperation({
+          ...claim,
+          operationKey: "tool:takeover",
+          kind: "tool",
+          inputDigest: "takeover",
+          input: {},
+          replayPolicy: "never",
+          attempt: claimed!.run.attempt,
+        })
+        yield* store.startOperation({ ...claim, operationId: operation.operationId })
+
+        const locked = yield* Deferred.make<void>()
+        const takeover = Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* sql.withTransaction(
+            Effect.gen(function* () {
+              const pid = (yield* sql<{ readonly pid: number }>`SELECT pg_backend_pid() AS pid`)[0]!.pid
+              yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${receipt.runId} FOR UPDATE`
+              yield* sql`
+                SELECT operation_id FROM baton_run_operations
+                WHERE run_id = ${receipt.runId} AND operation_id = ${operation.operationId}
+                FOR UPDATE
+              `
+              yield* Deferred.succeed(locked, undefined)
+              let blocked = false
+              for (let attempt = 0; attempt < 200 && !blocked; attempt++) {
+                const [waiting] = yield* sql<{ readonly blocked: boolean }>`
+                  SELECT EXISTS (
+                    SELECT 1 FROM pg_stat_activity
+                    WHERE ${pid} = ANY(pg_blocking_pids(pid))
+                  ) AS blocked
+                `
+                blocked = waiting?.blocked === true
+                if (!blocked) yield* Effect.sleep("10 millis")
+              }
+              expect(blocked).toBe(true)
+              yield* sql`
+                UPDATE baton_runs
+                SET owner_worker_id = 'owner-b', attempt_fence = attempt_fence + 1,
+                  lease_expires_at = NOW() + INTERVAL '10 seconds', updated_at = NOW()
+                WHERE run_id = ${receipt.runId}
+              `
+            }),
+          )
+        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+
+        const takeoverFiber = yield* Effect.forkScoped(takeover)
+        yield* Deferred.await(locked)
+        const checkpoint = {
+          driverVersion: "1" as const,
+          executable: assistantRef.ref,
+          turn: 1,
+          budget: { allocation: {}, remaining: {}, depth: 0 },
+          state: {},
+        }
+        const staleFiber = yield* Effect.forkScoped(
+          store.completeOperation({
+            ...claim,
+            operationId: operation.operationId,
+            outcome: { _tag: "Succeeded", value: { owner: "owner-a" } },
+            checkpoint,
+          }),
+        )
+        yield* Fiber.join(takeoverFiber)
+        const stale = yield* Fiber.join(staleFiber).pipe(Effect.flip)
+        expect(stale).toBeInstanceOf(Errors.StaleClaim)
+        expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
+          "running",
+        )
+        const completed = yield* store.completeOperation({
+          runId: receipt.runId,
+          ownerId: "owner-b",
+          attemptFence: claim.attemptFence + 1,
+          operationId: operation.operationId,
+          outcome: { _tag: "Succeeded", value: { owner: "owner-b" } },
+          checkpoint,
+        })
+        expect(completed.status).toBe("succeeded")
       }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
     ),
   )
@@ -421,12 +700,45 @@ describePostgres("postgres run store", () => {
         })
         const claimed = yield* claims.claimReadyRuns({ workerId: "wait-w", limit: 1, lease: "10 seconds" })
         const claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: claimed[0]!.attemptFence }
-        yield* driver.wait({ ...claim, wait: openWait("approval", "approval") })
+        yield* driver.suspend({
+          ...claim,
+          wait: openWait("approval", "approval"),
+          suspension: suspension("approval", "approval"),
+        })
         expect((yield* runtime.inspect(successor.runId)).status).toBe("queued")
         yield* runtime.respond({ runId: waiting.runId, waitId: "approval", resolution: { _tag: "Approved" } })
         expect((yield* runtime.inspect(waiting.runId)).status).toBe("running")
-        yield* driver.wait({ ...claim, wait: openWait("signal-me", "signal") })
+        yield* driver.suspend({
+          ...claim,
+          wait: openWait("signal-me", "signal"),
+          suspension: suspension("signal-me"),
+        })
         yield* runtime.signal({ runId: waiting.runId, name: "signal-me" })
+        const checkpoint = {
+          driverVersion: "1" as const,
+          executable: assistantRef.ref,
+          turn: 1,
+          budget: { allocation: {}, remaining: {}, depth: 0 },
+          state: { dialect: "postgres" },
+        }
+        for (const outcome of [
+          { _tag: "Failed" as const, error: { message: "failed" } },
+          { _tag: "Unknown" as const },
+        ]) {
+          const operation = yield* driver.recordOperation({
+            ...claim,
+            operationKey: `tool:${outcome._tag}`,
+            kind: "tool",
+            inputDigest: outcome._tag,
+            input: {},
+            replayPolicy: "never",
+            attempt: 1,
+          })
+          yield* driver.startOperation({ ...claim, operationId: operation.operationId })
+          yield* driver.completeOperation({ ...claim, operationId: operation.operationId, outcome, checkpoint })
+        }
+        expect((yield* driver.loadExecution(waiting.runId)).checkpoint).toEqual(checkpoint)
+        expect((yield* runtime.inspect(waiting.runId)).status).toBe("needs-resolution")
         yield* claims.commitWithClaim({
           runId: waiting.runId,
           workerId: "wait-w",
@@ -439,7 +751,7 @@ describePostgres("postgres run store", () => {
             runId: waiting.runId,
             ownerId: "wait-w",
             attemptFence: claimed[0]!.attemptFence,
-            error: { message: "nope" },
+            error: Errors.AgentExecutionFailure.make({ message: "nope" }),
           })
           .pipe(Effect.flip)
         expect(again).toBeInstanceOf(Errors.StaleClaim)
@@ -468,7 +780,7 @@ describePostgres("postgres run store", () => {
         const child = yield* runtime.spawn({
           parentRunId: parent.runId,
           invocationId: "inv-1",
-          agent: (yield* runtime.inspect(parent.runId)).agent,
+          selection: "researcher",
           prompt: textPrompt("child"),
         })
         const [childClaim] = yield* claims.claimReadyRuns({ workerId: "child-w", limit: 1, lease: "10 seconds" })
@@ -511,13 +823,42 @@ describePostgres("postgres run store", () => {
           idempotencyKey: "reviews",
           members: [0, 1, 2].map((ordinal) => ({
             key: `review-${ordinal}`,
-            agent: researcherRef,
+            selection: "researcher",
             prompt: `review-${ordinal}`,
           })),
           concurrency: 1,
           join: { _tag: "Quorum", required: 2 },
           remainder: "abandon",
         })
+        expect((yield* runtime.inspect(receipt.childRunIds[0]!)).executableRef).toEqual(researcherRef.ref)
+        const changed = yield* runtime
+          .fanOut({
+            parentRunId: parent.runId,
+            idempotencyKey: "reviews",
+            members: [0, 1, 2].map((ordinal) => ({
+              key: `review-${ordinal}`,
+              selection: ordinal === 0 ? "analyst" : "researcher",
+              prompt: `review-${ordinal}`,
+            })),
+            concurrency: 1,
+            join: { _tag: "Quorum", required: 2 },
+            remainder: "abandon",
+          })
+          .pipe(Effect.flip)
+        expect(changed).toBeInstanceOf(Errors.FanOutConflict)
+        const beforeMissing = yield* runtime.inspectTree(parent.runId)
+        const missing = yield* runtime
+          .fanOut({
+            parentRunId: parent.runId,
+            idempotencyKey: "missing",
+            members: [{ key: "missing", selection: "undeclared", prompt: "missing" }],
+            concurrency: 1,
+            join: { _tag: "AllSuccess" },
+            remainder: "await",
+          })
+          .pipe(Effect.flip)
+        expect(missing).toBeInstanceOf(Errors.ChildSelectionMissing)
+        expect(yield* runtime.inspectTree(parent.runId)).toEqual(beforeMissing)
         const first = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
         expect(first.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[0]])
         yield* claims.commitWithClaim({
@@ -556,7 +897,7 @@ describePostgres("postgres run store", () => {
           .fanOut({
             parentRunId: parent.runId,
             idempotencyKey: "late",
-            members: [{ key: "late", agent: researcherRef, prompt: "late" }],
+            members: [{ key: "late", selection: "researcher", prompt: "late" }],
             concurrency: 1,
             join: { _tag: "AllSuccess" },
             remainder: "await",
@@ -612,6 +953,36 @@ describePostgres("postgres run store", () => {
         expect(tagsA).toEqual(tagsB)
         expect(tagsA[0]).toBe("0:RunAccepted")
       }),
+    ),
+  )
+
+  it.live("rejects malformed and cross-closure persisted event references with RuntimeUnavailable", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const malformed = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("malformed-event-ref"),
+          idempotencyKey: "malformed",
+          prompt: textPrompt("malformed"),
+        })
+        const crossClosure = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("cross-closure-event-ref"),
+          idempotencyKey: "cross-closure",
+          prompt: textPrompt("cross-closure"),
+        })
+
+        yield* corruptEventExecutableRef(malformed.runId, {})
+        const historyError = yield* runtime.history({ runId: malformed.runId, cursor: -1, limit: 10 }).pipe(Effect.flip)
+        expect(historyError).toBeInstanceOf(Errors.RuntimeUnavailable)
+
+        yield* corruptEventExecutableRef(crossClosure.runId, alternateAssistantRef.ref)
+        const replayError = yield* runtime
+          .events({ runId: crossClosure.runId, cursor: -1 })
+          .pipe(Stream.runCollect, Effect.flip)
+        expect(replayError).toBeInstanceOf(Errors.RuntimeUnavailable)
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
     ),
   )
 

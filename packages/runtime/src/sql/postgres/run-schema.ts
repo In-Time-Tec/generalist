@@ -19,10 +19,14 @@ import {
   STEERING_MIGRATION_STATEMENTS,
   FAN_OUT_MIGRATION_STATEMENTS,
   TREE_MIGRATION_STATEMENTS,
+  EXECUTABLE_MIGRATION_STATEMENTS,
+  OPERATION_RESOLUTION_MIGRATION_STATEMENTS,
   kernelSchemaChecksum,
   schemaChecksum,
   steeringSchemaChecksum,
   fanOutSchemaChecksum,
+  treeSchemaChecksum,
+  executableSchemaChecksum,
 } from "./schema.js"
 
 export interface SchemaPlan {
@@ -117,6 +121,28 @@ const treeMigrationEffect = Effect.gen(function* () {
   const now = yield* DateTime.nowAsDate
   yield* sql`
     UPDATE ${sql(SCHEMA_META_TABLE)}
+    SET version = 4, checksum = ${treeSchemaChecksum()}, dirty = FALSE, applied_at = ${now}
+    WHERE id = 1
+  `
+})
+
+const executableMigrationEffect = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  for (const statement of EXECUTABLE_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
+  const now = yield* DateTime.nowAsDate
+  yield* sql`
+    UPDATE ${sql(SCHEMA_META_TABLE)}
+    SET version = 5, checksum = ${executableSchemaChecksum()}, dirty = FALSE, applied_at = ${now}
+    WHERE id = 1
+  `
+})
+
+const operationResolutionMigrationEffect = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  for (const statement of OPERATION_RESOLUTION_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
+  const now = yield* DateTime.nowAsDate
+  yield* sql`
+    UPDATE ${sql(SCHEMA_META_TABLE)}
     SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = FALSE, applied_at = ${now}
     WHERE id = 1
   `
@@ -174,6 +200,26 @@ export const apply = (
   SqlClient.SqlClient
 > =>
   Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const meta = yield* readMeta(source)
+    if (meta.present && meta.version < 5) {
+      const runs = yield* mapSqlError(
+        sql<{ present: boolean }>`SELECT EXISTS (SELECT 1 FROM baton_runs) AS present`,
+      ).pipe(
+        Effect.mapError((error) =>
+          SchemaMigrationFailed.make({
+            source,
+            message: "message" in error ? String(error.message) : "schema migration guard failed",
+          }),
+        ),
+      )
+      if (runs[0]?.present === true) {
+        return yield* SchemaMigrationFailed.make({
+          source,
+          message: "cannot migrate nonempty baton_runs to executable manifests",
+        })
+      }
+    }
     const runMigrations = Migrator.make({})
     yield* runMigrations({
       loader: Migrator.fromRecord({
@@ -181,6 +227,8 @@ export const apply = (
         "0002_baton_runtime_postgres_steering": steeringMigrationEffect,
         "0003_baton_runtime_postgres_fan_out": fanOutMigrationEffect,
         "0004_baton_runtime_postgres_tree_projection": treeMigrationEffect,
+        "0005_baton_runtime_postgres_executable_manifest": executableMigrationEffect,
+        "0006_baton_runtime_postgres_operation_resolution": operationResolutionMigrationEffect,
       }),
       table: MIGRATIONS_TABLE,
     }).pipe(

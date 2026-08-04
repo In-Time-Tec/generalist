@@ -1,7 +1,7 @@
 import { Schema } from "effect"
-import { AgentRef } from "./agent-ref.js"
+import { ExecutableRef } from "./executable-manifest.js"
 import { RunBudget } from "./run-budget.js"
-import { of as canonicalDigest } from "./canonical-digest.js"
+import { digest as canonicalDigest } from "./canonical-json.js"
 
 /** @experimental Version string for a durable driver implementation. */
 export const DriverVersion = Schema.String
@@ -65,28 +65,12 @@ export const WaitDefinition = Schema.Struct({
 /** @experimental */
 export type WaitDefinition = typeof WaitDefinition.Type
 
-/** @experimental Versions and portable policy pinned for durable reconstruction. */
-export const ExecutionManifest = Schema.Struct({
-  agent: AgentRef,
-  driverVersion: DriverVersion,
-  checkpointCodecVersion: Schema.String,
-  eventCodecVersion: Schema.String,
-  toolSchemaDigests: Schema.Record(Schema.String, Schema.String),
-  model: Schema.optionalKey(Schema.Unknown),
-  portablePolicy: Schema.optionalKey(Schema.Unknown),
-  rootBudget: RunBudget,
-})
-
-/** @experimental */
-export type ExecutionManifest = typeof ExecutionManifest.Type
-
 /** @experimental Reconstructable durable checkpoint for one agent run. */
 export const DriverCheckpoint = Schema.Struct({
   driverVersion: DriverVersion,
-  agent: AgentRef,
+  executable: Schema.optionalKey(ExecutableRef),
   turn: Schema.Finite,
   budget: RunBudget,
-  execution: ExecutionManifest,
   state: Schema.Unknown,
 })
 

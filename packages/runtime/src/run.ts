@@ -1,9 +1,10 @@
 import { Schema } from "effect"
-import { AgentRef } from "./agent-ref.js"
+import { decodePinned, ExecutableManifest, ExecutableRef } from "./executable-manifest.js"
 import { RunWait } from "./run-wait.js"
 import { Cursor } from "./cursor.js"
 import { Prompt } from "effect/unstable/ai"
 import { ModelTelemetry } from "@batonfx/core"
+import { AgentExecutionFailure, ExecutableIdentityMismatch, ExecutablePinMissing } from "./errors.js"
 
 export const RunStatus = Schema.Literals([
   "queued",
@@ -20,39 +21,109 @@ export type RunStatus = typeof RunStatus.Type
 export const RunId = Schema.String.check(Schema.isNonEmpty())
 export type RunId = typeof RunId.Type
 
-export const RunReceipt = Schema.Struct({
+export interface RunReceipt {
+  readonly runId: RunId
+  readonly messageId: string
+  readonly acceptedSequence: number
+  readonly duplicate: boolean
+}
+
+interface RunReceiptEncoded extends Omit<RunReceipt, "runId"> {
+  readonly runId: typeof RunId.Encoded
+}
+
+export const RunReceipt: Schema.Codec<RunReceipt, RunReceiptEncoded> = Schema.Struct({
   runId: RunId,
   messageId: Schema.String,
   acceptedSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   duplicate: Schema.Boolean,
 })
-export type RunReceipt = typeof RunReceipt.Type
 
-export const RunInspection = Schema.Struct({
+export interface RunInspection {
+  readonly runId: RunId
+  readonly status: RunStatus
+  readonly executableRef: typeof ExecutableRef.Type
+  readonly executableManifest: typeof ExecutableManifest.Type
+  readonly parentRunId?: RunId
+  readonly wait?: typeof RunWait.Type
+  readonly lastSequence: number
+  readonly durability: "ephemeral" | "durable"
+}
+
+interface RunInspectionEncoded extends Omit<RunInspection, "runId" | "executableRef" | "executableManifest" | "wait"> {
+  readonly runId: typeof RunId.Encoded
+  readonly executableRef: typeof ExecutableRef.Encoded
+  readonly executableManifest: typeof ExecutableManifest.Encoded
+  readonly wait?: typeof RunWait.Encoded
+}
+
+const hasValidExecutable = (value: {
+  readonly executableRef: unknown
+  readonly executableManifest: unknown
+}): boolean => {
+  try {
+    decodePinned({ ref: value.executableRef, manifest: value.executableManifest })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = Schema.Struct({
   runId: RunId,
   status: RunStatus,
-  agent: AgentRef,
+  executableRef: ExecutableRef,
+  executableManifest: ExecutableManifest,
   parentRunId: Schema.optionalKey(RunId),
   wait: Schema.optionalKey(RunWait),
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
   durability: Schema.Literals(["ephemeral", "durable"]),
-})
-export type RunInspection = typeof RunInspection.Type
+}).pipe(
+  Schema.refine((value): value is typeof value => hasValidExecutable(value), {
+    message: "executableRef must match executableManifest",
+  }),
+)
 
-export const AgentResult = Schema.Struct({
+export interface AgentResult {
+  readonly text: string
+  readonly turns: number
+  readonly transcript: Prompt.Prompt
+}
+
+interface AgentResultEncoded extends Omit<AgentResult, "transcript"> {
+  readonly transcript: Prompt.PromptEncoded
+}
+
+export const AgentResult: Schema.Codec<AgentResult, AgentResultEncoded> = Schema.Struct({
   text: Schema.String,
   turns: Schema.Finite,
   transcript: Prompt.Prompt,
 })
-export type AgentResult = typeof AgentResult.Type
 
-export const RunFailure = Schema.Struct({
-  message: Schema.String,
-  cause: Schema.optionalKey(Schema.Defect()),
-})
+export const RunFailure = Schema.Union([AgentExecutionFailure, ExecutablePinMissing, ExecutableIdentityMismatch])
 export type RunFailure = typeof RunFailure.Type
 
-export const RunOutcome = Schema.Union([
+export type RunOutcome =
+  | { readonly _tag: "Succeeded"; readonly result: AgentResult; readonly eventId: string; readonly occurredAt: string }
+  | { readonly _tag: "Failed"; readonly error: RunFailure; readonly eventId: string; readonly occurredAt: string }
+  | { readonly _tag: "Cancelled"; readonly reason?: string; readonly eventId: string; readonly occurredAt: string }
+
+type RunOutcomeEncoded =
+  | {
+      readonly _tag: "Succeeded"
+      readonly result: AgentResultEncoded
+      readonly eventId: string
+      readonly occurredAt: string
+    }
+  | {
+      readonly _tag: "Failed"
+      readonly error: typeof RunFailure.Encoded
+      readonly eventId: string
+      readonly occurredAt: string
+    }
+  | { readonly _tag: "Cancelled"; readonly reason?: string; readonly eventId: string; readonly occurredAt: string }
+
+export const RunOutcome: Schema.Codec<RunOutcome, RunOutcomeEncoded> = Schema.Union([
   Schema.TaggedStruct("Succeeded", {
     result: AgentResult,
     eventId: Schema.String,
@@ -69,9 +140,37 @@ export const RunOutcome = Schema.Union([
     occurredAt: Schema.String,
   }),
 ])
-export type RunOutcome = typeof RunOutcome.Type
 
-export const RawUsageFact = Schema.Union([
+interface RawUsageCommon {
+  readonly runId: RunId
+  readonly turn: number
+  readonly purpose: "conversation" | "structured-output" | "compaction-summary"
+  readonly modelCallId: string
+  readonly modelAttemptId: string
+  readonly attempt: number
+  readonly provider?: string
+  readonly model?: string
+}
+
+export type RawUsageFact =
+  | (RawUsageCommon & {
+      readonly _tag: "Completed"
+      readonly usageAt: number
+      readonly usage: ModelTelemetry.ModelAttemptCompleted["usage"]
+      readonly requestId?: string
+      readonly responseModel?: string
+      readonly serviceTier?: string
+    })
+  | (RawUsageCommon & {
+      readonly _tag: "Failed"
+      readonly category: ModelTelemetry.ModelFailureCategory
+      readonly usageAt: number
+      readonly providerUsage: ModelTelemetry.ModelProviderUsage
+    })
+
+type RawUsageFactEncoded = RawUsageFact
+
+export const RawUsageFact: Schema.Codec<RawUsageFact, RawUsageFactEncoded> = Schema.Union([
   Schema.TaggedStruct("Completed", {
     runId: RunId,
     turn: Schema.Finite,
@@ -101,7 +200,6 @@ export const RawUsageFact = Schema.Union([
     model: Schema.optionalKey(Schema.String),
   }),
 ])
-export type RawUsageFact = typeof RawUsageFact.Type
 
 const CompactionBase = {
   runId: RunId,
@@ -112,7 +210,30 @@ const CompactionBase = {
   contextTokensBefore: Schema.optionalKey(Schema.Finite),
   entriesBefore: Schema.optionalKey(Schema.Finite),
 }
-export const CompactionInspection = Schema.Union([
+interface CompactionInspectionBase {
+  readonly runId: RunId
+  readonly turn: number
+  readonly compactionId: string
+  readonly startedAt: number
+  readonly trigger: ModelTelemetry.CompactionTrigger
+  readonly contextTokensBefore?: number
+  readonly entriesBefore?: number
+}
+
+export type CompactionInspection =
+  | (CompactionInspectionBase & { readonly _tag: "Running" })
+  | (CompactionInspectionBase & {
+      readonly _tag: "Applied"
+      readonly checkpointId: string
+      readonly appliedAt: number
+      readonly kind: "microcompact" | "summarize"
+      readonly commit: ModelTelemetry.CompactionCommit
+    })
+  | (CompactionInspectionBase & { readonly _tag: "Failed"; readonly failedAt: number })
+
+type CompactionInspectionEncoded = CompactionInspection
+
+export const CompactionInspection: Schema.Codec<CompactionInspection, CompactionInspectionEncoded> = Schema.Union([
   Schema.TaggedStruct("Running", CompactionBase),
   Schema.TaggedStruct("Applied", {
     ...CompactionBase,
@@ -123,21 +244,58 @@ export const CompactionInspection = Schema.Union([
   }),
   Schema.TaggedStruct("Failed", { ...CompactionBase, failedAt: Schema.Finite }),
 ])
-export type CompactionInspection = typeof CompactionInspection.Type
 
-export const RunSnapshot = Schema.Struct({
+export interface RunSnapshot {
+  readonly run: RunInspection
+  readonly cursor: typeof Cursor.Type
+  readonly outcome?: RunOutcome
+  readonly usage: ReadonlyArray<RawUsageFact>
+  readonly compactions: ReadonlyArray<CompactionInspection>
+}
+
+interface RunSnapshotEncoded extends Omit<RunSnapshot, "run" | "cursor" | "outcome" | "usage" | "compactions"> {
+  readonly run: RunInspectionEncoded
+  readonly cursor: typeof Cursor.Encoded
+  readonly outcome?: RunOutcomeEncoded
+  readonly usage: ReadonlyArray<RawUsageFactEncoded>
+  readonly compactions: ReadonlyArray<CompactionInspectionEncoded>
+}
+
+export const RunSnapshot: Schema.Codec<RunSnapshot, RunSnapshotEncoded> = Schema.Struct({
   run: RunInspection,
   cursor: Cursor,
   outcome: Schema.optionalKey(RunOutcome),
   usage: Schema.Array(RawUsageFact),
   compactions: Schema.Array(CompactionInspection),
 })
-export type RunSnapshot = typeof RunSnapshot.Type
 
-export const Run = Schema.Struct({
+export interface Run {
+  readonly runId: RunId
+  readonly status: RunStatus
+  readonly executableRef: typeof ExecutableRef.Type
+  readonly executableManifest: typeof ExecutableManifest.Type
+  readonly messageId: string
+  readonly sessionId: string
+  readonly rootRunId: RunId
+  readonly parentRunId?: RunId
+  readonly wait?: typeof RunWait.Type
+  readonly lastSequence: number
+  readonly attempt: number
+}
+
+interface RunEncoded extends Omit<Run, "runId" | "executableRef" | "executableManifest" | "rootRunId" | "wait"> {
+  readonly runId: typeof RunId.Encoded
+  readonly executableRef: typeof ExecutableRef.Encoded
+  readonly executableManifest: typeof ExecutableManifest.Encoded
+  readonly rootRunId: typeof RunId.Encoded
+  readonly wait?: typeof RunWait.Encoded
+}
+
+export const Run: Schema.Codec<Run, RunEncoded> = Schema.Struct({
   runId: RunId,
   status: RunStatus,
-  agent: AgentRef,
+  executableRef: ExecutableRef,
+  executableManifest: ExecutableManifest,
   messageId: Schema.String,
   sessionId: Schema.String,
   rootRunId: RunId,
@@ -145,8 +303,11 @@ export const Run = Schema.Struct({
   wait: Schema.optionalKey(RunWait),
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
   attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-})
-export type Run = typeof Run.Type
+}).pipe(
+  Schema.refine((value): value is typeof value => hasValidExecutable(value), {
+    message: "executableRef must match executableManifest",
+  }),
+)
 
 export const isTerminal = (status: RunStatus): status is "succeeded" | "failed" | "cancelled" =>
   status === "succeeded" || status === "failed" || status === "cancelled"

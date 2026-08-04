@@ -4,7 +4,7 @@ import { RunNotFound } from "../errors.js"
 import { projectRunSnapshot, projectTreeInspection } from "../inspection.js"
 import { makeCursor } from "../tree-cursor.js"
 import { decodeEvent } from "./codecs.js"
-import { decodeRun, loadRunWait } from "./store-helpers.js"
+import { decodeRunEffect, loadRunWait } from "./store-helpers.js"
 import type { EventRow, RunRow } from "./rows.js"
 
 interface FirstPositionRow {
@@ -35,13 +35,14 @@ const loadRuns = (rootRunId: string) =>
     const first = new Map(positions.map((row) => [row.run_id, Number(row.first_position)] as const))
     return yield* Effect.forEach(rows, (row) =>
       Effect.gen(function* () {
-        const run = decodeRun(row)
+        const run = yield* decodeRunEffect(row)
         const wait = yield* loadRunWait(run.runId, run.activeWaitId)
         return {
           inspection: {
             runId: run.runId,
             status: run.status,
-            agent: run.agent,
+            executableRef: run.executableRef,
+            executableManifest: run.executableManifest,
             lastSequence: run.lastSequence,
             durability: "durable" as const,
             ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),

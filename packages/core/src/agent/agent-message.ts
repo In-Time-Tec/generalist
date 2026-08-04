@@ -6,6 +6,10 @@ import { isMessageFromRecall, recalledMessageIdentity, replaceRecalledMessage } 
 import type { Middleware, TurnContext } from "../model/model-middleware.js"
 import type { Entry } from "../context/session.js"
 
+export const providerOutputState = () => ({ textCharacters: 0, reasoningCharacters: 0, finishReason: undefined })
+export const errorMessage = (error: unknown) =>
+  error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+
 export const withSystem = (instructions: string, prompt: Prompt.Prompt): Prompt.Prompt =>
   Prompt.fromMessages([Prompt.makeMessage("system", { content: instructions }), ...prompt.content])
 

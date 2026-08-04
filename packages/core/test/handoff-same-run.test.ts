@@ -1,7 +1,17 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Layer, Stream } from "effect"
+import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "../src/index"
+import {
+  Agent,
+  AgentManifest,
+  Approvals,
+  DurableDriver,
+  ExecutableManifest,
+  Handoff,
+  ModelMiddleware,
+  Pins,
+  ToolExecutor,
+} from "../src/index"
 import { ItLayer } from "./it-layer"
 import { withProviderFinish } from "./provider-finish"
 
@@ -22,6 +32,87 @@ const toolCallPart = (id: string, name: string, params: unknown) =>
 const promptText = (prompt: Prompt.Prompt): string => JSON.stringify(prompt.content)
 
 layer(Layer.empty)("Handoff same-run", (it) => {
+  ItLayer.make(it, "persists the exact active Agent pin and resumes from it", () => {
+    const model = Pins.makeModel({ model: "handoff-test" })
+    const childAgent = Agent.make({ name: "pinned-math" })
+    const child = AgentManifest.fromLiveAgent(childAgent, {
+      model,
+      tools: [],
+      skills: [],
+      services: [],
+      policy: { _tag: "Portable", policy: { _tag: "Forever" } },
+      budget: {},
+      children: [],
+    })
+    const target = Handoff.target(childAgent, child.pin)
+    const supervisorSetup = Handoff.supervisor({ name: "pinned-supervisor", specialists: [target] })
+    const root = AgentManifest.fromLiveAgent(supervisorSetup.agent, {
+      model,
+      tools: [{ name: "handoff_to_pinned-math", pin: Pins.makeCapability({ tool: "handoff", version: 1 }) }],
+      skills: [],
+      services: [],
+      policy: { _tag: "Portable", policy: { _tag: "Forever" } },
+      budget: {},
+      children: [{ selection: "pinned-math", agent: child.pin }],
+    })
+    const executable = ExecutableManifest.make({ root: root.pin, agents: [root, child] })
+    let handoffCheckpoint: DurableDriver.DriverCheckpoint | undefined
+    let handoffCommit: Handoff.HandoffCommit | undefined
+    let calls = 0
+    const journal = Layer.succeed(DurableDriver.DriverJournalService, {
+      onScheduled: () => Effect.succeed(undefined),
+      onCompleted: (
+        operation: DurableDriver.DriverOperation,
+        outcome: DurableDriver.OperationOutcome,
+        checkpoint: DurableDriver.DriverCheckpoint,
+      ) =>
+        Effect.sync(() => {
+          if (operation.kind === "handoff" && outcome._tag === "Succeeded") {
+            handoffCheckpoint = checkpoint
+            handoffCommit = Schema.decodeUnknownSync(Handoff.HandoffCommit)(outcome.value)
+          }
+        }),
+      onCheckpoint: () => Effect.void,
+    })
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          calls += 1
+          return calls === 1
+            ? Stream.make(toolCallPart("pinned-handoff", "handoff_to_pinned-math", { prompt: "continue" }))
+            : Stream.make(textDelta("complete"))
+        }),
+        ToolExecutor.layerToolkit(supervisorSetup.toolkit),
+        supervisorSetup.catalog,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        journal,
+      ),
+      Effect.gen(function* () {
+        yield* Agent.stream(supervisorSetup.agent, {
+          prompt: "start",
+          executableRef: executable.ref,
+          executableManifest: executable.manifest,
+        }).pipe(Stream.runDrain)
+        expect(handoffCheckpoint?.executable?.active).toBe(child.pin)
+        expect(handoffCommit?.state).toMatchObject({
+          root: "pinned-supervisor",
+          active: "pinned-math",
+          handoffCount: 1,
+          edgeCounts: [{ source: "pinned-supervisor", target: "pinned-math", count: 1 }],
+          pendingContinuation: { prompt: Prompt.make("continue") },
+        })
+        expect(handoffCommit?.state.path).toHaveLength(1)
+        yield* Agent.stream(childAgent, {
+          prompt: "restart",
+          executableRef: { ...executable.ref, active: child.pin },
+          executableManifest: executable.manifest,
+          driverCheckpoint: handoffCheckpoint!,
+        }).pipe(Stream.runDrain)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "preserves session and logical operation identity across handoff", () => {
     let mathTurn = 0
     const mathTarget = Handoff.target(Agent.make({ name: "math" }))
@@ -49,6 +140,45 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         const events = yield* Stream.runCollect(Agent.stream(supervisorSetup.agent, { prompt: "start" }))
         expect(mathTurn).toBe(1)
         expect(events.at(-1)?._tag).toBe("Completed")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "reuses the same handoff operation identity across equivalent restarts", () => {
+    const mathTarget = Handoff.target(Agent.make({ name: "stable-math" }))
+    const supervisorSetup = Handoff.supervisor({ name: "stable-supervisor", specialists: [mathTarget] })
+    const completedKeys: Array<string> = []
+    return [
+      Layer.mergeAll(
+        modelLayer((options) =>
+          promptText(options.prompt).includes("continue stable")
+            ? Stream.make(textDelta("complete"))
+            : Stream.make(toolCallPart("stable-call", "handoff_to_stable-math", { prompt: "continue stable" })),
+        ),
+        ToolExecutor.layerToolkit(supervisorSetup.toolkit),
+        supervisorSetup.catalog,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        Layer.succeed(DurableDriver.DriverJournalService, {
+          onScheduled: () => Effect.succeed(undefined),
+          onCompleted: (operation: DurableDriver.DriverOperation) =>
+            Effect.sync(() => {
+              if (operation.kind === "handoff") {
+                completedKeys.push(operation.key)
+              }
+            }),
+          onCheckpoint: () => Effect.void,
+        }),
+      ),
+      Effect.gen(function* () {
+        for (let restart = 0; restart < 2; restart++) {
+          yield* Agent.stream(supervisorSetup.agent, {
+            prompt: "start stable",
+            logicalOperationId: "stable-handoff-run",
+          }).pipe(Stream.runDrain)
+        }
+        expect(completedKeys).toHaveLength(2)
+        expect(completedKeys[0]).toBe(completedKeys[1])
       }),
     ] as const
   })

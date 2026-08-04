@@ -1,51 +1,47 @@
 import { Effect } from "effect"
-import type { AgentRef } from "../agent-ref.js"
 import {
-  AgentNotRegistered,
-  AgentVersionUnavailable,
   IdempotencyConflict,
   RunIdConflict,
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
+  ChildSelectionMissing,
 } from "../errors.js"
-import type { Message } from "../message.js"
+import { decodePinned, equals, resolveChild } from "../executable-manifest.js"
 import type { RunReceipt } from "../run.js"
 import type { AdmitSendInput } from "../run-store.js"
+import type { Message } from "../message.js"
 import type { SpawnInput } from "../runtime.js"
 import { appendLifecycle, makeAccepted, makeAttemptStarted, makeChildLinked } from "./append.js"
-import { messageDigest } from "./digest.js"
+import { childDigest, messageDigest } from "./digest.js"
 import { enqueueLane, promoteHead } from "./lanes.js"
-import { agentKey, idempotencyKey, type MemoryState, type StoredRun } from "./state.js"
+import { idempotencyKey, type MemoryState, type StoredRun } from "./state.js"
 
 const newRunId = (state: MemoryState): readonly [string, MemoryState] => {
   const runId = `run_${state.nextRunCounter}`
   return [runId, { ...state, nextRunCounter: state.nextRunCounter + 1 }]
 }
 
-const requireAgent = (state: MemoryState, agent: AgentRef): Effect.Effect<void, AgentNotRegistered> =>
-  state.agentRefs.has(agentKey(agent)) ? Effect.void : Effect.fail(AgentNotRegistered.make({ agent }))
-
 export const admitSend = (
   state: MemoryState,
   input: AdmitSendInput,
-): Effect.Effect<
-  readonly [RunReceipt, MemoryState],
-  IdempotencyConflict | RunIdConflict | AgentNotRegistered | RuntimeUnavailable
-> =>
+): Effect.Effect<readonly [RunReceipt, MemoryState], IdempotencyConflict | RunIdConflict | RuntimeUnavailable> =>
   Effect.gen(function* () {
     if (state.closed) {
       return yield* RuntimeUnavailable.make({ message: "runtime store released" })
     }
-    yield* requireAgent(state, input.agent)
     const digest = messageDigest(input.message)
+    const executable = yield* Effect.try({
+      try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
     const key = idempotencyKey(input.message.to, input.message.sessionId, input.message.idempotencyKey)
     const existing = state.idempotency.get(key)
     if (existing !== undefined) {
       if (input.runId !== undefined && input.runId !== existing.receipt.runId) {
         return yield* RunIdConflict.make({ runId: input.runId, existingRunId: existing.receipt.runId })
       }
-      if (existing.digest !== digest) {
+      if (existing.digest !== digest || !equals(existing.executable, executable)) {
         return yield* IdempotencyConflict.make({
           address: input.message.to,
           sessionId: input.message.sessionId,
@@ -65,7 +61,8 @@ export const admitSend = (
     const run: StoredRun = {
       runId,
       status: "queued",
-      agent: input.agent,
+      executableRef: input.executableRef,
+      executableManifest: input.executableManifest,
       address: input.message.to,
       message: input.message,
       rootRunId: runId,
@@ -103,16 +100,16 @@ export const admitSend = (
       duplicate: false,
     }
     const idempotency = new Map(next.idempotency)
-    idempotency.set(key, { digest, receipt })
+    idempotency.set(key, { digest, executable, receipt })
     return [receipt, { ...next, idempotency }] as const
   })
 
 export const admitSpawn = (
   state: MemoryState,
-  input: SpawnInput & { readonly message: Message; readonly agent: AgentRef; readonly parentRunId: string },
+  input: SpawnInput & { readonly message: Message; readonly parentRunId: string },
 ): Effect.Effect<
   readonly [RunReceipt, MemoryState],
-  RunNotFound | RunTerminal | AgentVersionUnavailable | AgentNotRegistered | IdempotencyConflict | RuntimeUnavailable
+  RunNotFound | RunTerminal | ChildSelectionMissing | IdempotencyConflict | RuntimeUnavailable
 > =>
   Effect.gen(function* () {
     if (state.closed) {
@@ -123,16 +120,21 @@ export const admitSpawn = (
     if (parent.status === "succeeded" || parent.status === "failed" || parent.status === "cancelled") {
       return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
-    if (!state.agentRefs.has(agentKey(input.agent))) {
-      return yield* AgentVersionUnavailable.make({ agent: input.agent })
+    const executableRef = resolveChild(parent.executableRef, parent.executableManifest, input.selection)
+    if (executableRef === undefined) {
+      return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: input.selection })
     }
 
     const sessionId = input.message.sessionId
-    const digest = messageDigest(input.message)
+    const digest = childDigest(input.message, executableRef)
+    const executable = yield* Effect.try({
+      try: () => decodePinned({ ref: executableRef, manifest: parent.executableManifest }),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
     const key = idempotencyKey(input.message.to, sessionId, input.message.idempotencyKey)
     const existing = state.idempotency.get(key)
     if (existing !== undefined) {
-      if (existing.digest !== digest) {
+      if (existing.digest !== digest || !equals(existing.executable, executable)) {
         return yield* IdempotencyConflict.make({
           address: input.message.to,
           sessionId,
@@ -147,7 +149,8 @@ export const admitSpawn = (
     const child: StoredRun = {
       runId,
       status: "queued",
-      agent: input.agent,
+      executableRef,
+      executableManifest: parent.executableManifest,
       address: input.message.to,
       message: input.message,
       rootRunId: parent.rootRunId,
@@ -184,8 +187,6 @@ export const admitSpawn = (
       duplicate: false,
     }
     const idempotency = new Map(next.idempotency)
-    idempotency.set(key, { digest, receipt })
+    idempotency.set(key, { digest, executable, receipt })
     return [receipt, { ...next, idempotency }] as const
   })
-
-export { requireAgent }

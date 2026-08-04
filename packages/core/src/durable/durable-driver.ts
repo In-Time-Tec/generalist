@@ -1,15 +1,14 @@
 import { Effect, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import type { AgentRef } from "./agent-ref.js"
-import type { DriverCheckpoint, DriverDecision, ExecutionManifest, OperationOutcome } from "./driver-contract.js"
+import type { ExecutableRef } from "./executable-manifest.js"
+import type { DriverCheckpoint, DriverDecision, OperationOutcome } from "./driver-contract.js"
 import type { RunBudget } from "./run-budget.js"
 
 /** @experimental Input used to construct the first checkpoint for one run. */
 export interface DriverInput {
-  readonly agent: AgentRef
+  readonly executable?: ExecutableRef
   readonly prompt: Prompt.Prompt
   readonly budget: RunBudget
-  readonly execution?: ExecutionManifest
   readonly resume?: unknown
 }
 

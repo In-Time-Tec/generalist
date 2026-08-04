@@ -1,13 +1,11 @@
-import { Context, Effect, Layer, Stream } from "effect"
+import { Context, Effect, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import type { Agent } from "@batonfx/core"
 import type { Address } from "./address.js"
-import type { AgentRef } from "./agent-ref.js"
+import type { PinnedExecutable } from "./executable-manifest.js"
+import type { Interface as ExecutableResolverInterface } from "./executable-resolver.js"
 import type { Cursor } from "./cursor.js"
 import type {
   AddressNotFound,
-  AgentNotRegistered,
-  AgentVersionUnavailable,
   CursorExpired,
   IdempotencyConflict,
   RunIdConflict,
@@ -24,27 +22,24 @@ import type {
   FanOutRemainderUnsupported,
   TreeCursorInvalid,
   TreeCursorExpired,
+  ChildSelectionMissing,
+  OperationResolutionConflict,
 } from "./errors.js"
 import type { Metadata } from "./message.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunEvent } from "./run-event.js"
 import type { WaitResolution } from "./run-wait.js"
 import type { FanOutInput, FanOutInspection, FanOutReceipt } from "./fan-out.js"
-
-export interface AgentRegistration {
-  readonly ref: AgentRef
-  readonly agent: Agent.Agent<any, any, any, any>
-  readonly services?: Layer.Layer<any>
-}
+import type { ResolveOperationInput } from "./operation-resolution.js"
 
 export interface AddressBinding {
   readonly address: Address
-  readonly agent: AgentRef
+  readonly executable: PinnedExecutable
 }
 
 export interface LayerOptions {
-  readonly agents: ReadonlyArray<AgentRegistration>
   readonly addresses: ReadonlyArray<AddressBinding>
+  readonly resolver: ExecutableResolverInterface
   readonly subscriberQueueCapacity?: number
 }
 
@@ -65,7 +60,7 @@ export interface SendInput {
 export interface SpawnInput {
   readonly parentRunId: string
   readonly invocationId: string
-  readonly agent: AgentRef
+  readonly selection: string
   readonly prompt: Prompt.Prompt | Prompt.RawInput
   readonly sessionId?: string
   readonly idempotencyKey?: string
@@ -112,29 +107,23 @@ export interface SteerInput {
   readonly prompt: Prompt.Prompt | Prompt.RawInput
 }
 
-export type SendError = AddressNotFound | IdempotencyConflict | RunIdConflict | AgentNotRegistered | RuntimeUnavailable
-export type SpawnError =
-  | RunNotFound
-  | RunTerminal
-  | AgentVersionUnavailable
-  | AgentNotRegistered
-  | IdempotencyConflict
-  | RuntimeUnavailable
+export type SendError = AddressNotFound | IdempotencyConflict | RunIdConflict | RuntimeUnavailable
+export type SpawnError = RunNotFound | RunTerminal | ChildSelectionMissing | IdempotencyConflict | RuntimeUnavailable
 export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
 export type TreeEventsError = RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
 export type RespondError = RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable
 export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable
 export type CancelError = RunNotFound | RuntimeUnavailable
 export type SteerError = RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable
+export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
 export type FanOutError =
   | RunNotFound
   | RunTerminal
-  | AgentVersionUnavailable
-  | AgentNotRegistered
   | FanOutConflict
   | FanOutInvalid
   | FanOutRemainderUnsupported
+  | ChildSelectionMissing
   | RuntimeUnavailable
 export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable
 export type AwaitFanOutError = InspectFanOutError | EventsError
@@ -154,6 +143,7 @@ export interface Interface {
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
   readonly steer: (input: SteerInput) => Effect.Effect<void, SteerError>
+  readonly resolveOperation: (input: ResolveOperationInput) => Effect.Effect<void, ResolveOperationError>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
   readonly fanOut: (input: FanOutInput) => Effect.Effect<FanOutReceipt, FanOutError>
   readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, InspectFanOutError>

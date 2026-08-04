@@ -1,12 +1,12 @@
 import { Console, Effect, Layer, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Chat } from "@batonfx/core"
-import { Address, AgentHost, AgentRef, RunStore, Runtime } from "@batonfx/runtime"
+import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { TestModel } from "@batonfx/test"
 import { Sse } from "@batonfx/transport"
 
 const agent = Agent.make({ name: "transport-agent" })
-const agentRef = AgentRef.make({ id: "transport-agent", version: "1", digest: "sha256:transport-agent" })
+const executable = ExecutableManifest.makeTest("transport-agent", "1")
 const agentAddress = Address.make("agent:transport-guide")
 const agentServices = Layer.mergeAll(
   TestModel.layer([TestModel.text("Hello from transport.")]),
@@ -14,8 +14,8 @@ const agentServices = Layer.mergeAll(
 )
 
 const runtimeLayer = Runtime.layerMemory({
-  agents: [{ ref: agentRef, agent, services: agentServices }],
-  addresses: [{ address: agentAddress, agent: agentRef }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
+  addresses: [{ address: agentAddress, executable }],
   subscriberQueueCapacity: 16,
 })
 

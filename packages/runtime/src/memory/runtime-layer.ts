@@ -1,11 +1,5 @@
 import { Effect, Layer, Stream } from "effect"
-import {
-  AddressNotFound,
-  AgentNotRegistered,
-  AgentVersionUnavailable,
-  FanOutInvalid,
-  FanOutRemainderUnsupported,
-} from "../errors.js"
+import { AddressNotFound, FanOutInvalid, FanOutRemainderUnsupported } from "../errors.js"
 import { make as makeAddress } from "../address.js"
 import { origin as cursorOrigin } from "../cursor.js"
 import { make as makeMessage } from "../message.js"
@@ -18,22 +12,15 @@ import {
   type SpawnInput,
 } from "../runtime.js"
 import { normalizePrompt } from "./prompt.js"
-import { agentKey } from "./state.js"
 import { makeRunStore } from "./store.js"
 import { AgentHost } from "../agent-host.js"
 import { make as makeAgentHost } from "../agent-host.js"
 import { ActiveExecutions, layer as activeExecutionsLayer } from "../active-executions.js"
 import { digest as steeringDigest } from "../steering.js"
-import { childRunIdFor, digestFanOut, fanOutIdFor } from "../fan-out.js"
+import { childRunIdFor, fanOutIdFor } from "../fan-out.js"
 import { parseCursor } from "../tree-parse.js"
 
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
-
-const resolveAgent = (options: LayerOptions, agentRef: SpawnInput["agent"]) =>
-  options.agents.find(
-    (entry) =>
-      entry.ref.id === agentRef.id && entry.ref.version === agentRef.version && entry.ref.digest === agentRef.digest,
-  )?.ref
 
 export const makeRuntime = (
   options: LayerOptions,
@@ -41,8 +28,7 @@ export const makeRuntime = (
   Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
-    const agents = new Map(options.agents.map((entry) => [agentKey(entry.ref), entry.ref] as const))
-    const addresses = new Map(options.addresses.map((entry) => [entry.address, entry.agent] as const))
+    const addresses = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     const awaitFanOut = (fanOutId: string): ReturnType<RuntimeInterface["awaitFanOut"]> =>
       Effect.gen(function* () {
         const current = yield* store.inspectFanOut(fanOutId)
@@ -62,9 +48,8 @@ export const makeRuntime = (
     return Runtime.of({
       send: (input: SendInput) =>
         Effect.gen(function* () {
-          const agent = addresses.get(input.to)
-          if (agent === undefined) return yield* AddressNotFound.make({ address: input.to })
-          if (!agents.has(agentKey(agent))) return yield* AgentNotRegistered.make({ agent })
+          const executable = addresses.get(input.to)
+          if (executable === undefined) return yield* AddressNotFound.make({ address: input.to })
           const prompt = normalizePrompt(input.prompt)
           const message = makeMessage({
             id: input.messageId ?? nextMessageId("msg", input.idempotencyKey),
@@ -80,16 +65,13 @@ export const makeRuntime = (
           })
           return yield* store.admitSend({
             message,
-            agent,
+            executableRef: executable.ref,
+            executableManifest: executable.manifest,
             ...(input.runId === undefined ? {} : { runId: input.runId }),
           })
         }),
       spawn: (input: SpawnInput) =>
         Effect.gen(function* () {
-          const agent = resolveAgent(options, input.agent)
-          if (agent === undefined) return yield* AgentVersionUnavailable.make({ agent: input.agent })
-          if (!agents.has(agentKey(agent))) return yield* AgentNotRegistered.make({ agent })
-          const parent = yield* store.inspect(input.parentRunId)
           const sessionId = input.sessionId ?? `child:${input.parentRunId}`
           const idempotencyKey = input.idempotencyKey ?? `spawn:${input.parentRunId}:${input.invocationId}`
           const address = makeAddress(`spawn:${input.parentRunId}`)
@@ -100,13 +82,12 @@ export const makeRuntime = (
             sessionId,
             prompt,
             idempotencyKey,
-            correlationId: input.correlationId ?? parent.runId,
+            correlationId: input.correlationId ?? input.parentRunId,
             metadata: input.metadata ?? {},
           })
           return yield* store.admitSpawn({
             ...input,
             message,
-            agent,
             parentRunId: input.parentRunId,
           })
         }),
@@ -141,6 +122,7 @@ export const makeRuntime = (
         const prompt = normalizePrompt(input.prompt)
         return store.admitSteering({ ...input, prompt, digest: steeringDigest(prompt) })
       },
+      resolveOperation: (input) => store.resolveOperation(input),
       inspect: (runId) => store.inspect(runId),
       fanOut: (input) =>
         Effect.gen(function* () {
@@ -167,24 +149,16 @@ export const makeRuntime = (
           if (input.remainder === "terminate") {
             return yield* FanOutRemainderUnsupported.make({ remainder: "terminate", durability: info.durability })
           }
-          yield* store.inspect(input.parentRunId)
           const fanOutId = fanOutIdFor(input.parentRunId, input.idempotencyKey)
-          const members = yield* Effect.forEach(input.members, (member, ordinal) =>
-            Effect.gen(function* () {
-              const agent = resolveAgent(options, member.agent)
-              if (agent === undefined) return yield* AgentVersionUnavailable.make({ agent: member.agent })
-              if (!agents.has(agentKey(agent))) return yield* AgentNotRegistered.make({ agent })
-              return {
-                ordinal,
-                key: member.key,
-                childRunId: childRunIdFor(fanOutId, ordinal),
-                agent,
-                prompt: normalizePrompt(member.prompt),
-                sessionId: member.sessionId ?? `fanout:${fanOutId}`,
-                metadata: member.metadata ?? {},
-              }
-            }),
-          )
+          const members = input.members.map((member, ordinal) => ({
+            ordinal,
+            key: member.key,
+            childRunId: childRunIdFor(fanOutId, ordinal),
+            selection: member.selection,
+            prompt: normalizePrompt(member.prompt),
+            sessionId: member.sessionId ?? `fanout:${fanOutId}`,
+            metadata: member.metadata ?? {},
+          }))
           const normalized = {
             parentRunId: input.parentRunId,
             idempotencyKey: input.idempotencyKey,
@@ -196,7 +170,6 @@ export const makeRuntime = (
           return yield* store.admitFanOut({
             ...normalized,
             fanOutId,
-            digest: digestFanOut(normalized),
           })
         }),
       inspectFanOut: (fanOutId) => store.inspectFanOut(fanOutId),
@@ -208,7 +181,7 @@ export const layer = (options: LayerOptions): Layer.Layer<Runtime | RunStore | A
   const store = Layer.effect(RunStore, makeRunStore(options))
   const active = activeExecutionsLayer
   const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(Layer.merge(store, active)))
-  const host = Layer.effect(AgentHost, makeAgentHost({ workerId: "memory", agents: options.agents })).pipe(
+  const host = Layer.effect(AgentHost, makeAgentHost({ workerId: "memory", resolver: options.resolver })).pipe(
     Layer.provide(Layer.merge(store, active)),
   )
   return Layer.mergeAll(runtime, host, store)

@@ -11,7 +11,7 @@ import {
   ToolExecutor,
   Toolkit,
 } from "@batonfx/core"
-import { Address, AgentHost, AgentRef, RunStore, Runtime } from "@batonfx/runtime"
+import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { Sse } from "@batonfx/transport"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -34,7 +34,7 @@ const deployTool = Tool.make("deploy", {
 
 const toolkit = Toolkit.make(deployTool)
 const agent = Agent.make({ name: "release-agent", toolkit })
-const agentRef = AgentRef.make({ id: "release-agent", version: "1", digest: "sha256:release-agent" })
+const executable = ExecutableManifest.makeTest("release-agent", "1")
 const agentAddress = Address.make("agent:release")
 const toolkitLayer = toolkit.toLayer({ deploy: () => Effect.die("approval should suspend before execution") })
 const toolExecutorLayer = Layer.unwrap(
@@ -72,8 +72,8 @@ const agentServices = Layer.mergeAll(
 )
 
 const runtimeLayer = Runtime.layerMemory({
-  agents: [{ ref: agentRef, agent, services: agentServices }],
-  addresses: [{ address: agentAddress, agent: agentRef }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
+  addresses: [{ address: agentAddress, executable }],
 })
 
 const program = Effect.gen(function* () {

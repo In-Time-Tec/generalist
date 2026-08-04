@@ -1,5 +1,14 @@
-import { Runtime } from "../src/index.js"
-import { assistant, assistantAddress, assistantRef, researcher, researcherAddress, researcherRef } from "./helpers.js"
+import { ExecutableResolver, Runtime } from "../src/index.js"
+import {
+  analyst,
+  analystRef,
+  assistant,
+  assistantAddress,
+  assistantRef,
+  researcher,
+  researcherAddress,
+  researcherRef,
+} from "./helpers.js"
 
 export const tempDbPath = (label = "baton-runtime"): string => {
   const dir = `/tmp/${label}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -10,13 +19,14 @@ export const tempDbPath = (label = "baton-runtime"): string => {
 export const sqliteLayer = (filename: string) =>
   Runtime.layerSqlite({
     filename,
-    agents: [
-      { ref: assistantRef, agent: assistant },
-      { ref: researcherRef, agent: researcher },
-    ],
+    resolver: ExecutableResolver.makeStatic([
+      { executable: assistantRef, agent: assistant },
+      { executable: researcherRef, agent: researcher },
+      { executable: analystRef, agent: analyst },
+    ]),
     addresses: [
-      { address: assistantAddress, agent: assistantRef },
-      { address: researcherAddress, agent: researcherRef },
+      { address: assistantAddress, executable: assistantRef },
+      { address: researcherAddress, executable: researcherRef },
     ],
     subscriberQueueCapacity: 8,
   })

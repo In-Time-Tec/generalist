@@ -10,28 +10,18 @@ import {
 } from "../errors.js"
 import { RunStore, type CompletionOutcome } from "../run-store.js"
 import type { LayerOptions } from "../runtime.js"
-import { agentKey, emptyState, type MemoryState } from "./state.js"
+import { emptyState, type MemoryState } from "./state.js"
 import { admitSend, admitSpawn } from "./store-admit.js"
-import {
-  cancel,
-  complete,
-  emitAgentEvent,
-  fail,
-  markOperationUnknown,
-  respond,
-  resume,
-  signal,
-  wait,
-} from "./store-control.js"
+import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store-control.js"
 import { followEvents, inspectRun, shutdownStore, toInspection } from "./store-events.js"
 import {
   expireRunningOperation,
-  failOperation,
   getOperation,
   getOperationByKey,
   recordOperation,
   startOperation,
-  succeedOperation,
+  completeOperation,
+  resolveOperation,
 } from "./store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
 import { admitSteering, readSteering } from "./store-steering.js"
@@ -39,24 +29,13 @@ import { Prompt } from "effect/unstable/ai"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { makeCursor } from "../tree-cursor.js"
 import { projectRunSnapshot, projectTreeInspection, type InspectionRun } from "../inspection.js"
-
-const registrationMaps = (options: LayerOptions) => {
-  const agentRefs = new Map(options.agents.map((entry) => [agentKey(entry.ref), entry.ref] as const))
-  const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.agent] as const))
-  return { agentRefs, addressBindings }
-}
+import { decodePinned, equals } from "../executable-manifest.js"
 
 export const makeRunStore = (options: LayerOptions) =>
   Effect.gen(function* () {
-    const { agentRefs, addressBindings } = registrationMaps(options)
-    for (const binding of options.addresses) {
-      if (!agentRefs.has(agentKey(binding.agent))) {
-        return yield* Effect.die(new Error(`address ${binding.address} binds unregistered agent`))
-      }
-    }
+    const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     const stateRef = yield* SynchronizedRef.make(
       emptyState({
-        agentRefs,
         addressBindings,
         subscriberQueueCapacity: options.subscriberQueueCapacity ?? 64,
       }),
@@ -85,11 +64,15 @@ export const makeRunStore = (options: LayerOptions) =>
         Effect.gen(function* () {
           const bound = addressBindings.get(input.message.to)
           if (bound === undefined) return yield* AddressNotFound.make({ address: input.message.to })
-          if (
-            bound.id !== input.agent.id ||
-            bound.version !== input.agent.version ||
-            bound.digest !== input.agent.digest
-          ) {
+          const admitted = yield* Effect.try({
+            try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
+            catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+          })
+          const binding = yield* Effect.try({
+            try: () => decodePinned(bound),
+            catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+          })
+          if (!equals(binding, admitted)) {
             return yield* AddressNotFound.make({ address: input.message.to })
           }
           return yield* SynchronizedRef.modifyEffect(stateRef, (state) => admitSend(state, input))
@@ -254,19 +237,18 @@ export const makeRunStore = (options: LayerOptions) =>
           ),
         ),
       fail: (input) => fencedUpdate(input, (state) => fail(state, input)),
-      wait: (input) => fencedUpdate(input, (state) => wait(state, input)),
+      suspend: (input) => fencedUpdate(input, (state) => suspend(state, input)),
       resume: (input) => update((state) => resume(state, input)),
       emitAgentEvent: (input) => fencedUpdate(input, (state) => emitAgentEvent(state, input)),
-      markOperationUnknown: (input) => fencedUpdate(input, (state) => markOperationUnknown(state, input)),
       recordOperation: (input) => fencedModify(input, (state) => recordOperation(state, input)),
       startOperation: (input) => fencedModify(input, (state) => startOperation(state, input)),
-      succeedOperation: (input) => fencedModify(input, (state) => succeedOperation(state, input)),
-      failOperation: (input) => fencedModify(input, (state) => failOperation(state, input)),
+      completeOperation: (input) => fencedModify(input, (state) => completeOperation(state, input)),
       expireRunningOperation: (input) => fencedModify(input, (state) => expireRunningOperation(state, input)),
       getOperation: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => getOperation(state, input))),
       getOperationByKey: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => getOperationByKey(state, input))),
+      resolveOperation: (input) => update((state) => resolveOperation(state, input)),
       claimExecution: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => claimExecution(state, input)),
       loadExecution: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadExecution(state, runId))),

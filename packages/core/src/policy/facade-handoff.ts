@@ -16,6 +16,8 @@ import {
   executeSameRunHandoff as Handoff_executeSameRunHandoff,
   HandoffRejected as Handoff_Rejected,
   FanOutUnsatisfied as Handoff_FanOutUnsatisfied,
+  HandoffCommit as Handoff_Commit,
+  HandoffControlState as Handoff_ControlState,
 } from "./handoff.js"
 export const Handoff = {
   register: Handoff_register,
@@ -35,6 +37,8 @@ export const Handoff = {
   executeSameRunHandoff: Handoff_executeSameRunHandoff,
   HandoffRejected: Handoff_Rejected,
   FanOutUnsatisfied: Handoff_FanOutUnsatisfied,
+  HandoffCommit: Handoff_Commit,
+  HandoffControlState: Handoff_ControlState,
 } as typeof import("./handoff.js")
 export namespace Handoff {
   export type register = typeof import("./handoff.js").register
@@ -59,6 +63,8 @@ export namespace Handoff {
   export type SupervisorOptions = import("./handoff.js").SupervisorOptions
   export type HandoffTarget = import("./handoff.js").HandoffTarget
   export type HandoffToolOptions = import("./handoff.js").HandoffToolOptions
+  export type HandoffCommit = import("./handoff.js").HandoffCommit
+  export type HandoffControlState = import("./handoff.js").HandoffControlState
   export type DelegateOptions<
     Parameters extends import("effect").Schema.Top = import("effect").Schema.Top,
     Success extends import("effect").Schema.Top = typeof import("effect").Schema.String,

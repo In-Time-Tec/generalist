@@ -1,9 +1,9 @@
 import { Effect, Ref, Schema } from "effect"
-import type { Prompt, Tool } from "effect/unstable/ai"
+import { Prompt, type Tool } from "effect/unstable/ai"
 import type { Agent, RunOptions } from "./agent.js"
-import type { AgentRef } from "../durable/agent-ref.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
 import type { HandoffTarget } from "../policy/handoff-target.js"
+import { AgentPin } from "../durable/pin.js"
 
 export const HandoffFrame = Schema.Struct({
   handoffId: Schema.String,
@@ -15,11 +15,42 @@ export const HandoffFrame = Schema.Struct({
 
 export type HandoffFrame = typeof HandoffFrame.Type
 
+export const HandoffEdgeCount = Schema.Struct({
+  source: Schema.String,
+  target: Schema.String,
+  count: Schema.Finite,
+})
+
+export const HandoffControlState = Schema.Struct({
+  root: Schema.String,
+  active: Schema.String,
+  path: Schema.Array(HandoffFrame),
+  edgeCounts: Schema.Array(HandoffEdgeCount),
+  handoffCount: Schema.Finite,
+  pendingContinuation: Schema.optionalKey(
+    Schema.Struct({
+      prompt: Prompt.Prompt,
+      instructions: Schema.optionalKey(Schema.String),
+    }),
+  ),
+})
+
+export type HandoffControlState = typeof HandoffControlState.Type
+
+export const HandoffCommit = Schema.Struct({
+  _tag: Schema.Literal("HandoffCommit"),
+  state: HandoffControlState,
+  transcript: Prompt.Prompt,
+  targetAgentPin: Schema.optionalKey(AgentPin),
+})
+
+export type HandoffCommit = typeof HandoffCommit.Type
+
 export interface HandoffRunState {
-  readonly rootRef: AgentRef
+  readonly root: string
   readonly active: HandoffTarget
   readonly path: ReadonlyArray<HandoffFrame>
-  readonly edgeCounts: ReadonlyMap<string, number>
+  readonly edgeCounts: ReadonlyMap<string, ReadonlyMap<string, number>>
   readonly handoffCount: number
   readonly pendingContinuation:
     | {
@@ -29,19 +60,93 @@ export interface HandoffRunState {
     | undefined
 }
 
+export const toHandoffControlState = (state: HandoffRunState): HandoffControlState => ({
+  root: state.root,
+  active: state.active.name,
+  path: state.path,
+  edgeCounts: [...state.edgeCounts].flatMap(([source, targets]) =>
+    [...targets].map(([target, count]) => ({ source, target, count })),
+  ),
+  handoffCount: state.handoffCount,
+  ...(state.pendingContinuation === undefined
+    ? {}
+    : {
+        pendingContinuation: {
+          prompt: Prompt.make(state.pendingContinuation.prompt),
+          ...(state.pendingContinuation.overrides?.instructions === undefined
+            ? {}
+            : { instructions: state.pendingContinuation.overrides.instructions }),
+        },
+      }),
+})
+
+export const takePendingContinuation = <E, R>(
+  stateRef: Ref.Ref<HandoffRunState>,
+  persist: (state: HandoffControlState) => Effect.Effect<void, E, R>,
+): Effect.Effect<HandoffRunState["pendingContinuation"], E, R> =>
+  Effect.gen(function* () {
+    const state = yield* Ref.get(stateRef)
+    if (state.pendingContinuation === undefined) return undefined
+    const continued = { ...state, pendingContinuation: undefined }
+    yield* persist(toHandoffControlState(continued))
+    yield* Ref.set(stateRef, continued)
+    return state.pendingContinuation
+  })
+
+export const fromHandoffControlState = (state: HandoffControlState, active: HandoffTarget): HandoffRunState => {
+  const edgeCounts = new Map<string, Map<string, number>>()
+  for (const edge of state.edgeCounts) {
+    const targets = edgeCounts.get(edge.source) ?? new Map<string, number>()
+    targets.set(edge.target, edge.count)
+    edgeCounts.set(edge.source, targets)
+  }
+  return {
+    root: state.root,
+    active,
+    path: state.path,
+    edgeCounts,
+    handoffCount: state.handoffCount,
+    ...(state.pendingContinuation === undefined
+      ? { pendingContinuation: undefined }
+      : {
+          pendingContinuation: {
+            prompt: state.pendingContinuation.prompt,
+            ...(state.pendingContinuation.instructions === undefined
+              ? {}
+              : { overrides: { instructions: state.pendingContinuation.instructions } }),
+          },
+        }),
+  }
+}
+
 export const makeHandoffRunState = (
   agent: Agent<Record<string, Tool.Any>, unknown>,
-  rootRef: AgentRef,
+  activePin?: AgentPin,
 ): HandoffRunState => ({
-  rootRef,
-  active: { name: agent.name, agent, ref: rootRef },
+  root: agent.name,
+  active: { name: agent.name, agent, ...(activePin === undefined ? {} : { pin: activePin }) },
   path: [],
   edgeCounts: new Map(),
   handoffCount: 0,
   pendingContinuation: undefined,
 })
 
-export const edgeKey = (source: AgentRef, target: AgentRef): string => `${source.id}:${target.id}`
+export const edgeLabel = (source: string, target: string): string => JSON.stringify([source, target])
+
+export const edgeCount = (counts: HandoffRunState["edgeCounts"], source: string, target: string): number =>
+  counts.get(source)?.get(target) ?? 0
+
+export const incrementEdge = (
+  counts: HandoffRunState["edgeCounts"],
+  source: string,
+  target: string,
+): HandoffRunState["edgeCounts"] => {
+  const next = new Map(counts)
+  const targets = new Map(next.get(source))
+  targets.set(target, (targets.get(target) ?? 0) + 1)
+  next.set(source, targets)
+  return next
+}
 
 export class HandoffTargetMissing extends Schema.TaggedErrorClass<HandoffTargetMissing>()(
   "@batonfx/core/HandoffTargetMissing",
@@ -87,5 +192,15 @@ export const maxHandoffs = (
 
 export const makeHandoffStateRef = (
   agent: Agent<Record<string, Tool.Any>, unknown>,
-  rootRef: AgentRef,
-): Effect.Effect<Ref.Ref<HandoffRunState>> => Ref.make(makeHandoffRunState(agent, rootRef))
+  activePin?: AgentPin,
+  restored?: HandoffControlState,
+): Effect.Effect<Ref.Ref<HandoffRunState>> =>
+  Ref.make(
+    restored === undefined
+      ? makeHandoffRunState(agent, activePin)
+      : fromHandoffControlState(restored, {
+          name: agent.name,
+          agent,
+          ...(activePin === undefined ? {} : { pin: activePin }),
+        }),
+  )

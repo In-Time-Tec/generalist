@@ -1,14 +1,17 @@
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
+import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { RecordOperationInput } from "../run-store.js"
-import { encodeJson } from "./codecs.js"
+import { decodeJson, encodeJson } from "./codecs.js"
 import { canBlindRetry } from "./operations.js"
 import type { OperationRow } from "./rows.js"
 import { appendEvent, loadRun, nowIso, toOperationRecord } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
 import { encodeContinuation } from "../steering.js"
+import { checkpointRef } from "../executable-manifest.js"
+import { encodeExecutableRef } from "./codecs.js"
+import { OperationResolution, digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
 
 const nextId = (prefix: string): Effect.Effect<string> =>
   Effect.sync(() => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`)
@@ -55,6 +58,10 @@ export const recordOperation = (hub: EventHub, input: RecordOperationInput) =>
       }
     }
     const operationId = yield* nextId("op")
+    const executableRef = yield* Effect.try({
+      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
     yield* sql`
       INSERT INTO baton_run_operations (
         run_id, operation_id, operation_key, kind, status, input_digest, input_json,
@@ -69,6 +76,7 @@ export const recordOperation = (hub: EventHub, input: RecordOperationInput) =>
       yield* sql`
         UPDATE baton_runs SET
           driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+          executable_ref_json = ${encodeExecutableRef(executableRef)},
           transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
           continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
             THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
@@ -111,44 +119,82 @@ export const startOperation = (input: { readonly runId: string; readonly operati
     return toOperationRecord(row)
   })
 
-export const succeedOperation = (input: {
-  readonly runId: string
-  readonly operationId: string
-  readonly result: unknown
-}) =>
+export const completeOperation = (
+  hub: EventHub,
+  input: {
+    readonly runId: string
+    readonly operationId: string
+    readonly outcome: import("../run-store.js").OperationCompletionOutcome
+    readonly checkpoint: import("@batonfx/core").DurableDriver.DriverCheckpoint
+    readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
+    readonly continuation?: import("../steering.js").ExecutionContinuation | null
+    readonly steeringEntryIds?: ReadonlyArray<string>
+  },
+) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* requireRun(input.runId)
-    const finished = yield* nowIso
-    yield* sql`
-      UPDATE baton_run_operations
-      SET status = 'succeeded', result_json = ${encodeJson(input.result)}, finished_at = ${finished}
-      WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
-        AND status IN ('requested', 'running')
-    `
-    const rows = yield* sql<OperationRow>`
+    const run = yield* requireRun(input.runId)
+    const existing = yield* sql<OperationRow>`
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
-    const row = rows[0]
-    if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-    return toOperationRecord(row)
-  })
-
-export const failOperation = (input: {
-  readonly runId: string
-  readonly operationId: string
-  readonly error: unknown
-}) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    yield* requireRun(input.runId)
+    if (existing[0] === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
+    if (existing[0].status === "succeeded" || existing[0].status === "failed" || existing[0].status === "unknown") {
+      return toOperationRecord(existing[0])
+    }
+    for (const entryId of new Set(input.steeringEntryIds ?? [])) {
+      const rows = yield* sql<SteeringConsumptionRow>`
+        SELECT entry_id, consumed_operation_id FROM baton_run_steering
+        WHERE run_id = ${input.runId} AND entry_id = ${entryId}
+      `
+      if (rows[0]?.consumed_operation_id !== input.operationId) {
+        return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} does not belong to operation` })
+      }
+    }
+    const executableRef = yield* Effect.try({
+      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
     const finished = yield* nowIso
+    if (input.outcome._tag === "Succeeded") {
+      yield* sql`
+        UPDATE baton_run_operations
+        SET status = 'succeeded', result_json = ${encodeJson(input.outcome.value)}, finished_at = ${finished}
+        WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+          AND status IN ('requested', 'running')
+      `
+    } else if (input.outcome._tag === "Failed") {
+      yield* sql`
+        UPDATE baton_run_operations
+        SET status = 'failed', error_json = ${encodeJson(input.outcome.error)}, finished_at = ${finished}
+        WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+          AND status IN ('requested', 'running')
+      `
+    } else {
+      yield* sql`
+        UPDATE baton_run_operations SET status = 'unknown', finished_at = ${finished}
+        WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+          AND status IN ('requested', 'running')
+      `
+    }
     yield* sql`
-      UPDATE baton_run_operations
-      SET status = 'failed', error_json = ${encodeJson(input.error)}, finished_at = ${finished}
-      WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
-        AND status IN ('requested', 'running')
+      UPDATE baton_runs SET
+        driver_checkpoint_json = ${JSON.stringify(input.checkpoint)},
+        executable_ref_json = ${encodeExecutableRef(executableRef)},
+        transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+        continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
+          THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
+          ELSE continuation_json END,
+        updated_at = ${finished}
+      WHERE run_id = ${input.runId}
     `
+    if (input.outcome._tag === "Unknown") {
+      yield* appendEvent(
+        hub,
+        yield* requireRun(input.runId),
+        { _tag: "OperationUnknown", operationId: input.operationId },
+        "needs-resolution",
+      )
+    }
     const rows = yield* sql<OperationRow>`
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
@@ -215,4 +261,71 @@ export const getOperationByKey = (input: { readonly runId: string; readonly oper
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_key = ${input.operationKey}
     `
     return rows[0] === undefined ? undefined : toOperationRecord(rows[0])
+  })
+
+export const resolveOperation = (
+  input: ResolveOperationInput,
+  claimableStatus: "queued" | "running" = "queued",
+  clearLease = false,
+) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const run = yield* requireRun(input.runId)
+    const rows = yield* sql<OperationRow>`
+      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+    `
+    const row = rows[0]
+    const resolutionJson = encodeJson(input.resolution)
+    const conflict = () =>
+      OperationResolutionConflict.make({
+        runId: input.runId,
+        operationId: input.operationId,
+        idempotencyKey: input.idempotencyKey,
+      })
+    if (row === undefined) return yield* conflict()
+    if (row.resolution_idempotency_key !== null) {
+      const priorResolution =
+        row.resolution_json === null ? undefined : decodeJson(OperationResolution, row.resolution_json)
+      if (
+        row.resolution_idempotency_key === input.idempotencyKey &&
+        priorResolution !== undefined &&
+        resolutionDigest(priorResolution) === resolutionDigest(input.resolution)
+      )
+        return
+      return yield* conflict()
+    }
+    if (run.status !== "needs-resolution" || row.status !== "unknown") return yield* conflict()
+    const finished = yield* nowIso
+    if (input.resolution._tag === "Succeeded") {
+      yield* sql`
+        UPDATE baton_run_operations SET status = 'succeeded', result_json = ${encodeJson(input.resolution.value)},
+          resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}, finished_at = ${finished}
+        WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'unknown'
+      `
+    } else if (input.resolution._tag === "Failed") {
+      yield* sql`
+        UPDATE baton_run_operations SET status = 'failed', error_json = ${encodeJson(input.resolution.error)},
+          resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}, finished_at = ${finished}
+        WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'unknown'
+      `
+    } else {
+      yield* sql`
+        UPDATE baton_run_operations SET status = 'requested', result_json = NULL, error_json = NULL,
+          resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson},
+          started_at = NULL, finished_at = NULL
+        WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'unknown'
+      `
+    }
+    if (clearLease) {
+      yield* sql`
+        UPDATE baton_runs SET status = ${claimableStatus}, owner_worker_id = NULL, lease_expires_at = NULL,
+          updated_at = ${finished}
+        WHERE run_id = ${input.runId} AND status = 'needs-resolution'
+      `
+    } else {
+      yield* sql`
+        UPDATE baton_runs SET status = ${claimableStatus}, owner_worker_id = NULL, updated_at = ${finished}
+        WHERE run_id = ${input.runId} AND status = 'needs-resolution'
+      `
+    }
   })
