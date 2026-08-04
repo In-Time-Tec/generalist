@@ -3,7 +3,7 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { RecordOperationInput } from "../run-store.js"
 import { canBlindRetry, type OperationRecord, type OperationStatus } from "../sql/operations.js"
-import { makeUnknown, appendLifecycle, rejectIfTerminal } from "./append.js"
+import { makeUnknown, appendAgentEvent, appendLifecycle, rejectIfTerminal } from "./append.js"
 import { Option } from "effect"
 import { operationKeyMapKey, operationMapKey, type MemoryState } from "./state.js"
 
@@ -22,7 +22,21 @@ export const recordOperation = (
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
     const byKey = state.operations.get(operationKeyMapKey(input.runId, input.operationKey))
-    if (byKey !== undefined) return [byKey, state] as const
+    if (byKey !== undefined) {
+      for (const entryId of input.steeringEntryIds ?? []) {
+        const entry = run.steering.find((candidate) => candidate.entryId === entryId)
+        if (entry?.consumedOperationId !== byKey.operationId) {
+          return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} does not belong to operation` })
+        }
+      }
+      return [byKey, state] as const
+    }
+    for (const entryId of input.steeringEntryIds ?? []) {
+      const entry = run.steering.find((candidate) => candidate.entryId === entryId)
+      if (entry === undefined || entry.consumedOperationId !== undefined) {
+        return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} is not pending` })
+      }
+    }
     const operationId = `op_${state.nextOperationCounter}`
     const record: OperationRecord = {
       runId: input.runId,
@@ -38,7 +52,38 @@ export const recordOperation = (
     const operations = new Map(state.operations)
     operations.set(operationMapKey(input.runId, operationId), record)
     operations.set(operationKeyMapKey(input.runId, input.operationKey), record)
-    return [record, { ...state, nextOperationCounter: state.nextOperationCounter + 1, operations }] as const
+    const runs = new Map(state.runs)
+    const updatedRun = {
+      ...run,
+      ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
+      ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
+      ...(input.continuation === undefined || input.continuation === null ? {} : { continuation: input.continuation }),
+      steering: run.steering.map((entry) =>
+        (input.steeringEntryIds ?? []).includes(entry.entryId)
+          ? {
+              entryId: entry.entryId,
+              runId: entry.runId,
+              sequence: entry.sequence,
+              idempotencyKey: entry.idempotencyKey,
+              digest: entry.digest,
+              prompt: entry.prompt,
+              consumedOperationId: operationId,
+            }
+          : entry,
+      ),
+    }
+    if (input.continuation === null) {
+      const { continuation: _, ...withoutContinuation } = updatedRun
+      runs.set(run.runId, withoutContinuation)
+    } else {
+      runs.set(run.runId, updatedRun)
+    }
+    let next: MemoryState = { ...state, nextOperationCounter: state.nextOperationCounter + 1, operations, runs }
+    for (const event of input.steeringEvents ?? []) {
+      const [, appended] = yield* appendAgentEvent(next, input.runId, event)
+      next = appended
+    }
+    return [record, next] as const
   })
 
 export const startOperation = (

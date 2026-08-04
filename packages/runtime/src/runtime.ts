@@ -11,6 +11,7 @@ import type {
   CursorExpired,
   IdempotencyConflict,
   RunIdConflict,
+  SteeringConflict,
   ResponseConflict,
   RunNotFound,
   RunTerminal,
@@ -98,6 +99,12 @@ export interface CancelInput {
   readonly reason?: string
 }
 
+export interface SteerInput {
+  readonly runId: string
+  readonly idempotencyKey: string
+  readonly prompt: Prompt.Prompt | Prompt.RawInput
+}
+
 export type SendError = AddressNotFound | IdempotencyConflict | RunIdConflict | AgentNotRegistered | RuntimeUnavailable
 export type SpawnError =
   | RunNotFound
@@ -109,6 +116,7 @@ export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | Runti
 export type RespondError = RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable
 export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable
 export type CancelError = RunNotFound | RuntimeUnavailable
+export type SteerError = RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
 
 export interface Interface {
@@ -121,6 +129,7 @@ export interface Interface {
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
+  readonly steer: (input: SteerInput) => Effect.Effect<void, SteerError>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
 }
 

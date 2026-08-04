@@ -17,6 +17,7 @@ import { makeRunStore } from "./store.js"
 import { AgentHost } from "../agent-host.js"
 import { make as makeAgentHost } from "../agent-host.js"
 import { ActiveExecutions, layer as activeExecutionsLayer } from "../active-executions.js"
+import { digest as steeringDigest } from "../steering.js"
 
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 
@@ -98,6 +99,10 @@ export const makeRuntime = (
       respond: (input) => store.respond(input),
       signal: (input) => store.signal(input),
       cancel: (input) => store.cancel(input).pipe(Effect.andThen(active.interrupt(input.runId))),
+      steer: (input) => {
+        const prompt = normalizePrompt(input.prompt)
+        return store.admitSteering({ ...input, prompt, digest: steeringDigest(prompt) })
+      },
       inspect: (runId) => store.inspect(runId),
     })
   })

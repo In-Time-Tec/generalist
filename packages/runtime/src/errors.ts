@@ -39,6 +39,11 @@ export class RunTerminal extends Schema.TaggedErrorClass<RunTerminal>()("@batonf
   status: Schema.Literals(["succeeded", "failed", "cancelled"]),
 }) {}
 
+export class SteeringConflict extends Schema.TaggedErrorClass<SteeringConflict>()("@batonfx/runtime/SteeringConflict", {
+  runId: RunId,
+  idempotencyKey: Schema.String,
+}) {}
+
 export class WaitNotOpen extends Schema.TaggedErrorClass<WaitNotOpen>()("@batonfx/runtime/WaitNotOpen", {
   runId: Schema.String,
   waitId: Schema.String,

@@ -27,6 +27,7 @@ describe("@batonfx/runtime public surface", () => {
     expect(typeof RunTree.events).toBe("function")
     expect(Errors.AddressNotFound).toBeDefined()
     expect(Errors.IdempotencyConflict).toBeDefined()
+    expect(Errors.SteeringConflict).toBeDefined()
     expect(Errors.SubscriberLagged).toBeDefined()
     expect(Cursor.origin).toBe(-1)
   })

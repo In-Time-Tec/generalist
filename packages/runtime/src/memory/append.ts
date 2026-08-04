@@ -89,7 +89,12 @@ export const appendEvent = (
           : { terminalEventId: run.terminalEventId }),
     }
     const runs = new Map(state.runs)
-    runs.set(runId, updated)
+    if (event._tag === "RunCancelled" || event._tag === "RunCompleted" || event._tag === "RunFailed") {
+      const { continuation: _, ...withoutContinuation } = updated
+      runs.set(runId, withoutContinuation)
+    } else {
+      runs.set(runId, updated)
+    }
     return [event, { ...state, runs }] as const
   })
 

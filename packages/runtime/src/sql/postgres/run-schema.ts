@@ -10,7 +10,16 @@ import {
   SchemaVersionUnsupported,
 } from "../errors.js"
 import { mapSqlError } from "../sql-effect.js"
-import { MIGRATION_STATEMENTS, MIGRATIONS_TABLE, SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "./schema.js"
+import {
+  MIGRATION_STATEMENTS,
+  KERNEL_MIGRATION_STATEMENTS,
+  MIGRATIONS_TABLE,
+  SCHEMA_META_TABLE,
+  SCHEMA_VERSION,
+  STEERING_MIGRATION_STATEMENTS,
+  kernelSchemaChecksum,
+  schemaChecksum,
+} from "./schema.js"
 
 export interface SchemaPlan {
   readonly current: number
@@ -60,19 +69,30 @@ const readMeta = (source: string) =>
 
 const migrationEffect = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  for (const statement of MIGRATION_STATEMENTS) {
+  for (const statement of KERNEL_MIGRATION_STATEMENTS) {
     yield* sql.unsafe(statement)
   }
-  const checksum = schemaChecksum()
+  const checksum = kernelSchemaChecksum()
   const now = yield* DateTime.nowAsDate
   yield* sql`
     INSERT INTO ${sql(SCHEMA_META_TABLE)} (id, version, checksum, dirty, applied_at)
-    VALUES (1, ${SCHEMA_VERSION}, ${checksum}, FALSE, ${now})
+    VALUES (1, 1, ${checksum}, FALSE, ${now})
     ON CONFLICT (id) DO UPDATE SET
       version = EXCLUDED.version,
       checksum = EXCLUDED.checksum,
       dirty = FALSE,
       applied_at = EXCLUDED.applied_at
+  `
+})
+
+const steeringMigrationEffect = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  for (const statement of STEERING_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
+  const now = yield* DateTime.nowAsDate
+  yield* sql`
+    UPDATE ${sql(SCHEMA_META_TABLE)}
+    SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = FALSE, applied_at = ${now}
+    WHERE id = 1
   `
 })
 
@@ -132,6 +152,7 @@ export const apply = (
     yield* runMigrations({
       loader: Migrator.fromRecord({
         "0001_baton_runtime_postgres_kernel": migrationEffect,
+        "0002_baton_runtime_postgres_steering": steeringMigrationEffect,
       }),
       table: MIGRATIONS_TABLE,
     }).pipe(

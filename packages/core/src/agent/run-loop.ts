@@ -439,7 +439,8 @@ export const makeRunLoop = <
       Stream.suspend(() => (next === undefined ? Stream.empty : runTurn(1, next.prompt, next.overrides))),
     )
   }
-  const runStream = validatedResume === undefined ? runTurn(0, initialPrompt) : resumeStream(validatedResume)
+  const runStream =
+    validatedResume === undefined ? runTurn(options.turnStart ?? 0, initialPrompt) : resumeStream(validatedResume)
   const guardedStream = runStream.pipe(
     Stream.catchCause((cause) => {
       const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const MIGRATION_LOCK = "baton_runtime_schema"
@@ -116,10 +116,25 @@ export const MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   CONSTRAINT baton_run_links_parent_fk FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
   CONSTRAINT baton_run_links_child_fk FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
 ) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS baton_run_steering (
+  entry_id VARCHAR(255) PRIMARY KEY,
+  run_id VARCHAR(255) NOT NULL,
+  sequence BIGINT NOT NULL,
+  idempotency_key VARCHAR(255) NOT NULL,
+  digest VARCHAR(128) NOT NULL,
+  prompt_json LONGTEXT NOT NULL,
+  consumed_operation_id VARCHAR(255),
+  UNIQUE KEY baton_run_steering_sequence_key (run_id, sequence),
+  UNIQUE KEY baton_run_steering_idempotency_key (run_id, idempotency_key),
+  KEY baton_run_steering_pending_idx (run_id, consumed_operation_id, sequence),
+  CONSTRAINT baton_run_steering_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+) ENGINE=InnoDB`,
+  `ALTER TABLE baton_runs ADD COLUMN continuation_json LONGTEXT`,
 ]
 
 export const MIGRATION_MANIFEST = [
-  { id: 1, name: "baton_runtime_mysql_kernel", statements: MIGRATION_STATEMENTS },
+  { id: 1, name: "baton_runtime_mysql_kernel", statements: MIGRATION_STATEMENTS.slice(0, -2) },
+  { id: 2, name: "baton_runtime_mysql_steering", statements: MIGRATION_STATEMENTS.slice(-2) },
 ] as const
 
 export const schemaChecksum = (): string => {

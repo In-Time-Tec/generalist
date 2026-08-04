@@ -82,6 +82,33 @@ describePostgres("postgres run store", () => {
     ),
   )
 
+  it.live("persists FIFO steering and orders completion against admission", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("steering"),
+          idempotencyKey: "run",
+          prompt: "start",
+        })
+        yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "one", prompt: "first" })
+        yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "two", prompt: "second" })
+        const [claim] = yield* claims.claimReadyRuns({ workerId: "steering", limit: 1, lease: "10 seconds" })
+        expect(claim).toBeDefined()
+        const executionClaim = { runId: claim!.run.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence }
+        const entries = yield* store.readSteering(executionClaim)
+        expect(entries.map((entry) => JSON.stringify(entry.prompt))).toEqual([
+          expect.stringContaining("first"),
+          expect.stringContaining("second"),
+        ])
+        expect(yield* store.complete({ ...executionClaim, result: completedResult("early") })).toBe("steering-pending")
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
   it.live("exact duplicate admission and changed-payload conflict", () =>
     withSchema(
       Effect.gen(function* () {

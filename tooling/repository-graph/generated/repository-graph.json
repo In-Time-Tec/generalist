@@ -2208,6 +2208,11 @@
       "test": false
     },
     {
+      "path": "packages/runtime/src/memory/store-steering.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
       "path": "packages/runtime/src/memory/store.ts",
       "package": "@batonfx/runtime",
       "test": false
@@ -2393,12 +2398,22 @@
       "test": false
     },
     {
+      "path": "packages/runtime/src/sql/store-steering.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
       "path": "packages/runtime/src/sql/store.ts",
       "package": "@batonfx/runtime",
       "test": false
     },
     {
       "path": "packages/runtime/src/sql/subscribers.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/steering.ts",
       "package": "@batonfx/runtime",
       "test": false
     },
@@ -2494,6 +2509,11 @@
     },
     {
       "path": "packages/runtime/test/runtime-send.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/runtime-steering.test.ts",
       "package": "@batonfx/runtime",
       "test": true
     },
@@ -10626,6 +10646,10 @@
       "specifier": "effect"
     },
     {
+      "source": "packages/runtime/src/agent-host.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
       "source": "packages/runtime/src/agent-ref.ts",
       "specifier": "@batonfx/core",
       "package": "@batonfx/core"
@@ -10824,6 +10848,10 @@
     },
     {
       "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../steering.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
       "specifier": "./prompt.js"
     },
     {
@@ -10931,6 +10959,18 @@
       "specifier": "effect"
     },
     {
+      "source": "packages/runtime/src/memory/store-steering.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-steering.ts",
+      "specifier": "./append.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-steering.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/runtime/src/memory/store.ts",
       "specifier": "../errors.js"
     },
@@ -10964,7 +11004,15 @@
     },
     {
       "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "./store-steering.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/runtime/src/message.ts",
@@ -11253,6 +11301,10 @@
     },
     {
       "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../store-steering.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
       "specifier": "../subscribers.js"
     },
     {
@@ -11297,6 +11349,10 @@
     },
     {
       "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "../../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
       "specifier": "../../run-event.js"
     },
     {
@@ -11306,6 +11362,10 @@
     {
       "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
       "specifier": "../codecs.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
+      "specifier": "../errors.js"
     },
     {
       "source": "packages/runtime/src/sql/postgres/pg-helpers.ts",
@@ -11433,6 +11493,10 @@
     },
     {
       "source": "packages/runtime/src/sql/postgres/store-ops.ts",
+      "specifier": "../../steering.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store-ops.ts",
       "specifier": "../codecs.js"
     },
     {
@@ -11486,6 +11550,10 @@
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
       "specifier": "../store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../store-steering.js"
     },
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
@@ -11673,6 +11741,10 @@
     },
     {
       "source": "packages/runtime/src/sql/store-helpers.ts",
+      "specifier": "../steering.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-helpers.ts",
       "specifier": "./codecs.js"
     },
     {
@@ -11693,6 +11765,10 @@
     },
     {
       "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "../steering.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-operations.ts",
       "specifier": "./codecs.js"
     },
     {
@@ -11709,6 +11785,34 @@
     },
     {
       "source": "packages/runtime/src/sql/store-operations.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-steering.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-steering.ts",
+      "specifier": "../run.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-steering.ts",
+      "specifier": "../steering.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-steering.ts",
+      "specifier": "./store-helpers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-steering.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-steering.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-steering.ts",
       "specifier": "effect/unstable/sql"
     },
     {
@@ -11757,6 +11861,10 @@
     },
     {
       "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./store-steering.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
       "specifier": "./subscribers.js"
     },
     {
@@ -11774,6 +11882,18 @@
     {
       "source": "packages/runtime/src/sql/subscribers.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/steering.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/steering.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/src/steering.ts",
+      "specifier": "node:crypto"
     },
     {
       "source": "packages/runtime/src/tree.ts",
@@ -12116,6 +12236,35 @@
     {
       "source": "packages/runtime/test/runtime-send.test.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-steering.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-steering.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-steering.test.ts",
+      "specifier": "./sqlite-helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-steering.test.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/test/runtime-steering.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-steering.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-steering.test.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/runtime/test/runtime-worker.test.ts",
@@ -13246,6 +13395,11 @@
     {
       "source": "packages/runtime/test/runtime-send.test.ts",
       "test": "packages/runtime/test/runtime-send.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/runtime-steering.test.ts",
+      "test": "packages/runtime/test/runtime-steering.test.ts",
       "kind": "same-stem"
     },
     {

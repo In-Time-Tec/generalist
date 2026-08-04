@@ -104,12 +104,13 @@ export const apply = (source: string) =>
           ON DUPLICATE KEY UPDATE dirty = 1
         `
             for (const statement of MIGRATION_STATEMENTS.slice(1)) yield* sql.unsafe(statement)
-            const migration = MIGRATION_MANIFEST[0]
-            yield* sql`
-          INSERT INTO baton_sql_migrations (migration_id, name, applied_at)
-          VALUES (${migration.id}, ${migration.name}, NOW(3))
-          ON DUPLICATE KEY UPDATE name = VALUES(name)
-        `
+            for (const migration of MIGRATION_MANIFEST) {
+              yield* sql`
+                INSERT INTO baton_sql_migrations (migration_id, name, applied_at)
+                VALUES (${migration.id}, ${migration.name}, NOW(3))
+                ON DUPLICATE KEY UPDATE name = VALUES(name)
+              `
+            }
             yield* sql`
           UPDATE baton_schema_meta
           SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0, applied_at = NOW(3)

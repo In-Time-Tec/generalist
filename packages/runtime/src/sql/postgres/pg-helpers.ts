@@ -20,6 +20,10 @@ import type { DecodedRun, EventRow, OperationRow, RunRow } from "../rows.js"
 import type { OperationRecord } from "../operations.js"
 import { decodeRun } from "../store-helpers.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
+import type { AgentLoopEvent } from "../../agent-event.js"
+import type { ExecutionClaim } from "../../run-store.js"
+import { RunNotFound, RunTerminal } from "../../errors.js"
+import { StaleClaim } from "../errors.js"
 
 export type EventPartial = { readonly _tag: string } & Record<string, unknown>
 
@@ -29,6 +33,28 @@ export const loadRun = (runId: string) =>
     const rows = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${runId}`
     const row = rows[0]
     return row === undefined ? undefined : decodeRun(row)
+  })
+
+export const emitAgentEvent = (hub: EventHub, input: ExecutionClaim & { readonly event: AgentLoopEvent }) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const loaded = yield* loadRun(input.runId)
+    if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
+    if (loaded.ownerWorkerId !== input.ownerId || loaded.attemptFence !== input.attemptFence) {
+      return yield* StaleClaim.make({
+        runId: input.runId,
+        workerId: input.ownerId,
+        attemptFence: input.attemptFence,
+      })
+    }
+    if (isTerminal(loaded.status)) return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
+    yield* appendEvent(hub, loaded, input.event as EventPartial)
+    if (input.event._tag === "TurnCompleted") {
+      yield* sql`
+        UPDATE baton_runs SET transcript_json = ${JSON.stringify(input.event.transcript)}, continuation_json = NULL
+        WHERE run_id = ${loaded.runId}
+      `
+    }
   })
 
 export const loadEventsAfter = (runId: string, cursor: number) =>
@@ -116,6 +142,7 @@ export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartia
           cancellation_requested = ${cancellationRequested},
           cancel_reason = ${cancelReason},
           attempt = ${attempt},
+          continuation_json = NULL,
           updated_at = NOW()
         WHERE run_id = ${run.runId}
       `

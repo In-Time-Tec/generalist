@@ -23,6 +23,7 @@ const executionRecord = (
   ...(run.suspension === undefined ? {} : { suspension: run.suspension }),
   ...(run.wait?.resolution === undefined ? {} : { resolution: run.wait.resolution }),
   ...(run.transcript === undefined ? {} : { transcript: run.transcript }),
+  ...(run.continuation === undefined ? {} : { continuation: run.continuation }),
 })
 
 export const loadExecution = (state: MemoryState, runId: string) =>

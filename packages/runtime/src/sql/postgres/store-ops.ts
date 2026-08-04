@@ -10,6 +10,7 @@ import { canBlindRetry } from "../operations.js"
 import type { DecodedRun, OperationRow } from "../rows.js"
 import type { EventHub } from "../subscribers.js"
 import { appendEvent, toOperationRecord } from "./pg-helpers.js"
+import { encodeContinuation } from "../../steering.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
 type RunFn = <A, E>(
@@ -67,7 +68,29 @@ export const postgresOperations = (input: {
             WHERE run_id = ${op.runId} AND operation_key = ${op.operationKey}
           `
           const prior = existing[0]
-          if (prior !== undefined) return toOperationRecord(prior)
+          if (prior !== undefined) {
+            for (const entryId of new Set(op.steeringEntryIds ?? [])) {
+              const rows = yield* sql<{ readonly consumed_operation_id: string | null }>`
+                SELECT consumed_operation_id FROM baton_run_steering
+                WHERE run_id = ${op.runId} AND entry_id = ${entryId}
+              `
+              if (rows[0]?.consumed_operation_id !== prior.operation_id) {
+                return yield* RuntimeUnavailable.make({
+                  message: `steering entry ${entryId} does not belong to operation`,
+                })
+              }
+            }
+            return toOperationRecord(prior)
+          }
+          for (const entryId of new Set(op.steeringEntryIds ?? [])) {
+            const rows = yield* sql<{ readonly consumed_operation_id: string | null }>`
+              SELECT consumed_operation_id FROM baton_run_steering
+              WHERE run_id = ${op.runId} AND entry_id = ${entryId}
+            `
+            if (rows[0] === undefined || rows[0].consumed_operation_id !== null) {
+              return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} is not pending` })
+            }
+          }
           const operationId = yield* nextId("op")
           yield* sql`
             INSERT INTO baton_run_operations (
@@ -79,6 +102,30 @@ export const postgresOperations = (input: {
               ${op.attempt}, NULL, NULL, NULL, NULL
             )
           `
+          if (op.checkpoint !== undefined || op.transcript !== undefined || op.continuation !== undefined) {
+            yield* sql`
+              UPDATE baton_runs SET
+                driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : JSON.stringify(op.checkpoint)}, driver_checkpoint_json),
+                transcript_json = COALESCE(${op.transcript === undefined ? null : JSON.stringify(op.transcript)}, transcript_json),
+                continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
+                  THEN ${op.continuation === null || op.continuation === undefined ? null : encodeContinuation(op.continuation)}
+                  ELSE continuation_json END
+              WHERE run_id = ${op.runId}
+            `
+          }
+          for (const entryId of op.steeringEntryIds ?? []) {
+            yield* sql`
+              UPDATE baton_run_steering SET consumed_operation_id = ${operationId}
+              WHERE run_id = ${op.runId} AND entry_id = ${entryId} AND consumed_operation_id IS NULL
+            `
+          }
+          for (const event of op.steeringEvents ?? []) {
+            yield* appendEvent(
+              hub,
+              yield* requireRun(op.runId),
+              event as { readonly _tag: string } & Record<string, unknown>,
+            )
+          }
           const rows = yield* sql<OperationRow>`
             SELECT * FROM baton_run_operations WHERE run_id = ${op.runId} AND operation_id = ${operationId}
           `

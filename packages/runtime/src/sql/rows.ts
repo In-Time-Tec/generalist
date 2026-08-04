@@ -28,6 +28,7 @@ export interface RunRow {
   readonly driver_checkpoint_json: string | null
   readonly suspension_json: string | null
   readonly transcript_json: string | null
+  readonly continuation_json: string | null
   readonly owner_worker_id?: string | null
   readonly lease_expires_at?: string | Date | null
   readonly created_at: string | Date
@@ -99,4 +100,5 @@ export interface DecodedRun {
   readonly driverCheckpoint?: import("@batonfx/core").DurableDriver.DriverCheckpoint
   readonly suspension?: import("@batonfx/core").AgentEvent.AgentSuspended
   readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
+  readonly continuation?: import("../steering.js").ExecutionContinuation
 }

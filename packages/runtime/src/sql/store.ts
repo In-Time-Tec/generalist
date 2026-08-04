@@ -37,6 +37,7 @@ import {
 import { decodeRun, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
 import { withSql } from "./sql-effect.js"
+import { admitSteering, readSteering, saveCompletionContinuation } from "./store-steering.js"
 import { makeEventHub } from "./subscribers.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
@@ -102,6 +103,8 @@ export const makeSqliteRunStore = (
       respond: (input) => run(respond(hub, input)),
       signal: (input) => run(signal(hub, input)),
       cancel: (input) => run(cancel(hub, input)),
+      admitSteering: (input) => run(admitSteering(input)),
+      readSteering: (input) => fenced(input, readSteering(input)),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {
@@ -158,13 +161,28 @@ export const makeSqliteRunStore = (
             )
           }),
         ),
-      complete: (input) => fenced(input, complete(hub, input)),
+      complete: (input) =>
+        fenced(
+          input,
+          saveCompletionContinuation(input.runId, input.result).pipe(
+            Effect.flatMap((continuation) =>
+              continuation === undefined
+                ? complete(hub, input).pipe(
+                    Effect.as({ _tag: "Completed" } as import("../run-store.js").CompletionOutcome),
+                  )
+                : Effect.succeed({
+                    _tag: "SteeringPending",
+                    continuation,
+                  } as import("../run-store.js").CompletionOutcome),
+            ),
+          ),
+        ),
       fail: (input) => fenced(input, fail(hub, input)),
       wait: (input) => fenced(input, wait(hub, input)),
       resume: (input) => run(resume(hub, input)),
       emitAgentEvent: (input) => fenced(input, emitAgentEvent(hub, input)),
       markOperationUnknown: (input) => fenced(input, markOperationUnknown(hub, input)),
-      recordOperation: (input) => fenced(input, recordOperation(input)),
+      recordOperation: (input) => fenced(input, recordOperation(hub, input)),
       startOperation: (input) => fenced(input, startOperation(input)),
       succeedOperation: (input) => fenced(input, succeedOperation(input)),
       failOperation: (input) => fenced(input, failOperation(input)),

@@ -250,6 +250,8 @@ export interface RunOptions {
   readonly logicalOperationId?: string
   /** @experimental First model-call ordinal for a host resuming from a durable checkpoint. */
   readonly modelCallOrdinalStart?: number
+  /** @experimental First turn number for a host continuing an existing transcript. */
+  readonly turnStart?: number
   /** @experimental Runtime-owned checkpoint used to reconstruct the same durable driver. */
   readonly driverCheckpoint?: DriverCheckpoint
   /** @experimental Pinned identity admitted by a durable host. */

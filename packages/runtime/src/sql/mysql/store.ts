@@ -31,6 +31,7 @@ import { appendEvent, decodeRun, loadEventsAfter, loadRun, loadRunWait, nowIso }
 import type { RunRow } from "../rows.js"
 import { withSql } from "../sql-effect.js"
 import { makeEventHub } from "../subscribers.js"
+import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
 import {
   SchemaChecksumMismatch,
   SchemaDirty,
@@ -241,6 +242,8 @@ export const makeMysqlServices = (
             Effect.andThen(clearClaim(input.runId)),
           ),
         ),
+      admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
+      readSteering: (input) => fenced(input, readSteering(input)),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {
@@ -296,8 +299,15 @@ export const makeMysqlServices = (
         fenced(
           input,
           lockParent(input.runId).pipe(
-            Effect.andThen(complete(transactionHub, input)),
-            Effect.andThen(clearClaim(input.runId)),
+            Effect.andThen(
+              Effect.gen(function* () {
+                const continuation = yield* saveCompletionContinuation(input.runId, input.result)
+                if (continuation !== undefined) return { _tag: "SteeringPending" as const, continuation }
+                yield* complete(transactionHub, input)
+                yield* clearClaim(input.runId)
+                return { _tag: "Completed" as const }
+              }),
+            ),
           ),
         ),
       fail: (input) =>
@@ -312,7 +322,7 @@ export const makeMysqlServices = (
       resume: (input) => run(lockRun(input.runId).pipe(Effect.andThen(resume(transactionHub, input)))),
       emitAgentEvent: (input) => fenced(input, emitAgentEvent(transactionHub, input)),
       markOperationUnknown: (input) => fenced(input, markOperationUnknown(transactionHub, input)),
-      recordOperation: (input) => fenced(input, recordOperation(input)),
+      recordOperation: (input) => fenced(input, recordOperation(transactionHub, input)),
       startOperation: (input) => fenced(input, startOperation(input)),
       succeedOperation: (input) => fenced(input, succeedOperation(input)),
       failOperation: (input) => fenced(input, failOperation(input)),

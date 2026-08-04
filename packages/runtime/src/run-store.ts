@@ -12,6 +12,7 @@ import type {
   RunTerminal,
   RuntimeUnavailable,
   SubscriberLagged,
+  SteeringConflict,
   WaitNotOpen,
 } from "./errors.js"
 import type { Message } from "./message.js"
@@ -23,6 +24,8 @@ import type { AgentRef } from "./agent-ref.js"
 import type { CancelInput, RespondInput, SignalInput, SpawnInput } from "./runtime.js"
 import type { OperationKind, OperationRecord, OperationStatus, ReplayPolicy } from "./sql/operations.js"
 import type { AgentEvent, DurableDriver } from "@batonfx/core"
+import type { ExecutionContinuation, SteeringEntry } from "./steering.js"
+import type { Prompt } from "effect/unstable/ai"
 
 export type Durability = "ephemeral" | "durable"
 export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
@@ -47,7 +50,23 @@ export interface RecordOperationInput extends ExecutionClaim {
   readonly input: unknown
   readonly replayPolicy: ReplayPolicy
   readonly attempt: number
+  readonly checkpoint?: DurableDriver.DriverCheckpoint
+  readonly transcript?: Prompt.Prompt
+  readonly continuation?: ExecutionContinuation | null
+  readonly steeringEntryIds?: ReadonlyArray<string>
+  readonly steeringEvents?: ReadonlyArray<AgentLoopEvent>
 }
+
+export interface AdmitSteeringInput {
+  readonly runId: string
+  readonly idempotencyKey: string
+  readonly digest: string
+  readonly prompt: Prompt.Prompt
+}
+
+export type CompletionOutcome =
+  | { readonly _tag: "Completed" }
+  | { readonly _tag: "SteeringPending"; readonly continuation: ExecutionContinuation }
 
 export interface ExecutionRecord {
   readonly runId: string
@@ -59,6 +78,7 @@ export interface ExecutionRecord {
   readonly suspension?: AgentEvent.AgentSuspended
   readonly resolution?: WaitResolution
   readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
+  readonly continuation?: ExecutionContinuation
 }
 
 export interface ExecutionClaim {
@@ -92,6 +112,10 @@ export interface Interface {
   ) => Effect.Effect<void, RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable>
   readonly signal: (input: SignalInput) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable>
   readonly cancel: (input: CancelInput) => Effect.Effect<void, RunNotFound | RuntimeUnavailable>
+  readonly admitSteering: (
+    input: AdmitSteeringInput,
+  ) => Effect.Effect<void, RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable>
+  readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
   readonly history: (input: {
     readonly runId: string
@@ -107,7 +131,7 @@ export interface Interface {
       readonly runId: string
       readonly result: AgentResult
     },
-  ) => Effect.Effect<void, WorkerMutationError>
+  ) => Effect.Effect<CompletionOutcome, WorkerMutationError>
   readonly fail: (
     input: ExecutionClaim & {
       readonly runId: string

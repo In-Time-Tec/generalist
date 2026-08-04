@@ -8,16 +8,22 @@ import { canBlindRetry } from "./operations.js"
 import type { OperationRow } from "./rows.js"
 import { appendEvent, loadRun, nowIso, toOperationRecord } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
+import { encodeContinuation } from "../steering.js"
 
 const nextId = (prefix: string): Effect.Effect<string> =>
   Effect.sync(() => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`)
+
+interface SteeringConsumptionRow {
+  readonly entry_id: string
+  readonly consumed_operation_id: string | null
+}
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(
     Effect.flatMap((run) => (run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run))),
   )
 
-export const recordOperation = (input: RecordOperationInput) =>
+export const recordOperation = (hub: EventHub, input: RecordOperationInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
@@ -27,7 +33,27 @@ export const recordOperation = (input: RecordOperationInput) =>
       WHERE run_id = ${input.runId} AND operation_key = ${input.operationKey}
     `
     const prior = existing[0]
-    if (prior !== undefined) return toOperationRecord(prior)
+    if (prior !== undefined) {
+      for (const entryId of new Set(input.steeringEntryIds ?? [])) {
+        const rows = yield* sql<SteeringConsumptionRow>`
+          SELECT entry_id, consumed_operation_id FROM baton_run_steering
+          WHERE run_id = ${input.runId} AND entry_id = ${entryId}
+        `
+        if (rows[0]?.consumed_operation_id !== prior.operation_id) {
+          return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} does not belong to operation` })
+        }
+      }
+      return toOperationRecord(prior)
+    }
+    for (const entryId of new Set(input.steeringEntryIds ?? [])) {
+      const rows = yield* sql<SteeringConsumptionRow>`
+        SELECT entry_id, consumed_operation_id FROM baton_run_steering
+        WHERE run_id = ${input.runId} AND entry_id = ${entryId}
+      `
+      if (rows[0] === undefined || rows[0].consumed_operation_id !== null) {
+        return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} is not pending` })
+      }
+    }
     const operationId = yield* nextId("op")
     yield* sql`
       INSERT INTO baton_run_operations (
@@ -39,6 +65,27 @@ export const recordOperation = (input: RecordOperationInput) =>
         ${input.attempt}, NULL, NULL
       )
     `
+    if (input.checkpoint !== undefined || input.transcript !== undefined || input.continuation !== undefined) {
+      yield* sql`
+        UPDATE baton_runs SET
+          driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+          transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+          continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
+            THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
+            ELSE continuation_json END
+        WHERE run_id = ${input.runId}
+      `
+    }
+    for (const entryId of input.steeringEntryIds ?? []) {
+      yield* sql`
+        UPDATE baton_run_steering SET consumed_operation_id = ${operationId}
+        WHERE run_id = ${input.runId} AND entry_id = ${entryId} AND consumed_operation_id IS NULL
+      `
+    }
+    for (const event of input.steeringEvents ?? []) {
+      const current = yield* requireRun(input.runId)
+      yield* appendEvent(hub, current, event as { readonly _tag: string } & Record<string, unknown>)
+    }
     const rows = yield* sql<OperationRow>`
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${operationId}
     `

@@ -76,6 +76,7 @@ export const admitSend = (
       children: [],
       events: [],
       subscribers: new Map(),
+      steering: [],
     }
     const runs = new Map(withId.runs)
     runs.set(runId, run)
@@ -154,6 +155,7 @@ export const admitSpawn = (
       children: [],
       events: [],
       subscribers: new Map(),
+      steering: [],
     }
     const runs = new Map(withId.runs)
     const parentUpdated: StoredRun = { ...parent, children: [...parent.children, runId] }

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const NOTIFY_CHANNEL = "baton_run_events"
@@ -99,13 +99,38 @@ export const MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   PRIMARY KEY (parent_run_id, child_run_id),
   UNIQUE (child_run_id)
 )`,
+  `CREATE TABLE IF NOT EXISTS baton_run_steering (
+  entry_id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES baton_runs(run_id),
+  sequence BIGINT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  digest TEXT NOT NULL,
+  prompt_json TEXT NOT NULL,
+  consumed_operation_id TEXT,
+  UNIQUE (run_id, sequence),
+  UNIQUE (run_id, idempotency_key)
+)`,
+  `CREATE INDEX IF NOT EXISTS baton_run_steering_pending_idx
+    ON baton_run_steering(run_id, sequence) WHERE consumed_operation_id IS NULL`,
   `CREATE INDEX IF NOT EXISTS baton_runs_claim_idx
     ON baton_runs(status, lease_expires_at)
     WHERE status IN ('queued', 'running', 'waiting', 'needs-resolution', 'cancelling')`,
   `CREATE INDEX IF NOT EXISTS baton_lanes_head_idx ON baton_lanes(head_run_id)`,
   `CREATE INDEX IF NOT EXISTS baton_run_operations_status_idx ON baton_run_operations(status)`,
   `CREATE INDEX IF NOT EXISTS baton_run_waits_due_idx ON baton_run_waits(status, due_at)`,
+  `ALTER TABLE baton_runs ADD COLUMN continuation_json TEXT`,
 ]
+
+export const STEERING_MIGRATION_STATEMENTS = [...MIGRATION_STATEMENTS.slice(7, 9), MIGRATION_STATEMENTS.at(-1)!]
+export const KERNEL_MIGRATION_STATEMENTS = [...MIGRATION_STATEMENTS.slice(0, 7), ...MIGRATION_STATEMENTS.slice(9, -1)]
+
+export const kernelSchemaChecksum = (): string => {
+  const hasher = new Bun.CryptoHasher("sha256")
+  hasher.update(KERNEL_MIGRATION_STATEMENTS.join("\n"))
+  hasher.update("\nversion=1")
+  hasher.update("\ndialect=postgres")
+  return hasher.digest("hex")
+}
 
 export const schemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")

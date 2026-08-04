@@ -175,6 +175,7 @@ import {
   RunIdConflict as Errors_RunIdConflict,
   RunNotFound as Errors_RunNotFound,
   RunTerminal as Errors_RunTerminal,
+  SteeringConflict as Errors_SteeringConflict,
   WaitNotOpen as Errors_WaitNotOpen,
   ResponseConflict as Errors_ResponseConflict,
   CursorExpired as Errors_CursorExpired,
@@ -199,6 +200,7 @@ export const Errors = {
   RunIdConflict: Errors_RunIdConflict,
   RunNotFound: Errors_RunNotFound,
   RunTerminal: Errors_RunTerminal,
+  SteeringConflict: Errors_SteeringConflict,
   WaitNotOpen: Errors_WaitNotOpen,
   ResponseConflict: Errors_ResponseConflict,
   CursorExpired: Errors_CursorExpired,
@@ -221,6 +223,7 @@ export namespace Errors {
   export type RunIdConflict = import("./errors.js").RunIdConflict
   export type RunNotFound = import("./errors.js").RunNotFound
   export type RunTerminal = import("./errors.js").RunTerminal
+  export type SteeringConflict = import("./errors.js").SteeringConflict
   export type WaitNotOpen = import("./errors.js").WaitNotOpen
   export type ResponseConflict = import("./errors.js").ResponseConflict
   export type CursorExpired = import("./errors.js").CursorExpired
@@ -268,12 +271,14 @@ export namespace Runtime {
   export type RespondInput = import("./runtime.js").RespondInput
   export type SignalInput = import("./runtime.js").SignalInput
   export type CancelInput = import("./runtime.js").CancelInput
+  export type SteerInput = import("./runtime.js").SteerInput
   export type SendError = import("./runtime.js").SendError
   export type SpawnError = import("./runtime.js").SpawnError
   export type EventsError = import("./runtime.js").EventsError
   export type RespondError = import("./runtime.js").RespondError
   export type SignalError = import("./runtime.js").SignalError
   export type CancelError = import("./runtime.js").CancelError
+  export type SteerError = import("./runtime.js").SteerError
   export type InspectError = import("./runtime.js").InspectError
   export type layer = typeof import("./memory/runtime-layer.js").layer
   export type layerMemory = typeof import("./memory/runtime-layer.js").layerMemory
@@ -302,6 +307,10 @@ export namespace RunStore {
   export type StoreInfo = import("./run-store.js").StoreInfo
   export type AdmitSendInput = import("./run-store.js").AdmitSendInput
   export type RecordOperationInput = import("./run-store.js").RecordOperationInput
+  export type AdmitSteeringInput = import("./run-store.js").AdmitSteeringInput
+  export type CompletionOutcome = import("./run-store.js").CompletionOutcome
+  export type SteeringEntry = import("./steering.js").SteeringEntry
+  export type ExecutionContinuation = import("./steering.js").ExecutionContinuation
   export type layerMemory = typeof import("./memory/store.js").layerMemory
   export type layerSqlite = typeof import("./platform-layers.js").layerSqliteStore
 }

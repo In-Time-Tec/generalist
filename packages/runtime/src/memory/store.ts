@@ -1,6 +1,6 @@
 import { Effect, Layer, SynchronizedRef } from "effect"
-import { AddressNotFound, CursorExpired } from "../errors.js"
-import { RunStore } from "../run-store.js"
+import { AddressNotFound, CursorExpired, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
+import { RunStore, type CompletionOutcome } from "../run-store.js"
 import type { LayerOptions } from "../runtime.js"
 import { agentKey, emptyState, type MemoryState } from "./state.js"
 import { admitSend, admitSpawn } from "./store-admit.js"
@@ -26,6 +26,8 @@ import {
   succeedOperation,
 } from "./store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
+import { admitSteering, readSteering } from "./store-steering.js"
+import { Prompt } from "effect/unstable/ai"
 
 const registrationMaps = (options: LayerOptions) => {
   const agentRefs = new Map(options.agents.map((entry) => [agentKey(entry.ref), entry.ref] as const))
@@ -86,6 +88,16 @@ export const makeRunStore = (options: LayerOptions) =>
       respond: (input) => update((state) => respond(state, input)),
       signal: (input) => update((state) => signal(state, input)),
       cancel: (input) => update((state) => cancel(state, input)),
+      admitSteering: (input) => update((state) => admitSteering(state, input)),
+      readSteering: (input) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) =>
+            Effect.gen(function* () {
+              yield* requireExecutionClaim(state, input)
+              return yield* readSteering(state, input)
+            }),
+          ),
+        ),
       inspect: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectRun(state, runId))),
       history: (input) =>
         SynchronizedRef.get(stateRef).pipe(
@@ -113,7 +125,42 @@ export const makeRunStore = (options: LayerOptions) =>
               .map(toInspection),
           ),
         ),
-      complete: (input) => fencedUpdate(input, (state) => complete(state, input)),
+      complete: (input) =>
+        SynchronizedRef.modifyEffect(stateRef, (state) =>
+          requireExecutionClaim(state, input).pipe(
+            Effect.andThen(
+              ((): Effect.Effect<
+                readonly [CompletionOutcome, MemoryState],
+                RunNotFound | RunTerminal | RuntimeUnavailable
+              > =>
+                Effect.gen(function* () {
+                  const run = state.runs.get(input.runId)!
+                  const pending = run.steering.filter((entry) => entry.consumedOperationId === undefined)
+                  if (pending.length > 0) {
+                    const continuation = {
+                      schemaVersion: 1 as const,
+                      prompt: pending.reduce<Prompt.Prompt>(
+                        (prompt, entry) => Prompt.concat(prompt, entry.prompt),
+                        Prompt.empty,
+                      ),
+                      history: input.result.transcript,
+                      nextTurn: input.result.turns,
+                      steeringEntryIds: pending.map((entry) => entry.entryId),
+                    }
+                    const runs = new Map(state.runs)
+                    runs.set(run.runId, { ...run, transcript: input.result.transcript, continuation })
+                    const outcome: CompletionOutcome = { _tag: "SteeringPending", continuation }
+                    return [outcome, { ...state, runs }] as const
+                  }
+                  const runs = new Map(state.runs)
+                  const { continuation: _, ...withoutContinuation } = run
+                  runs.set(run.runId, withoutContinuation)
+                  const outcome: CompletionOutcome = { _tag: "Completed" }
+                  return [outcome, yield* complete({ ...state, runs }, input)] as const
+                }))(),
+            ),
+          ),
+        ),
       fail: (input) => fencedUpdate(input, (state) => fail(state, input)),
       wait: (input) => fencedUpdate(input, (state) => wait(state, input)),
       resume: (input) => update((state) => resume(state, input)),

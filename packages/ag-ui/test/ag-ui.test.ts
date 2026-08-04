@@ -59,6 +59,7 @@ describe("AgUi", () => {
       respond: () => unused(),
       signal: () => unused(),
       cancel: () => unused(),
+      steer: () => unused(),
       inspect: () => unused(),
     })
     return Effect.gen(function* () {
@@ -87,6 +88,7 @@ describe("AgUi", () => {
       respond: () => unused(),
       signal: () => unused(),
       cancel: () => unused(),
+      steer: () => unused(),
       inspect: () => unused(),
     })
     const layer = AgUi.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime)))
@@ -148,6 +150,7 @@ describe("AgUi", () => {
       },
       signal: () => unused(),
       cancel: () => unused(),
+      steer: () => unused(),
       inspect: () => unused(),
     })
     return Effect.gen(function* () {
@@ -204,6 +207,7 @@ describe("AgUi", () => {
       respond: () => unused(),
       signal: () => unused(),
       cancel: () => unused(),
+      steer: () => unused(),
       inspect: () => unused(),
     })
     return Effect.gen(function* () {
@@ -249,6 +253,7 @@ describe("AgUi", () => {
       respond: () => unused(),
       signal: () => unused(),
       cancel: () => unused(),
+      steer: () => unused(),
       inspect: () => unused(),
     })
     return Effect.gen(function* () {

@@ -20,6 +20,7 @@ import type { WaitRow } from "./rows.js"
 import { WaitResolution, type RunWait } from "../run-wait.js"
 import { Schema } from "effect"
 import type { OperationRecord } from "./operations.js"
+import { decodeContinuation } from "../steering.js"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -62,6 +63,9 @@ export const decodeRun = (row: RunRow): DecodedRun => ({
   ...(row.transcript_json === null || row.transcript_json === undefined
     ? {}
     : { transcript: JSON.parse(row.transcript_json) }),
+  ...(row.continuation_json === null || row.continuation_json === undefined
+    ? {}
+    : { continuation: decodeContinuation(row.continuation_json) }),
   ...(() => {
     const lease = asIso(row.lease_expires_at)
     return lease === undefined ? {} : { leaseExpiresAt: lease }
@@ -160,6 +164,7 @@ export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartia
           cancellation_requested = ${cancellationRequested},
           cancel_reason = ${cancelReason},
           attempt = ${attempt},
+          continuation_json = NULL,
           updated_at = ${updated}
         WHERE run_id = ${run.runId}
           AND last_sequence = ${run.lastSequence}

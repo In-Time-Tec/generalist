@@ -9,6 +9,7 @@ import type { OperationRecord } from "../sql/operations.js"
 import type { AgentEvent, DurableDriver } from "@batonfx/core"
 import type { Prompt } from "effect/unstable/ai"
 import type { RunWait } from "../run-wait.js"
+import type { ExecutionContinuation, SteeringEntry } from "../steering.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -37,12 +38,14 @@ export interface StoredRun {
   readonly checkpoint?: DurableDriver.DriverCheckpoint
   readonly suspension?: AgentEvent.AgentSuspended
   readonly transcript?: Prompt.Prompt
+  readonly continuation?: ExecutionContinuation
   readonly cancellationRequested: boolean
   readonly cancelReason?: string
   readonly terminalEventId?: string
   readonly children: ReadonlyArray<string>
   readonly events: ReadonlyArray<RunEvent>
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
+  readonly steering: ReadonlyArray<SteeringEntry & { readonly consumedOperationId?: string }>
 }
 
 export interface Lane {
@@ -55,6 +58,7 @@ export interface MemoryState {
   readonly nextRunCounter: number
   readonly nextSubscriberId: number
   readonly nextOperationCounter: number
+  readonly nextSteeringCounter: number
   readonly runs: ReadonlyMap<string, StoredRun>
   readonly lanes: ReadonlyMap<string, Lane>
   readonly idempotency: ReadonlyMap<string, IdempotencyEntry>
@@ -80,6 +84,7 @@ export const emptyState = (input: {
   nextRunCounter: 1,
   nextSubscriberId: 1,
   nextOperationCounter: 1,
+  nextSteeringCounter: 1,
   runs: new Map(),
   lanes: new Map(),
   idempotency: new Map(),

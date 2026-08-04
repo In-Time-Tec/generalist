@@ -2,25 +2,44 @@ import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { SqliteMigrator } from "@effect/sql-sqlite-bun"
 import { SchemaChecksumMismatch, SchemaDirty, SchemaMigrationFailed, SchemaVersionUnsupported } from "./errors.js"
-import { MIGRATION_STATEMENTS, MIGRATIONS_TABLE, SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "./schema.js"
+import {
+  KERNEL_MIGRATION_STATEMENTS,
+  MIGRATIONS_TABLE,
+  SCHEMA_META_TABLE,
+  SCHEMA_VERSION,
+  STEERING_MIGRATION_STATEMENTS,
+  kernelSchemaChecksum,
+  schemaChecksum,
+} from "./schema.js"
 import { mapSqlError } from "./sql-effect.js"
 
 const migrationEffect = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   yield* sql`PRAGMA foreign_keys = ON`
-  for (const statement of MIGRATION_STATEMENTS) {
+  for (const statement of KERNEL_MIGRATION_STATEMENTS) {
     yield* sql.unsafe(statement)
   }
-  const checksum = schemaChecksum()
+  const checksum = kernelSchemaChecksum()
   const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
   yield* sql`
     INSERT INTO ${sql(SCHEMA_META_TABLE)} (id, version, checksum, dirty, applied_at)
-    VALUES (1, ${SCHEMA_VERSION}, ${checksum}, 0, ${now})
+    VALUES (1, 1, ${checksum}, 0, ${now})
     ON CONFLICT(id) DO UPDATE SET
       version = excluded.version,
       checksum = excluded.checksum,
       dirty = 0,
       applied_at = excluded.applied_at
+  `
+})
+
+const steeringMigrationEffect = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  for (const statement of STEERING_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
+  const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
+  yield* sql`
+    UPDATE ${sql(SCHEMA_META_TABLE)}
+    SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0, applied_at = ${now}
+    WHERE id = 1
   `
 })
 
@@ -101,6 +120,7 @@ export const migrate = (
     yield* SqliteMigrator.run({
       loader: SqliteMigrator.fromRecord({
         "0001_baton_runtime_kernel": migrationEffect,
+        "0002_baton_runtime_steering": steeringMigrationEffect,
       }),
       table: MIGRATIONS_TABLE,
     }).pipe(

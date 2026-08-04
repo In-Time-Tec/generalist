@@ -157,9 +157,16 @@ export const resume = (hub: EventHub, input: { readonly runId: string; readonly 
 
 export const emitAgentEvent = (hub: EventHub, input: { readonly runId: string; readonly event: AgentLoopEvent }) =>
   Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     yield* appendEvent(hub, run, input.event as { readonly _tag: string } & Record<string, unknown>)
+    if (input.event._tag === "TurnCompleted") {
+      yield* sql`
+        UPDATE baton_runs SET transcript_json = ${JSON.stringify(input.event.transcript)}, continuation_json = NULL
+        WHERE run_id = ${run.runId}
+      `
+    }
   })
 
 export const markOperationUnknown = (hub: EventHub, input: { readonly runId: string; readonly operationId: string }) =>

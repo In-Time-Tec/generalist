@@ -35,6 +35,7 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
       list: () => Effect.succeed([]),
       respond: () => Effect.die("unused respond"),
       signal: () => Effect.die("unused signal"),
+      steer: () => Effect.die("unused steer"),
       cancel: () => Effect.void,
       inspect: (runId) => Effect.succeed({ runId, status: "running", agent, lastSequence: 2, durability: "durable" }),
       ...implementation,

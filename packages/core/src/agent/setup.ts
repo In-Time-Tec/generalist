@@ -204,6 +204,12 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
         turn: 0,
       })
     }
+    if (options.turnStart !== undefined && (!Number.isSafeInteger(options.turnStart) || options.turnStart < 0)) {
+      return yield* AgentError.make({
+        message: "RunOptions.turnStart must be a non-negative safe integer",
+        turn: 0,
+      })
+    }
 
     const decodedProgressPolicy = Schema.decodeUnknownOption(progressOverflowPolicySchema)(
       options.toolProgress === undefined ? defaultProgressOverflowPolicy : options.toolProgress,

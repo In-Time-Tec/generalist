@@ -1,6 +1,6 @@
 # `@batonfx/runtime`
 
-Addressable Run admission, canonical `RunEvent` streams, finite inspection reads, and memory, SQLite, PostgreSQL, or MySQL Runtime stores for Baton agents.
+Addressable Run admission, durable idempotent steering, canonical `RunEvent` streams, finite inspection reads, and memory, SQLite, PostgreSQL, or MySQL Runtime stores for Baton agents.
 
 ## Install
 
@@ -117,6 +117,11 @@ const program = Effect.gen(function* () {
     idempotencyKey: "message:1",
     prompt: "Hello",
   })
+  yield* runtime.steer({
+    runId: accepted.runId,
+    idempotencyKey: "steering:1",
+    prompt: "Prioritize migration risk.",
+  })
   const snapshot = yield* runtime.snapshot(accepted.runId)
   const history = yield* runtime.history({ runId: accepted.runId, cursor: -1, limit: 100 })
   const runs = yield* runtime.list({ limit: 100 })
@@ -147,7 +152,7 @@ For durable single-process use, provide `Runtime.layerSqlite({ filename, agents,
 
 ## Errors, requirements, and resources
 
-Programs require `Runtime.Runtime`; host integration may use `RunStore.RunStore` for fenced execution and operation recording. Boundary failures are schema-backed (`AddressNotFound`, `IdempotencyConflict`, `RunIdConflict`, `RunNotFound`, `CursorExpired`, `SubscriberLagged`, `SchemaDirty`, `SchemaChecksumMismatch`, `SchemaVersionUnsupported`, `SchemaUpgradeRequired`, `StaleClaim`, `MultiWorkerUnsupported`, and related tags).
+Programs require `Runtime.Runtime`; host integration may use `RunStore.RunStore` for fenced execution and operation recording. Boundary failures are schema-backed (`AddressNotFound`, `IdempotencyConflict`, `SteeringConflict`, `RunIdConflict`, `RunNotFound`, `CursorExpired`, `SubscriberLagged`, `SchemaDirty`, `SchemaChecksumMismatch`, `SchemaVersionUnsupported`, `SchemaUpgradeRequired`, `StaleClaim`, `MultiWorkerUnsupported`, and related tags).
 
 `AgentRef` values match `@batonfx/core` `{ id, version, digest }`. Runtime `AgentRef.make` accepts a pinned digest for tests and Layer wiring; core's manifest-based `make` remains available from `@batonfx/core`.
 

@@ -146,6 +146,7 @@ const makeRuntime = (acceptedSequence = 0) => {
       return Effect.void
     },
     signal: () => Effect.void,
+    steer: () => Effect.void,
     cancel: ({ runId, reason }) => {
       const run = runs.get(runId)!
       const next = run.events.at(-1)!.sequence + 1
