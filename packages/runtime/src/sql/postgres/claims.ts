@@ -18,10 +18,13 @@ export const claimReadyRuns = (options: ClaimOptions) =>
     const claimed = yield* sql<RunRow>`
       WITH candidates AS (
         SELECT r.run_id
-        FROM baton_lanes l
-        INNER JOIN baton_runs r ON r.run_id = l.head_run_id
+        FROM baton_runs r
         WHERE r.status IN ('queued', 'running', 'needs-resolution', 'cancelling')
           AND r.cancellation_requested = FALSE
+          AND (
+            r.parent_run_id IS NOT NULL
+            OR EXISTS (SELECT 1 FROM baton_lanes l WHERE l.head_run_id = r.run_id)
+          )
           AND (
             r.owner_worker_id IS NULL
             OR r.lease_expires_at IS NULL

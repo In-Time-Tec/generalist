@@ -29,9 +29,12 @@ export const makeMysqlClaims = (input: {
           const scanLimit = Math.max(claimInput.limit, Math.min(4096, claimInput.limit * 64))
           const candidates = yield* sql<{ run_id: string }>`
             SELECT r.run_id FROM baton_runs r
-            WHERE EXISTS (
-                SELECT 1 FROM baton_lanes l
-                WHERE JSON_UNQUOTE(JSON_EXTRACT(l.queue_json, '$[0]')) = r.run_id
+            WHERE (
+                r.parent_run_id IS NOT NULL
+                OR EXISTS (
+                  SELECT 1 FROM baton_lanes l
+                  WHERE JSON_UNQUOTE(JSON_EXTRACT(l.queue_json, '$[0]')) = r.run_id
+                )
               )
               AND r.status IN ('queued', 'running', 'needs-resolution', 'cancelling')
               AND r.cancellation_requested = 0

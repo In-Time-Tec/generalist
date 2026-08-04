@@ -346,7 +346,6 @@ describePostgres("postgres run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const driver = yield* RunStore.RunStore
         const claims = yield* RunClaims.RunClaims
         const sessionId = uniqueSession("child")
         const parent = yield* runtime.send({
@@ -362,9 +361,13 @@ describePostgres("postgres run store", () => {
           agent: (yield* runtime.inspect(parent.runId)).agent,
           prompt: textPrompt("child"),
         })
-        yield* driver.complete({
-          ...(yield* driver.claimExecution({ runId: child.runId, ownerId: "test" })),
+        const [childClaim] = yield* claims.claimReadyRuns({ workerId: "child-w", limit: 1, lease: "10 seconds" })
+        expect(childClaim?.run.runId).toBe(child.runId)
+        yield* claims.commitWithClaim({
           runId: child.runId,
+          workerId: "child-w",
+          attemptFence: childClaim!.attemptFence,
+          transition: "complete",
           result: completedResult("child-done"),
         })
         const parentTags = yield* runtime.events({ runId: parent.runId, cursor: -1 }).pipe(

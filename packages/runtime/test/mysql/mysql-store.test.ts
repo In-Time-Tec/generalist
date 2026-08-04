@@ -286,21 +286,29 @@ describeMysql("mysql run store", () => {
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("child"),
           idempotencyKey: "parent",
           prompt: "parent",
         })
+        yield* claims.claimReadyRuns({ workerId: "parent-worker", limit: 1, lease: "10 seconds" })
         const child = yield* runtime.spawn({
           parentRunId: parent.runId,
           invocationId: "child-1",
           agent: (yield* runtime.inspect(parent.runId)).agent,
           prompt: "child",
         })
-        const claim = yield* store.claimExecution({ runId: child.runId, ownerId: "child-worker" })
-        yield* store.complete({ ...claim, runId: child.runId, result: completedResult("child") })
+        const [claim] = yield* claims.claimReadyRuns({ workerId: "child-worker", limit: 1, lease: "10 seconds" })
+        expect(claim?.run.runId).toBe(child.runId)
+        yield* claims.commitWithClaim({
+          runId: child.runId,
+          workerId: "child-worker",
+          attemptFence: claim!.attemptFence,
+          transition: "complete",
+          result: completedResult("child"),
+        })
         const tags = (yield* runtime.history({ runId: parent.runId, cursor: -1, limit: 20 })).map((event) => event._tag)
         expect(tags).toContain("ChildLinked")
         expect(tags).toContain("ChildSettled")
