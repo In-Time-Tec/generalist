@@ -131,7 +131,7 @@ describe("AgUi", () => {
           openedAt: "2026-08-03T00:00:00.000Z",
         },
         lastSequence: 3,
-        durability: "volatile" as const,
+        durability: "ephemeral" as const,
       },
       cursor: 3,
     }
@@ -184,7 +184,7 @@ describe("AgUi", () => {
         status: "running" as const,
         agent,
         lastSequence: 8,
-        durability: "volatile" as const,
+        durability: "ephemeral" as const,
       },
       cursor: 8,
     }

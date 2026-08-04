@@ -18,8 +18,8 @@ layer(memoryLayer)("Runtime send", (it) => {
       expect(receipt.acceptedSequence).toBe(0)
       const inspection = yield* runtime.inspect(receipt.runId)
       expect(inspection.status).toBe("running")
-      expect(inspection.durability).toBe("volatile")
-      expect((yield* store.info).durability).toBe("volatile")
+      expect(inspection.durability).toBe("ephemeral")
+      expect((yield* store.info).durability).toBe("ephemeral")
       const tags = yield* runtime.events({ runId: receipt.runId }).pipe(
         Stream.take(2),
         Stream.runCollect,

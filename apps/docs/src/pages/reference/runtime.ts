@@ -26,7 +26,7 @@ export const runtimeReference = definePage({
     h2("layers", "Runtime layers"),
     p(
       code("Runtime.layerMemory"),
-      " is volatile and loses state when its process exits. ",
+      " is ephemeral and loses state when its process exits. ",
       code("Runtime.layerSqlite"),
       " is durable for one process. ",
       code("Runtime.layerPostgres"),

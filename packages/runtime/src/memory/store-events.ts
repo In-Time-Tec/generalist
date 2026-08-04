@@ -12,7 +12,7 @@ export const toInspection = (
   status: run.status,
   agent: run.agent,
   lastSequence: run.lastSequence,
-  durability: "volatile",
+  durability: "ephemeral",
   ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
   ...(run.wait === undefined ? {} : { wait: run.wait }),
 })

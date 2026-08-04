@@ -67,7 +67,7 @@ export const makeRunStore = (options: LayerOptions) =>
       )
 
     return RunStore.of({
-      info: Effect.succeed({ durability: "volatile", backend: "memory", multiWorker: false }),
+      info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
       admitSend: (input) =>
         Effect.gen(function* () {
           const bound = addressBindings.get(input.message.to)

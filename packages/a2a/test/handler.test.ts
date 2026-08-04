@@ -86,7 +86,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     agent,
     ...(run.wait === undefined ? {} : { wait: run.wait }),
     lastSequence: run.events.at(-1)?.sequence ?? -1,
-    durability: "volatile",
+    durability: "ephemeral",
   })
 
   const runtime: Runtime.Interface = {

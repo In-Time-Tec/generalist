@@ -30,7 +30,7 @@ import {
 ```text
 Runtime.layerMemory({ agents, addresses })
 ├─ provides Runtime.Runtime
-└─ provides RunStore.RunStore (volatile, backend: memory)
+└─ provides RunStore.RunStore (ephemeral, backend: memory)
 
 Runtime.layerSqlite({ filename, agents, addresses })
 ├─ provides Runtime.Runtime

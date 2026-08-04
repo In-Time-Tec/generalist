@@ -33,7 +33,7 @@ export const RunInspection = Schema.Struct({
   parentRunId: Schema.optionalKey(RunId),
   wait: Schema.optionalKey(RunWait),
   lastSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(-1)),
-  durability: Schema.Literals(["volatile", "durable"]),
+  durability: Schema.Literals(["ephemeral", "durable"]),
 })
 export type RunInspection = typeof RunInspection.Type
 

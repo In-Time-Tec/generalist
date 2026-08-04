@@ -24,7 +24,7 @@ import type { CancelInput, RespondInput, SignalInput, SpawnInput } from "./runti
 import type { OperationKind, OperationRecord, OperationStatus, ReplayPolicy } from "./sql/operations.js"
 import type { AgentEvent, DurableDriver } from "@batonfx/core"
 
-export type Durability = "volatile" | "durable"
+export type Durability = "ephemeral" | "durable"
 export type StoreBackend = "memory" | "sqlite" | "postgres" | "mysql"
 
 export interface AdmitSendInput {
