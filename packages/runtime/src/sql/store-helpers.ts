@@ -141,6 +141,14 @@ export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartia
       INSERT INTO baton_run_events (run_id, sequence, event_id, event_json)
       VALUES (${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)})
     `
+    yield* sql`UPDATE baton_tree_roots SET last_position = last_position + 1 WHERE root_run_id = ${run.rootRunId}`
+    const treeRoot = (yield* sql<{ last_position: number }>`
+      SELECT last_position FROM baton_tree_roots WHERE root_run_id = ${run.rootRunId}
+    `)[0]!
+    yield* sql`
+      INSERT INTO baton_tree_event_index (root_run_id, position, run_id, run_sequence, event_id)
+      VALUES (${run.rootRunId}, ${Number(treeRoot.last_position)}, ${run.runId}, ${sequence}, ${event.eventId})
+    `
     const status = nextStatus ?? run.status
     const activeWaitId =
       event._tag === "RunWaiting" ? event.wait.waitId : event._tag === "RunResumed" ? null : (run.activeWaitId ?? null)
@@ -312,6 +320,9 @@ export const insertRun = (input: {
         ${JSON.stringify([])}, ${created}, ${created}
       )
     `
+    if (input.runId === input.rootRunId) {
+      yield* sql`INSERT INTO baton_tree_roots (root_run_id) VALUES (${input.runId})`
+    }
   })
 
 export const toOperationRecord = (row: OperationRow): OperationRecord => ({

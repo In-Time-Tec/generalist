@@ -40,6 +40,7 @@ import { withSql } from "./sql-effect.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "./store-steering.js"
 import { makeEventHub } from "./subscribers.js"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
+import { loadTreeHistory } from "./tree-history.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly filename: string
@@ -145,6 +146,7 @@ export const makeSqliteRunStore = (
             return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
           }),
         ),
+      treeHistory: (input) => runNoTxn(loadTreeHistory(input)),
       list: (input) =>
         runNoTxn(
           Effect.gen(function* () {

@@ -29,6 +29,8 @@ export const resetRuntimeTables = (url: string) =>
       Effect.gen(function* () {
         yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=0")
         for (const table of [
+          "baton_tree_event_index",
+          "baton_tree_roots",
           "baton_fan_out_members",
           "baton_fan_outs",
           "baton_run_steering",

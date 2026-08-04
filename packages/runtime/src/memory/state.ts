@@ -11,6 +11,7 @@ import type { Prompt } from "effect/unstable/ai"
 import type { RunWait } from "../run-wait.js"
 import type { ExecutionContinuation, SteeringEntry } from "../steering.js"
 import type { FanOutJoin, FanOutMemberResult, FanOutRemainder, FanOutStatus } from "../fan-out.js"
+import type { TreeEvent } from "../tree.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -61,6 +62,7 @@ export interface MemoryState {
   readonly nextOperationCounter: number
   readonly nextSteeringCounter: number
   readonly runs: ReadonlyMap<string, StoredRun>
+  readonly treeRoots: ReadonlyMap<string, TreeRoot>
   readonly lanes: ReadonlyMap<string, Lane>
   readonly idempotency: ReadonlyMap<string, IdempotencyEntry>
   readonly fanOuts: ReadonlyMap<string, StoredFanOut>
@@ -68,6 +70,12 @@ export interface MemoryState {
   readonly agentRefs: ReadonlyMap<string, AgentRef>
   readonly addressBindings: ReadonlyMap<string, AgentRef>
   readonly subscriberQueueCapacity: number
+}
+
+export interface TreeRoot {
+  readonly earliestPosition: number
+  readonly lastPosition: number
+  readonly events: ReadonlyArray<TreeEvent>
 }
 
 export interface StoredFanOut {
@@ -100,6 +108,7 @@ export const emptyState = (input: {
   nextOperationCounter: 1,
   nextSteeringCounter: 1,
   runs: new Map(),
+  treeRoots: new Map(),
   lanes: new Map(),
   idempotency: new Map(),
   fanOuts: new Map(),

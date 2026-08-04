@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Ref } from "effect"
-import { Errors, Runtime, RunStore } from "../src/index.js"
+import { Errors, Runtime, RunStore, RunTree } from "../src/index.js"
 import { makeRuntime } from "../src/memory/runtime-layer.js"
 import { layer as activeExecutionsLayer } from "../src/active-executions.js"
 import {
@@ -65,6 +65,21 @@ const fail = (runId: string) =>
   })
 
 layer(memoryLayer)("Runtime fan-out", (it) => {
+  it.effect("indexes ordered admission and settlement events exactly once", () =>
+    Effect.gen(function* () {
+      const { parent, receipt } = yield* admit("tree-index")
+      for (const childRunId of receipt.childRunIds) yield* succeed(childRunId)
+      const page = yield* RunTree.history({ rootRunId: parent.runId, limit: 100 })
+      const acceptedChildren = page.events
+        .filter((entry) => entry.event._tag === "RunAccepted" && entry.runId !== parent.runId)
+        .map((entry) => entry.runId)
+      expect(acceptedChildren).toEqual(receipt.childRunIds)
+      expect(page.events.filter((entry) => entry.event._tag === "RunCompleted")).toHaveLength(3)
+      expect(page.events.filter((entry) => entry.event._tag === "ChildSettled")).toHaveLength(3)
+      expect(page.events.filter((entry) => entry.event._tag === "FanOutJoined")).toHaveLength(1)
+    }),
+  )
+
   it.effect("admits one immutable ordered aggregate idempotently", () =>
     Effect.gen(function* () {
       const { runtime, input, receipt } = yield* admit("idempotent")

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const MIGRATION_LOCK = "baton_runtime_schema"
@@ -163,12 +163,50 @@ export const FAN_OUT_MIGRATION_STATEMENTS = [
   CONSTRAINT baton_fan_out_member_child_fk FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
 ) ENGINE=InnoDB`,
 ]
-export const MIGRATION_STATEMENTS = [...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS]
+export const TREE_MIGRATION_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS baton_tree_roots (
+  root_run_id VARCHAR(255) PRIMARY KEY,
+  earliest_position BIGINT NOT NULL DEFAULT 0,
+  last_position BIGINT NOT NULL DEFAULT -1,
+  CONSTRAINT baton_tree_roots_run_fk FOREIGN KEY (root_run_id) REFERENCES baton_runs(run_id)
+) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS baton_tree_event_index (
+  root_run_id VARCHAR(255) NOT NULL,
+  position BIGINT NOT NULL,
+  run_id VARCHAR(255) NOT NULL,
+  run_sequence INT NOT NULL,
+  event_id VARCHAR(255) NOT NULL,
+  PRIMARY KEY (root_run_id, position),
+  UNIQUE KEY baton_tree_event_id_key (event_id),
+  UNIQUE KEY baton_tree_run_sequence_key (run_id, run_sequence),
+  CONSTRAINT baton_tree_index_root_fk FOREIGN KEY (root_run_id) REFERENCES baton_tree_roots(root_run_id),
+  CONSTRAINT baton_tree_index_event_fk FOREIGN KEY (event_id) REFERENCES baton_run_events(event_id),
+  CONSTRAINT baton_tree_index_run_event_fk FOREIGN KEY (run_id, run_sequence) REFERENCES baton_run_events(run_id, sequence)
+) ENGINE=InnoDB`,
+  `INSERT IGNORE INTO baton_tree_roots (root_run_id)
+SELECT run_id FROM baton_runs WHERE root_run_id = run_id`,
+  `INSERT IGNORE INTO baton_tree_event_index (root_run_id, position, run_id, run_sequence, event_id)
+SELECT root_run_id, position, run_id, sequence, event_id FROM (
+  SELECT r.root_run_id, e.run_id, e.sequence, e.event_id,
+    ROW_NUMBER() OVER (PARTITION BY r.root_run_id ORDER BY e.run_id, e.sequence, e.event_id) - 1 AS position
+  FROM baton_run_events e JOIN baton_runs r ON r.run_id = e.run_id
+) backfill`,
+  `UPDATE baton_tree_roots roots LEFT JOIN (
+  SELECT root_run_id, MAX(position) AS last_position FROM baton_tree_event_index GROUP BY root_run_id
+) indexed ON indexed.root_run_id = roots.root_run_id
+SET roots.last_position = COALESCE(indexed.last_position, -1)`,
+]
+export const MIGRATION_STATEMENTS = [
+  ...LEGACY_MIGRATION_STATEMENTS,
+  ...FAN_OUT_MIGRATION_STATEMENTS,
+  ...TREE_MIGRATION_STATEMENTS,
+]
 
 export const MIGRATION_MANIFEST = [
   { id: 1, name: "baton_runtime_mysql_kernel", statements: LEGACY_MIGRATION_STATEMENTS.slice(0, -2) },
   { id: 2, name: "baton_runtime_mysql_steering", statements: LEGACY_MIGRATION_STATEMENTS.slice(-2) },
   { id: 3, name: "baton_runtime_mysql_fan_out", statements: FAN_OUT_MIGRATION_STATEMENTS },
+  { id: 4, name: "baton_runtime_mysql_tree_projection", statements: TREE_MIGRATION_STATEMENTS },
 ] as const
 
 export const schemaChecksum = (): string => {
@@ -183,6 +221,14 @@ export const steeringSchemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
   hasher.update(LEGACY_MIGRATION_STATEMENTS.join("\n"))
   hasher.update("\nversion=2")
+  hasher.update("\ndialect=mysql")
+  return hasher.digest("hex")
+}
+
+export const fanOutSchemaChecksum = (): string => {
+  const hasher = new Bun.CryptoHasher("sha256")
+  hasher.update([...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS].join("\n"))
+  hasher.update("\nversion=3")
   hasher.update("\ndialect=mysql")
   return hasher.digest("hex")
 }

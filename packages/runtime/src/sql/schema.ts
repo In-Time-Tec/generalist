@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 
@@ -144,7 +144,43 @@ export const FAN_OUT_MIGRATION_STATEMENTS = [
 )`,
   `CREATE INDEX IF NOT EXISTS baton_fan_out_members_status_idx ON baton_fan_out_members(fan_out_id, status, ordinal)`,
 ]
-export const MIGRATION_STATEMENTS = [...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS]
+export const TREE_MIGRATION_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS baton_tree_roots (
+  root_run_id TEXT PRIMARY KEY,
+  earliest_position INTEGER NOT NULL DEFAULT 0,
+  last_position INTEGER NOT NULL DEFAULT -1,
+  FOREIGN KEY (root_run_id) REFERENCES baton_runs(run_id)
+)`,
+  `CREATE TABLE IF NOT EXISTS baton_tree_event_index (
+  root_run_id TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  run_id TEXT NOT NULL,
+  run_sequence INTEGER NOT NULL,
+  event_id TEXT NOT NULL,
+  PRIMARY KEY (root_run_id, position),
+  UNIQUE (event_id),
+  UNIQUE (run_id, run_sequence),
+  FOREIGN KEY (root_run_id) REFERENCES baton_tree_roots(root_run_id),
+  FOREIGN KEY (run_id, run_sequence) REFERENCES baton_run_events(run_id, sequence),
+  FOREIGN KEY (event_id) REFERENCES baton_run_events(event_id)
+)`,
+  `INSERT OR IGNORE INTO baton_tree_roots (root_run_id)
+SELECT run_id FROM baton_runs WHERE root_run_id = run_id`,
+  `INSERT OR IGNORE INTO baton_tree_event_index (root_run_id, position, run_id, run_sequence, event_id)
+SELECT root_run_id, position, run_id, sequence, event_id FROM (
+  SELECT r.root_run_id, e.run_id, e.sequence, e.event_id,
+    ROW_NUMBER() OVER (PARTITION BY r.root_run_id ORDER BY e.run_id, e.sequence, e.event_id) - 1 AS position
+  FROM baton_run_events e JOIN baton_runs r ON r.run_id = e.run_id
+)`,
+  `UPDATE baton_tree_roots SET last_position = COALESCE((
+  SELECT MAX(position) FROM baton_tree_event_index i WHERE i.root_run_id = baton_tree_roots.root_run_id
+), -1)`,
+]
+export const MIGRATION_STATEMENTS = [
+  ...LEGACY_MIGRATION_STATEMENTS,
+  ...FAN_OUT_MIGRATION_STATEMENTS,
+  ...TREE_MIGRATION_STATEMENTS,
+]
 export const STEERING_MIGRATION_STATEMENTS = [
   ...LEGACY_MIGRATION_STATEMENTS.slice(7, 9),
   LEGACY_MIGRATION_STATEMENTS.at(-1)!,
@@ -172,5 +208,12 @@ export const steeringSchemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
   hasher.update(LEGACY_MIGRATION_STATEMENTS.join("\n"))
   hasher.update("\nversion=2")
+  return hasher.digest("hex")
+}
+
+export const fanOutSchemaChecksum = (): string => {
+  const hasher = new Bun.CryptoHasher("sha256")
+  hasher.update([...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS].join("\n"))
+  hasher.update("\nversion=3")
   return hasher.digest("hex")
 }

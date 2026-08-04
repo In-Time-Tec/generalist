@@ -25,6 +25,7 @@ import { make as makeAgentHost } from "../agent-host.js"
 import { ActiveExecutions, layer as activeExecutionsLayer } from "../active-executions.js"
 import { digest as steeringDigest } from "../steering.js"
 import { childRunIdFor, digestFanOut, fanOutIdFor } from "../fan-out.js"
+import { parseCursor } from "../tree-parse.js"
 
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 
@@ -117,6 +118,11 @@ export const makeRuntime = (
       snapshot: (runId) => store.inspect(runId).pipe(Effect.map((run) => ({ run, cursor: run.lastSequence }))),
       history: (input) =>
         store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
+      treeHistory: (input) =>
+        Effect.gen(function* () {
+          const position = yield* parseCursor(input.rootRunId, input.cursor)
+          return yield* store.treeHistory({ rootRunId: input.rootRunId, position, limit: input.limit })
+        }),
       list: (input) => store.list(input),
       respond: (input) => store.respond(input),
       signal: (input) => store.signal(input),

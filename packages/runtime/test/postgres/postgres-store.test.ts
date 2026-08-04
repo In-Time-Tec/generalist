@@ -6,6 +6,7 @@ import { Errors, RunClaims, RunSchema, Runtime, RuntimeWorker, RunStore } from "
 import {
   SCHEMA_META_TABLE,
   SCHEMA_VERSION,
+  TREE_MIGRATION_STATEMENTS,
   schemaChecksum,
   steeringSchemaChecksum,
 } from "../../src/sql/postgres/schema.js"
@@ -57,6 +58,45 @@ const markDirty = () =>
   RunSchema.markDirty("postgres-test").pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
 
 describePostgres("postgres run store", () => {
+  it.live("executes the v4 backfill in numeric per-Run sequence order", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("tree-backfill"),
+          idempotencyKey: "run",
+          prompt: "backfill",
+        })
+        const sequences = yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          const template = (yield* sql<{ event_json: string }>`
+            SELECT event_json FROM baton_run_events WHERE run_id = ${receipt.runId} ORDER BY sequence DESC LIMIT 1
+          `)[0]!
+          for (let sequence = 1; sequence < 12; sequence++) {
+            const event = JSON.parse(template.event_json) as Record<string, unknown>
+            event.eventId = `${receipt.runId}:${sequence}`
+            event.sequence = sequence
+            yield* sql`
+              INSERT INTO baton_run_events (run_id, sequence, event_id, event_json)
+              VALUES (${receipt.runId}, ${sequence}, ${event.eventId as string}, ${JSON.stringify(event)})
+            `
+          }
+          yield* sql`UPDATE baton_runs SET last_sequence = 11 WHERE run_id = ${receipt.runId}`
+          yield* sql.unsafe("DROP TABLE baton_tree_event_index")
+          yield* sql.unsafe("DROP TABLE baton_tree_roots")
+          for (const statement of TREE_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
+          const rows = yield* sql<{ run_sequence: number }>`
+            SELECT run_sequence FROM baton_tree_event_index
+            WHERE root_run_id = ${receipt.runId} ORDER BY position
+          `
+          return rows.map((row) => Number(row.run_sequence))
+        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        expect(sequences).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
   it.live("applies schema and reports multi-worker capability", () =>
     withSchema(
       Effect.gen(function* () {

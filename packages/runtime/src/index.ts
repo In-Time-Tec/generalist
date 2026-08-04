@@ -181,6 +181,8 @@ import {
   WaitNotOpen as Errors_WaitNotOpen,
   ResponseConflict as Errors_ResponseConflict,
   CursorExpired as Errors_CursorExpired,
+  TreeCursorInvalid as Errors_TreeCursorInvalid,
+  TreeCursorExpired as Errors_TreeCursorExpired,
   SubscriberLagged as Errors_SubscriberLagged,
   RuntimeUnavailable as Errors_RuntimeUnavailable,
   AgentBindingConflict as Errors_AgentBindingConflict,
@@ -210,6 +212,8 @@ export const Errors = {
   WaitNotOpen: Errors_WaitNotOpen,
   ResponseConflict: Errors_ResponseConflict,
   CursorExpired: Errors_CursorExpired,
+  TreeCursorInvalid: Errors_TreeCursorInvalid,
+  TreeCursorExpired: Errors_TreeCursorExpired,
   SubscriberLagged: Errors_SubscriberLagged,
   RuntimeUnavailable: Errors_RuntimeUnavailable,
   AgentBindingConflict: Errors_AgentBindingConflict,
@@ -237,6 +241,8 @@ export namespace Errors {
   export type WaitNotOpen = import("./errors.js").WaitNotOpen
   export type ResponseConflict = import("./errors.js").ResponseConflict
   export type CursorExpired = import("./errors.js").CursorExpired
+  export type TreeCursorInvalid = import("./errors.js").TreeCursorInvalid
+  export type TreeCursorExpired = import("./errors.js").TreeCursorExpired
   export type SubscriberLagged = import("./errors.js").SubscriberLagged
   export type RuntimeUnavailable = import("./errors.js").RuntimeUnavailable
   export type AgentBindingConflict = import("./errors.js").AgentBindingConflict
@@ -418,12 +424,18 @@ export namespace AgentHost {
   export type Options = import("./agent-host.js").Options
 }
 
-import { events as RunTree_events } from "./tree.js"
+import { events as RunTree_events, history as RunTree_history, TreeCursor as RunTree_TreeCursor } from "./tree.js"
 export const RunTree = {
   events: RunTree_events,
+  history: RunTree_history,
+  TreeCursor: RunTree_TreeCursor,
 } as typeof import("./tree.js")
 export namespace RunTree {
+  export type TreeCursor = import("./tree.js").TreeCursor
   export type TreeEvent = import("./tree.js").TreeEvent
+  export type TreePage = import("./tree.js").TreePage
   export type EventsInput = import("./tree.js").EventsInput
+  export type HistoryInput = import("./tree.js").HistoryInput
   export type events = typeof import("./tree.js").events
+  export type history = typeof import("./tree.js").history
 }

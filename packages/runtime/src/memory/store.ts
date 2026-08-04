@@ -1,5 +1,13 @@
 import { Effect, Layer, SynchronizedRef } from "effect"
-import { AddressNotFound, CursorExpired, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
+import {
+  AddressNotFound,
+  CursorExpired,
+  RunNotFound,
+  RunTerminal,
+  RuntimeUnavailable,
+  TreeCursorExpired,
+  TreeCursorInvalid,
+} from "../errors.js"
 import { RunStore, type CompletionOutcome } from "../run-store.js"
 import type { LayerOptions } from "../runtime.js"
 import { agentKey, emptyState, type MemoryState } from "./state.js"
@@ -29,6 +37,7 @@ import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } f
 import { admitSteering, readSteering } from "./store-steering.js"
 import { Prompt } from "effect/unstable/ai"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
+import { makeCursor } from "../tree-cursor.js"
 
 const registrationMaps = (options: LayerOptions) => {
   const agentRefs = new Map(options.agents.map((entry) => [agentKey(entry.ref), entry.ref] as const))
@@ -115,6 +124,43 @@ export const makeRunStore = (options: LayerOptions) =>
                     ),
               ),
             ),
+          ),
+        ),
+      treeHistory: (input) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) =>
+            Effect.gen(function* () {
+              const root = state.treeRoots.get(input.rootRunId)
+              if (root === undefined) return yield* RunNotFound.make({ runId: input.rootRunId })
+              if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 1000) {
+                return yield* TreeCursorInvalid.make({
+                  rootRunId: input.rootRunId,
+                  cursor: makeCursor(input.rootRunId, input.position),
+                  message: "tree history limit must be an integer between 1 and 1000",
+                })
+              }
+              if (input.position > root.lastPosition) {
+                return yield* TreeCursorInvalid.make({
+                  rootRunId: input.rootRunId,
+                  cursor: makeCursor(input.rootRunId, input.position),
+                  message: "tree cursor position is in the future",
+                })
+              }
+              if (input.position < root.earliestPosition - 1) {
+                return yield* TreeCursorExpired.make({
+                  rootRunId: input.rootRunId,
+                  cursor: makeCursor(input.rootRunId, input.position),
+                  earliestCursor: makeCursor(input.rootRunId, root.earliestPosition - 1),
+                })
+              }
+              const events = root.events.slice(input.position + 1, input.position + 1 + input.limit)
+              const position = events.length === 0 ? input.position : input.position + events.length
+              return {
+                events,
+                cursor: makeCursor(input.rootRunId, position),
+                hasMore: position < root.lastPosition,
+              }
+            }),
           ),
         ),
       list: (input) =>

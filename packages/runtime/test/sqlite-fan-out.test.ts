@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { Runtime, RunStore } from "../src/index.js"
+import { Runtime, RunStore, RunTree } from "../src/index.js"
 import { assistantAddress, completedResult, researcherRef } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
@@ -29,7 +29,7 @@ it.live("persists and resumes bounded fan-out across SQLite reopen", () =>
       }
       const receipt = yield* runtime.fanOut(input)
       expect((yield* runtime.fanOut(input)).duplicate).toBe(true)
-      return receipt
+      return { ...receipt, parentRunId: parent.runId }
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
 
     yield* Effect.gen(function* () {
@@ -51,6 +51,20 @@ it.live("persists and resumes bounded fan-out across SQLite reopen", () =>
       expect(joined.status).toBe("succeeded")
       expect(joined.members.map((member) => member.status)).toEqual(["succeeded", "succeeded", "abandoned"])
       expect(joined.members.map((member) => member.ordinal)).toEqual([0, 1, 2])
+      const tree = yield* RunTree.history({ rootRunId: admitted.parentRunId, limit: 100 })
+      const acceptedChildren = tree.events.filter(
+        (entry) => entry.event._tag === "RunAccepted" && entry.parentRunId === admitted.parentRunId,
+      )
+      expect(acceptedChildren.map((entry) => entry.runId)).toEqual(admitted.childRunIds)
+      expect(
+        tree.events
+          .filter((entry) => entry.event._tag === "RunCompleted" && admitted.childRunIds.includes(entry.runId))
+          .map((entry) => entry.runId),
+      ).toEqual(admitted.childRunIds.slice(0, 2))
+      expect(
+        tree.events.flatMap((entry) => (entry.event._tag === "ChildSettled" ? [entry.event.childRunId] : [])),
+      ).toEqual(admitted.childRunIds.slice(0, 2))
+      expect(tree.events.filter((entry) => entry.event._tag === "FanOutJoined")).toHaveLength(1)
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
   }).pipe(Effect.asVoid),
 )

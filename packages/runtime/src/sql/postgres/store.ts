@@ -31,6 +31,7 @@ import { decodeRun, loadRunWait } from "../store-helpers.js"
 import type { WaitResolution } from "../../run-wait.js"
 import { fanOutStoreMethods } from "./store-fan-out.js"
 import { deferCancelledFanOutParent, makeCancelRun } from "./store-cancel.js"
+import { loadTreeHistory } from "../tree-history.js"
 import {
   afterTerminal,
   appendEvent,
@@ -352,6 +353,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
           }),
         ),
+      treeHistory: (input) => runNoTxn(loadTreeHistory(input)),
       list: (input) =>
         runNoTxn(
           Effect.gen(function* () {

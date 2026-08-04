@@ -45,6 +45,7 @@ const mockRuntime = (implementation: Partial<Runtime.Interface>): Runtime.Interf
     events: () => Stream.empty,
     snapshot: () => unused(),
     history: () => unused(),
+    treeHistory: () => unused(),
     list: () => unused(),
     respond: () => unused(),
     signal: () => unused(),

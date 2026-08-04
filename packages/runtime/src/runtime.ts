@@ -22,6 +22,8 @@ import type {
   FanOutInvalid,
   FanOutNotFound,
   FanOutRemainderUnsupported,
+  TreeCursorInvalid,
+  TreeCursorExpired,
 } from "./errors.js"
 import type { Metadata } from "./message.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
@@ -118,6 +120,7 @@ export type SpawnError =
   | IdempotencyConflict
   | RuntimeUnavailable
 export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
+export type TreeEventsError = RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
 export type RespondError = RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable
 export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable
 export type CancelError = RunNotFound | RuntimeUnavailable
@@ -141,6 +144,9 @@ export interface Interface {
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, InspectError>
   readonly history: (input: HistoryInput) => Effect.Effect<ReadonlyArray<RunEvent>, EventsError>
+  readonly treeHistory: (
+    input: import("./tree.js").HistoryInput,
+  ) => Effect.Effect<import("./tree.js").TreePage, TreeEventsError>
   readonly list: (input: ListInput) => Effect.Effect<ReadonlyArray<RunInspection>, RuntimeUnavailable>
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>

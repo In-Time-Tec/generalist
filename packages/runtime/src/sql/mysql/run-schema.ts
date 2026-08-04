@@ -15,6 +15,7 @@ import {
   SCHEMA_VERSION,
   schemaChecksum,
   steeringSchemaChecksum,
+  fanOutSchemaChecksum,
 } from "./schema.js"
 
 export interface SchemaPlan {
@@ -121,6 +122,12 @@ export const apply = (source: string) =>
                   WHERE id = 1
                 `
               } else if (migration.id === 3) {
+                yield* sql`
+                  UPDATE baton_schema_meta
+                  SET version = 3, checksum = ${fanOutSchemaChecksum()}, dirty = 0, applied_at = NOW(3)
+                  WHERE id = 1
+                `
+              } else if (migration.id === 4) {
                 yield* sql`
                   UPDATE baton_schema_meta
                   SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0, applied_at = NOW(3)

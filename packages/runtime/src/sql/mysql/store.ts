@@ -42,6 +42,7 @@ import {
 import { check as checkSchema } from "./run-schema.js"
 import { makeMysqlClaims } from "./store-claims.js"
 import { admitFanOut, inspectFanOut } from "../store-fan-out.js"
+import { loadTreeHistory } from "../tree-history.js"
 
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
@@ -272,6 +273,7 @@ export const makeMysqlServices = (
             return (yield* loadEventsAfter(input.runId, input.cursor)).slice(0, input.limit)
           }),
         ),
+      treeHistory: (input) => runNoTxn(loadTreeHistory(input)),
       list: (input) =>
         runNoTxn(
           Effect.gen(function* () {

@@ -2438,7 +2438,27 @@
       "test": false
     },
     {
+      "path": "packages/runtime/src/sql/tree-history.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
       "path": "packages/runtime/src/steering.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/tree-cursor.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/tree-event.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/tree-parse.ts",
       "package": "@batonfx/runtime",
       "test": false
     },
@@ -2548,7 +2568,17 @@
       "test": true
     },
     {
+      "path": "packages/runtime/test/runtime-tree.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
       "path": "packages/runtime/test/runtime-worker.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/schema-version.test.ts",
       "package": "@batonfx/runtime",
       "test": true
     },
@@ -10715,6 +10745,10 @@
     },
     {
       "source": "packages/runtime/src/errors.ts",
+      "specifier": "./tree-cursor.js"
+    },
+    {
+      "source": "packages/runtime/src/errors.ts",
       "specifier": "effect"
     },
     {
@@ -10843,6 +10877,10 @@
     },
     {
       "source": "packages/runtime/src/memory/append.ts",
+      "specifier": "../tree-event.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/append.ts",
       "specifier": "effect"
     },
     {
@@ -10912,6 +10950,10 @@
     {
       "source": "packages/runtime/src/memory/runtime-layer.ts",
       "specifier": "../steering.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../tree-parse.js"
     },
     {
       "source": "packages/runtime/src/memory/runtime-layer.ts",
@@ -11068,6 +11110,10 @@
     {
       "source": "packages/runtime/src/memory/store.ts",
       "specifier": "../run-store.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store.ts",
+      "specifier": "../tree-cursor.js"
     },
     {
       "source": "packages/runtime/src/memory/store.ts",
@@ -11412,6 +11458,10 @@
     },
     {
       "source": "packages/runtime/src/sql/mysql/store.ts",
+      "specifier": "../tree-history.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/mysql/store.ts",
       "specifier": "./run-schema.js"
     },
     {
@@ -11693,6 +11743,10 @@
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
       "specifier": "../subscribers.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/postgres/store.ts",
+      "specifier": "../tree-history.js"
     },
     {
       "source": "packages/runtime/src/sql/postgres/store.ts",
@@ -12056,6 +12110,10 @@
     },
     {
       "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./tree-history.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
       "specifier": "effect"
     },
     {
@@ -12071,6 +12129,30 @@
       "specifier": "effect"
     },
     {
+      "source": "packages/runtime/src/sql/tree-history.ts",
+      "specifier": "../errors.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/tree-history.ts",
+      "specifier": "../tree-cursor.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/tree-history.ts",
+      "specifier": "../tree-event.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/tree-history.ts",
+      "specifier": "./codecs.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/tree-history.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/tree-history.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
       "source": "packages/runtime/src/steering.ts",
       "specifier": "effect"
     },
@@ -12083,8 +12165,32 @@
       "specifier": "node:crypto"
     },
     {
+      "source": "packages/runtime/src/tree-cursor.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/tree-event.ts",
+      "specifier": "./tree-cursor.js"
+    },
+    {
+      "source": "packages/runtime/src/tree-parse.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/tree-parse.ts",
+      "specifier": "./tree-cursor.js"
+    },
+    {
+      "source": "packages/runtime/src/tree-parse.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/runtime/src/tree.ts",
       "specifier": "./runtime.js"
+    },
+    {
+      "source": "packages/runtime/src/tree.ts",
+      "specifier": "./tree-cursor.js"
     },
     {
       "source": "packages/runtime/src/tree.ts",
@@ -12478,6 +12584,34 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/runtime/test/runtime-tree.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-tree.test.ts",
+      "specifier": "../src/tree-cursor.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-tree.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/runtime-tree.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/runtime-tree.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/runtime-tree.test.ts",
+      "specifier": "effect/testing"
+    },
+    {
+      "source": "packages/runtime/test/runtime-tree.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
       "source": "packages/runtime/test/runtime-worker.test.ts",
       "specifier": "../src/agent-host.js"
     },
@@ -12500,6 +12634,22 @@
     {
       "source": "packages/runtime/test/runtime-worker.test.ts",
       "specifier": "effect/testing"
+    },
+    {
+      "source": "packages/runtime/test/schema-version.test.ts",
+      "specifier": "../src/sql/mysql/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/schema-version.test.ts",
+      "specifier": "../src/sql/postgres/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/schema-version.test.ts",
+      "specifier": "../src/sql/schema.js"
+    },
+    {
+      "source": "packages/runtime/test/schema-version.test.ts",
+      "specifier": "vitest"
     },
     {
       "source": "packages/runtime/test/sql-subscribers.test.ts",
@@ -13639,8 +13789,18 @@
       "kind": "same-stem"
     },
     {
+      "source": "packages/runtime/test/runtime-tree.test.ts",
+      "test": "packages/runtime/test/runtime-tree.test.ts",
+      "kind": "same-stem"
+    },
+    {
       "source": "packages/runtime/test/runtime-worker.test.ts",
       "test": "packages/runtime/test/runtime-worker.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/schema-version.test.ts",
+      "test": "packages/runtime/test/schema-version.test.ts",
       "kind": "same-stem"
     },
     {

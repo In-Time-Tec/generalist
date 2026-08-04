@@ -17,6 +17,8 @@ import type {
   FanOutConflict,
   FanOutInvalid,
   FanOutNotFound,
+  TreeCursorExpired,
+  TreeCursorInvalid,
 } from "./errors.js"
 import type { Message } from "./message.js"
 import type { RunInspection, RunReceipt, RunStatus } from "./run.js"
@@ -126,6 +128,14 @@ export interface Interface {
     readonly cursor: Cursor
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<RunEvent>, RunNotFound | CursorExpired | RuntimeUnavailable>
+  readonly treeHistory: (input: {
+    readonly rootRunId: string
+    readonly position: number
+    readonly limit: number
+  }) => Effect.Effect<
+    import("./tree.js").TreePage,
+    RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
+  >
   readonly list: (input: {
     readonly status?: RunStatus
     readonly limit: number

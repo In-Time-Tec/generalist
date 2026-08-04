@@ -1,59 +1,58 @@
-import { Effect, Stream } from "effect"
-import type { Cursor } from "./cursor.js"
-import type { EventsError } from "./runtime.js"
+import { Effect, Schedule, Stream } from "effect"
 import type { RunEvent } from "./run-event.js"
 import { Runtime } from "./runtime.js"
+import { type TreeCursor as TreeCursorType } from "./tree-cursor.js"
+export { TreeCursor } from "./tree-cursor.js"
 
 export interface TreeEvent {
-  readonly path: ReadonlyArray<string>
+  readonly rootRunId: string
+  readonly runId: string
+  readonly parentRunId?: string
+  readonly invocationId?: string
+  readonly modelCallId?: string
+  readonly modelAttemptId?: string
+  readonly toolCallId?: string
   readonly event: RunEvent
-  readonly cursor: Cursor
+  readonly cursor: TreeCursorType
+}
+
+export interface TreePage {
+  readonly events: ReadonlyArray<TreeEvent>
+  readonly cursor: TreeCursorType
+  readonly hasMore: boolean
+}
+
+export interface HistoryInput {
+  readonly rootRunId: string
+  readonly cursor?: TreeCursorType
+  readonly limit: number
 }
 
 export interface EventsInput {
   readonly rootRunId: string
-  readonly cursors?: ReadonlyMap<string, Cursor>
+  readonly cursor?: TreeCursorType
 }
 
-export const events = (input: EventsInput): Stream.Stream<TreeEvent, EventsError, Runtime> =>
+export const history = (input: HistoryInput) => Runtime.use((runtime) => runtime.treeHistory(input))
+
+export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./runtime.js").TreeEventsError, Runtime> =>
   Stream.unwrap(
     Runtime.use((runtime) =>
-      Effect.succeed(
-        runtime
-          .events({
-            runId: input.rootRunId,
-            ...(input.cursors?.has(input.rootRunId) ? { cursor: input.cursors.get(input.rootRunId)! } : {}),
-          })
-          .pipe(
-            Stream.map(
-              (event): TreeEvent => ({
-                path: [input.rootRunId],
-                event,
-                cursor: event.sequence,
-              }),
-            ),
-            Stream.flatMap((treeEvent) => {
-              if (treeEvent.event._tag !== "ChildLinked") {
-                return Stream.succeed(treeEvent)
-              }
-              const childRunId = treeEvent.event.childRunId
-              const child = runtime
-                .events({
-                  runId: childRunId,
-                  ...(input.cursors?.has(childRunId) ? { cursor: input.cursors.get(childRunId)! } : {}),
-                })
-                .pipe(
-                  Stream.map(
-                    (event): TreeEvent => ({
-                      path: [input.rootRunId, childRunId],
-                      event,
-                      cursor: event.sequence,
-                    }),
-                  ),
-                )
-              return Stream.merge(Stream.succeed(treeEvent), child)
+      Effect.sync(() => {
+        let cursor = input.cursor
+        const read = Effect.suspend(() =>
+          runtime.treeHistory({ rootRunId: input.rootRunId, ...(cursor === undefined ? {} : { cursor }), limit: 256 }),
+        ).pipe(
+          Effect.tap((page) =>
+            Effect.sync(() => {
+              cursor = page.cursor
             }),
           ),
-      ),
+        )
+        return Stream.fromEffect(read).pipe(
+          Stream.flatMap((page) => Stream.fromIterable(page.events)),
+          Stream.repeat(Schedule.spaced("50 millis")),
+        )
+      }),
     ),
   )

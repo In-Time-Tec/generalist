@@ -2,8 +2,14 @@ import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
 import { Effect, Exit, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
-import { Errors, Runtime, RunStore } from "../src/index.js"
-import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum, steeringSchemaChecksum } from "../src/sql/schema.js"
+import { Errors, Runtime, RunStore, RunTree } from "../src/index.js"
+import {
+  SCHEMA_META_TABLE,
+  SCHEMA_VERSION,
+  fanOutSchemaChecksum,
+  schemaChecksum,
+  steeringSchemaChecksum,
+} from "../src/sql/schema.js"
 import { markDirty } from "../src/sql/migrate.js"
 import { layer as sqliteClientLayer } from "../src/sql/bun-client.js"
 import { assistantAddress, completedResult, openWait, textPrompt } from "./helpers.js"
@@ -42,15 +48,17 @@ it.live("migrates and reopens a durable sqlite store", () =>
   }).pipe(Effect.asVoid),
 )
 
-it.live("upgrades an immutable version 2 SQLite fixture through migration 3", () =>
+it.live("upgrades an immutable version 2 SQLite fixture through migrations 3 and 4", () =>
   Effect.gen(function* () {
     expect(steeringSchemaChecksum()).toBe("01852e12f9feec6a47b4aad61a90b3b6061e032d870b763718df813c969000f7")
     const filename = tempDbPath("migrate-v2-v3")
     yield* Effect.scoped(Effect.provide(Runtime.Runtime, sqliteLayer(filename)))
     const fixture = new Database(filename)
+    fixture.run("DROP TABLE baton_tree_event_index")
+    fixture.run("DROP TABLE baton_tree_roots")
     fixture.run("DROP TABLE baton_fan_out_members")
     fixture.run("DROP TABLE baton_fan_outs")
-    fixture.run("DELETE FROM baton_sql_migrations WHERE migration_id = 3")
+    fixture.run("DELETE FROM baton_sql_migrations WHERE migration_id IN (3, 4)")
     fixture.run(`UPDATE ${SCHEMA_META_TABLE} SET version = 2, checksum = ?, dirty = 0 WHERE id = 1`, [
       steeringSchemaChecksum(),
     ])
@@ -71,6 +79,90 @@ it.live("upgrades an immutable version 2 SQLite fixture through migration 3", ()
         .get(),
     ).toEqual({ name: "baton_fan_outs" })
     upgraded.close()
+  }),
+)
+
+it.live("upgrades version 3 and deterministically backfills the tree index", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("migrate-v3-v4")
+    const receipt = yield* Effect.scoped(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        return yield* runtime.send({
+          to: assistantAddress,
+          sessionId: "session:backfill",
+          idempotencyKey: "backfill",
+          prompt: textPrompt("backfill"),
+        })
+      }).pipe(Effect.provide(sqliteLayer(filename))),
+    )
+    const fixture = new Database(filename)
+    const template = fixture
+      .query<
+        { event_json: string },
+        [string]
+      >("SELECT event_json FROM baton_run_events WHERE run_id = ? ORDER BY sequence DESC LIMIT 1")
+      .get(receipt.runId)!
+    for (let sequence = 2; sequence < 12; sequence++) {
+      const event = JSON.parse(template.event_json) as Record<string, unknown>
+      event.eventId = `${receipt.runId}:${sequence}`
+      event.sequence = sequence
+      fixture.run("INSERT INTO baton_run_events (run_id, sequence, event_id, event_json) VALUES (?, ?, ?, ?)", [
+        receipt.runId,
+        sequence,
+        event.eventId as string,
+        JSON.stringify(event),
+      ])
+    }
+    fixture.run("UPDATE baton_runs SET last_sequence = 11 WHERE run_id = ?", [receipt.runId])
+    fixture.run("DROP TABLE baton_tree_event_index")
+    fixture.run("DROP TABLE baton_tree_roots")
+    fixture.run("DELETE FROM baton_sql_migrations WHERE migration_id = 4")
+    fixture.run(`UPDATE ${SCHEMA_META_TABLE} SET version = 3, checksum = ?, dirty = 0 WHERE id = 1`, [
+      fanOutSchemaChecksum(),
+    ])
+    fixture.close()
+
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const page = yield* RunTree.history({ rootRunId: receipt.runId, limit: 20 })
+        expect(page.events.map((entry) => entry.event.sequence)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+        expect(page.hasMore).toBe(false)
+      }).pipe(Effect.provide(sqliteLayer(filename))),
+    )
+  }),
+)
+
+it.live("resumes tree history from an opaque cursor after close and reopen", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("tree-cursor-reopen")
+    const initial = yield* Effect.scoped(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: "session:tree-reopen",
+          idempotencyKey: "tree-reopen",
+          prompt: textPrompt("tree-reopen"),
+        })
+        const page = yield* RunTree.history({ rootRunId: receipt.runId, limit: 100 })
+        return { receipt, cursor: page.cursor }
+      }).pipe(Effect.provide(sqliteLayer(filename))),
+    )
+
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const store = yield* RunStore.RunStore
+        const claim = yield* store.claimExecution({ runId: initial.receipt.runId, ownerId: "tree-reopen" })
+        yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
+        const resumed = yield* RunTree.history({
+          rootRunId: initial.receipt.runId,
+          cursor: initial.cursor,
+          limit: 100,
+        })
+        expect(resumed.events.map((entry) => entry.event._tag)).toEqual(["TurnStarted"])
+      }).pipe(Effect.provide(sqliteLayer(filename))),
+    )
   }),
 )
 

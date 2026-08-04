@@ -83,8 +83,8 @@ layer(memoryLayer)("Runtime children", (it) => {
         Stream.runCollect,
         Effect.map((chunk) => Array.from(chunk)),
       )
-      expect(tree.some((item) => item.path.length === 1 && item.event._tag === "ChildLinked")).toBe(true)
-      expect(tree.some((item) => item.path[1] === child.runId && item.event._tag === "RunCompleted")).toBe(true)
+      expect(tree.some((item) => item.runId === parent.runId && item.event._tag === "ChildLinked")).toBe(true)
+      expect(tree.some((item) => item.runId === child.runId && item.event._tag === "RunCompleted")).toBe(true)
     }),
   )
 })

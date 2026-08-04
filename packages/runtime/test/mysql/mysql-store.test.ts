@@ -3,7 +3,12 @@ import { Effect, Exit, Layer, Redacted, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { Errors, MysqlRunSchema, RunClaims, Runtime, RuntimeWorker, RunStore } from "../../src/index.js"
-import { SCHEMA_VERSION, schemaChecksum, steeringSchemaChecksum } from "../../src/sql/mysql/schema.js"
+import {
+  SCHEMA_VERSION,
+  TREE_MIGRATION_STATEMENTS,
+  schemaChecksum,
+  steeringSchemaChecksum,
+} from "../../src/sql/mysql/schema.js"
 import { assistantAddress, completedResult, openWait, researcherRef, textPrompt } from "../helpers.js"
 import { mysqlAvailable, mysqlClient, mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "./helpers.js"
 
@@ -19,6 +24,45 @@ const withSchema = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   })
 
 describeMysql("mysql run store", () => {
+  it.live("executes the v4 backfill in numeric per-Run sequence order", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("tree-backfill"),
+          idempotencyKey: "run",
+          prompt: "backfill",
+        })
+        const sequences = yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          const template = (yield* sql<{ event_json: string }>`
+            SELECT event_json FROM baton_run_events WHERE run_id = ${receipt.runId} ORDER BY sequence DESC LIMIT 1
+          `)[0]!
+          for (let sequence = 1; sequence < 12; sequence++) {
+            const event = JSON.parse(template.event_json) as Record<string, unknown>
+            event.eventId = `${receipt.runId}:${sequence}`
+            event.sequence = sequence
+            yield* sql`
+              INSERT INTO baton_run_events (run_id, sequence, event_id, event_json)
+              VALUES (${receipt.runId}, ${sequence}, ${event.eventId as string}, ${JSON.stringify(event)})
+            `
+          }
+          yield* sql`UPDATE baton_runs SET last_sequence = 11 WHERE run_id = ${receipt.runId}`
+          yield* sql.unsafe("DROP TABLE baton_tree_event_index")
+          yield* sql.unsafe("DROP TABLE baton_tree_roots")
+          for (const statement of TREE_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
+          const rows = yield* sql<{ run_sequence: number }>`
+            SELECT run_sequence FROM baton_tree_event_index
+            WHERE root_run_id = ${receipt.runId} ORDER BY position
+          `
+          return rows.map((row) => Number(row.run_sequence))
+        }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
+        expect(sequences).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+    ),
+  )
+
   it.live("applies schema, uses READ COMMITTED, and reports multi-worker capability", () =>
     withSchema(
       Effect.gen(function* () {

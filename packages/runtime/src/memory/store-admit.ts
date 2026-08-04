@@ -80,7 +80,9 @@ export const admitSend = (
     }
     const runs = new Map(withId.runs)
     runs.set(runId, run)
-    let next: MemoryState = { ...withId, runs }
+    const treeRoots = new Map(withId.treeRoots)
+    treeRoots.set(runId, { earliestPosition: 0, lastPosition: -1, events: [] })
+    let next: MemoryState = { ...withId, runs, treeRoots }
     const enqueued = enqueueLane(next, input.message.to, input.message.sessionId, runId)
     next = enqueued.state
     const [, acceptedState] = yield* appendLifecycle(

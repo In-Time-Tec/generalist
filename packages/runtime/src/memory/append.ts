@@ -5,6 +5,7 @@ import { isTerminal, type RunStatus } from "../run.js"
 import type { AgentLoopEvent, AgentResult } from "../agent-event.js"
 import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run-event.js"
 import type { MemoryState, StoredRun, SubscriberQueue } from "./state.js"
+import { projectTreeEvent } from "../tree-event.js"
 
 const occurredAt = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -39,6 +40,11 @@ export const appendEvent = (
     const sequence = run.lastSequence + 1
     const at = yield* occurredAt
     const event = build(baseFields(run, sequence, at), run)
+    const root = state.treeRoots.get(run.rootRunId)
+    if (root === undefined) {
+      return yield* RuntimeUnavailable.make({ message: `tree root ${run.rootRunId} missing during append` })
+    }
+    const position = root.lastPosition + 1
     const subscribers = new Map(run.subscribers)
     for (const [subscriberId, queue] of run.subscribers) {
       const offered = yield* Queue.offer(queue, event)
@@ -95,7 +101,13 @@ export const appendEvent = (
     } else {
       runs.set(runId, updated)
     }
-    return [event, { ...state, runs }] as const
+    const treeRoots = new Map(state.treeRoots)
+    treeRoots.set(run.rootRunId, {
+      ...root,
+      lastPosition: position,
+      events: [...root.events, projectTreeEvent(event, position, run)],
+    })
+    return [event, { ...state, runs, treeRoots }] as const
   })
 
 export const appendLifecycle = (

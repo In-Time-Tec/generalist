@@ -3,6 +3,7 @@ import { Address } from "./address.js"
 import { Cursor } from "./cursor.js"
 import { AgentRef } from "./agent-ref.js"
 import { RunId } from "./run.js"
+import { TreeCursor } from "./tree-cursor.js"
 
 export class AddressNotFound extends Schema.TaggedErrorClass<AddressNotFound>()("@batonfx/runtime/AddressNotFound", {
   address: Address,
@@ -59,6 +60,16 @@ export class CursorExpired extends Schema.TaggedErrorClass<CursorExpired>()("@ba
   cursor: Cursor,
   earliestSequence: Schema.Int,
 }) {}
+
+export class TreeCursorInvalid extends Schema.TaggedErrorClass<TreeCursorInvalid>()(
+  "@batonfx/runtime/TreeCursorInvalid",
+  { rootRunId: RunId, cursor: TreeCursor, message: Schema.String },
+) {}
+
+export class TreeCursorExpired extends Schema.TaggedErrorClass<TreeCursorExpired>()(
+  "@batonfx/runtime/TreeCursorExpired",
+  { rootRunId: RunId, cursor: TreeCursor, earliestCursor: TreeCursor },
+) {}
 
 export class SubscriberLagged extends Schema.TaggedErrorClass<SubscriberLagged>()("@batonfx/runtime/SubscriberLagged", {
   runId: Schema.String,
