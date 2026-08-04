@@ -55,15 +55,16 @@ it.live("persists decoded finish parts that omit an undefined response", () =>
         prompt: textPrompt("hello"),
       })
       const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "test" })
+      const usage = {
+        inputTokens: { total: 1, uncached: 1 },
+        outputTokens: { total: 1, text: 1 },
+      } as unknown as Response.Usage
       const part = {
         "~effect/ai/Content/Part": "~effect/ai/Content/Part",
         metadata: {},
         type: "finish",
         reason: "stop",
-        usage: Response.Usage.make({
-          inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
-          outputTokens: { total: 1, text: 1, reasoning: undefined },
-        }),
+        usage,
       } as unknown as Response.FinishPart
       yield* store.emitAgentEvent({
         ...claim,
@@ -77,6 +78,37 @@ it.live("persists decoded finish parts that omit an undefined response", () =>
           part,
         },
       })
+      yield* store.emitAgentEvent({
+        ...claim,
+        runId: receipt.runId,
+        event: {
+          _tag: "ModelAttemptCompleted",
+          deliveryId: "delivery:1",
+          turn: 0,
+          modelCallId: "model-call:1",
+          modelAttemptId: "model-attempt:1",
+          attempt: 0,
+          completedAt: 1,
+          usage,
+          usageAt: 1,
+          finishReason: "stop",
+        },
+      })
+      yield* store.emitAgentEvent({
+        ...claim,
+        runId: receipt.runId,
+        event: {
+          _tag: "ModelCallCompleted",
+          deliveryId: "delivery:2",
+          turn: 0,
+          modelCallId: "model-call:1",
+          purpose: "conversation",
+          attempts: 1,
+          completedAt: 1,
+          usage,
+          finishReason: "stop",
+        },
+      })
       return receipt.runId
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
 
@@ -86,6 +118,8 @@ it.live("persists decoded finish parts that omit an undefined response", () =>
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
     const modelPart = history.find((event) => event._tag === "ModelPart")
     expect(modelPart?._tag === "ModelPart" && modelPart.part.type).toBe("finish")
+    expect(history.map((event) => event._tag)).toContain("ModelAttemptCompleted")
+    expect(history.map((event) => event._tag)).toContain("ModelCallCompleted")
   }).pipe(Effect.asVoid),
 )
 

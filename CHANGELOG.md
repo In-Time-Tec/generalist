@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.14.2
+
+- Accept Effect's encoded usage shape across successful model telemetry and turn-completion events in durable Runtime stores.
+
 ## 0.14.1
 
 - Accept model finish parts after Effect's encoded form omits undefined response and token-usage fields, preserving them through durable Runtime stores and replay.

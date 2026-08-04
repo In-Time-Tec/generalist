@@ -143,21 +143,22 @@ const ToolResult = Schema.Struct({
   preliminary: Schema.Boolean,
   metadata: Response.ProviderMetadata,
 })
+const Usage = Schema.Struct({
+  inputTokens: Schema.Struct({
+    uncached: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+    cacheRead: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+    cacheWrite: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+  }),
+  outputTokens: Schema.Struct({
+    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+    text: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+    reasoning: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+  }),
+})
 const FinishPart = Schema.Struct({
   ...Response.FinishPart.fields,
-  usage: Schema.Struct({
-    inputTokens: Schema.Struct({
-      uncached: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-      total: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-      cacheRead: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-      cacheWrite: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-    }),
-    outputTokens: Schema.Struct({
-      total: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-      text: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-      reasoning: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-    }),
-  }),
+  usage: Usage,
   response: Schema.optionalKey(Schema.UndefinedOr(Response.HttpResponseDetails)),
 })
 const StreamPart = Schema.Union([
@@ -193,6 +194,22 @@ const Part = Schema.Union([
   ToolResult,
 ])
 const optionalMetadata = { metadata: Schema.optionalKey(Metadata) }
+const ModelTelemetryEventSchema = Schema.Union([
+  ModelTelemetry.ModelCallStarted,
+  ModelTelemetry.ModelAttemptStarted,
+  ModelTelemetry.ModelAttemptFirstOutput,
+  Schema.Struct({ ...ModelTelemetry.ModelAttemptCompleted.fields, usage: Usage }),
+  ModelTelemetry.ModelAttemptFailed,
+  ModelTelemetry.ModelRetryScheduled,
+  Schema.Struct({
+    ...ModelTelemetry.ModelCallCompleted.fields,
+    usage: Schema.optionalKey(Usage),
+  }),
+  ModelTelemetry.ModelCallFailed,
+  ModelTelemetry.CompactionStarted,
+  ModelTelemetry.CompactionCompleted,
+  ModelTelemetry.CompactionFailed,
+])
 const AgentLoopEventSchema = Schema.Union([
   Schema.TaggedStruct("TurnStarted", { turn: Schema.Finite, ...optionalMetadata }),
   Schema.TaggedStruct("ModelPart", {
@@ -248,7 +265,7 @@ const AgentLoopEventSchema = Schema.Union([
   Schema.TaggedStruct("TurnCompleted", {
     turn: Schema.Finite,
     transcript: Prompt.Prompt,
-    usage: Schema.optionalKey(Response.Usage),
+    usage: Schema.optionalKey(Usage),
     finishReason: Schema.optionalKey(Response.FinishReason),
     ...optionalMetadata,
   }),
@@ -261,7 +278,7 @@ const AgentLoopEventSchema = Schema.Union([
     content: Schema.Array(Part),
     ...optionalMetadata,
   }),
-  ModelTelemetry.Event,
+  ModelTelemetryEventSchema,
 ])
 const LifecycleEventSchema = Schema.Union([
   Schema.TaggedStruct("RunAccepted", { messageId: Schema.String, address: Address }),
