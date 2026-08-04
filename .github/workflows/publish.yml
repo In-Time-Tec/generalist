@@ -251,7 +251,10 @@ jobs:
             grep -Fxq "${digest}  ${filename}" SHA256SUMS
           done < <(jq -r '.packages[] | [.filename, .sha256] | @tsv' release-evidence.json)
           publish_args=(--access public)
-          latest_version=$(npm view @batonfx/core version 2>/dev/null || true)
+          registry_document() {
+            curl --fail --silent --show-error "https://registry.npmjs.org/${1/\//%2f}/$2" 2>/dev/null || true
+          }
+          latest_version=$(curl --fail --silent --show-error https://registry.npmjs.org/@batonfx%2fcore 2>/dev/null | jq -r '."dist-tags".latest // empty' || true)
           if [[ -n "$latest_version" ]] && [[ "$(printf '%s\n' "$latest_version" "$VERSION" | sort -V | tail -1)" == "$latest_version" ]] && [[ "$latest_version" != "$VERSION" ]]; then
             publish_args+=(--tag "patch-$(printf '%s' "$VERSION" | cut -d. -f1-2 | tr . -)")
           fi
@@ -266,7 +269,7 @@ jobs:
 
           while IFS=$'\t' read -r package filename; do
             local_integrity="sha512-$(openssl dgst -sha512 -binary "$filename" | base64 -w0)"
-            registry_integrity=$(npm view "$package@$VERSION" dist.integrity 2>/dev/null || true)
+            registry_integrity=$(registry_document "$package" "$VERSION" | jq -r '.dist.integrity // empty')
             if [[ -n "$registry_integrity" ]]; then
               [[ "$registry_integrity" == "$local_integrity" ]]
               echo "$package@$VERSION already has the exact release tarball; skipping"
@@ -278,8 +281,9 @@ jobs:
           while IFS=$'\t' read -r package filename; do
             local_integrity="sha512-$(openssl dgst -sha512 -binary "$filename" | base64 -w0)"
             for attempt in {1..10}; do
-              registry_version=$(npm view "$package@$VERSION" version 2>/dev/null || true)
-              registry_integrity=$(npm view "$package@$VERSION" dist.integrity 2>/dev/null || true)
+              registry_json=$(registry_document "$package" "$VERSION")
+              registry_version=$(jq -r '.version // empty' <<< "$registry_json")
+              registry_integrity=$(jq -r '.dist.integrity // empty' <<< "$registry_json")
               if [[ "$registry_version" == "$VERSION" && "$registry_integrity" == "$local_integrity" ]]; then
                 echo "$package@$VERSION verified: $registry_integrity"
                 break

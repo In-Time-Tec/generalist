@@ -51,6 +51,8 @@ describe("release workflows", () => {
     expect(source).toContain("NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}")
     expect(source).toContain('npm publish "$filename" "${publish_args[@]}"')
     expect(source).toContain('[[ "$registry_integrity" == "$local_integrity" ]]')
+    expect(source).toContain('curl --fail --silent --show-error "https://registry.npmjs.org/${1/\\//%2f}/$2"')
+    expect(source).not.toContain('npm view "$package@$VERSION"')
     expect(source.match(/'\.packages\[\] \| \.name'/g)).toHaveLength(2)
     expect(source.match(/\(\.packages \| length\) == 11/g)).toHaveLength(2)
     for (const packageName of [
