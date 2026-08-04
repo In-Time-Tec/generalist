@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.14.1
+
+- Accept model finish parts after Effect's encoded form omits undefined response and token-usage fields, preserving them through durable Runtime stores and replay.
+
 ## 0.14.0
 
 - Add `@batonfx/runtime` as the authoritative addressable Run lifecycle with replay, inspection, waits, cancellation, memory, SQLite, and PostgreSQL stores.

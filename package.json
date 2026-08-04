@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "batonfx",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Effect-native agent framework with an optional durable Runtime",
   "private": true,
   "type": "module",

@@ -12222,6 +12222,10 @@
       "specifier": "effect"
     },
     {
+      "source": "packages/runtime/test/sqlite-store.test.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
       "source": "packages/skills/src/index.ts",
       "specifier": "./skill/github-catalog.js"
     },

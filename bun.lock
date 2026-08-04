@@ -238,7 +238,7 @@
     },
     "packages/a2a": {
       "name": "@batonfx/a2a",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@a2a-js/sdk": "catalog:",
         "@batonfx/runtime": "workspace:*",
@@ -256,7 +256,7 @@
     },
     "packages/ag-ui": {
       "name": "@batonfx/ag-ui",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@ag-ui/core": "catalog:",
         "@batonfx/runtime": "workspace:*",
@@ -274,7 +274,7 @@
     },
     "packages/core": {
       "name": "@batonfx/core",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "devDependencies": {
         "@effect/vitest": "catalog:",
         "@types/bun": "catalog:",
@@ -288,7 +288,7 @@
     },
     "packages/foldkit": {
       "name": "@batonfx/foldkit",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@batonfx/runtime": "workspace:*",
         "@batonfx/transport": "workspace:*",
@@ -308,7 +308,7 @@
     },
     "packages/mcp": {
       "name": "@batonfx/mcp",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@batonfx/core": "workspace:*",
         "@modelcontextprotocol/sdk": "catalog:",
@@ -327,7 +327,7 @@
     },
     "packages/memory": {
       "name": "@batonfx/memory",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@batonfx/core": "workspace:*",
       },
@@ -344,7 +344,7 @@
     },
     "packages/providers": {
       "name": "@batonfx/providers",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@aws-sdk/client-bedrock-runtime": "catalog:",
         "@aws-sdk/credential-provider-node": "catalog:",
@@ -368,7 +368,7 @@
     },
     "packages/runtime": {
       "name": "@batonfx/runtime",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@batonfx/core": "workspace:*",
         "@effect/sql-mysql2": "catalog:",
@@ -389,7 +389,7 @@
     },
     "packages/skills": {
       "name": "@batonfx/skills",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@batonfx/core": "workspace:*",
       },
@@ -406,7 +406,7 @@
     },
     "packages/test": {
       "name": "@batonfx/test",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@batonfx/core": "workspace:*",
       },
@@ -423,7 +423,7 @@
     },
     "packages/transport": {
       "name": "@batonfx/transport",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "dependencies": {
         "@batonfx/runtime": "workspace:*",
       },

@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
 import { Effect, Exit, Stream } from "effect"
+import { Response } from "effect/unstable/ai"
 import { Errors, Runtime, RunStore } from "../src/index.js"
 import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../src/sql/schema.js"
 import { markDirty } from "../src/sql/migrate.js"
@@ -38,6 +39,53 @@ it.live("migrates and reopens a durable sqlite store", () =>
       expect(tags).toEqual(["RunAccepted", "RunAttemptStarted"])
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
     void second
+  }).pipe(Effect.asVoid),
+)
+
+it.live("persists decoded finish parts that omit an undefined response", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("finish-part")
+    const runId = yield* Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:finish-part",
+        idempotencyKey: "finish-part:1",
+        prompt: textPrompt("hello"),
+      })
+      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "test" })
+      const part = {
+        "~effect/ai/Content/Part": "~effect/ai/Content/Part",
+        metadata: {},
+        type: "finish",
+        reason: "stop",
+        usage: Response.Usage.make({
+          inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: 1, text: 1, reasoning: undefined },
+        }),
+      } as unknown as Response.FinishPart
+      yield* store.emitAgentEvent({
+        ...claim,
+        runId: receipt.runId,
+        event: {
+          _tag: "ModelPart",
+          turn: 0,
+          modelCallId: "model-call:1",
+          modelAttemptId: "model-attempt:1",
+          attempt: 0,
+          part,
+        },
+      })
+      return receipt.runId
+    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+
+    const history = yield* Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      return yield* runtime.history({ runId, cursor: -1, limit: 10 })
+    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+    const modelPart = history.find((event) => event._tag === "ModelPart")
+    expect(modelPart?._tag === "ModelPart" && modelPart.part.type).toBe("finish")
   }).pipe(Effect.asVoid),
 )
 

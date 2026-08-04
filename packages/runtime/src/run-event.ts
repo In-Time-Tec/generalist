@@ -143,6 +143,23 @@ const ToolResult = Schema.Struct({
   preliminary: Schema.Boolean,
   metadata: Response.ProviderMetadata,
 })
+const FinishPart = Schema.Struct({
+  ...Response.FinishPart.fields,
+  usage: Schema.Struct({
+    inputTokens: Schema.Struct({
+      uncached: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+      total: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+      cacheRead: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+      cacheWrite: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+    }),
+    outputTokens: Schema.Struct({
+      total: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+      text: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+      reasoning: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+    }),
+  }),
+  response: Schema.optionalKey(Schema.UndefinedOr(Response.HttpResponseDetails)),
+})
 const StreamPart = Schema.Union([
   Response.TextStartPart,
   Response.TextDeltaPart,
@@ -158,7 +175,7 @@ const StreamPart = Schema.Union([
   Response.DocumentSourcePart,
   Response.UrlSourcePart,
   Response.ResponseMetadataPart,
-  Response.FinishPart,
+  FinishPart,
   Response.ErrorPart,
   ToolCall,
   ToolResult,
@@ -171,7 +188,7 @@ const Part = Schema.Union([
   Response.DocumentSourcePart,
   Response.UrlSourcePart,
   Response.ResponseMetadataPart,
-  Response.FinishPart,
+  FinishPart,
   ToolCall,
   ToolResult,
 ])
