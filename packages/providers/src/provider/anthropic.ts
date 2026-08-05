@@ -1,18 +1,46 @@
-import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic"
+import { AnthropicClient, AnthropicLanguageModel, Generated } from "@effect/ai-anthropic"
 import { ContextOverflow, ModelRegistry } from "@batonfx/core"
 import type { ModelRegistryFacade } from "@batonfx/core"
-import { Config, Effect, Layer, Redacted } from "effect"
+import { Config as EffectConfig, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { AiError, AnthropicStructuredOutput, Tool } from "effect/unstable/ai"
 import { layerImageSources } from "../model/image-source.js"
-import { type FailureInput, layerModelFailures } from "../model/model-failure.js"
+import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/model-failure.js"
 import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
 export interface AnthropicInput extends RegistrationOptions {
   readonly model: (string & {}) | AnthropicLanguageModel.Model
-  readonly config?: Omit<typeof AnthropicLanguageModel.Config.Service, "model">
+  readonly config?: Config
 }
+
+/** @experimental */
+export type Config = Omit<typeof AnthropicLanguageModel.Config.Service, "model">
+
+const {
+  max_tokens: maxTokens,
+  messages: _messages,
+  model: _model,
+  output_config: _outputConfig,
+  stream: _stream,
+  tool_choice: _toolChoice,
+  tools: _tools,
+  ...anthropicConfigFields
+} = Generated.BetaCreateMessageParams.fields
+
+const ConfigSchema = Schema.Struct({
+  ...anthropicConfigFields,
+  max_tokens: Schema.optionalKey(maxTokens),
+  output_config: Schema.optionalKey(
+    Schema.Struct({ effort: Schema.optionalKey(Schema.NullOr(Schema.Literals(["low", "medium", "high"]))) }),
+  ),
+  disableParallelToolCalls: Schema.optionalKey(Schema.Boolean),
+  strictJsonSchema: Schema.optionalKey(Schema.Boolean),
+})
+
+/** @experimental Decodes persisted provider options into Anthropic request configuration. */
+export const decodeConfig = (options: unknown): Config =>
+  Schema.decodeUnknownSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {}) as Config
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -97,14 +125,14 @@ export const toolJsonSchemaCompiler: ModelRegistry.ToolJsonSchemaCompiler = (too
 
 /** @experimental */
 export interface LayerOptions extends AnthropicInput {
-  readonly apiKey: Config.Config<Redacted.Redacted<string>>
+  readonly apiKey: EffectConfig.Config<Redacted.Redacted<string>>
   readonly clientConfig?: Omit<NonNullable<Parameters<typeof AnthropicClient.layerConfig>[0]>, "apiKey">
 }
 
 /** @experimental */
 export const layer = (
   input: LayerOptions,
-): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
+): Layer.Layer<ModelRegistry.ModelRegistry, EffectConfig.ConfigError, HttpClient.HttpClient> =>
   ModelRegistry.layer([
     ModelRegistry.registration({
       provider: "anthropic",
@@ -112,6 +140,7 @@ export const layer = (
       layer: anthropicLanguageModelLayer(input),
       classifyFailure,
       toolJsonSchemaCompiler,
+      isAvailabilityFailure,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     }),
@@ -125,6 +154,7 @@ export const registration = (input: AnthropicInput): ReturnType<ModelRegistryFac
     layer: anthropicLanguageModelLayer(input),
     classifyFailure,
     toolJsonSchemaCompiler,
+    isAvailabilityFailure,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })

@@ -5,6 +5,7 @@ import {
   ModelCallPurpose as ModelTelemetry_ModelCallPurpose,
   ModelFailureCategory as ModelTelemetry_ModelFailureCategory,
   ModelFailureClassification as ModelTelemetry_ModelFailureClassification,
+  ModelFailureDisposition as ModelTelemetry_ModelFailureDisposition,
   ModelRetryReason as ModelTelemetry_ModelRetryReason,
   ModelFirstOutputKind as ModelTelemetry_ModelFirstOutputKind,
   CompactionTrigger as ModelTelemetry_CompactionTrigger,
@@ -23,6 +24,7 @@ import {
   ModelAttemptCompleted as ModelTelemetry_ModelAttemptCompleted,
   ModelAttemptFailed as ModelTelemetry_ModelAttemptFailed,
   ModelRetryScheduled as ModelTelemetry_ModelRetryScheduled,
+  ModelFallbackScheduled as ModelTelemetry_ModelFallbackScheduled,
   ModelCallCompleted as ModelTelemetry_ModelCallCompleted,
   ModelCallFailed as ModelTelemetry_ModelCallFailed,
   CompactionStarted as ModelTelemetry_CompactionStarted,
@@ -47,6 +49,7 @@ export const ModelTelemetry = {
   ModelCallPurpose: ModelTelemetry_ModelCallPurpose,
   ModelFailureCategory: ModelTelemetry_ModelFailureCategory,
   ModelFailureClassification: ModelTelemetry_ModelFailureClassification,
+  ModelFailureDisposition: ModelTelemetry_ModelFailureDisposition,
   ModelRetryReason: ModelTelemetry_ModelRetryReason,
   ModelFirstOutputKind: ModelTelemetry_ModelFirstOutputKind,
   CompactionTrigger: ModelTelemetry_CompactionTrigger,
@@ -65,6 +68,7 @@ export const ModelTelemetry = {
   ModelAttemptCompleted: ModelTelemetry_ModelAttemptCompleted,
   ModelAttemptFailed: ModelTelemetry_ModelAttemptFailed,
   ModelRetryScheduled: ModelTelemetry_ModelRetryScheduled,
+  ModelFallbackScheduled: ModelTelemetry_ModelFallbackScheduled,
   ModelCallCompleted: ModelTelemetry_ModelCallCompleted,
   ModelCallFailed: ModelTelemetry_ModelCallFailed,
   CompactionStarted: ModelTelemetry_CompactionStarted,
@@ -89,6 +93,7 @@ export namespace ModelTelemetry {
   export type ModelCallPurpose = import("./model-telemetry.js").ModelCallPurpose
   export type ModelFailureCategory = import("./model-telemetry.js").ModelFailureCategory
   export type ModelFailureClassification = import("./model-telemetry.js").ModelFailureClassification
+  export type ModelFailureDisposition = import("./model-telemetry.js").ModelFailureDisposition
   export type ModelRetryReason = import("./model-telemetry.js").ModelRetryReason
   export type ModelFirstOutputKind = import("./model-telemetry.js").ModelFirstOutputKind
   export type CompactionTrigger = import("./model-telemetry.js").CompactionTrigger
@@ -107,6 +112,7 @@ export namespace ModelTelemetry {
   export type ModelAttemptCompleted = import("./model-telemetry.js").ModelAttemptCompleted
   export type ModelAttemptFailed = import("./model-telemetry.js").ModelAttemptFailed
   export type ModelRetryScheduled = import("./model-telemetry.js").ModelRetryScheduled
+  export type ModelFallbackScheduled = import("./model-telemetry.js").ModelFallbackScheduled
   export type ModelCallCompleted = import("./model-telemetry.js").ModelCallCompleted
   export type ModelCallFailed = import("./model-telemetry.js").ModelCallFailed
   export type CompactionStarted = import("./model-telemetry.js").CompactionStarted

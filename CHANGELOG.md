@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.15.0
+
+- Add exact durable executable registration, admission validation, and restart reconstruction from persisted registrations.
+- Add finite root-tree watching that drains through root settlement, plus cross-process cancellation watching and finalizer settlement.
+- Add durable Agent Program execution, including replay, approvals, cancellation, and persisted child and fan-out recovery.
+- Bring MySQL durable Runtime behavior to SQLite and PostgreSQL parity, including migration, claims, steering, cancellation, and Program recovery.
+- Add typed admission failures and persisted codecs for executable registrations and Runtime events.
+
 ## 0.14.2
 
 - Accept Effect's encoded usage shape across successful model telemetry and turn-completion events in durable Runtime stores.

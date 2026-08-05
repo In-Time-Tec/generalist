@@ -15,6 +15,13 @@ export interface FailureInput {
 /** @experimental */
 export type Resolver = (input: FailureInput) => AiError.AiError
 
+/** @internal Conservative cross-provider availability semantics. */
+export const isAvailabilityFailure = (error: unknown): boolean =>
+  AiError.isAiError(error) &&
+  (error.reason._tag === "RateLimitError" ||
+    error.reason._tag === "NetworkError" ||
+    error.reason._tag === "InternalProviderError")
+
 interface ModelResponse {
   readonly content: ReadonlyArray<Response.AnyPart>
 }

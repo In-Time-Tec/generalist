@@ -8,6 +8,9 @@ import {
   Runtime as Agent_Runtime,
   layerRuntime as Agent_layerRuntime,
   ResumeResolution as Agent_ResumeResolution,
+  AgentTypeId as Agent_AgentTypeId,
+  close as Agent_close,
+  withTools as Agent_withTools,
 } from "./agent.js"
 export const Agent = {
   make: Agent_make,
@@ -17,6 +20,9 @@ export const Agent = {
   Runtime: Agent_Runtime,
   layerRuntime: Agent_layerRuntime,
   ResumeResolution: Agent_ResumeResolution,
+  AgentTypeId: Agent_AgentTypeId,
+  close: Agent_close,
+  withTools: Agent_withTools,
 } as AgentFacade
 export namespace Agent {
   export type make = typeof import("./agent.js").make
@@ -25,6 +31,15 @@ export namespace Agent {
   export type generate = typeof import("./agent.js").generate
   export type Runtime = import("./agent.js").Runtime
   export type layerRuntime = typeof import("./agent.js").layerRuntime
+  export type close = typeof import("./agent.js").close
+  export type withTools = typeof import("./agent.js").withTools
+  export type Any = import("./agent.js").Any
+  export type Closed = import("./agent.js").Closed
+  export type ClosedServices<
+    Tools extends Record<string, import("effect/unstable/ai").Tool.Any>,
+    R,
+  > = import("./agent.js").ClosedServices<Tools, R>
+  export type Opened<A> = import("./agent.js").Opened<A>
   export type Agent<
     Tools extends Record<string, import("effect/unstable/ai").Tool.Any> = {},
     R = import("effect/unstable/ai").LanguageModel.LanguageModel,

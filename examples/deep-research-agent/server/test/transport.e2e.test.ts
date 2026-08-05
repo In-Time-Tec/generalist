@@ -146,10 +146,11 @@ describe("deep-research-agent Baton transport e2e", () => {
             _tag: "ToolExecutionCompleted",
             result: { name: "web_search" },
           })
-          expect(completed?._tag === "RunCompleted" && completed.result.text).toContain("Based on 2 sources")
-          expect(completed?._tag === "RunCompleted" && completed.result.text).toContain(
-            "https://github.com/batonfx/batonfx",
-          )
+          if (completed?._tag !== "RunCompleted" || "_tag" in completed.result) {
+            return yield* Effect.die("expected an Agent RunCompleted event")
+          }
+          expect(completed.result.text).toContain("Based on 2 sources")
+          expect(completed.result.text).toContain("https://github.com/batonfx/batonfx")
         }),
       ).pipe(Effect.provide(FetchHttpClient.layer), Effect.provide(bunServicesLayer)),
     60_000,

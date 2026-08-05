@@ -7,9 +7,14 @@ import {
 } from "./model-call-correction.js"
 import type { IdentityCell } from "./model-attempt-identity.js"
 import { CurrentModelCallOrdinal } from "../durable/operation-context.js"
-import { attemptModel, type CallContext, type InstrumentOptions } from "./model-attempt-instrumentation.js"
+import {
+  attemptModel,
+  type CallContext,
+  type InstrumentOptions,
+  settleFailure,
+} from "./model-attempt-instrumentation.js"
 import { memoized, singleFailure, tapRetryTelemetry } from "./model-attempt-observation.js"
-import { classifyFailure } from "./model-registry.js"
+import { candidateRoute, classifyFailure, registrationIdentity, type CandidateIdentity } from "./model-registry.js"
 import { adapt, invokeGenerateObject, invokeGenerateText } from "./model-service.js"
 import { type InvalidToolCallParameters, isInvalidToolCallParameters } from "./model-tool-call-validation.js"
 import { type Classification, type ModelResilienceMisconfigured, apply, validate } from "./model-resilience.js"
@@ -106,11 +111,12 @@ const beginCall = (
         failedAttemptUsage: undefined,
         finishReason: undefined,
         errorCategory: undefined,
+        pendingFailure: undefined,
       },
     }
-    const attempts = attemptModel(model, context)
-    const stack =
-      options.resilience === undefined
+    const instrumentCandidate = (candidate: LanguageModel.Service, identity?: CandidateIdentity) => {
+      const attempts = attemptModel(candidate, context, identity)
+      return options.resilience === undefined
         ? attempts
         : apply(
             attempts,
@@ -122,8 +128,40 @@ const beginCall = (
               turn: options.turn,
               modelCallId: context.modelCallId,
               emit: options.emit,
+              settleFailure: settleFailure(context, "retry").pipe(Effect.orDie),
             }),
           )
+    }
+    const route = candidateRoute(model)
+    const directIdentity = registrationIdentity(model)
+    const stack =
+      route === undefined
+        ? instrumentCandidate(model, directIdentity === undefined ? undefined : { ...directIdentity, candidate: 0 })
+        : route({
+            instrument: (candidate, identity) => instrumentCandidate(candidate, identity),
+            settleFailure: (disposition) => settleFailure(context, disposition).pipe(Effect.orDie),
+            fallbackScheduled: ({ from, to, error }) =>
+              Effect.gen(function* () {
+                yield* settleFailure(context, "fallback")
+                const at = yield* Clock.currentTimeMillis
+                yield* options.emit({
+                  _tag: "ModelFallbackScheduled",
+                  turn: options.turn,
+                  modelCallId: context.modelCallId,
+                  attempt: context.state.attempts - 1,
+                  fromCandidate: from.candidate,
+                  fromProvider: from.provider,
+                  fromModel: from.model,
+                  ...(from.registrationKey === undefined ? {} : { fromRegistrationKey: from.registrationKey }),
+                  toCandidate: to.candidate,
+                  toProvider: to.provider,
+                  toModel: to.model,
+                  ...(to.registrationKey === undefined ? {} : { toRegistrationKey: to.registrationKey }),
+                  category: context.categorize(error),
+                  at,
+                })
+              }).pipe(Effect.orDie),
+          })
     return { context, stack }
   })
 
@@ -177,13 +215,27 @@ const callFailed = (
 
 const callExit = (context: CallContext, exit: Exit.Exit<unknown, unknown>): Effect.Effect<void> => {
   if (context.state.errorCategory !== undefined) {
-    return callFailed(context, context.state.errorCategory, "terminal")
+    return settleFailure(context, "terminal").pipe(
+      Effect.andThen(callFailed(context, context.state.errorCategory, "terminal")),
+      Effect.orDie,
+    )
   }
   if (Exit.isSuccess(exit)) return callCompleted(context)
-  if (Cause.hasInterrupts(exit.cause)) return callFailed(context, "cancellation", "terminal")
+  if (Cause.hasInterrupts(exit.cause))
+    return settleFailure(context, "terminal").pipe(
+      Effect.andThen(callFailed(context, "cancellation", "terminal")),
+      Effect.orDie,
+    )
   const failure = singleFailure(exit.cause)
-  if (Option.isNone(failure)) return callFailed(context, "unknown", "terminal")
-  return callFailed(context, context.categorize(failure.value), context.classify(failure.value))
+  if (Option.isNone(failure))
+    return settleFailure(context, "terminal").pipe(
+      Effect.andThen(callFailed(context, "unknown", "terminal")),
+      Effect.orDie,
+    )
+  return settleFailure(context, "terminal").pipe(
+    Effect.andThen(callFailed(context, context.categorize(failure.value), context.classify(failure.value))),
+    Effect.orDie,
+  )
 }
 
 const validateOptions = (options: InstrumentOptions) =>
@@ -228,6 +280,7 @@ const callStream = (
           attempt: () => context.state.attempts - 1,
           categorize: context.categorize,
           emit: context.options.emit,
+          settleFailure: settleFailure(context, "retry").pipe(Effect.orDie),
         },
         model: stack,
         options: streamOptions,

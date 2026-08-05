@@ -131,6 +131,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
           failedAt: 3,
           category: "provider-response",
           classification: "terminal",
+          disposition: "terminal",
           providerUsage: { inputTokens: 3, outputTokens: 1, totalTokens: 4 },
         },
       })
@@ -223,6 +224,7 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
         failedAt: 2,
         category: "provider-response" as const,
         classification: "terminal" as const,
+        disposition: "terminal" as const,
       }
 
       const unordered = yield* makeRun("unordered-attempt")

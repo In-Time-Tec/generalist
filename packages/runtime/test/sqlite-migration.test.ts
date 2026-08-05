@@ -1,113 +1,115 @@
 import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { SchemaMigrationFailed } from "../src/sql/errors.js"
+import { SchemaChecksumMismatch, SchemaDirty, SchemaVersionUnsupported } from "../src/sql/errors.js"
 import { layer as sqliteClientLayer } from "../src/sql/bun-client.js"
 import { migrate } from "../src/sql/migrate.js"
-import {
-  FAN_OUT_MIGRATION_STATEMENTS,
-  LEGACY_MIGRATION_STATEMENTS,
-  SCHEMA_VERSION,
-  TREE_MIGRATION_STATEMENTS,
-  treeSchemaChecksum,
-} from "../src/sql/schema.js"
+import { SCHEMA_VERSION, schemaChecksum } from "../src/sql/schema.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
-const legacyMessage = "cannot migrate nonempty baton_runs to executable manifests"
+const apply = (filename: string) =>
+  migrate(filename).pipe(Effect.provide(sqliteClientLayer({ filename })), Effect.scoped)
 
-const makeV4Fixture = (filename: string, populated: boolean) => {
+const inspect = (filename: string) => {
   const db = new Database(filename)
-  for (const statement of [
-    ...LEGACY_MIGRATION_STATEMENTS,
-    ...FAN_OUT_MIGRATION_STATEMENTS,
-    ...TREE_MIGRATION_STATEMENTS,
-  ]) {
-    db.run(statement)
-  }
-  db.run(`CREATE TABLE baton_sql_migrations (
-    migration_id INTEGER PRIMARY KEY NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    name VARCHAR(255) NOT NULL
-  )`)
-  for (const [migrationId, name] of [
-    [1, "baton_runtime_kernel"],
-    [2, "baton_runtime_steering"],
-    [3, "baton_runtime_fan_out"],
-    [4, "baton_runtime_tree_projection"],
-  ] as const) {
-    db.run("INSERT INTO baton_sql_migrations (migration_id, name) VALUES (?, ?)", [migrationId, name])
-  }
-  db.run("INSERT INTO baton_schema_meta (id, version, checksum, dirty, applied_at) VALUES (1, 4, ?, 0, ?)", [
-    treeSchemaChecksum(),
-    new Date(0).toISOString(),
-  ])
-  if (populated) {
-    db.run(`INSERT INTO baton_runs (
-      run_id, status, address, session_id, message_id, message_json, message_digest, idempotency_key,
-      agent_json, root_run_id, accepted_sequence, responded_wait_ids_json, created_at, updated_at
-    ) VALUES (
-      'legacy-run', 'queued', 'agent', 'session', 'message', '{}', 'digest', 'key',
-      '{}', 'legacy-run', 0, '[]', '1970-01-01T00:00:00.000Z', '1970-01-01T00:00:00.000Z'
-    )`)
-  }
-  const columns = db
+  const tables = db
+    .query<{ name: string }, []>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'baton_%' ORDER BY name",
+    )
+    .all()
+    .map((row) => row.name)
+  const runColumns = db
     .query<{ name: string }, []>("PRAGMA table_info(baton_runs)")
+    .all()
+    .map((row) => row.name)
+  const operationColumns = db
+    .query<{ name: string }, []>("PRAGMA table_info(baton_run_operations)")
     .all()
     .map((row) => row.name)
   const meta = db
     .query<{ version: number; checksum: string }, []>("SELECT version, checksum FROM baton_schema_meta WHERE id = 1")
     .get()
-  expect(meta).toEqual({ version: 4, checksum: treeSchemaChecksum() })
-  expect(columns).toContain("agent_json")
-  expect(columns).not.toContain("executable_ref_json")
-  expect(columns).not.toContain("executable_manifest_json")
-  db.close()
-}
-
-const apply = (filename: string) =>
-  migrate(filename).pipe(Effect.provide(sqliteClientLayer({ filename })), Effect.scoped)
-
-const inspectSchema = (filename: string) => {
-  const db = new Database(filename)
-  const columns = db
-    .query<{ name: string }, []>("PRAGMA table_info(baton_runs)")
-    .all()
-    .map((row) => row.name)
-  const meta = db.query<{ version: number }, []>("SELECT version FROM baton_schema_meta WHERE id = 1").get()
-  const pinTables = db
-    .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%pin%'")
+  const migrations = db
+    .query<{ migration_id: number }, []>("SELECT migration_id FROM baton_sql_migrations ORDER BY migration_id")
     .all()
   db.close()
-  expect(meta?.version).toBe(SCHEMA_VERSION)
-  expect(columns).toContain("executable_ref_json")
-  expect(columns).toContain("executable_manifest_json")
-  expect(columns).not.toContain("agent_json")
-  expect(pinTables).toEqual([])
+  expect(meta).toEqual({ version: SCHEMA_VERSION, checksum: schemaChecksum() })
+  expect(migrations.map(({ migration_id }) => migration_id)).toEqual([1])
+  expect(runColumns).toEqual([
+    "run_id",
+    "status",
+    "address",
+    "session_id",
+    "message_id",
+    "message_json",
+    "message_digest",
+    "idempotency_key",
+    "executable_ref_json",
+    "executable_manifest_json",
+    "root_run_id",
+    "parent_run_id",
+    "invocation_id",
+    "active_wait_id",
+    "attempt",
+    "attempt_fence",
+    "last_sequence",
+    "cancellation_requested",
+    "cancel_reason",
+    "terminal_event_id",
+    "accepted_sequence",
+    "responded_wait_ids_json",
+    "driver_checkpoint_json",
+    "suspension_json",
+    "transcript_json",
+    "continuation_json",
+    "pending_outcome_json",
+    "owner_worker_id",
+    "created_at",
+    "updated_at",
+  ])
+  expect(operationColumns).toContain("resolution_idempotency_key")
+  expect(operationColumns).toContain("resolution_json")
+  expect(tables).toEqual([
+    "baton_executable_registrations",
+    "baton_fan_out_members",
+    "baton_fan_outs",
+    "baton_lanes",
+    "baton_program_operations",
+    "baton_program_runs",
+    "baton_run_events",
+    "baton_run_links",
+    "baton_run_operations",
+    "baton_run_registrations",
+    "baton_run_steering",
+    "baton_run_waits",
+    "baton_runs",
+    "baton_schema_meta",
+    "baton_sql_migrations",
+    "baton_tree_event_index",
+    "baton_tree_roots",
+  ])
 }
 
-it.live("migrates an empty genuine SQLite v4 schema to v5", () =>
+it.live("creates the current SQLite v1 baseline and applies idempotently", () =>
   Effect.gen(function* () {
-    const filename = tempDbPath("sqlite-empty-v4")
-    makeV4Fixture(filename, false)
+    const filename = tempDbPath("sqlite-baseline-v1")
     yield* apply(filename)
-    inspectSchema(filename)
+    yield* apply(filename)
+    inspect(filename)
   }),
 )
 
-it.live("rejects a populated genuine SQLite v4 schema with a typed failure", () =>
+it.live.each([
+  ["dirty", "UPDATE baton_schema_meta SET dirty = 1 WHERE id = 1", SchemaDirty],
+  ["checksum", "UPDATE baton_schema_meta SET checksum = 'wrong' WHERE id = 1", SchemaChecksumMismatch],
+  ["future", `UPDATE baton_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`, SchemaVersionUnsupported],
+] as const)("rejects a %s SQLite schema", ([, update, expected]) =>
   Effect.gen(function* () {
-    const filename = tempDbPath("sqlite-populated-v4")
-    makeV4Fixture(filename, true)
-    const failure = yield* apply(filename).pipe(Effect.flip)
-    expect(failure).toBeInstanceOf(SchemaMigrationFailed)
-    expect(failure.message).toBe(legacyMessage)
-  }),
-)
-
-it.live("creates a fresh SQLite v5 schema", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("sqlite-fresh-v5")
+    const filename = tempDbPath(`sqlite-reject-${expected.name}`)
     yield* apply(filename)
-    inspectSchema(filename)
+    const db = new Database(filename)
+    db.run(update)
+    db.close()
+    expect(yield* apply(filename).pipe(Effect.flip)).toBeInstanceOf(expected)
   }),
 )

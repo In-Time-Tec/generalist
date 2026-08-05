@@ -470,7 +470,7 @@ const overflowModelLayer = (streamText: ModelParams["streamText"], generateText?
         AiError.isAiError(error) && error.module === "AgentTestLanguageModel" && error.reason._tag === "UnknownError"
           ? "context-overflow"
           : "other",
-    }).pipe(Effect.map((registration) => ModelRegistry.layerMemory([Effect.succeed(registration)]))),
+    }).pipe(Effect.map((registration) => ModelRegistry.layer([Effect.succeed(registration)]))),
   )
 
 const retryTransientModelError = ModelResilience.layer({
@@ -848,6 +848,33 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "fails before model calls when compaction reserveTokens is invalid", () => {
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("unexpected"))
+        }),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "invalid-reserve-agent" })
+        for (const reserveTokens of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+          const failure = yield* Effect.flip(
+            Stream.runDrain(Agent.stream(agent, { prompt: "hello", compaction: { reserveTokens } })),
+          )
+          expect(failure._tag === "@batonfx/core/AgentError" && failure.message).toBe(
+            "RunOptions.compaction.reserveTokens must be a non-negative safe integer",
+          )
+        }
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "rejects history combined with persistence before model calls", () => {
     let modelCalls = 0
     return [
@@ -990,7 +1017,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             provider: "test",
             model: "agent-default",
             layer: modelLayer(() => Stream.make(textDelta("registry done"))),
-          }).pipe(Effect.map((registration) => ModelRegistry.layerMemory([Effect.succeed(registration)]))),
+          }).pipe(Effect.map((registration) => ModelRegistry.layer([Effect.succeed(registration)]))),
         ),
         Effect.gen(function* () {
           const agent = Agent.make({
@@ -1045,7 +1072,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         ModelRegistry.registration({ ...selection, layer: selectedModel }).pipe(
           Effect.map((registration) =>
             Layer.mergeAll(
-              ModelRegistry.layerMemory([Effect.succeed(registration)], { maxConcurrentModelCalls: 1 }),
+              ModelRegistry.layer([Effect.succeed(registration)], { maxConcurrentModelCalls: 1 }),
               unusedExecutor,
               Approvals.layerAutoApprove,
               ModelMiddleware.layerIdentity,
@@ -4003,7 +4030,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               calls += 1
               return calls === 1 ? Stream.fail(decodeFailure) : Stream.make(textDelta("recovered"))
             }),
-          }).pipe(Effect.map((registration) => ModelRegistry.layerMemory([Effect.succeed(registration)]))),
+          }).pipe(Effect.map((registration) => ModelRegistry.layer([Effect.succeed(registration)]))),
         ),
         Compaction.layerTest({
           maybeCompact: (request) =>

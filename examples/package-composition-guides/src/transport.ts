@@ -1,34 +1,52 @@
 import { Console, Effect, Layer, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Chat } from "@batonfx/core"
-import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
+import { Agent, AgentManifest, Chat, Pins } from "@batonfx/core"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { TestModel } from "@batonfx/test"
 import { Sse } from "@batonfx/transport"
 
 const agent = Agent.make({ name: "transport-agent" })
-const executable = ExecutableManifest.makeTest("transport-agent", "1")
-const agentAddress = Address.make("agent:transport-guide")
+const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
+  model: Pins.makeModel({ fixture: "transport-agent", revision: "1" }),
+  tools: [],
+  skills: [],
+  services: [],
+  policy: { _tag: "Portable", policy: agent.policy.snapshot! },
+  budget: agent.budget ?? {},
+  children: [],
+})
+const executable = ExecutableManifest.make({ root: pinnedAgent.pin, entries: [{ _tag: "Agent", ...pinnedAgent }] })
+const registrations = executable.manifest.entries.flatMap((entry) =>
+  entry._tag === "Agent"
+    ? [
+        entry.manifest.model,
+        ...entry.manifest.tools.map(({ pin }) => pin),
+        ...(entry.manifest.policy._tag === "Pinned" ? [entry.manifest.policy.pin] : []),
+      ].map((pin) => ({ pin, codec: "example", version: "1", payload: { fixture: "transport-agent" } }))
+    : [],
+)
 const agentServices = Layer.mergeAll(
   TestModel.layer([TestModel.text("Hello from transport.")]),
   Chat.layerPersisted({ storeId: "composition-guide-sessions" }).pipe(Layer.provide(Persistence.layerBackingMemory)),
 )
 
 const runtimeLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
-  addresses: [{ address: agentAddress, executable }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
+  addresses: [],
   subscriberQueueCapacity: 16,
 })
 
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const receipt = yield* runtime.send({
-    to: agentAddress,
+  const receipt = yield* runtime.start({
+    executable,
+    registrations,
     sessionId: "guide-session",
     idempotencyKey: "guide-message-1",
     prompt: "Say hello",
   })
   const store = yield* RunStore.RunStore
-  const host = yield* AgentHost.AgentHost
+  const host = yield* ExecutionHost.ExecutionHost
   yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "composition-guide" }))
   const first = yield* runtime.events({ runId: receipt.runId }).pipe(Stream.take(1), Stream.runCollect)
   yield* Console.log(

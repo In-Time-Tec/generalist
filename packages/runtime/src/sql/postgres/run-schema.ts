@@ -10,24 +10,7 @@ import {
   SchemaVersionUnsupported,
 } from "../errors.js"
 import { mapSqlError } from "../sql-effect.js"
-import {
-  MIGRATION_STATEMENTS,
-  KERNEL_MIGRATION_STATEMENTS,
-  MIGRATIONS_TABLE,
-  SCHEMA_META_TABLE,
-  SCHEMA_VERSION,
-  STEERING_MIGRATION_STATEMENTS,
-  FAN_OUT_MIGRATION_STATEMENTS,
-  TREE_MIGRATION_STATEMENTS,
-  EXECUTABLE_MIGRATION_STATEMENTS,
-  OPERATION_RESOLUTION_MIGRATION_STATEMENTS,
-  kernelSchemaChecksum,
-  schemaChecksum,
-  steeringSchemaChecksum,
-  fanOutSchemaChecksum,
-  treeSchemaChecksum,
-  executableSchemaChecksum,
-} from "./schema.js"
+import { MIGRATIONS_TABLE, SCHEMA_META_TABLE, SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "./schema.js"
 
 export interface SchemaPlan {
   readonly current: number
@@ -44,27 +27,16 @@ const readMeta = (source: string) =>
       const exists = yield* sql<{ exists: boolean }>`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
-          WHERE table_name = ${SCHEMA_META_TABLE}
+          WHERE table_schema = current_schema() AND table_name = ${SCHEMA_META_TABLE}
         ) AS exists
       `
-      if (exists[0]?.exists !== true) {
-        return { version: 0, checksum: "", dirty: false, present: false as const }
-      }
-      const rows = yield* sql<{
-        version: number
-        checksum: string
-        dirty: boolean
-      }>`SELECT version, checksum, dirty FROM ${sql(SCHEMA_META_TABLE)} WHERE id = 1`
+      if (exists[0]?.exists !== true) return { version: 0, checksum: "", dirty: false, present: false as const }
+      const rows = yield* sql<{ version: number; checksum: string; dirty: boolean }>`
+        SELECT version, checksum, dirty FROM ${sql(SCHEMA_META_TABLE)} WHERE id = 1
+      `
       const row = rows[0]
-      if (row === undefined) {
-        return { version: 0, checksum: "", dirty: false, present: false as const }
-      }
-      return {
-        version: Number(row.version),
-        checksum: row.checksum,
-        dirty: row.dirty === true,
-        present: true as const,
-      }
+      if (row === undefined) return { version: 0, checksum: "", dirty: false, present: false as const }
+      return { version: Number(row.version), checksum: row.checksum, dirty: row.dirty, present: true as const }
     }),
   ).pipe(
     Effect.mapError((error) =>
@@ -77,159 +49,55 @@ const readMeta = (source: string) =>
 
 const migrationEffect = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  for (const statement of KERNEL_MIGRATION_STATEMENTS) {
-    yield* sql.unsafe(statement)
-  }
-  const checksum = kernelSchemaChecksum()
+  for (const statement of SCHEMA_STATEMENTS) yield* sql.unsafe(statement)
   const now = yield* DateTime.nowAsDate
   yield* sql`
     INSERT INTO ${sql(SCHEMA_META_TABLE)} (id, version, checksum, dirty, applied_at)
-    VALUES (1, 1, ${checksum}, FALSE, ${now})
-    ON CONFLICT (id) DO UPDATE SET
-      version = EXCLUDED.version,
-      checksum = EXCLUDED.checksum,
-      dirty = FALSE,
-      applied_at = EXCLUDED.applied_at
-  `
-})
-
-const steeringMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of STEERING_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.nowAsDate
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = 2, checksum = ${steeringSchemaChecksum()}, dirty = FALSE, applied_at = ${now}
-    WHERE id = 1
-  `
-})
-
-const fanOutMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of FAN_OUT_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.nowAsDate
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = 3, checksum = ${fanOutSchemaChecksum()}, dirty = FALSE, applied_at = ${now}
-    WHERE id = 1
-  `
-})
-
-const treeMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of TREE_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.nowAsDate
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = 4, checksum = ${treeSchemaChecksum()}, dirty = FALSE, applied_at = ${now}
-    WHERE id = 1
-  `
-})
-
-const executableMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of EXECUTABLE_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.nowAsDate
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = 5, checksum = ${executableSchemaChecksum()}, dirty = FALSE, applied_at = ${now}
-    WHERE id = 1
-  `
-})
-
-const operationResolutionMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of OPERATION_RESOLUTION_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.nowAsDate
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = FALSE, applied_at = ${now}
-    WHERE id = 1
+    VALUES (1, ${SCHEMA_VERSION}, ${schemaChecksum()}, FALSE, ${now})
   `
 })
 
 export const plan = (source: string): Effect.Effect<SchemaPlan, SchemaMigrationFailed, SqlClient.SqlClient> =>
-  Effect.gen(function* () {
-    const meta = yield* readMeta(source)
-    return {
-      current: meta.version,
-      required: SCHEMA_VERSION,
-      checksum: schemaChecksum(),
-      statements: MIGRATION_STATEMENTS,
-      upgradeRequired: meta.version < SCHEMA_VERSION,
-    }
-  })
+  Effect.map(readMeta(source), (meta) => ({
+    current: meta.version,
+    required: SCHEMA_VERSION,
+    checksum: schemaChecksum(),
+    statements: meta.present ? [] : SCHEMA_STATEMENTS,
+    upgradeRequired: !meta.present,
+  }))
 
-export const check = (
-  source: string,
-): Effect.Effect<
-  void,
-  SchemaDirty | SchemaChecksumMismatch | SchemaVersionUnsupported | SchemaUpgradeRequired | SchemaMigrationFailed,
-  SqlClient.SqlClient
-> =>
+export const check = (source: string) =>
   Effect.gen(function* () {
     const meta = yield* readMeta(source)
-    if (!meta.present || meta.version < SCHEMA_VERSION) {
-      return yield* SchemaUpgradeRequired.make({
-        source,
-        current: meta.version,
-        required: SCHEMA_VERSION,
-      })
-    }
-    if (meta.dirty) {
-      return yield* SchemaDirty.make({ source, version: meta.version })
-    }
+    if (!meta.present) return yield* SchemaUpgradeRequired.make({ source, current: 0, required: SCHEMA_VERSION })
+    if (meta.dirty) return yield* SchemaDirty.make({ source, version: meta.version })
     if (meta.version > SCHEMA_VERSION) {
-      return yield* SchemaVersionUnsupported.make({
-        source,
-        version: meta.version,
-        supported: SCHEMA_VERSION,
-      })
+      return yield* SchemaVersionUnsupported.make({ source, version: meta.version, supported: SCHEMA_VERSION })
     }
     const expected = schemaChecksum()
-    if (meta.checksum !== expected) {
+    if (meta.version !== SCHEMA_VERSION || meta.checksum !== expected) {
       return yield* SchemaChecksumMismatch.make({ source, expected, actual: meta.checksum })
     }
   })
 
-export const apply = (
-  source: string,
-): Effect.Effect<
-  void,
-  SchemaDirty | SchemaChecksumMismatch | SchemaVersionUnsupported | SchemaMigrationFailed,
-  SqlClient.SqlClient
-> =>
+export const apply = (source: string) =>
   Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
     const meta = yield* readMeta(source)
-    if (meta.present && meta.version < 5) {
-      const runs = yield* mapSqlError(
-        sql<{ present: boolean }>`SELECT EXISTS (SELECT 1 FROM baton_runs) AS present`,
-      ).pipe(
-        Effect.mapError((error) =>
-          SchemaMigrationFailed.make({
-            source,
-            message: "message" in error ? String(error.message) : "schema migration guard failed",
-          }),
-        ),
-      )
-      if (runs[0]?.present === true) {
-        return yield* SchemaMigrationFailed.make({
-          source,
-          message: "cannot migrate nonempty baton_runs to executable manifests",
-        })
-      }
+    if (meta.present) return yield* check(source)
+    const sql = yield* SqlClient.SqlClient
+    const existing = yield* sql<{ present: number }>`
+      SELECT COUNT(*) AS present FROM information_schema.tables
+      WHERE table_schema = current_schema() AND table_name LIKE 'baton\_%' ESCAPE '\'
+    `
+    if (Number(existing[0]?.present ?? 0) > 0) {
+      return yield* SchemaMigrationFailed.make({
+        source,
+        message: "cannot create the baseline over an existing Baton schema",
+      })
     }
     const runMigrations = Migrator.make({})
     yield* runMigrations({
-      loader: Migrator.fromRecord({
-        "0001_baton_runtime_postgres_kernel": migrationEffect,
-        "0002_baton_runtime_postgres_steering": steeringMigrationEffect,
-        "0003_baton_runtime_postgres_fan_out": fanOutMigrationEffect,
-        "0004_baton_runtime_postgres_tree_projection": treeMigrationEffect,
-        "0005_baton_runtime_postgres_executable_manifest": executableMigrationEffect,
-        "0006_baton_runtime_postgres_operation_resolution": operationResolutionMigrationEffect,
-      }),
+      loader: Migrator.fromRecord({ "0001_baton_runtime": migrationEffect }),
       table: MIGRATIONS_TABLE,
     }).pipe(
       Effect.mapError((error) =>
@@ -241,10 +109,7 @@ export const apply = (
     )
     yield* check(source).pipe(
       Effect.catchTag("@batonfx/runtime/SchemaUpgradeRequired", (error) =>
-        SchemaMigrationFailed.make({
-          source,
-          message: `upgrade still required after apply: ${error.current} -> ${error.required}`,
-        }),
+        SchemaMigrationFailed.make({ source, message: `schema absent after apply: ${error.current}` }),
       ),
     )
   })
@@ -264,12 +129,7 @@ export const markDirty = (source: string): Effect.Effect<void, SchemaMigrationFa
     ),
   )
 
-export const RunSchema = {
-  plan,
-  check,
-  apply,
-  markDirty,
-} as const
+export const RunSchema = { plan, check, apply, markDirty } as const
 
 export const layerClient = (url: string): Layer.Layer<SqlClient.SqlClient | PgClient.PgClient, SqlError> =>
   PgClient.layer({ url: Redacted.make(url) })

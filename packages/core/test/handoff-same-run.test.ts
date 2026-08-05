@@ -55,7 +55,13 @@ layer(Layer.empty)("Handoff same-run", (it) => {
       budget: {},
       children: [{ selection: "pinned-math", agent: child.pin }],
     })
-    const executable = ExecutableManifest.make({ root: root.pin, agents: [root, child] })
+    const executable = ExecutableManifest.make({
+      root: root.pin,
+      entries: [
+        { _tag: "Agent", ...root },
+        { _tag: "Agent", ...child },
+      ],
+    })
     let handoffCheckpoint: DurableDriver.DriverCheckpoint | undefined
     let handoffCommit: Handoff.HandoffCommit | undefined
     let calls = 0

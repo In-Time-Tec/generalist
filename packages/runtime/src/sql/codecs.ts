@@ -56,17 +56,6 @@ export const decodeQueue = (text: string): ReadonlyArray<string> => decodeJson(S
 
 export const encodeEvent = (event: RunEvent): string => encodeJson(Schema.encodeSync(RunEventCodec)(event))
 
-export const decodeEvent = (text: string): RunEvent => {
-  const parsed = JSON.parse(text) as Record<string, unknown>
-  if (parsed._tag === "RunCompleted") {
-    const result = parsed.result as Record<string, unknown>
-    const transcript = result.transcript as { readonly content: ReadonlyArray<unknown> }
-    parsed.result = { ...result, transcript: Prompt.make(transcript.content as never) }
-  } else if (parsed._tag === "TurnCompleted") {
-    const transcript = parsed.transcript as { readonly content: ReadonlyArray<unknown> }
-    parsed.transcript = Prompt.make(transcript.content as never)
-  }
-  return Schema.decodeUnknownSync(RunEventCodec)(parsed)
-}
+export const decodeEvent = (text: string): RunEvent => decodeJson(RunEventCodec, text)
 
 export const encodeAddress = (address: Address): string => address

@@ -1,7 +1,7 @@
 import type { Artifact, Message, Part, Task, TaskStatus } from "@a2a-js/sdk"
 import { Role, TaskState } from "@a2a-js/sdk"
-import type { Run, RunEvent, Runtime } from "@batonfx/runtime"
-import { Effect } from "effect"
+import { ExecutionState, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
+import { Effect, Schema } from "effect"
 import { TaskProjectionFailed } from "./errors.js"
 
 const textPart = (text: string): Part => ({
@@ -78,11 +78,17 @@ const statusFrom = (
 
 const artifactFrom = (event: RunEvent.RunCompleted, events: ReadonlyArray<RunEvent.RunEvent>): Artifact => {
   const structured = events.findLast((candidate) => candidate._tag === "StructuredOutput")
+  const parts =
+    structured?._tag === "StructuredOutput"
+      ? [dataPart(structured.value)]
+      : Schema.is(ExecutionState.ProgramExecutionResult)(event.result)
+        ? [dataPart(event.result.value)]
+        : [textPart(event.result.text)]
   return {
     artifactId: `${event.eventId}:result`,
     name: "result",
     description: "Baton run result",
-    parts: structured?._tag === "StructuredOutput" ? [dataPart(structured.value)] : [textPart(event.result.text)],
+    parts,
     metadata: {},
     extensions: [],
   }

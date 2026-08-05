@@ -16,6 +16,11 @@ const executionRecord = (
   run: MemoryState["runs"] extends ReadonlyMap<string, infer R> ? R : never,
 ): ExecutionRecord => ({
   runId: run.runId,
+  rootRunId: run.rootRunId,
+  ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
+  ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
+  ...(run.ownerId === undefined ? {} : { ownerId: run.ownerId }),
+  admittedAt: run.events[0]!.occurredAt,
   message: run.message,
   executableRef: run.executableRef,
   executableManifest: run.executableManifest,
@@ -26,6 +31,7 @@ const executionRecord = (
   ...(run.wait?.resolution === undefined ? {} : { resolution: run.wait.resolution }),
   ...(run.transcript === undefined ? {} : { transcript: run.transcript }),
   ...(run.continuation === undefined ? {} : { continuation: run.continuation }),
+  registrations: run.registrations,
 })
 
 export const loadExecution = (state: MemoryState, runId: string) =>

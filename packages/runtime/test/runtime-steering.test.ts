@@ -2,9 +2,9 @@ import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, DurableDriver, ToolExecutor } from "@batonfx/core"
-import { testExecutable } from "./identity.js"
-import { Address, AgentHost, Errors, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
-import { assistantAddress, assistantRef, completedResult, memoryLayer } from "./helpers.js"
+import { closedTestAgent, testExecutable } from "./identity.js"
+import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
+import { assistant, assistantAddress, assistantRef, completedResult, memoryLayer, registrationsFor } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
 const admitRun = Effect.gen(function* () {
@@ -143,6 +143,43 @@ layer(memoryLayer)("Runtime durable steering memory contract", (test) => {
   )
 })
 
+for (const backend of ["memory", "sqlite"] as const) {
+  it.live(`${backend} completion cannot resurrect cancellation through pending steering`, () => {
+    const options = {
+      resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+      addresses: [
+        { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+      ],
+      scheduler: { pollInterval: "1 day" as const },
+    }
+    const runtimeLayer =
+      backend === "memory"
+        ? Runtime.layerMemory(options)
+        : Runtime.layerSqlite({ ...options, filename: tempDbPath("steering-cancel-completion") })
+
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: `steering-cancel-completion:${backend}`,
+        idempotencyKey: "run",
+        prompt: "start",
+      })
+      yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "pending", prompt: "do not resume" })
+      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "completion-race" })
+      yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+
+      expect(yield* store.complete({ ...claim, result: completedResult("late") })).toEqual({ _tag: "Completed" })
+      expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+      expect((yield* store.loadExecution(receipt.runId)).continuation).toBeUndefined()
+      const tags = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag)
+      expect(tags.filter((tag) => tag === "RunCancelled")).toHaveLength(1)
+      expect(tags).not.toContain("RunCompleted")
+    }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
+  })
+}
+
 it.live("persists accepted steering across a SQLite close and reopen", () => {
   const filename = tempDbPath("runtime-steering-reopen")
   let runId = ""
@@ -212,7 +249,7 @@ it.live("atomically persists steering consumption and model scheduling before SQ
   return schedule.pipe(Effect.andThen(reopen))
 })
 
-it.effect("AgentHost delivers durable steering in the next model operation", () => {
+it.effect("ExecutionHost delivers durable steering in the next model operation", () => {
   const requests: Array<string> = []
   let serviceAcquisitions = 0
   const agent = Agent.make({ name: "steered-host" })
@@ -238,13 +275,13 @@ it.effect("AgentHost delivers durable steering in the next model operation", () 
     ),
   )
   const runtimeLayer = Runtime.layerMemory({
-    resolver: ExecutableResolver.makeStatic([{ executable: ref, agent, services: model }]),
-    addresses: [{ address, executable: ref }],
+    resolver: ExecutableResolver.makeStatic([{ executable: ref, agent: Agent.close(agent, model) }]),
+    addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
   })
   return Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
-    const host = yield* AgentHost.AgentHost
+    const host = yield* ExecutionHost.ExecutionHost
     const receipt = yield* runtime.send({
       to: address,
       sessionId: "session:host-steering",
@@ -311,13 +348,13 @@ it.effect("steering admitted during model streaming does not interrupt it and re
       }),
     )
     const runtimeLayer = Runtime.layerMemory({
-      resolver: ExecutableResolver.makeStatic([{ executable: ref, agent, services: model }]),
-      addresses: [{ address, executable: ref }],
+      resolver: ExecutableResolver.makeStatic([{ executable: ref, agent: Agent.close(agent, model) }]),
+      addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
     })
 
     yield* Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const host = yield* AgentHost.AgentHost
+      const host = yield* ExecutionHost.ExecutionHost
       const store = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
         to: address,
@@ -398,14 +435,14 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
     const handlers = toolkit.toLayer({ batch_tool: () => Effect.die("ToolExecutor test layer owns execution") })
     const runtimeLayer = Runtime.layerMemory({
       resolver: ExecutableResolver.makeStatic([
-        { executable: ref, agent, services: Layer.mergeAll(model, executor, handlers) },
+        { executable: ref, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
       ]),
-      addresses: [{ address, executable: ref }],
+      addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
     })
 
     yield* Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const host = yield* AgentHost.AgentHost
+      const host = yield* ExecutionHost.ExecutionHost
       const store = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
         to: address,

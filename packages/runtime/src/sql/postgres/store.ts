@@ -1,17 +1,16 @@
-import { Effect, Equal, Stream } from "effect"
+import { Effect, Equal, Schema, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import {
-  AddressNotFound,
   CursorExpired,
   IdempotencyConflict,
-  RunIdConflict,
   ResponseConflict,
   RunTerminal,
+  RuntimeUnavailable,
   WaitNotOpen,
   ChildSelectionMissing,
 } from "../../errors.js"
-import { childDigest, messageDigest } from "../../memory/digest.js"
+import { childDigest } from "../../memory/digest.js"
 import { equals, resolveChild } from "../../executable-manifest.js"
 import { isTerminal } from "../../run.js"
 import { RunStore } from "../../run-store.js"
@@ -24,7 +23,7 @@ import { NOTIFY_CHANNEL } from "./schema.js"
 import { makePostgresClaims } from "./store-claims.js"
 import { postgresOperations } from "./store-ops.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "../store-execution.js"
-import { decodeRunEffect, loadRunWait } from "../store-helpers.js"
+import { decodeRunEffect, hasAdmission, loadRunWait } from "../store-helpers.js"
 import type { WaitResolution } from "../../run-wait.js"
 import { fanOutStoreMethods } from "./store-fan-out.js"
 import { deferCancelledFanOutParent, makeCancelRun } from "./store-cancel.js"
@@ -36,16 +35,23 @@ import { suspend } from "./store-suspend.js"
 import {
   afterTerminal,
   appendEvent,
+  completeRun,
   emitAgentEvent,
-  enqueueLane,
   insertRun,
   loadEventsAfter,
+  lockRun,
   loadRun,
   lockSpawnParent,
   requireRun,
   settleParent,
 } from "./pg-helpers.js"
 import type { PostgresStoreOptions } from "./runtime-layer.js"
+import { programStoreMethods } from "./store-program.js"
+import { admitStart as admitExactStart } from "../store-admit.js"
+import { admitSend } from "./store-admit.js"
+import { associateRegistrations, loadRegistrations } from "../executable-registrations.js"
+import { narrow } from "../../executable-registration.js"
+import { PendingRunOutcome } from "../../run-store.js"
 const nextId = (prefix: string) => Effect.sync(() => `${prefix}_${Math.random().toString(36).slice(2)}`)
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
@@ -76,85 +82,13 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
     })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "postgres", multiWorker: true }),
-      admitSend: (input) =>
+      hasAdmission: (input) => runNoTxn(hasAdmission(input)),
+      admitSend: (input) => run(admitSend(transactionHub, addressBindings, nextId, input)),
+      admitStart: (input) =>
         run(
-          Effect.gen(function* () {
-            const bound = addressBindings.get(input.message.to)
-            if (bound === undefined) return yield* AddressNotFound.make({ address: input.message.to })
-            const admitted = yield* decodePinnedEffect({
-              ref: input.executableRef,
-              manifest: input.executableManifest,
-            })
-            const binding = yield* decodePinnedEffect(bound)
-            if (!equals(binding, admitted)) {
-              return yield* AddressNotFound.make({ address: input.message.to })
-            }
-            yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`admit:${input.message.to}:${input.message.sessionId}:${input.message.idempotencyKey}`}))`
-            if (input.runId !== undefined) {
-              yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`run:${input.runId}`}))`
-            }
-            const digest = messageDigest(input.message)
-            const existing = yield* sql<RunRow>`
-              SELECT * FROM baton_runs
-              WHERE address = ${input.message.to}
-                AND session_id = ${input.message.sessionId}
-                AND idempotency_key = ${input.message.idempotencyKey}
-            `
-            const prior = existing[0]
-            if (prior !== undefined) {
-              if (input.runId !== undefined && input.runId !== prior.run_id) {
-                return yield* RunIdConflict.make({ runId: input.runId, existingRunId: prior.run_id })
-              }
-              const priorExecutable = yield* decodeStoredPinnedEffect(
-                prior.executable_ref_json,
-                prior.executable_manifest_json,
-              )
-              if (prior.message_digest !== digest || !equals(priorExecutable, admitted)) {
-                return yield* IdempotencyConflict.make({
-                  address: input.message.to,
-                  sessionId: input.message.sessionId,
-                  idempotencyKey: input.message.idempotencyKey,
-                  existingRunId: prior.run_id,
-                })
-              }
-              return {
-                runId: prior.run_id,
-                messageId: prior.message_id,
-                acceptedSequence: Number(prior.accepted_sequence),
-                duplicate: true,
-              }
-            }
-            if (input.runId !== undefined) {
-              const byId = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${input.runId}`
-              if (byId[0] !== undefined)
-                return yield* RunIdConflict.make({ runId: input.runId, existingRunId: byId[0].run_id })
-            }
-            const runId = input.runId ?? (yield* nextId("run"))
-            const enqueued = yield* enqueueLane(input.message.to, input.message.sessionId, runId)
-            yield* insertRun({
-              runId,
-              status: "queued",
-              message: input.message,
-              digest,
-              executableRef: input.executableRef,
-              executableManifest: input.executableManifest,
-              rootRunId: runId,
-              acceptedSequence: enqueued.acceptedSequence,
-            })
-            const loaded = (yield* loadRun(runId))!
-            yield* appendEvent(
-              hub,
-              loaded,
-              { _tag: "RunAccepted", messageId: input.message.id, address: input.message.to },
-              "queued",
-            )
-            return {
-              runId,
-              messageId: input.message.id,
-              acceptedSequence: enqueued.acceptedSequence,
-              duplicate: false,
-            }
-          }),
+          sql`SELECT pg_advisory_xact_lock(hashtext('baton:executable-registrations'))`.pipe(
+            Effect.andThen(admitExactStart(transactionHub, input)),
+          ),
         ),
       admitSpawn: (input) =>
         run(
@@ -169,6 +103,9 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               ref: executableRef,
               manifest: parent.executableManifest,
             })
+            const registrations = yield* narrow(executable, yield* loadRegistrations(parent.runId)).pipe(
+              Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
+            )
             const existing = yield* sql<RunRow>`
               SELECT * FROM baton_runs
               WHERE address = ${input.message.to}
@@ -209,6 +146,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               invocationId: input.invocationId,
               acceptedSequence: 0,
             })
+            yield* associateRegistrations(runId, registrations)
             yield* sql`
               INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, terminal_event_id, created_at, settled_at)
               VALUES (${parent.runId}, ${runId}, ${input.invocationId}, NULL, NOW(), NULL)
@@ -265,6 +203,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       respond: (input) =>
         run(
           Effect.gen(function* () {
+            yield* lockRun(input.runId)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status))
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
@@ -272,6 +211,9 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               const prior = yield* loadRunWait(loaded.runId, input.waitId)
               if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
               return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
+            }
+            if (loaded.cancellationRequested) {
+              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
             }
             if (loaded.activeWaitId !== input.waitId) {
               return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
@@ -293,6 +235,10 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = NOW()
               WHERE run_id = ${loaded.runId}
             `
+            yield* sql`
+              UPDATE baton_program_operations SET status = 'reserved'
+              WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'waiting'
+            `
             const current = (yield* loadRun(loaded.runId))!
             yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
           }),
@@ -300,10 +246,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       signal: (input) =>
         run(
           Effect.gen(function* () {
+            yield* lockRun(input.runId)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status)) {
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
             }
+            if (loaded.cancellationRequested) return
             if (loaded.activeWaitId === undefined || loaded.activeWaitId !== input.name) return
             const resolution: WaitResolution = {
               _tag: "Signal",
@@ -317,18 +265,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             yield* appendEvent(hub, loaded, { _tag: "RunResumed", waitId: loaded.activeWaitId, resolution }, "running")
           }),
         ),
-      cancel: (input) =>
-        run(
-          sql`SELECT pg_advisory_xact_lock(hashtext(${`steering:${input.runId}`}))`.pipe(
-            Effect.andThen(cancelRun(input.runId, input.reason)),
-          ),
-        ),
-      admitSteering: (input) =>
-        run(
-          sql`SELECT pg_advisory_xact_lock(hashtext(${`steering:${input.runId}`}))`.pipe(
-            Effect.andThen(admitSteering(input)),
-          ),
-        ),
+      cancel: (input) => run(lockRun(input.runId).pipe(Effect.andThen(cancelRun(input.runId, input.reason)))),
+      admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
       readSteering: (input) => run(requireExecutionClaim(input).pipe(Effect.andThen(readSteering(input)))),
       inspect: (runId) =>
         runNoTxn(
@@ -388,44 +326,22 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       complete: (input) =>
         run(
           Effect.gen(function* () {
-            yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`steering:${input.runId}`}))`
-            yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${input.runId} FOR UPDATE`
+            yield* lockRun(input.runId)
             yield* requireExecutionClaim(input)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status)) {
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
             }
-            if (loaded.cancellationRequested) {
-              if (yield* deferCancelledFanOutParent(sql, loaded.runId)) return { _tag: "Completed" as const }
-              const event = yield* appendEvent(
-                transactionHub,
-                loaded,
-                { _tag: "RunCancelled", ...(loaded.cancelReason === undefined ? {} : { reason: loaded.cancelReason }) },
-                "cancelled",
-              )
-              const settled = (yield* loadRun(loaded.runId))!
-              yield* settleParent(transactionHub, settled, event.eventId)
-              yield* afterTerminal(transactionHub, settled)
-              return { _tag: "Completed" as const }
-            }
             const continuation = yield* saveCompletionContinuation(input.runId, input.result)
             if (continuation !== undefined) return { _tag: "SteeringPending" as const, continuation }
-            const event = yield* appendEvent(
-              transactionHub,
-              loaded,
-              { _tag: "RunCompleted", result: input.result },
-              "succeeded",
-            )
-            const settled = (yield* loadRun(loaded.runId))!
-            yield* settleParent(transactionHub, settled, event.eventId)
-            yield* afterTerminal(transactionHub, settled)
+            yield* completeRun(transactionHub, loaded, input.result)
             return { _tag: "Completed" as const }
           }),
         ),
       fail: (input) =>
         run(
           Effect.gen(function* () {
-            yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${input.runId} FOR UPDATE`
+            yield* lockRun(input.runId)
             yield* requireExecutionClaim(input)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status)) {
@@ -444,6 +360,17 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               yield* afterTerminal(transactionHub, settled)
               return
             }
+            const runningFanOut = yield* sql<{ fan_out_id: string }>`
+              SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${loaded.runId} AND status = 'running' LIMIT 1
+            `
+            if (runningFanOut.length > 0) {
+              yield* sql`
+                UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
+                  pending_outcome_json = ${JSON.stringify(Schema.encodeSync(PendingRunOutcome)({ _tag: "Failed", error: input.error }))}
+                WHERE run_id = ${loaded.runId}
+              `
+              return
+            }
             const event = yield* appendEvent(
               transactionHub,
               loaded,
@@ -459,19 +386,45 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       resume: (input) =>
         run(
           Effect.gen(function* () {
+            yield* lockRun(input.runId)
             const loaded = yield* requireRun(input.runId)
             if (isTerminal(loaded.status)) {
               return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
             }
+            if (loaded.respondedWaitIds.has(input.waitId)) {
+              const prior = yield* loadRunWait(loaded.runId, input.waitId)
+              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, input.resolution)) return
+              return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
+            }
+            if (loaded.cancellationRequested) {
+              return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
+            }
             if (loaded.activeWaitId !== input.waitId) {
               return yield* WaitNotOpen.make({ runId: loaded.runId, waitId: input.waitId })
             }
-            yield* appendEvent(
-              hub,
-              loaded,
-              { _tag: "RunResumed", waitId: input.waitId, resolution: input.resolution },
-              "running",
-            )
+            const responded = [...loaded.respondedWaitIds, input.waitId]
+            const resolution: WaitResolution = input.resolution
+            const closed = yield* sql<{ wait_id: string }>`
+              UPDATE baton_run_waits SET status = 'responded', response_json = ${JSON.stringify(resolution)}, closed_at = NOW()
+              WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'open'
+              RETURNING wait_id
+            `
+            if (closed.length === 0) {
+              const prior = yield* loadRunWait(loaded.runId, input.waitId)
+              if (prior?.resolution !== undefined && Equal.equals(prior.resolution, resolution)) return
+              return yield* ResponseConflict.make({ runId: loaded.runId, waitId: input.waitId })
+            }
+            yield* sql`
+              UPDATE baton_runs
+              SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = NOW()
+              WHERE run_id = ${loaded.runId}
+            `
+            yield* sql`
+              UPDATE baton_program_operations SET status = 'reserved'
+              WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'waiting'
+            `
+            const current = (yield* loadRun(loaded.runId))!
+            yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
           }),
         ),
       emitAgentEvent: (input) => run(emitAgentEvent(transactionHub, input)),
@@ -480,6 +433,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       saveExecution: (input) => run(saveExecution(input)),
       ...fanOutStoreMethods({ sql, pg, hub: transactionHub, run, runNoTxn }),
       ...operations,
+      ...programStoreMethods({ sql, hub: transactionHub, run, runNoTxn }),
     })
     const claims = makePostgresClaims({ sql, hub: transactionHub, run, cancelRun })
     return { store, claims }

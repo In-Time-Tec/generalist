@@ -11,7 +11,7 @@ export const serveTransport = definePage({
   title: "How to serve an agent over SSE and WebSocket",
   navTitle: "Serve over SSE and WebSocket",
   group: "Guides",
-  description: "Admit addressable Runtime runs and expose their canonical RunEvents through SSE and WebSocket.",
+  description: "Admit exact Runtime runs and expose their canonical RunEvents through SSE and WebSocket.",
   content: [
     p(
       code("@batonfx/runtime"),
@@ -27,13 +27,13 @@ export const serveTransport = definePage({
     h2("run-in-memory", "1. Run an agent in memory"),
     p(
       code("Runtime.layerMemory"),
-      " resolves pinned executable manifests and binds addresses to them. The in-memory process claims admitted work through the provided ",
+      " resolves pinned executable manifests. The in-memory process claims admitted work through the provided ",
       code("RunStore"),
       " and executes it with ",
-      code("AgentHost"),
+      code("ExecutionHost"),
       ". ",
-      code("Runtime.send"),
-      " admits an idempotent message and returns a receipt containing the stable ",
+      code("Runtime.start"),
+      " atomically admits an exact executable and its immutable registrations, returning a receipt containing the stable ",
       code("runId"),
       ". ",
       code("Runtime.events"),

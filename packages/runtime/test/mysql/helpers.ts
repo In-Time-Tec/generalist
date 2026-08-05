@@ -11,20 +11,22 @@ import {
   assistantRef,
   researcher,
   researcherAddress,
+  registrationsFor,
   researcherRef,
 } from "../helpers.js"
+import { closedTestAgent } from "../identity.js"
 
 export const mysqlUrl = process.env.BATON_MYSQL_URL ?? process.env.MYSQL_URL
 export const mysqlAvailable = typeof mysqlUrl === "string" && mysqlUrl.length > 0
 
 const resolver = ExecutableResolver.makeStatic([
-  { executable: assistantRef, agent: assistant },
-  { executable: researcherRef, agent: researcher },
-  { executable: analystRef, agent: analyst },
+  { executable: assistantRef, agent: closedTestAgent(assistant) },
+  { executable: researcherRef, agent: closedTestAgent(researcher) },
+  { executable: analystRef, agent: closedTestAgent(analyst) },
 ])
 const addresses = [
-  { address: assistantAddress, executable: assistantRef },
-  { address: researcherAddress, executable: researcherRef },
+  { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+  { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
 ]
 
 export const mysqlClient = (url: string) => MysqlClient.layer({ url: Redacted.make(url), maxConnections: 4 })
@@ -39,6 +41,10 @@ export const resetRuntimeTables = (url: string) =>
       Effect.gen(function* () {
         yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=0")
         for (const table of [
+          "baton_run_registrations",
+          "baton_executable_registrations",
+          "baton_program_operations",
+          "baton_program_runs",
           "baton_tree_event_index",
           "baton_tree_roots",
           "baton_fan_out_members",

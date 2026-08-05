@@ -3,16 +3,18 @@ import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerR
 import { Persistence } from "effect/unstable/persistence"
 import {
   Agent,
+  AgentManifest,
   Approvals,
   Chat,
   LanguageModel,
   ModelMiddleware,
+  Pins,
   Response,
   Tool,
   ToolExecutor,
   Toolkit,
 } from "@batonfx/core"
-import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { Sse, Ws } from "@batonfx/transport"
 
 const searchTool = Tool.make("web_search", {
@@ -24,8 +26,25 @@ const searchTool = Tool.make("web_search", {
 const toolkit = Toolkit.make(searchTool)
 
 const agent = Agent.make({ name: "research-agent", toolkit })
-const executable = ExecutableManifest.makeTest("research-agent", "1")
-const agentAddress = Address.make("agent:research")
+const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
+  model: Pins.makeModel({ fixture: "research-agent", revision: "1" }),
+  tools: [{ name: searchTool.name, pin: Pins.makeCapability({ tool: searchTool.name, version: "1" }) }],
+  skills: [],
+  services: [],
+  policy: { _tag: "Portable", policy: agent.policy.snapshot! },
+  budget: agent.budget ?? {},
+  children: [],
+})
+const executable = ExecutableManifest.make({ root: pinnedAgent.pin, entries: [{ _tag: "Agent", ...pinnedAgent }] })
+const registrations = executable.manifest.entries.flatMap((entry) =>
+  entry._tag === "Agent"
+    ? [
+        entry.manifest.model,
+        ...entry.manifest.tools.map(({ pin }) => pin),
+        ...(entry.manifest.policy._tag === "Pinned" ? [entry.manifest.policy.pin] : []),
+      ].map((pin) => ({ pin, codec: "docs", version: "1", payload: { fixture: "research-agent" } }))
+    : [],
+)
 
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,
@@ -35,7 +54,7 @@ const modelLayer = Layer.effect(
   }),
 )
 
-const SendMessageInput = Schema.Struct({
+const StartRunInput = Schema.Struct({
   body: Schema.Struct({
     runId: Schema.optionalKey(Schema.String),
     sessionId: Schema.String,
@@ -65,7 +84,7 @@ const errorResponse = (status: number) => (error: unknown) =>
 const executeRun = (runId: string) =>
   Effect.gen(function* () {
     const store = yield* RunStore.RunStore
-    const host = yield* AgentHost.AgentHost
+    const host = yield* ExecutionHost.ExecutionHost
     yield* host.execute(yield* store.claimExecution({ runId, ownerId: "http-server" }))
   })
 
@@ -90,12 +109,13 @@ const routesLayer = HttpRouter.use((router) =>
     yield* router.add(
       "POST",
       "/runs",
-      HttpRouter.schemaJson(SendMessageInput).pipe(
+      HttpRouter.schemaJson(StartRunInput).pipe(
         Effect.flatMap(({ body }) =>
           Runtime.Runtime.use((runtime) =>
-            runtime.send({
+            runtime.start({
               ...(body.runId === undefined ? {} : { runId: body.runId }),
-              to: agentAddress,
+              executable,
+              registrations,
               sessionId: body.sessionId,
               idempotencyKey: body.idempotencyKey,
               prompt: body.prompt,
@@ -136,6 +156,7 @@ const routesLayer = HttpRouter.use((router) =>
 
 const agentServices = Layer.mergeAll(
   modelLayer,
+  toolkit.toLayer({ web_search: () => Effect.succeed("results") }),
   ToolExecutor.layerTest({
     execute: () => Effect.succeed({ _tag: "Success", result: "results", encodedResult: "results" }),
   }),
@@ -145,8 +166,8 @@ const agentServices = Layer.mergeAll(
 )
 
 const runtimeLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
-  addresses: [{ address: agentAddress, executable }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
+  addresses: [],
 })
 
 const appLayer = Layer.mergeAll(routesLayer, HttpRouter.cors())

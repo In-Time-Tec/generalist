@@ -6,12 +6,15 @@ import type { RunReceipt, RunStatus } from "../run.js"
 import type { RunEvent } from "../run-event.js"
 import type { CursorExpired, RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import type { OperationRecord } from "../sql/operations.js"
-import type { AgentEvent, DurableDriver } from "@batonfx/core"
+import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution-state.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { RunWait } from "../run-wait.js"
 import type { ExecutionContinuation, SteeringEntry } from "../steering.js"
 import type { FanOutJoin, FanOutMemberResult, FanOutRemainder, FanOutStatus } from "../fan-out.js"
 import type { TreeEvent } from "../tree.js"
+import type { ProgramOperationRecord, ProgramRunState } from "../program-store.js"
+import type { ExecutableRegistration } from "../executable-registration.js"
+import type { PendingRunOutcome } from "../run-store.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -39,17 +42,19 @@ export interface StoredRun {
   readonly attempt: number
   readonly attemptFence: number
   readonly ownerId?: string
-  readonly checkpoint?: DurableDriver.DriverCheckpoint
-  readonly suspension?: AgentEvent.AgentSuspended
+  readonly checkpoint?: ExecutionCheckpoint
+  readonly suspension?: ExecutionSuspension
   readonly transcript?: Prompt.Prompt
   readonly continuation?: ExecutionContinuation
   readonly cancellationRequested: boolean
   readonly cancelReason?: string
   readonly terminalEventId?: string
+  readonly pendingOutcome?: PendingRunOutcome
   readonly children: ReadonlyArray<string>
   readonly events: ReadonlyArray<RunEvent>
   readonly subscribers: ReadonlyMap<number, SubscriberQueue>
   readonly steering: ReadonlyArray<SteeringEntry & { readonly consumedOperationId?: string }>
+  readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 
 export interface Lane {
@@ -67,8 +72,11 @@ export interface MemoryState {
   readonly treeRoots: ReadonlyMap<string, TreeRoot>
   readonly lanes: ReadonlyMap<string, Lane>
   readonly idempotency: ReadonlyMap<string, IdempotencyEntry>
+  readonly registrationCatalog: ReadonlyMap<string, { readonly digest: string; readonly value: ExecutableRegistration }>
   readonly fanOuts: ReadonlyMap<string, StoredFanOut>
   readonly operations: ReadonlyMap<string, OperationRecord>
+  readonly programStates: ReadonlyMap<string, ProgramRunState>
+  readonly programOperations: ReadonlyMap<string, ProgramOperationRecord>
   readonly addressBindings: ReadonlyMap<string, { readonly ref: ExecutableRef; readonly manifest: ExecutableManifest }>
   readonly subscriberQueueCapacity: number
 }
@@ -109,8 +117,11 @@ export const emptyState = (input: {
   treeRoots: new Map(),
   lanes: new Map(),
   idempotency: new Map(),
+  registrationCatalog: new Map(),
   fanOuts: new Map(),
   operations: new Map(),
+  programStates: new Map(),
+  programOperations: new Map(),
   addressBindings: input.addressBindings,
   subscriberQueueCapacity: input.subscriberQueueCapacity,
 })

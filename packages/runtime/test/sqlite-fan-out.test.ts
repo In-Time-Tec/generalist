@@ -79,6 +79,70 @@ it.live("persists and resumes bounded fan-out across SQLite reopen", () =>
   }).pipe(Effect.asVoid),
 )
 
+it.live("recovers a pending SQLite root outcome and settles it after fan-out join", () =>
+  Effect.gen(function* () {
+    const filename = tempDbPath("terminal-parent-fan-out-join")
+    const admitted = yield* Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "sqlite:terminal-parent-fan-out-join",
+        idempotencyKey: "parent",
+        prompt: "parent",
+      })
+      const fanOutInput: Runtime.FanOutInput = {
+        parentRunId: parent.runId,
+        idempotencyKey: "reviews",
+        members: [{ key: "review", selection: "researcher", prompt: "review" }],
+        concurrency: 1,
+        join: { _tag: "AllSuccess" },
+        remainder: "await",
+      }
+      const receipt = yield* runtime.fanOut(fanOutInput)
+      yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
+      const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+      yield* store.complete({ ...parentClaim, result: { _tag: "Program", value: "parent" } })
+      expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
+      yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
+      expect(
+        yield* runtime.steer({ runId: parent.runId, idempotencyKey: "late", prompt: "late" }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.RunTerminal)
+      expect((yield* runtime.fanOut(fanOutInput)).duplicate).toBe(true)
+      expect(
+        yield* runtime.fanOut({ ...fanOutInput, idempotencyKey: "late-fan-out" }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.FanOutInvalid)
+      return { parentRunId: parent.runId, childRunId: receipt.childRunIds[0]! }
+    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+    const settled = yield* Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("waiting")
+      const childClaim = yield* store.claimExecution({ runId: admitted.childRunId, ownerId: "child" })
+      yield* store.complete({ ...childClaim, result: completedResult("child") })
+      const rootEvents = yield* runtime.history({ runId: admitted.parentRunId, limit: 100 })
+      const completed = rootEvents.find((event) => event._tag === "RunCompleted")!
+      const joined = rootEvents.find((event) => event._tag === "FanOutJoined")!
+      expect(joined.sequence).toBeLessThan(completed.sequence)
+      expect(rootEvents.at(-1)?._tag).toBe("RunCompleted")
+      expect(rootEvents.at(-1)).toMatchObject({ result: { _tag: "Program", value: "parent" } })
+      expect(rootEvents.filter((event) => event._tag === "FanOutJoined")).toHaveLength(1)
+      return { parentRunId: admitted.parentRunId, completedEventId: completed.eventId }
+    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+    yield* Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const snapshot = yield* runtime.inspect(settled.parentRunId)
+      expect(snapshot.status).toBe("succeeded")
+      const terminal = yield* RunTree.inspect(settled.parentRunId)
+      expect(terminal.runs.find((entry) => entry.run.runId === settled.parentRunId)!.outcome!.eventId).toBe(
+        settled.completedEventId,
+      )
+      const history = yield* RunTree.history({ rootRunId: settled.parentRunId, limit: 100 })
+      expect(history.events.filter((entry) => entry.event._tag === "FanOutJoined")).toHaveLength(1)
+    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  }),
+)
+
 it.live("rejects an undeclared SQLite fan-out member without side effects", () =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
@@ -105,6 +169,31 @@ it.live("rejects an undeclared SQLite fan-out member without side effects", () =
     expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
     expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
   }).pipe(Effect.provide(sqliteLayer(tempDbPath("fan-out-missing"))), Effect.scoped),
+)
+
+it.live("rejects SQLite fan-out terminate remainder before admission", () =>
+  Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const parent = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "sqlite:fan-out-terminate",
+      idempotencyKey: "parent",
+      prompt: "parent",
+    })
+    const before = yield* RunTree.inspect(parent.runId)
+    const failure = yield* runtime
+      .fanOut({
+        parentRunId: parent.runId,
+        idempotencyKey: "terminate",
+        members: [{ key: "review", selection: "researcher", prompt: "review" }],
+        concurrency: 1,
+        join: { _tag: "AllSuccess" },
+        remainder: "terminate",
+      })
+      .pipe(Effect.flip)
+    expect(failure).toEqual(Errors.FanOutRemainderUnsupported.make({ remainder: "terminate", durability: "durable" }))
+    expect(yield* RunTree.inspect(parent.runId)).toEqual(before)
+  }).pipe(Effect.provide(sqliteLayer(tempDbPath("fan-out-terminate"))), Effect.scoped),
 )
 
 it.live("atomically reconciles SQLite parent cancellation across fan-out members", () =>

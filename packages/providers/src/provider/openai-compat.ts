@@ -1,5 +1,6 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat"
 import { ModelRegistry } from "@batonfx/core"
+import { isAvailabilityFailure } from "../model/model-failure.js"
 import { Config, Effect, Layer, Redacted } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
@@ -50,6 +51,7 @@ export const layer = (
         }),
       ),
       toolJsonSchemaCompiler,
+      isAvailabilityFailure,
       ...(input.classifyFailure === undefined ? {} : { classifyFailure: input.classifyFailure }),
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),

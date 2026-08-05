@@ -6,7 +6,7 @@ import { Runtime } from "../../runtime.js"
 import { RunStore } from "../../run-store.js"
 import { RunClaims } from "../run-claims.js"
 import { makePostgresServices } from "./store.js"
-import { AgentHost, make as makeAgentHost } from "../../agent-host.js"
+import { ExecutionHost, make as makeExecutionHost } from "../../execution-host.js"
 import { layer as activeExecutionsLayer } from "../../active-executions.js"
 import type { LayerOptions } from "../../runtime.js"
 import type {
@@ -30,7 +30,7 @@ export type PostgresStoreError =
 
 export const layerPostgres = (
   options: PostgresStoreOptions,
-): Layer.Layer<Runtime | RunStore | RunClaims | AgentHost, PostgresStoreError | SqlError> => {
+): Layer.Layer<Runtime | RunStore | RunClaims | ExecutionHost, PostgresStoreError | SqlError> => {
   const client = PgClient.layer({ url: Redacted.make(options.url) })
   const services = Layer.effectContext(
     makePostgresServices(options).pipe(
@@ -39,8 +39,9 @@ export const layerPostgres = (
   ).pipe(Layer.provide(client))
   const dependencies = Layer.merge(services, activeExecutionsLayer)
   const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(AgentHost, makeAgentHost({ workerId: "postgres", resolver: options.resolver })).pipe(
-    Layer.provide(dependencies),
-  )
+  const host = Layer.effect(
+    ExecutionHost,
+    makeExecutionHost({ workerId: "postgres", resolver: options.resolver }),
+  ).pipe(Layer.provide(dependencies))
   return Layer.mergeAll(runtime, host, services)
 }

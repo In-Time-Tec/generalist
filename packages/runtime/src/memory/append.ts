@@ -2,7 +2,8 @@ import { DateTime, Effect, Option, Queue } from "effect"
 import type { Address } from "../address.js"
 import { RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import { isTerminal, type RunStatus } from "../run.js"
-import type { AgentLoopEvent, AgentResult } from "../agent-event.js"
+import type { AgentLoopEvent } from "../agent-event.js"
+import type { ExecutionResult } from "../execution-state.js"
 import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run-event.js"
 import type { MemoryState, StoredRun, SubscriberQueue } from "./state.js"
 import { projectTreeEvent } from "../tree-event.js"
@@ -97,8 +98,8 @@ export const appendEvent = (
     }
     const runs = new Map(state.runs)
     if (event._tag === "RunCancelled" || event._tag === "RunCompleted" || event._tag === "RunFailed") {
-      const { continuation: _, ...withoutContinuation } = updated
-      runs.set(runId, withoutContinuation)
+      const { continuation: _, pendingOutcome: __, ...withoutTerminalState } = updated
+      runs.set(runId, withoutTerminalState)
     } else {
       runs.set(runId, updated)
     }
@@ -111,10 +112,16 @@ export const appendEvent = (
     return [event, { ...state, runs, treeRoots }] as const
   })
 
+type LifecycleInput = LifecycleEvent extends infer Event
+  ? Event extends LifecycleEvent
+    ? Omit<Event, keyof RunEventBase>
+    : never
+  : never
+
 export const appendLifecycle = (
   state: MemoryState,
   runId: string,
-  event: Omit<LifecycleEvent, keyof RunEventBase> & { readonly _tag: LifecycleEvent["_tag"] },
+  event: LifecycleInput,
   nextStatus?: RunStatus,
 ): Effect.Effect<readonly [RunEvent, MemoryState], RuntimeUnavailable> =>
   appendEvent(state, runId, (base) => ({ ...base, ...event }) as RunEvent, nextStatus)
@@ -208,14 +215,16 @@ export const makeFanOutJoined = (
   >
 
 export const makeCompleted = (
-  result: AgentResult,
+  result: ExecutionResult,
 ): Omit<Extract<LifecycleEvent, { _tag: "RunCompleted" }>, keyof RunEventBase> =>
   ({
     _tag: "RunCompleted" as const,
     result,
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "RunCompleted" }>, keyof RunEventBase>
 
-export const makeFailed = (error: RunFailure) =>
+export const makeFailed = (
+  error: RunFailure,
+): Omit<Extract<LifecycleEvent, { _tag: "RunFailed" }>, keyof RunEventBase> =>
   ({
     _tag: "RunFailed" as const,
     error,

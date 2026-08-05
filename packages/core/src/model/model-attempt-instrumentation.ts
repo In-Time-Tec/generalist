@@ -10,6 +10,7 @@ import {
 } from "./model-attempt-observation.js"
 import { defaultResolveFailure, promoteResponseFailure, promoteStreamFailures } from "./model-response-failure.js"
 import type { Classification, Interface as Resilience } from "./model-resilience.js"
+import type { CandidateIdentity, FailureDisposition } from "./model-registry.js"
 import { type TerminationFailure, requireTerminal } from "./model-stream-termination.js"
 import {
   InvocationCoordinationFailed,
@@ -39,6 +40,7 @@ export interface CallState {
   failedAttemptUsage: ModelProviderUsage | undefined
   finishReason: Response.FinishReason | undefined
   errorCategory: ModelFailureCategory | undefined
+  pendingFailure: PendingFailure | undefined
 }
 
 export interface CallContext {
@@ -52,6 +54,13 @@ export interface CallContext {
   readonly categorize: (error: unknown) => ModelFailureCategory
   readonly classify: (error: unknown) => Classification
   readonly state: CallState
+}
+
+interface PendingFailure {
+  readonly attempt: AttemptContext
+  readonly category: ModelFailureCategory
+  readonly classification: Classification
+  readonly usage: ModelProviderUsage | undefined
 }
 
 interface Finished {
@@ -77,7 +86,18 @@ interface AttemptContext {
   readonly attempt: number
   readonly method: ModelInvocationMethod
   readonly state: AttemptState
+  readonly identity: CandidateIdentity | undefined
 }
+
+const identityFields = (identity: CandidateIdentity | undefined) =>
+  identity === undefined
+    ? {}
+    : {
+        provider: identity.provider,
+        model: identity.model,
+        ...(identity.registrationKey === undefined ? {} : { registrationKey: identity.registrationKey }),
+        candidate: identity.candidate,
+      }
 
 const coordinateCompleted = (
   context: CallContext,
@@ -98,6 +118,7 @@ const coordinateCompleted = (
         finishReason: finished.reason,
         ...(attempt.state.requestId === undefined ? {} : { requestId: attempt.state.requestId }),
         ...(attempt.state.responseModel === undefined ? {} : { responseModel: attempt.state.responseModel }),
+        ...identityFields(attempt.identity),
       })
     }
     attempt.state.coordinated = true
@@ -123,6 +144,7 @@ const attemptCompleted = (
       finishReason: finished.reason,
       ...(attempt.state.requestId === undefined ? {} : { requestId: attempt.state.requestId }),
       ...(attempt.state.responseModel === undefined ? {} : { responseModel: attempt.state.responseModel }),
+      ...identityFields(attempt.identity),
     })
   })
 
@@ -132,35 +154,52 @@ const attemptFailed = (
   category: ModelFailureCategory,
   classification: Classification,
   error?: unknown,
-): Effect.Effect<void, InvocationCoordinationFailed> => {
+): Effect.Effect<void> => {
   const usage = providerUsage.fromError(error)
   context.state.failedAttemptUsage = providerUsage.add(context.state.failedAttemptUsage, usage)
-  return Effect.gen(function* () {
-    const failedAt = yield* Clock.currentTimeMillis
-    if (context.options.coordinator !== undefined && context.logicalOperationId !== undefined) {
-      yield* context.options.coordinator.failAttempt({
-        logicalOperationId: context.logicalOperationId,
+  context.state.pendingFailure = { attempt, category, classification, usage }
+  return Effect.void
+}
+
+export const settleFailure = (
+  context: CallContext,
+  disposition: FailureDisposition,
+): Effect.Effect<void, InvocationCoordinationFailed> =>
+  Effect.suspend(() => {
+    const pending = context.state.pendingFailure
+    if (pending === undefined) return Effect.void
+    context.state.pendingFailure = undefined
+    const { attempt, category, classification, usage } = pending
+    return Effect.gen(function* () {
+      const failedAt = yield* Clock.currentTimeMillis
+      if (context.options.coordinator !== undefined && context.logicalOperationId !== undefined) {
+        yield* context.options.coordinator.failAttempt({
+          logicalOperationId: context.logicalOperationId,
+          modelCallId: context.modelCallId,
+          modelAttemptId: attempt.modelAttemptId,
+          attempt: attempt.attempt,
+          failedAt,
+          category,
+          classification,
+          disposition,
+          ...identityFields(attempt.identity),
+        })
+      }
+      yield* context.options.emit({
+        _tag: "ModelAttemptFailed",
+        turn: context.options.turn,
         modelCallId: context.modelCallId,
         modelAttemptId: attempt.modelAttemptId,
         attempt: attempt.attempt,
         failedAt,
         category,
         classification,
+        disposition,
+        ...identityFields(attempt.identity),
+        ...(usage === undefined ? {} : { providerUsage: usage }),
       })
-    }
-    yield* context.options.emit({
-      _tag: "ModelAttemptFailed",
-      turn: context.options.turn,
-      modelCallId: context.modelCallId,
-      modelAttemptId: attempt.modelAttemptId,
-      attempt: attempt.attempt,
-      failedAt,
-      category,
-      classification,
-      ...(usage === undefined ? {} : { providerUsage: usage }),
     })
   })
-}
 
 const attemptExit = (
   context: CallContext,
@@ -226,6 +265,7 @@ const observeStreamPart = (
 const beginAttempt = (
   context: CallContext,
   method: ModelInvocationMethod,
+  identity?: CandidateIdentity,
 ): Effect.Effect<AttemptContext, InvocationCoordinationFailed> =>
   Effect.gen(function* () {
     const attempt = context.state.attempts
@@ -253,6 +293,7 @@ const beginAttempt = (
         method,
         ...(context.provider === undefined ? {} : { provider: context.provider }),
         ...(context.model === undefined ? {} : { model: context.model }),
+        ...identityFields(identity),
         startedAt,
       })
     }
@@ -262,12 +303,14 @@ const beginAttempt = (
       modelCallId: context.modelCallId,
       modelAttemptId,
       attempt,
+      ...identityFields(identity),
       startedAt,
     })
     return {
       modelAttemptId,
       attempt,
       method,
+      identity,
       state: {
         firstOutputs: new Set(),
         termination: { _tag: "Open" },
@@ -287,8 +330,9 @@ const attemptEffect = <A extends AnyResponse, E, R>(
   context: CallContext,
   method: "generateText" | "generateObject",
   run: () => Effect.Effect<A, E, R>,
+  identity?: CandidateIdentity,
 ): Effect.Effect<A, E | AiError.AiError | InvocationCoordinationFailed, R> =>
-  Effect.flatMap(beginAttempt(context, method), (attempt) =>
+  Effect.flatMap(beginAttempt(context, method, identity), (attempt) =>
     run().pipe(
       Effect.flatMap((response) =>
         promoteResponseFailure(response, method, context.options.resilience?.resolve ?? defaultResolveFailure),
@@ -303,9 +347,10 @@ const attemptEffect = <A extends AnyResponse, E, R>(
 const attemptStream = <A extends Response.AnyPart, E, R>(
   context: CallContext,
   run: () => Stream.Stream<A, E, R>,
+  identity?: CandidateIdentity,
 ): Stream.Stream<A, E | AiError.AiError | InvocationCoordinationFailed | TerminationFailure, R> =>
   Stream.unwrap(
-    Effect.map(beginAttempt(context, "streamText"), (attempt) =>
+    Effect.map(beginAttempt(context, "streamText", identity), (attempt) =>
       requireTerminal(promoteStreamFailures(run(), context.options.resilience?.resolve ?? defaultResolveFailure), {
         toPart: Function.identity,
         turn: context.options.turn,
@@ -331,28 +376,34 @@ const attemptStream = <A extends Response.AnyPart, E, R>(
     ),
   )
 
-export const attemptModel: {
-  (context: CallContext): (model: LanguageModel.Service) => LanguageModel.Service
-  (model: LanguageModel.Service, context: CallContext): LanguageModel.Service
-} = Function.dual(
-  2,
-  (model: LanguageModel.Service, context: CallContext): LanguageModel.Service =>
-    adapt<
-      AiError.AiError | InvocationCoordinationFailed,
-      AiError.AiError | InvocationCoordinationFailed,
-      AiError.AiError | InvocationCoordinationFailed | TerminationFailure
-    >(model, {
-      generateText: (_options, invoke) =>
-        attemptEffect(context, "generateText", () =>
-          invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-        ),
-      generateObject: (_options, invoke) =>
-        attemptEffect(context, "generateObject", () =>
-          invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-        ),
-      streamText: (_options, invoke) =>
-        attemptStream(context, () =>
-          invoke().pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-        ),
-    }),
-)
+export const attemptModel = (
+  model: LanguageModel.Service,
+  context: CallContext,
+  identity?: CandidateIdentity,
+): LanguageModel.Service =>
+  adapt<
+    AiError.AiError | InvocationCoordinationFailed,
+    AiError.AiError | InvocationCoordinationFailed,
+    AiError.AiError | InvocationCoordinationFailed | TerminationFailure
+  >(model, {
+    generateText: (_options, invoke) =>
+      attemptEffect(
+        context,
+        "generateText",
+        () => invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+        identity,
+      ),
+    generateObject: (_options, invoke) =>
+      attemptEffect(
+        context,
+        "generateObject",
+        () => invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+        identity,
+      ),
+    streamText: (_options, invoke) =>
+      attemptStream(
+        context,
+        () => invoke().pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+        identity,
+      ),
+  })

@@ -46,6 +46,10 @@ export interface FanOutInput {
   readonly remainder: FanOutRemainder
 }
 
+export interface InitialFanOutInput extends Omit<FanOutInput, "parentRunId"> {}
+
+export const MAX_FAN_OUT_MEMBERS = 64
+
 export const FanOutReceipt = Schema.Struct({
   fanOutId: Schema.String,
   parentRunId: RunId,

@@ -24,23 +24,38 @@ import type {
   TreeCursorExpired,
   ChildSelectionMissing,
   OperationResolutionConflict,
+  ExecutableIdentityMismatch,
+  ExecutablePinMissing,
+  ExecutableRegistrationConflict,
+  ExecutableRegistrationInvalid,
+  ExecutableRegistrationMissing,
+  StartInvalid,
 } from "./errors.js"
 import type { Metadata } from "./message.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunEvent } from "./run-event.js"
 import type { WaitResolution } from "./run-wait.js"
-import type { FanOutInput, FanOutInspection, FanOutReceipt } from "./fan-out.js"
+import type { FanOutInput, FanOutInspection, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
 import type { ResolveOperationInput } from "./operation-resolution.js"
+import type { ExecutableRegistration } from "./executable-registration.js"
+import type { Duration } from "effect"
+
+export type { InitialFanOutInput } from "./fan-out.js"
 
 export interface AddressBinding {
   readonly address: Address
   readonly executable: PinnedExecutable
+  readonly registrations: ReadonlyArray<ExecutableRegistration>
 }
 
 export interface LayerOptions {
   readonly addresses: ReadonlyArray<AddressBinding>
   readonly resolver: ExecutableResolverInterface
   readonly subscriberQueueCapacity?: number
+  readonly scheduler?: {
+    readonly concurrency?: number
+    readonly pollInterval?: Duration.Input
+  }
 }
 
 export interface SendInput {
@@ -55,6 +70,37 @@ export interface SendInput {
   readonly correlationId?: string
   readonly inReplyTo?: string
   readonly metadata?: Metadata
+}
+
+export interface StartInput {
+  readonly runId?: string
+  readonly executable: PinnedExecutable
+  readonly registrations: ReadonlyArray<ExecutableRegistration>
+  readonly sessionId: string
+  readonly idempotencyKey: string
+  readonly prompt: Prompt.Prompt | Prompt.RawInput
+  readonly messageId?: string
+  readonly causationId?: string
+  readonly correlationId?: string
+  readonly metadata?: Metadata
+  readonly initialChildren?: ReadonlyArray<InitialChildInput>
+  readonly initialFanOuts?: ReadonlyArray<InitialFanOutInput>
+}
+
+export interface InitialChildInput {
+  readonly invocationId: string
+  readonly idempotencyKey: string
+  readonly selection: string
+  readonly prompt: Prompt.Prompt | Prompt.RawInput
+  readonly sessionId: string
+  readonly messageId?: string
+  readonly correlationId?: string
+  readonly metadata?: Metadata
+}
+
+export interface StartReceipt extends RunReceipt {
+  readonly childRunIds: ReadonlyArray<string>
+  readonly fanOuts: ReadonlyArray<FanOutReceipt>
 }
 
 export interface SpawnInput {
@@ -107,7 +153,30 @@ export interface SteerInput {
   readonly prompt: Prompt.Prompt | Prompt.RawInput
 }
 
-export type SendError = AddressNotFound | IdempotencyConflict | RunIdConflict | RuntimeUnavailable
+export type SendError =
+  | AddressNotFound
+  | IdempotencyConflict
+  | RunIdConflict
+  | ExecutableIdentityMismatch
+  | ExecutablePinMissing
+  | ExecutableRegistrationInvalid
+  | ExecutableRegistrationConflict
+  | ExecutableRegistrationMissing
+  | RuntimeUnavailable
+export type StartError =
+  | IdempotencyConflict
+  | RunIdConflict
+  | ExecutableIdentityMismatch
+  | ExecutablePinMissing
+  | ExecutableRegistrationInvalid
+  | ExecutableRegistrationConflict
+  | ExecutableRegistrationMissing
+  | ChildSelectionMissing
+  | StartInvalid
+  | FanOutConflict
+  | FanOutInvalid
+  | FanOutRemainderUnsupported
+  | RuntimeUnavailable
 export type SpawnError = RunNotFound | RunTerminal | ChildSelectionMissing | IdempotencyConflict | RuntimeUnavailable
 export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
 export type TreeEventsError = RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
@@ -129,6 +198,7 @@ export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable
 export type AwaitFanOutError = InspectFanOutError | EventsError
 
 export interface Interface {
+  readonly start: (input: StartInput) => Effect.Effect<StartReceipt, StartError>
   readonly send: (input: SendInput) => Effect.Effect<RunReceipt, SendError>
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>

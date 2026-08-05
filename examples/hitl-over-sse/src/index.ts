@@ -2,16 +2,18 @@ import { Console, Effect, Layer, Schema, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
 import {
   Agent,
+  AgentManifest,
   Approvals,
   Chat,
   LanguageModel,
   ModelMiddleware,
+  Pins,
   Response,
   Tool,
   ToolExecutor,
   Toolkit,
 } from "@batonfx/core"
-import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { Sse } from "@batonfx/transport"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -34,8 +36,25 @@ const deployTool = Tool.make("deploy", {
 
 const toolkit = Toolkit.make(deployTool)
 const agent = Agent.make({ name: "release-agent", toolkit })
-const executable = ExecutableManifest.makeTest("release-agent", "1")
-const agentAddress = Address.make("agent:release")
+const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
+  model: Pins.makeModel({ fixture: "release-agent", revision: "1" }),
+  tools: [{ name: deployTool.name, pin: Pins.makeCapability({ tool: deployTool.name, version: "1" }) }],
+  skills: [],
+  services: [],
+  policy: { _tag: "Portable", policy: agent.policy.snapshot! },
+  budget: agent.budget ?? {},
+  children: [],
+})
+const executable = ExecutableManifest.make({ root: pinnedAgent.pin, entries: [{ _tag: "Agent", ...pinnedAgent }] })
+const registrations = executable.manifest.entries.flatMap((entry) =>
+  entry._tag === "Agent"
+    ? [
+        entry.manifest.model,
+        ...entry.manifest.tools.map(({ pin }) => pin),
+        ...(entry.manifest.policy._tag === "Pinned" ? [entry.manifest.policy.pin] : []),
+      ].map((pin) => ({ pin, codec: "example", version: "1", payload: { fixture: "release-agent" } }))
+    : [],
+)
 const toolkitLayer = toolkit.toLayer({ deploy: () => Effect.die("approval should suspend before execution") })
 const toolExecutorLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -64,6 +83,7 @@ const agentServices = Layer.mergeAll(
     ),
   ),
   toolExecutorLayer,
+  toolkitLayer,
   Approvals.layerTest({
     resolve: (pending) => Effect.succeed({ ...pending, token: "approve-deploy-1" }),
   }),
@@ -72,20 +92,21 @@ const agentServices = Layer.mergeAll(
 )
 
 const runtimeLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
-  addresses: [{ address: agentAddress, executable }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
+  addresses: [],
 })
 
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const receipt = yield* runtime.send({
-    to: agentAddress,
+  const receipt = yield* runtime.start({
+    executable,
+    registrations,
     sessionId: "release-1",
     idempotencyKey: "deploy-api-1",
     prompt: "Deploy api",
   })
   const store = yield* RunStore.RunStore
-  const host = yield* AgentHost.AgentHost
+  const host = yield* ExecutionHost.ExecutionHost
   yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "hitl-example" }))
   const events = yield* runtime.events({ runId: receipt.runId }).pipe(
     Stream.takeUntil(

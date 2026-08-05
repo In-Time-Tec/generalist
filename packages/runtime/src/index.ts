@@ -13,7 +13,6 @@ export const Address = {
 export namespace Address {
   export type Address = import("./address.js").Address
 }
-
 import {
   ExecutableManifest as ExecutableManifest_ExecutableManifest,
   ExecutableRef as ExecutableManifest_ExecutableRef,
@@ -41,28 +40,9 @@ export namespace ExecutableManifest {
   export type PinnedExecutable = import("./executable-manifest.js").PinnedExecutable
 }
 
-import {
-  ExecutableResolver as ExecutableResolver_ExecutableResolver,
-  Input as ExecutableResolver_Input,
-  Attestation as ExecutableResolver_Attestation,
-  makeStatic as ExecutableResolver_makeStatic,
-  layerTest as ExecutableResolver_layerTest,
-} from "./executable-resolver.js"
-export const ExecutableResolver = {
-  ExecutableResolver: ExecutableResolver_ExecutableResolver,
-  Input: ExecutableResolver_Input,
-  Attestation: ExecutableResolver_Attestation,
-  makeStatic: ExecutableResolver_makeStatic,
-  layerTest: ExecutableResolver_layerTest,
-}
-export namespace ExecutableResolver {
-  export type ExecutableResolver = import("./executable-resolver.js").ExecutableResolver
-  export type Interface = import("./executable-resolver.js").Interface
-  export type Input = import("./executable-resolver.js").Input
-  export type Attestation = import("./executable-resolver.js").Attestation
-  export type Resolution = import("./executable-resolver.js").Resolution
-  export type StaticExecutable = import("./executable-resolver.js").StaticExecutable
-}
+export * as ExecutableRegistration from "./executable-registration.js"
+
+export * as ExecutableResolver from "./executable-resolver.js"
 
 import {
   Cursor as Cursor_Cursor,
@@ -102,7 +82,7 @@ export namespace Message {
 }
 
 import {
-  AgentResult as AgentResult_AgentResult,
+  ExecutionResult as ExecutionResult_ExecutionResult,
   RunFailure as RunFailure_RunFailure,
   RunStatus as Run_RunStatus,
   RunId as Run_RunId,
@@ -121,12 +101,13 @@ import {
   encodeSnapshot as Run_encodeSnapshot,
   decodeSnapshot as Run_decodeSnapshot,
 } from "./run.js"
-export const AgentResult: { readonly AgentResult: typeof import("./run.js").AgentResult } = {
-  AgentResult: AgentResult_AgentResult,
+export const ExecutionResult: { readonly ExecutionResult: typeof import("./run.js").ExecutionResult } = {
+  ExecutionResult: ExecutionResult_ExecutionResult,
 } as const
-export namespace AgentResult {
-  export type AgentResult = import("./run.js").AgentResult
+export namespace ExecutionResult {
+  export type ExecutionResult = import("./run.js").ExecutionResult
 }
+export * as ExecutionState from "./execution-state.js"
 export const RunFailure: { readonly RunFailure: typeof import("./run.js").RunFailure } = {
   RunFailure: RunFailure_RunFailure,
 } as const
@@ -135,7 +116,7 @@ export namespace RunFailure {
 }
 
 export const Run = {
-  AgentResult: AgentResult_AgentResult,
+  ExecutionResult: ExecutionResult_ExecutionResult,
   RunFailure: RunFailure_RunFailure,
   RunStatus: Run_RunStatus,
   RunId: Run_RunId,
@@ -155,7 +136,7 @@ export const Run = {
   decodeSnapshot: Run_decodeSnapshot,
 } as typeof import("./run.js")
 export namespace Run {
-  export type AgentResult = import("./run.js").AgentResult
+  export type ExecutionResult = import("./run.js").ExecutionResult
   export type RunFailure = import("./run.js").RunFailure
   export type RunStatus = import("./run.js").RunStatus
   export type RunId = import("./run.js").RunId
@@ -182,7 +163,7 @@ import {
   SpecVersion as RunEvent_SpecVersion,
   Sequence as RunEvent_Sequence,
   RunEventBase as RunEvent_RunEventBase,
-  AgentResultSchema as RunEvent_AgentResultSchema,
+  ExecutionResultSchema as RunEvent_ExecutionResultSchema,
   RunFailure as RunEvent_RunFailure,
   RunEvent as RunEvent_RunEvent,
   LifecycleTag as RunEvent_LifecycleTag,
@@ -192,7 +173,7 @@ export const RunEvent = {
   SpecVersion: RunEvent_SpecVersion,
   Sequence: RunEvent_Sequence,
   RunEventBase: RunEvent_RunEventBase,
-  AgentResultSchema: RunEvent_AgentResultSchema,
+  ExecutionResultSchema: RunEvent_ExecutionResultSchema,
   RunFailure: RunEvent_RunFailure,
   RunEvent: RunEvent_RunEvent,
   LifecycleTag: RunEvent_LifecycleTag,
@@ -203,7 +184,7 @@ export namespace RunEvent {
   export type Sequence = import("./run-event.js").Sequence
   export type RunEventBase = import("./run-event.js").RunEventBase
   export type AgentLoopEvent = import("./agent-event.js").AgentLoopEvent
-  export type AgentResult = import("./agent-event.js").AgentResult
+  export type ExecutionResult = import("./execution-state.js").ExecutionResult
   export type RunFailure = import("./run-event.js").RunFailure
   export type RunAccepted = import("./run-event.js").RunAccepted
   export type RunAttemptStarted = import("./run-event.js").RunAttemptStarted
@@ -225,6 +206,9 @@ export namespace RunEvent {
 import {
   AddressNotFound as Errors_AddressNotFound,
   ExecutablePinMissing as Errors_ExecutablePinMissing,
+  ExecutableRegistrationInvalid as Errors_ExecutableRegistrationInvalid,
+  ExecutableRegistrationConflict as Errors_ExecutableRegistrationConflict,
+  ExecutableRegistrationMissing as Errors_ExecutableRegistrationMissing,
   ExecutableIdentityMismatch as Errors_ExecutableIdentityMismatch,
   AgentExecutionFailure as Errors_AgentExecutionFailure,
   IdempotencyConflict as Errors_IdempotencyConflict,
@@ -244,6 +228,7 @@ import {
   FanOutInvalid as Errors_FanOutInvalid,
   FanOutRemainderUnsupported as Errors_FanOutRemainderUnsupported,
   ChildSelectionMissing as Errors_ChildSelectionMissing,
+  StartInvalid as Errors_StartInvalid,
   OperationResolutionConflict as Errors_OperationResolutionConflict,
 } from "./errors.js"
 import {
@@ -258,6 +243,9 @@ import {
 export const Errors = {
   AddressNotFound: Errors_AddressNotFound,
   ExecutablePinMissing: Errors_ExecutablePinMissing,
+  ExecutableRegistrationInvalid: Errors_ExecutableRegistrationInvalid,
+  ExecutableRegistrationConflict: Errors_ExecutableRegistrationConflict,
+  ExecutableRegistrationMissing: Errors_ExecutableRegistrationMissing,
   ExecutableIdentityMismatch: Errors_ExecutableIdentityMismatch,
   AgentExecutionFailure: Errors_AgentExecutionFailure,
   IdempotencyConflict: Errors_IdempotencyConflict,
@@ -277,6 +265,7 @@ export const Errors = {
   FanOutInvalid: Errors_FanOutInvalid,
   FanOutRemainderUnsupported: Errors_FanOutRemainderUnsupported,
   ChildSelectionMissing: Errors_ChildSelectionMissing,
+  StartInvalid: Errors_StartInvalid,
   OperationResolutionConflict: Errors_OperationResolutionConflict,
   SchemaDirty: Errors_SchemaDirty,
   SchemaChecksumMismatch: Errors_SchemaChecksumMismatch,
@@ -289,6 +278,9 @@ export const Errors = {
 export namespace Errors {
   export type AddressNotFound = import("./errors.js").AddressNotFound
   export type ExecutablePinMissing = import("./errors.js").ExecutablePinMissing
+  export type ExecutableRegistrationInvalid = import("./errors.js").ExecutableRegistrationInvalid
+  export type ExecutableRegistrationConflict = import("./errors.js").ExecutableRegistrationConflict
+  export type ExecutableRegistrationMissing = import("./errors.js").ExecutableRegistrationMissing
   export type ExecutableIdentityMismatch = import("./errors.js").ExecutableIdentityMismatch
   export type AgentExecutionFailure = import("./errors.js").AgentExecutionFailure
   export type IdempotencyConflict = import("./errors.js").IdempotencyConflict
@@ -308,6 +300,7 @@ export namespace Errors {
   export type FanOutInvalid = import("./errors.js").FanOutInvalid
   export type FanOutRemainderUnsupported = import("./errors.js").FanOutRemainderUnsupported
   export type ChildSelectionMissing = import("./errors.js").ChildSelectionMissing
+  export type StartInvalid = import("./errors.js").StartInvalid
   export type OperationResolutionConflict = import("./errors.js").OperationResolutionConflict
   export type SchemaDirty = import("./sql/errors.js").SchemaDirty
   export type SchemaChecksumMismatch = import("./sql/errors.js").SchemaChecksumMismatch
@@ -340,6 +333,9 @@ export namespace Runtime {
   export type LayerOptions = import("./runtime.js").LayerOptions
   export type AddressBinding = import("./runtime.js").AddressBinding
   export type SendInput = import("./runtime.js").SendInput
+  export type StartInput = import("./runtime.js").StartInput
+  export type InitialChildInput = import("./runtime.js").InitialChildInput
+  export type StartReceipt = import("./runtime.js").StartReceipt
   export type SpawnInput = import("./runtime.js").SpawnInput
   export type EventsInput = import("./runtime.js").EventsInput
   export type HistoryInput = import("./runtime.js").HistoryInput
@@ -349,6 +345,7 @@ export namespace Runtime {
   export type CancelInput = import("./runtime.js").CancelInput
   export type SteerInput = import("./runtime.js").SteerInput
   export type SendError = import("./runtime.js").SendError
+  export type StartError = import("./runtime.js").StartError
   export type SpawnError = import("./runtime.js").SpawnError
   export type EventsError = import("./runtime.js").EventsError
   export type RespondError = import("./runtime.js").RespondError
@@ -365,6 +362,8 @@ export namespace Runtime {
   export type MysqlStoreOptions = import("./sql/mysql/runtime-layer.js").MysqlStoreOptions
 }
 export * as OperationResolution from "./operation-resolution.js"
+export * as ChildRuns from "./child-runs.js"
+export * as CodeMode from "./code-mode.js"
 import {
   FanOutJoin as FanOut_FanOutJoin,
   FanOutRemainder as FanOut_FanOutRemainder,
@@ -409,6 +408,7 @@ export namespace RunStore {
   export type StoreBackend = import("./run-store.js").StoreBackend
   export type StoreInfo = import("./run-store.js").StoreInfo
   export type AdmitSendInput = import("./run-store.js").AdmitSendInput
+  export type AdmitStartInput = import("./run-store.js").AdmitStartInput
   export type RecordOperationInput = import("./run-store.js").RecordOperationInput
   export type AdmitSteeringInput = import("./run-store.js").AdmitSteeringInput
   export type CompletionOutcome = import("./run-store.js").CompletionOutcome
@@ -454,47 +454,25 @@ export namespace RuntimeWorker {
   export type layerWorkerLoop = typeof import("./sql/postgres/worker.js").layerWorkerLoop
 }
 
-import { AgentHost as AgentHost_AgentHost, layer as AgentHost_layer } from "./agent-host.js"
-export const AgentHost = {
-  AgentHost: AgentHost_AgentHost,
-  layer: AgentHost_layer,
-} as typeof import("./agent-host.js")
-export namespace AgentHost {
-  export type AgentHost = import("./agent-host.js").AgentHost
-  export type Interface = import("./agent-host.js").Interface
-  export type Options = import("./agent-host.js").Options
+import { LocalScheduler as LocalScheduler_LocalScheduler } from "./local-scheduler.js"
+export const LocalScheduler = {
+  LocalScheduler: LocalScheduler_LocalScheduler,
+} as typeof import("./local-scheduler.js")
+export namespace LocalScheduler {
+  export type LocalScheduler = import("./local-scheduler.js").LocalScheduler
+  export type Interface = import("./local-scheduler.js").Interface
+  export type Options = import("./local-scheduler.js").Options
 }
 
-import {
-  awaitTerminal as RunTree_awaitTerminal,
-  events as RunTree_events,
-  history as RunTree_history,
-  inspect as RunTree_inspect,
-  TreeCursor as RunTree_TreeCursor,
-  Inspection as RunTree_Inspection,
-  TreeRunInspection as RunTree_TreeRunInspection,
-  encodeInspection as RunTree_encodeInspection,
-  decodeInspection as RunTree_decodeInspection,
-} from "./tree.js"
-export const RunTree = {
-  events: RunTree_events,
-  history: RunTree_history,
-  inspect: RunTree_inspect,
-  awaitTerminal: RunTree_awaitTerminal,
-  TreeCursor: RunTree_TreeCursor,
-  Inspection: RunTree_Inspection,
-  TreeRunInspection: RunTree_TreeRunInspection,
-  encodeInspection: RunTree_encodeInspection,
-  decodeInspection: RunTree_decodeInspection,
-} as typeof import("./tree.js")
-export namespace RunTree {
-  export type TreeCursor = import("./tree.js").TreeCursor
-  export type TreeEvent = import("./tree.js").TreeEvent
-  export type TreePage = import("./tree.js").TreePage
-  export type EventsInput = import("./tree.js").EventsInput
-  export type HistoryInput = import("./tree.js").HistoryInput
-  export type Inspection = import("./tree.js").Inspection
-  export type TreeRunInspection = import("./tree.js").TreeRunInspection
-  export type events = typeof import("./tree.js").events
-  export type history = typeof import("./tree.js").history
+import { ExecutionHost as ExecutionHost_ExecutionHost, layer as ExecutionHost_layer } from "./execution-host.js"
+export const ExecutionHost = {
+  ExecutionHost: ExecutionHost_ExecutionHost,
+  layer: ExecutionHost_layer,
+} as typeof import("./execution-host.js")
+export namespace ExecutionHost {
+  export type ExecutionHost = import("./execution-host.js").ExecutionHost
+  export type Interface = import("./execution-host.js").Interface
+  export type Options = import("./execution-host.js").Options
 }
+
+export * as RunTree from "./tree.js"

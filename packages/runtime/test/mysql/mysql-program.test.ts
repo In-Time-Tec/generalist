@@ -1,0 +1,294 @@
+import { describe, expect, it } from "@effect/vitest"
+import { Effect } from "effect"
+import { Errors, ExecutionHost, RunClaims, Runtime, RunStore } from "../../src/index.js"
+import {
+  agentMapProgramFixture,
+  approvalProgramFixture,
+  programAddress,
+  programExecutable,
+  programFixture,
+} from "../program-fixture.js"
+import { mysqlAvailable, mysqlUrl, prepareMysql } from "./helpers.js"
+import { registrationsFor } from "../helpers.js"
+import {
+  programBudgetContract,
+  programCancellationFenceContract,
+  programCancellationFinalizerContract,
+  programReplayDivergenceContract,
+  programSettledReplayContract,
+  programUnknownOutcomeContract,
+} from "../program-store-contract.js"
+
+const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
+
+const programAddresses = [
+  { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
+]
+
+describeMysql("mysql Program store contract", () => {
+  it.live("enforces budgets, replay identity, and cancellation fences", () => {
+    const url = mysqlUrl!
+    const fixture = programFixture()
+    return programBudgetContract.pipe(
+      Effect.andThen(programReplayDivergenceContract),
+      Effect.andThen(programSettledReplayContract),
+      Effect.andThen(programCancellationFinalizerContract),
+      Effect.andThen(programCancellationFenceContract),
+      Effect.provide(
+        Runtime.layerMysql({
+          url,
+          source: "mysql-test",
+          resolver: fixture.resolver,
+          addresses: programAddresses,
+        }),
+      ),
+      Effect.scoped,
+      (execute) => prepareMysql(url).pipe(Effect.andThen(execute)),
+    )
+  })
+
+  it.live("resolves a crashed non-idempotent Program operation without redispatch", () => {
+    const url = mysqlUrl!
+    const fixture = programFixture()
+    return programUnknownOutcomeContract("mysql-program-resolution").pipe(
+      Effect.provide(
+        Runtime.layerMysql({
+          url,
+          source: "mysql-test",
+          resolver: fixture.resolver,
+          addresses: programAddresses,
+        }),
+      ),
+      Effect.scoped,
+      (execute) => prepareMysql(url).pipe(Effect.andThen(execute)),
+      Effect.andThen(Effect.sync(() => expect(fixture.counts().toolCalls).toBe(0))),
+    )
+  })
+
+  it.live("atomically records and replays Program tool and log operations", () => {
+    const url = mysqlUrl!
+    const fixture = programFixture()
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const claims = yield* RunClaims.RunClaims
+      const host = yield* ExecutionHost.ExecutionHost
+      const receipt = yield* runtime.send({
+        to: programAddress,
+        sessionId: "mysql-program",
+        idempotencyKey: "mysql-program",
+        prompt: "run",
+      })
+      const [claim] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
+      yield* host.execute({ runId: receipt.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
+      const runId = receipt.runId
+      expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
+      expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({ status: "succeeded" })
+      expect(yield* store.getProgramOperation({ runId, operation: "summary" })).toMatchObject({ status: "succeeded" })
+      expect(fixture.counts()).toEqual({ toolCalls: 1, logs: 1 })
+    }).pipe(
+      Effect.provide(
+        Runtime.layerMysql({ url, source: "mysql-test", resolver: fixture.resolver, addresses: programAddresses }),
+      ),
+      Effect.scoped,
+      (execute) => prepareMysql(url).pipe(Effect.andThen(execute)),
+    )
+  })
+
+  it.live("atomically reserves one approval response and resumes the Program operation", () => {
+    const url = mysqlUrl!
+    const fixture = approvalProgramFixture()
+    const options = {
+      url,
+      source: "mysql-test",
+      resolver: fixture.resolver,
+      addresses: programAddresses,
+    }
+    let runId = ""
+    const suspend = Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const claims = yield* RunClaims.RunClaims
+      const host = yield* ExecutionHost.ExecutionHost
+      const receipt = yield* runtime.send({
+        to: programAddress,
+        sessionId: "mysql-program-approval",
+        idempotencyKey: "mysql-program-approval",
+        prompt: "run",
+      })
+      runId = receipt.runId
+      const [first] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
+      yield* host.execute({ runId: receipt.runId, ownerId: first!.workerId, attemptFence: first!.attemptFence })
+      yield* Effect.all(
+        [
+          runtime.respond({ runId: receipt.runId, waitId: "approval:echo", resolution: { _tag: "Approved" } }),
+          runtime.respond({ runId: receipt.runId, waitId: "approval:echo", resolution: { _tag: "Approved" } }),
+        ],
+        { concurrency: "unbounded" },
+      )
+      expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
+        status: "reserved",
+      })
+    }).pipe(Effect.provide(Runtime.layerMysql(options)), Effect.scoped)
+
+    const resume = Effect.suspend(() =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const host = yield* ExecutionHost.ExecutionHost
+        const [claim] = yield* claims.claimReadyRuns({ workerId: "mysql-program-resume", limit: 1 })
+        yield* host.execute({ runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
+        expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({ status: "succeeded" })
+        expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
+      }).pipe(Effect.provide(Runtime.layerMysql(options)), Effect.scoped),
+    )
+
+    return prepareMysql(url).pipe(Effect.andThen(suspend), Effect.andThen(resume))
+  })
+
+  it.live("does not reopen a cancelled Program approval operation", () => {
+    const url = mysqlUrl!
+    const fixture = approvalProgramFixture()
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const claims = yield* RunClaims.RunClaims
+      const host = yield* ExecutionHost.ExecutionHost
+      const receipt = yield* runtime.send({
+        to: programAddress,
+        sessionId: "mysql-program-cancelled-approval",
+        idempotencyKey: "mysql-program-cancelled-approval",
+        prompt: "run",
+      })
+      const [claim] = yield* claims.claimReadyRuns({ workerId: "mysql-program-cancelled-approval", limit: 1 })
+      yield* host.execute({ runId: receipt.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
+      const operation = yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })
+      if (operation?.waitId === undefined) return yield* Effect.die("Program approval wait is missing")
+      yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+      expect(
+        yield* runtime
+          .respond({ runId: receipt.runId, waitId: operation.waitId, resolution: { _tag: "Approved" } })
+          .pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.RunTerminal)
+      expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })).toMatchObject({
+        status: "failed",
+      })
+      expect((yield* store.loadProgramState(receipt.runId))?.activeSlots).toBe(0)
+      expect(fixture.counts().executions).toBe(0)
+    }).pipe(
+      Effect.provide(
+        Runtime.layerMysql({
+          url,
+          source: "mysql-test",
+          resolver: fixture.resolver,
+          addresses: programAddresses,
+        }),
+      ),
+      Effect.scoped,
+      (execute) => prepareMysql(url).pipe(Effect.andThen(execute)),
+    )
+  })
+
+  it.live("claims Program children in order, wakes the parent, and settles cancellation", () => {
+    const url = mysqlUrl!
+    const fixture = agentMapProgramFixture()
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const claims = yield* RunClaims.RunClaims
+      const host = yield* ExecutionHost.ExecutionHost
+      const receipt = yield* runtime.send({
+        to: fixture.address,
+        sessionId: "mysql-program-map",
+        idempotencyKey: "mysql-program-map",
+        prompt: "run",
+      })
+      const [parentAdmission] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
+      yield* host.execute({
+        runId: receipt.runId,
+        ownerId: parentAdmission!.workerId,
+        attemptFence: parentAdmission!.attemptFence,
+      })
+      expect(yield* store.getProgramOperation({ runId: receipt.runId, operation: "workers" })).toMatchObject({
+        status: "waiting",
+      })
+      const firstChildren = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 2 })
+      expect(firstChildren).toHaveLength(2)
+      yield* Effect.forEach(
+        firstChildren,
+        (claim) => host.execute({ runId: claim.run.runId, ownerId: claim.workerId, attemptFence: claim.attemptFence }),
+        { concurrency: "unbounded", discard: true },
+      )
+      const [thirdChild] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
+      yield* host.execute({
+        runId: thirdChild!.run.runId,
+        ownerId: thirdChild!.workerId,
+        attemptFence: thirdChild!.attemptFence,
+      })
+      expect(fixture.counts().childFinalizers).toBe(3)
+      const [resumedParent] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
+      expect(resumedParent!.run.runId).toBe(receipt.runId)
+      yield* host.execute({
+        runId: receipt.runId,
+        ownerId: resumedParent!.workerId,
+        attemptFence: resumedParent!.attemptFence,
+      })
+      expect((yield* runtime.snapshot(receipt.runId)).outcome).toMatchObject({
+        _tag: "Succeeded",
+        result: { _tag: "Program", value: ["third:child", "first:child", "second:child"] },
+      })
+
+      const cancelled = yield* runtime.send({
+        to: fixture.address,
+        sessionId: "mysql-program-map-cancel",
+        idempotencyKey: "mysql-program-map-cancel",
+        prompt: "run",
+      })
+      const [cancelAdmission] = yield* claims.claimReadyRuns({ workerId: "mysql-program", limit: 1 })
+      yield* host.execute({
+        runId: cancelled.runId,
+        ownerId: cancelAdmission!.workerId,
+        attemptFence: cancelAdmission!.attemptFence,
+      })
+      const cancelledOperation = yield* store.getProgramOperation({ runId: cancelled.runId, operation: "workers" })
+      yield* runtime.cancel({ runId: cancelled.runId, reason: "cancel admitted Program tree" })
+      expect((yield* runtime.inspect(cancelled.runId)).status).toBe("cancelled")
+      for (const childRunId of cancelledOperation?.childRunIds ?? []) {
+        expect((yield* runtime.inspect(childRunId)).status).toBe("cancelled")
+      }
+      const waitId = cancelledOperation?.waitId
+      if (waitId === undefined) return yield* Effect.die("cancelled Program operation wait is missing")
+      expect(
+        yield* runtime.respond({ runId: cancelled.runId, waitId, resolution: { _tag: "Approved" } }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.RunTerminal)
+      expect(yield* runtime.signal({ runId: cancelled.runId, name: waitId }).pipe(Effect.flip)).toBeInstanceOf(
+        Errors.RunTerminal,
+      )
+      expect(
+        yield* store.resume({ runId: cancelled.runId, waitId, resolution: { _tag: "Approved" } }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.RunTerminal)
+      expect(yield* store.getProgramOperation({ runId: cancelled.runId, operation: "workers" })).toMatchObject({
+        status: "failed",
+      })
+      expect((yield* store.loadProgramState(cancelled.runId))?.activeSlots).toBe(0)
+    }).pipe(
+      Effect.provide(
+        Runtime.layerMysql({
+          url,
+          source: "mysql-test",
+          resolver: fixture.resolver,
+          addresses: [
+            {
+              address: fixture.address,
+              executable: fixture.executable,
+              registrations: registrationsFor(fixture.executable),
+            },
+          ],
+        }),
+      ),
+      Effect.scoped,
+      (execute) => prepareMysql(url).pipe(Effect.andThen(execute)),
+    )
+  })
+})

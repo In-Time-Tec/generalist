@@ -38,8 +38,9 @@ import { streamInternal } from "./agent-run.js"
 import { Runtime } from "./agent-persistence-lock.js"
 
 export { Runtime, layerRuntime } from "./agent-persistence-lock.js"
+export { close, withTools, type Any, type Closed, type ClosedServices, type Opened } from "./agent-closure.js"
 
-const AgentTypeId: unique symbol = Symbol.for("@batonfx/core/Agent")
+export const AgentTypeId: unique symbol = Symbol.for("@batonfx/core/Agent")
 /** @experimental An agent definition: a plain value, not a service. */
 export interface HandoffAgent<R> {
   readonly name: string
@@ -248,6 +249,13 @@ export interface RunOptions {
   readonly sessionId?: string
   /** @experimental Stable host identity for the logical model operations in this run. */
   readonly logicalOperationId?: string
+  /** @experimental Authoritative invocation facts supplied by a durable host. */
+  readonly invocation?: {
+    readonly runId: string
+    readonly rootRunId: string
+    readonly attempt: number
+    readonly admittedAt?: string
+  }
   /** @experimental First model-call ordinal for a host resuming from a durable checkpoint. */
   readonly modelCallOrdinalStart?: number
   /** @experimental First turn number for a host continuing an existing transcript. */
@@ -267,6 +275,7 @@ export interface RunOptions {
   /** @experimental Context-window hint for optional compaction. */
   readonly compaction?: {
     readonly contextWindow?: number
+    readonly reserveTokens?: number
   }
   /** @experimental Per-run budget narrowing; dimensions omitted inherit the agent default. */
   readonly budget?: BudgetLimits

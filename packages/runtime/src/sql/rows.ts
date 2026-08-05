@@ -30,6 +30,7 @@ export interface RunRow {
   readonly suspension_json: string | null
   readonly transcript_json: string | null
   readonly continuation_json: string | null
+  readonly pending_outcome_json: string | null
   readonly owner_worker_id?: string | null
   readonly lease_expires_at?: string | Date | null
   readonly created_at: string | Date
@@ -99,10 +100,12 @@ export interface DecodedRun {
   readonly acceptedSequence: number
   readonly respondedWaitIds: ReadonlySet<string>
   readonly ownerWorkerId?: string
+  readonly admittedAt: string
   readonly leaseExpiresAt?: string
   readonly attemptFenceEpoch?: number
-  readonly driverCheckpoint?: import("@batonfx/core").DurableDriver.DriverCheckpoint
-  readonly suspension?: import("@batonfx/core").AgentEvent.AgentSuspended
+  readonly driverCheckpoint?: import("../execution-state.js").ExecutionCheckpoint
+  readonly suspension?: import("../execution-state.js").ExecutionSuspension
   readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
   readonly continuation?: import("../steering.js").ExecutionContinuation
+  readonly pendingOutcome?: import("../run-store.js").PendingRunOutcome
 }

@@ -1,11 +1,38 @@
 import { Console, Effect, Layer, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, Approvals, Chat, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
-import { Address, AgentHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "@batonfx/runtime"
+import {
+  Agent,
+  AgentManifest,
+  Approvals,
+  Chat,
+  LanguageModel,
+  ModelMiddleware,
+  Pins,
+  Response,
+  ToolExecutor,
+} from "@batonfx/core"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, Cursor, RunStore, Runtime } from "@batonfx/runtime"
 
 const agent = Agent.make({ name: "chat-agent" })
-const executable = ExecutableManifest.makeTest("chat-agent", "1")
-const agentAddress = Address.make("agent:chat")
+const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
+  model: Pins.makeModel({ fixture: "chat-agent", revision: "1" }),
+  tools: [],
+  skills: [],
+  services: [],
+  policy: { _tag: "Portable", policy: agent.policy.snapshot! },
+  budget: agent.budget ?? {},
+  children: [],
+})
+const executable = ExecutableManifest.make({ root: pinnedAgent.pin, entries: [{ _tag: "Agent", ...pinnedAgent }] })
+const registrations = executable.manifest.entries.flatMap((entry) =>
+  entry._tag === "Agent"
+    ? [
+        entry.manifest.model,
+        ...entry.manifest.tools.map(({ pin }) => pin),
+        ...(entry.manifest.policy._tag === "Pinned" ? [entry.manifest.policy.pin] : []),
+      ].map((pin) => ({ pin, codec: "docs", version: "1", payload: { fixture: "chat-agent" } }))
+    : [],
+)
 const usage = Response.Usage.make({
   inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
   outputTokens: { total: 0, text: 0, reasoning: 0 },
@@ -36,8 +63,8 @@ const agentServices = Layer.mergeAll(
 )
 
 const runtimeLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
-  addresses: [{ address: agentAddress, executable }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
+  addresses: [],
 })
 
 const collectRun = (runId: string, cursor?: number) =>
@@ -55,14 +82,15 @@ const tags = (events: Iterable<{ readonly sequence: number; readonly _tag: strin
 
 const program = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const receipt = yield* runtime.send({
-    to: agentAddress,
+  const receipt = yield* runtime.start({
+    executable,
+    registrations,
     sessionId: "docs-1",
     idempotencyKey: "hello-1",
     prompt: "Say hello",
   })
   const store = yield* RunStore.RunStore
-  const host = yield* AgentHost.AgentHost
+  const host = yield* ExecutionHost.ExecutionHost
   yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "docs-example" }))
   const live = yield* collectRun(receipt.runId)
   yield* Console.log(`live:   ${tags(live)}`)

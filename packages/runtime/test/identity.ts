@@ -1,5 +1,18 @@
 import { Agent, AgentManifest, ExecutableManifest, Pins } from "@batonfx/core"
-import type { Tool } from "effect/unstable/ai"
+import { Effect, Layer, Stream } from "effect"
+import { LanguageModel, type Tool } from "effect/unstable/ai"
+
+/** Model Layer for test Agents that are admitted and inspected but never reach a model call. */
+export const unusedModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effect(
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
+    generateText: () => Effect.die(new Error("this test Agent must not call a model")),
+    streamText: () => Stream.die(new Error("this test Agent must not call a model")),
+  }),
+)
+
+/** Close one test Agent over a model it never calls. */
+export const closedTestAgent = (agent: Agent.Agent): Agent.Closed => Agent.close(agent, unusedModel)
 
 export const testExecutable = <Tools extends Record<string, Tool.Any>, R, P, A>(
   agent: Agent.Agent<Tools, R, P, A>,
@@ -14,7 +27,7 @@ export const pinnedTestExecutable = <Tools extends Record<string, Tool.Any>, R, 
   revision = "1",
 ): ExecutableManifest.PinnedExecutable => {
   const pinned = pinnedTestAgent(agent, revision)
-  return ExecutableManifest.make({ root: pinned.pin, agents: [pinned] })
+  return ExecutableManifest.make({ root: pinned.pin, entries: [{ _tag: "Agent", ...pinned }] })
 }
 
 export const pinnedTestAgent = <Tools extends Record<string, Tool.Any>, R, P, A>(

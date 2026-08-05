@@ -1,7 +1,8 @@
 import { Effect, Layer } from "effect"
-import type { AgentHost } from "./agent-host.js"
+import type { ExecutionHost } from "./execution-host.js"
 import type { RunStore } from "./run-store.js"
 import type { Runtime } from "./runtime.js"
+import type { LocalScheduler } from "./local-scheduler.js"
 import type { SqliteStoreError, SqliteStoreOptions } from "./sql/store.js"
 import type { SqlClient } from "effect/unstable/sql"
 
@@ -9,7 +10,7 @@ export type { SqliteStoreOptions }
 
 export const layerSqlite = (
   options: SqliteStoreOptions,
-): Layer.Layer<Runtime | RunStore | AgentHost, SqliteStoreError> =>
+): Layer.Layer<Runtime | RunStore | ExecutionHost | LocalScheduler, SqliteStoreError> =>
   Layer.unwrap(
     Effect.promise(() => import("./sql/runtime-layer.js")).pipe(Effect.map((module) => module.layerSqlite(options))),
   )

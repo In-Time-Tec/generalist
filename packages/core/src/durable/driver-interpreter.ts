@@ -117,10 +117,13 @@ const noopJournal: DriverJournal = {
   onCheckpoint: () => Effect.void,
 }
 
-const outcomeFromExit = <E>(exit: Exit.Exit<unknown, E>): OperationOutcome =>
-  Exit.isSuccess(exit)
-    ? { _tag: "Succeeded", value: exit.value }
-    : { _tag: "Failed", error: Cause.squash(exit.cause as Cause.Cause<E>) }
+const outcomeFromExit = <E>(operation: DriverOperation, exit: Exit.Exit<unknown, E>): OperationOutcome | undefined => {
+  if (Exit.isSuccess(exit)) return { _tag: "Succeeded", value: exit.value }
+  if (exit.cause.reasons.length === 1 && Cause.isFailReason(exit.cause.reasons[0]!)) {
+    return { _tag: "Failed", error: exit.cause.reasons[0]!.error }
+  }
+  return operation.replayPolicy === "never" ? { _tag: "Unknown", operationId: operation.key } : undefined
+}
 
 /** @experimental */
 export const guardUnknownNeverReplay = (
@@ -203,7 +206,6 @@ export const makeInline = (input: {
       nested = false,
     ): Effect.Effect<void, DriverError | DriverStateInvalid | DriverUnknownReplay> =>
       Effect.gen(function* () {
-        yield* guardUnknownNeverReplay(operation, outcome)
         let before = yield* Ref.get(checkpointRef)
         if (nested) {
           if (outcome._tag === "Succeeded" && operation.kind === "handoff") {
@@ -214,16 +216,11 @@ export const makeInline = (input: {
           yield* journal.onCompleted(operation, outcome, before)
           return
         }
-        const after = yield* input.driver.apply(before, outcome)
+        const after = outcome._tag === "Unknown" ? before : yield* input.driver.apply(before, outcome)
         yield* Ref.set(checkpointRef, after)
         yield* Ref.update(recordedRef, (current) => [...current, { operation, outcome, checkpoint: after }])
         yield* journal.onCompleted(operation, outcome, after)
         yield* Ref.set(activePendingRef, undefined)
-        if (outcome._tag === "Unknown") {
-          return yield* DriverError.make({
-            message: `Operation ${operation.key} ended unknown and requires host resolution`,
-          })
-        }
       })
     const run = <A, E, R>(
       spec: OperationSpec,
@@ -254,7 +251,12 @@ export const makeInline = (input: {
             ? spec.input.modelCallOrdinal
             : undefined
         const exit = yield* effect.pipe(Effect.provideService(CurrentModelCallOrdinal, ordinal), Effect.exit)
-        yield* commit(operation, outcomeFromExit(exit), nested)
+        const outcome = outcomeFromExit(operation, exit)
+        if (outcome !== undefined) {
+          yield* outcome._tag === "Unknown"
+            ? Effect.uninterruptible(commit(operation, outcome, nested))
+            : commit(operation, outcome, nested)
+        }
         return yield* Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause)
       })
     const interpreter: Interface = {
@@ -286,7 +288,14 @@ export const makeInline = (input: {
                 : undefined
             return stream.pipe(
               Stream.provideService(CurrentModelCallOrdinal, ordinal),
-              Stream.onExit((exit) => commit(operation, outcomeFromExit(exit), nested).pipe(Effect.orDie)),
+              Stream.onExit((exit) => {
+                const outcome = outcomeFromExit(operation, exit)
+                return outcome === undefined
+                  ? Effect.void
+                  : outcome._tag === "Unknown"
+                    ? Effect.uninterruptible(commit(operation, outcome, nested)).pipe(Effect.orDie)
+                    : commit(operation, outcome, nested).pipe(Effect.orDie)
+              }),
             )
           }),
         ) as Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>,

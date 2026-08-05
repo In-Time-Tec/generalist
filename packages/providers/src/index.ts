@@ -1,5 +1,6 @@
 import {
   classifyFailure as Anthropic_classifyFailure,
+  decodeConfig as Anthropic_decodeConfig,
   toolJsonSchemaCompiler as Anthropic_toolJsonSchemaCompiler,
   layer as Anthropic_layer,
   registration as Anthropic_registration,
@@ -7,6 +8,7 @@ import {
 } from "./provider/anthropic.js"
 export const Anthropic = {
   classifyFailure: Anthropic_classifyFailure,
+  decodeConfig: Anthropic_decodeConfig,
   toolJsonSchemaCompiler: Anthropic_toolJsonSchemaCompiler,
   layer: Anthropic_layer,
   registration: Anthropic_registration,
@@ -14,11 +16,13 @@ export const Anthropic = {
 } as typeof import("./provider/anthropic.js")
 export namespace Anthropic {
   export type classifyFailure = typeof import("./provider/anthropic.js").classifyFailure
+  export type decodeConfig = typeof import("./provider/anthropic.js").decodeConfig
   export type toolJsonSchemaCompiler = typeof import("./provider/anthropic.js").toolJsonSchemaCompiler
   export type layer = typeof import("./provider/anthropic.js").layer
   export type registration = typeof import("./provider/anthropic.js").registration
   export type layerConfig = typeof import("./provider/anthropic.js").layerConfig
   export type AnthropicInput = import("./provider/anthropic.js").AnthropicInput
+  export type Config = import("./provider/anthropic.js").Config
   export type LayerOptions = import("./provider/anthropic.js").LayerOptions
 }
 import {
@@ -33,6 +37,7 @@ import {
   make as amazonBedrockMake,
   layerLanguageModel as amazonBedrockLayerLanguageModel,
   classifyFailure as amazonBedrockClassifyFailure,
+  decodeConfig as amazonBedrockDecodeConfig,
   toolJsonSchemaCompiler as amazonBedrockToolJsonSchemaCompiler,
   layer as amazonBedrockLayer,
 } from "./provider/amazon-bedrock.js"
@@ -48,6 +53,7 @@ export const AmazonBedrock = {
   make: amazonBedrockMake,
   layerLanguageModel: amazonBedrockLayerLanguageModel,
   classifyFailure: amazonBedrockClassifyFailure,
+  decodeConfig: amazonBedrockDecodeConfig,
   toolJsonSchemaCompiler: amazonBedrockToolJsonSchemaCompiler,
   layer: amazonBedrockLayer,
 } as typeof import("./provider/amazon-bedrock.js")
@@ -64,6 +70,7 @@ export namespace AmazonBedrock {
   export type make = typeof import("./provider/amazon-bedrock.js").make
   export type layerLanguageModel = typeof import("./provider/amazon-bedrock.js").layerLanguageModel
   export type classifyFailure = typeof import("./provider/amazon-bedrock.js").classifyFailure
+  export type decodeConfig = typeof import("./provider/amazon-bedrock.js").decodeConfig
   export type toolJsonSchemaCompiler = typeof import("./provider/amazon-bedrock.js").toolJsonSchemaCompiler
   export type layer = typeof import("./provider/amazon-bedrock.js").layer
   export type Config = import("./provider/amazon-bedrock.js").Config
@@ -135,7 +142,22 @@ export namespace Embedding {
   export type OpenAiEmbeddingInput = import("./model/embedding.js").OpenAiEmbeddingInput
 }
 import {
+  AvailabilitySemanticsMissing as ModelRoute_AvailabilitySemanticsMissing,
+  make as ModelRoute_make,
+} from "./model/model-route.js"
+export const ModelRoute = {
+  AvailabilitySemanticsMissing: ModelRoute_AvailabilitySemanticsMissing,
+  make: ModelRoute_make,
+} as typeof import("./model/model-route.js")
+export namespace ModelRoute {
+  export type AvailabilitySemanticsMissing = import("./model/model-route.js").AvailabilitySemanticsMissing
+  export type make = typeof import("./model/model-route.js").make
+  export type Input = import("./model/model-route.js").Input
+  export type Route = import("./model/model-route.js").Route
+}
+import {
   classifyFailure as OpenAi_classifyFailure,
+  decodeConfig as OpenAi_decodeConfig,
   toolJsonSchemaCompiler as OpenAi_toolJsonSchemaCompiler,
   layer as OpenAi_layer,
   registration as OpenAi_registration,
@@ -148,6 +170,7 @@ import {
 } from "./provider/openai.js"
 export const OpenAi = {
   classifyFailure: OpenAi_classifyFailure,
+  decodeConfig: OpenAi_decodeConfig,
   toolJsonSchemaCompiler: OpenAi_toolJsonSchemaCompiler,
   layer: OpenAi_layer,
   registration: OpenAi_registration,
@@ -160,6 +183,7 @@ export const OpenAi = {
 } as typeof import("./provider/openai.js")
 export namespace OpenAi {
   export type classifyFailure = typeof import("./provider/openai.js").classifyFailure
+  export type decodeConfig = typeof import("./provider/openai.js").decodeConfig
   export type toolJsonSchemaCompiler = typeof import("./provider/openai.js").toolJsonSchemaCompiler
   export type layer = typeof import("./provider/openai.js").layer
   export type registration = typeof import("./provider/openai.js").registration
@@ -170,6 +194,7 @@ export namespace OpenAi {
   export type registrationAccount = typeof import("./provider/openai.js").registrationAccount
   export type layerAccount = typeof import("./provider/openai.js").layerAccount
   export type LayerOptions = import("./provider/openai.js").LayerOptions
+  export type Config = import("./provider/openai.js").Config
   export type OpenAiAccountCredential = import("./provider/openai.js").OpenAiAccountCredential
   export type OpenAiAccountCredentials = import("./provider/openai.js").OpenAiAccountCredentials
   export type OpenAiAccountInput = import("./provider/openai.js").OpenAiAccountInput

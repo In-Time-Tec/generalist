@@ -233,15 +233,15 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       })
     }
 
-    if (
+    const invalidCompaction =
       options.compaction?.contextWindow !== undefined &&
       (!Number.isFinite(options.compaction.contextWindow) || options.compaction.contextWindow <= 0)
-    ) {
-      return yield* AgentError.make({
-        message: "RunOptions.compaction.contextWindow must be a positive finite number",
-        turn: 0,
-      })
-    }
+        ? "RunOptions.compaction.contextWindow must be a positive finite number"
+        : options.compaction?.reserveTokens !== undefined &&
+            (!Number.isSafeInteger(options.compaction.reserveTokens) || options.compaction.reserveTokens < 0)
+          ? "RunOptions.compaction.reserveTokens must be a non-negative safe integer"
+          : undefined
+    if (invalidCompaction !== undefined) return yield* AgentError.make({ message: invalidCompaction, turn: 0 })
 
     const sessionId = options.sessionId ?? "local"
     const sessionOwnerToken = options.sessionOwnerToken

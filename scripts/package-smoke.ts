@@ -358,7 +358,7 @@ for (const value of [A2A.layer, AgUi.layer, Runtime.layerMemory, RunEvent.RunEve
 const tool = Tool.make("identity_proof", { parameters: Schema.Struct({ value: Schema.String }) })
 const agent = Agent.make({ name: "identity-proof", toolkit: Toolkit.make(tool) })
 const layers = [
-  ModelRegistry.layerMemory(),
+  ModelRegistry.layer(),
   Session.layerMemory,
   Catalog.layer(),
   TestModel.layer([TestModel.text("identity")]),

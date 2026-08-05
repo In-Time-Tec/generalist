@@ -5,7 +5,7 @@ import { RunNotFound, RunTerminal, SteeringConflict } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { AdmitSteeringInput, ExecutionClaim } from "../run-store.js"
 import { encodeContinuation, type ExecutionContinuation, type SteeringEntry } from "../steering.js"
-import type { AgentResult } from "../agent-event.js"
+import type { ExecutionResult } from "../execution-state.js"
 import { loadRun } from "./store-helpers.js"
 
 interface SteeringRow {
@@ -31,7 +31,6 @@ export const admitSteering = (input: AdmitSteeringInput) =>
     const sql = yield* SqlClient.SqlClient
     const run = yield* loadRun(input.runId)
     if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
-    if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     const existing = yield* sql<SteeringRow>`
       SELECT * FROM baton_run_steering
       WHERE run_id = ${input.runId} AND idempotency_key = ${input.idempotencyKey}
@@ -40,6 +39,14 @@ export const admitSteering = (input: AdmitSteeringInput) =>
     if (prior !== undefined) {
       if (prior.digest === input.digest) return
       return yield* SteeringConflict.make({ runId: input.runId, idempotencyKey: input.idempotencyKey })
+    }
+    if (isTerminal(run.status) || run.pendingOutcome !== undefined) {
+      const status = isTerminal(run.status)
+        ? run.status
+        : run.pendingOutcome?._tag === "Completed"
+          ? "succeeded"
+          : "failed"
+      return yield* RunTerminal.make({ runId: run.runId, status })
     }
     const rows = yield* sql<{ next_sequence: number | string }>`
       SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence
@@ -70,8 +77,11 @@ const readPendingSteering = (runId: string) =>
 
 export const readSteering = (input: ExecutionClaim) => readPendingSteering(input.runId)
 
-export const saveCompletionContinuation = (runId: string, result: AgentResult) =>
+export const saveCompletionContinuation = (runId: string, result: ExecutionResult) =>
   Effect.gen(function* () {
+    if (!("transcript" in result)) return undefined
+    const run = yield* loadRun(runId)
+    if (run?.cancellationRequested === true) return undefined
     const sql = yield* SqlClient.SqlClient
     const entries = yield* readPendingSteering(runId)
     const continuation: ExecutionContinuation | undefined =

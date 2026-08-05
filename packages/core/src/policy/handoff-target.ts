@@ -1,15 +1,15 @@
 import { Context, Layer } from "effect"
-import type { Tool } from "effect/unstable/ai"
-import type { Agent } from "../agent/agent.js"
+import type { Any as AnyAgent } from "../agent/agent-closure.js"
 import type { AgentPin } from "../durable/pin.js"
 
-export interface HandoffTarget<R = any> {
+/** One catalog entry. The catalog never provides a target's requirements; `HandoffRequirementsMissing` reports them. */
+export interface HandoffTarget {
   readonly name: string
-  readonly agent: Agent<Record<string, Tool.Any>, R>
+  readonly agent: AnyAgent
   readonly pin?: AgentPin
 }
 
-export const target = <R>(agent: Agent<Record<string, Tool.Any>, R>, pin?: AgentPin): HandoffTarget<R> => ({
+export const target = (agent: AnyAgent, pin?: AgentPin): HandoffTarget => ({
   name: agent.name,
   agent,
   ...(pin === undefined ? {} : { pin }),

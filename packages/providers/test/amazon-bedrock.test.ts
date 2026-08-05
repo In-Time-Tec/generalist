@@ -10,6 +10,7 @@ import {
   Client,
   ClientFailure,
   classifyFailure,
+  decodeConfig,
   layerClient,
   layer,
   make,
@@ -106,6 +107,29 @@ const fakeClient = (options?: {
 })
 
 describe("AmazonBedrock", () => {
+  it("decodes only canonical persisted adapter options", () => {
+    expect(
+      decodeConfig({
+        maxTokens: 8_192,
+        temperature: 0.2,
+        stopSequences: ["stop"],
+        additionalModelRequestFields: { thinking: { type: "enabled", budget_tokens: 2_048 } },
+      }),
+    ).toEqual({
+      maxTokens: 8_192,
+      temperature: 0.2,
+      stopSequences: ["stop"],
+      additionalModelRequestFields: { thinking: { type: "enabled", budget_tokens: 2_048 } },
+    })
+    expect(() => decodeConfig({ max_output_tokens: 8_192 })).toThrow()
+    expect(() => decodeConfig({ max_tokens: 8_192 })).toThrow()
+    expect(() => decodeConfig({ output_config: { effort: "high" } })).toThrow()
+    expect(() => decodeConfig({ maxTokens: 0 })).toThrow()
+    expect(() => decodeConfig({ additionalModelRequestFields: { invalid: undefined } })).toThrow()
+    expect(() => decodeConfig({ performanceConfig: { latency: "fast" } })).toThrow()
+    expect(() => decodeConfig({ guardrailConfig: { guardrailIdentifier: "guardrail" } })).toThrow()
+  })
+
   it("keeps the explicit public runtime surface", async () => {
     const module = await import("@batonfx/providers/amazon-bedrock")
     expect(Object.keys(module).toSorted()).toEqual([
@@ -114,6 +138,7 @@ describe("AmazonBedrock", () => {
       "CredentialFailure",
       "RecoveryFailure",
       "classifyFailure",
+      "decodeConfig",
       "defaultChain",
       "isRecoverableCredentialFailure",
       "layer",

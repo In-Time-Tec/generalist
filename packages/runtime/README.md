@@ -1,6 +1,6 @@
 # `@batonfx/runtime`
 
-Addressable Run admission, durable steering, bounded fan-out and joins, canonical `RunEvent` streams, finite inspection reads, and memory, SQLite, PostgreSQL, or MySQL Runtime stores for Baton agents.
+Exact and addressed Run admission, durable steering, bounded fan-out and joins, canonical `RunEvent` streams, finite inspection reads, and memory, SQLite, PostgreSQL, or MySQL Runtime stores for Baton agents.
 
 ## Install
 
@@ -16,6 +16,7 @@ SQL backends need their Effect SQL driver. The workspace catalog pins `@effect/s
 import {
   Address,
   ExecutableManifest,
+  ExecutableRegistration,
   MysqlRunSchema,
   Runtime,
   RunSchema,
@@ -33,6 +34,12 @@ import {
 - PostgreSQL and MySQL startup verify schema only. Apply migrations in a predeploy job with `RunSchema.apply` or `MysqlRunSchema.apply`.
 - `RuntimeWorker.layerWorker` requires `RunClaims` and owns polling, claim concurrency, and lease refresh.
 
+## Admission
+
+`Runtime.start({ executable, registrations, sessionId, idempotencyKey, prompt })` starts an application-selected exact `PinnedExecutable` without an address binding. Its complete model/capability registration set is validated and atomically stored with the root Run. Registrations are immutable, bounded `{ pin, codec, version, payload }` JSON values; payloads contain reconstruction data such as credential references, never resolved credentials. On recovery, `ExecutableResolver.resolve` receives only the persisted Run manifest and registrations and owns codec interpretation, credential dereference, live resource construction, and scoped finalization.
+
+`Runtime.send` remains FIFO addressed mailbox admission. Exact duplicate `start` or `send` calls return the same Run ID; changed prompts or executable authority fail as `IdempotencyConflict`, while changed data under an existing registration pin fails as `ExecutableRegistrationConflict`.
+
 ## Fan-out
 
 `Runtime.spawn` and `Runtime.fanOut` accept semantic child selections declared by the parent Run's active Agent manifest. Admission resolves each selection to an exact Agent pin from the persisted executable closure under the parent lock; address bindings and the executable resolver are not consulted. Fan-out resolves every member atomically, and the resolved refs participate in its idempotency digest. `Runtime.awaitFanOut` waits on committed child events until the durable join decision is available; `Runtime.inspectFanOut` remains the non-blocking inspection operation. Both return member outcomes in input ordinal order.
@@ -41,7 +48,7 @@ Join modes are `AllSuccess`, `AllSettled`, `FirstSuccess`, `Quorum`, and `BestEf
 
 ## Errors, requirements, and resources
 
-Programs require `Runtime.Runtime`; host integration may use `RunStore.RunStore` for fenced execution and operation recording. Boundary failures are schema-backed (`AddressNotFound`, `ChildSelectionMissing`, `IdempotencyConflict`, `SteeringConflict`, `RunIdConflict`, `RunNotFound`, `CursorExpired`, `SubscriberLagged`, `SchemaDirty`, `SchemaChecksumMismatch`, `SchemaVersionUnsupported`, `SchemaUpgradeRequired`, `StaleClaim`, `MultiWorkerUnsupported`, and related tags).
+Programs require `Runtime.Runtime`; host integration may use `RunStore.RunStore` for fenced execution and operation recording. Boundary failures are schema-backed (`AddressNotFound`, `ExecutableRegistrationInvalid`, `ExecutableRegistrationMissing`, `ExecutableRegistrationConflict`, `ChildSelectionMissing`, `IdempotencyConflict`, `SteeringConflict`, `RunIdConflict`, `RunNotFound`, `CursorExpired`, `SubscriberLagged`, `SchemaDirty`, `SchemaChecksumMismatch`, `SchemaVersionUnsupported`, `SchemaUpgradeRequired`, `StaleClaim`, `MultiWorkerUnsupported`, and related tags).
 
 `ExecutableRef` values match Core's `{ executable, active }` closed-closure identity. Production applications construct them through `AgentManifest.make` / `fromLiveAgent` and `ExecutableManifest.make`; `ExecutableManifest.makeTest` is only for tests and non-running documentation fixtures.
 

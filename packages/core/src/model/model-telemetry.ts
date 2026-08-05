@@ -1,11 +1,31 @@
-import { Cause, Context, Effect, Layer, Option, Schema } from "effect"
-import { AiError, IdGenerator, LanguageModel, Response } from "effect/unstable/ai"
+import { Cause, Schema } from "effect"
+import { AiError, Response } from "effect/unstable/ai"
 import {
   ModelProviderUsage as ModelProviderUsageSchema,
   type ModelProviderUsage as ModelProviderUsageValue,
 } from "./model-attempt-observation.js"
 import { isModelStreamTimeout, isTerminationFailure } from "./model-stream-termination.js"
 import { isInvalidToolCallParameters } from "./model-tool-call-validation.js"
+export {
+  Delivery,
+  DeliveryFailed,
+  InvocationCoordinationFailed,
+  InvocationCoordinator,
+  generateId,
+  isInvocationCoordinationFailed,
+  layerInvocationCoordinatorNoop,
+  layerNoop,
+  type DeliveryInterface,
+  type InvocationCoordinatorInterface,
+} from "./model-telemetry-services.js"
+export {
+  CurrentCompactionId,
+  CurrentInstrumentation,
+  CurrentPurpose,
+  CurrentSummaryCall,
+  type Instrumentation,
+  type SummaryCallCell,
+} from "./model-telemetry-context.js"
 
 /** @experimental */
 export const ModelProviderUsage = ModelProviderUsageSchema
@@ -43,6 +63,12 @@ export const ModelFailureClassification = Schema.Literals(["transient", "termina
 
 /** @experimental */
 export type ModelFailureClassification = typeof ModelFailureClassification.Type
+
+/** @experimental Decision taken after a provider attempt failed. */
+export const ModelFailureDisposition = Schema.Literals(["retry", "fallback", "terminal"])
+
+/** @experimental */
+export type ModelFailureDisposition = typeof ModelFailureDisposition.Type
 
 /**
  * @experimental Bounded reason a model attempt retry was scheduled.
@@ -86,6 +112,8 @@ export const ModelInvocationStarted = Schema.Struct({
   method: ModelInvocationMethod,
   provider: Schema.optionalKey(Schema.String),
   model: Schema.optionalKey(Schema.String),
+  registrationKey: Schema.optionalKey(Schema.String),
+  candidate: Schema.optionalKey(attemptOrdinal),
   startedAt: Schema.Finite,
 })
 export type ModelInvocationStarted = typeof ModelInvocationStarted.Type
@@ -100,6 +128,10 @@ export const ModelInvocationCompleted = Schema.Struct({
   finishReason: Response.FinishReason,
   requestId: Schema.optionalKey(Schema.String),
   responseModel: Schema.optionalKey(Schema.String),
+  provider: Schema.optionalKey(Schema.String),
+  model: Schema.optionalKey(Schema.String),
+  registrationKey: Schema.optionalKey(Schema.String),
+  candidate: Schema.optionalKey(attemptOrdinal),
 })
 export type ModelInvocationCompleted = typeof ModelInvocationCompleted.Type
 
@@ -111,34 +143,13 @@ export const ModelInvocationFailed = Schema.Struct({
   failedAt: Schema.Finite,
   category: ModelFailureCategory,
   classification: ModelFailureClassification,
+  disposition: ModelFailureDisposition,
+  provider: Schema.optionalKey(Schema.String),
+  model: Schema.optionalKey(Schema.String),
+  registrationKey: Schema.optionalKey(Schema.String),
+  candidate: Schema.optionalKey(attemptOrdinal),
 })
 export type ModelInvocationFailed = typeof ModelInvocationFailed.Type
-
-export class InvocationCoordinationFailed extends Schema.TaggedErrorClass<InvocationCoordinationFailed>()(
-  "@batonfx/core/InvocationCoordinationFailed",
-  { message: Schema.String },
-) {}
-
-export interface InvocationCoordinatorInterface {
-  readonly beforeAttempt: (input: ModelInvocationStarted) => Effect.Effect<void, InvocationCoordinationFailed>
-  readonly completeAttempt: (input: ModelInvocationCompleted) => Effect.Effect<void, InvocationCoordinationFailed>
-  readonly failAttempt: (input: ModelInvocationFailed) => Effect.Effect<void, InvocationCoordinationFailed>
-}
-
-export class InvocationCoordinator extends Context.Service<InvocationCoordinator, InvocationCoordinatorInterface>()(
-  "@batonfx/core/InvocationCoordinator",
-) {}
-
-export const layerInvocationCoordinatorNoop: Layer.Layer<InvocationCoordinator> = Layer.succeed(
-  InvocationCoordinator,
-  InvocationCoordinator.of({
-    beforeAttempt: () => Effect.void,
-    completeAttempt: () => Effect.void,
-    failAttempt: () => Effect.void,
-  }),
-)
-
-export const isInvocationCoordinationFailed = Schema.is(InvocationCoordinationFailed)
 
 /**
  * @experimental A model call began. One call spans every provider attempt made
@@ -168,6 +179,10 @@ export const ModelAttemptStarted = Schema.Struct({
   modelCallId: Schema.String,
   modelAttemptId: Schema.String,
   attempt: attemptOrdinal,
+  provider: Schema.optionalKey(Schema.String),
+  model: Schema.optionalKey(Schema.String),
+  registrationKey: Schema.optionalKey(Schema.String),
+  candidate: Schema.optionalKey(attemptOrdinal),
   startedAt: Schema.Finite,
 })
 
@@ -209,6 +224,10 @@ export const ModelAttemptCompleted = Schema.Struct({
   usage: Response.Usage,
   usageAt: Schema.Finite,
   finishReason: Response.FinishReason,
+  provider: Schema.optionalKey(Schema.String),
+  model: Schema.optionalKey(Schema.String),
+  registrationKey: Schema.optionalKey(Schema.String),
+  candidate: Schema.optionalKey(attemptOrdinal),
   requestId: Schema.optionalKey(Schema.String),
   responseModel: Schema.optionalKey(Schema.String),
   serviceTier: Schema.optionalKey(Schema.String),
@@ -228,11 +247,38 @@ export const ModelAttemptFailed = Schema.Struct({
   failedAt: Schema.Finite,
   category: ModelFailureCategory,
   classification: ModelFailureClassification,
+  disposition: ModelFailureDisposition,
+  provider: Schema.optionalKey(Schema.String),
+  model: Schema.optionalKey(Schema.String),
+  registrationKey: Schema.optionalKey(Schema.String),
+  candidate: Schema.optionalKey(attemptOrdinal),
   providerUsage: Schema.optionalKey(ModelProviderUsage),
 })
 
 /** @experimental */
 export type ModelAttemptFailed = typeof ModelAttemptFailed.Type
+
+/** @experimental An unavailable candidate was exhausted before any replay-sensitive output escaped. */
+export const ModelFallbackScheduled = Schema.Struct({
+  _tag: Schema.tag("ModelFallbackScheduled"),
+  deliveryId: Schema.String,
+  turn: Schema.Finite,
+  modelCallId: Schema.String,
+  attempt: attemptOrdinal,
+  fromCandidate: attemptOrdinal,
+  fromProvider: Schema.String,
+  fromModel: Schema.String,
+  fromRegistrationKey: Schema.optionalKey(Schema.String),
+  toCandidate: attemptOrdinal,
+  toProvider: Schema.String,
+  toModel: Schema.String,
+  toRegistrationKey: Schema.optionalKey(Schema.String),
+  category: ModelFailureCategory,
+  at: Schema.Finite,
+})
+
+/** @experimental */
+export type ModelFallbackScheduled = typeof ModelFallbackScheduled.Type
 
 /** @experimental Atomic checkpoint record joining a compaction pass to its telemetry and projection. */
 export const CompactionCommit = Schema.Struct({
@@ -381,6 +427,7 @@ export const Event = Schema.Union([
   ModelAttemptCompleted,
   ModelAttemptFailed,
   ModelRetryScheduled,
+  ModelFallbackScheduled,
   ModelCallCompleted,
   ModelCallFailed,
   CompactionStarted,
@@ -405,23 +452,6 @@ type WithoutDeliveryId<T> = T extends Event ? Omit<T, "deliveryId"> : never
 
 /** @experimental Lifecycle payload before the run assigns its stable delivery identifier. */
 export type EventPayload = WithoutDeliveryId<Event>
-
-/** @experimental Host telemetry delivery failure. A remote failure can be ambiguous; reconcile with the sink. */
-export class DeliveryFailed extends Schema.TaggedErrorClass<DeliveryFailed>()("@batonfx/core/DeliveryFailed", {
-  message: Schema.String,
-  cause: Schema.optionalKey(Schema.Defect()),
-}) {}
-
-/** @experimental Host sink for ordered, backpressured lifecycle delivery. Deduplicate by `(sessionId, deliveryId)`. */
-export interface DeliveryInterface {
-  readonly deliver: (batch: DeliveryBatch) => Effect.Effect<void, DeliveryFailed>
-}
-
-/** @experimental */
-export class Delivery extends Context.Service<Delivery, DeliveryInterface>()("@batonfx/core/Delivery") {}
-
-/** @experimental No-op host delivery sink. */
-export const layerNoop: Layer.Layer<Delivery> = Layer.succeed(Delivery, Delivery.of({ deliver: () => Effect.void }))
 
 /** @experimental Map a model failure onto the bounded cross-provider category. */
 export const classifyFailureCategory = (error: unknown): ModelFailureCategory => {
@@ -458,42 +488,3 @@ export const classifyFailureCategory = (error: unknown): ModelFailureCategory =>
       return "unknown"
   }
 }
-
-/** @experimental The active loop's model-call telemetry seam. */
-export interface Instrumentation {
-  readonly emit: (event: EventPayload) => Effect.Effect<void>
-  readonly wrap: (model: LanguageModel.Service) => LanguageModel.Service
-}
-
-/** @experimental The instrumentation of the enclosing agent run, when present. */
-export const CurrentInstrumentation: Context.Reference<Instrumentation | undefined> = Context.Reference<
-  Instrumentation | undefined
->("@batonfx/core/ModelTelemetry/CurrentInstrumentation", { defaultValue: () => undefined })
-
-/** @experimental Purpose stamped onto model calls issued within the current region. */
-export const CurrentPurpose: Context.Reference<ModelCallPurpose> = Context.Reference<ModelCallPurpose>(
-  "@batonfx/core/ModelTelemetry/CurrentPurpose",
-  { defaultValue: () => "conversation" },
-)
-
-/** @experimental Compaction pass identifier stamped onto model calls it issues. */
-export const CurrentCompactionId: Context.Reference<string | undefined> = Context.Reference<string | undefined>(
-  "@batonfx/core/ModelTelemetry/CurrentCompactionId",
-  { defaultValue: () => undefined },
-)
-
-/** @experimental Mutable cell recording the model call a compaction pass issued for its summary. */
-export interface SummaryCallCell {
-  current: string | undefined
-}
-
-/** @experimental Cell a compaction pass provides to learn its summary model-call id. */
-export const CurrentSummaryCall: Context.Reference<SummaryCallCell | undefined> = Context.Reference<
-  SummaryCallCell | undefined
->("@batonfx/core/ModelTelemetry/CurrentSummaryCall", { defaultValue: () => undefined })
-
-/** @experimental Generate one telemetry identifier via `IdGenerator`, defaulting when absent. */
-export const generateId: Effect.Effect<string> = Effect.flatMap(
-  Effect.serviceOption(IdGenerator.IdGenerator),
-  (service) => Option.getOrElse(service, () => IdGenerator.defaultIdGenerator).generateId(),
-)

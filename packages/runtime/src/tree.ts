@@ -1,6 +1,6 @@
-import { Effect, Schedule, Schema, Stream } from "effect"
+import { Effect, Option, Schedule, Schema, Stream } from "effect"
 import type { RunEvent } from "./run-event.js"
-import { CompactionInspection, RawUsageFact, RunInspection, RunOutcome } from "./run.js"
+import { CompactionInspection, isTerminal, RawUsageFact, RunInspection, RunOutcome } from "./run.js"
 import { Runtime } from "./runtime.js"
 import { TreeCursor, type TreeCursor as TreeCursorType } from "./tree-cursor.js"
 export { TreeCursor }
@@ -32,6 +32,10 @@ export interface HistoryInput {
 export interface EventsInput {
   readonly rootRunId: string
   readonly cursor?: TreeCursorType
+}
+
+export interface WatchInput extends EventsInput {
+  readonly settlement?: "tree-terminal" | "root-blocked"
 }
 
 export interface TreeRunInspection {
@@ -137,6 +141,89 @@ export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./r
         return Stream.fromEffect(read).pipe(
           Stream.flatMap((page) => Stream.fromIterable(page.events)),
           Stream.repeat(Schedule.spaced("50 millis")),
+        )
+      }),
+    ),
+  )
+
+interface TreeIndex {
+  readonly runs: ReadonlyMap<string, RunInspection>
+  readonly childrenByWait: ReadonlyMap<string, ReadonlyArray<RunInspection>>
+}
+
+const indexTree = (runs: ReadonlyArray<TreeRunInspection>): TreeIndex => {
+  const byId = new Map<string, RunInspection>()
+  const childrenByWait = new Map<string, Array<RunInspection>>()
+  for (const entry of runs) {
+    byId.set(entry.run.runId, entry.run)
+    if (entry.parentRunId === undefined || entry.invocationId === undefined) continue
+    const key = `${entry.parentRunId}\u0000${entry.invocationId}`
+    const linked = childrenByWait.get(key)
+    if (linked === undefined) childrenByWait.set(key, [entry.run])
+    else linked.push(entry.run)
+  }
+  return { runs: byId, childrenByWait }
+}
+
+const canProgress = (index: TreeIndex, runId: string, memo: Map<string, boolean>): boolean => {
+  const cached = memo.get(runId)
+  if (cached !== undefined) return cached
+  memo.set(runId, false)
+  const decide = (value: boolean) => {
+    memo.set(runId, value)
+    return value
+  }
+  const run = index.runs.get(runId)
+  if (run === undefined || isTerminal(run.status) || run.status === "needs-resolution") return decide(false)
+  if (run.status !== "waiting") return decide(true)
+  const wait = run.wait
+  if (wait === undefined || wait.status !== "open") return decide(true)
+  if (wait.reason !== "tool-wait") return decide(false)
+  const linked = index.childrenByWait.get(`${runId}\u0000${wait.waitId}`)
+  if (linked === undefined) return decide(true)
+  return decide(linked.some((child) => isTerminal(child.status) || canProgress(index, child.runId, memo)))
+}
+
+const isSettled = (inspection: Inspection, settlement: NonNullable<WatchInput["settlement"]>): boolean => {
+  if (inspection._tag === "Terminal") return true
+  if (settlement === "tree-terminal") return false
+  const index = indexTree(inspection.runs)
+  const memo = new Map<string, boolean>()
+  return !inspection.activeRunIds.some((runId) => canProgress(index, runId, memo))
+}
+
+export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./runtime.js").TreeEventsError, Runtime> =>
+  Stream.unwrap(
+    Runtime.use((runtime) =>
+      Effect.sync(() => {
+        const settlement = input.settlement ?? "tree-terminal"
+        return Stream.paginate(
+          { cursor: input.cursor, pause: false },
+          (
+            state,
+          ): Effect.Effect<
+            readonly [ReadonlyArray<TreeEvent>, Option.Option<{ cursor: TreeCursorType; pause: boolean }>],
+            import("./runtime.js").TreeEventsError
+          > =>
+            Effect.gen(function* () {
+              if (state.pause) yield* Effect.sleep("50 millis")
+              const page = yield* runtime.treeHistory({
+                rootRunId: input.rootRunId,
+                ...(state.cursor === undefined ? {} : { cursor: state.cursor }),
+                limit: 256,
+              })
+              if (page.hasMore || page.events.length > 0) {
+                return [page.events, Option.some({ cursor: page.cursor, pause: false })] as const
+              }
+              const inspection = yield* runtime.inspectTree(input.rootRunId)
+              const drained = page.cursor === inspection.cursor
+              return [
+                page.events,
+                drained && isSettled(inspection, settlement)
+                  ? Option.none()
+                  : Option.some({ cursor: page.cursor, pause: drained }),
+              ] as const
+            }),
         )
       }),
     ),

@@ -68,6 +68,12 @@ With no authentication override, the pinned AWS SDK selects its standard Node cr
 
 Credentials are resolved for each request. An optional secret-free recovery hook is coalesced by rejected credential generation and can run the host's configured login command after an explicit expired-token rejection; Baton then force-refreshes credentials and retries once. Access denial, validation, throttling, quotas, network/TLS errors, 5xx responses, signature mismatch, and arbitrary 403 responses never trigger recovery. Stream failures are never replayed after output is observable. Tests should provide explicit credentials and an in-process request handler or client fixture rather than ambient AWS state.
 
+## Ordered candidate routes
+
+`ModelRoute.make({ candidates })` returns one exact `ModelRegistry` selection and registration for an immutable ordered list of provider registrations. Each candidate exhausts the run's bounded `ModelResilience` retries before the route advances. Only provider-approved rate-limit, network, and internal-provider availability failures can advance; cancellation, unknown outcomes, authentication, invalid requests, schema/tool input failures, context overflow, and budget failures remain terminal. A streamed route never advances after reasoning, text, or a validated tool call escapes.
+
+The returned selection identity includes every candidate's provider, model, registration key, and order. Register `route.registration` and put `route.selection` on the Agent; callers do not inspect or execute individual candidates.
+
 ## Errors, requirements, and resources
 
 The layer discharges `ModelRegistry` and `LanguageModel`, leaving `R = never`; success is `void`. The error channel is the agent's schema-backed `RunError` union, including `AgentError`, `AgentSuspended`, `TurnLimitExceeded`, and `MiddlewareViolation`, plus schema-backed `LanguageModelNotRegistered` from model selection. This deterministic layer owns no external resource and introduces no concurrency. Production provider layers can additionally require configuration and `HttpClient`; callers choosing fetch explicitly compose `FetchHttpClient.layer`.

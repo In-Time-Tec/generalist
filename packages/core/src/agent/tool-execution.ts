@@ -202,9 +202,16 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
           const droppedProgress = yield* Ref.make(0)
           const emitSemaphore = yield* Semaphore.make(1)
           const signal = yield* Effect.abortSignal
+          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+          const durableOperationKey = operationKey(logicalId, "tool", turn, request.toolCallIndex, call.id, call.name)
           const toolContext = ToolContext.of({
             signal,
             sessionId,
+            toolCallId: call.id,
+            operationKey: durableOperationKey,
+            idempotencyKey: durableOperationKey,
+            ...(options.invocation === undefined ? {} : options.invocation),
+            ...(options.budget?.deadline === undefined ? {} : { deadline: options.budget.deadline }),
             emit: (progress) => {
               const event: ToolProgress = {
                 _tag: "ToolProgress",
@@ -271,11 +278,10 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
                           : error,
                       ),
                     )
-          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
           const execution = intercept(
             {
               kind: "tool",
-              key: operationKey(logicalId, "tool", turn, request.toolCallIndex, call.id, call.name),
+              key: durableOperationKey,
               input: {
                 turn,
                 toolCallIndex: request.toolCallIndex,

@@ -1,6 +1,7 @@
 import { Effect, Ref, Schema } from "effect"
-import { Prompt, type Tool } from "effect/unstable/ai"
-import type { Agent, RunOptions } from "./agent.js"
+import { Prompt } from "effect/unstable/ai"
+import type { RunOptions } from "./agent.js"
+import type { Any as AnyAgent } from "./agent-closure.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
 import type { HandoffTarget } from "../policy/handoff-target.js"
 import { AgentPin } from "../durable/pin.js"
@@ -119,10 +120,7 @@ export const fromHandoffControlState = (state: HandoffControlState, active: Hand
   }
 }
 
-export const makeHandoffRunState = (
-  agent: Agent<Record<string, Tool.Any>, unknown>,
-  activePin?: AgentPin,
-): HandoffRunState => ({
+export const makeHandoffRunState = (agent: AnyAgent, activePin?: AgentPin): HandoffRunState => ({
   root: agent.name,
   active: { name: agent.name, agent, ...(activePin === undefined ? {} : { pin: activePin }) },
   path: [],
@@ -179,10 +177,7 @@ export type HandoffAccepted = typeof HandoffAccepted.Type
 
 export const isHandoffAccepted = Schema.is(HandoffAccepted)
 
-export const maxHandoffs = (
-  options: RunOptions,
-  agent: Agent<Record<string, Tool.Any>, unknown>,
-): number | undefined => {
+export const maxHandoffs = (options: RunOptions, agent: AnyAgent): number | undefined => {
   const run = options.budget?.handoffs
   const agentDefault = agent.budget?.handoffs
   if (run === undefined) return agentDefault
@@ -191,7 +186,7 @@ export const maxHandoffs = (
 }
 
 export const makeHandoffStateRef = (
-  agent: Agent<Record<string, Tool.Any>, unknown>,
+  agent: AnyAgent,
   activePin?: AgentPin,
   restored?: HandoffControlState,
 ): Effect.Effect<Ref.Ref<HandoffRunState>> =>

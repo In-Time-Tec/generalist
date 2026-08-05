@@ -10,13 +10,13 @@ import {
   RunStore,
   RunTree,
   Runtime,
-  AgentHost,
-  AgentResult,
+  ExecutionHost,
+  ExecutionResult,
   RunFailure,
   OperationResolution,
 } from "../src/index.js"
 
-const encodedVersion = (manifest: typeof ExecutableManifest.ExecutableManifest.Encoded): "1" => manifest.version
+const encodedVersion = (manifest: typeof ExecutableManifest.ExecutableManifest.Encoded): "2" => manifest.version
 const acceptResolutionConflict = (_error: Errors.OperationResolutionConflict): void => undefined
 
 describe("@batonfx/runtime public surface", () => {
@@ -29,11 +29,12 @@ describe("@batonfx/runtime public surface", () => {
     expect(typeof RunEvent.eventIdFor).toBe("function")
     expect(typeof Runtime.layerMemory).toBe("function")
     expect(typeof RunStore.layerMemory).toBe("function")
-    expect(typeof AgentHost.AgentHost).toBe("function")
+    expect(typeof ExecutionHost.ExecutionHost).toBe("function")
     expect(typeof RunTree.events).toBe("function")
-    expect(AgentResult.AgentResult).toBeDefined()
+    expect(typeof RunTree.watch).toBe("function")
+    expect(ExecutionResult.ExecutionResult).toBeDefined()
     expect(RunFailure.RunFailure).toBeDefined()
-    expect(Run.AgentResult).toBe(AgentResult.AgentResult)
+    expect(Run.ExecutionResult).toBe(ExecutionResult.ExecutionResult)
     expect(Run.RunFailure).toBe(RunFailure.RunFailure)
     expect(Errors.AddressNotFound).toBeDefined()
     expect(Errors.IdempotencyConflict).toBeDefined()

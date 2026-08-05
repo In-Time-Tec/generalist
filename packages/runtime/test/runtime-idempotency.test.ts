@@ -2,7 +2,7 @@ import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { Errors, Runtime } from "../src/index.js"
 import { assistantAddress, memoryLayer, textPrompt } from "./helpers.js"
-import { alternateAssistantRef, assistantRef } from "./helpers.js"
+import { alternateAssistantRef, assistantRef, registrationsFor } from "./helpers.js"
 import { make as makeMessage } from "../src/message.js"
 import { admitSend } from "../src/memory/store-admit.js"
 import { emptyState } from "../src/memory/state.js"
@@ -94,11 +94,13 @@ layer(memoryLayer)("Runtime idempotency", (it) => {
         message,
         executableRef: assistantRef.ref,
         executableManifest: assistantRef.manifest,
+        registrations: registrationsFor(assistantRef),
       })
       const conflict = yield* admitSend(admitted, {
         message,
         executableRef: alternateAssistantRef.ref,
         executableManifest: alternateAssistantRef.manifest,
+        registrations: registrationsFor(alternateAssistantRef),
       }).pipe(Effect.flip)
       expect(conflict).toBeInstanceOf(Errors.IdempotencyConflict)
     }),

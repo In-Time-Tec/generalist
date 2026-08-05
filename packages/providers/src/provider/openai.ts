@@ -1,11 +1,11 @@
-import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai"
+import { OpenAiClient, OpenAiLanguageModel, OpenAiSchema } from "@effect/ai-openai"
 import { ContextOverflow, ModelRegistry } from "@batonfx/core"
 import type { ModelRegistryFacade } from "@batonfx/core"
 import { Config, Effect, Function, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import type { Credential, ServiceInterface } from "./openai-account-auth.js"
 import { layerImageSources } from "../model/image-source.js"
-import { type FailureInput, layerModelFailures } from "../model/model-failure.js"
+import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/model-failure.js"
 import {
   FetchHttpClient,
   Headers,
@@ -28,8 +28,34 @@ export interface RegistrationOptions {
 /** @experimental */
 export interface OpenAiInput extends RegistrationOptions {
   readonly model: (string & {}) | OpenAiLanguageModel.Model
-  readonly config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">
+  readonly config?: Config
 }
+
+/** @experimental */
+export type Config = Omit<typeof OpenAiLanguageModel.Config.Service, "model">
+
+const {
+  input: _input,
+  model: _model,
+  stream: _stream,
+  text: _text,
+  tool_choice: _toolChoice,
+  tools: _tools,
+  ...openAiConfigFields
+} = OpenAiSchema.CreateResponse.fields
+
+const ConfigSchema = Schema.Struct({
+  ...openAiConfigFields,
+  fileIdPrefixes: Schema.optionalKey(Schema.Array(Schema.String)),
+  text: Schema.optionalKey(
+    Schema.Struct({ verbosity: Schema.optionalKey(Schema.Literals(["low", "medium", "high"])) }),
+  ),
+  strictJsonSchema: Schema.optionalKey(Schema.Boolean),
+})
+
+/** @experimental Decodes persisted provider options into OpenAI request configuration. */
+export const decodeConfig = (options: unknown): Config =>
+  Schema.decodeUnknownSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {}) as Config
 
 const serverFailureCodes = new Set([
   "internal_server_error",
@@ -176,6 +202,7 @@ export const layer = (
       layer: openAiLanguageModelLayer(input),
       classifyFailure,
       toolJsonSchemaCompiler,
+      isAvailabilityFailure,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     }),
@@ -189,6 +216,7 @@ export const registration = (input: OpenAiInput): ReturnType<ModelRegistryFacade
     layer: openAiLanguageModelLayer(input),
     classifyFailure,
     toolJsonSchemaCompiler,
+    isAvailabilityFailure,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })
@@ -348,7 +376,7 @@ export const credentialsFromAccountAuth: {
 export interface OpenAiAccountInput extends RegistrationOptions {
   readonly model: (string & {}) | OpenAiLanguageModel.Model
   readonly credentials: OpenAiAccountCredentials
-  readonly config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">
+  readonly config?: Config
 }
 
 const credentialFailure = (request: HttpClientRequest.HttpClientRequest, error: OpenAiAccountCredentialError) =>
@@ -454,6 +482,7 @@ export const registrationAccount = (input: OpenAiAccountInput): ReturnType<Model
     layer: openAiLanguageModelLayer(input).pipe(Layer.provide(openAiAccountClientLayer(input.credentials))),
     classifyFailure,
     toolJsonSchemaCompiler,
+    isAvailabilityFailure,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })

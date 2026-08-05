@@ -1,14 +1,15 @@
-import { Schema } from "effect"
+import { Effect, Schema, SchemaParser } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { ExecutableRef } from "./executable-manifest.js"
-import type { AgentLoopEvent, AgentResult } from "./agent-event.js"
-import { AgentResult as AgentResultSchema, RunFailure as RunFailureSchema, RunId } from "./run.js"
+import type { AgentLoopEvent } from "./agent-event.js"
+import type { ExecutionResult } from "./execution-state.js"
+import { ExecutionResult as ExecutionResultSchema, RunFailure as RunFailureSchema, RunId } from "./run.js"
 import { RunWait, WaitResolution } from "./run-wait.js"
 import { Address } from "./address.js"
 import { ModelTelemetry } from "@batonfx/core"
 import { FanOutJoin, FanOutRemainder } from "./fan-out.js"
 
-export type { AgentLoopEvent, AgentResult }
+export type { AgentLoopEvent, ExecutionResult }
 
 export const SpecVersion = Schema.Literals(["1"])
 export type SpecVersion = typeof SpecVersion.Type
@@ -34,8 +35,8 @@ export const RunEventBase = Schema.Struct({
 })
 export type RunEventBase = typeof RunEventBase.Type
 
-export { AgentResultSchema }
-export const RunFailure = RunFailureSchema
+export { ExecutionResultSchema }
+export const RunFailure: Schema.Codec<RunFailure, unknown> = RunFailureSchema
 export type RunFailure = import("./run.js").RunFailure
 
 export type RunAccepted = RunEventBase & {
@@ -93,7 +94,7 @@ export type FanOutJoined = RunEventBase & {
 }
 export type RunCompleted = RunEventBase & {
   readonly _tag: "RunCompleted"
-  readonly result: AgentResult
+  readonly result: ExecutionResult
 }
 export type RunFailed = RunEventBase & {
   readonly _tag: "RunFailed"
@@ -106,6 +107,13 @@ export type RunCancellationRequested = RunEventBase & {
 export type RunCancelled = RunEventBase & {
   readonly _tag: "RunCancelled"
   readonly reason?: string
+}
+export type ProgramLog = RunEventBase & {
+  readonly _tag: "ProgramLog"
+  readonly operation: string
+  readonly level: "debug" | "info" | "warn" | "error"
+  readonly message: string
+  readonly data?: Readonly<Record<string, unknown>>
 }
 
 export type LifecycleEvent =
@@ -122,6 +130,7 @@ export type LifecycleEvent =
   | RunFailed
   | RunCancellationRequested
   | RunCancelled
+  | ProgramLog
 
 export type RunEvent = (RunEventBase & AgentLoopEvent) | LifecycleEvent
 
@@ -139,6 +148,7 @@ export const LifecycleTag = Schema.Literals([
   "RunFailed",
   "RunCancellationRequested",
   "RunCancelled",
+  "ProgramLog",
 ])
 
 const Metadata = Schema.Record(Schema.String, Schema.Unknown)
@@ -328,14 +338,28 @@ const LifecycleEventSchema = Schema.Union([
       }),
     ),
   }),
-  Schema.TaggedStruct("RunCompleted", { result: AgentResultSchema }),
+  Schema.TaggedStruct("RunCompleted", { result: ExecutionResultSchema }),
   Schema.TaggedStruct("RunFailed", { error: RunFailure }),
   Schema.TaggedStruct("RunCancellationRequested", { reason: Schema.optionalKey(Schema.String) }),
   Schema.TaggedStruct("RunCancelled", { reason: Schema.optionalKey(Schema.String) }),
+  Schema.TaggedStruct("ProgramLog", {
+    operation: Schema.String,
+    level: Schema.Literals(["debug", "info", "warn", "error"]),
+    message: Schema.String,
+    data: Schema.optionalKey(Metadata),
+  }),
 ])
 const EventPayload = Schema.Union([AgentLoopEventSchema, LifecycleEventSchema])
-export const RunEvent: Schema.Codec<RunEvent, RunEvent, never, never> = Schema.declare(
-  (value): value is RunEvent => Schema.is(RunEventBase)(value) && Schema.is(EventPayload)(value),
-) as Schema.Codec<RunEvent, RunEvent, never, never>
+type RunEventEncoded = typeof RunEventBase.Encoded & typeof EventPayload.Encoded
+export const RunEvent: Schema.Codec<RunEvent, RunEventEncoded> = Schema.declareConstructor<RunEvent, RunEventEncoded>()(
+  [RunEventBase, EventPayload],
+  ([baseCodec, payloadCodec]) =>
+    (input, _ast, options) =>
+      Effect.zipWith(
+        SchemaParser.decodeUnknownEffect(baseCodec)(input, options),
+        SchemaParser.decodeUnknownEffect(payloadCodec)(input, options),
+        (base, payload) => ({ ...base, ...payload }) as RunEvent,
+      ),
+)
 
 export const eventIdFor = (runId: string, sequence: number): string => `${runId}:${sequence}`

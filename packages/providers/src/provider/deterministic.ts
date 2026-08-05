@@ -45,6 +45,7 @@ export const registration = (input: DeterministicInput = {}): ReturnType<ModelRe
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",
     layer: deterministicModelLayer,
+    isAvailabilityFailure: () => false,
     ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
   })

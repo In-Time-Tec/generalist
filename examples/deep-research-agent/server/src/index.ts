@@ -1,7 +1,7 @@
 import { layer } from "@effect/platform-bun/BunHttpServer"
 import { runMain } from "@effect/platform-bun/BunRuntime"
-import { AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "@batonfx/core"
-import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
+import { Agent, AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "@batonfx/core"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { Sse, Ws } from "@batonfx/transport"
 import { Config, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
@@ -20,10 +20,21 @@ const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
   budget: agent.budget ?? {},
   children: [],
 })
-const executable = ExecutableManifest.make({ root: pinnedAgent.pin, agents: [pinnedAgent] })
-const agentAddress = Address.make("agent:deep-research")
+const executable = ExecutableManifest.make({
+  root: pinnedAgent.pin,
+  entries: [{ _tag: "Agent", ...pinnedAgent }],
+})
+const registrations = executable.manifest.entries.flatMap((entry) =>
+  entry._tag === "Agent"
+    ? [
+        entry.manifest.model,
+        ...entry.manifest.tools.map(({ pin }) => pin),
+        ...(entry.manifest.policy._tag === "Pinned" ? [entry.manifest.policy.pin] : []),
+      ].map((pin) => ({ pin, codec: "example", version: "1", payload: { fixture: "deep-research-agent" } }))
+    : [],
+)
 
-const SendMessageInput = Schema.Struct({
+const StartRunInput = Schema.Struct({
   body: Schema.Struct({
     runId: Schema.optionalKey(Schema.String),
     sessionId: Schema.String,
@@ -51,7 +62,7 @@ const errorResponse = (status: number) => (error: unknown) =>
 const executeRun = (runId: string) =>
   Effect.gen(function* () {
     const store = yield* RunStore.RunStore
-    const host = yield* AgentHost.AgentHost
+    const host = yield* ExecutionHost.ExecutionHost
     const claim = yield* store.claimExecution({ runId, ownerId: "deep-research-server" })
     yield* host.execute(claim)
   })
@@ -78,12 +89,13 @@ const routesLayer = HttpRouter.use((router) =>
     yield* router.add(
       "POST",
       "/runs",
-      HttpRouter.schemaJson(SendMessageInput).pipe(
+      HttpRouter.schemaJson(StartRunInput).pipe(
         Effect.flatMap(({ body }) =>
           Runtime.Runtime.use((runtime) =>
-            runtime.send({
+            runtime.start({
               ...(body.runId === undefined ? {} : { runId: body.runId }),
-              to: agentAddress,
+              executable,
+              registrations,
               sessionId: body.sessionId,
               idempotencyKey: body.idempotencyKey,
               prompt: body.prompt,
@@ -145,6 +157,7 @@ export const modelLayer = layerOrDeterministic({
 const agentServices = Layer.mergeAll(
   modelLayer,
   toolExecutorLayer,
+  toolkitHandlersLayer,
   Approvals.layerTest({
     resolve: (request) => Effect.succeed({ ...request, token: `approve-${request.call.id}` }),
   }),
@@ -154,8 +167,8 @@ const agentServices = Layer.mergeAll(
 
 /** @experimental */
 const runtimeLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
-  addresses: [{ address: agentAddress, executable }],
+  resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
+  addresses: [],
 })
 
 /** @experimental */

@@ -1,10 +1,21 @@
 import { Schema } from "effect"
+import { ProgramHost } from "@batonfx/core"
 import { decodePinned, ExecutableManifest, ExecutableRef } from "./executable-manifest.js"
 import { RunWait } from "./run-wait.js"
 import { Cursor } from "./cursor.js"
-import { Prompt } from "effect/unstable/ai"
 import { ModelTelemetry } from "@batonfx/core"
-import { AgentExecutionFailure, ExecutableIdentityMismatch, ExecutablePinMissing } from "./errors.js"
+import {
+  AgentExecutionFailure,
+  ExecutableIdentityMismatch,
+  ExecutablePinMissing,
+  ExecutableRegistrationInvalid,
+  ExecutableRegistrationMissing,
+} from "./errors.js"
+import { ExecutionResult as ExecutionResultSchema } from "./execution-state.js"
+import type { ExecutionResult as ExecutionResultType } from "./execution-state.js"
+
+export const ExecutionResult = ExecutionResultSchema
+export type ExecutionResult = ExecutionResultType
 
 export const RunStatus = Schema.Literals([
   "queued",
@@ -84,34 +95,37 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
   }),
 )
 
-export interface AgentResult {
-  readonly text: string
-  readonly turns: number
-  readonly transcript: Prompt.Prompt
-}
+export type RunFailure =
+  | typeof AgentExecutionFailure.Type
+  | typeof ExecutablePinMissing.Type
+  | typeof ExecutableIdentityMismatch.Type
+  | typeof ExecutableRegistrationInvalid.Type
+  | typeof ExecutableRegistrationMissing.Type
+  | ProgramHost.ExecutionFailure
 
-interface AgentResultEncoded extends Omit<AgentResult, "transcript"> {
-  readonly transcript: Prompt.PromptEncoded
-}
-
-export const AgentResult: Schema.Codec<AgentResult, AgentResultEncoded> = Schema.Struct({
-  text: Schema.String,
-  turns: Schema.Finite,
-  transcript: Prompt.Prompt,
-})
-
-export const RunFailure = Schema.Union([AgentExecutionFailure, ExecutablePinMissing, ExecutableIdentityMismatch])
-export type RunFailure = typeof RunFailure.Type
+export const RunFailure: Schema.Codec<RunFailure, unknown> = Schema.Union([
+  AgentExecutionFailure,
+  ExecutablePinMissing,
+  ExecutableIdentityMismatch,
+  ExecutableRegistrationInvalid,
+  ExecutableRegistrationMissing,
+  ProgramHost.ExecutionFailure,
+])
 
 export type RunOutcome =
-  | { readonly _tag: "Succeeded"; readonly result: AgentResult; readonly eventId: string; readonly occurredAt: string }
+  | {
+      readonly _tag: "Succeeded"
+      readonly result: ExecutionResultType
+      readonly eventId: string
+      readonly occurredAt: string
+    }
   | { readonly _tag: "Failed"; readonly error: RunFailure; readonly eventId: string; readonly occurredAt: string }
   | { readonly _tag: "Cancelled"; readonly reason?: string; readonly eventId: string; readonly occurredAt: string }
 
 type RunOutcomeEncoded =
   | {
       readonly _tag: "Succeeded"
-      readonly result: AgentResultEncoded
+      readonly result: typeof ExecutionResultSchema.Encoded
       readonly eventId: string
       readonly occurredAt: string
     }
@@ -125,7 +139,7 @@ type RunOutcomeEncoded =
 
 export const RunOutcome: Schema.Codec<RunOutcome, RunOutcomeEncoded> = Schema.Union([
   Schema.TaggedStruct("Succeeded", {
-    result: AgentResult,
+    result: ExecutionResultSchema,
     eventId: Schema.String,
     occurredAt: Schema.String,
   }),

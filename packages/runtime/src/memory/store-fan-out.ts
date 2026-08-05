@@ -1,5 +1,5 @@
 /* oxlint-disable no-accumulating-spread */
-import { Effect } from "effect"
+import { DateTime, Effect } from "effect"
 import { make as makeAddress } from "../address.js"
 import {
   FanOutConflict,
@@ -24,10 +24,12 @@ import {
   makeChildSettled,
   makeFanOutAdmitted,
   makeFanOutJoined,
+  makeResumed,
 } from "./append.js"
 import type { MemoryState, StoredFanOut, StoredRun } from "./state.js"
 import { resolveChild } from "../executable-manifest.js"
 import { digestFanOut } from "../fan-out.js"
+import { narrow } from "../executable-registration.js"
 
 const inspection = (fanOut: StoredFanOut): FanOutInspection => ({
   fanOutId: fanOut.fanOutId,
@@ -60,12 +62,6 @@ export const admitFanOut = (
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
     const parent = state.runs.get(input.parentRunId)
     if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
-    if (parent.status === "cancelling") {
-      return yield* FanOutInvalid.make({ message: `parent Run ${parent.runId} is cancelling` })
-    }
-    if (isTerminal(parent.status)) {
-      return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
-    }
     const members = [] as Array<import("../fan-out.js").StoredFanOutMember>
     for (const member of input.members) {
       const executableRef = resolveChild(parent.executableRef, parent.executableManifest, member.selection)
@@ -96,6 +92,15 @@ export const admitFanOut = (
         },
         state,
       ] as const
+    }
+    if (parent.pendingOutcome !== undefined) {
+      return yield* FanOutInvalid.make({ message: `parent Run ${parent.runId} has a pending outcome` })
+    }
+    if (parent.status === "cancelling") {
+      return yield* FanOutInvalid.make({ message: `parent Run ${parent.runId} is cancelling` })
+    }
+    if (isTerminal(parent.status)) {
+      return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
 
     let next = state
@@ -131,6 +136,10 @@ export const admitFanOut = (
         events: [],
         subscribers: new Map(),
         steering: [],
+        registrations: yield* narrow(
+          { ref: member.executableRef, manifest: parent.executableManifest },
+          parent.registrations,
+        ).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) }))),
       }
       const runs = new Map(next.runs)
       runs.set(member.childRunId, child)
@@ -191,7 +200,12 @@ const terminalResult = (member: FanOutMemberResult, event: RunEvent): FanOutMemb
   return { ...member, status: "cancelled", terminalEventId: event.eventId }
 }
 
-export const reconcileFanOut = (state: MemoryState, child: StoredRun, event: RunEvent) =>
+export const reconcileFanOut = (
+  state: MemoryState,
+  child: StoredRun,
+  event: RunEvent,
+  settlePending: (state: MemoryState, parent: StoredRun) => Effect.Effect<MemoryState, RuntimeUnavailable>,
+) =>
   Effect.gen(function* () {
     const current = [...state.fanOuts.values()].find((fanOut) =>
       fanOut.members.some((member) => member.childRunId === child.runId),
@@ -328,6 +342,46 @@ export const reconcileFanOut = (state: MemoryState, child: StoredRun, event: Run
           makeFanOutJoined(current.fanOutId, joined, counts, remainder),
         )
         next = emitted
+      }
+      const pendingParent = next.runs.get(current.parentRunId)
+      const hasOtherRunningFanOut = [...next.fanOuts.values()].some(
+        (fanOut) => fanOut.parentRunId === current.parentRunId && fanOut.status === "running",
+      )
+      if (
+        pendingParent?.pendingOutcome !== undefined &&
+        !pendingParent.cancellationRequested &&
+        !hasOtherRunningFanOut
+      ) {
+        next = yield* settlePending(next, pendingParent)
+      }
+      const operationEntry = [...next.programOperations.entries()].find(
+        ([, operation]) => operation.fanOutId === current.fanOutId && operation.status === "waiting",
+      )
+      const resumeParent = next.runs.get(current.parentRunId)
+      if (
+        operationEntry !== undefined &&
+        resumeParent !== undefined &&
+        !isTerminal(resumeParent.status) &&
+        resumeParent.activeWaitId === operationEntry[1].waitId
+      ) {
+        const [operationKey, operation] = operationEntry
+        const resolution = { _tag: "Signal" as const, name: operation.waitId! }
+        const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
+        const runs = new Map(next.runs)
+        const { ownerId: _, ...releasedParent } = resumeParent
+        runs.set(resumeParent.runId, {
+          ...releasedParent,
+          wait: { ...resumeParent.wait!, status: "signaled", resolution, closedAt },
+        })
+        const programOperations = new Map(next.programOperations)
+        programOperations.set(operationKey, { ...operation, status: "running" })
+        const [, resumed] = yield* appendLifecycle(
+          { ...next, runs, programOperations },
+          resumeParent.runId,
+          makeResumed(operation.waitId!, resolution),
+          "running",
+        )
+        next = resumed
       }
     }
     return next

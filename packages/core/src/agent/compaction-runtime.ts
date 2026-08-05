@@ -180,7 +180,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
         return {
           contextTokens,
           contextWindow: options.compaction?.contextWindow ?? Number.POSITIVE_INFINITY,
-          reserveTokens: DEFAULT_RESERVE_TOKENS,
+          reserveTokens: options.compaction?.reserveTokens ?? DEFAULT_RESERVE_TOKENS,
         }
       }),
     )

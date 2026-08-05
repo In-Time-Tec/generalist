@@ -1,5 +1,5 @@
-import { Approvals, Chat, ModelMiddleware, ToolExecutor } from "@batonfx/core"
-import { Address, AgentHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
+import { Agent, AgentManifest, Approvals, Chat, ModelMiddleware, Pins, ToolExecutor } from "@batonfx/core"
+import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
 import { Sse, Ws } from "@batonfx/transport"
 import { Effect, Layer, Schema } from "effect"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
@@ -7,12 +7,29 @@ import { Persistence } from "effect/unstable/persistence"
 import { agent } from "./agent"
 import { modelLayer } from "./model"
 import { cannedLayer } from "./search-provider"
-import { toolkit, toolkitLayer } from "./tools"
+import { toolkit, toolkitLayer, webSearchTool } from "./tools"
 
-const executable = ExecutableManifest.makeTest("research-agent", "1")
-const agentAddress = Address.make("agent:research")
+const pinnedAgent = AgentManifest.fromLiveAgent(agent, {
+  model: Pins.makeModel({ fixture: "research-agent", revision: "1" }),
+  tools: [{ name: webSearchTool.name, pin: Pins.makeCapability({ tool: webSearchTool.name, version: "1" }) }],
+  skills: [],
+  services: [],
+  policy: { _tag: "Portable", policy: agent.policy.snapshot! },
+  budget: agent.budget ?? {},
+  children: [],
+})
+const executable = ExecutableManifest.make({ root: pinnedAgent.pin, entries: [{ _tag: "Agent", ...pinnedAgent }] })
+const registrations = executable.manifest.entries.flatMap((entry) =>
+  entry._tag === "Agent"
+    ? [
+        entry.manifest.model,
+        ...entry.manifest.tools.map(({ pin }) => pin),
+        ...(entry.manifest.policy._tag === "Pinned" ? [entry.manifest.policy.pin] : []),
+      ].map((pin) => ({ pin, codec: "docs", version: "1", payload: { fixture: "research-agent" } }))
+    : [],
+)
 
-const SendMessageInput = Schema.Struct({
+const StartRunInput = Schema.Struct({
   body: Schema.Struct({
     runId: Schema.optionalKey(Schema.String),
     sessionId: Schema.String,
@@ -42,7 +59,7 @@ const errorResponse = (status: number) => (error: unknown) =>
 const executeRun = (runId: string) =>
   Effect.gen(function* () {
     const store = yield* RunStore.RunStore
-    const host = yield* AgentHost.AgentHost
+    const host = yield* ExecutionHost.ExecutionHost
     yield* host.execute(yield* store.claimExecution({ runId, ownerId: "research-agent-server" }))
   })
 
@@ -67,12 +84,13 @@ const routesLayer = HttpRouter.use((router) =>
     yield* router.add(
       "POST",
       "/runs",
-      HttpRouter.schemaJson(SendMessageInput).pipe(
+      HttpRouter.schemaJson(StartRunInput).pipe(
         Effect.flatMap(({ body }) =>
           Runtime.Runtime.use((runtime) =>
-            runtime.send({
+            runtime.start({
               ...(body.runId === undefined ? {} : { runId: body.runId }),
-              to: agentAddress,
+              executable,
+              registrations,
               sessionId: body.sessionId,
               idempotencyKey: body.idempotencyKey,
               prompt: body.prompt,
@@ -119,17 +137,17 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "research-agent" }).pipe
 const agentServices = Layer.mergeAll(
   modelLayer,
   toolExecutorLayer,
+  toolkitLayer.pipe(Layer.provideMerge(cannedLayer)),
   approvalsLayer,
   ModelMiddleware.layerIdentity,
   persistenceLayer,
 )
 
-export const runtimeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | AgentHost.AgentHost> = Runtime.layerMemory(
-  {
-    resolver: ExecutableResolver.makeStatic([{ executable, agent, services: agentServices }]),
-    addresses: [{ address: agentAddress, executable }],
-  },
-)
+export const runtimeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExecutionHost.ExecutionHost> =
+  Runtime.layerMemory({
+    resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, agentServices) }]),
+    addresses: [],
+  })
 
 export const httpLayer: Layer.Layer<never, never, HttpServer.HttpServer> = HttpRouter.serve(
   Layer.mergeAll(routesLayer, HttpRouter.cors()),

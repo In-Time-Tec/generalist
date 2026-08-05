@@ -1,9 +1,9 @@
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 1
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const MIGRATION_LOCK = "baton_runtime_schema"
 
-export const LEGACY_MIGRATION_STATEMENTS: ReadonlyArray<string> = [
+export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   `CREATE TABLE IF NOT EXISTS baton_schema_meta (
   id INT PRIMARY KEY,
   version INT NOT NULL,
@@ -36,7 +36,8 @@ export const LEGACY_MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   message_json LONGTEXT NOT NULL,
   message_digest VARCHAR(128) NOT NULL,
   idempotency_key VARCHAR(255) NOT NULL,
-  agent_json LONGTEXT NOT NULL,
+  executable_ref_json LONGTEXT NOT NULL,
+  executable_manifest_json LONGTEXT NOT NULL,
   root_run_id VARCHAR(255) NOT NULL,
   parent_run_id VARCHAR(255),
   invocation_id VARCHAR(255),
@@ -52,6 +53,8 @@ export const LEGACY_MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   driver_checkpoint_json LONGTEXT,
   suspension_json LONGTEXT,
   transcript_json LONGTEXT,
+  continuation_json LONGTEXT,
+  pending_outcome_json LONGTEXT,
   owner_worker_id VARCHAR(255),
   lease_expires_at VARCHAR(30),
   created_at VARCHAR(30) NOT NULL,
@@ -84,6 +87,8 @@ export const LEGACY_MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   lease_expires_at VARCHAR(30),
   started_at VARCHAR(30),
   finished_at VARCHAR(30),
+  resolution_idempotency_key VARCHAR(255),
+  resolution_json LONGTEXT,
   PRIMARY KEY (run_id, operation_id),
   UNIQUE KEY baton_run_operations_key (run_id, operation_key),
   KEY baton_run_operations_status_idx (status),
@@ -129,10 +134,6 @@ export const LEGACY_MIGRATION_STATEMENTS: ReadonlyArray<string> = [
   KEY baton_run_steering_pending_idx (run_id, consumed_operation_id, sequence),
   CONSTRAINT baton_run_steering_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
 ) ENGINE=InnoDB`,
-  `ALTER TABLE baton_runs ADD COLUMN continuation_json LONGTEXT`,
-]
-
-export const FAN_OUT_MIGRATION_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS baton_fan_outs (
   fan_out_id VARCHAR(255) PRIMARY KEY,
   parent_run_id VARCHAR(255) NOT NULL,
@@ -162,8 +163,6 @@ export const FAN_OUT_MIGRATION_STATEMENTS = [
   CONSTRAINT baton_fan_out_member_fan_out_fk FOREIGN KEY (fan_out_id) REFERENCES baton_fan_outs(fan_out_id),
   CONSTRAINT baton_fan_out_member_child_fk FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
 ) ENGINE=InnoDB`,
-]
-export const TREE_MIGRATION_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS baton_tree_roots (
   root_run_id VARCHAR(255) PRIMARY KEY,
   earliest_position BIGINT NOT NULL DEFAULT 0,
@@ -182,91 +181,59 @@ export const TREE_MIGRATION_STATEMENTS = [
   CONSTRAINT baton_tree_index_root_fk FOREIGN KEY (root_run_id) REFERENCES baton_tree_roots(root_run_id),
   CONSTRAINT baton_tree_index_event_fk FOREIGN KEY (event_id) REFERENCES baton_run_events(event_id),
   CONSTRAINT baton_tree_index_run_event_fk FOREIGN KEY (run_id, run_sequence) REFERENCES baton_run_events(run_id, sequence)
+  ) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS baton_program_runs (
+  run_id VARCHAR(255) PRIMARY KEY,
+  program_pin VARCHAR(255) NOT NULL,
+  budget_json LONGTEXT NOT NULL,
+  deadline_millis BIGINT NOT NULL,
+  tool_calls BIGINT NOT NULL DEFAULT 0,
+  agent_runs BIGINT NOT NULL DEFAULT 0,
+  tokens BIGINT NOT NULL DEFAULT 0,
+  log_bytes BIGINT NOT NULL DEFAULT 0,
+  active_slots BIGINT NOT NULL DEFAULT 0,
+  CONSTRAINT baton_program_runs_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
 ) ENGINE=InnoDB`,
-  `INSERT IGNORE INTO baton_tree_roots (root_run_id)
-SELECT run_id FROM baton_runs WHERE root_run_id = run_id`,
-  `INSERT IGNORE INTO baton_tree_event_index (root_run_id, position, run_id, run_sequence, event_id)
-SELECT root_run_id, position, run_id, sequence, event_id FROM (
-  SELECT r.root_run_id, e.run_id, e.sequence, e.event_id,
-    ROW_NUMBER() OVER (PARTITION BY r.root_run_id ORDER BY e.run_id, e.sequence, e.event_id) - 1 AS position
-  FROM baton_run_events e JOIN baton_runs r ON r.run_id = e.run_id
-) backfill`,
-  `UPDATE baton_tree_roots roots LEFT JOIN (
-  SELECT root_run_id, MAX(position) AS last_position FROM baton_tree_event_index GROUP BY root_run_id
-) indexed ON indexed.root_run_id = roots.root_run_id
-SET roots.last_position = COALESCE(indexed.last_position, -1)`,
+  `CREATE TABLE IF NOT EXISTS baton_program_operations (
+  run_id VARCHAR(255) NOT NULL,
+  operation_name VARCHAR(255) NOT NULL,
+  kind VARCHAR(32) NOT NULL,
+  capability VARCHAR(255) NOT NULL,
+  input_digest VARCHAR(128) NOT NULL,
+  input_json LONGTEXT NOT NULL,
+  replay_policy VARCHAR(32) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  result_json LONGTEXT,
+  error_json LONGTEXT,
+  wait_id VARCHAR(255),
+  fan_out_id VARCHAR(255),
+  child_run_ids_json LONGTEXT NOT NULL,
+  resolution_idempotency_key VARCHAR(255),
+  resolution_json LONGTEXT,
+  PRIMARY KEY (run_id, operation_name),
+  CONSTRAINT baton_program_operations_run_fk FOREIGN KEY (run_id) REFERENCES baton_program_runs(run_id)
+) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS baton_executable_registrations (
+  pin VARCHAR(255) PRIMARY KEY,
+  codec VARCHAR(255) NOT NULL,
+  version VARCHAR(255) NOT NULL,
+  payload_json LONGTEXT NOT NULL,
+  registration_digest VARCHAR(128) NOT NULL
+) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS baton_run_registrations (
+  run_id VARCHAR(255) NOT NULL,
+  pin VARCHAR(255) NOT NULL,
+  PRIMARY KEY (run_id, pin),
+  CONSTRAINT baton_run_registrations_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id),
+  CONSTRAINT baton_run_registrations_pin_fk FOREIGN KEY (pin) REFERENCES baton_executable_registrations(pin)
+  ) ENGINE=InnoDB`,
+  `CREATE INDEX baton_run_registrations_pin_idx ON baton_run_registrations(pin)`,
 ]
-export const EXECUTABLE_MIGRATION_STATEMENTS = [
-  `ALTER TABLE baton_runs ADD COLUMN executable_ref_json LONGTEXT NOT NULL`,
-  `ALTER TABLE baton_runs ADD COLUMN executable_manifest_json LONGTEXT NOT NULL`,
-  `ALTER TABLE baton_runs DROP COLUMN agent_json`,
-]
-export const OPERATION_RESOLUTION_MIGRATION_STATEMENTS = [
-  `ALTER TABLE baton_run_operations ADD COLUMN resolution_idempotency_key VARCHAR(255)`,
-  `ALTER TABLE baton_run_operations ADD COLUMN resolution_json LONGTEXT`,
-]
-export const MIGRATION_STATEMENTS = [
-  ...LEGACY_MIGRATION_STATEMENTS,
-  ...FAN_OUT_MIGRATION_STATEMENTS,
-  ...TREE_MIGRATION_STATEMENTS,
-  ...EXECUTABLE_MIGRATION_STATEMENTS,
-  ...OPERATION_RESOLUTION_MIGRATION_STATEMENTS,
-]
-
-export const MIGRATION_MANIFEST = [
-  { id: 1, name: "baton_runtime_mysql_kernel", statements: LEGACY_MIGRATION_STATEMENTS.slice(0, -2) },
-  { id: 2, name: "baton_runtime_mysql_steering", statements: LEGACY_MIGRATION_STATEMENTS.slice(-2) },
-  { id: 3, name: "baton_runtime_mysql_fan_out", statements: FAN_OUT_MIGRATION_STATEMENTS },
-  { id: 4, name: "baton_runtime_mysql_tree_projection", statements: TREE_MIGRATION_STATEMENTS },
-  { id: 5, name: "baton_runtime_mysql_executable_manifest", statements: EXECUTABLE_MIGRATION_STATEMENTS },
-  { id: 6, name: "baton_runtime_mysql_operation_resolution", statements: OPERATION_RESOLUTION_MIGRATION_STATEMENTS },
-] as const
 
 export const schemaChecksum = (): string => {
   const hasher = new Bun.CryptoHasher("sha256")
-  hasher.update(MIGRATION_STATEMENTS.join("\n"))
+  hasher.update(SCHEMA_STATEMENTS.join("\n"))
   hasher.update(`\nversion=${SCHEMA_VERSION}`)
-  hasher.update("\ndialect=mysql")
-  return hasher.digest("hex")
-}
-
-export const executableSchemaChecksum = (): string => {
-  const hasher = new Bun.CryptoHasher("sha256")
-  hasher.update(
-    [
-      ...LEGACY_MIGRATION_STATEMENTS,
-      ...FAN_OUT_MIGRATION_STATEMENTS,
-      ...TREE_MIGRATION_STATEMENTS,
-      ...EXECUTABLE_MIGRATION_STATEMENTS,
-    ].join("\n"),
-  )
-  hasher.update("\nversion=5")
-  hasher.update("\ndialect=mysql")
-  return hasher.digest("hex")
-}
-
-export const steeringSchemaChecksum = (): string => {
-  const hasher = new Bun.CryptoHasher("sha256")
-  hasher.update(LEGACY_MIGRATION_STATEMENTS.join("\n"))
-  hasher.update("\nversion=2")
-  hasher.update("\ndialect=mysql")
-  return hasher.digest("hex")
-}
-
-export const fanOutSchemaChecksum = (): string => {
-  const hasher = new Bun.CryptoHasher("sha256")
-  hasher.update([...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS].join("\n"))
-  hasher.update("\nversion=3")
-  hasher.update("\ndialect=mysql")
-  return hasher.digest("hex")
-}
-
-export const treeSchemaChecksum = (): string => {
-  const hasher = new Bun.CryptoHasher("sha256")
-  hasher.update(
-    [...LEGACY_MIGRATION_STATEMENTS, ...FAN_OUT_MIGRATION_STATEMENTS, ...TREE_MIGRATION_STATEMENTS].join("\n"),
-  )
-  hasher.update("\nversion=4")
   hasher.update("\ndialect=mysql")
   return hasher.digest("hex")
 }

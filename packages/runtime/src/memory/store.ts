@@ -10,9 +10,10 @@ import {
 } from "../errors.js"
 import { RunStore, type CompletionOutcome } from "../run-store.js"
 import type { LayerOptions } from "../runtime.js"
-import { emptyState, type MemoryState } from "./state.js"
-import { admitSend, admitSpawn } from "./store-admit.js"
+import { emptyState, idempotencyKey, type MemoryState } from "./state.js"
+import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store-admit.js"
 import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store-control.js"
+import { isTerminal } from "../run.js"
 import { followEvents, inspectRun, shutdownStore, toInspection } from "./store-events.js"
 import {
   expireRunningOperation,
@@ -30,6 +31,16 @@ import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { makeCursor } from "../tree-cursor.js"
 import { projectRunSnapshot, projectTreeInspection, type InspectionRun } from "../inspection.js"
 import { decodePinned, equals } from "../executable-manifest.js"
+import {
+  admitProgramAgents,
+  completeProgram,
+  commitProgramLog,
+  reserveProgramOperation,
+  resolveProgramOperation,
+  suspendProgramOperation,
+  settleProgramOperation,
+  startProgramOperation,
+} from "./store-program.js"
 
 export const makeRunStore = (options: LayerOptions) =>
   Effect.gen(function* () {
@@ -60,6 +71,16 @@ export const makeRunStore = (options: LayerOptions) =>
 
     return RunStore.of({
       info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
+      hasAdmission: (input) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) =>
+            state.closed
+              ? RuntimeUnavailable.make({ message: "runtime store released" })
+              : Effect.succeed(
+                  state.idempotency.has(idempotencyKey(input.address, input.sessionId, input.idempotencyKey)),
+                ),
+          ),
+        ),
       admitSend: (input) =>
         Effect.gen(function* () {
           const bound = addressBindings.get(input.message.to)
@@ -77,7 +98,16 @@ export const makeRunStore = (options: LayerOptions) =>
           }
           return yield* SynchronizedRef.modifyEffect(stateRef, (state) => admitSend(state, input))
         }),
+      admitStart: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitStart(state, input)),
       admitSpawn: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitSpawn(state, input)),
+      admitProgramChild: (input) => fencedModify(input, (state) => admitProgramChild(state, input)),
+      admitProgramChildAndSuspend: (input) =>
+        fencedModify(input, (state) =>
+          Effect.gen(function* () {
+            const [receipt, admitted] = yield* admitProgramChild(state, input)
+            return [receipt, yield* suspend(admitted, input)] as const
+          }),
+        ),
       events: (input) => followEvents(stateRef, input),
       respond: (input) => update((state) => respond(state, input)),
       signal: (input) => update((state) => signal(state, input)),
@@ -193,12 +223,21 @@ export const makeRunStore = (options: LayerOptions) =>
         ),
       list: (input) =>
         SynchronizedRef.get(stateRef).pipe(
-          Effect.map((state) =>
-            [...state.runs.values()]
+          Effect.map((state) => {
+            const runs = [...state.runs.values()]
+            const start =
+              input.afterRunId === undefined
+                ? 0
+                : (() => {
+                    const index = runs.findIndex((run) => run.runId === input.afterRunId)
+                    return index === -1 ? 0 : index + 1
+                  })()
+            const filtered = runs
+              .slice(start)
               .filter((run) => input.status === undefined || run.status === input.status)
-              .slice(0, input.limit)
-              .map(toInspection),
-          ),
+            const ordered = (input.order ?? "newest") === "oldest" ? filtered : filtered.toReversed()
+            return ordered.slice(0, input.limit).map(toInspection)
+          }),
         ),
       complete: (input) =>
         SynchronizedRef.modifyEffect(stateRef, (state) =>
@@ -211,7 +250,7 @@ export const makeRunStore = (options: LayerOptions) =>
                 Effect.gen(function* () {
                   const run = state.runs.get(input.runId)!
                   const pending = run.steering.filter((entry) => entry.consumedOperationId === undefined)
-                  if (pending.length > 0) {
+                  if (!run.cancellationRequested && pending.length > 0 && "transcript" in input.result) {
                     const continuation = {
                       schemaVersion: 1 as const,
                       prompt: pending.reduce<Prompt.Prompt>(
@@ -248,7 +287,24 @@ export const makeRunStore = (options: LayerOptions) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => getOperation(state, input))),
       getOperationByKey: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => getOperationByKey(state, input))),
-      resolveOperation: (input) => update((state) => resolveOperation(state, input)),
+      resolveOperation: (input) =>
+        update((state) =>
+          (state.programOperations.has(`${input.runId}\0${input.operationId}`)
+            ? resolveProgramOperation(state, input)
+            : resolveOperation(state, input)
+          ).pipe(
+            // A resolved unknown outcome must settle a cancellation that was admitted while it was pending.
+            Effect.flatMap((resolved) => {
+              const run = resolved.runs.get(input.runId)
+              return run === undefined || !run.cancellationRequested || isTerminal(run.status)
+                ? Effect.succeed(resolved)
+                : cancel(resolved, {
+                    runId: input.runId,
+                    ...(run.cancelReason === undefined ? {} : { reason: run.cancelReason }),
+                  })
+            }),
+          ),
+        ),
       claimExecution: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => claimExecution(state, input)),
       loadExecution: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadExecution(state, runId))),
@@ -256,6 +312,29 @@ export const makeRunStore = (options: LayerOptions) =>
       admitFanOut: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitFanOut(state, input)),
       inspectFanOut: (fanOutId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectFanOut(state, fanOutId))),
+      reserveProgramOperation: (input) => fencedModify(input, (state) => reserveProgramOperation(state, input)),
+      suspendProgramOperation: (input) => fencedModify(input, (state) => suspendProgramOperation(state, input)),
+      admitProgramAgents: (input) => fencedModify(input, (state) => admitProgramAgents(state, input)),
+      settleProgramOperation: (input) => fencedModify(input, (state) => settleProgramOperation(state, input)),
+      startProgramOperation: (input) => fencedModify(input, (state) => startProgramOperation(state, input)),
+      loadProgramState: (runId) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) =>
+            state.runs.has(runId)
+              ? Effect.succeed(state.programStates.get(runId))
+              : Effect.fail(RunNotFound.make({ runId })),
+          ),
+        ),
+      getProgramOperation: (input) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) =>
+            state.runs.has(input.runId)
+              ? Effect.succeed(state.programOperations.get(`${input.runId}\0${input.operation}`))
+              : Effect.fail(RunNotFound.make({ runId: input.runId })),
+          ),
+        ),
+      completeProgram: (input) => fencedModify(input, (state) => completeProgram(state, input)),
+      commitProgramLog: (input) => fencedModify(input, (state) => commitProgramLog(state, input)),
     })
   })
 

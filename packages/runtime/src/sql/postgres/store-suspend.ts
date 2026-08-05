@@ -7,18 +7,19 @@ import type { Interface as RunStoreInterface } from "../../run-store.js"
 import { encodeContinuation } from "../../steering.js"
 import { encodeExecutableRef } from "../codecs.js"
 import type { EventHub } from "../subscribers.js"
-import { appendEvent, requireRun } from "./pg-helpers.js"
+import { appendEvent, lockRun, requireRun } from "./pg-helpers.js"
 import { requireExecutionClaim } from "../store-execution.js"
 
 export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${input.runId} FOR UPDATE`
+    yield* lockRun(input.runId)
     yield* requireExecutionClaim(input)
     const loaded = yield* requireRun(input.runId)
     if (isTerminal(loaded.status)) {
       return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
     }
+    if (loaded.cancellationRequested) return
     const executableRef = yield* Effect.try({
       try: () => checkpointRef(loaded.executableRef, loaded.executableManifest, input.checkpoint),
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
@@ -45,4 +46,5 @@ export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["susp
         status = 'open', reason = EXCLUDED.reason, response_json = NULL, opened_at = EXCLUDED.opened_at, closed_at = NULL
     `
     yield* appendEvent(hub, loaded, { _tag: "RunWaiting", wait: input.wait }, "waiting")
+    yield* sql`UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}`
   })

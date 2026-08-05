@@ -73,7 +73,7 @@ export const researchAgent = definePage({
       " registers the agent at an address and publishes canonical replayable RunEvents. The server claims each admitted in-memory execution through ",
       code("RunStore"),
       " and runs it with ",
-      code("AgentHost"),
+      code("ExecutionHost"),
       ". The approvals layer returns ",
       code("Pending"),
       " so approval-gated tools park the run until a human resolves its wait. The routes expose Runtime over HTTP: ",

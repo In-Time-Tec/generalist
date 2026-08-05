@@ -1,15 +1,22 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Redacted, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Redacted, Schema, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
-import { Errors, RunClaims, RunSchema, Runtime, RuntimeWorker, RunStore } from "../../src/index.js"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, ToolExecutor } from "@batonfx/core"
 import {
-  SCHEMA_META_TABLE,
-  SCHEMA_VERSION,
-  TREE_MIGRATION_STATEMENTS,
-  schemaChecksum,
-  steeringSchemaChecksum,
-} from "../../src/sql/postgres/schema.js"
+  Address,
+  Cursor,
+  Errors,
+  ExecutionHost,
+  ExecutableResolver,
+  RunClaims,
+  RunSchema,
+  Runtime,
+  RuntimeWorker,
+  RunStore,
+} from "../../src/index.js"
+import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../../src/sql/postgres/schema.js"
 import {
   alternateAssistantRef,
   assistantAddress,
@@ -19,6 +26,7 @@ import {
   openWait,
   suspension,
   researcherRef,
+  registrationsFor,
   textPrompt,
 } from "../helpers.js"
 import {
@@ -29,18 +37,70 @@ import {
   preparePostgres,
   uniqueSession,
 } from "./helpers.js"
+import { testExecutable } from "../identity.js"
 
 const describePostgres = postgresAvailable ? describe.sequential : describe.skip
 
 const url = postgresUrl!
-
-expect(steeringSchemaChecksum()).toBe("3536918f55414098259ef8aac4aa0dd4dd327aa5daf5a8ed5926f15137e92a40")
 
 const withSchema = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
     yield* preparePostgres(url)
     return yield* effect
   })
+
+const admitWaitForCancellation = (waitId: string) =>
+  Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    const claims = yield* RunClaims.RunClaims
+    const receipt = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: uniqueSession(`cancelled-wait-${waitId}`),
+      idempotencyKey: `cancelled-wait-${waitId}`,
+      prompt: textPrompt("wait"),
+    })
+    const [parentClaim] = yield* claims.claimReadyRuns({ workerId: "cancelled-wait", limit: 1, lease: "10 seconds" })
+    if (parentClaim === undefined) return yield* Effect.die("cancelled wait parent claim is missing")
+    yield* store.suspend({
+      runId: receipt.runId,
+      ownerId: parentClaim.workerId,
+      attemptFence: parentClaim.attemptFence,
+      wait: openWait(waitId),
+      suspension: suspension(waitId),
+    })
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* sql`
+        UPDATE baton_runs
+        SET status = 'running', owner_worker_id = ${parentClaim.workerId}
+        WHERE run_id = ${receipt.runId}
+      `
+    }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+    return {
+      runtime,
+      store,
+      runId: receipt.runId,
+      claim: { runId: receipt.runId, ownerId: parentClaim.workerId, attemptFence: parentClaim.attemptFence },
+    }
+  })
+
+const exactRegistrations = () => {
+  const pins = new Set<string>()
+  for (const entry of assistantRef.manifest.entries) {
+    if (entry._tag !== "Agent") continue
+    pins.add(entry.manifest.model)
+    for (const value of [...entry.manifest.tools, ...entry.manifest.skills, ...entry.manifest.services]) {
+      pins.add(value.pin)
+    }
+    if (entry.manifest.policy._tag === "Pinned") pins.add(entry.manifest.policy.pin)
+    if (entry.manifest.compaction !== undefined) {
+      pins.add(entry.manifest.compaction.service)
+      pins.add(entry.manifest.compaction.summaryModel)
+    }
+  }
+  return [...pins].map((pin) => ({ pin, codec: "postgres-test", version: "1", payload: { route: "exact" } }))
+}
 
 const expireLease = (runId: string) =>
   Effect.gen(function* () {
@@ -81,42 +141,71 @@ const corruptEventExecutableRef = (runId: string, executableRef: unknown) =>
 const markDirty = () =>
   RunSchema.markDirty("postgres-test").pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
 
+const finish = Response.makePart("finish", {
+  reason: "stop",
+  usage: Response.Usage.make({
+    inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
+    outputTokens: { total: 1, text: 1, reasoning: undefined },
+  }),
+  response: undefined,
+})
+
 describePostgres("postgres run store", () => {
-  it.live("executes the v4 backfill in numeric per-Run sequence order", () =>
+  it.live("persists exact-start registrations and replays admission idempotently", () =>
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const receipt = yield* runtime.send({
-          to: assistantAddress,
-          sessionId: uniqueSession("tree-backfill"),
-          idempotencyKey: "run",
-          prompt: "backfill",
-        })
-        const sequences = yield* Effect.gen(function* () {
-          const sql = yield* SqlClient.SqlClient
-          const template = (yield* sql<{ event_json: string }>`
-            SELECT event_json FROM baton_run_events WHERE run_id = ${receipt.runId} ORDER BY sequence DESC LIMIT 1
-          `)[0]!
-          for (let sequence = 1; sequence < 12; sequence++) {
-            const event = JSON.parse(template.event_json) as Record<string, unknown>
-            event.eventId = `${receipt.runId}:${sequence}`
-            event.sequence = sequence
-            yield* sql`
-              INSERT INTO baton_run_events (run_id, sequence, event_id, event_json)
-              VALUES (${receipt.runId}, ${sequence}, ${event.eventId as string}, ${JSON.stringify(event)})
-            `
-          }
-          yield* sql`UPDATE baton_runs SET last_sequence = 11 WHERE run_id = ${receipt.runId}`
-          yield* sql.unsafe("DROP TABLE baton_tree_event_index")
-          yield* sql.unsafe("DROP TABLE baton_tree_roots")
-          for (const statement of TREE_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-          const rows = yield* sql<{ run_sequence: number }>`
-            SELECT run_sequence FROM baton_tree_event_index
-            WHERE root_run_id = ${receipt.runId} ORDER BY position
-          `
-          return rows.map((row) => Number(row.run_sequence))
-        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
-        expect(sequences).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+        const store = yield* RunStore.RunStore
+        const input = {
+          executable: assistantRef,
+          registrations: exactRegistrations(),
+          sessionId: uniqueSession("exact-start"),
+          idempotencyKey: "exact-start",
+          prompt: textPrompt("exact"),
+          initialChildren: [
+            {
+              invocationId: "initial-research",
+              idempotencyKey: "initial-research",
+              selection: "researcher",
+              sessionId: uniqueSession("exact-start-child"),
+              prompt: textPrompt("research"),
+            },
+          ],
+        }
+        const first = yield* runtime.start(input)
+        const duplicate = yield* runtime.start(input)
+        const execution = yield* store.loadExecution(first.runId)
+        expect(duplicate).toMatchObject({ runId: first.runId, duplicate: true })
+        expect(duplicate.childRunIds).toEqual(first.childRunIds)
+        expect((yield* store.loadExecution(first.childRunIds[0]!)).executableRef).toEqual(researcherRef.ref)
+        expect(execution.registrations).toEqual(
+          [...input.registrations].toSorted((left, right) => left.pin.localeCompare(right.pin)),
+        )
+        expect(
+          yield* runtime
+            .start({
+              ...input,
+              initialChildren: [{ ...input.initialChildren[0]!, prompt: textPrompt("changed") }],
+            })
+            .pipe(Effect.flip),
+        ).toBeInstanceOf(Errors.IdempotencyConflict)
+        const conflict = yield* runtime
+          .start({
+            ...input,
+            idempotencyKey: "changed-registration",
+            registrations: input.registrations.map((registration, index) =>
+              index === 0
+                ? {
+                    pin: registration.pin,
+                    codec: registration.codec,
+                    version: registration.version,
+                    payload: { route: "changed" },
+                  }
+                : registration,
+            ),
+          })
+          .pipe(Effect.flip)
+        expect(conflict).toBeInstanceOf(Errors.ExecutableRegistrationConflict)
       }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
     ),
   )
@@ -206,7 +295,9 @@ describePostgres("postgres run store", () => {
           expect.stringContaining("first"),
           expect.stringContaining("second"),
         ])
-        expect(yield* store.complete({ ...executionClaim, result: completedResult("early") })).toBe("steering-pending")
+        expect(yield* store.complete({ ...executionClaim, result: completedResult("early") })).toMatchObject({
+          _tag: "SteeringPending",
+        })
       }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
     ),
   )
@@ -275,14 +366,20 @@ describePostgres("postgres run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("terminal-parent"),
           idempotencyKey: "parent",
           prompt: textPrompt("parent"),
         })
-        const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "terminal-parent" })
-        yield* store.complete({ ...claim, result: completedResult("done") })
+        const [claim] = yield* claims.claimReadyRuns({ workerId: "terminal-parent", limit: 1 })
+        yield* store.complete({
+          runId: parent.runId,
+          ownerId: claim!.workerId,
+          attemptFence: claim!.attemptFence,
+          result: completedResult("done"),
+        })
         const failure = yield* runtime
           .spawn({
             parentRunId: parent.runId,
@@ -699,7 +796,7 @@ describePostgres("postgres run store", () => {
           prompt: textPrompt("next"),
         })
         const claimed = yield* claims.claimReadyRuns({ workerId: "wait-w", limit: 1, lease: "10 seconds" })
-        const claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: claimed[0]!.attemptFence }
+        let claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: claimed[0]!.attemptFence }
         yield* driver.suspend({
           ...claim,
           wait: openWait("approval", "approval"),
@@ -708,12 +805,16 @@ describePostgres("postgres run store", () => {
         expect((yield* runtime.inspect(successor.runId)).status).toBe("queued")
         yield* runtime.respond({ runId: waiting.runId, waitId: "approval", resolution: { _tag: "Approved" } })
         expect((yield* runtime.inspect(waiting.runId)).status).toBe("running")
+        const [approvalResume] = yield* claims.claimReadyRuns({ workerId: "wait-w", limit: 1, lease: "10 seconds" })
+        claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: approvalResume!.attemptFence }
         yield* driver.suspend({
           ...claim,
           wait: openWait("signal-me", "signal"),
           suspension: suspension("signal-me"),
         })
         yield* runtime.signal({ runId: waiting.runId, name: "signal-me" })
+        const [signalResume] = yield* claims.claimReadyRuns({ workerId: "wait-w", limit: 1, lease: "10 seconds" })
+        claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: signalResume!.attemptFence }
         const checkpoint = {
           driverVersion: "1" as const,
           executable: assistantRef.ref,
@@ -742,7 +843,7 @@ describePostgres("postgres run store", () => {
         yield* claims.commitWithClaim({
           runId: waiting.runId,
           workerId: "wait-w",
-          attemptFence: claimed[0]!.attemptFence,
+          attemptFence: claim.attemptFence,
           transition: "complete",
           result: completedResult("done"),
         })
@@ -750,7 +851,7 @@ describePostgres("postgres run store", () => {
           .fail({
             runId: waiting.runId,
             ownerId: "wait-w",
-            attemptFence: claimed[0]!.attemptFence,
+            attemptFence: claim.attemptFence,
             error: Errors.AgentExecutionFailure.make({ message: "nope" }),
           })
           .pipe(Effect.flip)
@@ -758,8 +859,305 @@ describePostgres("postgres run store", () => {
         expect((yield* runtime.inspect(waiting.runId)).status).toBe("succeeded")
         const nextClaim = yield* claims.claimReadyRuns({ workerId: "wait-w", limit: 1, lease: "10 seconds" })
         expect(nextClaim[0]?.run.runId).toBe(successor.runId)
+        yield* claims.releaseClaim({
+          runId: successor.runId,
+          workerId: "wait-w",
+          attemptFence: nextClaim[0]!.attemptFence,
+        })
         yield* runtime.cancel({ runId: successor.runId, reason: "stop" })
         expect((yield* runtime.inspect(successor.runId)).status).toBe("cancelled")
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("interrupts an active claimed Run when another process persists cancellation", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const claims = yield* RunClaims.RunClaims
+        const host = yield* ExecutionHost.ExecutionHost
+        const sessionId = uniqueSession("cross-process-cancel")
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId,
+          idempotencyKey: "cross-process-cancel",
+          prompt: textPrompt("work"),
+        })
+        const [claim] = yield* claims.claimReadyRuns({ workerId: "cancel-worker", limit: 1, lease: "30 seconds" })
+        expect(claim).toBeDefined()
+
+        // Model one worker holding the Run while a separate connection persists cancellation.
+        const executing = yield* host
+          .execute({ runId: receipt.runId, ownerId: claim!.workerId, attemptFence: claim!.attemptFence })
+          .pipe(Effect.forkChild({ startImmediately: true }))
+        yield* runtime.cancel({ runId: receipt.runId, reason: "cross-process" })
+        yield* Fiber.join(executing)
+
+        const settled = yield* runtime.inspect(receipt.runId)
+        expect(["cancelling", "cancelled"]).toContain(settled.status)
+        expect(
+          yield* claims.refreshLease({
+            runId: receipt.runId,
+            workerId: claim!.workerId,
+            attemptFence: claim!.attemptFence,
+            lease: "5 seconds",
+          }),
+        ).toBe(false)
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("interrupts an active model call from a separate PostgreSQL runtime node", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>()
+        const lifecycle: Array<string> = []
+        const agent = Agent.make({ name: "postgres-cancel-model" })
+        const executable = testExecutable(agent, "postgres-cancel-model-v1")
+        const address = Address.make("agent:postgres-cancel-model")
+        const model = Layer.effect(
+          LanguageModel.LanguageModel,
+          Effect.sync(() => lifecycle.push("service acquired")).pipe(
+            Effect.andThen(
+              LanguageModel.make({
+                generateText: () => Effect.never,
+                streamText: () =>
+                  Stream.fromEffect(Deferred.succeed(started, undefined)).pipe(
+                    Stream.flatMap(() => Stream.never),
+                    Stream.ensuring(Effect.sync(() => lifecycle.push("model finalized"))),
+                  ),
+              }),
+            ),
+            Effect.ensuring(Effect.sync(() => lifecycle.push("service finalized"))),
+          ),
+        )
+        const resolver = ExecutableResolver.ExecutableResolver.of({
+          resolve: (input) =>
+            Effect.gen(function* () {
+              const phase = input.runId === "pending" ? "admission" : "execution"
+              lifecycle.push(`${phase} resolver acquired`)
+              yield* Effect.addFinalizer(() => Effect.sync(() => lifecycle.push(`${phase} resolver finalized`)))
+              return { _tag: "Agent" as const, agent: Agent.close(agent, model), attestation: executable }
+            }),
+        })
+        const options = {
+          url,
+          resolver,
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        }
+        const workerLayer = RuntimeWorker.layerWorker({
+          workerId: "postgres-model-worker",
+          cancellationInterval: "10 millis",
+          lease: "30 seconds",
+        }).pipe(Layer.provideMerge(Runtime.layerPostgres(options)))
+        return yield* Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const worker = yield* RuntimeWorker.RuntimeWorker
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: uniqueSession("cross-process-model"),
+            idempotencyKey: "cross-process-model",
+            prompt: "block model",
+          })
+          const execution = yield* worker.execute.pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(started)
+          yield* Runtime.Runtime.pipe(
+            Effect.flatMap((otherRuntime) =>
+              otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),
+            ),
+            Effect.provide(Runtime.layerPostgres(options)),
+            Effect.scoped,
+          )
+          yield* Fiber.join(execution)
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+          expect(lifecycle).toEqual([
+            "admission resolver acquired",
+            "admission resolver finalized",
+            "execution resolver acquired",
+            "service acquired",
+            "service finalized",
+            "model finalized",
+            "execution resolver finalized",
+          ])
+        }).pipe(Effect.provide(workerLayer), Effect.scoped)
+      }),
+    ),
+  )
+
+  it.live("interrupts an active tool call and finalizes worker resources before cancellation settles", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>()
+        const lifecycle: Array<string> = []
+        const tool = Tool.make("block", { parameters: Schema.Struct({}), success: Schema.String })
+        const agent = Agent.make({ name: "postgres-cancel-tool", toolkit: Toolkit.make(tool) })
+        const executable = testExecutable(agent, "postgres-cancel-tool-v1")
+        const address = Address.make("agent:postgres-cancel-tool")
+        const model = Layer.effect(
+          LanguageModel.LanguageModel,
+          Effect.sync(() => lifecycle.push("service acquired")).pipe(
+            Effect.andThen(
+              LanguageModel.make({
+                generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+                streamText: () =>
+                  Stream.fromIterable<Response.StreamPartEncoded>([
+                    Response.makePart("tool-call", {
+                      id: "block-1",
+                      name: "block",
+                      params: {},
+                      providerExecuted: false,
+                    }),
+                    finish,
+                  ]),
+              }),
+            ),
+            Effect.ensuring(Effect.sync(() => lifecycle.push("service finalized"))),
+          ),
+        )
+        const executor = ToolExecutor.layerTest({
+          execute: () =>
+            Deferred.succeed(started, undefined).pipe(
+              Effect.andThen(Effect.never),
+              Effect.ensuring(Effect.sync(() => lifecycle.push("tool finalized"))),
+            ),
+        })
+        const handlers = Toolkit.make(tool).toLayer({
+          block: () => Effect.die("ToolExecutor test layer owns execution"),
+        })
+        const resolver = ExecutableResolver.makeStatic([
+          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+        ])
+        const options = {
+          url,
+          resolver,
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        }
+        const workerLayer = RuntimeWorker.layerWorker({
+          workerId: "postgres-tool-worker",
+          cancellationInterval: "10 millis",
+          lease: "30 seconds",
+        }).pipe(Layer.provideMerge(Runtime.layerPostgres(options)))
+        return yield* Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const worker = yield* RuntimeWorker.RuntimeWorker
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: uniqueSession("cross-process-tool"),
+            idempotencyKey: "cross-process-tool",
+            prompt: "block tool",
+          })
+          const execution = yield* worker.execute.pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(started)
+          yield* Runtime.Runtime.pipe(
+            Effect.flatMap((otherRuntime) =>
+              otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),
+            ),
+            Effect.provide(Runtime.layerPostgres(options)),
+            Effect.scoped,
+          )
+          yield* Fiber.join(execution)
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+          expect(lifecycle).toEqual(["service acquired", "service finalized", "tool finalized"])
+          const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
+            (event) => event._tag === "OperationUnknown",
+          )
+          if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
+          expect((yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })).status).toBe(
+            "unknown",
+          )
+          yield* runtime.resolveOperation({
+            runId: receipt.runId,
+            operationId: unknown.operationId,
+            idempotencyKey: "cross-process-tool-resolution",
+            resolution: { _tag: "Failed", error: { message: "tool was interrupted" } },
+          })
+          yield* runtime.cancel({ runId: receipt.runId, reason: "settle cancellation" })
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+        }).pipe(Effect.provide(workerLayer), Effect.scoped)
+      }),
+    ),
+  )
+
+  it.live("serializes concurrent response and cancellation into one ordered outcome", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const driver = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+
+        for (const attempt of [0, 1, 2, 3, 4, 5, 6, 7]) {
+          const sessionId = uniqueSession(`race-${attempt}`)
+          const admitted = yield* runtime.send({
+            to: assistantAddress,
+            sessionId,
+            idempotencyKey: `race-${attempt}`,
+            prompt: textPrompt("race"),
+          })
+          const [claimed] = yield* claims.claimReadyRuns({ workerId: "race-w", limit: 1, lease: "10 seconds" })
+          yield* driver.suspend({
+            runId: admitted.runId,
+            ownerId: "race-w",
+            attemptFence: claimed!.attemptFence,
+            wait: openWait("approval", "approval"),
+            suspension: suspension("approval", "approval"),
+          })
+
+          const respond = runtime
+            .respond({ runId: admitted.runId, waitId: "approval", resolution: { _tag: "Approved" } })
+            .pipe(Effect.exit)
+          const cancel = runtime.cancel({ runId: admitted.runId, reason: "race" }).pipe(Effect.exit)
+          const [respondExit, cancelExit] = yield* Effect.all([respond, cancel], { concurrency: "unbounded" })
+
+          expect(cancelExit._tag).toBe("Success")
+          const status = (yield* runtime.inspect(admitted.runId)).status
+
+          if (respondExit._tag === "Success") {
+            // An accepted response is never lost: it stays durably recorded even when cancellation wins the Run.
+            const events = yield* driver.history({ runId: admitted.runId, cursor: Cursor.origin, limit: 200 })
+            expect(events.some((event) => event._tag === "RunResumed")).toBe(true)
+          }
+          expect(status).toBe("cancelled")
+        }
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("keeps duplicate responses idempotent after cancellation admission", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const { runtime, runId } = yield* admitWaitForCancellation("approval")
+        const resolution = { _tag: "Approved" as const }
+        yield* runtime.respond({ runId, waitId: "approval", resolution })
+        yield* runtime.cancel({ runId, reason: "stop" })
+        yield* runtime.respond({ runId, waitId: "approval", resolution })
+        const conflict = yield* runtime
+          .respond({ runId, waitId: "approval", resolution: { _tag: "Denied", reason: "changed" } })
+          .pipe(Effect.flip)
+        expect(conflict).toBeInstanceOf(Errors.ResponseConflict)
+        expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("does not resume a cancellation-requested wait", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const { runtime, store, runId, claim } = yield* admitWaitForCancellation("approval")
+        yield* runtime.cancel({ runId, reason: "stop" })
+        const response = yield* runtime
+          .respond({ runId, waitId: "approval", resolution: { _tag: "Approved" } })
+          .pipe(Effect.flip)
+        expect(response).toBeInstanceOf(Errors.WaitNotOpen)
+        yield* runtime.signal({ runId, name: "approval" })
+        const resume = yield* store
+          .resume({ runId, waitId: "approval", resolution: { _tag: "Approved" } })
+          .pipe(Effect.flip)
+        expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
+        yield* store.suspend({ ...claim, wait: openWait("approval"), suspension: suspension("approval") })
+        const inspection = yield* runtime.inspect(runId)
+        expect(inspection.status).toBe("cancelling")
+        expect(inspection.wait).toMatchObject({ status: "cancelled" })
       }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
     ),
   )
@@ -776,7 +1174,7 @@ describePostgres("postgres run store", () => {
           idempotencyKey: "parent",
           prompt: textPrompt("parent"),
         })
-        yield* claims.claimReadyRuns({ workerId: "parent-w", limit: 1, lease: "10 seconds" })
+        const [parentClaim] = yield* claims.claimReadyRuns({ workerId: "parent-w", limit: 1, lease: "10 seconds" })
         const child = yield* runtime.spawn({
           parentRunId: parent.runId,
           invocationId: "inv-1",
@@ -799,6 +1197,11 @@ describePostgres("postgres run store", () => {
         )
         expect(parentTags).toContain("ChildLinked")
         expect(parentTags).toContain("ChildSettled")
+        yield* claims.releaseClaim({
+          runId: parent.runId,
+          workerId: "parent-w",
+          attemptFence: parentClaim!.attemptFence,
+        })
         yield* runtime.cancel({ runId: parent.runId, reason: "parent-stop" })
         expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
         expect((yield* runtime.inspect(child.runId)).status).toBe("succeeded")
@@ -870,6 +1273,57 @@ describePostgres("postgres run store", () => {
         })
         const second = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
         expect(second.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[1]])
+      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("settles a parked Program completion through the canonical fan-out path", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const parent = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("program-fan-out-completion"),
+          idempotencyKey: "parent",
+          prompt: "parent",
+        })
+        const [parentClaim] = yield* claims.claimReadyRuns({ workerId: "program-parent", limit: 1 })
+        const fanOut = yield* runtime.fanOut({
+          parentRunId: parent.runId,
+          idempotencyKey: "reviews",
+          members: [{ key: "review", selection: "researcher", prompt: "review" }],
+          concurrency: 1,
+          join: { _tag: "AllSuccess" },
+          remainder: "await",
+        })
+        yield* store.completeProgram({
+          runId: parent.runId,
+          ownerId: parentClaim!.workerId,
+          attemptFence: parentClaim!.attemptFence,
+          output: "program-output",
+          outputBytes: 14,
+          outputLimit: 100,
+        })
+        expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
+        expect(
+          yield* runtime.steer({ runId: parent.runId, idempotencyKey: "late", prompt: "late" }).pipe(Effect.flip),
+        ).toBeInstanceOf(Errors.RunTerminal)
+        const [childClaim] = yield* claims.claimReadyRuns({ workerId: "program-child", limit: 1 })
+        expect(childClaim?.run.runId).toBe(fanOut.childRunIds[0])
+        yield* claims.commitWithClaim({
+          runId: childClaim!.run.runId,
+          workerId: childClaim!.workerId,
+          attemptFence: childClaim!.attemptFence,
+          transition: "complete",
+          result: completedResult("reviewed"),
+        })
+        expect((yield* runtime.inspect(parent.runId)).status).toBe("succeeded")
+        expect((yield* runtime.history({ runId: parent.runId, limit: 100 })).at(-1)).toMatchObject({
+          _tag: "RunCompleted",
+          result: { _tag: "Program", value: "program-output" },
+        })
       }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
     ),
   )

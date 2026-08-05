@@ -6,8 +6,17 @@ import { CursorExpired, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { checkpointRef } from "../../executable-manifest.js"
 import type { LayerOptions } from "../../runtime.js"
 import { RunStore, type Interface as RunStoreInterface } from "../../run-store.js"
-import { admitSend, admitSpawn } from "../store-admit.js"
-import { cancel, complete, emitAgentEvent, fail, respond, resume, signal } from "../store-control.js"
+import { admitProgramChild, admitSend, admitSpawn, admitStart } from "../store-admit.js"
+import {
+  cancel,
+  complete,
+  emitAgentEvent,
+  fail,
+  respond,
+  resume,
+  settleAdmittedCancellation,
+  signal,
+} from "../store-control.js"
 import {
   expireRunningOperation,
   getOperation,
@@ -18,7 +27,15 @@ import {
   resolveOperation,
 } from "../store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim } from "../store-execution.js"
-import { appendEvent, decodeRunEffect, loadEventsAfter, loadRun, loadRunWait, nowIso } from "../store-helpers.js"
+import {
+  appendEvent,
+  decodeRunEffect,
+  hasAdmission,
+  loadEventsAfter,
+  loadRun,
+  loadRunWait,
+  nowIso,
+} from "../store-helpers.js"
 import type { RunRow } from "../rows.js"
 import { withSql } from "../sql-effect.js"
 import { makeEventHub } from "../subscribers.js"
@@ -38,6 +55,18 @@ import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
 import { encodeExecutableRef } from "../codecs.js"
 import { encodeContinuation } from "../../steering.js"
 import { withConsistentSnapshot } from "../inspection-transaction.js"
+import {
+  admitProgramAgents,
+  commitProgramLog,
+  getProgramOperation,
+  loadProgramState,
+  reserveProgramOperation,
+  resolveProgramOperation,
+  suspendProgramOperation,
+  settleProgramOperation,
+  startProgramOperation,
+} from "../store-program.js"
+import { ProgramCapabilities } from "@batonfx/core"
 
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
@@ -184,6 +213,9 @@ export const makeMysqlServices = (
           { _tag: "RunWaiting", wait: { ...input.wait, openedAt: opened } },
           "waiting",
         )
+        yield* sql`
+          UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}
+        `
       })
     const saveExecution = (input: Parameters<RunStoreInterface["saveExecution"]>[0]) =>
       Effect.gen(function* () {
@@ -207,6 +239,7 @@ export const makeMysqlServices = (
 
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "mysql", multiWorker: true }),
+      hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) =>
         run(
           lockNamed(
@@ -214,7 +247,23 @@ export const makeMysqlServices = (
             admitSend(transactionHub, addressBindings, input, { promote: false }),
           ),
         ),
+      admitStart: (input) => run(lockNamed("baton:executable-registrations", admitStart(transactionHub, input))),
       admitSpawn: (input) => run(lockRun(input.parentRunId).pipe(Effect.andThen(admitSpawn(transactionHub, input)))),
+      admitProgramChild: (input) =>
+        run(
+          lockRun(input.runId).pipe(
+            Effect.andThen(requireExecutionClaim(input)),
+            Effect.andThen(admitProgramChild(transactionHub, input)),
+          ),
+        ),
+      admitProgramChildAndSuspend: (input) =>
+        run(
+          lockRun(input.runId).pipe(
+            Effect.andThen(requireExecutionClaim(input)),
+            Effect.andThen(admitProgramChild(transactionHub, input)),
+            Effect.tap(() => suspend(input)),
+          ),
+        ),
       events: (input) =>
         Stream.unwrap(
           Effect.gen(function* () {
@@ -293,10 +342,11 @@ export const makeMysqlServices = (
       list: (input) =>
         runNoTxn(
           Effect.gen(function* () {
+            const limit = sql.literal(String(Math.max(0, Math.floor(input.limit))))
             const rows =
               input.status === undefined
-                ? yield* sql<RunRow>`SELECT * FROM baton_runs ORDER BY created_at DESC LIMIT ${input.limit}`
-                : yield* sql<RunRow>`SELECT * FROM baton_runs WHERE status = ${input.status} ORDER BY created_at DESC LIMIT ${input.limit}`
+                ? yield* sql<RunRow>`SELECT * FROM baton_runs ORDER BY created_at DESC LIMIT ${limit}`
+                : yield* sql<RunRow>`SELECT * FROM baton_runs WHERE status = ${input.status} ORDER BY created_at DESC LIMIT ${limit}`
             return yield* Effect.forEach(rows, (row) =>
               Effect.gen(function* () {
                 const loaded = yield* decodeRunEffect(row)
@@ -348,7 +398,17 @@ export const makeMysqlServices = (
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
       resolveOperation: (input) =>
-        run(lockRun(input.runId).pipe(Effect.andThen(resolveOperation(input, "queued", true)))),
+        run(
+          lockRun(input.runId).pipe(
+            Effect.andThen(getProgramOperation({ runId: input.runId, operation: input.operationId })),
+            Effect.flatMap((program) =>
+              program === undefined
+                ? resolveOperation(input, "queued", true)
+                : resolveProgramOperation(input, "queued", true),
+            ),
+            Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
+          ),
+        ),
       claimExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(claimExecution(input)))),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
       saveExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(saveExecution(input)))),
@@ -360,6 +420,54 @@ export const makeMysqlServices = (
           ),
         ),
       inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
+      reserveProgramOperation: (input) => fenced(input, reserveProgramOperation(input)),
+      admitProgramAgents: (input) =>
+        fenced(
+          input,
+          admitProgramAgents(transactionHub, input, (_hub, operation) => suspend(operation)),
+        ),
+      suspendProgramOperation: (input) =>
+        fenced(
+          input,
+          suspendProgramOperation(transactionHub, input, (_hub, operation) => suspend(operation)),
+        ),
+      settleProgramOperation: (input) => fenced(input, settleProgramOperation(transactionHub, input)),
+      startProgramOperation: (input) => fenced(input, startProgramOperation(input)),
+      loadProgramState: (runId) =>
+        runNoTxn(
+          Effect.gen(function* () {
+            const loaded = yield* loadRun(runId)
+            if (loaded === undefined) return yield* RunNotFound.make({ runId })
+            return yield* loadProgramState(runId)
+          }),
+        ),
+      getProgramOperation: (input) =>
+        runNoTxn(
+          Effect.gen(function* () {
+            const loaded = yield* loadRun(input.runId)
+            if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
+            return yield* getProgramOperation(input)
+          }),
+        ),
+      completeProgram: (input) =>
+        fenced(
+          input,
+          Effect.gen(function* () {
+            if (input.outputBytes > input.outputLimit)
+              return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
+                dimension: "outputBytes",
+                limit: input.outputLimit,
+              })
+            yield* lockParent(input.runId)
+            yield* complete(transactionHub, {
+              ...input,
+              result: { _tag: "Program", value: input.output },
+            })
+            yield* clearClaim(input.runId)
+            return { _tag: "Completed" as const }
+          }),
+        ),
+      commitProgramLog: (input) => fenced(input, commitProgramLog(transactionHub, input)),
     })
     return { store, claims: makeMysqlClaims({ sql, hub: transactionHub, run, lockParent, clearClaim }) }
   })

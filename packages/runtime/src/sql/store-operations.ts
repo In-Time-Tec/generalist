@@ -125,7 +125,7 @@ export const completeOperation = (
     readonly runId: string
     readonly operationId: string
     readonly outcome: import("../run-store.js").OperationCompletionOutcome
-    readonly checkpoint: import("@batonfx/core").DurableDriver.DriverCheckpoint
+    readonly checkpoint: import("../execution-state.js").ExecutionCheckpoint
     readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
     readonly continuation?: import("../steering.js").ExecutionContinuation | null
     readonly steeringEntryIds?: ReadonlyArray<string>

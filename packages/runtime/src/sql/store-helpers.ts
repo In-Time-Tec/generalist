@@ -1,7 +1,8 @@
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { eventIdFor, type AgentLoopEvent, type AgentResult, type RunEvent, type RunFailure } from "../run-event.js"
+import { eventIdFor, type AgentLoopEvent, type ExecutionResult, type RunEvent, type RunFailure } from "../run-event.js"
+import { ExecutionCheckpoint } from "../execution-state.js"
 import type { ExecutableManifest, ExecutableRef } from "../executable-manifest.js"
 import type { Message } from "../message.js"
 import { isTerminal, type RunStatus } from "../run.js"
@@ -25,8 +26,8 @@ import type { OperationRecord } from "./operations.js"
 import { decodeContinuation } from "../steering.js"
 import { reconcileFanOut } from "./store-fan-out.js"
 import { RuntimeUnavailable } from "../errors.js"
-import { DurableDriver } from "@batonfx/core"
 import { checkpointRef, decodePinned } from "../executable-manifest.js"
+import { PendingRunOutcome } from "../run-store.js"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -42,7 +43,7 @@ export const decodeRun = (row: RunRow): DecodedRun => {
   const checkpoint =
     row.driver_checkpoint_json === null || row.driver_checkpoint_json === undefined
       ? undefined
-      : Schema.decodeUnknownSync(DurableDriver.DriverCheckpoint)(JSON.parse(row.driver_checkpoint_json))
+      : Schema.decodeUnknownSync(ExecutionCheckpoint)(JSON.parse(row.driver_checkpoint_json))
   const checkpointExecutable = checkpointRef(executable.ref, executable.manifest, checkpoint)
   if (
     checkpointExecutable.executable !== executable.ref.executable ||
@@ -60,6 +61,7 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     executableRef: executable.ref,
     executableManifest: executable.manifest,
     rootRunId: row.root_run_id,
+    admittedAt: asIso(row.created_at)!,
     attempt: Number(row.attempt),
     attemptFence: Number(row.attempt_fence),
     lastSequence: Number(row.last_sequence),
@@ -86,6 +88,9 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     ...(row.continuation_json === null || row.continuation_json === undefined
       ? {}
       : { continuation: decodeContinuation(row.continuation_json) }),
+    ...(row.pending_outcome_json === null || row.pending_outcome_json === undefined
+      ? {}
+      : { pendingOutcome: Schema.decodeUnknownSync(PendingRunOutcome)(JSON.parse(row.pending_outcome_json)) }),
     ...(() => {
       const lease = asIso(row.lease_expires_at)
       return lease === undefined ? {} : { leaseExpiresAt: lease }
@@ -105,6 +110,22 @@ export const loadRun = (runId: string) =>
     const rows = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${runId}`
     const row = rows[0]
     return row === undefined ? undefined : yield* decodeRunEffect(row)
+  })
+
+export const hasAdmission = (input: {
+  readonly address: string
+  readonly sessionId: string
+  readonly idempotencyKey: string
+}) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<{ run_id: string }>`
+      SELECT run_id FROM baton_runs
+      WHERE address = ${input.address}
+        AND session_id = ${input.sessionId}
+        AND idempotency_key = ${input.idempotencyKey}
+    `
+    return rows.length > 0
   })
 
 export const decodePersistedEvents = (rows: ReadonlyArray<EventRow>, manifest: ExecutableManifest) =>
@@ -196,7 +217,7 @@ export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartia
       event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
         ? event.eventId
         : (run.terminalEventId ?? null)
-    const cancellationRequested = event._tag === "RunCancellationRequested" || run.cancellationRequested ? 1 : 0
+    const cancellationRequested = event._tag === "RunCancellationRequested" || run.cancellationRequested
     const cancelReason =
       event._tag === "RunCancellationRequested" && "reason" in event && typeof event.reason === "string"
         ? event.reason
@@ -213,9 +234,10 @@ export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartia
           terminal_event_id = ${terminalEventId},
           cancellation_requested = ${cancellationRequested},
           cancel_reason = ${cancelReason},
-          attempt = ${attempt},
-          continuation_json = NULL,
-          updated_at = ${updated}
+           attempt = ${attempt},
+           continuation_json = NULL,
+           pending_outcome_json = NULL,
+           updated_at = ${updated}
         WHERE run_id = ${run.runId}
           AND last_sequence = ${run.lastSequence}
           AND status NOT IN ('succeeded', 'failed', 'cancelled')
@@ -282,6 +304,22 @@ export const afterTerminal = (hub: EventHub, run: DecodedRun) =>
     yield* promoteHead(hub, run.address, run.sessionId)
   })
 
+/** A Run stays non-terminal while it still owns unsettled children. */
+export const hasUnsettledChild = (
+  runId: string,
+): Effect.Effect<boolean, RuntimeUnavailable | SqlError, SqlClient.SqlClient> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const pending = yield* sql<{ child_run_id: string }>`
+      SELECT l.child_run_id FROM baton_run_links l
+      JOIN baton_runs r ON r.run_id = l.child_run_id
+      WHERE l.parent_run_id = ${runId}
+        AND r.status NOT IN ('succeeded', 'failed', 'cancelled')
+      LIMIT 1
+    `
+    return pending.length > 0
+  })
+
 export const settleParent = (
   hub: EventHub,
   child: DecodedRun,
@@ -310,13 +348,20 @@ export const settleParent = (
         terminalEventId,
       })
     }
-    yield* reconcileFanOut(hub, child.runId, terminalEventId)
+    yield* reconcileFanOut(hub, child.runId, terminalEventId, settleParent)
     const currentParent = yield* loadRun(parent.runId)
+    if (currentParent?.status === "queued" && !(yield* hasUnsettledChild(parent.runId))) {
+      const attempt = currentParent.attempt + 1
+      yield* sql`UPDATE baton_runs SET attempt_fence = ${attempt} WHERE run_id = ${parent.runId}`
+      yield* appendEvent(hub, { ...currentParent, attempt }, { _tag: "RunAttemptStarted", attempt }, "running")
+      return
+    }
     if (currentParent?.status !== "cancelling" || currentParent.ownerWorkerId !== undefined) return
     const running = yield* sql<{ fan_out_id: string }>`
       SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${parent.runId} AND status = 'running' LIMIT 1
     `
     if (running.length > 0) return
+    if (yield* hasUnsettledChild(parent.runId)) return
     const cancelled = yield* appendEvent(
       hub,
       currentParent,
@@ -358,7 +403,7 @@ export const insertRun = (input: {
         ${encodeMessage(input.message)}, ${input.digest}, ${input.message.idempotencyKey},
         ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
         ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
-        NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, 0, NULL, NULL, ${input.acceptedSequence},
+        NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, ${false}, NULL, NULL, ${input.acceptedSequence},
         ${JSON.stringify([])}, ${created}, ${created}
       )
     `
@@ -383,4 +428,4 @@ export const toOperationRecord = (row: OperationRow): OperationRecord => ({
   ...(row.resolution_json === null ? {} : { resolution: JSON.parse(row.resolution_json) }),
 })
 
-export type { AgentLoopEvent, AgentResult, RunFailure }
+export type { AgentLoopEvent, ExecutionResult, RunFailure }

@@ -1,10 +1,107 @@
-import { expect, layer } from "@effect/vitest"
-import { Effect, Fiber, Stream } from "effect"
+import { expect, it as testIt, layer } from "@effect/vitest"
+import { Effect, Fiber, Ref, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Response } from "effect/unstable/ai"
-import { Errors, RunStore, RunTree, Runtime } from "../src/index.js"
-import { makeCursor } from "../src/tree-cursor.js"
-import { assistantAddress, completedResult, memoryLayer, textPrompt } from "./helpers.js"
+import { Agent, ExecutableManifest, Pins, ProgramManifest } from "@batonfx/core"
+import { Errors, ExecutableRegistration, RunStore, RunTree, Runtime, RunWait } from "../src/index.js"
+import { makeCursor, type TreeCursor } from "../src/tree-cursor.js"
+import {
+  analystRef,
+  assistantAddress,
+  assistantRef,
+  completedResult,
+  memoryLayer,
+  openWait,
+  registrationsFor,
+  suspension,
+  textPrompt,
+} from "./helpers.js"
+import { pinnedTestAgent } from "./identity.js"
+
+testIt("retains the exact active Agent registration closure", () => {
+  const required = ExecutableRegistration.requiredPinsForActiveExecutable(assistantRef)
+  expect(required).toEqual(ExecutableRegistration.requiredPins(assistantRef))
+  expect(required).toEqual(new Set(registrationsFor(assistantRef).map((registration) => registration.pin)))
+})
+
+testIt("excludes entries outside the active Agent closure", () => {
+  const required = ExecutableRegistration.requiredPinsForActiveExecutable({
+    ...assistantRef,
+    ref: { ...assistantRef.ref, active: analystRef.ref.active },
+  })
+  const assistantEntry = assistantRef.manifest.entries.find((entry) => entry.pin === assistantRef.ref.active)!
+  const analystEntry = assistantRef.manifest.entries.find((entry) => entry.pin === analystRef.ref.active)!
+  expect(required.has(assistantEntry._tag === "Agent" ? assistantEntry.manifest.model : "")).toBe(false)
+  expect(required.has(analystEntry._tag === "Agent" ? analystEntry.manifest.model : "")).toBe(true)
+  expect(required.size).toBeLessThan(ExecutableRegistration.requiredPins(assistantRef).size)
+})
+
+testIt("retains a Program registration closure through Agent capabilities", () => {
+  const child = pinnedTestAgent(Agent.make({ name: "program-child" }))
+  const program = ProgramManifest.make({
+    name: "program",
+    source: { language: "javascript", text: "return null" },
+    sandbox: Pins.makeCapability({ sandbox: "program" }),
+    input: Pins.makeCapability({ codec: "input" }),
+    output: Pins.makeCapability({ codec: "output" }),
+    capabilities: {
+      tools: [],
+      steps: [],
+      agents: [{ selection: "child", agent: child.pin, input: Pins.makeCapability({ codec: "child-input" }) }],
+    },
+    budget: {
+      agentRuns: 1,
+      concurrency: 1,
+      toolCalls: 0,
+      tokens: 1,
+      wallClockMillis: 1,
+      logBytes: 1,
+      outputBytes: 1,
+    },
+  })
+  const executable = ExecutableManifest.make({
+    root: program.pin,
+    entries: [
+      { _tag: "Program", ...program },
+      { _tag: "Agent", ...child },
+    ],
+  })
+  const required = ExecutableRegistration.requiredPinsForActiveExecutable(executable)
+  expect(required.has(child.manifest.model)).toBe(true)
+  expect(required.has(program.manifest.capabilities.agents[0]!.input)).toBe(true)
+})
+
+const blockRootOnChild = (sessionId: string, invocationId: string) =>
+  Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    const root = yield* runtime.send({
+      to: assistantAddress,
+      sessionId,
+      idempotencyKey: "root",
+      prompt: textPrompt("root"),
+    })
+    const child = yield* runtime.spawn({
+      parentRunId: root.runId,
+      invocationId,
+      selection: "researcher",
+      prompt: textPrompt("child"),
+    })
+    const childClaim = yield* store.claimExecution({ runId: child.runId, ownerId: "child-worker" })
+    yield* store.suspend({
+      ...(yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })),
+      runId: root.runId,
+      wait: openWait(invocationId),
+      suspension: suspension(invocationId),
+    })
+    return { runtime, store, root, child, childClaim }
+  })
+
+const watchBlocked = (rootRunId: string) =>
+  RunTree.watch({ rootRunId, settlement: "root-blocked" }).pipe(
+    Stream.runCollect,
+    Effect.forkChild({ startImmediately: true }),
+  )
 
 layer(memoryLayer)("RunTree", (it) => {
   it.effect("inspects exact active Runs and stable mixed terminal outcomes", () =>
@@ -64,6 +161,29 @@ layer(memoryLayer)("RunTree", (it) => {
       yield* store.complete({ ...claim, result: completedResult("done") })
       yield* TestClock.adjust("50 millis")
       expect((yield* Fiber.join(waiting))._tag).toBe("Terminal")
+    }),
+  )
+
+  it.effect("watches a tree until its terminal inspection cursor is drained", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const root = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "tree:watch",
+        idempotencyKey: "root",
+        prompt: textPrompt("root"),
+      })
+      const watching = yield* RunTree.watch({ rootRunId: root.runId }).pipe(
+        Stream.runCollect,
+        Effect.forkChild({ startImmediately: true }),
+      )
+      const rootClaim = yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })
+      yield* store.complete({ ...rootClaim, result: completedResult("root result") })
+      yield* TestClock.adjust("50 millis")
+      const watched = Array.from(yield* Fiber.join(watching))
+      expect(watched.some(({ runId, event }) => runId === root.runId && event._tag === "RunCompleted")).toBe(true)
+      expect((yield* RunTree.inspect(root.runId))._tag).toBe("Terminal")
     }),
   )
 
@@ -269,6 +389,190 @@ layer(memoryLayer)("RunTree", (it) => {
       expect(events.map(({ event }) => (event._tag === "TurnStarted" ? event.turn : undefined))).toEqual([1, 2])
       expect(events[0]?.cursor).not.toBe(history.cursor)
       expect(events[1]?.cursor).not.toBe(events[0]?.cursor)
+    }),
+  )
+
+  it.effect("settles a root-blocked watch on an open approval wait at the root", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const root = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "tree:blocked:approval",
+        idempotencyKey: "root",
+        prompt: textPrompt("root"),
+      })
+      yield* store.suspend({
+        ...(yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })),
+        runId: root.runId,
+        wait: openWait("approval:root", "approval"),
+        suspension: suspension("approval:root", "approval"),
+      })
+      const watched = Array.from(yield* Fiber.join(yield* watchBlocked(root.runId)))
+      expect(watched.some(({ runId, event }) => runId === root.runId && event._tag === "RunWaiting")).toBe(true)
+      expect((yield* RunTree.inspect(root.runId))._tag).toBe("Active")
+    }),
+  )
+
+  it.effect("settles a root-blocked watch when a descendant holds an open approval wait", () =>
+    Effect.gen(function* () {
+      const { child, childClaim, root, store } = yield* blockRootOnChild("tree:blocked:descendant", "invoke:child")
+      yield* store.suspend({
+        ...childClaim,
+        runId: child.runId,
+        wait: openWait("approval:child", "approval"),
+        suspension: suspension("approval:child", "approval"),
+      })
+      const watched = Array.from(yield* Fiber.join(yield* watchBlocked(root.runId)))
+      expect(watched.some(({ runId, event }) => runId === child.runId && event._tag === "RunWaiting")).toBe(true)
+    }),
+  )
+
+  it.effect("settles a root-blocked watch when a descendant needs operation resolution", () =>
+    Effect.gen(function* () {
+      const {
+        child,
+        childClaim: claim,
+        root,
+        store,
+      } = yield* blockRootOnChild("tree:blocked:resolution", "invoke:child")
+      const operation = yield* store.recordOperation({
+        ...claim,
+        operationKey: "tool:unknown",
+        kind: "tool",
+        inputDigest: "digest",
+        input: {},
+        replayPolicy: "never",
+        attempt: claim.attempt,
+      })
+      yield* store.startOperation({ ...claim, operationId: operation.operationId })
+      yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
+      expect((yield* store.inspect(child.runId)).status).toBe("needs-resolution")
+      const watched = Array.from(yield* Fiber.join(yield* watchBlocked(root.runId)))
+      expect(watched.some(({ runId }) => runId === child.runId)).toBe(true)
+    }),
+  )
+
+  it.effect("keeps a root-blocked watch open while a child services the root tool-wait", () =>
+    Effect.gen(function* () {
+      const { root } = yield* blockRootOnChild("tree:blocked:tool-wait", "invoke:child")
+      const watching = yield* watchBlocked(root.runId)
+      yield* TestClock.adjust("50 millis")
+      yield* TestClock.adjust("50 millis")
+      expect(watching.pollUnsafe()).toBeUndefined()
+      yield* Fiber.interrupt(watching)
+    }),
+  )
+
+  it.effect("keeps a root-blocked watch open when the root completes before its child", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const root = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "tree:blocked:root-first",
+        idempotencyKey: "root",
+        prompt: textPrompt("root"),
+      })
+      const child = yield* runtime.spawn({
+        parentRunId: root.runId,
+        invocationId: "invoke:child",
+        selection: "researcher",
+        prompt: textPrompt("child"),
+      })
+      yield* store.claimExecution({ runId: child.runId, ownerId: "child-worker" })
+      const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })
+      yield* store.complete({ ...claim, result: completedResult("root result") })
+      const watching = yield* watchBlocked(root.runId)
+      yield* TestClock.adjust("50 millis")
+      yield* TestClock.adjust("50 millis")
+      expect(watching.pollUnsafe()).toBeUndefined()
+      yield* Fiber.interrupt(watching)
+    }),
+  )
+
+  it.effect("requires an explicit open wait and an equal cursor before a root-blocked watch settles", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const root = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "tree:blocked:script",
+        idempotencyKey: "root",
+        prompt: textPrompt("root"),
+      })
+      yield* store.suspend({
+        ...(yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })),
+        runId: root.runId,
+        wait: openWait("gate", "external"),
+        suspension: suspension("gate"),
+      })
+      const blocked = yield* RunTree.inspect(root.runId)
+      expect(blocked._tag).toBe("Active")
+      if (blocked._tag !== "Active") return
+      const history = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+      const first = history.events[0]!
+      const second = history.events[1]!
+      const early = makeCursor(root.runId, 0)
+      const late = makeCursor(root.runId, 1)
+      expect(blocked.runs).toHaveLength(1)
+      const rootRun = blocked.runs[0]!.run
+      const inspectionWith = (wait: RunWait.RunWait | undefined, cursor: TreeCursor): RunTree.Inspection => ({
+        ...blocked,
+        cursor,
+        runs: [
+          {
+            run: {
+              runId: rootRun.runId,
+              status: rootRun.status,
+              executableRef: rootRun.executableRef,
+              executableManifest: rootRun.executableManifest,
+              lastSequence: rootRun.lastSequence,
+              durability: rootRun.durability,
+              ...(wait === undefined ? {} : { wait }),
+            },
+          },
+        ],
+      })
+      const pages: ReadonlyArray<RunTree.TreePage> = [
+        { events: [first], cursor: early, hasMore: false },
+        { events: [], cursor: early, hasMore: false },
+        { events: [], cursor: early, hasMore: false },
+        { events: [], cursor: early, hasMore: false },
+        { events: [second], cursor: late, hasMore: false },
+        { events: [], cursor: late, hasMore: false },
+      ]
+      const inspections: ReadonlyArray<RunTree.Inspection> = [
+        inspectionWith({ ...openWait("gate", "external"), status: "responded" }, early),
+        inspectionWith(undefined, early),
+        inspectionWith(openWait("gate", "external"), late),
+        inspectionWith(openWait("gate", "external"), late),
+      ]
+      const reads = yield* Ref.make(0)
+      const inspects = yield* Ref.make(0)
+      const scripted: Runtime.Interface = {
+        ...runtime,
+        treeHistory: () =>
+          Ref.getAndUpdate(reads, (index) => index + 1).pipe(
+            Effect.map((index) => pages[index] ?? pages[pages.length - 1]!),
+          ),
+        inspectTree: () =>
+          Ref.getAndUpdate(inspects, (index) => index + 1).pipe(
+            Effect.map((index) => inspections[index] ?? inspections[inspections.length - 1]!),
+          ),
+      }
+      const watching = yield* RunTree.watch({ rootRunId: root.runId, settlement: "root-blocked" }).pipe(
+        Stream.runCollect,
+        Effect.provideService(Runtime.Runtime, scripted),
+        Effect.forkChild({ startImmediately: true }),
+      )
+      yield* TestClock.adjust("50 millis")
+      yield* TestClock.adjust("50 millis")
+      yield* TestClock.adjust("50 millis")
+      const collected = Array.from(yield* Fiber.join(watching))
+      expect(collected.map(({ cursor }) => cursor)).toEqual([first.cursor, second.cursor])
+      expect(yield* Ref.get(reads)).toBe(pages.length)
+      expect(yield* Ref.get(inspects)).toBe(inspections.length)
     }),
   )
 })

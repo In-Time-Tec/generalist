@@ -3,6 +3,31 @@ import { Effect, Option, Stream } from "effect"
 import { Errors, Runtime, RunStore } from "../src/index.js"
 import { assistantAddress, completedResult, memoryLayer, openWait, suspension, textPrompt } from "./helpers.js"
 
+const admitWaitWithClaimedChild = (waitId: string) =>
+  Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    const parent = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: `session:cancel-wait:${waitId}`,
+      idempotencyKey: `cancel-wait:${waitId}`,
+      prompt: textPrompt("wait"),
+    })
+    const child = yield* runtime.spawn({
+      parentRunId: parent.runId,
+      invocationId: `child:${waitId}`,
+      selection: "researcher",
+      prompt: textPrompt("child"),
+    })
+    yield* store.claimExecution({ runId: child.runId, ownerId: "child" })
+    yield* store.suspend({
+      ...(yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })),
+      wait: openWait(waitId, "signal"),
+      suspension: suspension(waitId),
+    })
+    return { runtime, store, runId: parent.runId }
+  })
+
 layer(memoryLayer)("Runtime control and terminals", (it) => {
   it.effect("enforces first-terminal-wins for complete after cancel", () =>
     Effect.gen(function* () {
@@ -65,6 +90,53 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
         })
         .pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.ResponseConflict)
+    }),
+  )
+
+  it.effect("does not resume a cancellation-requested wait", () =>
+    Effect.gen(function* () {
+      const { runtime, store, runId } = yield* admitWaitWithClaimedChild("wait:cancelled")
+      yield* runtime.cancel({ runId, reason: "stop" })
+      expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
+
+      const response = yield* runtime
+        .respond({
+          runId,
+          waitId: "wait:cancelled",
+          resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
+        })
+        .pipe(Effect.flip)
+      expect(response).toBeInstanceOf(Errors.WaitNotOpen)
+      yield* runtime.signal({ runId, name: "wait:cancelled" })
+      const resume = yield* store
+        .resume({
+          runId,
+          waitId: "wait:cancelled",
+          resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
+        })
+        .pipe(Effect.flip)
+      expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
+      expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
+    }),
+  )
+
+  it.effect("keeps a concurrent response and cancellation from leaving a Run running", () =>
+    Effect.gen(function* () {
+      const { runtime, runId } = yield* admitWaitWithClaimedChild("wait:race")
+      yield* Effect.all(
+        [
+          runtime
+            .respond({
+              runId,
+              waitId: "wait:race",
+              resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
+            })
+            .pipe(Effect.exit),
+          runtime.cancel({ runId, reason: "stop" }).pipe(Effect.exit),
+        ],
+        { concurrency: "unbounded" },
+      )
+      expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
     }),
   )
 
@@ -194,6 +266,45 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
       })
       expect(replayed.status).toBe("succeeded")
       expect(replayed.result).toEqual({ answer: 42, source: { kind: "manual", rank: 1 } })
+    }),
+  )
+
+  it.effect("keeps a cancelled Run in needs-resolution until an unknown operation is resolved", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:cancel-unknown",
+        idempotencyKey: "cancel-unknown",
+        prompt: textPrompt("hello"),
+      })
+      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "worker:one" })
+      const operation = yield* store.recordOperation({
+        ...claim,
+        operationKey: "tool:non-replayable",
+        kind: "tool",
+        inputDigest: "digest",
+        input: { call: "once" },
+        replayPolicy: "never",
+        attempt: claim.attempt,
+      })
+      yield* store.startOperation({ ...claim, operationId: operation.operationId })
+      yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
+      expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+
+      // Cancellation is admission, not settlement: an unknown outcome must not be projected as cancelled.
+      yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+      const afterCancel = yield* runtime.inspect(receipt.runId)
+      expect(afterCancel.status).toBe("needs-resolution")
+
+      yield* runtime.resolveOperation({
+        runId: receipt.runId,
+        operationId: operation.operationId,
+        idempotencyKey: "resolution:cancelled",
+        resolution: { _tag: "Succeeded", value: { answer: 1 } },
+      })
+      expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
     }),
   )
 

@@ -13,12 +13,17 @@ const requireRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun,
 export const admitSteering = (state: MemoryState, input: AdmitSteeringInput) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
-    const terminal = rejectIfTerminal(run)
-    if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
     const prior = run.steering.find((entry) => entry.idempotencyKey === input.idempotencyKey)
     if (prior !== undefined) {
       if (prior.digest === input.digest) return state
       return yield* SteeringConflict.make({ runId: input.runId, idempotencyKey: input.idempotencyKey })
+    }
+    const terminal = rejectIfTerminal(run)
+    if (Option.isSome(terminal) || run.pendingOutcome !== undefined) {
+      const status = Option.getOrElse(terminal, () =>
+        run.pendingOutcome?._tag === "Completed" ? "succeeded" : "failed",
+      )
+      return yield* RunTerminal.make({ runId: run.runId, status })
     }
     const runs = new Map(state.runs)
     runs.set(run.runId, {

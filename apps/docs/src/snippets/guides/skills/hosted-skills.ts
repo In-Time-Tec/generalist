@@ -8,7 +8,7 @@ export const skills: Layer.Layer<
   SkillSource.SkillSourceError,
   Crypto.Crypto | FileSystem.FileSystem | HttpClient.HttpClient | Path.Path
 > = SkillSource.layer<Crypto.Crypto | FileSystem.FileSystem | HttpClient.HttpClient | Path.Path>([
-  SkillLoader.make({ roots: [".agents/skills"] }),
+  SkillLoader.make({ cwd: ".", roots: [".agents/skills"] }),
   HttpCatalog.make({ manifestUrl: "https://skills.example.com/skills.json" }),
   S3Catalog.make({ bucket: "company-skills", region: "us-west-2", prefix: "support" }),
   GitHubCatalog.make({

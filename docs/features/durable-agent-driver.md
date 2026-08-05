@@ -1,14 +1,14 @@
 # Durable agent driver
 
-Core exposes a versioned durable agent driver contract, pinned `ExecutableRef` identity, and portable `RunBudget` limits that a future `@batonfx/runtime` host and inline `Agent.stream` can share without importing SQL or runtime types into `@batonfx/core`.
+Core exposes a versioned durable agent driver contract, pinned `ExecutableRef` identity, and portable `RunBudget` limits shared by `@batonfx/runtime` and inline `Agent.stream` without importing SQL or runtime types into `@batonfx/core`.
 
 ## Executable identity
 
-Core uses opaque, schema-backed `AgentPin`, `ModelPin`, `CapabilityPin`, and `ExecutablePin` strings. Every pin includes its kind, contract version, algorithm, and digest. A pin of the wrong kind or with a malformed SHA-256 digest fails schema decoding.
+Core uses opaque, schema-backed `AgentPin`, `ProgramPin`, `ModelPin`, `CapabilityPin`, and `ExecutablePin` strings. Every pin includes its kind, contract version, algorithm, and digest. A pin of the wrong kind or with a malformed SHA-256 digest fails schema decoding.
 
 `AgentManifest` is the closed identity contract for one Agent. It covers exact instructions, one required opaque model pin, named tool, skill, and service capability pins, a closed portable policy or opaque policy pin, budget defaults, and named child-selection bindings. `AgentManifest.make` rejects duplicate names, capability pins, child selections, and child pins, sorts semantically unordered arrays, and owns the resulting `AgentPin`. `AgentManifest.fromLiveAgent` additionally verifies that caller-supplied tool pins exactly cover the live toolkit, portable policy data exactly matches the live policy snapshot, and budget data exactly matches the live Agent budget. A policy pin is accepted only when the live policy is opaque. Models, services, skills, and opaque policies remain explicit caller inputs because Agent introspection cannot prove their implementation identity.
 
-`ExecutableManifest` closes the complete graph with root and active Agent pins plus every pinned Agent entry. Its constructor verifies each Agent digest, canonical ordering and uniqueness, exact root reachability, active reachability, child closure, and acyclicity before owning the `ExecutablePin`. `ExecutableRef { executable, active }` is the only durable Runtime reference. The public decoder accepts the pinned `{ ref, manifest }` pair and reruns every constructor invariant and digest check; manifests and refs cannot be decoded separately as executable authority. Callers cannot supply a digest to either manifest constructor.
+Version-2 `ExecutableManifest` closes the complete graph with root and active executable pins plus tagged pinned Agent and Program entries. Its constructor verifies every entry digest, canonical ordering and uniqueness, exact root reachability, active reachability, Agent child closure, Program Agent-capability closure, and acyclicity before owning the `ExecutablePin`. `ExecutableRef { executable, active }` is the only durable Runtime reference. The public decoder accepts the pinned `{ ref, manifest }` pair and reruns every constructor invariant and digest check; manifests and refs cannot be decoded separately as executable authority. Callers cannot supply a digest to any manifest constructor.
 
 Pinned same-run handoff targets carry their exact Agent pin. The completed handoff operation persists the new active pin in the same driver checkpoint commit, and restart requires that exact executable and active identity. Direct standalone Agent execution remains viable without pins, but a supplied durable checkpoint is never accepted without an explicit executable identity.
 
@@ -50,7 +50,7 @@ Inline runs interpret operations immediately through existing Effect services. T
 
 `DurableDriver.guardUnknownNeverReplay` rejects `Unknown` outcomes for operations with `never` replay policy before re-execution, failing typed as `DriverUnknownReplay`.
 
-Runtime hosts journal `DriverOperation` records and reconstruct `layerForRun` from the last fenced checkpoint. Core restores instrumentation's next model-call ordinal from that checkpoint's durable loop state, so model call and attempt IDs remain stable across restart and replay without an AgentHost-specific override. The journal also receives checkpoint-only budget mutations so every safe boundary is persisted. Durable persistence, Agent event projection, waits, same-Run resume, and worker orchestration live in `@batonfx/runtime`, not core.
+Runtime hosts journal `DriverOperation` records and reconstruct `layerForRun` from the last fenced checkpoint. Core restores instrumentation's next model-call ordinal from that checkpoint's durable loop state, so model call and attempt IDs remain stable across restart and replay without an ExecutionHost-specific override. The journal also receives checkpoint-only budget mutations so every safe boundary is persisted. Durable persistence, Agent event projection, waits, same-Run resume, and worker orchestration live in `@batonfx/runtime`, not core.
 
 ## Not yet intercepted
 

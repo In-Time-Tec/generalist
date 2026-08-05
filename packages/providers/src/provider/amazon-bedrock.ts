@@ -5,6 +5,7 @@ import { AiError, LanguageModel, Tool } from "effect/unstable/ai"
 import type { RegistrationOptions } from "./openai.js"
 import { Client, ClientFailure, layerClient, type Options } from "./amazon-bedrock-client.js"
 import { conformImageSourceModel } from "../model/image-source.js"
+import { isAvailabilityFailure } from "../model/model-failure.js"
 import { makeRequest } from "./amazon-bedrock-request.js"
 import { responseParts, streamParts } from "./amazon-bedrock-response.js"
 export {
@@ -67,6 +68,31 @@ export interface Config {
   readonly promptVariables?: ConverseCommandInput["promptVariables"]
   readonly requestMetadata?: ConverseCommandInput["requestMetadata"]
 }
+
+const ConfigSchema = Schema.Struct({
+  maxTokens: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1))),
+  temperature: Schema.optionalKey(Schema.Finite),
+  topP: Schema.optionalKey(Schema.Finite),
+  stopSequences: Schema.optionalKey(Schema.Array(Schema.String)),
+  additionalModelRequestFields: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+  additionalModelResponseFieldPaths: Schema.optionalKey(Schema.Array(Schema.String)),
+  guardrailConfig: Schema.optionalKey(
+    Schema.Struct({
+      guardrailIdentifier: Schema.String,
+      guardrailVersion: Schema.String,
+      trace: Schema.optionalKey(Schema.Literals(["disabled", "enabled", "enabled_full"])),
+    }),
+  ),
+  performanceConfig: Schema.optionalKey(
+    Schema.Struct({ latency: Schema.optionalKey(Schema.Literals(["standard", "optimized"])) }),
+  ),
+  promptVariables: Schema.optionalKey(Schema.Record(Schema.String, Schema.Struct({ text: Schema.String }))),
+  requestMetadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+})
+
+/** @experimental Decodes persisted provider options into Bedrock request configuration. */
+export const decodeConfig = (options: unknown): Config =>
+  Schema.decodeUnknownSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {}) as unknown as Config
 /** @experimental */
 export interface Input extends RegistrationOptions {
   readonly model: string
@@ -158,6 +184,7 @@ export const layer = (
       layer: layerLanguageModel(input),
       classifyFailure,
       toolJsonSchemaCompiler,
+      isAvailabilityFailure,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     }),

@@ -133,6 +133,7 @@ interface RetryContext {
   readonly turn: number
   readonly modelCallId: string
   readonly emit: (event: EventPayload) => Effect.Effect<void>
+  readonly settleFailure: Effect.Effect<void>
 }
 
 export const tapRetryTelemetry = (context: RetryContext): Resilience => ({
@@ -145,17 +146,20 @@ export const tapRetryTelemetry = (context: RetryContext): Resilience => ({
   retrySchedule: context.resilience.retrySchedule.pipe(
     Schedule.while(({ input }) => context.classify(input) === "transient"),
     Schedule.tap((metadata) =>
-      Effect.flatMap(Clock.currentTimeMillis, (at) =>
-        context.emit({
-          _tag: "ModelRetryScheduled",
-          turn: context.turn,
-          modelCallId: context.modelCallId,
-          attempt: context.attempt(),
-          reason: "provider-resilience",
-          category: context.categorize(metadata.input),
-          delayMillis: Duration.toMillis(metadata.duration),
-          at,
-        }),
+      context.settleFailure.pipe(
+        Effect.andThen(Clock.currentTimeMillis),
+        Effect.flatMap((at) =>
+          context.emit({
+            _tag: "ModelRetryScheduled",
+            turn: context.turn,
+            modelCallId: context.modelCallId,
+            attempt: context.attempt(),
+            reason: "provider-resilience",
+            category: context.categorize(metadata.input),
+            delayMillis: Duration.toMillis(metadata.duration),
+            at,
+          }),
+        ),
       ),
     ),
   ),

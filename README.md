@@ -84,7 +84,7 @@ const clientTools = ToolExecutor.layerRouter([
 ## Start here
 
 - Consumer docs: [`docs/site/README.md`](docs/site/README.md)
-- 5-minute guide: [`docs/site/getting-started.md`](docs/site/getting-started.md)
+- 5-minute guide: [Introduction](https://batonfx-docs.up.railway.app/docs/start/introduction)
 - Runnable examples: [`examples/`](examples/)
 - Product direction: [`PRODUCT.md`](PRODUCT.md)
 - Current behavior: [`docs/features/`](docs/features/)

@@ -2,7 +2,6 @@ import { Effect, Layer, Redacted } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import { ExecutableResolver, Runtime, RuntimeWorker, RunSchema } from "../../src/index.js"
-import { SCHEMA_VERSION, schemaChecksum } from "../../src/sql/postgres/schema.js"
 import {
   analyst,
   analystRef,
@@ -11,45 +10,42 @@ import {
   assistantRef,
   researcher,
   researcherAddress,
+  registrationsFor,
   researcherRef,
 } from "../helpers.js"
+import { closedTestAgent } from "../identity.js"
 
 export const postgresUrl = process.env.BATON_DATABASE_URL ?? process.env.DATABASE_URL
 
 export const postgresAvailable = typeof postgresUrl === "string" && postgresUrl.length > 0
 
 const resolver = ExecutableResolver.makeStatic([
-  { executable: assistantRef, agent: assistant },
-  { executable: researcherRef, agent: researcher },
-  { executable: analystRef, agent: analyst },
+  { executable: assistantRef, agent: closedTestAgent(assistant) },
+  { executable: researcherRef, agent: closedTestAgent(researcher) },
+  { executable: analystRef, agent: closedTestAgent(analyst) },
 ])
 const addresses = [
-  { address: assistantAddress, executable: assistantRef },
-  { address: researcherAddress, executable: researcherRef },
+  { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+  { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
 ]
 
 export const applySchema = (url: string) =>
   RunSchema.apply("postgres").pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
 
-export const resetRuntimeTables = (url: string) =>
+const resetRuntimeSchema = (url: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    yield* sql`
-      TRUNCATE baton_tree_event_index, baton_tree_roots, baton_fan_out_members, baton_fan_outs, baton_run_steering, baton_run_links,
-        baton_run_waits, baton_run_operations, baton_run_events, baton_runs, baton_lanes
-      RESTART IDENTITY CASCADE
-    `
-    yield* sql`
-      UPDATE baton_schema_meta
-      SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = FALSE
-      WHERE id = 1
-    `
+    yield* sql.unsafe(`DROP TABLE IF EXISTS
+      baton_run_registrations, baton_executable_registrations,
+      baton_program_operations, baton_program_runs, baton_tree_event_index, baton_tree_roots, baton_fan_out_members, baton_fan_outs, baton_run_steering,
+      baton_run_links, baton_run_waits, baton_run_operations, baton_run_events, baton_runs, baton_lanes,
+      baton_runtime_locks, baton_sql_migrations, baton_schema_meta CASCADE`)
   }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
 
 export const preparePostgres = (url: string) =>
   Effect.gen(function* () {
+    yield* resetRuntimeSchema(url)
     yield* applySchema(url)
-    yield* resetRuntimeTables(url)
   })
 
 export const postgresLayer = (url: string) =>

@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
-import { Errors, Runtime, RunStore, RunTree } from "../src/index.js"
+import { ChildRuns, Cursor, Errors, Runtime, RunStore, RunTree } from "../src/index.js"
 import {
   alternateAssistantAddress,
   alternateResearcherRef,
@@ -29,6 +29,14 @@ layer(memoryLayer)("Runtime children", (it) => {
         selection: "researcher",
         prompt: textPrompt("research"),
       })
+      const duplicate = yield* runtime.spawn({
+        parentRunId: parent.runId,
+        invocationId: "invocation:research",
+        selection: "researcher",
+        prompt: textPrompt("research"),
+      })
+      expect(duplicate.runId).toBe(child.runId)
+      expect(duplicate.duplicate).toBe(true)
       yield* driver.emitAgentEvent({
         ...(yield* driver.claimExecution({ runId: child.runId, ownerId: "test" })),
         runId: child.runId,
@@ -98,6 +106,50 @@ layer(memoryLayer)("Runtime children", (it) => {
     }),
   )
 
+  it.effect("attributes root cancellation to every owned child before the root reports terminal", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const driver = yield* RunStore.RunStore
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:cancel-tree",
+        idempotencyKey: "parent",
+        prompt: textPrompt("plan"),
+      })
+      const first = yield* runtime.spawn({
+        parentRunId: parent.runId,
+        invocationId: "invocation:one",
+        selection: "researcher",
+        prompt: textPrompt("one"),
+      })
+      const second = yield* runtime.spawn({
+        parentRunId: parent.runId,
+        invocationId: "invocation:two",
+        selection: "researcher",
+        prompt: textPrompt("two"),
+      })
+
+      yield* runtime.cancel({ runId: parent.runId, reason: "stop" })
+
+      expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
+      expect((yield* runtime.inspect(second.runId)).status).toBe("cancelled")
+      expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
+
+      for (const child of [first, second]) {
+        const events = yield* driver.history({ runId: child.runId, cursor: Cursor.origin, limit: 100 })
+        const cancelled = events.find((event) => event._tag === "RunCancelled")
+        expect(cancelled).toBeDefined()
+        expect(cancelled!.runId).toBe(child.runId)
+        expect(cancelled).toMatchObject({ reason: "stop" })
+      }
+
+      const tree = yield* RunTree.history({ rootRunId: parent.runId, limit: 200 })
+      const cancelledRunIds = tree.events.filter((item) => item.event._tag === "RunCancelled").map((item) => item.runId)
+      expect(new Set(cancelledRunIds)).toEqual(new Set([parent.runId, first.runId, second.runId]))
+      expect(cancelledRunIds.indexOf(parent.runId)).toBe(cancelledRunIds.length - 1)
+    }),
+  )
+
   it.effect("rejects child admission after the parent is terminal and leaves the tree stable", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -126,6 +178,40 @@ layer(memoryLayer)("Runtime children", (it) => {
 })
 
 layer(parentRelativeLayer)("parent-relative child selection", (it) => {
+  it.effect("replays model-facing child admission and joins the persisted result", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "relative:tool-child",
+        idempotencyKey: "parent",
+        prompt: "parent",
+      })
+      yield* store.claimExecution({ runId: parent.runId, ownerId: "test-parent" })
+      const children = ChildRuns.make(store)
+      const input = {
+        parentRunId: parent.runId,
+        toolCallId: "child-call",
+        selection: "researcher",
+        prompt: "research",
+      }
+      const first = yield* children.invoke(input)
+      const replay = yield* children.invoke(input)
+      expect(first._tag).toBe("Suspend")
+      expect(replay).toEqual(first)
+      if (first._tag !== "Suspend") return
+      yield* store.complete({
+        ...(yield* store.claimExecution({ runId: first.token, ownerId: "test" })),
+        result: completedResult("durable notes"),
+      })
+      expect(yield* children.invoke(input)).toMatchObject({
+        _tag: "Success",
+        result: { _tag: "Succeeded", childRunId: first.token, text: "durable notes" },
+      })
+    }),
+  )
+
   it.effect("resolves the same selection independently in two executable closures", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime

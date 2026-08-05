@@ -12,8 +12,18 @@ import {
   SchemaVersionUnsupported,
 } from "./errors.js"
 import { migrate } from "./migrate.js"
-import { admitSend, admitSpawn } from "./store-admit.js"
-import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store-control.js"
+import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store-admit.js"
+import {
+  cancel,
+  complete,
+  emitAgentEvent,
+  fail,
+  respond,
+  resume,
+  settleAdmittedCancellation,
+  signal,
+  suspend,
+} from "./store-control.js"
 import {
   expireRunningOperation,
   getOperation,
@@ -23,7 +33,7 @@ import {
   completeOperation,
   resolveOperation,
 } from "./store-operations.js"
-import { decodeRunEffect, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
+import { decodeRunEffect, hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
 import { withSql } from "./sql-effect.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "./store-steering.js"
@@ -31,6 +41,18 @@ import { makeEventHub } from "./subscribers.js"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { loadTreeHistory } from "./tree-history.js"
 import { loadRunSnapshot, loadTreeInspection } from "./inspection.js"
+import {
+  admitProgramAgents,
+  commitProgramLog,
+  getProgramOperation,
+  loadProgramState,
+  reserveProgramOperation,
+  resolveProgramOperation,
+  suspendProgramOperation,
+  settleProgramOperation,
+  startProgramOperation,
+} from "./store-program.js"
+import { ProgramCapabilities } from "@batonfx/core"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly filename: string
@@ -81,8 +103,21 @@ export const makeSqliteRunStore = (
 
     return RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
+      hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => run(admitSend(hub, addressBindings, input)),
+      admitStart: (input) => runBuffered((transactionHub) => admitStart(transactionHub, input)),
       admitSpawn: (input) => run(admitSpawn(hub, input)),
+      admitProgramChild: (input) =>
+        runBuffered((transactionHub) =>
+          requireExecutionClaim(input).pipe(Effect.andThen(admitProgramChild(transactionHub, input))),
+        ),
+      admitProgramChildAndSuspend: (input) =>
+        runBuffered((transactionHub) =>
+          requireExecutionClaim(input).pipe(
+            Effect.andThen(admitProgramChild(transactionHub, input)),
+            Effect.tap(() => suspend(transactionHub, input)),
+          ),
+        ),
       events: (input) =>
         hub.subscribe({
           runId: input.runId,
@@ -137,14 +172,21 @@ export const makeSqliteRunStore = (
       list: (input) =>
         runNoTxn(
           Effect.gen(function* () {
-            const rows =
-              input.status === undefined
-                ? yield* sql<
-                    import("./rows.js").RunRow
-                  >`SELECT * FROM baton_runs ORDER BY created_at DESC LIMIT ${input.limit}`
-                : yield* sql<
-                    import("./rows.js").RunRow
-                  >`SELECT * FROM baton_runs WHERE status = ${input.status} ORDER BY created_at DESC LIMIT ${input.limit}`
+            const newest = (input.order ?? "newest") === "newest"
+            const statusFilter = input.status === undefined ? sql`` : sql`AND status = ${input.status}`
+            const afterFilter =
+              input.afterRunId === undefined
+                ? sql``
+                : newest
+                  ? sql`AND (r.created_at, r.run_id) < (SELECT w.created_at, w.run_id FROM baton_runs w WHERE w.run_id = ${input.afterRunId})`
+                  : sql`AND (r.created_at, r.run_id) > (SELECT w.created_at, w.run_id FROM baton_runs w WHERE w.run_id = ${input.afterRunId})`
+            const direction = newest ? sql`DESC` : sql`ASC`
+            const rows = yield* sql<import("./rows.js").RunRow>`
+              SELECT * FROM baton_runs r
+              WHERE r.run_id IS NOT NULL ${statusFilter} ${afterFilter}
+              ORDER BY r.created_at ${direction}, r.run_id ${direction}
+              LIMIT ${input.limit}
+            `
             return yield* Effect.forEach(rows, (row) =>
               Effect.gen(function* () {
                 const loaded = yield* decodeRunEffect(row)
@@ -190,12 +232,70 @@ export const makeSqliteRunStore = (
       expireRunningOperation: (input) => fenced(input, expireRunningOperation(hub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
-      resolveOperation: (input) => run(resolveOperation(input, "running")),
+      resolveOperation: (input) =>
+        run(
+          getProgramOperation({ runId: input.runId, operation: input.operationId }).pipe(
+            Effect.flatMap((program) =>
+              program === undefined ? resolveOperation(input, "running") : resolveProgramOperation(input, "running"),
+            ),
+            Effect.andThen(settleAdmittedCancellation(hub, input.runId)),
+          ),
+        ),
       claimExecution: (input) => run(claimExecution(input)),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
       saveExecution: (input) => run(saveExecution(input)),
       admitFanOut: (input) => runBuffered((transactionHub) => admitFanOut(transactionHub, input)),
       inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
+      reserveProgramOperation: (input) => fenced(input, reserveProgramOperation(input)),
+      admitProgramAgents: (input) =>
+        runBuffered((transactionHub) =>
+          requireExecutionClaim(input).pipe(Effect.andThen(admitProgramAgents(transactionHub, input, suspend))),
+        ),
+      suspendProgramOperation: (input) =>
+        runBuffered((transactionHub) =>
+          requireExecutionClaim(input).pipe(Effect.andThen(suspendProgramOperation(transactionHub, input, suspend))),
+        ),
+      settleProgramOperation: (input) =>
+        runBuffered((transactionHub) =>
+          requireExecutionClaim(input).pipe(Effect.andThen(settleProgramOperation(transactionHub, input))),
+        ),
+      startProgramOperation: (input) => fenced(input, startProgramOperation(input)),
+      loadProgramState: (runId) =>
+        runNoTxn(
+          Effect.gen(function* () {
+            const loaded = yield* loadRun(runId)
+            if (loaded === undefined) return yield* RunNotFound.make({ runId })
+            return yield* loadProgramState(runId)
+          }),
+        ),
+      getProgramOperation: (input) =>
+        runNoTxn(
+          Effect.gen(function* () {
+            const loaded = yield* loadRun(input.runId)
+            if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
+            return yield* getProgramOperation(input)
+          }),
+        ),
+      completeProgram: (input) =>
+        runBuffered((transactionHub) =>
+          Effect.gen(function* () {
+            yield* requireExecutionClaim(input)
+            if (input.outputBytes > input.outputLimit)
+              return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
+                dimension: "outputBytes",
+                limit: input.outputLimit,
+              })
+            yield* complete(transactionHub, {
+              ...input,
+              result: { _tag: "Program", value: input.output },
+            })
+            return { _tag: "Completed" as const }
+          }),
+        ),
+      commitProgramLog: (input) =>
+        runBuffered((transactionHub) =>
+          requireExecutionClaim(input).pipe(Effect.andThen(commitProgramLog(transactionHub, input))),
+        ),
     })
   })
 

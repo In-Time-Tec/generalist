@@ -46,10 +46,11 @@ describePostgres("postgres process tracer", () => {
           suspension: suspension("gate"),
         })
         yield* runtime.signal({ runId: first.runId, name: "gate" })
+        const resumed = yield* claims.claimReadyRuns({ workerId: "tracer-a", limit: 1, lease: "10 seconds" })
         yield* claims.commitWithClaim({
           runId: first.runId,
           workerId: "tracer-a",
-          attemptFence: a[0]!.attemptFence,
+          attemptFence: resumed[0]!.attemptFence,
           transition: "complete",
           result: completedResult("done"),
         })

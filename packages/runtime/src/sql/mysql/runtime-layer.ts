@@ -1,7 +1,7 @@
 import { Config, Context, Effect, Layer, Redacted } from "effect"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { MysqlClient } from "@effect/sql-mysql2"
-import { AgentHost, make as makeAgentHost } from "../../agent-host.js"
+import { ExecutionHost, make as makeExecutionHost } from "../../execution-host.js"
 import { layer as activeExecutionsLayer } from "../../active-executions.js"
 import { makeRuntime } from "../../memory/runtime-layer.js"
 import { Runtime } from "../../runtime.js"
@@ -13,7 +13,7 @@ export type { MysqlStoreOptions }
 
 export const layerMysql = (
   options: MysqlStoreOptions,
-): Layer.Layer<Runtime | RunStore | RunClaims | AgentHost, MysqlStoreError | SqlError | Config.ConfigError> => {
+): Layer.Layer<Runtime | RunStore | RunClaims | ExecutionHost, MysqlStoreError | SqlError | Config.ConfigError> => {
   const maxConnections = options.maxConnections ?? 10
   const client = MysqlClient.layer({
     url: Redacted.make(options.url),
@@ -26,7 +26,7 @@ export const layerMysql = (
   ).pipe(Layer.provide(client))
   const dependencies = Layer.merge(services, activeExecutionsLayer)
   const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(dependencies))
-  const host = Layer.effect(AgentHost, makeAgentHost({ workerId: "mysql", resolver: options.resolver })).pipe(
+  const host = Layer.effect(ExecutionHost, makeExecutionHost({ workerId: "mysql", resolver: options.resolver })).pipe(
     Layer.provide(dependencies),
   )
   return Layer.mergeAll(runtime, host, services)

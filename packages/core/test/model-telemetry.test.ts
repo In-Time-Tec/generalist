@@ -89,6 +89,7 @@ describe("ModelTelemetry", () => {
         failedAt: 4,
         category: "rate-limit",
         classification: "transient",
+        disposition: "retry",
         providerUsage: { inputTokens: 7, outputTokens: 3, totalTokens: 10 },
       },
       {

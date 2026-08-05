@@ -1,9 +1,11 @@
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Ref } from "effect"
 import { TestClock } from "effect/testing"
-import { AgentHost } from "../src/agent-host.js"
+import { ExecutionHost } from "../src/execution-host.js"
 import { makeWorker } from "../src/sql/postgres/worker.js"
 import { RunClaims, type ClaimedRun, type Interface as ClaimsInterface } from "../src/sql/run-claims.js"
+import { RunStore, type Interface as StoreInterface } from "../src/run-store.js"
+import type { RunInspection, RunStatus } from "../src/run.js"
 
 const claimed = {
   run: { runId: "run:worker" },
@@ -20,16 +22,21 @@ const claimsService = (refreshLease: ClaimsInterface["refreshLease"]): ClaimsInt
     commitWithClaim: () => Effect.void,
   })
 
+/** These worker tests exercise claim renewal only; the watcher needs one status read. */
+const storeService = (status: RunStatus): StoreInterface =>
+  ({ inspect: () => Effect.succeed({ status } as RunInspection) }) as unknown as StoreInterface
+
 it.effect("renews a claim for the lifetime of agent execution", () =>
   Effect.gen(function* () {
     const started = yield* Deferred.make<void>()
     const release = yield* Deferred.make<void>()
     const refreshes = yield* Ref.make(0)
-    const host = AgentHost.of({
+    const host = ExecutionHost.of({
       execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(release))),
     })
     const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
-      Effect.provideService(AgentHost, host),
+      Effect.provideService(ExecutionHost, host),
+      Effect.provideService(RunStore, storeService("running")),
       Effect.provideService(
         RunClaims,
         claimsService(() => Ref.updateAndGet(refreshes, (count) => count + 1).pipe(Effect.as(true))),
@@ -51,7 +58,7 @@ it.effect("interrupts stale execution when lease renewal loses ownership", () =>
   Effect.gen(function* () {
     const started = yield* Deferred.make<void>()
     const interrupted = yield* Deferred.make<void>()
-    const host = AgentHost.of({
+    const host = ExecutionHost.of({
       execute: () =>
         Deferred.succeed(started, undefined).pipe(
           Effect.andThen(Effect.never),
@@ -59,7 +66,8 @@ it.effect("interrupts stale execution when lease renewal loses ownership", () =>
         ),
     })
     const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
-      Effect.provideService(AgentHost, host),
+      Effect.provideService(ExecutionHost, host),
+      Effect.provideService(RunStore, storeService("running")),
       Effect.provideService(
         RunClaims,
         claimsService(() => Effect.succeed(false)),

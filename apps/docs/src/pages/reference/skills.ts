@@ -34,7 +34,7 @@ export const skillsReference = definePage({
     ),
     h2("skill-loader", "SkillLoader.layer"),
     p(
-      code("SkillLoader.layer(options?)"),
+      code("SkillLoader.layer({ cwd, ...options })"),
       " builds a ",
       code("SkillSource.SkillSource"),
       " layer requiring ",

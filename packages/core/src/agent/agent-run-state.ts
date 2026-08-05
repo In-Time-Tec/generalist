@@ -24,6 +24,12 @@ export interface AgentRunState {
   }
 }
 
+export const makeProviderOutputState = (): AgentRunState["providerOutput"] => ({
+  textCharacters: 0,
+  reasoningCharacters: 0,
+  finishReason: undefined,
+})
+
 /** @internal A checkpoint of the state consumed by a model-turn continuation. */
 export interface AgentRunCheckpoint {
   readonly turn: number

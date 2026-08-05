@@ -141,7 +141,9 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
       } catch (error) {
         return yield* HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) })
       }
-      if (!input.options.executableManifest.agents.some(({ pin }) => pin === resolved.pin)) {
+      if (
+        !input.options.executableManifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === resolved.pin)
+      ) {
         return yield* HandoffRejected.make({
           handoffId,
           turn: input.turn,

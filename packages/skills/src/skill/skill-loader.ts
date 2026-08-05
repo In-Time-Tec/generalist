@@ -4,8 +4,8 @@ import { parseDocument, parseFrontmatter, splitDocument } from "./skill-document
 
 /** @experimental Filesystem skill-loader options. */
 export interface LoadOptions {
+  readonly cwd: string
   readonly roots?: ReadonlyArray<string>
-  readonly cwd?: string
   readonly descriptionCap?: number
   readonly frontmatterMaxBytes?: number
 }
@@ -84,11 +84,11 @@ const discoverRoot = (
   })
 
 /** @experimental Build a composable SkillSource from filesystem roots. */
-export const make = (options: LoadOptions = {}): SkillSource.Source<FileSystem.FileSystem | Path.Path> =>
+export const make = (options: LoadOptions): SkillSource.Source<FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const cwd = options.cwd === undefined ? "." : path.resolve(options.cwd)
+    const cwd = path.resolve(options.cwd)
     const roots = options.roots ?? DEFAULT_ROOTS
     const descriptionCap = options.descriptionCap ?? SkillSource.DESCRIPTION_CAP
     const frontmatterMaxBytes = options.frontmatterMaxBytes ?? 64 * 1024
@@ -107,6 +107,6 @@ export const make = (options: LoadOptions = {}): SkillSource.Source<FileSystem.F
 
 /** @experimental Build a SkillSource layer from filesystem roots. */
 export const layer = (
-  options: LoadOptions = {},
+  options: LoadOptions,
 ): Layer.Layer<SkillSource.SkillSource, SkillSource.SkillSourceError, FileSystem.FileSystem | Path.Path> =>
   Layer.effect(SkillSource.SkillSource, make(options).pipe(Effect.map(SkillSource.SkillSource.of)))

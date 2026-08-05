@@ -8,6 +8,7 @@ import { loadRun, loadRunWait, nowIso } from "./store-helpers.js"
 import type { DecodedRun } from "./rows.js"
 import { checkpointRef } from "../executable-manifest.js"
 import { encodeExecutableRef } from "./codecs.js"
+import { loadRegistrations } from "./executable-registrations.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))))
@@ -20,8 +21,17 @@ export const requireExecutionClaim = (input: ExecutionClaim) =>
     }
   })
 
-const executionRecord = (run: DecodedRun, resolution?: ExecutionRecord["resolution"]): ExecutionRecord => ({
+const executionRecord = (
+  run: DecodedRun,
+  registrations: ExecutionRecord["registrations"],
+  resolution?: ExecutionRecord["resolution"],
+): ExecutionRecord => ({
   runId: run.runId,
+  rootRunId: run.rootRunId,
+  ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
+  ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
+  ...(run.ownerWorkerId === undefined ? {} : { ownerId: run.ownerWorkerId }),
+  admittedAt: run.admittedAt,
   message: run.message,
   executableRef: run.executableRef,
   executableManifest: run.executableManifest,
@@ -32,13 +42,15 @@ const executionRecord = (run: DecodedRun, resolution?: ExecutionRecord["resoluti
   ...(resolution === undefined ? {} : { resolution }),
   ...(run.transcript === undefined ? {} : { transcript: run.transcript }),
   ...(run.continuation === undefined ? {} : { continuation: run.continuation }),
+  registrations,
 })
 
 export const loadExecution = (runId: string) =>
   Effect.gen(function* () {
     const run = yield* requireRun(runId)
     const wait = yield* loadRunWait(run.runId, run.activeWaitId)
-    return executionRecord(run, wait?.resolution)
+    const registrations = yield* loadRegistrations(runId)
+    return executionRecord(run, registrations, wait?.resolution)
   })
 
 export const claimExecution = (input: { readonly runId: string; readonly ownerId: string }) =>
@@ -66,7 +78,8 @@ export const claimExecution = (input: { readonly runId: string; readonly ownerId
       return yield* StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: run.attemptFence })
     }
     const wait = yield* loadRunWait(claimed.runId, run.activeWaitId)
-    return { ...executionRecord(claimed, wait?.resolution), ownerId: input.ownerId }
+    const registrations = yield* loadRegistrations(input.runId)
+    return { ...executionRecord(claimed, registrations, wait?.resolution), ownerId: input.ownerId }
   })
 
 export const saveExecution = (

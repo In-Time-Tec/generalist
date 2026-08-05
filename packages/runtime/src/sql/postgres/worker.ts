@@ -1,13 +1,17 @@
 import { Context, Duration, Effect, Layer, Ref, Schedule } from "effect"
 import type { RuntimeUnavailable } from "../../errors.js"
 import { RunClaims, type ClaimedRun } from "../run-claims.js"
-import { AgentHost } from "../../agent-host.js"
+import { ExecutionHost } from "../../execution-host.js"
+import { RunStore } from "../../run-store.js"
+import { isTerminal } from "../../run.js"
 
 export interface WorkerOptions {
   readonly workerId: string
   readonly concurrency?: number
   readonly lease?: Duration.Input
   readonly pollInterval?: Duration.Input
+  /** Upper bound between a persisted cancellation and local interruption of the claimed Run. */
+  readonly cancellationInterval?: Duration.Input
 }
 
 export interface Interface {
@@ -19,14 +23,31 @@ export interface Interface {
 
 export class RuntimeWorker extends Context.Service<RuntimeWorker, Interface>()("@batonfx/runtime/RuntimeWorker") {}
 
-export const makeWorker = (options: WorkerOptions): Effect.Effect<Interface, never, RunClaims | AgentHost> =>
+export const makeWorker = (
+  options: WorkerOptions,
+): Effect.Effect<Interface, never, RunClaims | ExecutionHost | RunStore> =>
   Effect.gen(function* () {
     const claims = yield* RunClaims
-    const host = yield* AgentHost
+    const host = yield* ExecutionHost
+    const store = yield* RunStore
     const concurrency = options.concurrency ?? 1
     const lease = options.lease ?? "30 seconds"
     const activeRef = yield* Ref.make<ReadonlyArray<ClaimedRun>>([])
     const renewalInterval = Duration.millis(Math.max(1, Duration.toMillis(lease) / 2))
+    const cancellationInterval = options.cancellationInterval ?? "100 millis"
+
+    /**
+     * Interrupt a claimed Run when cancellation was persisted by another process.
+     * The delay is bounded by `cancellationInterval`.
+     */
+    const watchCancellation = (runId: string): Effect.Effect<void, RuntimeUnavailable> =>
+      Effect.sleep(cancellationInterval).pipe(
+        Effect.andThen(store.inspect(runId)),
+        Effect.flatMap((run) =>
+          run.status === "cancelling" || isTerminal(run.status) ? Effect.void : watchCancellation(runId),
+        ),
+        Effect.catchTag("@batonfx/runtime/RunNotFound", () => Effect.void),
+      )
 
     const executeClaim = (item: ClaimedRun): Effect.Effect<void, RuntimeUnavailable> => {
       const renew: Effect.Effect<void, RuntimeUnavailable> = Effect.sleep(renewalInterval).pipe(
@@ -42,7 +63,7 @@ export const makeWorker = (options: WorkerOptions): Effect.Effect<Interface, nev
       )
       return host
         .execute({ runId: item.run.runId, ownerId: options.workerId, attemptFence: item.attemptFence })
-        .pipe(Effect.raceFirst(renew))
+        .pipe(Effect.raceFirst(renew), Effect.raceFirst(watchCancellation(item.run.runId)))
     }
 
     const tick: Effect.Effect<ReadonlyArray<ClaimedRun>, RuntimeUnavailable> = Effect.gen(function* () {
@@ -83,10 +104,14 @@ export const makeWorker = (options: WorkerOptions): Effect.Effect<Interface, nev
     }
   })
 
-export const layerWorker = (options: WorkerOptions): Layer.Layer<RuntimeWorker, never, RunClaims | AgentHost> =>
+export const layerWorker = (
+  options: WorkerOptions,
+): Layer.Layer<RuntimeWorker, never, RunClaims | ExecutionHost | RunStore> =>
   Layer.effect(RuntimeWorker, makeWorker(options).pipe(Effect.map((service) => RuntimeWorker.of(service))))
 
-export const layerWorkerLoop = (options: WorkerOptions): Layer.Layer<RuntimeWorker, never, RunClaims | AgentHost> =>
+export const layerWorkerLoop = (
+  options: WorkerOptions,
+): Layer.Layer<RuntimeWorker, never, RunClaims | ExecutionHost | RunStore> =>
   Layer.effect(
     RuntimeWorker,
     Effect.gen(function* () {

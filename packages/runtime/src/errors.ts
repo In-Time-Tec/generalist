@@ -13,6 +13,21 @@ export class ExecutablePinMissing extends Schema.TaggedErrorClass<ExecutablePinM
   { runId: Schema.String, ref: ExecutableRef },
 ) {}
 
+export class ExecutableRegistrationInvalid extends Schema.TaggedErrorClass<ExecutableRegistrationInvalid>()(
+  "@batonfx/runtime/ExecutableRegistrationInvalid",
+  { message: Schema.String },
+) {}
+
+export class ExecutableRegistrationConflict extends Schema.TaggedErrorClass<ExecutableRegistrationConflict>()(
+  "@batonfx/runtime/ExecutableRegistrationConflict",
+  { pin: Schema.String },
+) {}
+
+export class ExecutableRegistrationMissing extends Schema.TaggedErrorClass<ExecutableRegistrationMissing>()(
+  "@batonfx/runtime/ExecutableRegistrationMissing",
+  { pin: Schema.String },
+) {}
+
 export class ExecutableIdentityMismatch extends Schema.TaggedErrorClass<ExecutableIdentityMismatch>()(
   "@batonfx/runtime/ExecutableIdentityMismatch",
   {
@@ -26,6 +41,15 @@ export class AgentExecutionFailure extends Schema.TaggedErrorClass<AgentExecutio
   "@batonfx/runtime/AgentExecutionFailure",
   { message: Schema.String, cause: Schema.optionalKey(Schema.Defect()) },
 ) {}
+
+/** @experimental Internal canonical failure for resolver-owned compaction option drift. */
+export const compactionOptionsMismatch = AgentExecutionFailure.make({
+  message: "Resolved compaction options do not match Agent manifest",
+})
+
+export const undecodableSuspension = AgentExecutionFailure.make({
+  message: "Persisted suspension could not be decoded",
+})
 
 export class IdempotencyConflict extends Schema.TaggedErrorClass<IdempotencyConflict>()(
   "@batonfx/runtime/IdempotencyConflict",
@@ -55,6 +79,10 @@ export class ChildSelectionMissing extends Schema.TaggedErrorClass<ChildSelectio
   "@batonfx/runtime/ChildSelectionMissing",
   { parentRunId: Schema.String, selection: Schema.String },
 ) {}
+
+export class StartInvalid extends Schema.TaggedErrorClass<StartInvalid>()("@batonfx/runtime/StartInvalid", {
+  message: Schema.String,
+}) {}
 
 export class SteeringConflict extends Schema.TaggedErrorClass<SteeringConflict>()("@batonfx/runtime/SteeringConflict", {
   runId: Schema.String,

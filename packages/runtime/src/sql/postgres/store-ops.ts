@@ -13,6 +13,8 @@ import type { EventHub } from "../subscribers.js"
 import { appendEvent, toOperationRecord } from "./pg-helpers.js"
 import { encodeContinuation } from "../../steering.js"
 import { checkpointRef } from "../../executable-manifest.js"
+import { getProgramOperation, resolveProgramOperation } from "../store-program.js"
+import { settleAdmittedCancellation } from "../store-control.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
 type RunFn = <A, E>(
@@ -288,6 +290,8 @@ export const postgresOperations = (input: {
         Effect.gen(function* () {
           yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${op.runId} FOR UPDATE`
           const loaded = yield* requireRun(op.runId)
+          const program = yield* getProgramOperation({ runId: op.runId, operation: op.operationId })
+          if (program !== undefined) return yield* resolveProgramOperation(op, "queued", true)
           const rows = yield* sql<OperationRow>`
             SELECT * FROM baton_run_operations
             WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
@@ -340,6 +344,7 @@ export const postgresOperations = (input: {
             UPDATE baton_runs SET status = 'queued', owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW()
             WHERE run_id = ${op.runId} AND status = 'needs-resolution'
           `
+          yield* settleAdmittedCancellation(hub, op.runId)
         }),
       ),
   }

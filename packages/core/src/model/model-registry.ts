@@ -31,20 +31,51 @@ export interface ModelSelection {
   readonly registrationKey?: string
 }
 
+/** @experimental Immutable identity of one candidate within an ordered provider route. */
+export interface CandidateIdentity extends ModelSelection {
+  readonly candidate: number
+}
+
+/** @experimental Disposition chosen for a failed provider attempt. */
+export type FailureDisposition = "retry" | "fallback" | "terminal"
+
+/** @experimental Instrumentation boundary supplied to a provider-owned candidate route. */
+export interface CandidateRouteInstrumentation {
+  readonly instrument: (model: LanguageModel.Service, identity: CandidateIdentity) => LanguageModel.Service
+  readonly settleFailure: (disposition: FailureDisposition) => Effect.Effect<void>
+  readonly fallbackScheduled: (input: {
+    readonly from: CandidateIdentity
+    readonly to: CandidateIdentity
+    readonly error: unknown
+  }) => Effect.Effect<void>
+}
+
+/** @experimental Provider-owned ordered candidate routing implementation. */
+export type CandidateRoute = (instrumentation: CandidateRouteInstrumentation) => LanguageModel.Service
+
 /** @experimental Semantic classification of a model failure. */
 export type FailureClassification = "context-overflow" | "other"
 
 /** @experimental Provider-owned semantic model-failure classifier. */
 export type FailureClassifier = (error: unknown) => FailureClassification
 
+/** @experimental Provider-owned decision that a failed invocation may advance an ordered candidate route. */
+export type AvailabilityFailureClassifier = (error: unknown) => boolean
+
 const failureClassifiers = new WeakMap<LanguageModel.Service, FailureClassifier>()
 const toolJsonSchemaCompilers = new WeakMap<LanguageModel.Service, ToolJsonSchemaCompiler>()
+const candidateRoutes = new WeakMap<LanguageModel.Service, CandidateRoute>()
+const registrationIdentities = new WeakMap<LanguageModel.Service, ModelSelection>()
 
 registerMetadataCopier((source, target) => {
   const classifier = failureClassifiers.get(source)
   if (classifier !== undefined) failureClassifiers.set(target, classifier)
   const compiler = toolJsonSchemaCompilers.get(source)
   if (compiler !== undefined) toolJsonSchemaCompilers.set(target, compiler)
+  const route = candidateRoutes.get(source)
+  if (route !== undefined) candidateRoutes.set(target, route)
+  const identity = registrationIdentities.get(source)
+  if (identity !== undefined) registrationIdentities.set(target, identity)
 })
 
 /** @experimental Provider-owned compilation of a tool's exact request JSON Schema. */
@@ -75,10 +106,31 @@ export const withToolJsonSchemaCompiler: {
   return wrapped
 })
 
+/** @experimental Attach a provider-owned candidate route at the raw model-attempt boundary. */
+export const withCandidateRoute: {
+  (route: CandidateRoute): (model: LanguageModel.Service) => LanguageModel.Service
+  (model: LanguageModel.Service, route: CandidateRoute): LanguageModel.Service
+} = Function.dual(2, (model: LanguageModel.Service, route: CandidateRoute): LanguageModel.Service => {
+  const wrapped = { ...model }
+  candidateRoutes.set(wrapped, route)
+  const classifier = failureClassifiers.get(model)
+  if (classifier !== undefined) failureClassifiers.set(wrapped, classifier)
+  const compiler = toolJsonSchemaCompilers.get(model)
+  if (compiler !== undefined) toolJsonSchemaCompilers.set(wrapped, compiler)
+  return wrapped
+})
+
+/** @internal */
+export const candidateRoute = (model: LanguageModel.Service): CandidateRoute | undefined => candidateRoutes.get(model)
+
 const attachRegistrationMetadata = (registration: Registration, context: Context.Context<ModelEnvironment>) => {
-  if (registration.classifyFailure === undefined && registration.toolJsonSchemaCompiler === undefined) return context
   const model = Context.get(context, LanguageModel.LanguageModel)
   const registered = { ...model }
+  registrationIdentities.set(registered, {
+    provider: registration.provider,
+    model: registration.model,
+    ...(registration.registrationKey === undefined ? {} : { registrationKey: registration.registrationKey }),
+  })
   if (registration.classifyFailure !== undefined) failureClassifiers.set(registered, registration.classifyFailure)
   else {
     const classifier = failureClassifiers.get(model)
@@ -90,8 +142,14 @@ const attachRegistrationMetadata = (registration: Registration, context: Context
     const compiler = toolJsonSchemaCompilers.get(model)
     if (compiler !== undefined) toolJsonSchemaCompilers.set(registered, compiler)
   }
+  const route = candidateRoutes.get(model)
+  if (route !== undefined) candidateRoutes.set(registered, route)
   return Context.add(context, LanguageModel.LanguageModel, registered)
 }
+
+/** @internal */
+export const registrationIdentity = (model: LanguageModel.Service): ModelSelection | undefined =>
+  registrationIdentities.get(model)
 
 /** @experimental */
 export class LanguageModelNotRegistered extends Schema.TaggedErrorClass<LanguageModelNotRegistered>()(
@@ -112,6 +170,7 @@ export interface Registration {
   readonly metadata?: Metadata
   readonly classifyFailure?: FailureClassifier
   readonly toolJsonSchemaCompiler?: ToolJsonSchemaCompiler
+  readonly isAvailabilityFailure?: AvailabilityFailureClassifier
 }
 
 /** @experimental */
@@ -171,6 +230,7 @@ export const registration = <R>(input: {
   readonly metadata?: Metadata
   readonly classifyFailure?: FailureClassifier
   readonly toolJsonSchemaCompiler?: ToolJsonSchemaCompiler
+  readonly isAvailabilityFailure?: AvailabilityFailureClassifier
 }) =>
   Model.make(input.provider, input.model, input.layer).captureRequirements.pipe(
     Effect.map(
@@ -182,6 +242,7 @@ export const registration = <R>(input: {
         ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
         ...(input.classifyFailure === undefined ? {} : { classifyFailure: input.classifyFailure }),
         ...(input.toolJsonSchemaCompiler === undefined ? {} : { toolJsonSchemaCompiler: input.toolJsonSchemaCompiler }),
+        ...(input.isAvailabilityFailure === undefined ? {} : { isAvailabilityFailure: input.isAvailabilityFailure }),
       }),
     ),
   )
@@ -319,7 +380,6 @@ export const layerCombined: {
 )
 
 /** @experimental In-memory model registry. */
-export const layerMemory: typeof layer = layer
 
 /** @experimental */
 export const layerTest = (implementation: Interface) => Layer.succeed(ModelRegistry, ModelRegistry.of(implementation))

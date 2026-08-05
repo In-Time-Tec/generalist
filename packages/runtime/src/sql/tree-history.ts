@@ -54,7 +54,7 @@ export const loadTreeHistory = (input: {
       JOIN baton_run_events e ON e.run_id = i.run_id AND e.sequence = i.run_sequence
       JOIN baton_runs r ON r.run_id = i.run_id
       WHERE i.root_run_id = ${input.rootRunId} AND i.position > ${input.position}
-      ORDER BY i.position ASC LIMIT ${input.limit + 1}
+      ORDER BY i.position ASC LIMIT ${sql.literal(String(Math.max(0, Math.floor(input.limit)) + 1))}
     `
     const selected = rows.slice(0, input.limit)
     const events = selected.map((row) =>

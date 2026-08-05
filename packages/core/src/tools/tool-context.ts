@@ -12,6 +12,14 @@ export interface Interface {
   readonly signal: AbortSignal
   readonly emit: (progress: Progress) => Effect.Effect<void>
   readonly sessionId: string
+  readonly runId?: string
+  readonly rootRunId?: string
+  readonly toolCallId?: string
+  readonly operationKey?: string
+  readonly idempotencyKey?: string
+  readonly attempt?: number
+  readonly admittedAt?: string
+  readonly deadline?: string
 }
 
 /** @experimental */

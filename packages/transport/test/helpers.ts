@@ -22,6 +22,7 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
   Layer.succeed(
     Runtime.Runtime,
     Runtime.Runtime.of({
+      start: () => Effect.die("unused start"),
       send: () => Effect.die("unused send"),
       spawn: () => Effect.die("unused spawn"),
       events: ({ cursor }) =>

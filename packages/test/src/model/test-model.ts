@@ -447,7 +447,7 @@ export const make: {
         layer: modelLayer,
         selection,
         registration,
-        registryLayer: ModelRegistry.layerMemory([Effect.succeed(registration)]),
+        registryLayer: ModelRegistry.layer([Effect.succeed(registration)]),
         requests,
         prompts: requests.pipe(Effect.map((items) => items.map((request) => request.prompt))),
         remaining: SubscriptionRef.get(state).pipe(
@@ -489,7 +489,7 @@ export const layerRegistry: {
 } = Function.dual(
   (args) => Array.isArray(args[0]),
   (fixtures: ReadonlyArray<Fixture>, governance?: ModelRegistry.GovernanceOptions) =>
-    ModelRegistry.layerMemory(
+    ModelRegistry.layer(
       fixtures.map((fixture) => Effect.succeed(fixture.registration)),
       governance,
     ),

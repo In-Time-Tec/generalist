@@ -246,7 +246,8 @@ const applyRunEvent = (model: Model, event: RunEvent.RunEvent): readonly [Model,
         : [withSequence, Option.none()]
     case "RunCompleted": {
       const flushed = flushStreaming(withSequence)
-      return [{ ...flushed, run: Idle() }, Option.some(RunCompleted({ text: event.result.text }))]
+      const text = "_tag" in event.result ? (JSON.stringify(event.result.value) ?? "null") : event.result.text
+      return [{ ...flushed, run: Idle() }, Option.some(RunCompleted({ text }))]
     }
     case "RunFailed": {
       const message = event.error.message

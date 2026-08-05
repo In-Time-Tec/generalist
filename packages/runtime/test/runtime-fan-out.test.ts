@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Fiber, Ref } from "effect"
+import { Effect, Ref } from "effect"
 import { Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../src/index.js"
 import { makeRuntime } from "../src/memory/runtime-layer.js"
 import { layer as activeExecutionsLayer } from "../src/active-executions.js"
@@ -11,7 +11,9 @@ import {
   memoryLayer,
   researcher,
   researcherRef,
+  registrationsFor,
 } from "./helpers.js"
+import { closedTestAgent } from "./identity.js"
 
 const admit = (
   key: string,
@@ -142,13 +144,84 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
     }),
   )
 
-  it.effect("awaits the durable join and reconciles after the parent is terminal", () =>
+  it.effect("holds the parent outcome until fan-out join and emits no lifecycle event after terminal", () =>
     Effect.gen(function* () {
       const { runtime, parent, receipt } = yield* admit("await-terminal-parent", { count: 1 })
       yield* succeed(parent.runId)
-      const waiting = yield* runtime.awaitFanOut(receipt.fanOutId).pipe(Effect.forkChild)
+      expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
       yield* succeed(receipt.childRunIds[0]!)
-      expect((yield* Fiber.join(waiting)).status).toBe("succeeded")
+      const rootEvents = (yield* RunTree.history({ rootRunId: parent.runId, limit: 100 })).events
+        .filter((entry) => entry.runId === parent.runId)
+        .map((entry) => entry.event)
+      const completed = rootEvents.find((event) => event._tag === "RunCompleted")!
+      const joined = rootEvents.find((event) => event._tag === "FanOutJoined")!
+      expect(joined.sequence).toBeLessThan(completed.sequence)
+      expect(rootEvents.at(-1)?._tag).toBe("RunCompleted")
+      expect(rootEvents.filter((event) => event._tag === "FanOutJoined")).toHaveLength(1)
+      expect((yield* runtime.awaitFanOut(receipt.fanOutId)).status).toBe("succeeded")
+      const snapshot = yield* runtime.inspect(parent.runId)
+      expect(snapshot.status).toBe("succeeded")
+      const terminal = yield* RunTree.inspect(parent.runId)
+      expect(terminal.runs.find((entry) => entry.run.runId === parent.runId)!.outcome!.eventId).toBe(completed.eventId)
+    }),
+  )
+
+  it.effect("preserves a pending parent failure through fan-out join", () =>
+    Effect.gen(function* () {
+      const { runtime, parent, receipt } = yield* admit("pending-failure", { count: 1 })
+      yield* fail(parent.runId)
+      expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
+      yield* succeed(receipt.childRunIds[0]!)
+      const events = yield* runtime.history({ runId: parent.runId, limit: 100 })
+      expect(events.at(-2)?._tag).toBe("FanOutJoined")
+      expect(events.at(-1)).toMatchObject({
+        _tag: "RunFailed",
+        error: Errors.AgentExecutionFailure.make({ message: "failed" }),
+      })
+    }),
+  )
+
+  it.effect("settles a parked fan-out member through its outer fan-out", () =>
+    Effect.gen(function* () {
+      const { runtime, receipt: outer } = yield* admit("nested-pending", { count: 1 })
+      const memberRunId = outer.childRunIds[0]!
+      const inner = yield* runtime.fanOut({
+        parentRunId: memberRunId,
+        idempotencyKey: "inner",
+        members: [{ key: "analysis", selection: "analyst", prompt: "analyze" }],
+        concurrency: 1,
+        join: { _tag: "AllSuccess" },
+        remainder: "await",
+      })
+      yield* succeed(memberRunId, "member")
+      expect((yield* runtime.inspect(memberRunId)).status).toBe("waiting")
+      yield* succeed(inner.childRunIds[0]!, "analysis")
+      expect((yield* runtime.inspect(memberRunId)).status).toBe("succeeded")
+      expect((yield* runtime.inspectFanOut(outer.fanOutId)).status).toBe("succeeded")
+    }),
+  )
+
+  it.effect("makes a parked outcome win steering and new fan-out admission", () =>
+    Effect.gen(function* () {
+      const { runtime, parent, input, receipt } = yield* admit("pending-wins", { count: 1 })
+      const store = yield* RunStore.RunStore
+      yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
+      const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "pending-wins" })
+      yield* store.complete({ ...claim, result: { _tag: "Program", value: "preserved" } })
+      expect((yield* runtime.inspect(parent.runId)).status).toBe("waiting")
+      yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
+      expect(
+        yield* runtime.steer({ runId: parent.runId, idempotencyKey: "late", prompt: "late" }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.RunTerminal)
+      expect(yield* runtime.fanOut(input)).toEqual({ ...receipt, duplicate: true })
+      expect(yield* runtime.fanOut({ ...input, idempotencyKey: "late-fan-out" }).pipe(Effect.flip)).toBeInstanceOf(
+        Errors.FanOutInvalid,
+      )
+      yield* succeed(receipt.childRunIds[0]!)
+      expect((yield* runtime.history({ runId: parent.runId, limit: 100 })).at(-1)).toMatchObject({
+        _tag: "RunCompleted",
+        result: { _tag: "Program", value: "preserved" },
+      })
     }),
   )
 
@@ -177,10 +250,12 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
       })
       const racingRuntime = yield* makeRuntime({
         resolver: ExecutableResolver.makeStatic([
-          { executable: assistantRef, agent: assistant },
-          { executable: researcherRef, agent: researcher },
+          { executable: assistantRef, agent: closedTestAgent(assistant) },
+          { executable: researcherRef, agent: closedTestAgent(researcher) },
         ]),
-        addresses: [{ address: assistantAddress, executable: assistantRef }],
+        addresses: [
+          { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+        ],
       }).pipe(Effect.provideService(RunStore.RunStore, racingStore), Effect.provide(activeExecutionsLayer))
       expect((yield* racingRuntime.awaitFanOut(receipt.fanOutId)).status).toBe("succeeded")
     }),
@@ -192,6 +267,7 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
         const admitted = yield* admit(`reject-${status}`, { count: 1 })
         if (status === "terminal") {
           yield* succeed(admitted.parent.runId)
+          yield* succeed(admitted.receipt.childRunIds[0]!)
         } else {
           const store = yield* RunStore.RunStore
           yield* store.claimExecution({ runId: admitted.parent.runId, ownerId: "active-parent" })
@@ -202,6 +278,21 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
           .pipe(Effect.flip)
         expect(error).toBeInstanceOf(status === "terminal" ? Errors.RunTerminal : Errors.FanOutInvalid)
       }
+    }),
+  )
+
+  it.effect("returns an admitted duplicate after terminal and rejects changed or new fan-out input", () =>
+    Effect.gen(function* () {
+      const { runtime, parent, input, receipt } = yield* admit("terminal-duplicate", { count: 1 })
+      yield* succeed(parent.runId)
+      yield* succeed(receipt.childRunIds[0]!)
+      expect(yield* runtime.fanOut(input)).toEqual({ ...receipt, duplicate: true })
+      expect(
+        yield* runtime.fanOut({ ...input, members: [{ ...input.members[0]!, prompt: "changed" }] }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.FanOutConflict)
+      expect(
+        yield* runtime.fanOut({ ...input, idempotencyKey: "new-after-terminal" }).pipe(Effect.flip),
+      ).toBeInstanceOf(Errors.RunTerminal)
     }),
   )
 

@@ -1,5 +1,5 @@
 import { Effect, Equal, Option, Ref, Schema, Stream } from "effect"
-import { Prompt, Response, Tool } from "effect/unstable/ai"
+import { Prompt, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, type Event } from "./agent-event.js"
 import { type Item, type MemoryError, messageFromRecall, projectTranscript } from "../context/memory.js"
 import {
@@ -21,8 +21,9 @@ import type { Input } from "../turn/steering.js"
 import { type Decision, StopReason } from "../turn/turn-policy.js"
 import type { SteeringDrained } from "./agent-event.js"
 import { ToolNameCollision } from "./agent-event.js"
-import type { AgentRunState } from "./agent-run-state.js"
+import { makeProviderOutputState, type AgentRunState } from "./agent-run-state.js"
 import { makeModelTurn } from "./model-turn.js"
+import { AgentPin } from "../durable/pin.js"
 import { makeToolExecution } from "./tool-execution.js"
 import { makeCompactionRuntime } from "./compaction-runtime.js"
 import { setupRun } from "./setup.js"
@@ -33,11 +34,6 @@ import { operationKey } from "../durable/driver-interpreter.js"
 import { intercept, bindResume, setHandoffState } from "../durable/driver-run.js"
 import { makeHandoffStateRef, takePendingContinuation } from "./handoff-state.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
-const providerOutputState = (): {
-  textCharacters: number
-  reasoningCharacters: number
-  finishReason: Response.FinishReason | undefined
-} => ({ textCharacters: 0, reasoningCharacters: 0, finishReason: undefined })
 type ObjectSchema = Schema.Codec<unknown, Record<string, unknown>, unknown, unknown>
 interface StructuredRunConfig<S extends ObjectSchema> {
   readonly schema: S
@@ -199,7 +195,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
         currentContext: undefined,
         currentContextTokens: undefined,
         reportedContextUsage: undefined,
-        providerOutput: providerOutputState(),
+        providerOutput: makeProviderOutputState(),
       }
       const pendingResults = (): ReadonlyArray<PendingToolResult> =>
         [...state.pending.entries()].toSorted(([left], [right]) => left - right).map(([, result]) => result)
@@ -221,13 +217,15 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
           turn: 0,
         })
       }
+      if (options.executableRef !== undefined && !Schema.is(AgentPin)(options.executableRef.active)) {
+        return yield* AgentError.make({
+          message: `Agent execution requires an active Agent pin: ${options.executableRef.active}`,
+          turn: 0,
+        })
+      }
       const handoffStateRef =
         hasSameRunHandoff || restoredHandoff !== undefined
-          ? yield* makeHandoffStateRef(
-              agent as unknown as import("./agent.js").Agent<Record<string, Tool.Any>, unknown>,
-              options.executableRef?.active,
-              restoredHandoff,
-            )
+          ? yield* makeHandoffStateRef(agent, options.executableRef?.active as AgentPin | undefined, restoredHandoff)
           : undefined
       const restoreActivatedSkills = (history: Prompt.Prompt): Effect.Effect<void, AgentError | ToolNameCollision> =>
         Effect.gen(function* () {

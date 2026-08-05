@@ -20,7 +20,7 @@ import { SkillLoader } from "@batonfx/skills"
 ```text
 BunServices.layer
 └─ provides FileSystem + Path
-   └─ SkillLoader.layer({ roots: [] })
+   └─ SkillLoader.layer({ cwd: ".", roots: [] })
       └─ provides SkillSource.SkillSource
 ```
 
@@ -34,7 +34,7 @@ import { BunServices } from "@effect/platform-bun"
 import { SkillSource } from "@batonfx/core"
 import { SkillLoader } from "@batonfx/skills"
 
-const skillLayer = SkillLoader.layer({ roots: [] }).pipe(Layer.provide(BunServices.layer))
+const skillLayer = SkillLoader.layer({ cwd: ".", roots: [] }).pipe(Layer.provide(BunServices.layer))
 
 const program = SkillSource.SkillSource.use((source) =>
   source.all.pipe(Effect.flatMap((skills) => Console.log(`discovered ${skills.length} skills`))),
@@ -47,7 +47,7 @@ Run `bun examples/package-composition-guides/src/skills.ts`.
 
 ## Errors, requirements, and resources
 
-`BunServices.layer` provides the `FileSystem` and `Path` requirements used by `SkillLoader.layer`; the composed program has `R = never`, succeeds with `void`, and retains schema-backed `SkillSourceError` for filesystem, parsing, path, and validation failures. The layer owns platform services; this empty-root run performs no concurrent work and uses no timers, detached fibers, or unbounded buffers.
+`SkillLoader.layer` requires the host to supply an explicit `cwd`; it never derives workspace authority from ambient process state. `BunServices.layer` provides the `FileSystem` and `Path` requirements; the composed program has `R = never`, succeeds with `void`, and retains schema-backed `SkillSourceError` for filesystem, parsing, path, and validation failures. The layer owns platform services; this empty-root run performs no concurrent work and uses no timers, detached fibers, or unbounded buffers.
 
 ## More
 

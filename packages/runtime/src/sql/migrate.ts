@@ -2,96 +2,17 @@ import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { SqliteMigrator } from "@effect/sql-sqlite-bun"
 import { SchemaChecksumMismatch, SchemaDirty, SchemaMigrationFailed, SchemaVersionUnsupported } from "./errors.js"
-import {
-  KERNEL_MIGRATION_STATEMENTS,
-  MIGRATIONS_TABLE,
-  SCHEMA_META_TABLE,
-  SCHEMA_VERSION,
-  STEERING_MIGRATION_STATEMENTS,
-  FAN_OUT_MIGRATION_STATEMENTS,
-  TREE_MIGRATION_STATEMENTS,
-  EXECUTABLE_MIGRATION_STATEMENTS,
-  OPERATION_RESOLUTION_MIGRATION_STATEMENTS,
-  kernelSchemaChecksum,
-  schemaChecksum,
-  steeringSchemaChecksum,
-  fanOutSchemaChecksum,
-  treeSchemaChecksum,
-  executableSchemaChecksum,
-} from "./schema.js"
+import { MIGRATIONS_TABLE, SCHEMA_META_TABLE, SCHEMA_STATEMENTS, SCHEMA_VERSION, schemaChecksum } from "./schema.js"
 import { mapSqlError } from "./sql-effect.js"
 
 const migrationEffect = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   yield* sql`PRAGMA foreign_keys = ON`
-  for (const statement of KERNEL_MIGRATION_STATEMENTS) {
-    yield* sql.unsafe(statement)
-  }
-  const checksum = kernelSchemaChecksum()
+  for (const statement of SCHEMA_STATEMENTS) yield* sql.unsafe(statement)
   const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
   yield* sql`
     INSERT INTO ${sql(SCHEMA_META_TABLE)} (id, version, checksum, dirty, applied_at)
-    VALUES (1, 1, ${checksum}, 0, ${now})
-    ON CONFLICT(id) DO UPDATE SET
-      version = excluded.version,
-      checksum = excluded.checksum,
-      dirty = 0,
-      applied_at = excluded.applied_at
-  `
-})
-
-const steeringMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of STEERING_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = 2, checksum = ${steeringSchemaChecksum()}, dirty = 0, applied_at = ${now}
-    WHERE id = 1
-  `
-})
-
-const fanOutMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of FAN_OUT_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = 3, checksum = ${fanOutSchemaChecksum()}, dirty = 0, applied_at = ${now}
-    WHERE id = 1
-  `
-})
-
-const treeMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of TREE_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = 4, checksum = ${treeSchemaChecksum()}, dirty = 0, applied_at = ${now}
-    WHERE id = 1
-  `
-})
-
-const executableMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of EXECUTABLE_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = 5, checksum = ${executableSchemaChecksum()}, dirty = 0, applied_at = ${now}
-    WHERE id = 1
-  `
-})
-
-const operationResolutionMigrationEffect = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  for (const statement of OPERATION_RESOLUTION_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-  const now = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
-  yield* sql`
-    UPDATE ${sql(SCHEMA_META_TABLE)}
-    SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0, applied_at = ${now}
-    WHERE id = 1
+    VALUES (1, ${SCHEMA_VERSION}, ${schemaChecksum()}, 0, ${now})
   `
 })
 
@@ -105,18 +26,14 @@ export const verifySchema = (
   mapSqlError(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      const rows = yield* sql<{
-        version: number
-        checksum: string
-        dirty: number
-      }>`SELECT version, checksum, dirty FROM ${sql(SCHEMA_META_TABLE)} WHERE id = 1`
+      const rows = yield* sql<{ version: number; checksum: string; dirty: number }>`
+        SELECT version, checksum, dirty FROM ${sql(SCHEMA_META_TABLE)} WHERE id = 1
+      `
       const row = rows[0]
       if (row === undefined) {
         return yield* SchemaMigrationFailed.make({ source, message: "schema meta missing after migration" })
       }
-      if (Number(row.dirty) === 1) {
-        return yield* SchemaDirty.make({ source, version: Number(row.version) })
-      }
+      if (Number(row.dirty) === 1) return yield* SchemaDirty.make({ source, version: Number(row.version) })
       if (Number(row.version) > SCHEMA_VERSION) {
         return yield* SchemaVersionUnsupported.make({
           source,
@@ -125,7 +42,7 @@ export const verifySchema = (
         })
       }
       const expected = schemaChecksum()
-      if (row.checksum !== expected) {
+      if (Number(row.version) !== SCHEMA_VERSION || row.checksum !== expected) {
         return yield* SchemaChecksumMismatch.make({ source, expected, actual: row.checksum })
       }
     }),
@@ -169,44 +86,22 @@ export const migrate = (
         }),
       ),
     )
-    yield* mapSqlError(
-      Effect.gen(function* () {
-        const legacyTables = yield* sql<{ present: number }>`
-          SELECT COUNT(*) AS present FROM sqlite_master
-          WHERE type = 'table' AND name IN (${SCHEMA_META_TABLE}, 'baton_runs')
-        `
-        if (Number(legacyTables[0]?.present ?? 0) !== 2) return
-        const meta = yield* sql<{ version: number }>`
-          SELECT version FROM ${sql(SCHEMA_META_TABLE)} WHERE id = 1
-        `
-        if (Number(meta[0]?.version ?? SCHEMA_VERSION) >= 5) return
-        const runs = yield* sql<{ present: number }>`SELECT EXISTS (SELECT 1 FROM baton_runs) AS present`
-        if (Number(runs[0]?.present ?? 0) === 1) {
-          return yield* SchemaMigrationFailed.make({
-            source,
-            message: "cannot migrate nonempty baton_runs to executable manifests",
-          })
-        }
-      }),
-    ).pipe(
-      Effect.mapError((error) =>
-        error instanceof SchemaMigrationFailed
-          ? error
-          : SchemaMigrationFailed.make({
-              source,
-              message: "message" in error ? String(error.message) : "schema migration guard failed",
-            }),
-      ),
-    )
+    const existing = yield* mapSqlError(sql<{ meta_present: number; baton_tables: number }>`
+      SELECT
+        SUM(CASE WHEN name = ${SCHEMA_META_TABLE} THEN 1 ELSE 0 END) AS meta_present,
+        COUNT(*) AS baton_tables
+      FROM sqlite_master WHERE type = 'table' AND name LIKE 'baton_%'
+    `).pipe(Effect.mapError(() => SchemaMigrationFailed.make({ source, message: "schema meta read failed" })))
+    if (Number(existing[0]?.meta_present ?? 0) > 0) return yield* verifySchema(source)
+    if (Number(existing[0]?.baton_tables ?? 0) > 0) {
+      return yield* SchemaMigrationFailed.make({
+        source,
+        message: "cannot create the baseline over an existing Baton schema",
+      })
+    }
+
     yield* SqliteMigrator.run({
-      loader: SqliteMigrator.fromRecord({
-        "0001_baton_runtime_kernel": migrationEffect,
-        "0002_baton_runtime_steering": steeringMigrationEffect,
-        "0003_baton_runtime_fan_out": fanOutMigrationEffect,
-        "0004_baton_runtime_tree_projection": treeMigrationEffect,
-        "0005_baton_runtime_executable_manifest": executableMigrationEffect,
-        "0006_baton_runtime_operation_resolution": operationResolutionMigrationEffect,
-      }),
+      loader: SqliteMigrator.fromRecord({ "0001_baton_runtime": migrationEffect }),
       table: MIGRATIONS_TABLE,
     }).pipe(
       Effect.mapError((error) =>

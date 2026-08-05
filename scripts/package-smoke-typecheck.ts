@@ -53,7 +53,6 @@ type ModelResilienceFailureResolver = Assert<
 type SessionCanonical = Assert<
   Equal<LayerShape<typeof Session.layerMemory>, readonly [Session.SessionStore, never, never]>
 >
-type RegistryCanonical = Assert<Equal<typeof ModelRegistry.layerMemory, typeof ModelRegistry.layer>>
 type ToolOutputCanonical = Assert<
   Equal<LayerShape<typeof ToolOutput.layerMemory>, readonly [ToolOutput.ToolOutputStore, never, never]>
 >

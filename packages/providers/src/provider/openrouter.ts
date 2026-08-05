@@ -4,7 +4,7 @@ import { Config, Layer, Redacted } from "effect"
 import { AiError } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
 import { layerImageSources } from "../model/image-source.js"
-import { type FailureInput, layerModelFailures } from "../model/model-failure.js"
+import { type FailureInput, isAvailabilityFailure, layerModelFailures } from "../model/model-failure.js"
 import type { RegistrationOptions } from "./openai.js"
 
 /** @experimental */
@@ -105,6 +105,7 @@ export const layer = (
       model: input.model,
       layer: openRouterLanguageModelLayer(input),
       classifyFailure,
+      isAvailabilityFailure,
       ...(input.registrationKey === undefined ? {} : { registrationKey: input.registrationKey }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
     }),

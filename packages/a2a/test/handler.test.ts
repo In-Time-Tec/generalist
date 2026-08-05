@@ -58,6 +58,12 @@ const completed = (runId: string, sequence: number): RunEvent.RunCompleted => ({
   result: { text: "complete", turns: 1, transcript: Prompt.empty },
 })
 
+const completedProgram = (runId: string, sequence: number): RunEvent.RunCompleted => ({
+  ...base(runId, sequence),
+  _tag: "RunCompleted",
+  result: { _tag: "Program", value: { answer: 42 } },
+})
+
 const waiting = (runId: string): RunEvent.RunWaiting => ({
   ...base(runId, 2),
   _tag: "RunWaiting",
@@ -92,14 +98,18 @@ const makeRuntime = (acceptedSequence = 0) => {
   })
 
   const runtime: Runtime.Interface = {
+    start: () => Effect.die("not used"),
     send: (input) => {
       sentRunIds.push(input.runId!)
       const runId = input.runId!
       const shouldWait = input.messageId === "wait"
+      const shouldRunProgram = input.messageId === "program"
       runs.set(runId, {
         status: "queued",
         events: [accepted(runId)],
-        pending: shouldWait ? [attempt(runId), waiting(runId)] : [attempt(runId), completed(runId, 2)],
+        pending: shouldWait
+          ? [attempt(runId), waiting(runId)]
+          : [attempt(runId), shouldRunProgram ? completedProgram(runId, 2) : completed(runId, 2)],
       })
       return Effect.succeed({ runId, messageId: input.messageId!, acceptedSequence, duplicate: false })
     },
@@ -233,6 +243,19 @@ describe("DefaultRequestHandler projection", () => {
       new ServerCallContext(),
     )
     expect(listed.tasks.map((item) => item.id)).toEqual([taskId])
+  })
+
+  it("projects Program completion values as structured artifacts", async () => {
+    const fixture = makeRuntime()
+    const handler = makeHandler(fixture.runtime, { address, card })
+    const responses = []
+    for await (const response of handler.sendMessageStream(request(message("program")), new ServerCallContext())) {
+      responses.push(response)
+    }
+
+    const taskId = responses[0]?.payload?.$case === "task" ? responses[0].payload.value.id : ""
+    const task = await handler.getTask({ tenant: "", id: taskId }, new ServerCallContext())
+    expect(task.artifacts[0]?.parts[0]?.content).toEqual({ $case: "data", value: { answer: 42 } })
   })
 
   it("starts a newly admitted run at the run-event origin, not its lane sequence", async () => {

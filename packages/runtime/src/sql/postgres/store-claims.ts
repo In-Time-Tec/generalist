@@ -11,7 +11,7 @@ import { decodeRunEffect } from "../store-helpers.js"
 import type { EventHub } from "../subscribers.js"
 import { claimReadyRuns, refreshLease, releaseClaim } from "./claims.js"
 import { RunClaims, type Interface as ClaimsInterface } from "../run-claims.js"
-import { afterTerminal, appendEvent, loadEventsAfter, loadRun, settleParent } from "./pg-helpers.js"
+import { afterTerminal, appendEvent, completeRun, loadEventsAfter, loadRun, settleParent } from "./pg-helpers.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
 type RunFn = <A, E>(
@@ -94,15 +94,7 @@ export const makePostgresClaims = (input: {
             return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
           }
           if (commitInput.transition === "complete") {
-            const event = yield* appendEvent(
-              hub,
-              loaded,
-              { _tag: "RunCompleted", result: commitInput.result as never },
-              "succeeded",
-            )
-            const settled = (yield* loadRun(loaded.runId))!
-            yield* settleParent(hub, settled, event.eventId)
-            yield* afterTerminal(hub, settled)
+            yield* completeRun(hub, loaded, commitInput.result as never)
             return
           }
           const event = yield* appendEvent(

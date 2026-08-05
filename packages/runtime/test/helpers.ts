@@ -1,7 +1,19 @@
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentEvent } from "@batonfx/core"
-import { Address, ExecutableManifest, ExecutableResolver, Runtime } from "../src/index.js"
-import { pinnedTestAgent } from "./identity.js"
+import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "../src/index.js"
+import { closedTestAgent, pinnedTestAgent } from "./identity.js"
+
+/** Exact registration set covering every pin an executable requires. */
+export const registrationsFor = (
+  executable: ExecutableManifest.PinnedExecutable,
+  suffix = "1",
+): ReadonlyArray<ExecutableRegistration.ExecutableRegistration> =>
+  [...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
+    pin,
+    codec: "test",
+    version: "1",
+    payload: { fixture: suffix },
+  }))
 
 export const assistant: Agent.Agent = Agent.make({ name: "assistant" })
 export const researcher: Agent.Agent = Agent.make({ name: "researcher" })
@@ -13,9 +25,11 @@ const assistantPinned = pinnedTestAgent(assistant, "1", [
   { selection: "analyst", agent: analystPinned.pin },
   { selection: "researcher", agent: researcherPinned.pin },
 ])
+const entries = (...agents: ReadonlyArray<ReturnType<typeof pinnedTestAgent>>) =>
+  agents.map((agent) => ({ _tag: "Agent" as const, pin: agent.pin, manifest: agent.manifest }))
 const executable = ExecutableManifest.make({
   root: assistantPinned.pin,
-  agents: [assistantPinned, researcherPinned, analystPinned],
+  entries: entries(assistantPinned, researcherPinned, analystPinned),
 })
 
 export const assistantRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
@@ -26,7 +40,7 @@ export const assistantRef: ExecutableManifest.PinnedExecutable & ExecutableManif
 const researcherExecutable = ExecutableManifest.make({
   root: assistantPinned.pin,
   active: researcherPinned.pin,
-  agents: [assistantPinned, researcherPinned, analystPinned],
+  entries: entries(assistantPinned, researcherPinned, analystPinned),
 })
 export const researcherRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
   ...researcherExecutable,
@@ -36,7 +50,7 @@ export const researcherRef: ExecutableManifest.PinnedExecutable & ExecutableMani
 const analystExecutable = ExecutableManifest.make({
   root: assistantPinned.pin,
   active: analystPinned.pin,
-  agents: [assistantPinned, researcherPinned, analystPinned],
+  entries: entries(assistantPinned, researcherPinned, analystPinned),
 })
 export const analystRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
   ...analystExecutable,
@@ -46,7 +60,7 @@ export const analystRef: ExecutableManifest.PinnedExecutable & ExecutableManifes
 export const assistantAddress = Address.make("agent:assistant")
 export const researcherAddress = Address.make("agent:researcher")
 
-const alternateAssistant = Agent.make({ name: "alternate-assistant" })
+export const alternateAssistant: Agent.Agent = Agent.make({ name: "alternate-assistant" })
 const alternateResearcher = Agent.make({ name: "alternate-researcher" })
 const alternateResearcherPinned = pinnedTestAgent(alternateResearcher, "2")
 const alternateAssistantPinned = pinnedTestAgent(alternateAssistant, "2", [
@@ -54,7 +68,7 @@ const alternateAssistantPinned = pinnedTestAgent(alternateAssistant, "2", [
 ])
 const alternateExecutable = ExecutableManifest.make({
   root: alternateAssistantPinned.pin,
-  agents: [alternateAssistantPinned, alternateResearcherPinned],
+  entries: entries(alternateAssistantPinned, alternateResearcherPinned),
 })
 export const alternateAssistantRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
   ...alternateExecutable,
@@ -63,7 +77,7 @@ export const alternateAssistantRef: ExecutableManifest.PinnedExecutable & Execut
 const alternateResearcherExecutable = ExecutableManifest.make({
   root: alternateAssistantPinned.pin,
   active: alternateResearcherPinned.pin,
-  agents: [alternateAssistantPinned, alternateResearcherPinned],
+  entries: entries(alternateAssistantPinned, alternateResearcherPinned),
 })
 export const alternateResearcherRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
   ...alternateResearcherExecutable,
@@ -73,14 +87,18 @@ export const alternateAssistantAddress = Address.make("agent:alternate-assistant
 
 export const parentRelativeOptions: Runtime.LayerOptions = {
   resolver: ExecutableResolver.makeStatic([
-    { executable: assistantRef, agent: assistant },
-    { executable: researcherRef, agent: researcher },
-    { executable: alternateAssistantRef, agent: alternateAssistant },
-    { executable: alternateResearcherRef, agent: alternateResearcher },
+    { executable: assistantRef, agent: closedTestAgent(assistant) },
+    { executable: researcherRef, agent: closedTestAgent(researcher) },
+    { executable: alternateAssistantRef, agent: closedTestAgent(alternateAssistant) },
+    { executable: alternateResearcherRef, agent: closedTestAgent(alternateResearcher) },
   ]),
   addresses: [
-    { address: assistantAddress, executable: assistantRef },
-    { address: alternateAssistantAddress, executable: alternateAssistantRef },
+    { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+    {
+      address: alternateAssistantAddress,
+      executable: alternateAssistantRef,
+      registrations: registrationsFor(alternateAssistantRef),
+    },
   ],
 }
 
@@ -88,20 +106,20 @@ export const parentRelativeLayer = Runtime.layerMemory(parentRelativeOptions)
 
 export const memoryLayer = Runtime.layerMemory({
   resolver: ExecutableResolver.makeStatic([
-    { executable: assistantRef, agent: assistant },
-    { executable: researcherRef, agent: researcher },
-    { executable: analystRef, agent: analyst },
+    { executable: assistantRef, agent: closedTestAgent(assistant) },
+    { executable: researcherRef, agent: closedTestAgent(researcher) },
+    { executable: analystRef, agent: closedTestAgent(analyst) },
   ]),
   addresses: [
-    { address: assistantAddress, executable: assistantRef },
-    { address: researcherAddress, executable: researcherRef },
+    { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+    { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
   ],
   subscriberQueueCapacity: 8,
 })
 
 export const lagLayer = Runtime.layerMemory({
-  resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: assistant }]),
-  addresses: [{ address: assistantAddress, executable: assistantRef }],
+  resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+  addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
   subscriberQueueCapacity: 1,
 })
 

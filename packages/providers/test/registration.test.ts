@@ -20,12 +20,14 @@ import {
 } from "@batonfx/core"
 import {
   classifyFailure as classifyAnthropicFailure,
+  decodeConfig as decodeAnthropicConfig,
   layer as anthropicLayer,
   toolJsonSchemaCompiler as anthropicToolJsonSchemaCompiler,
 } from "@batonfx/providers/anthropic"
 import { layerOpenAi as deterministicLayerOpenAi } from "@batonfx/providers/deterministic"
 import {
   classifyFailure as classifyOpenAiFailure,
+  decodeConfig as decodeOpenAiConfig,
   layer as openAiLayer,
   toolJsonSchemaCompiler as openAiToolJsonSchemaCompiler,
 } from "@batonfx/providers/openai"
@@ -66,6 +68,39 @@ type EveryLayerError<Layers extends ReadonlyArray<Layer.Any>, Error> = Layers ex
 const tuple = <const Values extends ReadonlyArray<unknown>>(...values: Values): Values => values
 
 describe("providers", () => {
+  it("decodes canonical persisted OpenAI and Anthropic options", () => {
+    expect(
+      decodeOpenAiConfig({
+        max_output_tokens: 16_384,
+        reasoning: { effort: "high", summary: "auto" },
+        text: { verbosity: "low" },
+      }),
+    ).toEqual({
+      max_output_tokens: 16_384,
+      reasoning: { effort: "high", summary: "auto" },
+      text: { verbosity: "low" },
+    })
+    expect(
+      decodeAnthropicConfig({
+        max_tokens: 8_192,
+        output_config: { effort: "medium" },
+        thinking: { type: "enabled", budget_tokens: 2_048 },
+      }),
+    ).toEqual({
+      max_tokens: 8_192,
+      output_config: { effort: "medium" },
+      thinking: { type: "enabled", budget_tokens: 2_048 },
+    })
+  })
+
+  it("rejects invalid and cross-provider persisted options", () => {
+    expect(() => decodeOpenAiConfig({ max_tokens: 1_000 })).toThrow()
+    expect(() => decodeOpenAiConfig({ max_output_tokens: "1000" })).toThrow()
+    expect(() => decodeAnthropicConfig({ max_output_tokens: 1_000 })).toThrow()
+    expect(() => decodeAnthropicConfig({ max_tokens: 0 })).toThrow()
+    expect(() => decodeAnthropicConfig({ output_config: { effort: "extreme" } })).toThrow()
+  })
+
   it.effect("compiles the same request schema as each released provider codec", () => {
     const tool = Tool.make("lookup", {
       parameters: Schema.Struct({ required: Schema.String, optional: Schema.optionalKey(Schema.String) }),

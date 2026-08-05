@@ -3,12 +3,7 @@ import { Effect, Exit, Layer, Redacted, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { Errors, MysqlRunSchema, RunClaims, Runtime, RuntimeWorker, RunStore } from "../../src/index.js"
-import {
-  SCHEMA_VERSION,
-  TREE_MIGRATION_STATEMENTS,
-  schemaChecksum,
-  steeringSchemaChecksum,
-} from "../../src/sql/mysql/schema.js"
+import { SCHEMA_VERSION, schemaChecksum } from "../../src/sql/mysql/schema.js"
 import {
   alternateAssistantRef,
   assistantAddress,
@@ -24,50 +19,85 @@ import { mysqlAvailable, mysqlClient, mysqlLayer, mysqlUrl, prepareMysql, unique
 const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
 const url = mysqlUrl!
 
-expect(steeringSchemaChecksum()).toBe("8db779640c0b84515867e96dea8709a53b2ae369152b425408194f24501ea996")
-
 const withSchema = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
     yield* prepareMysql(url)
     return yield* effect
   })
 
+const exactRegistrations = () => {
+  const pins = new Set<string>()
+  for (const entry of assistantRef.manifest.entries) {
+    if (entry._tag !== "Agent") continue
+    pins.add(entry.manifest.model)
+    for (const value of [...entry.manifest.tools, ...entry.manifest.skills, ...entry.manifest.services]) {
+      pins.add(value.pin)
+    }
+    if (entry.manifest.policy._tag === "Pinned") pins.add(entry.manifest.policy.pin)
+    if (entry.manifest.compaction !== undefined) {
+      pins.add(entry.manifest.compaction.service)
+      pins.add(entry.manifest.compaction.summaryModel)
+    }
+  }
+  return [...pins].map((pin) => ({ pin, codec: "mysql-test", version: "1", payload: { route: "exact" } }))
+}
+
 describeMysql("mysql run store", () => {
-  it.live("executes the v4 backfill in numeric per-Run sequence order", () =>
+  it.live("persists exact-start registrations and replays admission idempotently", () =>
     withSchema(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const receipt = yield* runtime.send({
-          to: assistantAddress,
-          sessionId: uniqueSession("tree-backfill"),
-          idempotencyKey: "run",
-          prompt: "backfill",
-        })
-        const sequences = yield* Effect.gen(function* () {
-          const sql = yield* SqlClient.SqlClient
-          const template = (yield* sql<{ event_json: string }>`
-            SELECT event_json FROM baton_run_events WHERE run_id = ${receipt.runId} ORDER BY sequence DESC LIMIT 1
-          `)[0]!
-          for (let sequence = 1; sequence < 12; sequence++) {
-            const event = JSON.parse(template.event_json) as Record<string, unknown>
-            event.eventId = `${receipt.runId}:${sequence}`
-            event.sequence = sequence
-            yield* sql`
-              INSERT INTO baton_run_events (run_id, sequence, event_id, event_json)
-              VALUES (${receipt.runId}, ${sequence}, ${event.eventId as string}, ${JSON.stringify(event)})
-            `
-          }
-          yield* sql`UPDATE baton_runs SET last_sequence = 11 WHERE run_id = ${receipt.runId}`
-          yield* sql.unsafe("DROP TABLE baton_tree_event_index")
-          yield* sql.unsafe("DROP TABLE baton_tree_roots")
-          for (const statement of TREE_MIGRATION_STATEMENTS) yield* sql.unsafe(statement)
-          const rows = yield* sql<{ run_sequence: number }>`
-            SELECT run_sequence FROM baton_tree_event_index
-            WHERE root_run_id = ${receipt.runId} ORDER BY position
-          `
-          return rows.map((row) => Number(row.run_sequence))
-        }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
-        expect(sequences).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+        const store = yield* RunStore.RunStore
+        const input = {
+          executable: assistantRef,
+          registrations: exactRegistrations(),
+          sessionId: uniqueSession("exact-start"),
+          idempotencyKey: "exact-start",
+          prompt: textPrompt("exact"),
+          initialChildren: [
+            {
+              invocationId: "initial-research",
+              idempotencyKey: "initial-research",
+              selection: "researcher",
+              sessionId: uniqueSession("exact-start-child"),
+              prompt: textPrompt("research"),
+            },
+          ],
+        }
+        const first = yield* runtime.start(input)
+        const duplicate = yield* runtime.start(input)
+        const execution = yield* store.loadExecution(first.runId)
+        expect(duplicate).toMatchObject({ runId: first.runId, duplicate: true })
+        expect(duplicate.childRunIds).toEqual(first.childRunIds)
+        expect((yield* store.loadExecution(first.childRunIds[0]!)).executableRef).toEqual(researcherRef.ref)
+        expect(execution.registrations).toEqual(
+          [...input.registrations].toSorted((left, right) => left.pin.localeCompare(right.pin)),
+        )
+        expect(
+          yield* runtime
+            .start({
+              ...input,
+              initialChildren: [{ ...input.initialChildren[0]!, prompt: textPrompt("changed") }],
+            })
+            .pipe(Effect.flip),
+        ).toBeInstanceOf(Errors.IdempotencyConflict)
+        const conflict = yield* runtime
+          .start({
+            ...input,
+            idempotencyKey: "changed-registration",
+            registrations: input.registrations.map((registration, index) =>
+              index === 0
+                ? {
+                    pin: registration.pin,
+                    codec: registration.codec,
+                    version: registration.version,
+                    payload: { route: "changed" },
+                  }
+                : registration,
+            ),
+          })
+          .pipe(Effect.flip)
+        expect(conflict).toBeInstanceOf(Errors.ExecutableRegistrationConflict)
       }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
     ),
   )
@@ -149,14 +179,20 @@ describeMysql("mysql run store", () => {
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: uniqueSession("terminal-parent"),
           idempotencyKey: "parent",
           prompt: textPrompt("parent"),
         })
-        const claim = yield* store.claimExecution({ runId: parent.runId, ownerId: "terminal-parent" })
-        yield* store.complete({ ...claim, result: completedResult("done") })
+        const [claim] = yield* claims.claimReadyRuns({ workerId: "terminal-parent", limit: 1 })
+        yield* store.complete({
+          runId: parent.runId,
+          ownerId: claim!.workerId,
+          attemptFence: claim!.attemptFence,
+          result: completedResult("done"),
+        })
         const failure = yield* runtime
           .spawn({
             parentRunId: parent.runId,
@@ -192,7 +228,9 @@ describeMysql("mysql run store", () => {
           expect.stringContaining("first"),
           expect.stringContaining("second"),
         ])
-        expect(yield* store.complete({ ...executionClaim, result: completedResult("early") })).toBe("steering-pending")
+        expect(yield* store.complete({ ...executionClaim, result: completedResult("early") })).toMatchObject({
+          _tag: "SteeringPending",
+        })
       }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
     ),
   )
@@ -419,13 +457,15 @@ describeMysql("mysql run store", () => {
           prompt: "wait-op",
         })
         const claimed = (yield* claims.claimReadyRuns({ workerId: "wait-worker", limit: 1 }))[0]!
-        const claim = { runId: receipt.runId, ownerId: "wait-worker", attemptFence: claimed.attemptFence }
+        const suspending = { runId: receipt.runId, ownerId: "wait-worker", attemptFence: claimed.attemptFence }
         yield* store.suspend({
-          ...claim,
+          ...suspending,
           wait: openWait("approval", "approval"),
           suspension: suspension("approval", "approval"),
         })
         yield* runtime.respond({ runId: receipt.runId, waitId: "approval", resolution: { _tag: "Approved" } })
+        const reclaimed = (yield* claims.claimReadyRuns({ workerId: "wait-worker", limit: 1 }))[0]!
+        const claim = { runId: receipt.runId, ownerId: "wait-worker", attemptFence: reclaimed.attemptFence }
         const recorded = yield* store.recordOperation({
           ...claim,
           operationKey: "tool:external",
@@ -585,6 +625,61 @@ describeMysql("mysql run store", () => {
         })
         const second = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
         expect(second.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[1]])
+      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+    ),
+  )
+
+  it.live("preserves a parked outcome against steering and new fan-out admission", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const parent = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("pending-fan-out"),
+          idempotencyKey: "parent",
+          prompt: "parent",
+        })
+        const [parentClaim] = yield* claims.claimReadyRuns({ workerId: "pending-parent", limit: 1 })
+        const input: Runtime.FanOutInput = {
+          parentRunId: parent.runId,
+          idempotencyKey: "reviews",
+          members: [{ key: "review", selection: "researcher", prompt: "review" }],
+          concurrency: 1,
+          join: { _tag: "AllSuccess" },
+          remainder: "await",
+        }
+        const fanOut = yield* runtime.fanOut(input)
+        yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
+        yield* store.complete({
+          runId: parent.runId,
+          ownerId: parentClaim!.workerId,
+          attemptFence: parentClaim!.attemptFence,
+          result: { _tag: "Program", value: "preserved" },
+        })
+        yield* runtime.steer({ runId: parent.runId, idempotencyKey: "prior", prompt: "prior" })
+        expect(
+          yield* runtime.steer({ runId: parent.runId, idempotencyKey: "late", prompt: "late" }).pipe(Effect.flip),
+        ).toBeInstanceOf(Errors.RunTerminal)
+        expect((yield* runtime.fanOut(input)).duplicate).toBe(true)
+        expect(yield* runtime.fanOut({ ...input, idempotencyKey: "late-fan-out" }).pipe(Effect.flip)).toBeInstanceOf(
+          Errors.FanOutInvalid,
+        )
+        const [childClaim] = yield* claims.claimReadyRuns({ workerId: "pending-child", limit: 1 })
+        expect(childClaim?.run.runId).toBe(fanOut.childRunIds[0])
+        yield* claims.commitWithClaim({
+          runId: childClaim!.run.runId,
+          workerId: childClaim!.workerId,
+          attemptFence: childClaim!.attemptFence,
+          transition: "complete",
+          result: completedResult("reviewed"),
+        })
+        expect((yield* runtime.inspect(parent.runId)).status).toBe("succeeded")
+        expect((yield* runtime.history({ runId: parent.runId, limit: 100 })).at(-1)).toMatchObject({
+          _tag: "RunCompleted",
+          result: { _tag: "Program", value: "preserved" },
+        })
       }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
     ),
   )

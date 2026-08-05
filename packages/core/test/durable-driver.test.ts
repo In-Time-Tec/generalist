@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Cause, Effect, Layer, Schema, Stream } from "effect"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, AgentManifest, DurableDriver, ExecutableManifest, Pins, RunBudget, ToolExecutor } from "../src/index"
@@ -17,6 +17,7 @@ const persistenceLayer = Chat.layerPersisted({ storeId: "durable-driver-test" })
 )
 
 const roundTrip = (value: unknown): unknown => Json.parse(Json.stringify(value))
+const agentEntry = (agent: AgentManifest.PinnedAgent) => ({ _tag: "Agent" as const, ...agent })
 
 describe("executable identity", () => {
   it("counts handoff edges by structural source and target identity", () => {
@@ -97,6 +98,17 @@ describe("executable identity", () => {
       base({ skills: [{ name: "research", pin: Pins.makeCapability({ skill: "research" }) }] }),
       base({ services: [{ name: "clock", pin: Pins.makeCapability({ service: "clock" }) }] }),
       base({ policy: { _tag: "Portable", policy: { _tag: "Forever" } } }),
+      base({
+        compaction: {
+          service: Pins.makeCapability({ compaction: "default" }),
+          summaryModel: Pins.makeModel({ implementation: "summary" }),
+          contextWindow: 128_000,
+          reserveTokens: 8_000,
+          keepRecentTokens: 16_000,
+          strategyIdentity: "default:v1",
+          summaryPromptIdentity: "summary:v1",
+        },
+      }),
       base({ budget: { modelCalls: 5 } }),
       base({
         children: [
@@ -125,6 +137,28 @@ describe("executable identity", () => {
         ],
       }).pin,
     )
+  })
+
+  it("pins every compaction policy dimension", () => {
+    const compaction: AgentManifest.CompactionIdentity = {
+      service: Pins.makeCapability({ compaction: "default" }),
+      summaryModel: Pins.makeModel({ implementation: "summary" }),
+      contextWindow: 128_000,
+      reserveTokens: 8_000,
+      keepRecentTokens: 16_000,
+      strategyIdentity: "default:v1",
+      summaryPromptIdentity: "summary:v1",
+    }
+    const original = base({ compaction })
+    for (const changed of [
+      base({ compaction: { ...compaction, contextWindow: 64_000 } }),
+      base({ compaction: { ...compaction, reserveTokens: 4_000 } }),
+      base({ compaction: { ...compaction, keepRecentTokens: 8_000 } }),
+      base({ compaction: { ...compaction, strategyIdentity: "default:v2" } }),
+      base({ compaction: { ...compaction, summaryPromptIdentity: "summary:v2" } }),
+    ]) {
+      expect(changed.pin).not.toBe(original.pin)
+    }
   })
 
   it("builds from a live Agent only with exact caller-supplied tool pins", () => {
@@ -192,25 +226,36 @@ describe("executable identity", () => {
 
   it("validates complete closures and rejects duplicate or dangling entries", () => {
     const agent = base()
-    const executable = ExecutableManifest.make({ root: agent.pin, agents: [agent] })
+    const executable = ExecutableManifest.make({ root: agent.pin, entries: [agentEntry(agent)] })
     expect(roundTrip(executable)).toEqual(executable)
-    expect(() => ExecutableManifest.make({ root: agent.pin, agents: [agent, agent] })).toThrow("Duplicate")
+    expect(() => ExecutableManifest.make({ root: agent.pin, entries: [agentEntry(agent), agentEntry(agent)] })).toThrow(
+      "Duplicate",
+    )
     const missing = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"c".repeat(64)}`)
-    expect(() => ExecutableManifest.make({ root: missing, agents: [agent] })).toThrow("Root")
-    expect(() => ExecutableManifest.make({ root: agent.pin, active: missing, agents: [agent] })).toThrow("Active")
+    expect(() => ExecutableManifest.make({ root: missing, entries: [agentEntry(agent)] })).toThrow("Root")
+    expect(() => ExecutableManifest.make({ root: agent.pin, active: missing, entries: [agentEntry(agent)] })).toThrow(
+      "Active",
+    )
     const dangling = base({ children: [{ selection: "child", agent: missing }] })
-    expect(() => ExecutableManifest.make({ root: dangling.pin, agents: [dangling] })).toThrow("Dangling")
+    expect(() => ExecutableManifest.make({ root: dangling.pin, entries: [agentEntry(dangling)] })).toThrow(
+      "Agent binding",
+    )
     expect(() =>
-      ExecutableManifest.make({ root: missing, agents: [{ pin: missing, manifest: agent.manifest }] }),
+      ExecutableManifest.make({
+        root: missing,
+        entries: [{ _tag: "Agent", pin: missing, manifest: agent.manifest }],
+      }),
     ).toThrow("digest mismatch")
     const disconnected = base({ name: "disconnected", tools: [] })
-    expect(() => ExecutableManifest.make({ root: agent.pin, agents: [agent, disconnected] })).toThrow("disconnected")
+    expect(() =>
+      ExecutableManifest.make({ root: agent.pin, entries: [agentEntry(agent), agentEntry(disconnected)] }),
+    ).toThrow("disconnected")
   })
 
   it.effect("decodes only a fully verified pinned executable", () =>
     Effect.gen(function* () {
       const agent = base()
-      const executable = ExecutableManifest.make({ root: agent.pin, agents: [agent] })
+      const executable = ExecutableManifest.make({ root: agent.pin, entries: [agentEntry(agent)] })
       expect(yield* ExecutableManifest.decode(roundTrip(executable))).toEqual(executable)
       const wrongExecutable = {
         ...executable,
@@ -221,7 +266,7 @@ describe("executable identity", () => {
         ...executable,
         manifest: {
           ...executable.manifest,
-          agents: [{ ...executable.manifest.agents[0]!, manifest: { ...agent.manifest, name: "altered" } }],
+          entries: [{ ...executable.manifest.entries[0]!, manifest: { ...agent.manifest, name: "altered" } }],
         },
       }
       yield* ExecutableManifest.decode(altered).pipe(Effect.flip)
@@ -231,9 +276,13 @@ describe("executable identity", () => {
   it("pins root and active selection, canonicalizes entries, and rejects cycles", () => {
     const child = base({ name: "child", tools: [] })
     const root = base({ children: [{ selection: "delegate", agent: child.pin }] })
-    const left = ExecutableManifest.make({ root: root.pin, agents: [root, child] })
-    const reordered = ExecutableManifest.make({ root: root.pin, agents: [child, root] })
-    const activeChild = ExecutableManifest.make({ root: root.pin, active: child.pin, agents: [root, child] })
+    const left = ExecutableManifest.make({ root: root.pin, entries: [agentEntry(root), agentEntry(child)] })
+    const reordered = ExecutableManifest.make({ root: root.pin, entries: [agentEntry(child), agentEntry(root)] })
+    const activeChild = ExecutableManifest.make({
+      root: root.pin,
+      active: child.pin,
+      entries: [agentEntry(root), agentEntry(child)],
+    })
     expect(left.ref.executable).toBe(reordered.ref.executable)
     expect(left.ref.executable).toBe(activeChild.ref.executable)
     expect(activeChild.ref.active).toBe(child.pin)
@@ -249,9 +298,9 @@ describe("executable identity", () => {
     expect(() =>
       ExecutableManifest.make({
         root: pinA,
-        agents: [
-          { pin: pinA, manifest: manifestA },
-          { pin: pinB, manifest: manifestB },
+        entries: [
+          { _tag: "Agent", pin: pinA, manifest: manifestA },
+          { _tag: "Agent", pin: pinB, manifest: manifestB },
         ],
       }),
     ).toThrow("Cyclic")
@@ -739,6 +788,134 @@ describe("DurableDriver Agent.stream integration", () => {
         operationId: "op-unknown",
       }).pipe(Effect.flip)
       expect(error._tag).toBe("@batonfx/core/DriverUnknownReplay")
+    }),
+  )
+
+  it.effect("records interruption after a non-replayable effect as unknown without losing interruption", () =>
+    Effect.gen(function* () {
+      const lifecycle: Array<string> = []
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "interrupt", sessionId: "interrupt" })
+      const initial = yield* driver.initial({ prompt: Prompt.make("interrupt"), budget: RunBudget.allocate({}) })
+      const interpreter = yield* DurableDriver.makeInline({
+        driver,
+        initial,
+        journal: {
+          onScheduled: () => Effect.succeed(undefined),
+          onCompleted: (_operation, outcome) =>
+            Effect.sync(() => lifecycle.push(outcome._tag === "Unknown" ? "unknown persisted" : outcome._tag)),
+          onCheckpoint: () => Effect.void,
+        },
+      })
+      const exit = yield* interpreter
+        .run(
+          { kind: "tool", key: "interrupt:tool", input: {}, replayPolicy: "never" },
+          Effect.acquireUseRelease(
+            Effect.sync(() => lifecycle.push("effect committed")),
+            () => Effect.interrupt,
+            () => Effect.sync(() => lifecycle.push("handler finalized")),
+          ),
+        )
+        .pipe(Effect.exit)
+
+      expect(exit._tag).toBe("Failure")
+      if (exit._tag === "Failure") expect(exit.cause.reasons.every(Cause.isInterruptReason)).toBe(true)
+      expect(lifecycle).toEqual(["effect committed", "handler finalized", "unknown persisted"])
+      expect((yield* interpreter.recorded)[0]?.outcome).toEqual({
+        _tag: "Unknown",
+        operationId: "interrupt:tool",
+      })
+    }),
+  )
+
+  it.effect("preserves typed failures and defects while classifying only defects as uncertain", () =>
+    Effect.gen(function* () {
+      const outcomes: Array<DurableDriver.OperationOutcome> = []
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "classification", sessionId: "classification" })
+      const initial = yield* driver.initial({ prompt: Prompt.make("classification"), budget: RunBudget.allocate({}) })
+      const interpreter = yield* DurableDriver.makeInline({
+        driver,
+        initial,
+        journal: {
+          onScheduled: () => Effect.succeed(undefined),
+          onCompleted: (_operation, outcome) => Effect.sync(() => outcomes.push(outcome)),
+          onCheckpoint: () => Effect.void,
+        },
+      })
+      const typed = { _tag: "TypedHandlerFailure" as const, detail: "kept" }
+      expect(
+        yield* interpreter
+          .run({ kind: "tool", key: "classification:typed", input: {}, replayPolicy: "never" }, Effect.fail(typed))
+          .pipe(Effect.flip),
+      ).toBe(typed)
+      const defect = new Error("handler defect")
+      const defectExit = yield* interpreter
+        .run({ kind: "tool", key: "classification:defect", input: {}, replayPolicy: "never" }, Effect.die(defect))
+        .pipe(Effect.exit)
+      expect(defectExit._tag).toBe("Failure")
+      if (defectExit._tag === "Failure") expect(Cause.squash(defectExit.cause)).toBe(defect)
+      expect(outcomes).toEqual([
+        { _tag: "Failed", error: typed },
+        { _tag: "Unknown", operationId: "classification:defect" },
+      ])
+    }),
+  )
+
+  it.effect("leaves interrupted retry-safe effects pending under the same identity", () =>
+    Effect.gen(function* () {
+      const completed: Array<DurableDriver.OperationOutcome> = []
+      const scheduled: Array<string> = []
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "retry-safe", sessionId: "retry-safe" })
+      const initial = yield* driver.initial({ prompt: Prompt.make("retry-safe"), budget: RunBudget.allocate({}) })
+      const interpreter = yield* DurableDriver.makeInline({
+        driver,
+        initial,
+        journal: {
+          onScheduled: (operation) =>
+            Effect.sync(() => {
+              scheduled.push(operation.key)
+              return undefined
+            }),
+          onCompleted: (_operation, outcome) => Effect.sync(() => completed.push(outcome)),
+          onCheckpoint: () => Effect.void,
+        },
+      })
+      const spec = {
+        kind: "model" as const,
+        key: "retry-safe:model",
+        input: {},
+        replayPolicy: "provider-idempotent" as const,
+      }
+      yield* interpreter.run(spec, Effect.interrupt).pipe(Effect.exit)
+      expect(yield* interpreter.run(spec, Effect.succeed("retried"))).toBe("retried")
+      expect(scheduled).toEqual([spec.key, spec.key])
+      expect(completed).toEqual([{ _tag: "Succeeded", value: "retried" }])
+    }),
+  )
+
+  it.effect("records a defective non-replayable stream as unknown after stream finalizers", () =>
+    Effect.gen(function* () {
+      const lifecycle: Array<string> = []
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream", sessionId: "stream" })
+      const initial = yield* driver.initial({ prompt: Prompt.make("stream"), budget: RunBudget.allocate({}) })
+      const interpreter = yield* DurableDriver.makeInline({
+        driver,
+        initial,
+        journal: {
+          onScheduled: () => Effect.succeed(undefined),
+          onCompleted: (_operation, outcome) => Effect.sync(() => lifecycle.push(outcome._tag)),
+          onCheckpoint: () => Effect.void,
+        },
+      })
+      const defect = new Error("stream defect")
+      const exit = yield* interpreter
+        .runStream(
+          { kind: "tool", key: "stream:tool", input: {}, replayPolicy: "never" },
+          Stream.die(defect).pipe(Stream.ensuring(Effect.sync(() => lifecycle.push("stream finalized")))),
+        )
+        .pipe(Stream.runDrain, Effect.exit)
+      expect(exit._tag).toBe("Failure")
+      if (exit._tag === "Failure") expect(Cause.squash(exit.cause)).toBe(defect)
+      expect(lifecycle).toEqual(["stream finalized", "Unknown"])
     }),
   )
 

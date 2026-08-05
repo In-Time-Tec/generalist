@@ -14,6 +14,11 @@ export const AgentPin = pinSchema("agent-pin")
 /** @experimental */
 export type AgentPin = typeof AgentPin.Type
 
+/** @experimental Exact identity of one closed Agent Program manifest. */
+export const ProgramPin = pinSchema("program-pin")
+/** @experimental */
+export type ProgramPin = typeof ProgramPin.Type
+
 /** @experimental Exact opaque identity of a model implementation and configuration. */
 export const ModelPin = pinSchema("model-pin")
 /** @experimental */
@@ -40,6 +45,10 @@ export const makeCapability = (identity: unknown): CapabilityPin =>
 /** @experimental */
 export const makeAgent = (identity: unknown): AgentPin =>
   Schema.decodeUnknownSync(AgentPin)(`agent-pin:v1:sha256:${digest(identity)}`)
+
+/** @experimental */
+export const makeProgram = (identity: unknown): ProgramPin =>
+  Schema.decodeUnknownSync(ProgramPin)(`program-pin:v1:sha256:${digest(identity)}`)
 
 /** @experimental */
 export const makeExecutable = (identity: unknown): ExecutablePin =>

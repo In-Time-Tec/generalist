@@ -53,7 +53,7 @@ describe("ModelRegistry", () => {
     "fails typed when the selected model is not registered",
     () =>
       [
-        ModelRegistry.layerMemory(),
+        ModelRegistry.layer(),
         Effect.gen(function* () {
           const failure = yield* Effect.flip(
             ModelRegistry.operate({ provider: "missing", model: "none" }, Effect.succeed("unused")),
@@ -73,7 +73,7 @@ describe("ModelRegistry", () => {
     "fails streams typed when the selected model is not registered",
     () =>
       [
-        ModelRegistry.layerMemory(),
+        ModelRegistry.layer(),
         Effect.gen(function* () {
           const failure = yield* Effect.flip(
             ModelRegistry.stream({ provider: "missing", model: "none" }, Stream.make("unused")).pipe(Stream.runDrain),
@@ -89,7 +89,7 @@ describe("ModelRegistry", () => {
     "provides a registered language model layer",
     () =>
       [
-        ModelRegistry.layerMemory(),
+        ModelRegistry.layer(),
         Effect.gen(function* () {
           const registration = yield* ModelRegistry.registration({
             provider: "test",
@@ -225,7 +225,7 @@ describe("ModelRegistry", () => {
     "upserts registrations by provider, model, and registrationKey",
     () =>
       [
-        ModelRegistry.layerMemory(),
+        ModelRegistry.layer(),
         Effect.gen(function* () {
           const first = yield* ModelRegistry.registration({
             provider: "test",
@@ -275,7 +275,7 @@ describe("ModelRegistry", () => {
       )
 
     return [
-      ModelRegistry.layerMemory(),
+      ModelRegistry.layer(),
       Effect.gen(function* () {
         const first = yield* ModelRegistry.registration({
           ...selection,
@@ -445,7 +445,7 @@ describe("ModelRegistry", () => {
     "bounds concurrent provides to maxConcurrentModelCalls",
     () =>
       [
-        ModelRegistry.layerMemory([], { maxConcurrentModelCalls: 1 }),
+        ModelRegistry.layer([], { maxConcurrentModelCalls: 1 }),
         Effect.gen(function* () {
           const registration = yield* ModelRegistry.registration({
             provider: "test",

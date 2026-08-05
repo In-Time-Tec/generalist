@@ -1,9 +1,11 @@
 import { ExecutableManifest as CoreExecutableManifest } from "@batonfx/core"
 import { Schema } from "effect"
-import type { DurableDriver } from "@batonfx/core"
+import type { ExecutionCheckpoint } from "./execution-state.js"
 
 /** @experimental Complete closed executable Agent graph. */
 export interface ExecutableManifest extends CoreExecutableManifest.ExecutableManifest {}
+type AgentEntry = Extract<ExecutableManifest["entries"][number], { readonly _tag: "Agent" }>
+type ProgramEntry = Extract<ExecutableManifest["entries"][number], { readonly _tag: "Program" }>
 /** @experimental Encoded complete closed executable Agent graph. */
 export type ExecutableManifestEncoded = typeof CoreExecutableManifest.ExecutableManifest.Encoded
 
@@ -66,10 +68,10 @@ export const equals = (left: PinnedExecutable, right: PinnedExecutable): boolean
 export const checkpointRef = (
   current: ExecutableRef,
   manifest: ExecutableManifest,
-  checkpoint: DurableDriver.DriverCheckpoint | undefined,
+  checkpoint: ExecutionCheckpoint | undefined,
 ): ExecutableRef => {
   decodePinned({ ref: current, manifest })
-  const next = checkpoint?.executable
+  const next = checkpoint === undefined || !("driverVersion" in checkpoint) ? undefined : checkpoint.executable
   if (next === undefined) return current
   if (next.executable !== current.executable) throw new TypeError("Checkpoint executable closure does not match Run")
   return decodePinned({ ref: { executable: next.executable, active: next.active }, manifest }).ref
@@ -79,7 +81,15 @@ export const resolveChild = (
   manifest: ExecutableManifest,
   selection: string,
 ): ExecutableRef | undefined => {
-  const active = manifest.agents.find((entry) => entry.pin === ref.active)
-  const child = active?.manifest.children.find((binding) => binding.selection === selection)
-  return child === undefined ? undefined : { executable: ref.executable, active: child.agent }
+  const active = manifest.entries.find((entry) => entry.pin === ref.active)
+  const child =
+    active?._tag === "Agent"
+      ? (active as AgentEntry).manifest.children.find((binding) => binding.selection === selection)?.agent
+      : active?._tag === "Program"
+        ? (active as ProgramEntry).manifest.capabilities.agents.find((binding) => binding.selection === selection)
+            ?.agent
+        : undefined
+  if (child === undefined || !manifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === child))
+    return undefined
+  return { executable: ref.executable, active: child }
 }
