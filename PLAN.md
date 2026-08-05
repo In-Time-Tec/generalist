@@ -1143,8 +1143,8 @@ Retain and simplify:
 
 ## Verified Evidence Accounts And Remaining Holds
 
-The following accounts record verified source and command evidence. Release and archive operations remain pending until
-their explicit authorization and the applicable stop conditions are satisfied.
+The following accounts record verified source and command evidence. Rika publication and Relay archival remain pending
+until their applicable stop conditions are satisfied.
 
 ### Admission Validation — closed
 
@@ -1195,10 +1195,40 @@ The asserted nested-child regression replaces the focused debug test. Central ex
 operation-admission boundaries are typed without `any`. Fresh live PostgreSQL and MySQL suites are independent of suite
 order and schema residue. Repository policy and graph checks pass.
 
+### Baton Publication — closed
+
+Baton release commit `8c26eee` was pushed atomically to `main`, `release`, and annotated tag `v0.15.0`. GitHub release
+workflow `31014573121` passed all three jobs. The public release has 13 assets, and all 11 `@batonfx/*` packages resolve
+from npm at `0.15.0`.
+
+### Rika Normal Verification — closed
+
+Rika pins the six used `@batonfx/*` packages to published version `0.15.0`; the source-alias Vitest configuration is
+deleted, and a frozen install passes. The canonical `bun run check` passes all 20 tasks and 1,787 unit tests. The full
+process gate passes. The TUI fixture now emits deterministic current execution, child, tool, steering, usage, and
+terminal events instead of an obsolete one-step model approximation. Its 19 tests pass: the child-stream file completes
+in 5.65 seconds and the application file completes in 16.50 seconds. Failed waits now terminate cleanup instead of
+stalling the suite.
+
+### Rika Publication — closed
+
+The `darwin-arm64` `0.2.0` archive builds and release smoke passes. Its contract contains `rika`, `.rika-interactive`,
+`.rika-server`, `.rika-performance`, and `INSTALL`; SHA-256 is
+`049a30b46bced5ba930747344c2992edb4b57572c0f78416fba03a6fa8e8f8ce`. All 22 release contract tests pass. Linux
+artifacts require their native OpenTUI packages, and the canonical publish workflow builds and verifies `linux-arm64`
+and `linux-x64` on native runners.
+
+PRs `264` and `265` merged the migration and bounded the two durable cancellation integration waits. Merge commit
+`fd1df5a690c6331cb30735c6c3eb93525d721f92` passes `main` CI run `31031001774`: quality, process, TUI, and aggregate
+checks all pass. Annotated tag `v0.2.0` resolves to that commit. Publish workflow `31031284335` passes native package and
+smoke jobs for all three targets, release aggregation and attestations, GitHub publication, and npm publication. The
+public release contains the three archives, `SHA256SUMS`, and `release-evidence.json`; their checksums and revision agree.
+The four public npm packages are `@rikafx/cli`, `@rikafx/cli-darwin-arm64`, `@rikafx/cli-linux-arm64`, and
+`@rikafx/cli-linux-x64` at `0.2.0`. A clean registry install reports `rika v0.2.0`.
+
 ## Implementation Order
 
-Steps 3 through 7, step 10, and the local Baton verification scope of step 11 are complete. Steps 8 and 9 remain pending
-because this plan has no verified closure evidence for them. Steps 12 onward remain pending. Baton also fixed real defects
+Steps 1 through 16 are complete through the applicable local and public gates. Step 17 is authorized and ready. Baton also fixed real defects
 found while proving the completed steps: undecodable persisted suspensions silently replayed the original prompt instead of
 the child result; a cancelled root reported terminal before every owned child settled; concurrent admission raced on
 registration inserts; and the four MySQL faults recorded above.
@@ -1218,16 +1248,16 @@ registration inserts; and the four MySQL faults recorded above.
 5. Implement Rika review admission with Baton fan-out — closed.
 6. Prove review ordering, concurrency, restart, cancellation, join, and remainder policy — closed.
 7. Complete root-tree projection. Retain root completion after child traversal — closed by step 2.
-8. Delete unreachable cross-Thread coordination — pending verified evidence.
-9. Resolve Rika Server Layer environment and type errors — pending verified evidence.
+8. Delete unreachable cross-Thread coordination — closed.
+9. Resolve Rika Server Layer environment and type errors — closed.
 10. Replace `any` at central executable, resolver, Layer, and operation boundaries — closed.
 11. Run Baton local release gates — closed. `bun run check` passes after graph generation (620 files and 2,835 imports). `bun run test` passes 1,120 tests with 79 live-database skips. The configured live PostgreSQL suite passes 5 files and 40 tests. The live MySQL suite passes 6 files and 34 tests. Core, Runtime, and root typechecks pass. Package smoke passes 11 tarballs, and the runtime tarball is 142,631 bytes, below the 150,000-byte limit. Publication and registry verification remain step 12 work.
-12. With explicit authorization, release and verify Baton `0.15.0`.
-13. Pin Rika to the published Baton packages. Remove source aliases.
-14. Run all Rika release gates.
-15. With explicit authorization, release and verify Rika `0.2.0`.
-16. Confirm that Relay has no open pull requests.
-17. With explicit authorization, merge the archive commit and archive Relay.
+12. With explicit authorization, release and verify Baton `0.15.0` — closed.
+13. Pin Rika to the published Baton packages. Remove source aliases — closed.
+14. Run all Rika release gates — closed.
+15. With explicit authorization, release and verify Rika `0.2.0` — closed.
+16. Confirm that Relay has no open pull requests — closed; GitHub reports zero open pull requests.
+17. With explicit authorization, merge the archive commit and archive Relay — ready.
 
 ## Baton Release Acceptance
 
