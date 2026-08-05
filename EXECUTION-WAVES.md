@@ -29,7 +29,7 @@
 | 8    | Complete    | Rika pins published Baton `0.15.0`; frozen install, 20 canonical check tasks, 1,787 unit tests, the process gate, and 19 bounded TUI tests pass.                                                              |
 | 9    | Complete    | Darwin local packaging and 22 release contract tests pass. Publish workflow `31031284335` packages and smokes all three native targets.                                                                      |
 | 10   | Complete    | Rika `0.2.0` is public with five verified assets and four npm packages. A clean registry install reports `rika v0.2.0`.                                                                                      |
-| 11   | In progress | Relay has zero open pull requests. Archive commit `5b1a1868` is ready to merge, then the repository can become read-only.                                                                                    |
+| 11   | Complete    | PR `384` merged archive commit `5b1a1868`; the temporary branch is deleted, zero pull requests remain open, and `In-Time-Tec/relayfx` reports `isArchived: true`.                                             |
 
 Wave 0F confirmed these additional release gaps:
 

@@ -1228,7 +1228,7 @@ The four public npm packages are `@rikafx/cli`, `@rikafx/cli-darwin-arm64`, `@ri
 
 ## Implementation Order
 
-Steps 1 through 16 are complete through the applicable local and public gates. Step 17 is authorized and ready. Baton also fixed real defects
+Steps 1 through 17 are complete through the applicable local and public gates. Baton also fixed real defects
 found while proving the completed steps: undecodable persisted suspensions silently replayed the original prompt instead of
 the child result; a cancelled root reported terminal before every owned child settled; concurrent admission raced on
 registration inserts; and the four MySQL faults recorded above.
@@ -1257,7 +1257,9 @@ registration inserts; and the four MySQL faults recorded above.
 14. Run all Rika release gates — closed.
 15. With explicit authorization, release and verify Rika `0.2.0` — closed.
 16. Confirm that Relay has no open pull requests — closed; GitHub reports zero open pull requests.
-17. With explicit authorization, merge the archive commit and archive Relay — ready.
+17. With explicit authorization, merge the archive commit and archive Relay — closed. PR `384` merged archive commit
+    `5b1a1868` in merge commit `c0508570`; the temporary branch is deleted, GitHub reports zero open pull requests, and
+    `In-Time-Tec/relayfx` reports `isArchived: true`.
 
 ## Baton Release Acceptance
 
