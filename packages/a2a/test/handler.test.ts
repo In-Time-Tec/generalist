@@ -69,7 +69,7 @@ const waiting = (runId: string): RunEvent.RunWaiting => ({
   _tag: "RunWaiting",
   wait: {
     waitId: `wait:${runId}`,
-    reason: "tool-wait",
+    reason: { _tag: "ToolWait" },
     status: "open",
     openedAt: base(runId, 2).occurredAt,
   },
@@ -153,6 +153,7 @@ const makeRuntime = (acceptedSequence = 0) => {
       return Effect.succeed(run.events.filter((event) => event.sequence > cursor).slice(0, limit))
     },
     treeHistory: () => Effect.die("not used"),
+    treeChanges: () => Stream.empty,
     inspectTree: () => Effect.die("not used"),
     list: ({ status, limit }) =>
       Effect.succeed(
@@ -161,6 +162,7 @@ const makeRuntime = (acceptedSequence = 0) => {
           .slice(0, limit)
           .map(([runId, run]) => inspection(runId, run)),
       ),
+    respondApproval: () => Effect.die("not used"),
     respond: ({ runId, waitId, resolution }) => {
       const run = runs.get(runId)!
       const next = run.events.at(-1)!.sequence + 1

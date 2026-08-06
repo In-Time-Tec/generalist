@@ -1,3 +1,4 @@
+import { DurableDriver } from "@batonfx/core"
 import { Schema } from "effect"
 import type { OperationResolution } from "../operation-resolution.js"
 
@@ -17,8 +18,8 @@ export type OperationKind = typeof OperationKind.Type
 export const OperationStatus = Schema.Literals(["requested", "running", "succeeded", "failed", "unknown"])
 export type OperationStatus = typeof OperationStatus.Type
 
-export const ReplayPolicy = Schema.Literals(["pure", "provider-idempotent", "never"])
-export type ReplayPolicy = typeof ReplayPolicy.Type
+export const ReplayPolicy = DurableDriver.ReplayPolicy
+export type ReplayPolicy = DurableDriver.ReplayPolicy
 
 export interface OperationRecord {
   readonly runId: string

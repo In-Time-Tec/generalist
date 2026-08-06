@@ -114,6 +114,7 @@ describe("deep-research-agent Baton transport e2e", () => {
             ),
             Stream.runCollect,
           )
+          const approvalRequested = Array.from(first).find((event) => event._tag === "ApprovalRequested")
           const waiting = Array.from(first).find((event) => event._tag === "RunWaiting")
           if (waiting === undefined || waiting._tag !== "RunWaiting") {
             return yield* Effect.die(`expected RunWaiting: ${JSON.stringify(Array.from(first))}`)
@@ -133,7 +134,30 @@ describe("deep-research-agent Baton transport e2e", () => {
           const completed = all.find((event) => event._tag === "RunCompleted")
 
           expect(receipt.duplicate).toBe(false)
-          expect(waiting.wait.reason).toBe("approval")
+          expect(waiting.wait).toMatchObject({
+            waitId: "approval:search-1",
+            reason: {
+              _tag: "Approval",
+              request: {
+                approvalId: "approval:search-1",
+                operation: "search-1",
+                capability: "web_search",
+                input: { query: "What makes Baton agent framework standalone?" },
+              },
+            },
+          })
+          expect(approvalRequested).toMatchObject({
+            _tag: "ApprovalRequested",
+            request: {
+              approvalId: "approval:search-1",
+              operation: "search-1",
+              capability: "web_search",
+              input: { query: "What makes Baton agent framework standalone?" },
+            },
+          })
+          expect(approvalRequested?._tag === "ApprovalRequested" ? approvalRequested.request : undefined).toEqual(
+            waiting.wait.reason._tag === "Approval" ? waiting.wait.reason.request : undefined,
+          )
           expect(toolCall).toMatchObject({
             _tag: "ModelPart",
             part: {

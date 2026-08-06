@@ -1,7 +1,7 @@
-import { Effect, Option, Schedule, Schema, Stream } from "effect"
-import type { RunEvent } from "./run-event.js"
+import { Effect, Option, Pull, Schedule, Schema, Stream } from "effect"
+import { RunEvent } from "./run-event.js"
 import { CompactionInspection, isTerminal, RawUsageFact, RunInspection, RunOutcome } from "./run.js"
-import { Runtime } from "./runtime.js"
+import { Runtime, type Interface as RuntimeInterface } from "./runtime.js"
 import { TreeCursor, type TreeCursor as TreeCursorType } from "./tree-cursor.js"
 export { TreeCursor }
 
@@ -17,11 +17,45 @@ export interface TreeEvent {
   readonly cursor: TreeCursorType
 }
 
+interface TreeEventEncoded extends Omit<TreeEvent, "event" | "cursor"> {
+  readonly event: typeof RunEvent.Encoded
+  readonly cursor: typeof TreeCursor.Encoded
+}
+
+export const TreeEvent: Schema.Codec<TreeEvent, TreeEventEncoded> = Schema.Struct({
+  rootRunId: Schema.String,
+  runId: Schema.String,
+  parentRunId: Schema.optionalKey(Schema.String),
+  invocationId: Schema.optionalKey(Schema.String),
+  modelCallId: Schema.optionalKey(Schema.String),
+  modelAttemptId: Schema.optionalKey(Schema.String),
+  toolCallId: Schema.optionalKey(Schema.String),
+  event: RunEvent,
+  cursor: TreeCursor,
+})
+
+export const encodeTreeEvent = Schema.encodeEffect(TreeEvent)
+export const decodeTreeEvent = Schema.decodeEffect(TreeEvent)
+
 export interface TreePage {
   readonly events: ReadonlyArray<TreeEvent>
   readonly cursor: TreeCursorType
   readonly hasMore: boolean
 }
+
+interface TreePageEncoded extends Omit<TreePage, "events" | "cursor"> {
+  readonly events: ReadonlyArray<TreeEventEncoded>
+  readonly cursor: typeof TreeCursor.Encoded
+}
+
+export const TreePage: Schema.Codec<TreePage, TreePageEncoded> = Schema.Struct({
+  events: Schema.Array(TreeEvent),
+  cursor: TreeCursor,
+  hasMore: Schema.Boolean,
+})
+
+export const encodeTreePage = Schema.encodeEffect(TreePage)
+export const decodeTreePage = Schema.decodeEffect(TreePage)
 
 export interface HistoryInput {
   readonly rootRunId: string
@@ -124,23 +158,33 @@ export const awaitTerminal = (
     ),
   )
 
+const recoveryWakeups = Stream.fromSchedule(Schedule.spaced("1 second")).pipe(Stream.map(() => undefined))
+
+const changes = (runtime: RuntimeInterface, rootRunId: string) =>
+  Stream.merge(runtime.treeChanges(rootRunId), recoveryWakeups)
+
 export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./runtime.js").TreeEventsError, Runtime> =>
   Stream.unwrap(
     Runtime.use((runtime) =>
-      Effect.sync(() => {
-        let cursor = input.cursor
-        const read = Effect.suspend(() =>
-          runtime.treeHistory({ rootRunId: input.rootRunId, ...(cursor === undefined ? {} : { cursor }), limit: 256 }),
-        ).pipe(
-          Effect.tap((page) =>
-            Effect.sync(() => {
-              cursor = page.cursor
+      Effect.gen(function* () {
+        const pullChange = yield* Stream.toPull(changes(runtime, input.rootRunId))
+        return Stream.paginate(
+          { cursor: input.cursor, wait: true },
+          (
+            state,
+          ): Effect.Effect<
+            readonly [ReadonlyArray<TreeEvent>, Option.Option<{ cursor: TreeCursorType; wait: boolean }>],
+            import("./runtime.js").TreeEventsError
+          > =>
+            Effect.gen(function* () {
+              if (state.wait) yield* pullChange.pipe(Pull.catchDone(() => Effect.void))
+              const page = yield* runtime.treeHistory({
+                rootRunId: input.rootRunId,
+                ...(state.cursor === undefined ? {} : { cursor: state.cursor }),
+                limit: 256,
+              })
+              return [page.events, Option.some({ cursor: page.cursor, wait: !page.hasMore })] as const
             }),
-          ),
-        )
-        return Stream.fromEffect(read).pipe(
-          Stream.flatMap((page) => Stream.fromIterable(page.events)),
-          Stream.repeat(Schedule.spaced("50 millis")),
         )
       }),
     ),
@@ -178,7 +222,7 @@ const canProgress = (index: TreeIndex, runId: string, memo: Map<string, boolean>
   if (run.status !== "waiting") return decide(true)
   const wait = run.wait
   if (wait === undefined || wait.status !== "open") return decide(true)
-  if (wait.reason !== "tool-wait") return decide(false)
+  if (wait.reason._tag !== "ToolWait") return decide(false)
   const linked = index.childrenByWait.get(`${runId}\u0000${wait.waitId}`)
   if (linked === undefined) return decide(true)
   return decide(linked.some((child) => isTerminal(child.status) || canProgress(index, child.runId, memo)))
@@ -195,25 +239,26 @@ const isSettled = (inspection: Inspection, settlement: NonNullable<WatchInput["s
 export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./runtime.js").TreeEventsError, Runtime> =>
   Stream.unwrap(
     Runtime.use((runtime) =>
-      Effect.sync(() => {
+      Effect.gen(function* () {
         const settlement = input.settlement ?? "tree-terminal"
+        const pullChange = yield* Stream.toPull(changes(runtime, input.rootRunId))
         return Stream.paginate(
-          { cursor: input.cursor, pause: false },
+          { cursor: input.cursor, wait: true },
           (
             state,
           ): Effect.Effect<
-            readonly [ReadonlyArray<TreeEvent>, Option.Option<{ cursor: TreeCursorType; pause: boolean }>],
+            readonly [ReadonlyArray<TreeEvent>, Option.Option<{ cursor: TreeCursorType; wait: boolean }>],
             import("./runtime.js").TreeEventsError
           > =>
             Effect.gen(function* () {
-              if (state.pause) yield* Effect.sleep("50 millis")
+              if (state.wait) yield* pullChange.pipe(Pull.catchDone(() => Effect.void))
               const page = yield* runtime.treeHistory({
                 rootRunId: input.rootRunId,
                 ...(state.cursor === undefined ? {} : { cursor: state.cursor }),
                 limit: 256,
               })
-              if (page.hasMore || page.events.length > 0) {
-                return [page.events, Option.some({ cursor: page.cursor, pause: false })] as const
+              if (page.hasMore) {
+                return [page.events, Option.some({ cursor: page.cursor, wait: false })] as const
               }
               const inspection = yield* runtime.inspectTree(input.rootRunId)
               const drained = page.cursor === inspection.cursor
@@ -221,7 +266,7 @@ export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./run
                 page.events,
                 drained && isSettled(inspection, settlement)
                   ? Option.none()
-                  : Option.some({ cursor: page.cursor, pause: drained }),
+                  : Option.some({ cursor: page.cursor, wait: drained }),
               ] as const
             }),
         )

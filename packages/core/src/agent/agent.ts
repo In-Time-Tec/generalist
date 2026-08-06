@@ -35,6 +35,7 @@ import { HandoffRejected } from "../policy/handoff-runtime.js"
 import { defaultPolicy, type TurnPolicy, TurnPolicyError } from "../turn/turn-policy.js"
 
 import { streamInternal } from "./agent-run.js"
+import { defaultToolScheduling } from "./tool-scheduler.js"
 import { Runtime } from "./agent-persistence-lock.js"
 
 export { Runtime, layerRuntime } from "./agent-persistence-lock.js"
@@ -66,15 +67,19 @@ export interface Agent<
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly authorization?: ToolAuthorizer<AuthorizationServices>
-  readonly toolExecution?: ToolExecutionPolicy
+  readonly toolScheduling: ToolSchedulingPolicy
   readonly metadata?: Readonly<Record<string, unknown>>
   readonly budget?: BudgetLimits
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>
 }
 
-/** @experimental Policy for framework-executed tool calls emitted by one model turn. */
-export interface ToolExecutionPolicy {
-  readonly concurrency: number | "unbounded"
+/**
+ * @experimental Safe scheduling policy for framework-executed calls emitted by one model turn. Tools not explicitly
+ * listed as parallel-safe execute as authored-order exclusive barriers.
+ */
+export interface ToolSchedulingPolicy {
+  readonly maxConcurrency: number
+  readonly parallelSafe: ReadonlyArray<string>
 }
 
 /** @experimental One origin-preserving static or Handoff tool declaration. */
@@ -105,7 +110,7 @@ export interface MakeOptions<
   readonly model?: ModelSelection
   readonly memory?: Key
   readonly authorization?: ToolAuthorizer<AuthorizationServices>
-  readonly toolExecution?: ToolExecutionPolicy
+  readonly toolScheduling?: ToolSchedulingPolicy
   readonly metadata?: Readonly<Record<string, unknown>>
   readonly budget?: BudgetLimits
 }
@@ -183,7 +188,7 @@ export function make<
     ...(options.model === undefined ? {} : { model: options.model }),
     ...(options.memory === undefined ? {} : { memory: options.memory }),
     ...(options.authorization === undefined ? {} : { authorization: options.authorization }),
-    ...(options.toolExecution === undefined ? {} : { toolExecution: options.toolExecution }),
+    toolScheduling: options.toolScheduling ?? defaultToolScheduling,
     ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
     ...(options.budget === undefined ? {} : { budget: options.budget }),
     toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map(

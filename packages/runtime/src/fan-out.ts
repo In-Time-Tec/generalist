@@ -85,6 +85,7 @@ export interface StoredFanOutMember {
   readonly ordinal: number
   readonly key: string
   readonly childRunId: string
+  readonly selection: string
   readonly executableRef: ExecutableRef
   readonly prompt: Prompt.Prompt
   readonly sessionId: string
@@ -95,7 +96,7 @@ export interface AdmitFanOutInput {
   readonly fanOutId: string
   readonly parentRunId: string
   readonly idempotencyKey: string
-  readonly members: ReadonlyArray<Omit<StoredFanOutMember, "executableRef"> & { readonly selection: string }>
+  readonly members: ReadonlyArray<Omit<StoredFanOutMember, "executableRef">>
   readonly concurrency: number
   readonly join: FanOutJoin
   readonly remainder: FanOutRemainder
@@ -124,6 +125,7 @@ export const digestFanOut = (input: {
       ordinal: member.ordinal,
       key: member.key,
       childRunId: member.childRunId,
+      selection: member.selection,
       executableRef: member.executableRef,
       prompt: Schema.encodeSync(Prompt.Prompt)(member.prompt),
       sessionId: member.sessionId,

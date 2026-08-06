@@ -1,6 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Option, Stream } from "effect"
-import { Errors, Runtime, RunStore } from "../src/index.js"
+import { Response } from "effect/unstable/ai"
+import { Approval, Errors, Runtime, RunStore } from "../src/index.js"
 import { assistantAddress, completedResult, memoryLayer, openWait, suspension, textPrompt } from "./helpers.js"
 
 const admitWaitWithClaimedChild = (waitId: string) =>
@@ -90,6 +91,88 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
         })
         .pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.ResponseConflict)
+    }),
+  )
+
+  it.effect("preserves a typed approval request and response in Run and tree history", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:approval-events",
+        idempotencyKey: "approval-events",
+        prompt: textPrompt("approve the operation"),
+      })
+      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-events" })
+      const call = Response.makePart("tool-call", {
+        id: "operation:delete-draft",
+        name: "delete_draft",
+        params: { draftId: "draft-1" },
+        providerExecuted: false,
+      })
+      const approvalRequest = {
+        approvalId: "approval:delete-draft",
+        operation: call.id,
+        capability: call.name,
+        input: call.params,
+      }
+      yield* store.emitAgentEvent({
+        ...claim,
+        event: { _tag: "ApprovalRequested", turn: 0, call, request: approvalRequest },
+      })
+      yield* store.suspend({
+        ...claim,
+        suspension: {
+          ...suspension("approval:delete-draft", "approval"),
+          tool_call_id: call.id,
+          tool_name: call.name,
+          tool_params: call.params,
+        },
+        wait: {
+          waitId: "approval:delete-draft",
+          reason: {
+            _tag: "Approval",
+            request: approvalRequest,
+          },
+          status: "open",
+          openedAt: "2026-08-03T00:00:00.000Z",
+        },
+      })
+      expect((yield* runtime.inspect(receipt.runId)).wait).toMatchObject({
+        reason: {
+          _tag: "Approval",
+          request: {
+            approvalId: "approval:delete-draft",
+            operation: "operation:delete-draft",
+            capability: "delete_draft",
+          },
+        },
+      })
+      yield* Approval.deny({
+        runId: receipt.runId,
+        approvalId: "approval:delete-draft",
+        reason: "operator denied",
+      })
+      const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })
+      expect(history).toContainEqual(expect.objectContaining({ _tag: "ApprovalRequested", call }))
+      expect(history).toContainEqual(
+        expect.objectContaining({
+          _tag: "RunResumed",
+          waitId: "approval:delete-draft",
+          resolution: { _tag: "Denied", reason: "operator denied" },
+        }),
+      )
+      const tree = yield* runtime.treeHistory({ rootRunId: receipt.runId, limit: 100 })
+      expect(tree.events.map(({ event }) => event._tag)).toContain("ApprovalRequested")
+      expect(tree.events).toContainEqual(
+        expect.objectContaining({
+          event: expect.objectContaining({
+            _tag: "RunResumed",
+            resolution: { _tag: "Denied", reason: "operator denied" },
+          }),
+        }),
+      )
     }),
   )
 

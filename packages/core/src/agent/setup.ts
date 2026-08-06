@@ -30,6 +30,7 @@ import { activateSkillTool, skillListingBudgetTokens } from "./agent-skill-tool.
 import { dispatchForOrigin } from "./tool-dispatch.js"
 import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "./agent-suspension.js"
 import { skillListingsInstructions } from "./agent-message.js"
+import { validationFailure as toolSchedulingFailure } from "./tool-scheduler.js"
 type StaticDeclaration = { readonly origin: import("./agent-event.js").ToolOrigin; readonly tool: Tool.Any }
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -222,15 +223,9 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
     }
     const progressPolicy: ProgressOverflowPolicy = decodedProgressPolicy.value
 
-    if (
-      agent.toolExecution !== undefined &&
-      agent.toolExecution.concurrency !== "unbounded" &&
-      (!Number.isSafeInteger(agent.toolExecution.concurrency) || agent.toolExecution.concurrency <= 0)
-    ) {
-      return yield* AgentError.make({
-        message: 'Agent.toolExecution.concurrency must be a positive safe integer or "unbounded"',
-        turn: 0,
-      })
+    const invalidToolScheduling = toolSchedulingFailure(agent.toolScheduling, Object.keys(agent.toolkit.tools))
+    if (invalidToolScheduling !== undefined) {
+      return yield* AgentError.make({ message: invalidToolScheduling, turn: 0 })
     }
 
     const invalidCompaction =

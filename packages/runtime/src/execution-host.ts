@@ -24,6 +24,7 @@ import { agentBudget } from "./execution-defaults.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "./code-mode.js"
 import { hostContext } from "./execution-context.js"
 import { executeProgram } from "./execute-program.js"
+import { approvalReason } from "./run-wait.js"
 export interface Options {
   readonly workerId: string
   readonly resolver: ExecutableResolverInterface
@@ -432,8 +433,16 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                           ...(latest.transcript === undefined ? {} : { transcript: latest.transcript }),
                           ...(latest.continuation === undefined ? {} : { continuation: latest.continuation }),
                           wait: {
-                            waitId: suspension.tool_call_id,
-                            reason: suspension.reason,
+                            waitId: suspension.reason === "approval" ? suspension.token : suspension.tool_call_id,
+                            reason:
+                              suspension.reason === "approval"
+                                ? approvalReason({
+                                    approvalId: suspension.token,
+                                    operation: suspension.tool_call_id,
+                                    capability: suspension.tool_name,
+                                    input: suspension.tool_params,
+                                  })
+                                : { _tag: "ToolWait" },
                             status: "open",
                             openedAt,
                           },
@@ -465,7 +474,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                     continuation,
                   )
                 }
-                yield* codeMode === undefined ? runHosted(agent) : runHosted(withCodeModeTool(agent))
+                yield* codeMode === undefined ? runHosted(agent) : runHosted(withCodeModeTool(agent, codeMode))
               })
 
             yield* resolved.agent.open(runClosed)

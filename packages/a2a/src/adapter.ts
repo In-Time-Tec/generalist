@@ -172,15 +172,20 @@ const makeExecutor = (runtime: Runtime.Interface, deployment: Deployment): Agent
       if (snapshot.run.status !== "waiting" || wait === undefined || wait.status !== "open") {
         return yield* Effect.fail(new Error(`Task ${context.taskId} is not waiting for input`))
       }
-      yield* runtime.respond({
-        runId: context.taskId,
-        waitId: wait.waitId,
-        resolution:
-          wait.reason === "approval"
-            ? { _tag: "Approved" }
-            : { _tag: "ToolResult", result: prompt, encodedResult: prompt },
-        idempotencyKey: context.userMessage.messageId,
-      })
+      if (wait.reason._tag === "Approval") {
+        yield* runtime.respondApproval({
+          runId: context.taskId,
+          approvalId: wait.reason.request.approvalId,
+          decision: { _tag: "Approved" },
+        })
+      } else {
+        yield* runtime.respond({
+          runId: context.taskId,
+          waitId: wait.waitId,
+          resolution: { _tag: "ToolResult", result: prompt, encodedResult: prompt },
+          idempotencyKey: context.userMessage.messageId,
+        })
+      }
       yield* follow(runtime, task, snapshot.cursor, bus)
     })
     return Effect.runPromise(effect)

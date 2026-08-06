@@ -91,7 +91,7 @@ import {
   ProgramToolFailure,
 } from "./program/program-capabilities.js"
 import {
-  ReplayPolicy,
+  ProgramReplayPolicy,
   agent as makeProgramAgentBinding,
   make as makeProgramBindings,
   step as makeProgramStepBinding,
@@ -196,7 +196,7 @@ export namespace ProgramCapabilities {
 }
 
 export const ProgramBindings = {
-  ReplayPolicy,
+  ProgramReplayPolicy,
   agent: makeProgramAgentBinding,
   make: makeProgramBindings,
   step: makeProgramStepBinding,
@@ -229,7 +229,7 @@ export namespace ProgramBindings {
   export type Authorize<I> = import("./program/program-bindings.js").Authorize<I>
   export type Invocation = import("./program/program-bindings.js").Invocation
   export type AgentInvocation = import("./program/program-bindings.js").AgentInvocation
-  export type ReplayPolicy = import("./program/program-bindings.js").ReplayPolicy
+  export type ProgramReplayPolicy = import("./program/program-bindings.js").ProgramReplayPolicy
 }
 
 export const ProgramHost = {

@@ -1,6 +1,6 @@
 import { Cause, Context, Effect, Layer, Schema } from "effect"
 import { type Prompt, type Response, type Tool } from "effect/unstable/ai"
-import { AgentSuspended } from "../agent/agent-event.js"
+import { AgentSuspended, type ApprovalRequest } from "../agent/agent-event.js"
 import { canonicalSuspensionCall } from "../agent/agent-suspension.js"
 import { PermissionError, evaluateWithRules, type RuleStoreInterface } from "../policy/permissions.js"
 
@@ -50,7 +50,7 @@ export interface Request extends AccessRequest {
   readonly activeTools: ReadonlyArray<string>
   readonly activatedSkills: ReadonlyArray<string>
   readonly messages: ReadonlyArray<Prompt.Message>
-  readonly onApprovalRequired: Effect.Effect<void>
+  readonly onApprovalRequired: (request: ApprovalRequest) => Effect.Effect<void>
 }
 
 /** @experimental Final tool authorization boundary. */
@@ -113,15 +113,21 @@ export const make = (options: Options): ToolAuthorizer => ({
       if (decision._tag === "Deny") return deny(decision.reason ?? "Permission denied")
       const required = decision._tag === "Ask" || (yield* approvalRequired(request))
       if (!required) return { _tag: "Execute" }
-      yield* request.onApprovalRequired
-      const resolution = yield* options.approvals.resolve({
-        _tag: "Pending",
+      const pending = {
+        _tag: "Pending" as const,
         token: decision._tag === "Ask" ? decision.token : `approval:${request.call.id}`,
         call: request.call,
         agentName: request.agentName,
         turn: request.turn,
         ...(request.sessionId === undefined ? {} : { sessionId: request.sessionId }),
+      }
+      yield* request.onApprovalRequired({
+        approvalId: pending.token,
+        operation: request.call.id,
+        capability: request.call.name,
+        input: request.call.params,
       })
+      const resolution = yield* options.approvals.resolve(pending)
       switch (resolution._tag) {
         case "Approved":
           if (resolution.remember !== undefined)
@@ -130,7 +136,7 @@ export const make = (options: Options): ToolAuthorizer => ({
         case "Denied":
           return deny(resolution.reason ?? "Tool call denied")
         case "Pending":
-          return suspend(request, resolution.token)
+          return suspend(request, pending.token)
       }
     }),
 })

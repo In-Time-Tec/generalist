@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import type { RunAgentInput } from "@ag-ui/core"
 import { Effect, Layer, Stream } from "effect"
-import { Address, ExecutableManifest, Errors as RuntimeErrors, Runtime } from "@batonfx/runtime"
+import { Address, Approval, ExecutableManifest, Errors as RuntimeErrors, Runtime } from "@batonfx/runtime"
 import { AgUi } from "../src/index.js"
 
 const address = Address.make("agent:assistant")
@@ -48,9 +48,11 @@ const mockRuntime = (implementation: Partial<Runtime.Interface>): Runtime.Interf
     snapshot: () => unused(),
     history: () => unused(),
     treeHistory: () => unused(),
+    treeChanges: () => Stream.empty,
     inspectTree: () => unused(),
     list: () => unused(),
     respond: () => unused(),
+    respondApproval: () => unused(),
     signal: () => unused(),
     cancel: () => unused(),
     steer: () => unused(),
@@ -123,7 +125,7 @@ describe("AgUi", () => {
   })
 
   it.effect("resumes only the exact active wait", () => {
-    let response: Runtime.RespondInput | undefined
+    let response: Approval.RespondInput | undefined
     const snapshot = {
       run: {
         runId: "client-run-1",
@@ -132,7 +134,15 @@ describe("AgUi", () => {
         executableManifest: executable.manifest,
         wait: {
           waitId: "wait-1",
-          reason: "approval" as const,
+          reason: {
+            _tag: "Approval" as const,
+            request: {
+              approvalId: "wait-1",
+              operation: "tool-call-1",
+              capability: "test-tool",
+              input: {},
+            },
+          },
           status: "open" as const,
           openedAt: "2026-08-03T00:00:00.000Z",
         },
@@ -145,7 +155,7 @@ describe("AgUi", () => {
     }
     const runtime = mockRuntime({
       snapshot: () => Effect.succeed(snapshot),
-      respond: (value) => {
+      respondApproval: (value) => {
         response = value
         return Effect.void
       },
@@ -157,14 +167,13 @@ describe("AgUi", () => {
         .pipe(Stream.runDrain)
       expect(response).toEqual({
         runId: "client-run-1",
-        waitId: "wait-1",
-        resolution: { _tag: "Approved" },
-        idempotencyKey: "ag-ui:client-run-1:wait-1",
+        approvalId: "wait-1",
+        decision: { _tag: "Approved" },
       })
       yield* service
         .run(input({ resume: [{ interruptId: "wait-1", status: "resolved", payload: false }] }))
         .pipe(Stream.runDrain)
-      expect(response?.resolution).toEqual({ _tag: "Denied" })
+      expect(response?.decision).toEqual({ _tag: "Denied" })
       const mismatch = yield* service
         .run(input({ resume: [{ interruptId: "stale", status: "resolved", payload: "approved" }] }))
         .pipe(Stream.runDrain, Effect.flip)

@@ -32,7 +32,7 @@ const ConfigSchema = Schema.Struct({
   ...anthropicConfigFields,
   max_tokens: Schema.optionalKey(maxTokens),
   output_config: Schema.optionalKey(
-    Schema.Struct({ effort: Schema.optionalKey(Schema.NullOr(Schema.Literals(["low", "medium", "high"]))) }),
+    Schema.Struct({ effort: Schema.optionalKey(Schema.NullOr(Generated.BetaEffortLevel)) }),
   ),
   disableParallelToolCalls: Schema.optionalKey(Schema.Boolean),
   strictJsonSchema: Schema.optionalKey(Schema.Boolean),

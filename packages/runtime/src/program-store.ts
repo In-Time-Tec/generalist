@@ -46,7 +46,7 @@ export const ProgramOperationRecord = Schema.Struct({
   capability: Schema.String,
   inputDigest: Schema.String,
   input: Schema.Unknown,
-  replay: ProgramBindings.ReplayPolicy,
+  replay: ProgramBindings.ProgramReplayPolicy,
   status: ProgramOperationStatus,
   result: Schema.optionalKey(Schema.Unknown),
   error: Schema.optionalKey(Schema.Unknown),
@@ -77,7 +77,7 @@ export interface ReserveProgramOperationInput extends ExecutionClaim {
   readonly capability: string
   readonly inputDigest: string
   readonly input: unknown
-  readonly replay: ProgramBindings.ReplayPolicy
+  readonly replay: ProgramBindings.ProgramReplayPolicy
   readonly reservation: ProgramReservation
 }
 

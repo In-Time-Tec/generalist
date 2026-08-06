@@ -112,7 +112,15 @@ describe("AG-UI event projection", () => {
         {
           ...base,
           _tag: "RunWaiting",
-          wait: { waitId: "tool-1", reason: "approval", status: "open", openedAt: "2026-08-03T00:00:00.000Z" },
+          wait: {
+            waitId: "tool-1",
+            reason: {
+              _tag: "Approval",
+              request: { approvalId: "tool-1", operation: "tool-1", capability: "test", input: {} },
+            },
+            status: "open",
+            openedAt: "2026-08-03T00:00:00.000Z",
+          },
         },
         {
           ...base,

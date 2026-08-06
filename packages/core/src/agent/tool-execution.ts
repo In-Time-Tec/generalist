@@ -1,4 +1,4 @@
-import { Cause, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
+import { Cause, Duration, Effect, Fiber, Option, Queue, Ref, Schema, Semaphore, Stream } from "effect"
 import { Chat, Prompt, Tool } from "effect/unstable/ai"
 import {
   AgentSuspended,
@@ -6,7 +6,7 @@ import {
   type Event,
   type ToolProgress,
   ProgressOverflow,
-  ToolNameCollision,
+  type ToolNameCollision,
 } from "./agent-event.js"
 import { type AnyToolCall, domainFailureResult, successResult, type PendingToolResult } from "./agent-tool-result.js"
 import type { Agent, ProgressOverflowPolicy, RunError, RunOptions } from "./agent.js"
@@ -14,7 +14,6 @@ import type { AgentRunState } from "./agent-run-state.js"
 import type { HandoffRunState } from "./handoff-state.js"
 import { type AuthorizationError, type ToolAuthorizer } from "../tools/tool-authorization.js"
 import {
-  type DomainFailure,
   FrameworkFailure,
   type Outcome,
   type Request,
@@ -24,25 +23,30 @@ import {
   executeToolkit,
 } from "../tools/tool-executor.js"
 import { bound } from "../tools/tool-output.js"
-import { type Candidate, type Registry, assemble, get } from "../tools/tool-registry.js"
+import { type Registry, get } from "../tools/tool-registry.js"
 import { ToolContext } from "../tools/tool-context.js"
-import { activateSkillParameters } from "./agent-skill-tool.js"
 import { canonicalSuspensionCall, suspended } from "./agent-suspension.js"
+import { makeActivateSkillOutcome, type ToolState } from "./tool-skill-activation.js"
 import type { Skill, SkillSourceError } from "../context/skill-source.js"
 import { intercept } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
 import { handoffDispatch } from "./handoff-tool-execution.js"
 import { HandoffCatalog } from "../policy/handoff-target.js"
 
+/**
+ * Bound on how long a cancelled run waits for one forked tool or approval fiber to finish tearing down.
+ * A fiber that is uninterruptible, or that supervises an uninterruptible child, would otherwise keep the
+ * owning scope open forever and strand the run in `cancelling`.
+ */
+const toolTeardownGrace = Duration.seconds(5)
+
+/** Interrupt a forked tool or approval fiber and wait for its teardown without letting it wedge the run. */
+const teardown = <A, E>(fiber: Fiber.Fiber<A, E>): Effect.Effect<void> =>
+  Fiber.interrupt(fiber).pipe(Effect.timeoutOption(toolTeardownGrace), Effect.asVoid)
+
 type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
   | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
-const isToolNameCollision = Schema.is(ToolNameCollision)
-
-interface ToolState {
-  readonly registry: Registry
-  readonly activatedSkillBodies: Map<string, string>
-}
 
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, R> {
   readonly options: RunOptions
@@ -141,6 +145,8 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
         })
     }
   }
+
+  const activateSkillOutcome = makeActivateSkillOutcome({ skillRuntime, toolState, skillError })
 
   const activeAgentName = (): Effect.Effect<string> =>
     handoffState === undefined
@@ -292,7 +298,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
             },
             executionBase,
           )
-          const fiber = yield* Effect.uninterruptibleMask((restore) =>
+          const toolBody = Effect.uninterruptibleMask((restore) =>
             restore(execution.pipe(Effect.provideService(ToolContext, toolContext))).pipe(
               Effect.flatMap((outcome) =>
                 Ref.get(droppedProgress).pipe(
@@ -302,74 +308,10 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
                 ),
               ),
             ),
-          ).pipe(
-            Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)),
-            Effect.forkScoped({ startImmediately: true }),
-          )
+          ).pipe(Effect.ensuring(Queue.end(progressQueue).pipe(Effect.asVoid)))
+          const fiber = yield* Effect.acquireRelease(Effect.forkDetach(toolBody, { startImmediately: true }), teardown)
           return Stream.concat(Stream.fromQueue(progressQueue), Stream.fromEffect(Fiber.join(fiber)))
         }),
-      ),
-    )
-
-  const activateSkillOutcome = (
-    turn: number,
-    call: AnyToolCall,
-  ): Effect.Effect<Outcome, AgentError | ToolNameCollision | FrameworkFailure> =>
-    Effect.gen(function* () {
-      if (skillRuntime === undefined) {
-        return yield* FrameworkFailure.make({
-          stage: "missing-handler",
-          tool: call.name,
-          message: "SkillSource is not available",
-        })
-      }
-      const params = Schema.decodeUnknownOption(activateSkillParameters)(call.params)
-      if (Option.isNone(params)) {
-        return yield* FrameworkFailure.make({
-          stage: "decode-input",
-          tool: call.name,
-          message: "Skill activation requires a name",
-        })
-      }
-      const skill = yield* skillRuntime.source.get(params.value.name)
-      if (skill === undefined) {
-        const failure = { reason: "not-found" as const, message: `Skill not found: ${params.value.name}` }
-        return { _tag: "DomainFailure", failure, encodedFailure: failure } satisfies DomainFailure
-      }
-      if (skill.frontmatter.disableModelInvocation === true) {
-        const failure = {
-          reason: "not-model-invocable" as const,
-          message: `Skill is not model-invocable: ${params.value.name}`,
-        }
-        return { _tag: "DomainFailure", failure, encodedFailure: failure } satisfies DomainFailure
-      }
-      const current = yield* Ref.get(toolState)
-      let body = current.activatedSkillBodies.get(skill.frontmatter.name)
-      if (body === undefined) {
-        const registry = yield* assemble([
-          ...current.registry.entries,
-          ...skill.tools.map(
-            (tool): Candidate => ({
-              tool,
-              origin: { _tag: "Skill", skill: skill.frontmatter.name },
-              dispatch: "Skill",
-            }),
-          ),
-        ])
-        body = yield* skill.body
-        const activatedSkillBodies = new Map(current.activatedSkillBodies)
-        activatedSkillBodies.set(skill.frontmatter.name, body)
-        yield* Ref.set(toolState, { registry, activatedSkillBodies })
-      }
-      const output = {
-        name: skill.frontmatter.name,
-        body,
-        allowedTools: [...(skill.frontmatter.allowedTools ?? [])],
-      }
-      return { _tag: "Success", result: output, encodedResult: output } satisfies Success
-    }).pipe(
-      Effect.mapError((error) =>
-        isToolNameCollision(error) || Schema.is(FrameworkFailure)(error) ? error : skillError(turn, error),
       ),
     )
 
@@ -416,7 +358,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
         const resolvedRequest = { ...request, agentName }
         const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
         const approvalEvents = yield* Queue.bounded<Event, Cause.Done>(1)
-        const fiber = yield* authorizer
+        const authorization = authorizer
           .authorize({
             call,
             agentName,
@@ -427,15 +369,19 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
             activeTools,
             activatedSkills,
             messages,
-            onApprovalRequired: Queue.offer(approvalEvents, { _tag: "ApprovalRequested", turn, call }).pipe(
-              Effect.asVoid,
-            ),
+            onApprovalRequired: (approval) =>
+              Queue.offer(approvalEvents, { _tag: "ApprovalRequested", turn, call, request: approval }).pipe(
+                Effect.asVoid,
+              ),
           })
           .pipe(
             Effect.mapError((error) => authorizationError(turn, error)),
             Effect.ensuring(Queue.end(approvalEvents).pipe(Effect.asVoid)),
-            Effect.forkScoped({ startImmediately: true }),
           )
+        const fiber = yield* Effect.acquireRelease(
+          Effect.forkDetach(authorization, { startImmediately: true }),
+          teardown,
+        )
         return Stream.concat(
           Stream.fromQueue(approvalEvents),
           Stream.fromEffect(Fiber.join(fiber)).pipe(

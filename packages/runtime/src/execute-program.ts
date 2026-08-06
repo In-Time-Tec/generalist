@@ -4,6 +4,7 @@ import type { ProgramResolution } from "./executable-resolver.js"
 import type { ExecutionClaim, ExecutionRecord, Interface as RunStore } from "./run-store.js"
 import { AgentExecutionFailure, RunTerminal } from "./errors.js"
 import { make as makeProgramHost } from "./program-host.js"
+import { programWait } from "./program-approval.js"
 
 export const executeProgram = (input: {
   readonly claim: ExecutionClaim
@@ -55,8 +56,14 @@ export const executeProgram = (input: {
                     suspension: error,
                     checkpoint: { _tag: "Program", version: "1" },
                     wait: {
-                      waitId: error.token ?? `program:${error.operation}`,
-                      reason: error.reason === "approval" || error.reason === "tool-wait" ? error.reason : "external",
+                      ...programWait({
+                        runId: claim.runId,
+                        operation: error.operation,
+                        capability: "program",
+                        request: null,
+                        reason: error.reason,
+                        ...(error.token === undefined ? {} : { token: error.token }),
+                      }),
                       status: "open",
                       openedAt,
                     },

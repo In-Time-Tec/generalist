@@ -71,7 +71,7 @@ export interface LaneRow {
 
 export interface WaitRow {
   readonly wait_id: string
-  readonly reason: "tool-wait" | "approval"
+  readonly reason: string
   readonly status: "open" | "responded" | "signaled" | "cancelled"
   readonly response_json: string | null
   readonly opened_at: string | Date

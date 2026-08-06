@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Ref, Schedule, Semaphore } from "effect"
+import { Context, Effect, FiberMap, Layer, Ref, Schedule, type Scope, Semaphore } from "effect"
 import { ActiveExecutions } from "./active-executions.js"
 import { AgentExecutionFailure } from "./errors.js"
 import { ExecutionHost } from "./execution-host.js"
@@ -14,6 +14,8 @@ export interface Options {
 
 export interface Interface {
   readonly tick: Effect.Effect<void, never, RunStore>
+  /** Awaits every execution this scheduler admitted and has not yet observed finish. */
+  readonly idle: Effect.Effect<void>
 }
 
 export class LocalScheduler extends Context.Service<LocalScheduler, Interface>()("@batonfx/runtime/LocalScheduler") {}
@@ -21,12 +23,15 @@ export class LocalScheduler extends Context.Service<LocalScheduler, Interface>()
 const terminalStatuses = ["succeeded", "failed", "cancelled"] as const
 type TerminalStatus = (typeof terminalStatuses)[number]
 
-export const make = (options: Options): Effect.Effect<Interface, never, RunStore | ExecutionHost | ActiveExecutions> =>
+export const make = (
+  options: Options,
+): Effect.Effect<Interface, never, RunStore | ExecutionHost | ActiveExecutions | Scope.Scope> =>
   Effect.gen(function* () {
     const host = yield* ExecutionHost
     const active = yield* ActiveExecutions
     const concurrency = options.concurrency ?? 4
     const tickLock = yield* Semaphore.make(1)
+    const executions = yield* FiberMap.make<string, void, never>()
     const selectionWindow = Math.max(concurrency * 2, 16)
     const reconcileWindow = 32
 
@@ -178,8 +183,9 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
         const info = yield* store.info
         // Re-admitting a Run this process is already executing would fence out and interrupt that execution.
         const executing = yield* active.active
+        const admitted = yield* Effect.sync(() => new Set(Array.from(executions, ([runId]) => runId)))
         const available = yield* Effect.filter(running, (run) =>
-          executing.has(run.runId)
+          executing.has(run.runId) || admitted.has(run.runId)
             ? Effect.succeed(false)
             : store
                 .loadExecution(run.runId)
@@ -193,12 +199,17 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                 ),
         )
         yield* Effect.forEach(
-          available.slice(0, concurrency),
+          available.slice(0, Math.max(0, concurrency - admitted.size)),
           (run) =>
-            store
-              .claimExecution({ runId: run.runId, ownerId: options.workerId })
-              .pipe(Effect.flatMap(host.execute), Effect.ignore),
-          { concurrency, discard: true },
+            FiberMap.run(
+              executions,
+              run.runId,
+              store
+                .claimExecution({ runId: run.runId, ownerId: options.workerId })
+                .pipe(Effect.flatMap(host.execute), Effect.ignore),
+              { onlyIfMissing: true },
+            ),
+          { discard: true },
         )
       })
 
@@ -209,7 +220,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
       yield* selectReadyRuns(store)
     }).pipe(Effect.ignore, tickLock.withPermit)
 
-    return LocalScheduler.of({ tick })
+    return LocalScheduler.of({ tick, idle: FiberMap.awaitEmpty(executions) })
   })
 
 export const layer = (

@@ -13,8 +13,9 @@ import type { LayerOptions } from "../runtime.js"
 import { emptyState, idempotencyKey, type MemoryState } from "./state.js"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "./store-admit.js"
 import { cancel, complete, emitAgentEvent, fail, respond, resume, signal, suspend } from "./store-control.js"
+import { respondApproval } from "./store-approval.js"
 import { isTerminal } from "../run.js"
-import { followEvents, inspectRun, shutdownStore, toInspection } from "./store-events.js"
+import { followEvents, followTreeChanges, inspectRun, shutdownStore, toInspection } from "./store-events.js"
 import {
   expireRunningOperation,
   getOperation,
@@ -110,6 +111,7 @@ export const makeRunStore = (options: LayerOptions) =>
         ),
       events: (input) => followEvents(stateRef, input),
       respond: (input) => update((state) => respond(state, input)),
+      respondApproval: (input) => update((state) => respondApproval(state, input)),
       signal: (input) => update((state) => signal(state, input)),
       cancel: (input) => update((state) => cancel(state, input)),
       admitSteering: (input) => update((state) => admitSteering(state, input)),
@@ -221,6 +223,7 @@ export const makeRunStore = (options: LayerOptions) =>
             }),
           ),
         ),
+      treeChanges: (rootRunId) => followTreeChanges(stateRef, rootRunId),
       list: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.map((state) => {

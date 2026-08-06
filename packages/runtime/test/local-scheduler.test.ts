@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
+import { Deferred, Effect, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { ChildRuns, LocalScheduler, Runtime, RunStore } from "../src/index.js"
+import { ChildRuns, ExecutionHost, LocalScheduler, Runtime, RunStore } from "../src/index.js"
 import {
   assistant,
   assistantAddress,
@@ -16,6 +16,8 @@ import {
 import { Agent } from "@batonfx/core"
 import { closedTestAgent } from "./identity.js"
 import { makeStatic } from "../src/executable-resolver.js"
+import { layer as activeExecutionsLayer } from "../src/active-executions.js"
+import { make as makeLocalScheduler } from "../src/local-scheduler.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
 const finish = Response.makePart("finish", {
@@ -66,6 +68,7 @@ for (const backend of ["memory", "sqlite"] as const) {
         prompt: "root",
       })
       yield* scheduler.tick
+      yield* scheduler.idle
       const rootSnapshot = yield* runtime.snapshot(root.runId)
       if (rootSnapshot.outcome?._tag === "Failed") return yield* Effect.die(rootSnapshot.outcome.error)
       expect(rootSnapshot.run.status).toBe("succeeded")
@@ -83,6 +86,7 @@ for (const backend of ["memory", "sqlite"] as const) {
         prompt: "child",
       })
       yield* scheduler.tick
+      yield* scheduler.idle
       expect((yield* runtime.inspect(child.runId)).status).toBe("succeeded")
     }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
   })
@@ -222,16 +226,14 @@ for (const backend of ["memory", "sqlite"] as const) {
           idempotencyKey: "run",
           prompt: "run",
         })
-        const first = yield* scheduler.tick.pipe(Effect.forkChild({ startImmediately: true }))
+        yield* scheduler.tick
         yield* Deferred.await(started)
         const activeFence = (yield* store.loadExecution(receipt.runId)).attemptFence
-        const second = yield* scheduler.tick.pipe(Effect.forkChild({ startImmediately: true }))
-        yield* Effect.yieldNow
+        yield* scheduler.tick
 
         expect((yield* store.loadExecution(receipt.runId)).attemptFence).toBe(activeFence)
         yield* Deferred.succeed(release, undefined)
-        yield* Fiber.join(first)
-        yield* Fiber.join(second)
+        yield* scheduler.idle
         expect(requests).toBe(1)
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
       }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
@@ -295,19 +297,8 @@ for (const backend of ["memory", "sqlite"] as const) {
   })
 
   it.effect(`${backend} scheduler selection claims the oldest ready Runs beyond the window`, () => {
-    const model = Layer.effect(
-      LanguageModel.LanguageModel,
-      LanguageModel.make({
-        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-        streamText: () =>
-          Stream.fromIterable<Response.StreamPartEncoded>([
-            Response.makePart("text-delta", { id: "answer", delta: "done" }),
-            finish,
-          ]),
-      }),
-    )
     const options = {
-      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
+      resolver: makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
       addresses: [
         { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
       ],
@@ -320,7 +311,16 @@ for (const backend of ["memory", "sqlite"] as const) {
 
     return Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const scheduler = yield* LocalScheduler.LocalScheduler
+      const store = yield* RunStore.RunStore
+      const host = ExecutionHost.ExecutionHost.of({
+        execute: (claim) =>
+          store.complete({ ...claim, result: completedResult("done") }).pipe(Effect.asVoid, Effect.orDie),
+      })
+      const scheduler = yield* makeLocalScheduler({ workerId: backend, concurrency: 4 }).pipe(
+        Effect.provideService(RunStore.RunStore, store),
+        Effect.provideService(ExecutionHost.ExecutionHost, host),
+        Effect.provide(activeExecutionsLayer),
+      )
       const receipts: Array<{ readonly runId: string }> = []
       for (let index = 0; index < 17; index += 1) {
         receipts.push(
@@ -485,11 +485,191 @@ for (const backend of ["memory", "sqlite"] as const) {
         suspension: suspension("child-tool"),
       })
       yield* scheduler.tick
+      yield* scheduler.idle
       expect((yield* runtime.inspect(outcome.token)).status).toBe("succeeded")
       yield* scheduler.tick
       const parentInspection = yield* runtime.inspect(parent.runId)
       expect(parentInspection.wait?.waitId).toBe("child-tool")
       expect(parentInspection.wait?.status).toBe("responded")
+    }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
+  })
+
+  it.effect(`${backend} a tick admits a long-running Run without blocking on it`, () => {
+    const started = Deferred.makeUnsafe<void>()
+    const release = Deferred.makeUnsafe<void>()
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Stream.fromEffect(Deferred.succeed(started, undefined)).pipe(
+            Stream.drain,
+            Stream.concat(Stream.fromEffect(Deferred.await(release)).pipe(Stream.drain)),
+            Stream.concat(Stream.make(Response.makePart("text-delta", { id: "answer", delta: "done" }), finish)),
+          ),
+      }),
+    )
+    const options = {
+      resolver: makeStatic([
+        { executable: assistantRef, agent: Agent.close(assistant, model) },
+        { executable: researcherRef, agent: closedTestAgent(researcher) },
+      ]),
+      addresses: [
+        { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+      ],
+      scheduler: { pollInterval: "1 day" as const },
+    }
+    const runtimeLayer =
+      backend === "memory"
+        ? Runtime.layerMemory(options)
+        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-nonblocking") })
+
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const scheduler = yield* LocalScheduler.LocalScheduler
+      const store = yield* RunStore.RunStore
+      const blocking = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: `scheduler-nonblocking:${backend}`,
+        idempotencyKey: "blocking",
+        prompt: "blocking",
+      })
+      // A tick that admitted a Run which has not finished must still return.
+      yield* scheduler.tick
+      yield* Deferred.await(started)
+      expect((yield* runtime.inspect(blocking.runId)).status).toBe("running")
+
+      // A later tick still makes progress while the earlier execution is in flight.
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: `scheduler-nonblocking-second:${backend}`,
+        idempotencyKey: "parent",
+        prompt: "parent",
+      })
+      const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "manual-parent" })
+      const outcome = yield* ChildRuns.make(store).invoke({
+        parentRunId: parent.runId,
+        toolCallId: "child-tool",
+        selection: "researcher",
+        prompt: "child",
+      })
+      if (outcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
+      yield* store.suspend({ ...parentClaim, wait: openWait("child-tool"), suspension: suspension("child-tool") })
+      yield* store.complete({
+        ...(yield* store.claimExecution({ runId: outcome.token, ownerId: "manual-child" })),
+        result: completedResult("done"),
+      })
+      yield* scheduler.tick
+      const parentInspection = yield* runtime.inspect(parent.runId)
+      expect(parentInspection.wait?.status).toBe("responded")
+      expect((yield* runtime.inspect(blocking.runId)).status).toBe("running")
+
+      yield* Deferred.succeed(release, undefined)
+      yield* scheduler.idle
+      expect((yield* runtime.inspect(blocking.runId)).status).toBe("succeeded")
+    }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
+  })
+
+  it.effect(`${backend} the sweep interrupts an executing Run that a durable cancellation marked cancelling`, () => {
+    const started = Deferred.makeUnsafe<void>()
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.never,
+        streamText: () =>
+          Stream.fromEffect(Deferred.succeed(started, undefined)).pipe(Stream.flatMap(() => Stream.never)),
+      }),
+    )
+    const options = {
+      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
+      addresses: [
+        { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+      ],
+      scheduler: { pollInterval: "1 day" as const },
+    }
+    const runtimeLayer =
+      backend === "memory"
+        ? Runtime.layerMemory(options)
+        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-sweep-interrupt") })
+
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const scheduler = yield* LocalScheduler.LocalScheduler
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: `scheduler-sweep-interrupt:${backend}`,
+        idempotencyKey: "run",
+        prompt: "run",
+      })
+      yield* scheduler.tick
+      yield* Deferred.await(started)
+
+      // store.cancel only records the request; delivering the interrupt to the owning
+      // worker is the scheduler sweep's job, so the run must not settle without a tick.
+      yield* store.cancel({ runId: receipt.runId, reason: "stop" })
+      expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
+
+      yield* scheduler.tick
+      yield* scheduler.idle
+      expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+      expect(
+        (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
+      ).not.toContain("RunFailed")
+    }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
+  })
+
+  it.live(`${backend} concurrency still bounds simultaneously executing Runs across ticks`, () => {
+    const inFlight = { current: 0, peak: 0 }
+    const release = Deferred.makeUnsafe<void>()
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Stream.fromEffect(
+            Effect.sync(() => {
+              inFlight.current += 1
+              inFlight.peak = Math.max(inFlight.peak, inFlight.current)
+            }),
+          ).pipe(
+            Stream.drain,
+            Stream.concat(Stream.fromEffect(Deferred.await(release)).pipe(Stream.drain)),
+            Stream.concat(Stream.make(Response.makePart("text-delta", { id: "answer", delta: "done" }), finish)),
+          ),
+      }),
+    )
+    const options = {
+      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
+      addresses: [
+        { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+      ],
+      scheduler: { pollInterval: "1 day" as const, concurrency: 2 },
+    }
+    const runtimeLayer =
+      backend === "memory"
+        ? Runtime.layerMemory(options)
+        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-bounded-concurrency") })
+
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const scheduler = yield* LocalScheduler.LocalScheduler
+      for (let index = 0; index < 6; index += 1) {
+        yield* runtime.send({
+          to: assistantAddress,
+          sessionId: `scheduler-bounded-concurrency:${backend}:${index}`,
+          idempotencyKey: `bounded-concurrency-${index}`,
+          prompt: `run-${index}`,
+        })
+      }
+      // Ticks no longer block on admitted executions, so the in-flight count is the only bound.
+      for (let tick = 0; tick < 5; tick += 1) {
+        yield* scheduler.tick
+        yield* Effect.sleep("20 millis")
+      }
+      expect(inFlight.peak).toBeLessThanOrEqual(2)
+      yield* Deferred.succeed(release, undefined)
+      yield* scheduler.idle
     }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
   })
 }

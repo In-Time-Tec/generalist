@@ -20,7 +20,7 @@ import {
 import type { EventHub } from "./subscribers.js"
 import type { DecodedRun, EventRow, OperationRow, RunRow } from "./rows.js"
 import type { WaitRow } from "./rows.js"
-import { WaitResolution, type RunWait } from "../run-wait.js"
+import { decodeReason, WaitResolution, type RunWait } from "../run-wait.js"
 import { Schema } from "effect"
 import type { OperationRecord } from "./operations.js"
 import { decodeContinuation } from "../steering.js"
@@ -169,7 +169,7 @@ export const loadRunWait = (runId: string, waitId?: string) =>
       row.response_json === null ? undefined : Schema.decodeUnknownSync(WaitResolution)(JSON.parse(row.response_json))
     return {
       waitId: row.wait_id,
-      reason: row.reason,
+      reason: decodeReason(row.reason),
       status: row.status,
       openedAt,
       ...(resolution === undefined ? {} : { resolution }),

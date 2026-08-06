@@ -40,11 +40,17 @@ import {
 
 `Runtime.send` remains FIFO addressed mailbox admission. Exact duplicate `start` or `send` calls return the same Run ID; changed prompts or executable authority fail as `IdempotencyConflict`, while changed data under an existing registration pin fails as `ExecutableRegistrationConflict`.
 
+## Approvals
+
+Approval suspensions are typed waits containing a stable approval ID and the exact requested operation, capability, and input. Inspect the Run or tree, then call `Approval.approve({ runId, approvalId })` or `Approval.deny({ runId, approvalId, reason })`. Exact duplicate decisions are idempotent; stale identities and changed decisions fail as `ApprovalStale` and `ApprovalMismatch`. Generic wait responses and unknown-operation resolution are separate controls.
+
 ## Fan-out
 
 `Runtime.spawn` and `Runtime.fanOut` accept semantic child selections declared by the parent Run's active Agent manifest. Admission resolves each selection to an exact Agent pin from the persisted executable closure under the parent lock; address bindings and the executable resolver are not consulted. Fan-out resolves every member atomically, and the resolved refs participate in its idempotency digest. `Runtime.awaitFanOut` waits on committed child events until the durable join decision is available; `Runtime.inspectFanOut` remains the non-blocking inspection operation. Both return member outcomes in input ordinal order.
 
 Join modes are `AllSuccess`, `AllSettled`, `FirstSuccess`, `Quorum`, and `BestEffort`. Remainder policies are `await`, `request-cancel`, and `abandon`. `terminate` is rejected until a host can prove that all member effects terminated.
+
+For model-authored work, `ChildRuns.tool` keeps `run_child` blocking for one dependent child. `ChildRuns.startGroupTool` returns ordered durable receipts without blocking, and `ChildRuns.awaitGroupTool` later joins that group through one durable parent suspension. `ChildRuns.makeTools` narrows model-facing selections from declared child authority.
 
 ## Errors, requirements, and resources
 

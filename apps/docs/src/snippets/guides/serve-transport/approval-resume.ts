@@ -118,7 +118,7 @@ const program = Effect.gen(function* () {
   if (waiting === undefined || waiting._tag !== "RunWaiting") {
     return yield* Effect.die("expected a RunWaiting event")
   }
-  yield* Console.log(`waiting for ${waiting.wait.reason} on ${waiting.wait.waitId}`)
+  yield* Console.log(`waiting for ${waiting.wait.reason._tag} on ${waiting.wait.waitId}`)
   yield* runtime.respond({ runId: receipt.runId, waitId: waiting.wait.waitId, resolution: { _tag: "Approved" } })
   yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-example" }))
   const secondRun = yield* runtime.events({ runId: receipt.runId, cursor: Cursor.make(waiting.sequence) }).pipe(

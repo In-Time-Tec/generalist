@@ -19,6 +19,7 @@ export type RunError =
   | Runtime.SendError
   | Runtime.EventsError
   | Runtime.RespondError
+  | Runtime.RespondApprovalError
   | Runtime.InspectError
 
 /** @experimental */
@@ -129,17 +130,20 @@ export const layer = (options: LayerOptions): Layer.Layer<AgUi, never, Runtime.R
               }
               const payload = yield* serializablePayload(entry.payload)
               cursor = current.cursor
-              yield* runtime.respond({
-                runId: input.runId,
-                waitId: entry.interruptId,
-                resolution:
-                  current.run.wait.reason === "approval"
-                    ? payload === false
-                      ? { _tag: "Denied" }
-                      : { _tag: "Approved" }
-                    : { _tag: "ToolResult", result: payload, encodedResult: payload },
-                idempotencyKey: `ag-ui:${input.runId}:${entry.interruptId}`,
-              })
+              if (current.run.wait.reason._tag === "Approval") {
+                yield* runtime.respondApproval({
+                  runId: input.runId,
+                  approvalId: current.run.wait.reason.request.approvalId,
+                  decision: payload === false ? { _tag: "Denied" } : { _tag: "Approved" },
+                })
+              } else {
+                yield* runtime.respond({
+                  runId: input.runId,
+                  waitId: entry.interruptId,
+                  resolution: { _tag: "ToolResult", result: payload, encodedResult: payload },
+                  idempotencyKey: `ag-ui:${input.runId}:${entry.interruptId}`,
+                })
+              }
             } else {
               const final = yield* finalPrompt(input)
               yield* runtime.send({

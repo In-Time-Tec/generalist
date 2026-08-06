@@ -3,7 +3,7 @@ import { CursorExpired, RunNotFound, RuntimeUnavailable, SubscriberLagged } from
 import type { Cursor } from "../cursor.js"
 import type { RunInspection } from "../run.js"
 import type { RunEvent } from "../run-event.js"
-import type { MemoryState, SubscriberError, SubscriberQueue } from "./state.js"
+import type { MemoryState, SubscriberError, SubscriberQueue, TreeSubscriberQueue } from "./state.js"
 
 export const toInspection = (
   run: MemoryState["runs"] extends ReadonlyMap<string, infer R> ? R : never,
@@ -80,20 +80,63 @@ export const followEvents = (
     }),
   )
 
+export const followTreeChanges = (
+  stateRef: SynchronizedRef.SynchronizedRef<MemoryState>,
+  rootRunId: string,
+): Stream.Stream<void, RunNotFound | RuntimeUnavailable> =>
+  Stream.unwrap(
+    Effect.gen(function* () {
+      const liveQueue: TreeSubscriberQueue = yield* Queue.sliding<void, RuntimeUnavailable>(1)
+      const subscriberId = yield* SynchronizedRef.modifyEffect(stateRef, (state) =>
+        Effect.gen(function* () {
+          if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
+          const root = state.treeRoots.get(rootRunId)
+          if (root === undefined) return yield* RunNotFound.make({ runId: rootRunId })
+          const id = state.nextSubscriberId
+          const subscribers = new Map(root.subscribers)
+          subscribers.set(id, liveQueue)
+          const treeRoots = new Map(state.treeRoots)
+          treeRoots.set(rootRunId, { ...root, subscribers })
+          return [id, { ...state, nextSubscriberId: id + 1, treeRoots }] as const
+        }),
+      )
+      yield* Effect.addFinalizer(() =>
+        SynchronizedRef.update(stateRef, (state) => {
+          const root = state.treeRoots.get(rootRunId)
+          if (root === undefined) return state
+          const subscribers = new Map(root.subscribers)
+          subscribers.delete(subscriberId)
+          const treeRoots = new Map(state.treeRoots)
+          treeRoots.set(rootRunId, { ...root, subscribers })
+          return { ...state, treeRoots }
+        }).pipe(Effect.andThen(Queue.shutdown(liveQueue)), Effect.asVoid),
+      )
+      return Stream.concat(Stream.succeed(undefined), Stream.fromQueue(liveQueue))
+    }),
+  )
+
 export const shutdownStore = (stateRef: SynchronizedRef.SynchronizedRef<MemoryState>): Effect.Effect<void> =>
   SynchronizedRef.modifyEffect(stateRef, (state) =>
     Effect.gen(function* () {
       if (state.closed) return [undefined, state] as const
-      yield* Effect.forEach(
-        state.runs.values(),
-        (run) =>
+      const unavailable = RuntimeUnavailable.make({ message: "runtime store released" })
+      yield* Effect.all(
+        [
           Effect.forEach(
-            run.subscribers.values(),
-            (queue) => Queue.fail(queue, RuntimeUnavailable.make({ message: "runtime store released" })),
+            state.runs.values(),
+            (run) =>
+              Effect.forEach(run.subscribers.values(), (queue) => Queue.fail(queue, unavailable), { discard: true }),
             { discard: true },
           ),
+          Effect.forEach(
+            state.treeRoots.values(),
+            (root) =>
+              Effect.forEach(root.subscribers.values(), (queue) => Queue.fail(queue, unavailable), { discard: true }),
+            { discard: true },
+          ),
+        ],
         { discard: true },
       )
-      return [undefined, { ...state, closed: true, runs: new Map() }] as const
+      return [undefined, { ...state, closed: true, runs: new Map(), treeRoots: new Map() }] as const
     }),
   ).pipe(Effect.asVoid)

@@ -106,7 +106,7 @@ export const admitSend = (
     const runs = new Map(withId.runs)
     runs.set(runId, run)
     const treeRoots = new Map(withId.treeRoots)
-    treeRoots.set(runId, { earliestPosition: 0, lastPosition: -1, events: [] })
+    treeRoots.set(runId, { earliestPosition: 0, lastPosition: -1, events: [], subscribers: new Map() })
     let next: MemoryState = { ...withId, runs, treeRoots }
     const enqueued = enqueueLane(next, input.message.to, input.message.sessionId, runId)
     next = enqueued.state
@@ -361,7 +361,11 @@ export const admitSpawn = (
     runs.set(runId, child)
     let next: MemoryState = { ...withId, runs }
 
-    const [, linked] = yield* appendLifecycle(next, parent.runId, makeChildLinked(runId, input.invocationId))
+    const [, linked] = yield* appendLifecycle(
+      next,
+      parent.runId,
+      makeChildLinked(runId, input.invocationId, input.selection, input.message.prompt),
+    )
     next = linked
 
     const [, accepted] = yield* appendLifecycle(next, runId, makeAccepted(input.message.to, input.message.id), "queued")
@@ -446,7 +450,11 @@ export const admitProgramChild = (
     runs.set(parent.runId, { ...parent, children: [...parent.children, child.runId] })
     runs.set(child.runId, child)
     let next: MemoryState = { ...state, runs }
-    const [, linked] = yield* appendLifecycle(next, parent.runId, makeChildLinked(child.runId, input.invocationId))
+    const [, linked] = yield* appendLifecycle(
+      next,
+      parent.runId,
+      makeChildLinked(child.runId, input.invocationId, input.executableRef.active, input.message.prompt),
+    )
     next = linked
     const [, accepted] = yield* appendLifecycle(
       next,

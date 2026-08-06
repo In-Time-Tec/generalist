@@ -1,10 +1,11 @@
 import { Schema } from "effect"
 import type { Tool } from "effect/unstable/ai"
-import type { Agent } from "../agent/agent.js"
+import type { Agent, ToolSchedulingPolicy } from "../agent/agent.js"
+import { validationFailure as toolSchedulingFailure } from "../agent/tool-scheduler.js"
 import { BudgetLimits } from "./run-budget.js"
 import { AgentPin, CapabilityPin, makeAgent, ModelPin } from "./pin.js"
 import { digest } from "./canonical-json.js"
-import { ProgramAgentCapability, ProgramBudget } from "./program-manifest.js"
+import { ProgramBudget, type ProgramAgentCapability } from "./program-manifest.js"
 
 const compareText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0)
 
@@ -66,6 +67,7 @@ export interface AgentManifest {
   readonly skills: ReadonlyArray<NamedCapability>
   readonly services: ReadonlyArray<NamedCapability>
   readonly policy: PolicyIdentity
+  readonly toolScheduling: ToolSchedulingPolicy
   readonly compaction?: CompactionIdentity
   readonly programAuthority?: ProgramAuthority
   readonly budget: typeof BudgetLimits.Type
@@ -140,6 +142,10 @@ export const PolicyIdentity: Schema.Codec<PolicyIdentity, PolicyIdentityEncoded>
   Schema.Struct({ _tag: Schema.Literal("Portable"), policy: PortablePolicy }),
   Schema.Struct({ _tag: Schema.Literal("Pinned"), pin: CapabilityPin }),
 ])
+const ToolSchedulingPolicySchema = Schema.Struct({
+  maxConcurrency: Schema.Int.check(Schema.isGreaterThan(0)),
+  parallelSafe: Schema.Array(Schema.String),
+})
 /** @experimental Exact identity and token limits of one reconstructable compaction capability. */
 export const CompactionIdentity: Schema.Codec<CompactionIdentity, CompactionIdentityEncoded> = Schema.Struct({
   service: CapabilityPin,
@@ -150,15 +156,23 @@ export const CompactionIdentity: Schema.Codec<CompactionIdentity, CompactionIden
   strategyIdentity: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
   summaryPromptIdentity: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
 })
+const ProgramSelectionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
+const ProgramAuthorityNamedCapability = Schema.Struct({ name: ProgramSelectionId, pin: CapabilityPin })
+const ProgramAuthorityAgentCapability = Schema.Struct({
+  selection: ProgramSelectionId,
+  agent: AgentPin,
+  input: CapabilityPin,
+})
+
 /** @experimental Maximum Program authority an Agent may narrow for one dynamic child. */
 export const ProgramAuthority = Schema.Struct({
   sandbox: CapabilityPin,
   input: CapabilityPin,
   output: CapabilityPin,
   maxSourceBytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  tools: Schema.Array(NamedCapability),
-  agents: Schema.Array(ProgramAgentCapability),
-  steps: Schema.Array(NamedCapability),
+  tools: Schema.Array(ProgramAuthorityNamedCapability).pipe(Schema.check(Schema.isMaxLength(64))),
+  agents: Schema.Array(ProgramAuthorityAgentCapability).pipe(Schema.check(Schema.isMaxLength(64))),
+  steps: Schema.Array(ProgramAuthorityNamedCapability).pipe(Schema.check(Schema.isMaxLength(64))),
   budget: ProgramBudget,
 })
 /** @experimental Closed, reconstructable identity contract for one Agent. */
@@ -171,6 +185,7 @@ export const AgentManifest: Schema.Codec<AgentManifest, AgentManifestEncoded> = 
   skills: Schema.Array(NamedCapability),
   services: Schema.Array(NamedCapability),
   policy: PolicyIdentity,
+  toolScheduling: ToolSchedulingPolicySchema,
   compaction: Schema.optionalKey(CompactionIdentity),
   programAuthority: Schema.optionalKey(ProgramAuthority),
   budget: BudgetLimits,
@@ -209,9 +224,18 @@ const childIdentity = (value: ChildBinding): string => value.agent
 
 /** @experimental Construct and pin a canonical closed Agent manifest. */
 export const make = (input: Omit<AgentManifest, "version"> & { readonly version?: "1" }): PinnedAgent => {
+  const invalidToolScheduling = toolSchedulingFailure(
+    input.toolScheduling,
+    input.tools.map(({ name }) => name),
+  )
+  if (invalidToolScheduling !== undefined) throw new TypeError(invalidToolScheduling)
   const manifest = Schema.decodeUnknownSync(AgentManifest, { onExcessProperty: "error" })({
     ...input,
     version: "1",
+    toolScheduling: {
+      ...input.toolScheduling,
+      parallelSafe: [...input.toolScheduling.parallelSafe].toSorted(compareText),
+    },
     tools: uniqueSorted(input.tools, capabilityOrder, capabilityIdentity, ["tool name", "tool pin"]),
     skills: uniqueSorted(input.skills, capabilityOrder, capabilityIdentity, ["skill name", "skill pin"]),
     services: uniqueSorted(input.services, capabilityOrder, capabilityIdentity, ["service name", "service pin"]),
@@ -275,5 +299,6 @@ export const fromLiveAgent = <Tools extends Record<string, Tool.Any>, R, PolicyS
     name: agent.name,
     ...(agent.instructions === undefined ? {} : { instructions: agent.instructions }),
     ...identity,
+    toolScheduling: agent.toolScheduling,
   })
 }

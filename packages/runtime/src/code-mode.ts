@@ -15,21 +15,76 @@ import { make as makeMessage } from "./message.js"
 import { narrow as narrowRegistrations } from "./executable-registration.js"
 import { normalizePrompt } from "./memory/prompt.js"
 
-const CapabilityNames = Schema.Array(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))).pipe(
-  Schema.check(Schema.isMaxLength(64)),
-)
+const SelectionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
+const SelectionIds = Schema.Array(SelectionId).pipe(Schema.check(Schema.isMaxLength(64)))
+const BudgetDimensions = [
+  "agentRuns",
+  "concurrency",
+  "toolCalls",
+  "tokens",
+  "wallClockMillis",
+  "logBytes",
+  "outputBytes",
+] as const
+const AuthorityDimension = Schema.Literals(["sourceBytes", "tools", "agents", "steps", ...BudgetDimensions])
+
+/** @experimental Exact selection IDs advertised to the model for one ProgramAuthority. */
+export interface AuthorityCatalog {
+  readonly tools: ReadonlyArray<string>
+  readonly agents: ReadonlyArray<string>
+  readonly steps: ReadonlyArray<string>
+}
+
+/** @experimental Construct the exact canonical selection catalog for one ProgramAuthority. */
+export const makeCatalog = (authority: AgentManifest.ProgramAuthority): AuthorityCatalog => ({
+  tools: authority.tools.map(({ name }) => name),
+  agents: authority.agents.map(({ selection }) => selection),
+  steps: authority.steps.map(({ name }) => name),
+})
+
+const boundedInt = (minimum: number, maximum: number) =>
+  Schema.Int.check(Schema.isGreaterThanOrEqualTo(minimum), Schema.isLessThanOrEqualTo(maximum))
 
 /** @experimental Exact model-authored Program request admitted only through an authorized Agent Run. */
-export const Parameters = Schema.Struct({
-  source: Schema.String,
-  input: Schema.String,
-  tools: CapabilityNames,
-  agents: CapabilityNames,
-  steps: CapabilityNames,
-  budget: ProgramManifest.ProgramBudget,
-})
-/** @experimental */
-export type Parameters = typeof Parameters.Type
+export interface Parameters {
+  readonly source: string
+  readonly input: string
+  readonly tools: ReadonlyArray<string>
+  readonly agents: ReadonlyArray<string>
+  readonly steps: ReadonlyArray<string>
+  readonly budget: ProgramManifest.ProgramBudget
+}
+
+/**
+ * An empty catalog admits no selection at all. `Schema.Literals([])` would model that as `never`, which serializes to
+ * the untyped JSON Schema `items: { not: {} }` that providers reject, so express the same contract as a typed array
+ * that is bounded to zero elements.
+ */
+const selectionArray = (catalog: ReadonlyArray<string>): Schema.Codec<ReadonlyArray<string>> =>
+  catalog.length === 0
+    ? Schema.Array(SelectionId).pipe(Schema.check(Schema.isMaxLength(0)))
+    : Schema.Array(Schema.Literals(catalog)).pipe(Schema.check(Schema.isMaxLength(64)))
+
+/** @experimental Construct the model-visible request schema for one exact ProgramAuthority. */
+export const makeParameters = (authority: AgentManifest.ProgramAuthority) => {
+  const catalog = makeCatalog(authority)
+  return Schema.Struct({
+    source: Schema.String.pipe(Schema.check(Schema.isMaxLength(authority.maxSourceBytes))),
+    input: Schema.String,
+    tools: selectionArray(catalog.tools),
+    agents: selectionArray(catalog.agents),
+    steps: selectionArray(catalog.steps),
+    budget: Schema.Struct({
+      agentRuns: boundedInt(0, authority.budget.agentRuns),
+      concurrency: boundedInt(1, authority.budget.concurrency),
+      toolCalls: boundedInt(0, authority.budget.toolCalls),
+      tokens: boundedInt(0, authority.budget.tokens),
+      wallClockMillis: boundedInt(0, authority.budget.wallClockMillis),
+      logBytes: boundedInt(0, authority.budget.logBytes),
+      outputBytes: boundedInt(0, authority.budget.outputBytes),
+    }),
+  })
+}
 
 /** @experimental */
 export class ProgramAuthorityMissing extends Schema.TaggedErrorClass<ProgramAuthorityMissing>()(
@@ -40,7 +95,12 @@ export class ProgramAuthorityMissing extends Schema.TaggedErrorClass<ProgramAuth
 /** @experimental */
 export class ProgramAuthorityExceeded extends Schema.TaggedErrorClass<ProgramAuthorityExceeded>()(
   "@batonfx/runtime/ProgramAuthorityExceeded",
-  { dimension: Schema.String, message: Schema.String },
+  {
+    dimension: AuthorityDimension,
+    requestedId: Schema.optionalKey(SelectionId),
+    allowedIds: SelectionIds,
+    message: Schema.String.check(Schema.isMaxLength(512)),
+  },
 ) {}
 
 /** @experimental */
@@ -49,30 +109,48 @@ export class ProgramAdmissionFailed extends Schema.TaggedErrorClass<ProgramAdmis
   { message: Schema.String },
 ) {}
 
-/** @experimental Runtime-owned Effect AI tool for bounded dynamic Program admission. */
-export const tool = Tool.make("code_mode", {
-  description: "Run exact JavaScript in the host sandbox using a narrowed set of approved capabilities and budgets.",
-  parameters: Parameters,
-  success: Schema.Unknown,
-  failure: Schema.Union([ProgramAuthorityMissing, ProgramAuthorityExceeded, ProgramAdmissionFailed]),
-})
+const makeDeclaration = (parameters: ReturnType<typeof makeParameters>) =>
+  Tool.make("code_mode", {
+    description: "Run exact JavaScript in the host sandbox using a narrowed set of approved capabilities and budgets.",
+    parameters,
+    success: Schema.Unknown,
+    failure: Schema.Union([ProgramAuthorityMissing, ProgramAuthorityExceeded, ProgramAdmissionFailed]),
+  })
+
+/** @experimental Construct the Runtime-owned Effect AI tool for one exact ProgramAuthority. */
+export const makeTool = (authority: AgentManifest.ProgramAuthority) => makeDeclaration(makeParameters(authority))
 
 const selected = <A>(
   requested: ReadonlyArray<string>,
   allowed: ReadonlyArray<A>,
   nameOf: (value: A) => string,
-  dimension: string,
+  dimension: "tools" | "agents" | "steps",
 ): Effect.Effect<ReadonlyArray<A>, ProgramAuthorityExceeded> =>
   Effect.gen(function* () {
-    if (new Set(requested).size !== requested.length) {
-      return yield* ProgramAuthorityExceeded.make({ dimension, message: `${dimension} must be unique` })
+    const allowedIds = allowed.map(nameOf)
+    const seen = new Set<string>()
+    for (const requestedId of requested) {
+      if (seen.has(requestedId)) {
+        return yield* ProgramAuthorityExceeded.make({
+          dimension,
+          requestedId,
+          allowedIds,
+          message: `${dimension} selection must be unique`,
+        })
+      }
+      seen.add(requestedId)
     }
     const byName = new Map(allowed.map((value) => [nameOf(value), value] as const))
     const values: Array<A> = []
-    for (const name of requested) {
-      const value = byName.get(name)
+    for (const requestedId of requested) {
+      const value = byName.get(requestedId)
       if (value === undefined) {
-        return yield* ProgramAuthorityExceeded.make({ dimension, message: `${name} is not authorized` })
+        return yield* ProgramAuthorityExceeded.make({
+          dimension,
+          requestedId,
+          allowedIds,
+          message: `${requestedId} is not authorized`,
+        })
       }
       values.push(value)
     }
@@ -84,10 +162,11 @@ const narrowBudget = (
   maximum: ProgramManifest.ProgramBudget,
 ): Effect.Effect<void, ProgramAuthorityExceeded> =>
   Effect.gen(function* () {
-    for (const key of Object.keys(maximum) as Array<keyof ProgramManifest.ProgramBudget>) {
+    for (const key of BudgetDimensions) {
       if (requested[key] > maximum[key]) {
         return yield* ProgramAuthorityExceeded.make({
           dimension: key,
+          allowedIds: [],
           message: `${requested[key]} exceeds ${maximum[key]}`,
         })
       }
@@ -115,6 +194,8 @@ const closureFor = (
 }
 
 export interface Interface {
+  readonly parameters: ReturnType<typeof makeParameters>
+  readonly tool: ReturnType<typeof makeTool>
   readonly invoke: (request: Parameters & { readonly toolCallId: string }) => Effect.Effect<ToolExecutor.Outcome>
   readonly admitSuspension: (input: {
     readonly suspension: AgentEvent.AgentSuspended
@@ -132,12 +213,15 @@ export const make = (input: {
   readonly authority: AgentManifest.ProgramAuthority
   readonly store: RunStoreInterface
 }): Interface => {
+  const parameters = makeParameters(input.authority)
+  const declaration = makeDeclaration(parameters)
   const prepare = (request: Parameters & { readonly toolCallId: string }) =>
     Effect.gen(function* () {
       const sourceBytes = new TextEncoder().encode(request.source).byteLength
       if (sourceBytes > input.authority.maxSourceBytes) {
         return yield* ProgramAuthorityExceeded.make({
           dimension: "sourceBytes",
+          allowedIds: [],
           message: `${sourceBytes} exceeds ${input.authority.maxSourceBytes}`,
         })
       }
@@ -199,6 +283,8 @@ export const make = (input: {
           : String(failure),
     })
   return {
+    parameters,
+    tool: declaration,
     invoke: (request) =>
       prepare(request).pipe(
         Effect.map((prepared) => ({ _tag: "Suspend" as const, token: prepared.childRunId })),
@@ -213,8 +299,8 @@ export const make = (input: {
         }),
       ),
     admitSuspension: ({ suspension, openedAt, ...state }) =>
-      Schema.decodeUnknownEffect(Parameters, { onExcessProperty: "error" })(suspension.tool_params).pipe(
-        Effect.flatMap((parameters) => prepare({ ...parameters, toolCallId: suspension.tool_call_id })),
+      Schema.decodeUnknownEffect(parameters, { onExcessProperty: "error" })(suspension.tool_params).pipe(
+        Effect.flatMap((decoded) => prepare({ ...decoded, toolCallId: suspension.tool_call_id })),
         Effect.filterOrFail(
           (prepared) => prepared.childRunId === suspension.token,
           () => ProgramAdmissionFailed.make({ message: "code_mode suspension token does not match its child Run" }),
@@ -226,7 +312,7 @@ export const make = (input: {
             suspension,
             wait: {
               waitId: suspension.tool_call_id,
-              reason: suspension.reason,
+              reason: { _tag: "ToolWait" },
               status: "open",
               openedAt,
             },
@@ -241,7 +327,8 @@ export const make = (input: {
 /** @experimental Add the Runtime-owned declaration without changing the resolved Agent identity. */
 export const withTool = <Tools extends Record<string, Tool.Any>, R>(
   agent: Agent.Agent<Tools, R>,
-): Agent.Agent<Record<string, Tool.Any>, R> => Agent.withTools(agent, [tool])
+  implementation: Interface,
+): Agent.Agent<Record<string, Tool.Any>, R> => Agent.withTools(agent, [implementation.tool])
 
 /** @experimental Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */
 export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
@@ -252,15 +339,17 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
 }): ToolExecutor.Interface =>
   ToolExecutor.ToolExecutor.of({
     execute: (request) =>
-      request.call.name === tool.name
-        ? Schema.decodeUnknownEffect(Parameters, { onExcessProperty: "error" })(request.call.params).pipe(
+      request.call.name === options.implementation.tool.name
+        ? Schema.decodeUnknownEffect(options.implementation.parameters, { onExcessProperty: "error" })(
+            request.call.params,
+          ).pipe(
             Effect.flatMap((parameters) =>
               options.implementation.invoke({ ...parameters, toolCallId: request.call.id }),
             ),
             Effect.mapError(() =>
               ToolExecutor.FrameworkFailure.make({
                 stage: "decode-input",
-                tool: tool.name,
+                tool: options.implementation.tool.name,
                 message: "code_mode input does not match its schema",
               }),
             ),

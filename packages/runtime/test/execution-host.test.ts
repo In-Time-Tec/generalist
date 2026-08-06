@@ -1324,7 +1324,10 @@ describe("ExecutionHost", () => {
         transcript: Prompt.make("saved transcript"),
         wait: {
           waitId: "approval",
-          reason: "approval",
+          reason: {
+            _tag: "Approval",
+            request: { approvalId: "approval", operation: "approval", capability: "test", input: {} },
+          },
           status: "open",
           openedAt: "2026-08-04T00:00:00.000Z",
         },

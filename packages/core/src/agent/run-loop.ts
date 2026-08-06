@@ -39,6 +39,7 @@ import { LoopDriverState, modelCallOrdinal } from "../durable/loop-driver-state.
 import { takePendingContinuation } from "./handoff-state.js"
 import { DriverStateInvalid } from "../durable/durable-driver.js"
 import { terminalCompletedEvent, turnCompletedEvent } from "./model-turn-finish.js"
+import { schedule as scheduleTools } from "./tool-scheduler.js"
 export const makeRunLoop = <
   Tools extends Record<string, Tool.Any>,
   R,
@@ -364,8 +365,8 @@ export const makeRunLoop = <
     const currentTurn = resetTurnState(0).pipe(
       Stream.concat(
         Stream.unwrap(
-          Ref.get(toolState).pipe(
-            Effect.map((tools) => {
+          Effect.all({ tools: Ref.get(toolState), activeAgent: policyAgent() }).pipe(
+            Effect.map(({ tools, activeAgent }) => {
               const suspension = checkpoint.suspension
               const registry =
                 suspension.active_tools === undefined ? tools.registry : select(tools.registry, suspension.active_tools)
@@ -385,12 +386,10 @@ export const makeRunLoop = <
                   AgentError.make({ message: "Suspension tool call index is outside its batch", turn: 0 }),
                 )
               }
-              const executions = Stream.fromIterable(
-                checkpoint.unresolvedToolCallIndexes.map((toolCallIndex) => ({
-                  call: calls[toolCallIndex] as AnyToolCall,
-                  toolCallIndex,
-                })),
-              )
+              const executions = checkpoint.unresolvedToolCallIndexes.map((toolCallIndex) => ({
+                call: calls[toolCallIndex] as AnyToolCall,
+                toolCallIndex,
+              }))
               const execute = ({
                 call,
                 toolCallIndex,
@@ -414,13 +413,7 @@ export const makeRunLoop = <
                       ) as ReturnType<typeof toolCallEvents>)
                     : toolCallEvents(0, toolCallBatch, toolCallIndex, call, checkpoint.messages, registry)
               }
-              const concurrency = agent.toolExecution?.concurrency ?? 1
-              return concurrency === 1
-                ? executions.pipe(Stream.flatMap(execute))
-                : executions.pipe(
-                    Stream.mapEffect((execution) => Stream.runCollect(execute(execution)), { concurrency }),
-                    Stream.flatMap(Stream.fromIterable),
-                  )
+              return scheduleTools(executions, activeAgent.toolScheduling, execute)
             }),
           ),
         ),

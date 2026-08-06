@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Scope, Stream } from "effect"
-import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import {
   Agent,
   AgentManifest,
@@ -150,6 +150,7 @@ describe("Runtime code_mode Program children", () => {
           prompt: "use code mode",
         })).runId
         yield* scheduler.tick
+        yield* scheduler.idle
         expect((yield* runtime.inspect(rootRunId)).status).toBe("waiting")
         const tree = yield* runtime.inspectTree(rootRunId)
         expect(tree.runs).toHaveLength(2)
@@ -162,7 +163,9 @@ describe("Runtime code_mode Program children", () => {
       const finishRun = Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const scheduler = yield* LocalScheduler.LocalScheduler
-        yield* Effect.forEach([0, 1, 2, 3], () => scheduler.tick, { discard: true })
+        yield* Effect.forEach([0, 1, 2, 3], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), {
+          discard: true,
+        })
         expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
         expect((yield* runtime.snapshot(rootRunId)).outcome).toMatchObject({
           _tag: "Succeeded",
@@ -198,6 +201,7 @@ describe("Runtime code_mode Program children", () => {
           prompt: "use code mode",
         })).runId
         yield* scheduler.tick
+        yield* scheduler.idle
         const childRunId = (yield* runtime.inspectTree(rootRunId)).runs.find((run) => run.parentRunId === rootRunId)!
           .run.runId
         yield* runtime.cancel({ runId: rootRunId, reason: "operator cancelled" })
@@ -265,7 +269,9 @@ describe("Runtime code_mode Program children", () => {
           return
         }
         const scheduler = yield* LocalScheduler.LocalScheduler
-        yield* Effect.forEach([0, 1, 2, 3, 4, 5, 6, 7], () => scheduler.tick, { discard: true })
+        yield* Effect.forEach([0, 1, 2, 3, 4, 5, 6, 7], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), {
+          discard: true,
+        })
         expect(counts.model).toBe(2)
         expect(counts.capability).toBe(1)
         expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
@@ -297,8 +303,10 @@ describe("Runtime code_mode Program children", () => {
         prompt: "use code mode",
       })).runId
       yield* scheduler.tick
+      yield* scheduler.idle
       childRunId = (yield* runtime.inspectTree(rootRunId)).runs.find((run) => run.parentRunId === rootRunId)!.run.runId
       yield* scheduler.tick
+      yield* scheduler.idle
       expect((yield* runtime.inspect(rootRunId)).status).toBe("waiting")
       expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
       expect(counts.model).toBe(1)
@@ -307,7 +315,7 @@ describe("Runtime code_mode Program children", () => {
     const reopen = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const scheduler = yield* LocalScheduler.LocalScheduler
-      yield* Effect.forEach([0, 1, 2], () => scheduler.tick, { discard: true })
+      yield* Effect.forEach([0, 1, 2], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), { discard: true })
       expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
       expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
       expect(counts.model).toBe(2)
@@ -331,6 +339,155 @@ describe("Runtime code_mode Program children", () => {
       )
       expect(failure).toMatchObject({ _tag: "@batonfx/runtime/ExecutableRegistrationMissing", pin: sandboxPin })
     }).pipe(Effect.provide(Runtime.layerMemory({ resolver, addresses: [] })), Effect.scoped)
+  })
+
+  it.effect("advertises only exact ProgramAuthority selections and maxima in the model tool schema", () => {
+    const authority = {
+      ...root.manifest.programAuthority!,
+      tools: [{ name: "shell.run", pin: Pins.makeCapability({ tool: "shell.run" }) }],
+      agents: [{ selection: "researcher", agent: root.pin, input: inputPin }],
+      steps: [{ name: "load.dataset", pin: Pins.makeCapability({ step: "load.dataset" }) }],
+      budget: { ...budget, agentRuns: 2, toolCalls: 3 },
+    }
+    const declaration = CodeMode.makeTool(authority)
+    const modelSchema = Tool.getJsonSchema(declaration)
+    expect(modelSchema).toMatchObject({
+      properties: {
+        source: { type: "string", allOf: [{ maxLength: 1_000 }] },
+        tools: { items: { anyOf: [{ type: "string", enum: ["shell.run"] }] }, allOf: [{ maxItems: 64 }] },
+        agents: { items: { anyOf: [{ type: "string", enum: ["researcher"] }] }, allOf: [{ maxItems: 64 }] },
+        steps: { items: { anyOf: [{ type: "string", enum: ["load.dataset"] }] }, allOf: [{ maxItems: 64 }] },
+        budget: {
+          properties: {
+            agentRuns: { type: "integer", allOf: [{ minimum: 0 }, { maximum: 2 }] },
+            concurrency: { type: "integer", allOf: [{ minimum: 1 }, { maximum: 1 }] },
+            toolCalls: { type: "integer", allOf: [{ minimum: 0 }, { maximum: 3 }] },
+          },
+        },
+      },
+    })
+    const exact = {
+      source: "return input",
+      input: "input",
+      tools: ["shell.run"],
+      agents: ["researcher"],
+      steps: ["load.dataset"],
+      budget: authority.budget,
+    }
+    return Effect.gen(function* () {
+      expect(yield* Schema.decodeUnknownEffect(declaration.parametersSchema)(exact)).toEqual(exact)
+      const unknownSelection = yield* Effect.flip(
+        Schema.decodeUnknownEffect(declaration.parametersSchema)({ ...exact, tools: ["shell"] }),
+      )
+      expect(String(unknownSelection)).toContain('Expected "shell.run", got "shell"')
+      const excessiveBudget = yield* Effect.flip(
+        Schema.decodeUnknownEffect(declaration.parametersSchema)({
+          ...exact,
+          budget: { ...authority.budget, toolCalls: 4 },
+        }),
+      )
+      expect(String(excessiveBudget)).toContain("Expected a value less than or equal to 3, got 4")
+    })
+  })
+
+  it.effect("emits a provider-valid typed schema when a ProgramAuthority grants an empty selection catalog", () => {
+    const authority = root.manifest.programAuthority!
+    expect(authority.tools).toEqual([])
+    expect(authority.agents).toEqual([])
+    expect(authority.steps).toEqual([])
+    const declaration = CodeMode.makeTool(authority)
+    const modelSchema = Tool.getJsonSchema(declaration) as Record<string, unknown>
+    const invalid: Array<string> = []
+    const walk = (node: unknown, path: string): void => {
+      if (typeof node !== "object" || node === null) return
+      if (Array.isArray(node)) {
+        node.forEach((child, index) => walk(child, `${path}[${index}]`))
+        return
+      }
+      const schema = node as Record<string, unknown>
+      if ("not" in schema) invalid.push(`${path}.not`)
+      if (schema["type"] === "array") {
+        const items = schema["items"]
+        const typed =
+          typeof items === "object" && items !== null && ("type" in items || "anyOf" in items || "$ref" in items)
+        if (!typed) invalid.push(`${path}.items`)
+      }
+      for (const [key, value] of Object.entries(schema)) walk(value, `${path}.${key}`)
+    }
+    walk(modelSchema, "$")
+    expect(invalid).toEqual([])
+    for (const dimension of ["tools", "agents", "steps"] as const) {
+      expect((modelSchema["properties"] as Record<string, unknown>)[dimension]).toMatchObject({
+        type: "array",
+        items: { type: "string" },
+        allOf: [{ maxItems: 0 }],
+      })
+    }
+    const exact = { source: "return input", input: "input", tools: [], agents: [], steps: [], budget }
+    return Effect.gen(function* () {
+      expect(yield* Schema.decodeUnknownEffect(declaration.parametersSchema)(exact)).toEqual(exact)
+      for (const dimension of ["tools", "agents", "steps"] as const) {
+        const rejected = yield* Effect.flip(
+          Schema.decodeUnknownEffect(declaration.parametersSchema)({ ...exact, [dimension]: ["anything"] }),
+        )
+        expect(String(rejected)).toContain("Expected a value with a length of at most 0")
+      }
+    })
+  })
+
+  it.effect("bounds ProgramAuthority catalogs and reports exact allowed selection IDs", () => {
+    const tools = Array.from({ length: 64 }, (_, index) => ({
+      name: `tool-${index}`,
+      pin: Pins.makeCapability({ tool: index }),
+    }))
+    const bounded = AgentManifest.make({
+      ...root.manifest,
+      programAuthority: { ...root.manifest.programAuthority!, tools },
+    })
+    expect(() =>
+      AgentManifest.make({
+        ...root.manifest,
+        programAuthority: {
+          ...root.manifest.programAuthority!,
+          tools: [...tools, { name: "tool-64", pin: Pins.makeCapability({ tool: 64 }) }],
+        },
+      }),
+    ).toThrow()
+    expect(() =>
+      AgentManifest.make({
+        ...root.manifest,
+        programAuthority: {
+          ...root.manifest.programAuthority!,
+          tools: [{ name: "x".repeat(129), pin: Pins.makeCapability({ tool: "too-long" }) }],
+        },
+      }),
+    ).toThrow()
+    const implementation = CodeMode.make({
+      claim: { runId: "root", ownerId: "worker", attemptFence: 1 },
+      claimed: {} as ExecutionRecord,
+      authority: bounded.manifest.programAuthority!,
+      store: {} as RunStoreInterface,
+    })
+    return Effect.gen(function* () {
+      const result = yield* implementation.invoke({
+        source: "return input",
+        input: "input",
+        tools: ["unknown-tool"],
+        agents: [],
+        steps: [],
+        budget,
+        toolCallId: "code-1",
+      })
+      expect(result).toMatchObject({
+        _tag: "DomainFailure",
+        failure: {
+          _tag: "@batonfx/runtime/ProgramAuthorityExceeded",
+          dimension: "tools",
+          requestedId: "unknown-tool",
+          allowedIds: bounded.manifest.programAuthority!.tools.map(({ name }) => name),
+        },
+      })
+    })
   })
 
   it.effect("returns typed failures when source, capabilities, or budgets exceed ProgramAuthority", () => {
@@ -360,7 +517,12 @@ describe("Runtime code_mode Program children", () => {
       const capability = yield* invoke({ tools: ["shell"] })
       expect(capability).toMatchObject({
         _tag: "DomainFailure",
-        failure: { _tag: "@batonfx/runtime/ProgramAuthorityExceeded", dimension: "tools" },
+        failure: {
+          _tag: "@batonfx/runtime/ProgramAuthorityExceeded",
+          dimension: "tools",
+          requestedId: "shell",
+          allowedIds: [],
+        },
       })
       const overBudget = yield* invoke({ budget: { ...budget, toolCalls: 1 } })
       expect(overBudget).toMatchObject({

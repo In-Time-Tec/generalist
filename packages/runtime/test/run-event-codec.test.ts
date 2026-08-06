@@ -1,6 +1,7 @@
 import { expect, it } from "@effect/vitest"
 import { ProgramCapabilities, ProgramHost, SandboxExecutor } from "@batonfx/core"
 import { Effect, Schema, Stream } from "effect"
+import { Response } from "effect/unstable/ai"
 import { Errors, ExecutableResolver, LocalScheduler, RunEvent, Runtime, RunStore } from "../src/index.js"
 import type { RunFailure as RunFailureType } from "../src/run-event.js"
 import { decodeEvent, encodeEvent } from "../src/sql/codecs.js"
@@ -78,6 +79,38 @@ it("round-trips every RunFailure variant through the durable RunEvent codec", ()
       Schema.encodeSync(RunEvent.RunFailure)(failure),
     )
   }
+})
+
+it("round-trips the canonical ApprovalRequested identity and payload", () => {
+  const call = Response.makePart("tool-call", {
+    id: "call:delete",
+    name: "delete_draft",
+    params: { draftId: "draft-1" },
+    providerExecuted: false,
+  })
+  const event = {
+    ...failedEvent(failures[0]!),
+    _tag: "ApprovalRequested" as const,
+    turn: 2,
+    call,
+    request: {
+      approvalId: "approval:delete",
+      operation: call.id,
+      capability: call.name,
+      input: call.params,
+    },
+  }
+  const decoded = decodeEvent(encodeEvent(event))
+  expect(decoded).toMatchObject({
+    _tag: "ApprovalRequested",
+    turn: 2,
+    request: {
+      approvalId: "approval:delete",
+      operation: "call:delete",
+      capability: "delete_draft",
+      input: { draftId: "draft-1" },
+    },
+  })
 })
 
 it("rejects corrupted event payloads without fallback parsing", () => {
@@ -192,7 +225,9 @@ it.live("makes a changed SQLite resolver identity terminal once without schedule
     const runtime = yield* Runtime.Runtime
     const scheduler = yield* LocalScheduler.LocalScheduler
     yield* scheduler.tick
+    yield* scheduler.idle
     yield* scheduler.tick
+    yield* scheduler.idle
     expect((yield* runtime.inspect(runId)).status).toBe("failed")
     const history = yield* runtime.history({ runId, cursor: -1, limit: 20 })
     const terminalEvents = history.filter((event) => event._tag === "RunFailed")

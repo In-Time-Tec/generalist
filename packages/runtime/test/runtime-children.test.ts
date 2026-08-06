@@ -57,6 +57,14 @@ layer(memoryLayer)("Runtime children", (it) => {
       expect(parentTags).toContain("ChildLinked")
       expect(parentTags).toContain("ChildSettled")
       expect(parentTags).not.toContain("TurnStarted")
+      expect(
+        (yield* runtime.history({ runId: parent.runId, limit: 100 })).find((event) => event._tag === "ChildLinked"),
+      ).toMatchObject({
+        childRunId: child.runId,
+        invocationId: "invocation:research",
+        selection: "researcher",
+        prompt: textPrompt("research"),
+      })
 
       const childInspectionBefore = yield* runtime.inspect(child.runId)
       const childTags = yield* runtime.events({ runId: child.runId }).pipe(

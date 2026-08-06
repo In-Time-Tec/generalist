@@ -89,11 +89,27 @@ export interface ToolExecutionCompleted {
   }
 }
 
+/** @experimental Stable identity for one authorization request. */
+export const ApprovalId = Schema.String.check(Schema.isNonEmpty())
+/** @experimental */
+export type ApprovalId = typeof ApprovalId.Type
+
+/** @experimental Canonical identity and payload for one authorization request. */
+export const ApprovalRequest = Schema.Struct({
+  approvalId: ApprovalId,
+  operation: Schema.String.check(Schema.isNonEmpty()),
+  capability: Schema.String.check(Schema.isNonEmpty()),
+  input: Schema.Unknown,
+})
+/** @experimental */
+export type ApprovalRequest = typeof ApprovalRequest.Type
+
 /** @experimental Emitted before resolving a permission ask or needsApproval tool. */
 export interface ApprovalRequested {
   readonly _tag: "ApprovalRequested"
   readonly turn: number
   readonly call: Response.ToolCallPart<string, unknown>
+  readonly request: ApprovalRequest
   readonly metadata?: Metadata
 }
 

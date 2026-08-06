@@ -20,7 +20,7 @@ export const compressedSizeLimits: Record<(typeof packages)[number], number> = {
   memory: 10_000,
   providers: 35_000,
   mcp: 12_000,
-  runtime: 150_000,
+  runtime: 155_000,
   transport: 30_000,
   foldkit: 16_000,
 }

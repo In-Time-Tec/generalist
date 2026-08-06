@@ -18,18 +18,18 @@
 
 ## Execution Status
 
-| Wave | State       | Evidence                                                                                                                                                                                                     |
-| ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0    | Complete    | All six reports returned. The missing-root-row diagnosis was false. Rika truncated replay on a descendant terminal event. Baton now provides page-draining `RunTree.watch`; all ten Rika adapter tests pass. |
-| 1    | Complete    | Cancellation admission, shutdown recovery, tree watching, response races, scheduler fairness, and resolution projection are closed.                                                                          |
-| 2    | Complete    | Exact Rika Program admission, QuickJS capability isolation, registration and credential payload proofs, restart, and cancellation pass.                                                                      |
-| 3    | Complete    | Production review admission uses atomic root `initialFanOuts`: correctness, security, and quality; concurrency 3; `AllSettled`; `await`; no Rika ledger. Projection closure passes.                          |
-| 4    | Complete    | Central boundaries are typed, Server composition passes, unreachable cross-Thread coordination is deleted, and policy and graph checks pass.                                                                |
-| 5-7  | Complete    | Baton local gates, publication workflow `31014573121`, 13 public assets, and all 11 npm packages at `0.15.0` are verified.                                                                                    |
-| 8    | Complete    | Rika pins published Baton `0.15.0`; frozen install, 20 canonical check tasks, 1,787 unit tests, the process gate, and 19 bounded TUI tests pass.                                                              |
-| 9    | Complete    | Darwin local packaging and 22 release contract tests pass. Publish workflow `31031284335` packages and smokes all three native targets.                                                                      |
-| 10   | Complete    | Rika `0.2.0` is public with five verified assets and four npm packages. A clean registry install reports `rika v0.2.0`.                                                                                      |
-| 11   | Complete    | PR `384` merged archive commit `5b1a1868`; the temporary branch is deleted, zero pull requests remain open, and `In-Time-Tec/relayfx` reports `isArchived: true`.                                             |
+| Wave | State    | Evidence                                                                                                                                                                                                     |
+| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0    | Complete | All six reports returned. The missing-root-row diagnosis was false. Rika truncated replay on a descendant terminal event. Baton now provides page-draining `RunTree.watch`; all ten Rika adapter tests pass. |
+| 1    | Complete | Cancellation admission, shutdown recovery, tree watching, response races, scheduler fairness, and resolution projection are closed.                                                                          |
+| 2    | Complete | Exact Rika Program admission, QuickJS capability isolation, registration and credential payload proofs, restart, and cancellation pass.                                                                      |
+| 3    | Complete | Production review admission uses atomic root `initialFanOuts`: correctness, security, and quality; concurrency 3; `AllSettled`; `await`; no Rika ledger. Projection closure passes.                          |
+| 4    | Complete | Central boundaries are typed, Server composition passes, unreachable cross-Thread coordination is deleted, and policy and graph checks pass.                                                                 |
+| 5-7  | Complete | Baton local gates, publication workflow `31014573121`, 13 public assets, and all 11 npm packages at `0.15.0` are verified.                                                                                   |
+| 8    | Complete | Rika pins published Baton `0.15.0`; frozen install, 20 canonical check tasks, 1,787 unit tests, the process gate, and 19 bounded TUI tests pass.                                                             |
+| 9    | Complete | Darwin local packaging and 22 release contract tests pass. Publish workflow `31031284335` packages and smokes all three native targets.                                                                      |
+| 10   | Complete | Rika `0.2.0` is public with five verified assets and four npm packages. A clean registry install reports `rika v0.2.0`.                                                                                      |
+| 11   | Complete | PR `384` merged archive commit `5b1a1868`; the temporary branch is deleted, zero pull requests remain open, and `In-Time-Tec/relayfx` reports `isArchived: true`.                                            |
 
 Wave 0F confirmed these additional release gaps:
 

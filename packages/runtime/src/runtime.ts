@@ -11,6 +11,8 @@ import type {
   RunIdConflict,
   SteeringConflict,
   ResponseConflict,
+  ApprovalStale,
+  ApprovalMismatch,
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
@@ -37,6 +39,7 @@ import type { RunEvent } from "./run-event.js"
 import type { WaitResolution } from "./run-wait.js"
 import type { FanOutInput, FanOutInspection, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
 import type { ResolveOperationInput } from "./operation-resolution.js"
+import type { RespondInput as RespondApprovalInput } from "./approval.js"
 import type { ExecutableRegistration } from "./executable-registration.js"
 import type { Duration } from "effect"
 
@@ -181,6 +184,7 @@ export type SpawnError = RunNotFound | RunTerminal | ChildSelectionMissing | Ide
 export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
 export type TreeEventsError = RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
 export type RespondError = RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable
+export type RespondApprovalError = RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable
 export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable
 export type CancelError = RunNotFound | RuntimeUnavailable
 export type SteerError = RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable
@@ -207,9 +211,11 @@ export interface Interface {
   readonly treeHistory: (
     input: import("./tree.js").HistoryInput,
   ) => Effect.Effect<import("./tree.js").TreePage, TreeEventsError>
+  readonly treeChanges: (rootRunId: string) => Stream.Stream<void, TreeEventsError>
   readonly inspectTree: (rootRunId: string) => Effect.Effect<import("./tree.js").Inspection, InspectError>
   readonly list: (input: ListInput) => Effect.Effect<ReadonlyArray<RunInspection>, RuntimeUnavailable>
   readonly respond: (input: RespondInput) => Effect.Effect<void, RespondError>
+  readonly respondApproval: (input: RespondApprovalInput) => Effect.Effect<void, RespondApprovalError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
   readonly steer: (input: SteerInput) => Effect.Effect<void, SteerError>

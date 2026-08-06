@@ -1,4 +1,5 @@
 import { DateTime, Effect, Option, Queue } from "effect"
+import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
 import { RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import { isTerminal, type RunStatus } from "../run.js"
@@ -46,6 +47,7 @@ export const appendEvent = (
       return yield* RuntimeUnavailable.make({ message: `tree root ${run.rootRunId} missing during append` })
     }
     const position = root.lastPosition + 1
+    yield* Effect.forEach(root.subscribers.values(), (queue) => Queue.offer(queue, undefined), { discard: true })
     const subscribers = new Map(run.subscribers)
     for (const [subscriberId, queue] of run.subscribers) {
       const offered = yield* Queue.offer(queue, event)
@@ -165,11 +167,13 @@ export const makeUnknown = (operationId: string) =>
     operationId,
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "OperationUnknown" }>, keyof RunEventBase>
 
-export const makeChildLinked = (childRunId: string, invocationId: string) =>
+export const makeChildLinked = (childRunId: string, invocationId: string, selection: string, prompt: Prompt.Prompt) =>
   ({
     _tag: "ChildLinked" as const,
     childRunId,
     invocationId,
+    selection,
+    prompt,
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
 
 export const makeChildSettled = (childRunId: string, terminalEventId: string) =>

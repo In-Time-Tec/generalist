@@ -1,13 +1,21 @@
 import { Effect, Equal, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../errors.js"
+import {
+  ApprovalStale,
+  ResponseConflict,
+  RunNotFound,
+  RunTerminal,
+  RuntimeUnavailable,
+  WaitNotOpen,
+} from "../errors.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { AgentLoopEvent } from "../agent-event.js"
 import type { ExecutionResult } from "../execution-state.js"
 import type { CancelInput, RespondInput, SignalInput } from "../runtime.js"
+import type { RespondInput as RespondApprovalInput } from "../approval.js"
 import { isTerminal } from "../run.js"
 import type { RunFailure } from "../run-event.js"
-import type { WaitResolution } from "../run-wait.js"
+import { encodeReason, type WaitResolution } from "../run-wait.js"
 import { checkpointRef } from "../executable-manifest.js"
 import { encodeExecutableRef } from "./codecs.js"
 import { encodeContinuation } from "../steering.js"
@@ -24,6 +32,9 @@ import type { EventHub } from "./subscribers.js"
 import type { DecodedRun } from "./rows.js"
 import { reconcileProgramCancellation } from "./store-program.js"
 import { PendingRunOutcome } from "../run-store.js"
+import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
+import { inspectFanOut } from "./store-fan-out.js"
+import { approvalResponse } from "./respond-approval.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(
@@ -131,6 +142,22 @@ export const respond = (hub: EventHub, input: RespondInput) =>
     const current = (yield* loadRun(run.runId))!
     yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
   })
+
+export const respondApproval = (hub: EventHub, input: RespondApprovalInput) =>
+  approvalResponse(input).pipe(
+    Effect.flatMap((response) =>
+      response._tag === "Duplicate"
+        ? Effect.void
+        : respond(hub, { runId: input.runId, waitId: response.waitId, resolution: input.decision }),
+    ),
+    Effect.mapError((error) =>
+      error._tag === "@batonfx/runtime/ResponseConflict" ||
+      error._tag === "@batonfx/runtime/WaitNotOpen" ||
+      error._tag === "@batonfx/runtime/RunTerminal"
+        ? ApprovalStale.make({ runId: input.runId, approvalId: input.approvalId })
+        : error,
+    ),
+  )
 
 export const signal = (hub: EventHub, input: SignalInput) =>
   Effect.gen(function* () {
@@ -274,7 +301,7 @@ export const suspend = (hub: EventHub, input: Parameters<import("../run-store.js
     `
     yield* sql`
       INSERT INTO baton_run_waits (run_id, wait_id, reason, status, response_json, opened_at, closed_at)
-      VALUES (${run.runId}, ${input.wait.waitId}, ${input.wait.reason}, 'open', NULL, ${opened}, NULL)
+      VALUES (${run.runId}, ${input.wait.waitId}, ${encodeReason(input.wait.reason)}, 'open', NULL, ${opened}, NULL)
       ON CONFLICT(run_id, wait_id) DO UPDATE SET
         status = 'open',
         reason = excluded.reason,
@@ -282,6 +309,35 @@ export const suspend = (hub: EventHub, input: Parameters<import("../run-store.js
         closed_at = NULL
     `
     yield* appendEvent(hub, run, { _tag: "RunWaiting", wait: { ...input.wait, openedAt: opened } }, "waiting")
+    const groupId = groupIdFromSuspension(input.suspension)
+    if (groupId !== undefined) {
+      const rows = yield* sql<{ parent_run_id: string; status: string }>`
+        SELECT parent_run_id, status FROM baton_fan_outs WHERE fan_out_id = ${groupId}
+      `
+      const group = rows[0]
+      if (group?.parent_run_id === run.runId && group.status !== "running") {
+        const resolution = {
+          _tag: "Signal" as const,
+          name: input.wait.waitId,
+          payload: resultFromInspection(
+            yield* inspectFanOut(groupId).pipe(
+              Effect.mapError(() => RuntimeUnavailable.make({ message: `child group ${groupId} disappeared` })),
+            ),
+          ),
+        }
+        const closed = yield* nowIso
+        yield* sql`
+          UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${closed}
+          WHERE run_id = ${run.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
+        `
+        yield* appendEvent(
+          hub,
+          (yield* loadRun(run.runId))!,
+          { _tag: "RunResumed", waitId: input.wait.waitId, resolution },
+          "running",
+        )
+      }
+    }
     yield* sql`UPDATE baton_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
   })
 

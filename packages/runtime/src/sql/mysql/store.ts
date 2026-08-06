@@ -1,5 +1,4 @@
-import { Duration, Effect, Ref, Schedule, Stream } from "effect"
-import type { Scope } from "effect"
+import { Duration, Effect, Ref, Schedule, Stream, type Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError"
 import { CursorExpired, RunNotFound, RuntimeUnavailable } from "../../errors.js"
@@ -13,6 +12,7 @@ import {
   emitAgentEvent,
   fail,
   respond,
+  respondApproval,
   resume,
   settleAdmittedCancellation,
   signal,
@@ -67,27 +67,25 @@ import {
   startProgramOperation,
 } from "../store-program.js"
 import { ProgramCapabilities } from "@batonfx/core"
-
+import { groupIdFromSuspension, resultFromInspection } from "../../child-group.js"
+import { encodeReason } from "../../run-wait.js"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
   readonly maxConnections?: number
   readonly pollInterval?: Duration.Input
 }
-
 export type MysqlStoreError =
   | SchemaDirty
   | SchemaChecksumMismatch
   | SchemaVersionUnsupported
   | SchemaUpgradeRequired
   | SchemaMigrationFailed
-
 const isDeadlock = (error: unknown): boolean => {
   if (!isSqlError(error)) return false
   const text = `${error.message} ${String(error.reason)}`.toLowerCase()
   return text.includes("deadlock") || text.includes("1213") || text.includes("40001")
 }
-
 const initializeReadCommitted = (sql: SqlClient.SqlClient, connections: number) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -103,7 +101,6 @@ const initializeReadCommitted = (sql: SqlClient.SqlClient, connections: number) 
       )
     }),
   )
-
 export const makeMysqlServices = (
   options: MysqlStoreOptions,
 ): Effect.Effect<
@@ -140,7 +137,6 @@ export const makeMysqlServices = (
     if (isolation[0]?.isolation !== "READ-COMMITTED") {
       return yield* SchemaMigrationFailed.make({ source, message: "MySQL runtime requires READ COMMITTED" })
     }
-
     const transaction = <A, E>(
       effect: Effect.Effect<A, E, SqlClient.SqlClient>,
       retries = 4,
@@ -203,7 +199,7 @@ export const makeMysqlServices = (
         `
         yield* sql`
           INSERT INTO baton_run_waits (run_id, wait_id, reason, status, response_json, opened_at, closed_at)
-          VALUES (${loaded.runId}, ${input.wait.waitId}, ${input.wait.reason}, 'open', NULL, ${opened}, NULL)
+          VALUES (${loaded.runId}, ${input.wait.waitId}, ${encodeReason(input.wait.reason)}, 'open', NULL, ${opened}, NULL)
           ON DUPLICATE KEY UPDATE reason = VALUES(reason), status = 'open', response_json = NULL,
             opened_at = VALUES(opened_at), closed_at = NULL
         `
@@ -213,6 +209,35 @@ export const makeMysqlServices = (
           { _tag: "RunWaiting", wait: { ...input.wait, openedAt: opened } },
           "waiting",
         )
+        const groupId = groupIdFromSuspension(input.suspension)
+        if (groupId !== undefined) {
+          const rows = yield* sql<{ parent_run_id: string; status: string }>`
+            SELECT parent_run_id, status FROM baton_fan_outs WHERE fan_out_id = ${groupId}
+          `
+          const group = rows[0]
+          if (group?.parent_run_id === loaded.runId && group.status !== "running") {
+            const resolution = {
+              _tag: "Signal" as const,
+              name: input.wait.waitId,
+              payload: resultFromInspection(
+                yield* inspectFanOut(groupId).pipe(
+                  Effect.mapError(() => RuntimeUnavailable.make({ message: `child group ${groupId} disappeared` })),
+                ),
+              ),
+            }
+            const closed = yield* nowIso
+            yield* sql`
+              UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${closed}
+              WHERE run_id = ${loaded.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
+            `
+            yield* appendEvent(
+              transactionHub,
+              (yield* loadRun(loaded.runId))!,
+              { _tag: "RunResumed", waitId: input.wait.waitId, resolution },
+              "running",
+            )
+          }
+        }
         yield* sql`
           UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}
         `
@@ -236,7 +261,6 @@ export const makeMysqlServices = (
           WHERE run_id = ${input.runId} AND owner_worker_id = ${input.ownerId} AND attempt_fence = ${input.attemptFence}
         `
       })
-
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "mysql", multiWorker: true }),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
@@ -297,6 +321,8 @@ export const makeMysqlServices = (
           }),
         ),
       respond: (input) => run(lockRun(input.runId).pipe(Effect.andThen(respond(transactionHub, input)))),
+      respondApproval: (input) =>
+        run(lockRun(input.runId).pipe(Effect.andThen(respondApproval(transactionHub, input)))),
       signal: (input) => run(lockRun(input.runId).pipe(Effect.andThen(signal(transactionHub, input)))),
       cancel: (input) =>
         run(
@@ -339,6 +365,7 @@ export const makeMysqlServices = (
           }),
         ),
       treeHistory: (input) => runNoTxn(loadTreeHistory(input)),
+      treeChanges: (rootRunId) => hub.subscribeTree({ rootRunId }),
       list: (input) =>
         runNoTxn(
           Effect.gen(function* () {

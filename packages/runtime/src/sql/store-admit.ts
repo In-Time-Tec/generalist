@@ -379,6 +379,8 @@ export const admitSpawn = (
       _tag: "ChildLinked",
       childRunId: runId,
       invocationId: input.invocationId,
+      selection: input.selection,
+      prompt: input.message.prompt,
     })
     const child = (yield* loadRun(runId))!
     yield* appendEvent(
@@ -470,6 +472,8 @@ export const admitProgramChild = (hub: EventHub, input: AdmitProgramChildInput) 
       _tag: "ChildLinked",
       childRunId: input.childRunId,
       invocationId: input.invocationId,
+      selection: input.executableRef.active,
+      prompt: input.message.prompt,
     })
     const child = (yield* loadRun(input.childRunId))!
     yield* appendEvent(

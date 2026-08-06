@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Clock, Effect } from "effect"
 import { Pins } from "@batonfx/core"
-import { ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
+import { Approval, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
 import { registrationsFor } from "./helpers.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 import {
@@ -116,16 +116,42 @@ describe("durable Agent Programs", () => {
         prompt: "run",
       })
       yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-worker" }))
-      expect((yield* runtime.inspect(receipt.runId)).wait?.waitId).toBe("approval:echo")
+      const waiting = (yield* runtime.inspect(receipt.runId)).wait
+      expect(waiting).toMatchObject({
+        waitId: "approval:echo",
+        reason: {
+          _tag: "Approval",
+          request: { approvalId: "approval:echo", operation: "echo", capability: "echo" },
+        },
+      })
       expect(fixture.counts()).toEqual({ authorizations: 1, executions: 0, sandboxes: 1 })
-      yield* runtime.respond({ runId: receipt.runId, waitId: "approval:echo", resolution: { _tag: "Approved" } })
-      yield* runtime.respond({ runId: receipt.runId, waitId: "approval:echo", resolution: { _tag: "Approved" } })
-      const conflict = yield* Effect.flip(
-        runtime.respond({ runId: receipt.runId, waitId: "approval:echo", resolution: { _tag: "Denied" } }),
+      const wrong = yield* runtime
+        .respondApproval({ runId: receipt.runId, approvalId: "approval:other", decision: { _tag: "Approved" } })
+        .pipe(Effect.flip)
+      expect(wrong._tag).toBe("@batonfx/runtime/ApprovalMismatch")
+      yield* Approval.approve({ runId: receipt.runId, approvalId: "approval:echo" })
+      yield* runtime.respondApproval({
+        runId: receipt.runId,
+        approvalId: "approval:echo",
+        decision: { _tag: "Approved" },
+      })
+      const conflict = yield* runtime
+        .respondApproval({ runId: receipt.runId, approvalId: "approval:echo", decision: { _tag: "Denied" } })
+        .pipe(Effect.flip)
+      expect(conflict._tag).toBe("@batonfx/runtime/ApprovalMismatch")
+      expect(yield* runtime.history({ runId: receipt.runId, limit: 100 })).toContainEqual(
+        expect.objectContaining({
+          _tag: "RunResumed",
+          waitId: "approval:echo",
+          resolution: { _tag: "Approved" },
+        }),
       )
-      expect(conflict._tag).toBe("@batonfx/runtime/ResponseConflict")
       yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-worker" }))
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+      const stale = yield* runtime
+        .respondApproval({ runId: receipt.runId, approvalId: "approval:stale", decision: { _tag: "Approved" } })
+        .pipe(Effect.flip)
+      expect(stale._tag).toBe("@batonfx/runtime/ApprovalStale")
       expect(fixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
     }).pipe(
       Effect.provide(
@@ -166,7 +192,12 @@ describe("durable Agent Programs", () => {
       })
       runId = receipt.runId
       yield* host.execute(yield* store.claimExecution({ runId, ownerId: "approval-before-reopen" }))
-      yield* runtime.respond({ runId, waitId: "approval:echo", resolution: { _tag: "Approved" } })
+      expect((yield* runtime.inspect(runId)).wait).toMatchObject({
+        reason: {
+          _tag: "Approval",
+          request: { approvalId: "approval:echo", operation: "echo", capability: "echo" },
+        },
+      })
       expect(fixture.counts()).toEqual({ authorizations: 1, executions: 0, sandboxes: 1 })
     }).pipe(Effect.provide(Runtime.layerSqlite(options)), Effect.scoped)
     const resume = Effect.suspend(() =>
@@ -174,6 +205,14 @@ describe("durable Agent Programs", () => {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
         const host = yield* ExecutionHost.ExecutionHost
+        expect((yield* runtime.inspect(runId)).wait).toMatchObject({
+          status: "open",
+          reason: {
+            _tag: "Approval",
+            request: { approvalId: "approval:echo", operation: "echo", capability: "echo" },
+          },
+        })
+        yield* Approval.approve({ runId, approvalId: "approval:echo" })
         expect(yield* store.loadExecution(runId)).toMatchObject({
           suspension: { operation: "echo", reason: "approval" },
           resolution: { _tag: "Approved" },
@@ -206,10 +245,10 @@ describe("durable Agent Programs", () => {
         })
         yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: `program-${resolution}` }))
         if (resolution === "Denied") {
-          yield* runtime.respond({
+          yield* Approval.deny({
             runId: receipt.runId,
-            waitId: "approval:echo",
-            resolution: { _tag: "Denied", reason: "operator denied" },
+            approvalId: "approval:echo",
+            reason: "operator denied",
           })
           yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "program-denied-resume" }))
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")

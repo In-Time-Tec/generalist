@@ -5,14 +5,17 @@ import type { RunEvent } from "../run-event.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
+type TreeSubscriberQueue = Queue.Queue<void, RuntimeUnavailable>
 
 interface HubState {
   readonly nextId: number
   readonly byRun: ReadonlyMap<string, ReadonlyMap<number, SubscriberQueue>>
+  readonly byTreeRoot: ReadonlyMap<string, ReadonlyMap<number, TreeSubscriberQueue>>
 }
 
 export interface EventHub {
   readonly publish: (runId: string, event: RunEvent) => Effect.Effect<void>
+  readonly wakeTree: (rootRunId: string) => Effect.Effect<void>
   readonly subscribe: (input: {
     readonly runId: string
     readonly cursor: Cursor
@@ -23,12 +26,27 @@ export interface EventHub {
     readonly capacity: number
     readonly onSubscribed?: Effect.Effect<void>
   }) => Stream.Stream<RunEvent, RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable>
+  readonly subscribeTree: (input: {
+    readonly rootRunId: string
+    readonly onSubscribed?: Effect.Effect<void>
+  }) => Stream.Stream<void, RuntimeUnavailable>
   readonly shutdown: Effect.Effect<void>
 }
 
 export const makeEventHub = (): Effect.Effect<EventHub> =>
   Effect.gen(function* () {
-    const stateRef = yield* SynchronizedRef.make<HubState>({ nextId: 1, byRun: new Map() })
+    const stateRef = yield* SynchronizedRef.make<HubState>({
+      nextId: 1,
+      byRun: new Map(),
+      byTreeRoot: new Map(),
+    })
+
+    const wakeTree = (rootRunId: string) =>
+      SynchronizedRef.modifyEffect(stateRef, (state) =>
+        Effect.forEach(state.byTreeRoot.get(rootRunId)?.values() ?? [], (queue) => Queue.offer(queue, undefined), {
+          discard: true,
+        }).pipe(Effect.as([undefined, state] as const)),
+      ).pipe(Effect.asVoid)
 
     const publish = (runId: string, event: RunEvent) =>
       SynchronizedRef.modifyEffect(stateRef, (state) =>
@@ -48,7 +66,7 @@ export const makeEventHub = (): Effect.Effect<EventHub> =>
           else byRun.set(runId, nextSubs)
           return [undefined, { ...state, byRun }] as const
         }),
-      ).pipe(Effect.asVoid)
+      ).pipe(Effect.andThen(wakeTree(event.rootRunId)), Effect.asVoid)
 
     const subscribe: EventHub["subscribe"] = (input) =>
       Stream.unwrap(
@@ -60,7 +78,7 @@ export const makeEventHub = (): Effect.Effect<EventHub> =>
             current.set(id, liveQueue)
             const byRun = new Map(state.byRun)
             byRun.set(input.runId, current)
-            return [id, { nextId: id + 1, byRun }] as const
+            return [id, { ...state, nextId: id + 1, byRun }] as const
           })
           yield* Effect.addFinalizer(() =>
             SynchronizedRef.update(stateRef, (state) => {
@@ -91,21 +109,58 @@ export const makeEventHub = (): Effect.Effect<EventHub> =>
         }),
       )
 
+    const subscribeTree: EventHub["subscribeTree"] = (input) =>
+      Stream.unwrap(
+        Effect.gen(function* () {
+          const liveQueue = yield* Queue.sliding<void, RuntimeUnavailable>(1)
+          const subscriberId = yield* SynchronizedRef.modify(stateRef, (state) => {
+            const id = state.nextId
+            const current = new Map(state.byTreeRoot.get(input.rootRunId) ?? [])
+            current.set(id, liveQueue)
+            const byTreeRoot = new Map(state.byTreeRoot)
+            byTreeRoot.set(input.rootRunId, current)
+            return [id, { ...state, nextId: id + 1, byTreeRoot }] as const
+          })
+          yield* Effect.addFinalizer(() =>
+            SynchronizedRef.update(stateRef, (state) => {
+              const current = state.byTreeRoot.get(input.rootRunId)
+              if (current === undefined) return state
+              const next = new Map(current)
+              next.delete(subscriberId)
+              const byTreeRoot = new Map(state.byTreeRoot)
+              if (next.size === 0) byTreeRoot.delete(input.rootRunId)
+              else byTreeRoot.set(input.rootRunId, next)
+              return { ...state, byTreeRoot }
+            }).pipe(Effect.andThen(Queue.shutdown(liveQueue)), Effect.asVoid),
+          )
+          if (input.onSubscribed !== undefined) yield* Effect.forkScoped(input.onSubscribed)
+          return Stream.concat(Stream.succeed(undefined), Stream.fromQueue(liveQueue))
+        }),
+      )
+
+    const unavailable = RuntimeUnavailable.make({ message: "runtime store released" })
     const shutdown = SynchronizedRef.get(stateRef).pipe(
       Effect.flatMap((state) =>
-        Effect.forEach(
-          state.byRun.values(),
-          (subscribers) =>
+        Effect.all(
+          [
             Effect.forEach(
-              subscribers.values(),
-              (queue) => Queue.fail(queue, RuntimeUnavailable.make({ message: "runtime store released" })),
+              state.byRun.values(),
+              (subscribers) =>
+                Effect.forEach(subscribers.values(), (queue) => Queue.fail(queue, unavailable), { discard: true }),
               { discard: true },
             ),
+            Effect.forEach(
+              state.byTreeRoot.values(),
+              (subscribers) =>
+                Effect.forEach(subscribers.values(), (queue) => Queue.fail(queue, unavailable), { discard: true }),
+              { discard: true },
+            ),
+          ],
           { discard: true },
         ),
       ),
       Effect.asVoid,
     )
 
-    return { publish, subscribe, shutdown }
+    return { publish, wakeTree, subscribe, subscribeTree, shutdown }
   })

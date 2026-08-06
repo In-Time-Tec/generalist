@@ -38,7 +38,9 @@ export const stateFromRun = (run: Run.RunInspection): TaskState => {
     case "cancelling":
       return TaskState.TASK_STATE_WORKING
     case "waiting":
-      return run.wait?.reason === "approval" ? TaskState.TASK_STATE_AUTH_REQUIRED : TaskState.TASK_STATE_INPUT_REQUIRED
+      return run.wait?.reason._tag === "Approval"
+        ? TaskState.TASK_STATE_AUTH_REQUIRED
+        : TaskState.TASK_STATE_INPUT_REQUIRED
     case "needs-resolution":
       return TaskState.TASK_STATE_INPUT_REQUIRED
     case "succeeded":
@@ -67,7 +69,7 @@ const statusFrom = (
   let text: string | undefined
   if (terminal?._tag === "RunFailed") text = terminal.error.message
   if (terminal?._tag === "RunCancelled") text = terminal.reason ?? "Task canceled."
-  if (run.status === "waiting" && run.wait !== undefined) text = `Waiting for ${run.wait.reason}.`
+  if (run.status === "waiting" && run.wait !== undefined) text = `Waiting for ${run.wait.reason._tag}.`
   return {
     state: stateFromRun(run),
     message:
@@ -129,8 +131,10 @@ export const statusFromEvent = (task: Task, event: RunEvent.RunEvent): TaskStatu
     case "RunWaiting":
       return {
         state:
-          event.wait.reason === "approval" ? TaskState.TASK_STATE_AUTH_REQUIRED : TaskState.TASK_STATE_INPUT_REQUIRED,
-        message: agentMessage(task.id, task.contextId, event.eventId, `Waiting for ${event.wait.reason}.`),
+          event.wait.reason._tag === "Approval"
+            ? TaskState.TASK_STATE_AUTH_REQUIRED
+            : TaskState.TASK_STATE_INPUT_REQUIRED,
+        message: agentMessage(task.id, task.contextId, event.eventId, `Waiting for ${event.wait.reason._tag}.`),
         timestamp: event.occurredAt,
       }
     case "RunCompleted":

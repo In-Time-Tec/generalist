@@ -13,6 +13,12 @@ const pins = new Set([
 ])
 
 describe("release workflows", () => {
+  it("requires the behavioral test suite in continuous integration", () => {
+    const source = readFileSync(".github/workflows/ci.yml", "utf8")
+    expect(source).toContain("run: bun run check")
+    expect(source).toContain("run: bun run test")
+  })
+
   it("keeps release recovery immutable, authenticated, and least-privileged", () => {
     const source = readFileSync(".github/workflows/publish.yml", "utf8")
     const workflow = JSON.parse(

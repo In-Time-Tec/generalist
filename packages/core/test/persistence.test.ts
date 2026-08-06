@@ -423,7 +423,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           name: "suspend-agent",
           instructions: "system",
           toolkit: Toolkit.make(echoTool),
-          toolExecution: { concurrency: 4 },
+          toolScheduling: { maxConcurrency: 4, parallelSafe: ["echo"] },
         })
 
         const failure = yield* Effect.flip(

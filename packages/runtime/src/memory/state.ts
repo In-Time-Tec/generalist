@@ -18,6 +18,7 @@ import type { PendingRunOutcome } from "../run-store.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
+export type TreeSubscriberQueue = Queue.Queue<void, RuntimeUnavailable>
 
 export interface IdempotencyEntry {
   readonly digest: string
@@ -85,6 +86,7 @@ export interface TreeRoot {
   readonly earliestPosition: number
   readonly lastPosition: number
   readonly events: ReadonlyArray<TreeEvent>
+  readonly subscribers: ReadonlyMap<number, TreeSubscriberQueue>
 }
 
 export interface StoredFanOut {

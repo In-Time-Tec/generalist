@@ -391,7 +391,11 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
     })
     const toolkit = Toolkit.make(tool)
     const requests: Array<string> = []
-    const agent = Agent.make({ name: `tool-steering-${concurrency}`, toolkit, toolExecution: { concurrency } })
+    const agent = Agent.make({
+      name: `tool-steering-${concurrency}`,
+      toolkit,
+      toolScheduling: { maxConcurrency: concurrency, parallelSafe: ["batch_tool"] },
+    })
     const ref = testExecutable(agent, "1")
     const address = Address.make(`agent:tool-steering-${concurrency}`)
     const model = Layer.effect(

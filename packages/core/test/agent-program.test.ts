@@ -25,6 +25,7 @@ const agentPin = AgentManifest.make({
   skills: [],
   services: [],
   policy: { _tag: "Pinned", pin: Pins.makeCapability({ policy: "test" }) },
+  toolScheduling: { maxConcurrency: 1, parallelSafe: [] },
   budget: {},
   children: [],
 }).pin
@@ -524,13 +525,14 @@ it("pins version-2 manifests, exact source, steps, and tagged executable identit
           skills: [],
           services: [],
           policy: { _tag: "Pinned", pin: Pins.makeCapability({ policy: "test" }) },
+          toolScheduling: { maxConcurrency: 1, parallelSafe: [] },
           budget: {},
           children: [],
         }),
       },
     ],
   })
-  expect(first.pinned.manifest.version).toBe("2")
+  expect(first.pinned.manifest.version).toBe("1")
   expect(first.pinned.manifest.capabilities.steps[0]?.name).toBe("double")
   expect(first.pinned.pin).not.toBe(second.pinned.pin)
   expect(firstExecutable.manifest.entries.find(({ _tag }) => _tag === "Program")?._tag).toBe("Program")

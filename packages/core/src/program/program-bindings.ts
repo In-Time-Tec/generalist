@@ -10,9 +10,9 @@ import type {
 } from "./program-capabilities.js"
 
 /** @experimental Replay behavior selected by the host, never by program source. */
-export const ReplayPolicy = Schema.Literals(["recorded", "idempotent", "non-idempotent"])
+export const ProgramReplayPolicy = Schema.Literals(["recorded", "idempotent", "non-idempotent"])
 /** @experimental */
-export type ReplayPolicy = typeof ReplayPolicy.Type
+export type ProgramReplayPolicy = typeof ProgramReplayPolicy.Type
 
 /** @experimental Host-owned authorization callback for one decoded invocation. */
 export type Authorize<I> = (request: {
@@ -26,7 +26,7 @@ export interface ToolBinding<I, IE, O, OE, E = never> {
   readonly pin: CapabilityPin
   readonly input: Schema.Codec<I, IE>
   readonly output: Schema.Codec<O, OE>
-  readonly replay: ReplayPolicy
+  readonly replay: ProgramReplayPolicy
   readonly authorize: Authorize<I>
   readonly execute: (input: I) => Effect.Effect<O, E>
 }
@@ -42,7 +42,7 @@ export interface AgentBinding<I extends Prompt.RawInput, IE, E = never> {
   readonly agent: AgentPin
   readonly inputPin: CapabilityPin
   readonly input: Schema.Codec<I, IE>
-  readonly replay: ReplayPolicy
+  readonly replay: ProgramReplayPolicy
   readonly authorize: Authorize<I>
   readonly execute: (input: I) => Effect.Effect<AgentRunResult, ProgramSuspended | E>
 }
@@ -76,7 +76,7 @@ export interface AnyTool {
   readonly pin: CapabilityPin
   readonly input: Schema.Codec<unknown, unknown>
   readonly output: Schema.Codec<unknown, unknown>
-  readonly replay: ReplayPolicy
+  readonly replay: ProgramReplayPolicy
   readonly decode: (encoded: unknown) => Effect.Effect<Invocation, Schema.SchemaError>
 }
 
@@ -89,7 +89,7 @@ export interface AnyAgent {
   readonly agent: AgentPin
   readonly inputPin: CapabilityPin
   readonly input: Schema.Codec<unknown, unknown>
-  readonly replay: ReplayPolicy
+  readonly replay: ProgramReplayPolicy
   readonly decode: (encoded: unknown) => Effect.Effect<AgentInvocation, Schema.SchemaError>
 }
 

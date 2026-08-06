@@ -2,6 +2,8 @@ type AgentEventFacade = typeof import("./agent-event.js")
 
 import {
   addUsage as AgentEvent_addUsage,
+  ApprovalId as AgentEvent_ApprovalId,
+  ApprovalRequest as AgentEvent_ApprovalRequest,
   AgentError as AgentEvent_AgentError,
   TurnLimitExceeded as AgentEvent_TurnLimitExceeded,
   TurnPolicyStopped as AgentEvent_TurnPolicyStopped,
@@ -16,6 +18,8 @@ import {
 } from "./agent-event.js"
 export const AgentEvent = {
   addUsage: AgentEvent_addUsage,
+  ApprovalId: AgentEvent_ApprovalId,
+  ApprovalRequest: AgentEvent_ApprovalRequest,
   AgentError: AgentEvent_AgentError,
   TurnLimitExceeded: AgentEvent_TurnLimitExceeded,
   TurnPolicyStopped: AgentEvent_TurnPolicyStopped,
@@ -41,6 +45,8 @@ export namespace AgentEvent {
   export type ToolNameCollision = import("./agent-event.js").ToolNameCollision
   export type AgentSuspended = import("./agent-event.js").AgentSuspended
   export type ResumeMismatch = import("./agent-event.js").ResumeMismatch
+  export type ApprovalId = import("./agent-event.js").ApprovalId
+  export type ApprovalRequest = import("./agent-event.js").ApprovalRequest
   export type ApprovalRequested = import("./agent-event.js").ApprovalRequested
   export type Completed = import("./agent-event.js").Completed
   export type Event = import("./agent-event.js").Event

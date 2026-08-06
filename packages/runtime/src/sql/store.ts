@@ -19,6 +19,7 @@ import {
   emitAgentEvent,
   fail,
   respond,
+  respondApproval,
   resume,
   settleAdmittedCancellation,
   signal,
@@ -133,6 +134,7 @@ export const makeSqliteRunStore = (
           capacity,
         }),
       respond: (input) => run(respond(hub, input)),
+      respondApproval: (input) => run(respondApproval(hub, input)),
       signal: (input) => run(signal(hub, input)),
       cancel: (input) => runBuffered((transactionHub) => cancel(transactionHub, input)),
       admitSteering: (input) => run(admitSteering(input)),
@@ -169,6 +171,7 @@ export const makeSqliteRunStore = (
           }),
         ),
       treeHistory: (input) => runNoTxn(loadTreeHistory(input)),
+      treeChanges: (rootRunId) => hub.subscribeTree({ rootRunId }),
       list: (input) =>
         runNoTxn(
           Effect.gen(function* () {

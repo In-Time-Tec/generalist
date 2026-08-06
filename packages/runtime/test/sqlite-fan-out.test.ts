@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { Errors, Runtime, RunStore, RunTree } from "../src/index.js"
-import { assistantAddress, completedResult, researcherRef } from "./helpers.js"
+import { assistantAddress, completedResult, researcherRef, textPrompt } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
 it.live("persists and resumes bounded fan-out across SQLite reopen", () =>
@@ -59,6 +59,15 @@ it.live("persists and resumes bounded fan-out across SQLite reopen", () =>
       yield* store.complete({ ...second, result: completedResult("second") })
       const joined = yield* runtime.inspectFanOut(admitted.fanOutId)
       expect(joined.status).toBe("succeeded")
+      const linked = (yield* runtime.history({ runId: admitted.parentRunId, limit: 100 })).filter(
+        (event) => event._tag === "ChildLinked",
+      )
+      expect(linked.map((event) => event.selection)).toEqual(["researcher", "researcher", "researcher"])
+      expect(linked.map((event) => event.prompt)).toEqual([
+        textPrompt("review-0"),
+        textPrompt("review-1"),
+        textPrompt("review-2"),
+      ])
       expect(joined.members.map((member) => member.status)).toEqual(["succeeded", "succeeded", "abandoned"])
       expect(joined.members.map((member) => member.ordinal)).toEqual([0, 1, 2])
       const tree = yield* RunTree.history({ rootRunId: admitted.parentRunId, limit: 100 })

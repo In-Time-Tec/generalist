@@ -8,6 +8,8 @@ import type {
   IdempotencyConflict,
   RunIdConflict,
   ResponseConflict,
+  ApprovalStale,
+  ApprovalMismatch,
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
@@ -36,6 +38,7 @@ import type { RunEvent } from "./run-event.js"
 import type { ExecutableManifest, ExecutableRef } from "./executable-manifest.js"
 import type { CancelInput, InitialChildInput, RespondInput, SignalInput, SpawnInput, StartReceipt } from "./runtime.js"
 import type { ResolveOperationInput } from "./operation-resolution.js"
+import type { RespondInput as RespondApprovalInput } from "./approval.js"
 import type { OperationKind, OperationRecord, OperationStatus, ReplayPolicy } from "./sql/operations.js"
 import type { ExecutionContinuation, SteeringEntry } from "./steering.js"
 import type { ExecutableRegistration } from "./executable-registration.js"
@@ -235,6 +238,9 @@ export interface Interface {
   readonly respond: (
     input: RespondInput,
   ) => Effect.Effect<void, RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable>
+  readonly respondApproval: (
+    input: RespondApprovalInput,
+  ) => Effect.Effect<void, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable>
   readonly signal: (input: SignalInput) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable>
   readonly cancel: (input: CancelInput) => Effect.Effect<void, RunNotFound | RuntimeUnavailable>
   readonly admitSteering: (
@@ -259,6 +265,7 @@ export interface Interface {
     import("./tree.js").TreePage,
     RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
   >
+  readonly treeChanges: (rootRunId: string) => Stream.Stream<void, RunNotFound | RuntimeUnavailable>
   readonly list: (input: {
     readonly status?: RunStatus
     readonly limit: number

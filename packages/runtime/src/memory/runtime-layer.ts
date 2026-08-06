@@ -335,9 +335,11 @@ export const makeRuntime = (
           const position = yield* parseCursor(input.rootRunId, input.cursor)
           return yield* store.treeHistory({ rootRunId: input.rootRunId, position, limit: input.limit })
         }),
+      treeChanges: (rootRunId) => store.treeChanges(rootRunId),
       inspectTree: (rootRunId) => store.inspectTree(rootRunId),
       list: (input) => store.list(input),
       respond: (input) => store.respond(input),
+      respondApproval: (input) => store.respondApproval(input),
       signal: (input) => store.signal(input),
       cancel: (input) =>
         Effect.gen(function* () {

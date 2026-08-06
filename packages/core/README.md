@@ -31,6 +31,6 @@ The merged layer discharges `Agent.Runtime`, `Chat.Persistence`, and `LanguageMo
 - Baton uses Effect AI `Tool` and `Toolkit` directly; optional `ToolExecutor` handles external or durable placement.
 - Persisted chat uses `Chat.Persistence`; reusing a `chatId` carries history across runs. It requires `Agent.Runtime` and `Chat.Persistence`.
 - `Memory.Item.content` accepts Effect AI user text and file parts; protocol transcript parts are excluded from recall.
-- Sibling framework tool calls are serial by default. Set `toolExecution.concurrency` on the Agent for bounded or unbounded concurrency; results still checkpoint in provider call order.
+- Framework tool calls are exclusive by default. `toolScheduling.parallelSafe` opts named tools into concurrency bounded by `maxConcurrency`; unlisted calls are authored-order barriers. Lifecycle and progress stream live, while results checkpoint in provider call order.
 - `ToolExecutor.execute` returns `Success | DomainFailure | Suspend`; framework routing, placement, authorization, and schema failures remain typed Effect failures.
 - `TurnPolicy.forever` is the default. Use `TurnPolicy.recurs(n)` for an explicit follow-up bound or `TurnPolicy.make` for a service-dependent policy.

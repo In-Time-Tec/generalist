@@ -61,7 +61,10 @@ describe("Chat RunEvent projection", () => {
         _tag: "RunWaiting",
         wait: {
           waitId: "wait-1",
-          reason: "approval",
+          reason: {
+            _tag: "Approval",
+            request: { approvalId: "wait-1", operation: "tool-1", capability: "test", input: {} },
+          },
           status: "open",
           openedAt: "2026-08-03T00:00:00.000Z",
         },

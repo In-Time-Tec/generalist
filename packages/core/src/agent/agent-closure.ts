@@ -1,6 +1,6 @@
 import type { Layer } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
-import { AgentTypeId, type Agent, type ToolDeclaration, type ToolExecutionPolicy } from "./agent.js"
+import { AgentTypeId, type Agent, type ToolDeclaration, type ToolSchedulingPolicy } from "./agent.js"
 import type { BudgetLimits } from "../durable/run-budget.js"
 import type { Key } from "../context/memory.js"
 import type { ModelSelection } from "../model/model-registry.js"
@@ -16,7 +16,7 @@ export interface Any {
   readonly policy: TurnPolicy<unknown>
   readonly model?: ModelSelection
   readonly memory?: Key
-  readonly toolExecution?: ToolExecutionPolicy
+  readonly toolScheduling: ToolSchedulingPolicy
   readonly metadata?: Readonly<Record<string, unknown>>
   readonly budget?: BudgetLimits
   readonly toolDeclarations?: ReadonlyArray<ToolDeclaration>

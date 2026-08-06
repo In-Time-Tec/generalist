@@ -165,6 +165,14 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
       expect(child.invocationId).toBe("initial-research")
       expect(child.executableRef).toEqual(researcherRef.ref)
       expect(child.message.metadata).toEqual({ source: "admission" })
+      expect(
+        (yield* runtime.history({ runId: first.runId, limit: 100 })).find((event) => event._tag === "ChildLinked"),
+      ).toMatchObject({
+        childRunId: child.runId,
+        invocationId: "initial-research",
+        selection: "researcher",
+        prompt: textPrompt("research"),
+      })
       expect((yield* runtime.inspect(first.runId)).status).toBe("queued")
       const childFanOut = yield* runtime.fanOut({
         parentRunId: child.runId,
@@ -271,6 +279,12 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
       }
       expect((yield* runtime.inspect(first.runId)).status).toBe("succeeded")
       const events = yield* runtime.history({ runId: first.runId, limit: 100 })
+      const linked = events.filter((event) => event._tag === "ChildLinked")
+      expect(linked.map((event) => event.selection)).toEqual(["researcher", "researcher"])
+      expect(linked.map((event) => event.prompt)).toEqual([
+        textPrompt("review correctness"),
+        textPrompt("review security"),
+      ])
       expect(events.at(-2)?._tag).toBe("FanOutJoined")
       expect(events.at(-1)).toMatchObject({ _tag: "RunCompleted", result: completedResult("root result") })
       expect(
@@ -347,6 +361,14 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
         const runtime = yield* Runtime.Runtime
         const receipt = yield* runtime.start(input)
         expect((yield* runtime.inspectTree(receipt.runId)).runs).toHaveLength(2)
+        expect(
+          (yield* runtime.history({ runId: receipt.runId, limit: 100 })).find((event) => event._tag === "ChildLinked"),
+        ).toMatchObject({
+          childRunId: receipt.childRunIds[0],
+          invocationId: "research",
+          selection: "researcher",
+          prompt: textPrompt("child"),
+        })
         return receipt
       }).pipe(Effect.provide(Runtime.layerSqlite(options))),
     )

@@ -83,6 +83,7 @@ describe("executable identity", () => {
       skills: [],
       services: [],
       policy: { _tag: "Portable", policy: { _tag: "Recurs", count: 3 } },
+      toolScheduling: { maxConcurrency: 1, parallelSafe: [] },
       budget: { modelCalls: 4 },
       children: [],
       ...overrides,
@@ -98,6 +99,7 @@ describe("executable identity", () => {
       base({ skills: [{ name: "research", pin: Pins.makeCapability({ skill: "research" }) }] }),
       base({ services: [{ name: "clock", pin: Pins.makeCapability({ service: "clock" }) }] }),
       base({ policy: { _tag: "Portable", policy: { _tag: "Forever" } } }),
+      base({ toolScheduling: { maxConcurrency: 2, parallelSafe: ["weather"] } }),
       base({
         compaction: {
           service: Pins.makeCapability({ compaction: "default" }),
@@ -137,6 +139,23 @@ describe("executable identity", () => {
         ],
       }).pin,
     )
+    expect(
+      base({
+        tools: [
+          { name: "a", pin: first },
+          { name: "z", pin: second },
+        ],
+        toolScheduling: { maxConcurrency: 2, parallelSafe: ["z", "a"] },
+      }).pin,
+    ).toBe(
+      base({
+        tools: [
+          { name: "z", pin: second },
+          { name: "a", pin: first },
+        ],
+        toolScheduling: { maxConcurrency: 2, parallelSafe: ["a", "z"] },
+      }).pin,
+    )
   })
 
   it("pins every compaction policy dimension", () => {
@@ -166,6 +185,7 @@ describe("executable identity", () => {
       name: "assistant",
       instructions: "Be concise.",
       toolkit: Toolkit.make(Tool.make("weather", { parameters: Schema.Struct({ city: Schema.String }) })),
+      toolScheduling: { maxConcurrency: 2, parallelSafe: ["weather"] },
     })
     expect(
       AgentManifest.fromLiveAgent(agent, {
@@ -176,8 +196,11 @@ describe("executable identity", () => {
         policy: { _tag: "Portable", policy: { _tag: "Forever" } },
         budget: {},
         children: [],
-      }).manifest.name,
-    ).toBe("assistant")
+      }).manifest,
+    ).toMatchObject({
+      name: "assistant",
+      toolScheduling: { maxConcurrency: 2, parallelSafe: ["weather"] },
+    })
     expect(() =>
       AgentManifest.fromLiveAgent(agent, {
         model,
@@ -336,6 +359,10 @@ describe("executable identity", () => {
         ],
       }),
     ).toThrow("Duplicate child pin")
+    expect(() => base({ toolScheduling: { maxConcurrency: 2, parallelSafe: ["missing"] } })).toThrow("undeclared tool")
+    expect(() => base({ toolScheduling: { maxConcurrency: 2, parallelSafe: ["weather", "weather"] } })).toThrow(
+      "duplicate tool",
+    )
     expect(() => Pins.makeCapability({ invalid: () => undefined })).toThrow("Unsupported value")
     expect(() => Pins.makeCapability(Symbol("invalid"))).toThrow("Unsupported value")
     const hidden = { visible: true }

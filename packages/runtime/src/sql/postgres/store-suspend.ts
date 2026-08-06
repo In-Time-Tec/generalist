@@ -7,8 +7,11 @@ import type { Interface as RunStoreInterface } from "../../run-store.js"
 import { encodeContinuation } from "../../steering.js"
 import { encodeExecutableRef } from "../codecs.js"
 import type { EventHub } from "../subscribers.js"
+import { encodeReason } from "../../run-wait.js"
 import { appendEvent, lockRun, requireRun } from "./pg-helpers.js"
 import { requireExecutionClaim } from "../store-execution.js"
+import { groupIdFromSuspension, resultFromInspection } from "../../child-group.js"
+import { inspectFanOut } from "../store-fan-out.js"
 
 export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]) =>
   Effect.gen(function* () {
@@ -40,11 +43,39 @@ export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["susp
       INSERT INTO baton_run_waits (
         run_id, wait_id, reason, status, response_json, due_at, owner_worker_id, lease_expires_at, opened_at, closed_at
       ) VALUES (
-        ${loaded.runId}, ${input.wait.waitId}, ${input.wait.reason}, 'open', NULL, NULL, NULL, NULL, NOW(), NULL
+        ${loaded.runId}, ${input.wait.waitId}, ${encodeReason(input.wait.reason)}, 'open', NULL, NULL, NULL, NULL, NOW(), NULL
       )
       ON CONFLICT (run_id, wait_id) DO UPDATE SET
         status = 'open', reason = EXCLUDED.reason, response_json = NULL, opened_at = EXCLUDED.opened_at, closed_at = NULL
     `
     yield* appendEvent(hub, loaded, { _tag: "RunWaiting", wait: input.wait }, "waiting")
+    const groupId = groupIdFromSuspension(input.suspension)
+    if (groupId !== undefined) {
+      const rows = yield* sql<{ parent_run_id: string; status: string }>`
+        SELECT parent_run_id, status FROM baton_fan_outs WHERE fan_out_id = ${groupId}
+      `
+      const group = rows[0]
+      if (group?.parent_run_id === loaded.runId && group.status !== "running") {
+        const resolution = {
+          _tag: "Signal" as const,
+          name: input.wait.waitId,
+          payload: resultFromInspection(
+            yield* inspectFanOut(groupId).pipe(
+              Effect.mapError(() => RuntimeUnavailable.make({ message: `child group ${groupId} disappeared` })),
+            ),
+          ),
+        }
+        yield* sql`
+          UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = NOW()
+          WHERE run_id = ${loaded.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
+        `
+        yield* appendEvent(
+          hub,
+          yield* requireRun(loaded.runId),
+          { _tag: "RunResumed", waitId: input.wait.waitId, resolution },
+          "running",
+        )
+      }
+    }
     yield* sql`UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}`
   })

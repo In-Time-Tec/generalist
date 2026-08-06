@@ -4,7 +4,7 @@ import type { AgentRunState } from "./agent-run-state.js"
 import type { AgentError, Event } from "./agent-event.js"
 import type { AnyToolCall } from "./agent-tool-result.js"
 import type { HandoffRunState } from "./handoff-state.js"
-import type { RunError } from "./agent.js"
+import type { RunError, ToolSchedulingPolicy } from "./agent.js"
 import type { Middleware } from "../model/model-middleware.js"
 import type { ModelSelection, ModelRegistry } from "../model/model-registry.js"
 import type { ModelResilience } from "../model/model-resilience.js"
@@ -20,7 +20,7 @@ export type StaticToolServices<T extends Record<string, Tool.Any>> =
 export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   readonly agent: {
     readonly name: string
-    readonly toolExecution?: { readonly concurrency: number | "unbounded" }
+    readonly toolScheduling: ToolSchedulingPolicy
     readonly model?: import("../model/model-registry.js").ModelSelection
   }
   readonly handoffStateRef?: import("effect").Ref.Ref<HandoffRunState>

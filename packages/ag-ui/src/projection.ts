@@ -199,7 +199,16 @@ export const project = (
             runId: event.runId,
             outcome: {
               type: "interrupt",
-              interrupts: [{ id: wait.waitId, reason: wait.reason, metadata: { status: wait.status } }],
+              interrupts: [
+                {
+                  id: wait.waitId,
+                  reason: wait.reason._tag,
+                  metadata: {
+                    status: wait.status,
+                    ...(wait.reason._tag === "Approval" ? { approval: wait.reason.request } : {}),
+                  },
+                },
+              ],
             },
           },
         ])

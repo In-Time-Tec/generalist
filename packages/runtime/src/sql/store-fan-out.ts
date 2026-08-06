@@ -36,7 +36,7 @@ import type { EventHub } from "./subscribers.js"
 import { associateRegistrations, loadRegistrations } from "./executable-registrations.js"
 import { narrow } from "../executable-registration.js"
 import type { AdmitStartInput } from "../run-store.js"
-
+import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 interface FanOutRow {
   readonly fan_out_id: string
   readonly parent_run_id: string
@@ -47,7 +47,6 @@ interface FanOutRow {
   readonly concurrency: number
   readonly status: FanOutInspection["status"]
 }
-
 interface MemberRow {
   readonly ordinal: number
   readonly member_key: string
@@ -56,7 +55,6 @@ interface MemberRow {
   readonly terminal_event_id: string | null
   readonly outcome_json: string | null
 }
-
 const loadFanOut = (fanOutId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
@@ -67,7 +65,6 @@ const loadFanOut = (fanOutId: string) =>
     `
     return { fanOut, members }
   })
-
 const decodeMember = (row: MemberRow): FanOutMemberResult => {
   const outcome = row.outcome_json === null ? {} : (JSON.parse(row.outcome_json) as Record<string, unknown>)
   return {
@@ -80,7 +77,6 @@ const decodeMember = (row: MemberRow): FanOutMemberResult => {
     ...(outcome.error === undefined ? {} : { error: outcome.error }),
   }
 }
-
 export const inspectFanOut = (fanOutId: string) =>
   Effect.gen(function* () {
     const loaded = yield* loadFanOut(fanOutId)
@@ -96,7 +92,6 @@ export const inspectFanOut = (fanOutId: string) =>
       members: loaded.members.map(decodeMember),
     } satisfies FanOutInspection
   })
-
 export const admitFanOut = (hub: EventHub, input: AdmitFanOutInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
@@ -194,6 +189,8 @@ export const admitFanOut = (hub: EventHub, input: AdmitFanOutInput) =>
         _tag: "ChildLinked",
         childRunId: member.childRunId,
         invocationId: `${input.fanOutId}:${member.key}`,
+        selection: member.selection,
+        prompt: member.prompt,
       })
       const child = (yield* loadRun(member.childRunId))!
       yield* defaultAppendEvent(
@@ -223,7 +220,6 @@ export const admitFanOut = (hub: EventHub, input: AdmitFanOutInput) =>
       duplicate: false,
     }
   })
-
 export const admitInitialFanOuts = (hub: EventHub, parentRunId: string, fanOuts: AdmitStartInput["initialFanOuts"]) =>
   Effect.forEach(fanOuts, (fanOut) => {
     const fanOutId = fanOutIdFor(parentRunId, fanOut.idempotencyKey)
@@ -251,7 +247,6 @@ export const admitInitialFanOuts = (hub: EventHub, parentRunId: string, fanOuts:
       ),
     )
   })
-
 const outcomeFor = (event: RunEvent): Record<string, unknown> =>
   event._tag === "RunCompleted" ? { result: event.result } : event._tag === "RunFailed" ? { error: event.error } : {}
 
@@ -429,12 +424,43 @@ export const reconcileFanOutWith = <E, R>(
         yield* finalize(hub, terminalParent)
       }
     }
+    let resumeParent = parent === undefined ? undefined : yield* loadRun(parent.runId)
+    if (
+      resumeParent !== undefined &&
+      !isTerminal(resumeParent.status) &&
+      resumeParent.activeWaitId !== undefined &&
+      groupIdFromSuspension(resumeParent.suspension) === row.fan_out_id
+    ) {
+      const resolution = {
+        _tag: "Signal" as const,
+        name: resumeParent.activeWaitId,
+        payload: resultFromInspection(
+          yield* inspectFanOut(row.fan_out_id).pipe(
+            Effect.mapError(() =>
+              RuntimeUnavailable.make({ message: `child group ${row.fan_out_id} disappeared during join` }),
+            ),
+          ),
+        ),
+      }
+      const closedAt = yield* nowIso
+      yield* sql`
+        UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${closedAt}
+        WHERE run_id = ${resumeParent.runId} AND wait_id = ${resumeParent.activeWaitId} AND status = 'open'
+      `
+      yield* sql`UPDATE baton_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
+      yield* append(
+        hub,
+        (yield* loadRun(resumeParent.runId))!,
+        { _tag: "RunResumed", waitId: resumeParent.activeWaitId, resolution },
+        "running",
+      )
+      resumeParent = yield* loadRun(resumeParent.runId)
+    }
     const operations = yield* sql<{ run_id: string; operation_name: string; wait_id: string | null }>`
       SELECT run_id, operation_name, wait_id FROM baton_program_operations
       WHERE fan_out_id = ${row.fan_out_id} AND status = 'waiting'
     `
     const operation = operations[0]
-    const resumeParent = parent === undefined ? undefined : yield* loadRun(parent.runId)
     if (
       resumeParent !== undefined &&
       !isTerminal(resumeParent.status) &&

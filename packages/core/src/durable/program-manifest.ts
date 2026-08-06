@@ -66,7 +66,7 @@ export type ProgramCapabilityManifest = typeof ProgramCapabilityManifest.Type
 
 /** @experimental Closed reconstructable identity contract for one Agent Program. */
 export const ProgramManifest = Schema.Struct({
-  version: Schema.Literal("2"),
+  version: Schema.Literal("1"),
   name: Schema.String,
   source: ProgramSource,
   sandbox: CapabilityPin,
@@ -85,10 +85,10 @@ export interface PinnedProgram {
 }
 
 /** @experimental Construct and pin one canonical Agent Program manifest. */
-export const make = (input: Omit<ProgramManifest, "version"> & { readonly version?: "2" }): PinnedProgram => {
+export const make = (input: Omit<ProgramManifest, "version"> & { readonly version?: "1" }): PinnedProgram => {
   const manifest = Schema.decodeUnknownSync(ProgramManifest, { onExcessProperty: "error" })({
     ...input,
-    version: "2",
+    version: "1",
     capabilities: {
       tools: uniqueSorted(
         input.capabilities.tools,

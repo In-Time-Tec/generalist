@@ -138,7 +138,19 @@ export const openWait = (
   reason: "tool-wait" | "approval" | "signal" | "timer" | "external" = "tool-wait",
 ) => ({
   waitId,
-  reason,
+  reason:
+    reason === "approval"
+      ? {
+          _tag: "Approval" as const,
+          request: { approvalId: waitId, operation: waitId, capability: "test", input: {} },
+        }
+      : reason === "tool-wait"
+        ? { _tag: "ToolWait" as const }
+        : reason === "signal"
+          ? { _tag: "Signal" as const, name: waitId }
+          : reason === "timer"
+            ? { _tag: "Timer" as const }
+            : { _tag: "External" as const },
   status: "open" as const,
   openedAt: "2026-08-03T00:00:00.000Z",
 })

@@ -16,7 +16,7 @@ import {
   OperationResolution,
 } from "../src/index.js"
 
-const encodedVersion = (manifest: typeof ExecutableManifest.ExecutableManifest.Encoded): "2" => manifest.version
+const encodedVersion = (manifest: typeof ExecutableManifest.ExecutableManifest.Encoded): "1" => manifest.version
 const acceptResolutionConflict = (_error: Errors.OperationResolutionConflict): void => undefined
 
 describe("@batonfx/runtime public surface", () => {

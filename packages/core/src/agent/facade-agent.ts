@@ -68,6 +68,6 @@ export namespace Agent {
   export type RunRequirements<R, O> = import("./agent.js").RunRequirements<R, O>
   export type RunResult<O> = import("./agent.js").RunResult<O>
   export type ToolDeclaration = import("./agent.js").ToolDeclaration
-  export type ToolExecutionPolicy = import("./agent.js").ToolExecutionPolicy
+  export type ToolSchedulingPolicy = import("./agent.js").ToolSchedulingPolicy
   export type WithModelDefault = import("./agent.js").WithModelDefault
 }

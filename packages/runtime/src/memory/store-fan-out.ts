@@ -30,6 +30,7 @@ import type { MemoryState, StoredFanOut, StoredRun } from "./state.js"
 import { resolveChild } from "../executable-manifest.js"
 import { digestFanOut } from "../fan-out.js"
 import { narrow } from "../executable-registration.js"
+import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 
 const inspection = (fanOut: StoredFanOut): FanOutInspection => ({
   fanOutId: fanOut.fanOutId,
@@ -151,7 +152,7 @@ export const admitFanOut = (
       const [, linked] = yield* appendLifecycle(
         next,
         parent.runId,
-        makeChildLinked(member.childRunId, `${input.fanOutId}:${member.key}`),
+        makeChildLinked(member.childRunId, `${input.fanOutId}:${member.key}`, member.selection, member.prompt),
       )
       next = linked
       const [, accepted] = yield* appendLifecycle(
@@ -354,10 +355,38 @@ export const reconcileFanOut = (
       ) {
         next = yield* settlePending(next, pendingParent)
       }
+      let resumeParent = next.runs.get(current.parentRunId)
+      if (
+        resumeParent !== undefined &&
+        !isTerminal(resumeParent.status) &&
+        resumeParent.activeWaitId !== undefined &&
+        groupIdFromSuspension(resumeParent.suspension) === current.fanOutId
+      ) {
+        const group = next.fanOuts.get(current.fanOutId)!
+        const resolution = {
+          _tag: "Signal" as const,
+          name: resumeParent.activeWaitId,
+          payload: resultFromInspection(group),
+        }
+        const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
+        const runs = new Map(next.runs)
+        const { ownerId: _, ...releasedParent } = resumeParent
+        runs.set(resumeParent.runId, {
+          ...releasedParent,
+          wait: { ...resumeParent.wait!, status: "signaled", resolution, closedAt },
+        })
+        const [, resumed] = yield* appendLifecycle(
+          { ...next, runs },
+          resumeParent.runId,
+          makeResumed(resumeParent.activeWaitId, resolution),
+          "running",
+        )
+        next = resumed
+        resumeParent = next.runs.get(current.parentRunId)
+      }
       const operationEntry = [...next.programOperations.entries()].find(
         ([, operation]) => operation.fanOutId === current.fanOutId && operation.status === "waiting",
       )
-      const resumeParent = next.runs.get(current.parentRunId)
       if (
         operationEntry !== undefined &&
         resumeParent !== undefined &&

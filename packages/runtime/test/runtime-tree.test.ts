@@ -1,5 +1,5 @@
 import { expect, it as testIt, layer } from "@effect/vitest"
-import { Effect, Fiber, Ref, Stream } from "effect"
+import { Effect, Fiber, Ref, Schedule, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Pins, ProgramManifest } from "@batonfx/core"
@@ -216,6 +216,12 @@ layer(memoryLayer)("RunTree", (it) => {
       })
 
       const page = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+      const encodedEvent = yield* RunTree.encodeTreeEvent(page.events[0]!)
+      const encodedPage = yield* RunTree.encodeTreePage(page)
+      expect(yield* RunTree.decodeTreeEvent(encodedEvent)).toEqual(page.events[0])
+      expect(yield* RunTree.decodeTreePage(encodedPage)).toEqual(page)
+      expect(yield* Effect.flip(RunTree.decodeTreeEvent({ ...encodedEvent, event: null as never }))).toBeDefined()
+      expect(yield* Effect.flip(RunTree.decodeTreePage({ ...encodedPage, hasMore: null as never }))).toBeDefined()
       expect(page.events.map((entry) => entry.runId)).toContain(grandchild.runId)
       const childAccepted = page.events.find(
         (entry) => entry.runId === child.runId && entry.event._tag === "RunAccepted",
@@ -538,9 +544,7 @@ layer(memoryLayer)("RunTree", (it) => {
         { events: [first], cursor: early, hasMore: false },
         { events: [], cursor: early, hasMore: false },
         { events: [], cursor: early, hasMore: false },
-        { events: [], cursor: early, hasMore: false },
         { events: [second], cursor: late, hasMore: false },
-        { events: [], cursor: late, hasMore: false },
       ]
       const inspections: ReadonlyArray<RunTree.Inspection> = [
         inspectionWith({ ...openWait("gate", "external"), status: "responded" }, early),
@@ -552,6 +556,11 @@ layer(memoryLayer)("RunTree", (it) => {
       const inspects = yield* Ref.make(0)
       const scripted: Runtime.Interface = {
         ...runtime,
+        treeChanges: () =>
+          Stream.concat(
+            Stream.succeed(undefined),
+            Stream.fromSchedule(Schedule.spaced("1 milli")).pipe(Stream.map(() => undefined)),
+          ),
         treeHistory: () =>
           Ref.getAndUpdate(reads, (index) => index + 1).pipe(
             Effect.map((index) => pages[index] ?? pages[pages.length - 1]!),
@@ -566,9 +575,7 @@ layer(memoryLayer)("RunTree", (it) => {
         Effect.provideService(Runtime.Runtime, scripted),
         Effect.forkChild({ startImmediately: true }),
       )
-      yield* TestClock.adjust("50 millis")
-      yield* TestClock.adjust("50 millis")
-      yield* TestClock.adjust("50 millis")
+      yield* TestClock.adjust("3 millis")
       const collected = Array.from(yield* Fiber.join(watching))
       expect(collected.map(({ cursor }) => cursor)).toEqual([first.cursor, second.cursor])
       expect(yield* Ref.get(reads)).toBe(pages.length)

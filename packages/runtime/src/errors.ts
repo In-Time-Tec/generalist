@@ -99,6 +99,20 @@ export class ResponseConflict extends Schema.TaggedErrorClass<ResponseConflict>(
   waitId: Schema.String,
 }) {}
 
+/** @experimental The approval no longer names an unresolved request. */
+export class ApprovalStale extends Schema.TaggedErrorClass<ApprovalStale>()("@batonfx/runtime/ApprovalStale", {
+  runId: Schema.String,
+  approvalId: Schema.String,
+}) {}
+
+/** @experimental The response conflicts with the authoritative approval identity or decision. */
+export class ApprovalMismatch extends Schema.TaggedErrorClass<ApprovalMismatch>()("@batonfx/runtime/ApprovalMismatch", {
+  runId: Schema.String,
+  approvalId: Schema.String,
+  mismatch: Schema.Literals(["approval-id", "wait-kind", "decision"]),
+  expectedApprovalId: Schema.optionalKey(Schema.String),
+}) {}
+
 export class OperationResolutionConflict extends Schema.TaggedErrorClass<OperationResolutionConflict>()(
   "@batonfx/runtime/OperationResolutionConflict",
   { runId: Schema.String, operationId: Schema.String, idempotencyKey: Schema.String },

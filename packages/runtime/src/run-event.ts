@@ -6,7 +6,7 @@ import type { ExecutionResult } from "./execution-state.js"
 import { ExecutionResult as ExecutionResultSchema, RunFailure as RunFailureSchema, RunId } from "./run.js"
 import { RunWait, WaitResolution } from "./run-wait.js"
 import { Address } from "./address.js"
-import { ModelTelemetry } from "@batonfx/core"
+import { AgentEvent, ModelTelemetry } from "@batonfx/core"
 import { FanOutJoin, FanOutRemainder } from "./fan-out.js"
 
 export type { AgentLoopEvent, ExecutionResult }
@@ -65,6 +65,8 @@ export type ChildLinked = RunEventBase & {
   readonly _tag: "ChildLinked"
   readonly childRunId: string
   readonly invocationId: string
+  readonly selection: string
+  readonly prompt: Prompt.Prompt
 }
 export type ChildSettled = RunEventBase & {
   readonly _tag: "ChildSettled"
@@ -229,6 +231,7 @@ const ModelTelemetryEventSchema = Schema.Union([
   Schema.Struct({ ...ModelTelemetry.ModelAttemptCompleted.fields, usage: Usage }),
   ModelTelemetry.ModelAttemptFailed,
   ModelTelemetry.ModelRetryScheduled,
+  ModelTelemetry.ModelFallbackScheduled,
   Schema.Struct({
     ...ModelTelemetry.ModelCallCompleted.fields,
     usage: Schema.optionalKey(Usage),
@@ -284,7 +287,12 @@ const AgentLoopEventSchema = Schema.Union([
     reason: Schema.String,
     ...optionalMetadata,
   }),
-  Schema.TaggedStruct("ApprovalRequested", { turn: Schema.Finite, call: ToolCall, ...optionalMetadata }),
+  Schema.TaggedStruct("ApprovalRequested", {
+    turn: Schema.Finite,
+    call: ToolCall,
+    request: AgentEvent.ApprovalRequest,
+    ...optionalMetadata,
+  }),
   Schema.TaggedStruct("SteeringDrained", {
     turn: Schema.Finite,
     queue: Schema.Literals(["steering", "followUp"]),
@@ -315,7 +323,12 @@ const LifecycleEventSchema = Schema.Union([
   Schema.TaggedStruct("RunWaiting", { wait: RunWait }),
   Schema.TaggedStruct("RunResumed", { waitId: Schema.String, resolution: WaitResolution }),
   Schema.TaggedStruct("OperationUnknown", { operationId: Schema.String }),
-  Schema.TaggedStruct("ChildLinked", { childRunId: RunId, invocationId: Schema.String }),
+  Schema.TaggedStruct("ChildLinked", {
+    childRunId: RunId,
+    invocationId: Schema.String,
+    selection: Schema.String,
+    prompt: Prompt.Prompt,
+  }),
   Schema.TaggedStruct("ChildSettled", { childRunId: RunId, terminalEventId: Schema.String }),
   Schema.TaggedStruct("FanOutAdmitted", {
     fanOutId: Schema.String,

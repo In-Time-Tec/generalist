@@ -25,6 +25,7 @@ import { afterTerminal } from "./lanes.js"
 import type { MemoryState, StoredRun } from "./state.js"
 import { reconcileFanOut } from "./store-fan-out.js"
 import { ProgramCapabilities } from "@batonfx/core"
+import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 
 const getRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -403,7 +404,28 @@ export const suspend = (
     const waitingRuns = new Map(next.runs)
     const { ownerId: _, ...waiting } = waitingRuns.get(run.runId)!
     waitingRuns.set(run.runId, waiting)
-    return { ...next, runs: waitingRuns }
+    const released = { ...next, runs: waitingRuns }
+    const groupId = groupIdFromSuspension(input.suspension)
+    const group = groupId === undefined ? undefined : released.fanOuts.get(groupId)
+    if (group === undefined || group.parentRunId !== run.runId || group.status === "running") return released
+    const resolution = {
+      _tag: "Signal" as const,
+      name: input.wait.waitId,
+      payload: resultFromInspection(group),
+    }
+    const closedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
+    const resumedRuns = new Map(released.runs)
+    resumedRuns.set(run.runId, {
+      ...resumedRuns.get(run.runId)!,
+      wait: { ...input.wait, status: "signaled", resolution, closedAt },
+    })
+    const [, resumed] = yield* appendLifecycle(
+      { ...released, runs: resumedRuns },
+      run.runId,
+      makeResumed(input.wait.waitId, resolution),
+      "running",
+    )
+    return resumed
   })
 
 export const resume = (

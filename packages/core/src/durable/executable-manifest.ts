@@ -29,7 +29,7 @@ export type ExecutableTarget = typeof ExecutableTarget.Type
 
 /** @experimental Complete closed executable Agent graph. */
 export interface ExecutableManifest {
-  readonly version: "2"
+  readonly version: "1"
   readonly root: ExecutableTarget
   readonly entries: ReadonlyArray<ExecutableEntry>
 }
@@ -89,7 +89,7 @@ export const ExecutableEntry: Schema.Codec<ExecutableEntry, ExecutableEntryEncod
 
 /** @experimental Complete closed executable Agent graph. */
 export const ExecutableManifest: Schema.Codec<ExecutableManifest, ExecutableManifestEncoded> = Schema.Struct({
-  version: Schema.Literal("2"),
+  version: Schema.Literal("1"),
   root: ExecutableTarget,
   entries: Schema.Array(ExecutableEntry),
 })
@@ -146,7 +146,7 @@ export const make = (input: {
     .map(({ _tag, pin, manifest }) => ({ _tag, pin, manifest }) as ExecutableEntry)
     .toSorted((left, right) => compareText(left.pin, right.pin))
   const manifest = Schema.decodeUnknownSync(ExecutableManifest, { onExcessProperty: "error" })({
-    version: "2",
+    version: "1",
     root: input.root,
     entries,
   })
@@ -162,6 +162,7 @@ export const makeTest = (name: string, revision = "1"): PinnedExecutable => {
     skills: [],
     services: [],
     policy: { _tag: "Pinned", pin: makeCapability({ fixture: name, policy: revision }) },
+    toolScheduling: { maxConcurrency: 1, parallelSafe: [] },
     budget: {},
     children: [],
   })

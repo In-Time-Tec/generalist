@@ -238,9 +238,16 @@ const applyRunEvent = (model: Model, event: RunEvent.RunEvent): readonly [Model,
   const withSequence = { ...model, lastSeq: event.sequence }
   switch (event._tag) {
     case "RunWaiting":
-      return event.wait.reason === "approval"
+      return event.wait.reason._tag === "Approval"
         ? [
-            { ...withSequence, run: AwaitingApproval({ token: event.wait.waitId, toolName: "approval", params: {} }) },
+            {
+              ...withSequence,
+              run: AwaitingApproval({
+                token: event.wait.reason.request.approvalId,
+                toolName: event.wait.reason.request.capability,
+                params: event.wait.reason.request.input,
+              }),
+            },
             Option.some(ApprovalRequired()),
           ]
         : [withSequence, Option.none()]

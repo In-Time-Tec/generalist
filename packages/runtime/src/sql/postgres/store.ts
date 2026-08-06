@@ -2,6 +2,7 @@ import { Effect, Equal, Schema, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import {
+  ApprovalStale,
   CursorExpired,
   IdempotencyConflict,
   ResponseConflict,
@@ -52,6 +53,7 @@ import { admitSend } from "./store-admit.js"
 import { associateRegistrations, loadRegistrations } from "../executable-registrations.js"
 import { narrow } from "../../executable-registration.js"
 import { PendingRunOutcome } from "../../run-store.js"
+import { approvalResponse } from "../respond-approval.js"
 const nextId = (prefix: string) => Effect.sync(() => `${prefix}_${Math.random().toString(36).slice(2)}`)
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
@@ -155,6 +157,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               _tag: "ChildLinked",
               childRunId: runId,
               invocationId: input.invocationId,
+              selection: input.selection,
+              prompt: input.message.prompt,
             })
             const child = (yield* loadRun(runId))!
             yield* appendEvent(
@@ -243,6 +247,36 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
           }),
         ),
+      respondApproval: (input) =>
+        run(
+          Effect.gen(function* () {
+            yield* lockRun(input.runId)
+            const response = yield* approvalResponse(input)
+            if (response._tag === "Duplicate") return
+            const loaded = yield* requireRun(input.runId)
+            const responded = [...loaded.respondedWaitIds, response.waitId]
+            const resolution: WaitResolution = input.decision
+            const closed = yield* sql<{ wait_id: string }>`
+              UPDATE baton_run_waits SET status = 'responded', response_json = ${JSON.stringify(resolution)}, closed_at = NOW()
+              WHERE run_id = ${loaded.runId} AND wait_id = ${response.waitId} AND status = 'open'
+              RETURNING wait_id
+            `
+            if (closed.length === 0) {
+              return yield* ApprovalStale.make({ runId: loaded.runId, approvalId: input.approvalId })
+            }
+            yield* sql`
+              UPDATE baton_runs
+              SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = NOW()
+              WHERE run_id = ${loaded.runId}
+            `
+            yield* sql`
+              UPDATE baton_program_operations SET status = 'reserved'
+              WHERE run_id = ${loaded.runId} AND wait_id = ${response.waitId} AND status = 'waiting'
+            `
+            const current = (yield* loadRun(loaded.runId))!
+            yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: response.waitId, resolution }, "running")
+          }),
+        ),
       signal: (input) =>
         run(
           Effect.gen(function* () {
@@ -298,6 +332,19 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           }),
         ),
       treeHistory: (input) => runNoTxn(loadTreeHistory(input)),
+      treeChanges: (rootRunId) =>
+        hub.subscribeTree({
+          rootRunId,
+          onSubscribed: pg.listen(NOTIFY_CHANNEL).pipe(
+            Stream.runForEach((runId) =>
+              runNoTxn(loadRun(String(runId))).pipe(
+                Effect.flatMap((loaded) => (loaded?.rootRunId === rootRunId ? hub.wakeTree(rootRunId) : Effect.void)),
+                Effect.ignore,
+              ),
+            ),
+            Effect.ignore,
+          ),
+        }),
       list: (input) =>
         runNoTxn(
           Effect.gen(function* () {

@@ -149,15 +149,25 @@ export namespace Run {
   export type Run = import("./run.js").Run
 }
 
-import { RunWait as RunWait_RunWait, WaitResolution as RunWait_WaitResolution } from "./run-wait.js"
+import {
+  RunWait as RunWait_RunWait,
+  WaitReason as RunWait_WaitReason,
+  WaitResolution as RunWait_WaitResolution,
+  approvalReason as RunWait_approvalReason,
+} from "./run-wait.js"
 export const RunWait = {
   RunWait: RunWait_RunWait,
+  WaitReason: RunWait_WaitReason,
   WaitResolution: RunWait_WaitResolution,
+  approvalReason: RunWait_approvalReason,
 } as typeof import("./run-wait.js")
 export namespace RunWait {
   export type RunWait = import("./run-wait.js").RunWait
+  export type WaitReason = import("./run-wait.js").WaitReason
   export type WaitResolution = import("./run-wait.js").WaitResolution
 }
+
+export * as Approval from "./approval.js"
 
 import {
   SpecVersion as RunEvent_SpecVersion,
@@ -218,6 +228,8 @@ import {
   SteeringConflict as Errors_SteeringConflict,
   WaitNotOpen as Errors_WaitNotOpen,
   ResponseConflict as Errors_ResponseConflict,
+  ApprovalStale as Errors_ApprovalStale,
+  ApprovalMismatch as Errors_ApprovalMismatch,
   CursorExpired as Errors_CursorExpired,
   TreeCursorInvalid as Errors_TreeCursorInvalid,
   TreeCursorExpired as Errors_TreeCursorExpired,
@@ -255,6 +267,8 @@ export const Errors = {
   SteeringConflict: Errors_SteeringConflict,
   WaitNotOpen: Errors_WaitNotOpen,
   ResponseConflict: Errors_ResponseConflict,
+  ApprovalStale: Errors_ApprovalStale,
+  ApprovalMismatch: Errors_ApprovalMismatch,
   CursorExpired: Errors_CursorExpired,
   TreeCursorInvalid: Errors_TreeCursorInvalid,
   TreeCursorExpired: Errors_TreeCursorExpired,
@@ -290,6 +304,8 @@ export namespace Errors {
   export type SteeringConflict = import("./errors.js").SteeringConflict
   export type WaitNotOpen = import("./errors.js").WaitNotOpen
   export type ResponseConflict = import("./errors.js").ResponseConflict
+  export type ApprovalStale = import("./errors.js").ApprovalStale
+  export type ApprovalMismatch = import("./errors.js").ApprovalMismatch
   export type CursorExpired = import("./errors.js").CursorExpired
   export type TreeCursorInvalid = import("./errors.js").TreeCursorInvalid
   export type TreeCursorExpired = import("./errors.js").TreeCursorExpired
@@ -341,6 +357,7 @@ export namespace Runtime {
   export type HistoryInput = import("./runtime.js").HistoryInput
   export type ListInput = import("./runtime.js").ListInput
   export type RespondInput = import("./runtime.js").RespondInput
+  export type RespondApprovalInput = import("./approval.js").RespondInput
   export type SignalInput = import("./runtime.js").SignalInput
   export type CancelInput = import("./runtime.js").CancelInput
   export type SteerInput = import("./runtime.js").SteerInput
@@ -349,6 +366,7 @@ export namespace Runtime {
   export type SpawnError = import("./runtime.js").SpawnError
   export type EventsError = import("./runtime.js").EventsError
   export type RespondError = import("./runtime.js").RespondError
+  export type RespondApprovalError = import("./runtime.js").RespondApprovalError
   export type SignalError = import("./runtime.js").SignalError
   export type CancelError = import("./runtime.js").CancelError
   export type SteerError = import("./runtime.js").SteerError

@@ -24,7 +24,7 @@ const request: ToolAuthorization.Request = {
   agentName: "agent",
   turn: 1,
   sessionId: "session",
-  onApprovalRequired: Effect.void,
+  onApprovalRequired: () => Effect.void,
 }
 const store = (rules: ReadonlyArray<Permissions.Rule> = []): Permissions.RuleStoreInterface => ({
   rules: Effect.succeed(rules),
@@ -72,6 +72,35 @@ describe("ToolAuthorization", () => {
           resolution._tag === "Approved" ? "Execute" : resolution._tag === "Denied" ? "Deny" : "Suspend",
         )
       }
+    }),
+  )
+
+  it.effect("emits the canonical approval request and keeps its identity stable", () =>
+    Effect.gen(function* () {
+      let observed: Parameters<ToolAuthorization.Request["onApprovalRequired"]>[0] | undefined
+      const result = yield* ToolAuthorization.make({
+        permissions: permissions({ _tag: "Ask", token: "approval-stable" }),
+        approvals: {
+          resolve: (pending) => Effect.succeed({ ...pending, token: "attempted-replacement" }),
+        },
+        ruleStore: store(),
+      }).authorize({
+        ...request,
+        onApprovalRequired: (approval) =>
+          Effect.sync(() => {
+            observed = approval
+          }),
+      })
+      expect(observed).toEqual({
+        approvalId: "approval-stable",
+        operation: "call-1",
+        capability: "echo",
+        input: { text: "hi" },
+      })
+      expect(result).toMatchObject({
+        _tag: "Suspend",
+        suspension: { token: "approval-stable", tool_call_id: "call-1", tool_name: "echo" },
+      })
     }),
   )
 

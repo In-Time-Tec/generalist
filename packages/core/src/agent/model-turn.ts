@@ -21,10 +21,11 @@ import {
   validateDecodedToolCall,
 } from "../model/model-tool-call-validation.js"
 import { DuplicateToolCallId, MiddlewareViolation } from "./agent-event.js"
-import type { RunError } from "./agent.js"
+import type { RunError, ToolSchedulingPolicy } from "./agent.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
 import { wrapDriverAttempt } from "./model-turn-driver.js"
 import { captureFinishPart, captureStructuredUsage, chargeAttemptUsage } from "./model-turn-finish.js"
+import { schedule as scheduleTools } from "./tool-scheduler.js"
 import { attemptText, classifyOtherFailure, isToolNameCollision } from "./model-turn-parts.js"
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
@@ -60,12 +61,12 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
           Effect.map((handoffRun) => handoffRun.active.agent.model ?? agentModel),
           Effect.orElseSucceed(() => agentModel),
         )
-  const activeToolConcurrency = (): Effect.Effect<number | "unbounded"> =>
+  const activeToolScheduling = (): Effect.Effect<ToolSchedulingPolicy> =>
     handoffStateRef === undefined
-      ? Effect.succeed(agent.toolExecution?.concurrency ?? 1)
+      ? Effect.succeed(agent.toolScheduling)
       : Ref.get(handoffStateRef).pipe(
-          Effect.map((handoffRun) => handoffRun.active.agent.toolExecution?.concurrency ?? 1),
-          Effect.orElseSucceed(() => agent.toolExecution?.concurrency ?? 1),
+          Effect.map((handoffRun) => handoffRun.active.agent.toolScheduling),
+          Effect.orElseSucceed(() => agent.toolScheduling),
         )
   const captureProviderOutput = (part: Response.StreamPart<Record<string, Tool.Any>>): void => {
     if (part.type === "text-delta") state.providerOutput.textCharacters += part.delta.length
@@ -191,9 +192,9 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
       Effect.gen(function* () {
         const agentName = yield* activeAgentName(turn)
         const selection = yield* activeModelSelection()
-        const concurrency = yield* activeToolConcurrency()
+        const toolScheduling = yield* activeToolScheduling()
         const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
-        const parts = modelTurnBody(turn, prompt, activeRegistry, overrides, agentName, concurrency)
+        const parts = modelTurnBody(turn, prompt, activeRegistry, overrides, agentName, toolScheduling)
         if (overrides?.model !== undefined) return parts.pipe(Stream.provide(overrides.model))
         if (selection === undefined || agentModelRegistry === undefined) return parts
         return agentModelRegistry
@@ -211,7 +212,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     activeRegistry: Registry,
     overrides: TurnOverrides | undefined,
     agentName: string,
-    concurrency: number | "unbounded",
+    toolScheduling: ToolSchedulingPolicy,
   ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<T>> => {
     const instrumentTurnStream = <A, E>(
       stream: Stream.Stream<A, E, LanguageModel.LanguageModel>,
@@ -443,46 +444,9 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
             Stream.suspend(() => {
               Object.freeze(calls)
               Object.freeze(toolCallBatch)
-              const executionStreams = Stream.fromIterable(executions)
-              return concurrency === 1
-                ? executionStreams.pipe(
-                    Stream.flatMap(({ call, messages, toolCallIndex }) =>
-                      toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
-                    ),
-                  )
-                : Stream.unwrap(
-                    Effect.gen(function* () {
-                      const collected = yield* Ref.make(new Map<number, Array<Event>>())
-                      const batchSize = concurrency === "unbounded" ? executions.length : concurrency
-                      let failure: Cause.Cause<RunError> | undefined
-                      for (let offset = 0; offset < executions.length; offset += batchSize) {
-                        const batch = executions.slice(offset, offset + batchSize)
-                        const exit = yield* Effect.forEach(
-                          batch,
-                          ({ call, messages, toolCallIndex }) =>
-                            Stream.runForEach(
-                              toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
-                              (event) =>
-                                Ref.update(collected, (current) => {
-                                  const next = new Map(current)
-                                  next.set(toolCallIndex, [...(next.get(toolCallIndex) ?? []), event as Event])
-                                  return next
-                                }),
-                            ),
-                          { concurrency: "unbounded", discard: true },
-                        ).pipe(Effect.exit)
-                        if (Exit.isFailure(exit)) {
-                          failure = exit.cause as Cause.Cause<RunError>
-                          break
-                        }
-                      }
-                      const events = [...(yield* Ref.get(collected)).entries()]
-                        .toSorted(([left], [right]) => left - right)
-                        .flatMap(([, items]) => items)
-                      const completed = Stream.fromIterable(events)
-                      return failure === undefined ? completed : Stream.concat(completed, Stream.failCause(failure))
-                    }),
-                  )
+              return scheduleTools(executions, toolScheduling, ({ call, messages, toolCallIndex }) =>
+                toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
+              )
             }),
           )
         }),

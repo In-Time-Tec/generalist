@@ -25,20 +25,7 @@ import {
   strictDecode,
 } from "./program-boundary.js"
 import { Prompt } from "effect/unstable/ai"
-
-const approvedFor = (claimed: ExecutionRecord, operation: string): boolean =>
-  claimed.suspension?._tag === "@batonfx/core/ProgramSuspended" &&
-  claimed.suspension.operation === operation &&
-  claimed.suspension.reason === "approval" &&
-  claimed.resolution?._tag === "Approved"
-
-const deniedFor = (claimed: ExecutionRecord, operation: string): string | undefined =>
-  claimed.suspension?._tag === "@batonfx/core/ProgramSuspended" &&
-  claimed.suspension.operation === operation &&
-  claimed.suspension.reason === "approval" &&
-  claimed.resolution?._tag === "Denied"
-    ? (claimed.resolution.reason ?? "approval denied")
-    : undefined
+import { approvedFor, deniedFor, programWait } from "./program-approval.js"
 
 export const make = (input: {
   readonly claim: ExecutionClaim
@@ -89,7 +76,7 @@ export const make = (input: {
       readonly kind: ProgramOperationKind
       readonly capability: string
       readonly request: unknown
-      readonly replay: ProgramBindings.ReplayPolicy
+      readonly replay: ProgramBindings.ProgramReplayPolicy
       readonly reservation?: ProgramReservation
       readonly prepare: Effect.Effect<void, ProgramCapabilities.CapabilityFailure>
       readonly dispatch: Effect.Effect<A, ProgramCapabilities.CapabilityFailure>
@@ -131,16 +118,19 @@ export const make = (input: {
           const failure = failureFromExit(prepared.cause)
           if (Schema.is(ProgramCapabilities.ProgramSuspended)(failure)) {
             const openedAt = new Date(nowMillis).toISOString()
+            const wait = programWait({
+              runId: input.claim.runId,
+              operation: options.operation,
+              capability: options.capability,
+              request: options.request,
+              reason: failure.reason,
+              ...(failure.token === undefined ? {} : { token: failure.token }),
+            })
             yield* input.store
               .suspendProgramOperation({
                 ...reservation,
                 suspension: failure,
-                wait: {
-                  waitId: failure.token ?? `program:${failure.operation}`,
-                  reason: failure.reason === "approval" || failure.reason === "tool-wait" ? failure.reason : "external",
-                  status: "open",
-                  openedAt,
-                },
+                wait: { ...wait, status: "open", openedAt },
                 checkpoint: { _tag: "Program", version: "1" },
               })
               .pipe(Effect.mapError(storeFailure))
@@ -295,7 +285,7 @@ export const make = (input: {
           suspension,
           wait: {
             waitId: suspension.token!,
-            reason: "external",
+            reason: { _tag: "External", capability: "agent" },
             status: "open",
             openedAt: new Date(nowMillis).toISOString(),
           },
