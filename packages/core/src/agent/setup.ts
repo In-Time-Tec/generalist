@@ -119,7 +119,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       yield* Effect.gen(function* () {
         const path = yield* sessionService.value.path()
         const checkpoint = path.at(-1)
-        if (checkpoint?._tag !== "Compaction" || checkpoint.version !== 2) return
+        if (checkpoint?._tag !== "Compaction") return
         const history = yield* Ref.get(persisted.history)
         const before = buildContext(path.slice(0, -1))
         if (!Schema.toEquivalence(Prompt.Prompt)(before, history)) return
@@ -303,8 +303,8 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       const path = yield* sessionService.value
         .path()
         .pipe(Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })))
-      const checkpoint = path.findLast((entry) => entry._tag === "Compaction" && entry.version === 2)
-      if (checkpoint?._tag === "Compaction" && checkpoint.version === 2) {
+      const checkpoint = path.findLast((entry) => entry._tag === "Compaction")
+      if (checkpoint?._tag === "Compaction") {
         for (const event of checkpoint.telemetry) publishTelemetry(event)
       }
     }

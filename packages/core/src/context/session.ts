@@ -50,24 +50,14 @@ export interface HandoffEntry extends BaseEntry {
   readonly target: string
   readonly summary: string
 }
-/** @experimental A legacy summary compaction boundary for prompt projection. */
-export interface LegacyCompactionEntry extends BaseEntry {
-  readonly _tag: "Compaction"
-  readonly version?: 1
-  readonly summary: string
-  readonly firstKeptEntryId: EntryId
-}
 /** @experimental An exact point-in-time compaction projection. */
-export interface CheckpointEntry extends BaseEntry {
+export interface CompactionEntry extends BaseEntry {
   readonly _tag: "Compaction"
-  readonly version: 2
   readonly projectedHistory: Prompt.Prompt
   readonly telemetry: ReadonlyArray<ModelTelemetryEvent>
   readonly compactionCommit?: CompactionCommit
   readonly summary?: string
 }
-/** @experimental A legacy or exact compaction boundary. */
-export type CompactionEntry = LegacyCompactionEntry | CheckpointEntry
 /** @experimental A summary of an abandoned branch. */
 export interface BranchSummaryEntry extends BaseEntry {
   readonly _tag: "BranchSummary"
@@ -84,7 +74,7 @@ export type Entry =
   | HandoffEntry
   | CompactionEntry
   | BranchSummaryEntry
-type AppendEntryInput<Item extends Entry> = Item extends CheckpointEntry ? never : Omit<Item, "id" | "parentId">
+type AppendEntryInput<Item extends Entry> = Item extends CompactionEntry ? never : Omit<Item, "id" | "parentId">
 /** @experimental Session entry input appended by a store implementation. */
 export type AppendInput = AppendEntryInput<Entry>
 /** @experimental Session store operation failure. */
@@ -114,7 +104,7 @@ export interface PreparedCheckpoint {
 /** @experimental Authoritative result of an idempotent checkpoint append. */
 export interface CheckpointAppend {
   readonly _tag: "Appended" | "AlreadyPresent"
-  readonly checkpoint: CheckpointEntry
+  readonly checkpoint: CompactionEntry
   readonly leafId: EntryId
 }
 /** @experimental Session event-log service boundary. */
@@ -195,8 +185,6 @@ const entryFromInput = (input: AppendInput, id: EntryId, parentId: EntryId | nul
       return { ...base, _tag: "Steering", message: input.message }
     case "Handoff":
       return { ...base, _tag: "Handoff", target: input.target, summary: input.summary }
-    case "Compaction":
-      return { ...base, _tag: "Compaction", summary: input.summary, firstKeptEntryId: input.firstKeptEntryId }
     case "BranchSummary":
       return { ...base, _tag: "BranchSummary", summary: input.summary }
   }
@@ -218,17 +206,6 @@ const pathFromState = (state: State, leaf: EntryId): Result<ReadonlyArray<Entry>
   return success(entries.toReversed())
 }
 
-const validateCompaction = (state: State, input: AppendInput): Result<void> => {
-  if (input._tag !== "Compaction") return success(undefined)
-  if (state.leaf === null) return failure(`Session compaction keeps missing entry ${input.firstKeptEntryId}`)
-  const path = pathFromState(state, state.leaf)
-  if (path._tag === "Failure") return path
-  if (!path.value.some((entry) => entry.id === input.firstKeptEntryId)) {
-    return failure(`Session compaction keeps missing entry ${input.firstKeptEntryId}`)
-  }
-  return success(undefined)
-}
-
 const appendState = (
   state: State,
   input: AppendInput,
@@ -243,9 +220,6 @@ const appendState = (
       state,
     ]
   }
-  const valid = validateCompaction(state, input)
-  if (valid._tag === "Failure") return [valid, state]
-
   const id = String(state.counter)
   const entry = entryFromInput(input, id, state.leaf)
   return [
@@ -265,11 +239,11 @@ const commitEquivalence = Schema.toEquivalence(CompactionCommit)
 
 /** @experimental Canonical exact checkpoint equivalence, excluding the write-owner token. */
 export const checkpointMatches: {
-  (prepared: PreparedCheckpoint): (entry: CheckpointEntry) => boolean
-  (entry: CheckpointEntry, prepared: PreparedCheckpoint): boolean
+  (prepared: PreparedCheckpoint): (entry: CompactionEntry) => boolean
+  (entry: CompactionEntry, prepared: PreparedCheckpoint): boolean
 } = dual(
   2,
-  (entry: CheckpointEntry, prepared: PreparedCheckpoint): boolean =>
+  (entry: CompactionEntry, prepared: PreparedCheckpoint): boolean =>
     entry.id === prepared.id &&
     entry.parentId === prepared.parentId &&
     entry.summary === prepared.summary &&
@@ -297,7 +271,7 @@ const appendCheckpointState = (
   const existing = HashMap.get(state.entries, prepared.id)
   if (Option.isSome(existing)) {
     const entry = existing.value
-    if (entry._tag !== "Compaction" || entry.version !== 2 || !checkpointMatches(entry, prepared)) {
+    if (entry._tag !== "Compaction" || !checkpointMatches(entry, prepared)) {
       return [
         SessionConflict.make({
           reason: "checkpoint-id-reused",
@@ -333,9 +307,8 @@ const appendCheckpointState = (
       state,
     ]
   }
-  const checkpoint: CheckpointEntry = {
+  const checkpoint: CompactionEntry = {
     _tag: "Compaction",
-    version: 2,
     id: prepared.id,
     parentId: prepared.parentId,
     projectedHistory: prepared.projectedHistory,
@@ -365,9 +338,6 @@ const messageFromText = (role: "user" | "system", text: string): Prompt.Message 
     ? Prompt.makeMessage("system", { content: text })
     : Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 
-const checkpointMessage = (summary: string): Prompt.Message =>
-  messageFromText("user", `<conversation-checkpoint>\n${summary}\n</conversation-checkpoint>`)
-
 const branchSummaryMessage = (summary: string): Prompt.Message =>
   messageFromText("system", `<abandoned-branch-summary>\n${summary}\n</abandoned-branch-summary>`)
 
@@ -385,19 +355,8 @@ const handoffMessage = (entry: HandoffEntry): Prompt.Message =>
 const projectedMessages = (path: ReadonlyArray<Entry>): ReadonlyArray<Prompt.Message> => {
   const compactionIndex = path.findLastIndex((entry) => entry._tag === "Compaction")
   const compaction = compactionIndex === -1 ? undefined : (path[compactionIndex] as CompactionEntry)
-  const messages: Array<Prompt.Message> = compaction?.version === 2 ? [...compaction.projectedHistory.content] : []
-  const keptIndex =
-    compaction === undefined || compaction.version === 2
-      ? -1
-      : path.findIndex((entry) => entry.id === compaction.firstKeptEntryId)
-  const entries =
-    compactionIndex === -1
-      ? path
-      : compaction?.version === 2
-        ? path.slice(compactionIndex + 1)
-        : path.slice(keptIndex === -1 ? compactionIndex + 1 : keptIndex)
-
-  if (compaction !== undefined && compaction.version !== 2) messages.push(checkpointMessage(compaction.summary))
+  const messages: Array<Prompt.Message> = compaction === undefined ? [] : [...compaction.projectedHistory.content]
+  const entries = compactionIndex === -1 ? path : path.slice(compactionIndex + 1)
 
   for (const entry of entries) {
     switch (entry._tag) {

@@ -609,7 +609,6 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 ]),
                 prompt: request.prompt,
                 summary: "recall-derived summary",
-                firstKeptEntryId: firstKept.id,
               }),
             ).pipe(Compaction.withLifecycle(request))
           },
@@ -989,7 +988,6 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 ]),
                 prompt: request.prompt,
                 summary: "summary",
-                firstKeptEntryId: firstKept.id,
               }),
             ).pipe(Compaction.withLifecycle(request))
           },

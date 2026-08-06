@@ -135,8 +135,8 @@ export const coreContextReference = definePage({
         [[code("HandoffEntry")], [code("target"), ", ", code("summary")], [code("<handoff>"), " system note"]],
         [
           [code("CompactionEntry")],
-          [code("version: 2"), ", ", code("projectedHistory"), ", optional ", code("summary")],
-          ["Exact point-in-time projection; legacy summary and ", code("firstKeptEntryId"), " entries remain readable"],
+          [code("projectedHistory"), ", ", code("telemetry"), ", optional ", code("summary")],
+          ["Self-contained checkpoint; projection never reads entries before it"],
         ],
         [
           [code("BranchSummaryEntry")],
@@ -169,9 +169,7 @@ export const coreContextReference = definePage({
       code("MicrocompactResult"),
       " (tool outputs bounded in place) or ",
       code("SummarizeResult"),
-      " (summary checkpoint plus ",
-      code("firstKeptEntryId"),
-      ").",
+      " (summary checkpoint plus the kept tail).",
     ),
     table(
       ["Export", "Notes"],

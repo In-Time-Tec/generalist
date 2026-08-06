@@ -647,7 +647,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
                 history: Prompt.make("committed too early"),
                 prompt: Prompt.make("retry prompt"),
                 summary: "summary",
-                firstKeptEntryId: "0",
               }),
             ).pipe(Compaction.withLifecycle(request)),
         }),
@@ -887,7 +886,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     let pathEntered: Deferred.Deferred<void> | undefined
     let blockCheckpointPath = true
     let compactionCalls = 0
-    let committedCheckpoint: Session.CheckpointEntry | undefined
+    let committedCheckpoint: Session.CompactionEntry | undefined
     const sessionLayer = Layer.effect(
       Session.SessionStore,
       Ref.make<ReadonlyArray<Session.Entry>>([]).pipe(
@@ -906,15 +905,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
             appendCheckpoint: (prepared) =>
               Ref.modify(entries, (path) => {
                 const existing = path.find((entry) => entry.id === prepared.id)
-                if (existing?._tag === "Compaction" && existing.version === 2) {
+                if (existing?._tag === "Compaction") {
                   return [
                     { _tag: "AlreadyPresent", checkpoint: existing, leafId: path.at(-1)?.id ?? existing.id } as const,
                     path,
                   ] as readonly [Session.CheckpointAppend, ReadonlyArray<Session.Entry>]
                 }
-                const checkpoint: Session.CheckpointEntry = {
+                const checkpoint: Session.CompactionEntry = {
                   _tag: "Compaction",
-                  version: 2,
                   ...prepared,
                 }
                 committedCheckpoint = checkpoint
@@ -984,9 +982,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const history = yield* Ref.get(chat.history)
         const session = yield* Session.SessionStore
         const path = yield* session.path()
-        const checkpoints = path.filter(
-          (entry): entry is Session.CheckpointEntry => entry._tag === "Compaction" && entry.version === 2,
-        )
+        const checkpoints = path.filter((entry): entry is Session.CompactionEntry => entry._tag === "Compaction")
         expect(checkpoints).toHaveLength(1)
         expect(committedCheckpoint).toBeDefined()
         expect(checkpoints[0]?.telemetry.map((event) => event.deliveryId)).toEqual(

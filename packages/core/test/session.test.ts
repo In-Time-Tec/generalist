@@ -18,7 +18,7 @@ const promptTexts = (prompt: Prompt.Prompt): ReadonlyArray<string> =>
 
 describe("Session", () => {
   it("excludes exact checkpoints from ordinary append input", () => {
-    const excluded: Extract<Session.AppendInput, { readonly version: 2 }> extends never ? true : false = true
+    const excluded: Extract<Session.AppendInput, { readonly _tag: "Compaction" }> extends never ? true : false = true
     expect(excluded).toBe(true)
   })
 
@@ -94,21 +94,19 @@ describe("Session", () => {
           const first = yield* store.append({ _tag: "Message", message: user("m1") })
           const second = yield* store.append({ _tag: "Message", message: user("m2") })
           const third = yield* store.append({ _tag: "Message", message: user("m3") })
-          const fourth = yield* store.append({ _tag: "Message", message: user("m4") })
-          const fifth = yield* store.append({ _tag: "Message", message: user("m5") })
-          const compaction = yield* store.append({
-            _tag: "Compaction",
+          const id = yield* store.reserveEntryId
+          const { checkpoint } = yield* store.appendCheckpoint({
+            id,
+            parentId: third.id,
+            projectedHistory: Prompt.fromMessages([user("summary m1-m3"), user("m3")]),
+            telemetry: [],
             summary: "summary m1-m3",
-            firstKeptEntryId: fourth.id,
           })
+          const fourth = yield* store.append({ _tag: "Message", message: user("m4") })
           const path = yield* store.path()
 
-          expect(path).toEqual([first, second, third, fourth, fifth, compaction])
-          expect(promptTexts(Session.buildContext(path))).toEqual([
-            "<conversation-checkpoint>\nsummary m1-m3\n</conversation-checkpoint>",
-            "m4",
-            "m5",
-          ])
+          expect(path).toEqual([first, second, third, checkpoint, fourth])
+          expect(promptTexts(Session.buildContext(path))).toEqual(["summary m1-m3", "m3", "m4"])
         }),
       ] as const,
   )
@@ -128,10 +126,13 @@ describe("Session", () => {
             message: Memory.messageFromRecall([Prompt.makePart("text", { text: "recalled" })]),
           })
           const kept = yield* store.append({ _tag: "Message", message: assistant("model before") })
-          yield* store.append({
-            _tag: "Compaction",
+          const id = yield* store.reserveEntryId
+          yield* store.appendCheckpoint({
+            id,
+            parentId: kept.id,
+            projectedHistory: Prompt.fromMessages([user("summary containing recalled and authored context")]),
+            telemetry: [],
             summary: "summary containing recalled and authored context",
-            firstKeptEntryId: kept.id,
           })
           yield* store.append({ _tag: "Message", message: user("authored after") })
           const path = yield* store.path()
@@ -157,14 +158,27 @@ describe("Session", () => {
 
           yield* store.append({ _tag: "Message", message: user("m1") })
           const second = yield* store.append({ _tag: "Message", message: user("m2") })
-          yield* store.append({ _tag: "Compaction", summary: "old summary", firstKeptEntryId: second.id })
+          const oldId = yield* store.reserveEntryId
+          const old = yield* store.appendCheckpoint({
+            id: oldId,
+            parentId: second.id,
+            projectedHistory: Prompt.fromMessages([user("old summary")]),
+            telemetry: [],
+            summary: "old summary",
+          })
           const third = yield* store.append({ _tag: "Message", message: user("m3") })
-          yield* store.append({ _tag: "Compaction", summary: "new summary", firstKeptEntryId: third.id })
+          const newId = yield* store.reserveEntryId
+          yield* store.appendCheckpoint({
+            id: newId,
+            parentId: third.id,
+            projectedHistory: Prompt.fromMessages([user("new summary")]),
+            telemetry: [],
+            summary: "new summary",
+          })
+          yield* store.append({ _tag: "Message", message: user("m4") })
 
-          expect(promptTexts(Session.buildContext(yield* store.path()))).toEqual([
-            "<conversation-checkpoint>\nnew summary\n</conversation-checkpoint>",
-            "m3",
-          ])
+          expect(old.checkpoint.id).toBe(oldId)
+          expect(promptTexts(Session.buildContext(yield* store.path()))).toEqual(["new summary", "m4"])
         }),
       ] as const,
   )
@@ -246,7 +260,7 @@ describe("Session", () => {
 
   ItLayer.make(
     it,
-    "fails typed for unknown leaves and invalid compactions",
+    "fails typed for unknown leaves",
     () =>
       [
         Session.layerMemory,
@@ -255,14 +269,9 @@ describe("Session", () => {
 
           const setLeafFailure = yield* Effect.flip(store.setLeaf("missing"))
           const pathFailure = yield* Effect.flip(store.path("missing"))
-          yield* store.append({ _tag: "Message", message: user("m1") })
-          const compactionFailure = yield* Effect.flip(
-            store.append({ _tag: "Compaction", summary: "bad", firstKeptEntryId: "missing" }),
-          )
 
           expect(setLeafFailure._tag).toBe("@batonfx/core/SessionStoreError")
           expect(pathFailure._tag).toBe("@batonfx/core/SessionStoreError")
-          expect(compactionFailure._tag).toBe("@batonfx/core/SessionStoreError")
         }),
       ] as const,
   )

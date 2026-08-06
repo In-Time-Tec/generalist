@@ -102,11 +102,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           if (Option.isNone(cursor)) {
             const checkpoint = path.at(-1)
             const before = buildContext(path.slice(0, -1))
-            if (
-              checkpoint?._tag === "Compaction" &&
-              checkpoint.version === 2 &&
-              promptEquivalence(before, transcript)
-            ) {
+            if (checkpoint?._tag === "Compaction" && promptEquivalence(before, transcript)) {
               yield* Ref.set(chat.history, projection)
               yield* savePersisted(turn)
               return path

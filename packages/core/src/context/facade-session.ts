@@ -32,13 +32,11 @@ export namespace Session {
   export type BaseEntry = import("./session.js").BaseEntry
   export type BranchSummaryEntry = import("./session.js").BranchSummaryEntry
   export type CheckpointAppend = import("./session.js").CheckpointAppend
-  export type CheckpointEntry = import("./session.js").CheckpointEntry
   export type CompactionEntry = import("./session.js").CompactionEntry
   export type Entry = import("./session.js").Entry
   export type EntryId = import("./session.js").EntryId
   export type HandoffEntry = import("./session.js").HandoffEntry
   export type Interface = import("./session.js").Interface
-  export type LegacyCompactionEntry = import("./session.js").LegacyCompactionEntry
   export type MemoryEntry = import("./session.js").MemoryEntry
   export type MessageEntry = import("./session.js").MessageEntry
   export type Metadata = import("./session.js").Metadata

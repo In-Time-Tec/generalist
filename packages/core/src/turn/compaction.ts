@@ -5,7 +5,7 @@ import { safeCutIndex } from "./compaction-cut.js"
 import { summaryLanguageModel, withCompactionLifecycle } from "./compaction-telemetry.js"
 import { makeThresholdState } from "./compaction-threshold-state.js"
 import { estimatePromptTokens } from "./prompt-token-estimate.js"
-import { type Entry, type EntryId, buildContext } from "../context/session.js"
+import { type Entry, buildContext } from "../context/session.js"
 import { makeSummaryModelProvider } from "../model/summary-model.js"
 import { type Success } from "../tools/tool-executor.js"
 import { bound } from "../tools/tool-output.js"
@@ -51,7 +51,6 @@ export interface Usage {
 
 /** @experimental What to keep verbatim and what the summary replaces. */
 export interface Plan {
-  readonly firstKeptEntryId: EntryId
   readonly head: ReadonlyArray<Entry>
   readonly recent: ReadonlyArray<Entry>
 }
@@ -87,7 +86,6 @@ export interface SummarizeResult {
   readonly history: Prompt.Prompt
   readonly prompt: Prompt.Prompt
   readonly summary: string
-  readonly firstKeptEntryId: EntryId
 }
 /** @experimental Compaction result applied by the agent loop. */
 export type Result = MicrocompactResult | SummarizeResult
@@ -278,9 +276,7 @@ export const defaultStrategy = (options: DefaultOptions = {}): Strategy => {
       if (index <= 0 || index >= entries.length) return Option.none()
       const recent = entries.slice(index)
       const first = recent[0]
-      return first === undefined
-        ? Option.none()
-        : Option.some({ firstKeptEntryId: first.id, head: entries.slice(0, index), recent })
+      return first === undefined ? Option.none() : Option.some({ head: entries.slice(0, index), recent })
     },
     summarize: (plan, request) => {
       const effect = Effect.gen(function* () {
@@ -455,7 +451,6 @@ const compact = (
       history: compactedHistory(summary, plan.value.head, compactedRecent),
       prompt,
       summary,
-      firstKeptEntryId: plan.value.firstKeptEntryId,
     })
   })
 

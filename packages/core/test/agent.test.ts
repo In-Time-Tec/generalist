@@ -3681,7 +3681,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                       history,
                       prompt: Prompt.empty,
                       summary: `summary-${compactions}`,
-                      firstKeptEntryId: "legacy-field-is-not-projection-authority",
                     },
               )
             }).pipe(Compaction.withLifecycle(request)),
@@ -3702,7 +3701,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(compactions).toBe(5)
         expect(checkpoints).toHaveLength(5)
         expect(new Set(checkpoints.map((entry) => entry.id)).size).toBe(5)
-        expect(checkpoints.every((entry) => entry._tag === "Compaction" && entry.version === 2)).toBe(true)
+        expect(checkpoints.every((entry) => entry._tag === "Compaction")).toBe(true)
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
           expect(Json.stringify(Session.buildContext(path).content)).toBe(Json.stringify(completed.transcript.content))
@@ -3744,7 +3743,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const path = yield* session.path()
         const completed = events.at(-1)
 
-        expect(path.some((entry) => entry._tag === "Compaction" && entry.version === 2)).toBe(true)
+        expect(path.some((entry) => entry._tag === "Compaction")).toBe(true)
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
           expect(Json.stringify(Session.buildContext(path).content)).toBe(Json.stringify(completed.transcript.content))
@@ -3904,7 +3903,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const path = yield* session.path()
         const completed = events.at(-1)
 
-        expect(path.some((entry) => entry._tag === "Compaction" && entry.version === 2)).toBe(true)
+        expect(path.some((entry) => entry._tag === "Compaction")).toBe(true)
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
           expect(Session.buildContext(path).content).toEqual(completed.transcript.content)
