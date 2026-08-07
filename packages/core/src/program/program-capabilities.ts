@@ -103,6 +103,12 @@ export class ProgramOperationUnknown extends Schema.TaggedErrorClass<ProgramOper
   { operation: ProgramOperationName },
 ) {}
 
+/** @experimental One decoded invocation failed with an implementation-specific error. */
+export class ProgramInvocationFailure extends Schema.TaggedErrorClass<ProgramInvocationFailure>()(
+  "@batonfx/core/ProgramInvocationFailure",
+  { cause: Schema.Unknown },
+) {}
+
 /** @experimental */
 export class ProgramSuspended extends Schema.TaggedErrorClass<ProgramSuspended>()("@batonfx/core/ProgramSuspended", {
   operation: ProgramOperationName,
