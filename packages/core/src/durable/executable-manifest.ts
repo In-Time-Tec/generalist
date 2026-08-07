@@ -153,7 +153,10 @@ export const make = (input: {
 }
 
 /** @experimental Canonical executable fixture for tests and non-running documentation examples. */
-export const makeTest = (name: string, revision = "1"): PinnedExecutable => {
+export const makeTest: {
+  (revision?: string): (name: string) => PinnedExecutable
+  (name: string, revision?: string): PinnedExecutable
+} = Function.dual(2, (name: string, revision = "1"): PinnedExecutable => {
   const agent = makeManifest({
     name,
     model: makeModel({ fixture: name, revision }),
@@ -166,7 +169,7 @@ export const makeTest = (name: string, revision = "1"): PinnedExecutable => {
     children: [],
   })
   return make({ root: agent.pin, entries: [{ _tag: "Agent", ...agent }] })
-}
+})
 
 /** @experimental Verify that a durable reference is exactly owned by a closure. */
 export const validateRef: {

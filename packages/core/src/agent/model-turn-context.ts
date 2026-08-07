@@ -3,6 +3,7 @@ import type { Chat, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import type { AgentRunState } from "./agent-run-state.js"
 import type { AgentError, Event } from "./agent-event.js"
 import type { AnyToolCall } from "./agent-tool-result.js"
+import type { HandoffCatalog } from "../policy/handoff-target.js"
 import type { DriverInterpreter } from "../durable/driver-interpreter.js"
 import type { HandoffRunState } from "./handoff-state.js"
 import type { RunError, ToolSchedulingPolicy } from "./agent.js"
@@ -58,5 +59,5 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
     call: AnyToolCall,
     messages: ReadonlyArray<Prompt.Message>,
     registry: Registry,
-  ) => Stream.Stream<Event, RunError, R | StaticToolServices<T>>
+  ) => Stream.Stream<Event, RunError, R | StaticToolServices<T> | HandoffCatalog | DriverInterpreter>
 }

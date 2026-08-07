@@ -1,6 +1,7 @@
 import { Cause, Channel, Effect, Exit, HashMap, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { DriverInterpreter } from "../durable/driver-interpreter.js"
+import type { HandoffCatalog } from "../policy/handoff-target.js"
 import { AgentError, type Event } from "./agent-event.js"
 import { coalesceAdjacentText } from "../context/session-sync.js"
 import { applyPartChain, applyPromptChain } from "./agent-message.js"
@@ -214,7 +215,11 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     overrides: TurnOverrides | undefined,
     agentName: string,
     toolScheduling: ToolSchedulingPolicy,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<T> | DriverInterpreter> => {
+  ): Stream.Stream<
+    Event,
+    RunError,
+    LanguageModel.LanguageModel | R | StaticToolServices<T> | DriverInterpreter | HandoffCatalog
+  > => {
     const instrumentTurnStream = <A, E>(
       stream: Stream.Stream<A, E, LanguageModel.LanguageModel | DriverInterpreter>,
     ): Stream.Stream<
@@ -291,115 +296,118 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                 nextIndex: 0,
                 firstIndexes: HashMap.empty(),
               }),
-          (toolCallIds) =>
-            Stream.unwrap(
-              Effect.gen(function* () {
-                const activeModel = yield* LanguageModel.LanguageModel
-                classifyFailure = (error) => classifyModelFailure(activeModel, error)
-                const prepared = yield* preparePrompt(turn, activePrompt, compactOverflow)
-                if (compactOverflow && !prepared.changed && overflowCause !== undefined) {
-                  return yield* Effect.failCause(overflowCause)
-                }
-                const coalescedContent = prepared.prompt.content.map(coalesceAdjacentText)
-                const preparedPrompt = coalescedContent.some(
-                  (message: Prompt.Message, index: number) => message !== prepared.prompt.content[index],
-                )
-                  ? Prompt.fromMessages(coalescedContent)
-                  : prepared.prompt
-                const history = yield* Ref.get(chat.history)
-                preparedState = { history, preparedPrompt }
-                const responsePrompt = Prompt.concat(history, preparedPrompt)
-                if (Option.isSome(compactionService)) {
-                  state.currentContext = responsePrompt
-                  state.currentContextTokens = yield* countTokens(turn, responsePrompt)
-                }
-                const messages = responsePrompt.content
-                const rawParts = LanguageModel.streamText({
-                  prompt: responsePrompt,
-                  toolkit: activeRegistry.toolkit,
-                  disableToolCallResolution: true,
-                }).pipe(
-                  Stream.mapEffect((part) =>
-                    part.type === "error"
-                      ? Effect.fail(
-                          isToolNameCollision(part.error)
-                            ? part.error
-                            : AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }),
-                        )
-                      : Effect.succeed(part),
-                  ),
-                  Stream.tap((part) =>
-                    part.type === "response-metadata"
-                      ? Effect.void
-                      : Effect.sync(() => {
-                          emitted = true
-                          captureProviderOutput(part)
-                        }),
-                  ),
-                  Stream.catchCause((cause): Stream.Stream<Response.StreamPart<Record<string, Tool.Any>>, RunError> => {
-                    if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
-                    if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
-                    const error = singleFailure(cause)
-                    if (Option.isNone(error)) return Stream.failCause(cause)
-                    if (
-                      Schema.is(AgentError)(error.value) ||
-                      isToolNameCollision(error.value) ||
-                      isInvalidToolCallParameters(error.value)
-                    ) {
-                      return Stream.fail(error.value)
+              (toolCallIds) =>
+                Stream.unwrap(
+                  Effect.gen(function* () {
+                    const activeModel = yield* LanguageModel.LanguageModel
+                    classifyFailure = (error) => classifyModelFailure(activeModel, error)
+                    const prepared = yield* preparePrompt(turn, activePrompt, compactOverflow)
+                    if (compactOverflow && !prepared.changed && overflowCause !== undefined) {
+                      return yield* Effect.failCause(overflowCause)
                     }
-                    return Stream.make(Response.makePart("error", { error: error.value }))
-                  }),
-                )
-                return rawParts.pipe(
-                  Stream.mapEffect((part) => transformPart(turn, activeRegistry.toolkit, part)),
-                  Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
-                  Stream.map((part) => ({
-                    part,
-                    messages,
-                    accept: validateToolCallId(toolCallIds, part).pipe(
-                      Effect.andThen(
-                        Effect.sync(() => {
-                          transformedParts.push(part)
-                        }),
+                    const coalescedContent = prepared.prompt.content.map(coalesceAdjacentText)
+                    const preparedPrompt = coalescedContent.some(
+                      (message: Prompt.Message, index: number) => message !== prepared.prompt.content[index],
+                    )
+                      ? Prompt.fromMessages(coalescedContent)
+                      : prepared.prompt
+                    const history = yield* Ref.get(chat.history)
+                    preparedState = { history, preparedPrompt }
+                    const responsePrompt = Prompt.concat(history, preparedPrompt)
+                    if (Option.isSome(compactionService)) {
+                      state.currentContext = responsePrompt
+                      state.currentContextTokens = yield* countTokens(turn, responsePrompt)
+                    }
+                    const messages = responsePrompt.content
+                    const rawParts = LanguageModel.streamText({
+                      prompt: responsePrompt,
+                      toolkit: activeRegistry.toolkit,
+                      disableToolCallResolution: true,
+                    }).pipe(
+                      Stream.mapEffect((part) =>
+                        part.type === "error"
+                          ? Effect.fail(
+                              isToolNameCollision(part.error)
+                                ? part.error
+                                : AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }),
+                            )
+                          : Effect.succeed(part),
                       ),
+                      Stream.tap((part) =>
+                        part.type === "response-metadata"
+                          ? Effect.void
+                          : Effect.sync(() => {
+                              emitted = true
+                              captureProviderOutput(part)
+                            }),
+                      ),
+                      Stream.catchCause(
+                        (cause): Stream.Stream<Response.StreamPart<Record<string, Tool.Any>>, RunError> => {
+                          if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
+                          if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
+                          const error = singleFailure(cause)
+                          if (Option.isNone(error)) return Stream.failCause(cause)
+                          if (
+                            Schema.is(AgentError)(error.value) ||
+                            isToolNameCollision(error.value) ||
+                            isInvalidToolCallParameters(error.value)
+                          ) {
+                            return Stream.fail(error.value)
+                          }
+                          return Stream.make(Response.makePart("error", { error: error.value }))
+                        },
+                      ),
+                    )
+                    return rawParts.pipe(
+                      Stream.mapEffect((part) => transformPart(turn, activeRegistry.toolkit, part)),
+                      Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
+                      Stream.map((part) => ({
+                        part,
+                        messages,
+                        accept: validateToolCallId(toolCallIds, part).pipe(
+                          Effect.andThen(
+                            Effect.sync(() => {
+                              transformedParts.push(part)
+                            }),
+                          ),
+                        ),
+                      })),
+                      Stream.concat(
+                        Stream.fromEffect(
+                          Effect.sync(() => {
+                            completed = true
+                          }),
+                        ).pipe(Stream.drain),
+                      ),
+                    )
+                  }),
+                ).pipe(Stream.toChannel),
+              (_toolCallIds, exit: Exit.Exit<unknown, RunError>) =>
+                preparedState === undefined ||
+                !completed ||
+                (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
+                  ? Effect.void
+                  : Effect.suspend(() => {
+                      state.text = `${state.text}${attemptText(transformedParts)}`
+                      return Ref.set(
+                        chat.history,
+                        Prompt.concat(
+                          Prompt.concat(preparedState!.history, preparedState!.preparedPrompt),
+                          Prompt.fromMessages(
+                            Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText),
+                          ),
+                        ),
+                      )
+                    }).pipe(
+                      Effect.andThen(chargeAttemptUsageWith(interpreter, state)),
+                      Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
+                      Effect.orDie,
+                      Effect.asVoid,
                     ),
-                  })),
-                  Stream.concat(
-                    Stream.fromEffect(
-                      Effect.sync(() => {
-                        completed = true
-                      }),
-                    ).pipe(Stream.drain),
-                  ),
-                )
-              }),
-            ).pipe(Stream.toChannel),
-          (_toolCallIds, exit: Exit.Exit<unknown, RunError>) =>
-            preparedState === undefined ||
-            !completed ||
-            (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
-              ? Effect.void
-              : Effect.suspend(() => {
-                  state.text = `${state.text}${attemptText(transformedParts)}`
-                  return Ref.set(
-                    chat.history,
-                    Prompt.concat(
-                      Prompt.concat(preparedState!.history, preparedState!.preparedPrompt),
-                      Prompt.fromMessages(Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText)),
-                    ),
-                  )
-                }).pipe(
-                  Effect.andThen(chargeAttemptUsageWith(interpreter, state)),
-                  Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
-                  Effect.orDie,
-                  Effect.asVoid,
-                ),
             ),
           )
-        })
-      )
-      .pipe(
+        }),
+      ).pipe(
         Stream.catchCause((cause) => {
           if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
           if (retryableOverflow(cause, emitted)) {

@@ -35,7 +35,13 @@ export const PinnedExecutable: Schema.Codec<PinnedExecutable, PinnedExecutableEn
 /** @experimental Construct, validate, canonicalize, and pin a complete executable closure. */
 export const make: typeof CoreExecutableManifest.make = CoreExecutableManifest.make
 /** @experimental Construct an exact static executable fixture. */
-export const makeTest: typeof CoreExecutableManifest.makeTest = CoreExecutableManifest.makeTest
+export const makeTest: {
+  (revision?: string): (name: string) => CoreExecutableManifest.PinnedExecutable
+  (name: string, revision?: string): CoreExecutableManifest.PinnedExecutable
+} = Function.dual(
+  2,
+  CoreExecutableManifest.makeTest as (name: string, revision?: string) => CoreExecutableManifest.PinnedExecutable,
+)
 /** @experimental Verify that a durable reference is exactly owned by a closure. */
 export const validateRef: {
   (manifest: ExecutableManifest): (ref: ExecutableRef) => void

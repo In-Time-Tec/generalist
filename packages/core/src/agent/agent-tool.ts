@@ -13,7 +13,7 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import { TurnPolicyError } from "../turn/turn-policy.js"
-import { reserveChildBudget, refundChildBudget } from "../durable/driver-run.js"
+import {} from "../durable/driver-run.js"
 import { DriverInterpreter } from "../durable/driver-interpreter.js"
 import { RunBudgetExhausted, RunBudgetGrantWidened, type RunBudget } from "../durable/run-budget.js"
 import { RegistrationError, type Registration } from "../policy/handoff.js"
@@ -212,18 +212,20 @@ export const asTool: {
           return yield* resultFor(options.success, options.fromResult, result)
         }
         const grant = "budget" in agent && agent.budget !== undefined ? agent.budget : {}
-        const childBudget = yield* reserveChildBudget(grant).pipe(
-          Effect.mapError((error) =>
-            Schema.is(RunBudgetExhausted)(error) || Schema.is(RunBudgetGrantWidened)(error)
-              ? errorMessage(error)
-              : errorMessage(error),
-          ),
-        )
+        const childBudget = yield* interpreter.value
+          .reserveChild(grant)
+          .pipe(
+            Effect.mapError((error) =>
+              Schema.is(RunBudgetExhausted)(error) || Schema.is(RunBudgetGrantWidened)(error)
+                ? errorMessage(error)
+                : errorMessage(error),
+            ),
+          )
         const result = yield* runChild({ prompt, inheritedBudget: childBudget }).pipe(
-          Effect.ensuring(refundChildBudget(childBudget)),
+          Effect.ensuring(interpreter.value.refundChild(childBudget)),
         )
         return yield* resultFor(options.success, options.fromResult, result)
-      }) as Effect.Effect<unknown, string, R>
+      })
     const tool: Tool.Any = Tool.make(name, {
       ...(options.description === undefined ? {} : { description: options.description }),
       parameters,

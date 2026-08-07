@@ -7751,7 +7751,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ),
     Effect.gen(function* () {
       const agent = Agent.make({ name: "checkpoint-identity-agent" })
-      const executable = ExecutableManifest.makeTest("checkpoint-identity-agent")
+      const executable = ExecutableManifest.makeTest("checkpoint-identity-agent", undefined)
       const budget = RunBudget.allocate({})
       const checkpoint: DurableDriver.DriverCheckpoint = {
         driverVersion: DurableDriver.currentDriverVersion,
@@ -7791,7 +7791,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ),
     Effect.gen(function* () {
       const agent = Agent.make({ name: "journal-restart-agent" })
-      const executable = ExecutableManifest.makeTest("journal-restart-agent")
+      const executable = ExecutableManifest.makeTest("journal-restart-agent", undefined)
       let pending: DurableDriver.DriverCheckpoint | undefined
       const crashingJournal: DurableDriver.DriverJournal = {
         onScheduled: (operation, checkpoint) =>

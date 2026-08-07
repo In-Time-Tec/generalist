@@ -282,7 +282,7 @@ describe("executable identity", () => {
       expect(yield* ExecutableManifest.decode(roundTrip(executable))).toEqual(executable)
       const wrongExecutable = {
         ...executable,
-        ref: { ...executable.ref, executable: ExecutableManifest.makeTest("wrong").ref.executable },
+        ref: { ...executable.ref, executable: ExecutableManifest.makeTest("wrong", undefined).ref.executable },
       }
       yield* ExecutableManifest.decode(wrongExecutable).pipe(Effect.flip)
       const altered = {

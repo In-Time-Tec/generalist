@@ -1,6 +1,7 @@
 import { type Effect, type Option, type Ref, type Schema, type Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import type { AgentError, AgentSuspended, Event, SteeringDrained } from "./agent-event.js"
+import type { HandoffCatalog } from "../policy/handoff-target.js"
 import type { DriverInterpreter } from "../durable/driver-interpreter.js"
 import type { Agent, RunError } from "./agent.js"
 import type { PendingToolResult, AnyToolCall } from "./agent-tool-result.js"
@@ -52,7 +53,11 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     prompt: Prompt.RawInput,
     registry: Registry,
     overrides?: TurnOverrides,
-  ) => Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<Tools> | DriverInterpreter>
+  ) => Stream.Stream<
+    Event,
+    RunError,
+    LanguageModel.LanguageModel | R | StaticToolServices<Tools> | DriverInterpreter | HandoffCatalog
+  >
   readonly captureStructuredUsage: (
     content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
   ) => Effect.Effect<void>
@@ -97,14 +102,14 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     call: AnyToolCall,
     messages: ReadonlyArray<Prompt.Message>,
     registry: Registry,
-  ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools>>
+  ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools> | HandoffCatalog | DriverInterpreter>
   readonly resumeApproved: (
     turn: number,
     batch: Request["toolCallBatch"],
     index: number,
     call: AnyToolCall,
     registry: Registry,
-  ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools>>
+  ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools> | HandoffCatalog | DriverInterpreter>
   readonly rememberTurn: (
     turn: number,
     transcript: Prompt.Prompt,

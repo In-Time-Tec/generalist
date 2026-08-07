@@ -375,11 +375,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       applyCompactionResultBody(turn, result, parentId, commitData, onCommitted),
     )
   }
-  const preparePrompt = (
-    turn: number,
-    prompt: Prompt.Prompt,
-    overflow: boolean,
-  ) =>
+  const preparePrompt = (turn: number, prompt: Prompt.Prompt, overflow: boolean) =>
     Option.match(compactionService, {
       onNone: () => Effect.succeed({ prompt, changed: false }),
       onSome: (compaction) =>
@@ -487,10 +483,6 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             ),
           )
         }),
-    }) as Effect.Effect<
-      { readonly prompt: Prompt.Prompt; readonly changed: boolean },
-      RunError,
-      LanguageModel.LanguageModel
-    >
+    })
   return { preparePrompt, applyCompactionResult, compactionUsage, countTokens, syncSession }
 }
