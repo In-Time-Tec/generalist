@@ -6,7 +6,6 @@ import { Agent, ExecutableManifest, Pins, ProgramManifest } from "@batonfx/core"
 import { Errors, ExecutableRegistration, RunStore, RunTree, Runtime, RunWait } from "../src/index.js"
 import { makeCursor, type TreeCursor } from "../src/tree-cursor.js"
 import {
-
   analystRef,
   assistantAddress,
   assistantRef,

@@ -16,7 +16,7 @@ type BroadGenerateError = LanguageModel.ExtractError<LanguageModel.GenerateTextO
 type BroadGenerateObjectError = LanguageModel.ExtractError<BroadGenerateObjectOptions>
 
 type SchemaServices<S extends Schema.Encoder<Record<string, Tool.Any>, unknown>> = [unknown] extends [
-  S["DecodingServices"]
+  S["DecodingServices"],
 ]
   ? never
   : S["DecodingServices"]

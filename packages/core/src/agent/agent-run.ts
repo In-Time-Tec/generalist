@@ -1,5 +1,5 @@
 import { Effect, Equal, Function, Layer, Option, Ref, Schema, Stream } from "effect"
-import { Prompt, Tool } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, type Event } from "./agent-event.js"
 import { type Item, type MemoryError, messageFromRecall, projectTranscript } from "../context/memory.js"
 import {
@@ -33,9 +33,14 @@ import { resolve as resolveRunBudget } from "../durable/run-budget.js"
 import { operationKey } from "../durable/driver-interpreter.js"
 import { intercept, bindResume, setHandoffState } from "../durable/driver-run.js"
 import { makeHandoffStateRef, takePendingContinuation } from "./handoff-state.js"
-import type { ObjectSchema, StructuredRunConfig } from "./run-loop-context.js"
+import type { ObjectSchema, SchemaServicesD, StaticToolServices, StructuredRunConfig } from "./run-loop-context.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
-type RunStream<S extends ObjectSchema, R> = Stream.Stream<Event, RunError, R | S["DecodingServices"]>
+
+type RunStream<Tools extends Record<string, Tool.Any>, S extends ObjectSchema, R> = Stream.Stream<
+  Event,
+  RunError,
+  R | LanguageModel.LanguageModel | StaticToolServices<Tools> | SchemaServicesD<S>
+>
 const errorMessage = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error))
 const isToolNameCollision = Schema.is(ToolNameCollision)
 const isTurnPolicyDecision = (input: unknown): input is Decision => {
@@ -52,7 +57,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
   agent: Agent<Tools, R>,
   options: RunOptions,
   structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
-): RunStream<StructuredOutputSchema, R> =>
+): RunStream<Tools, StructuredOutputSchema, R> =>
   Stream.unwrap(
     Effect.gen(function* () {
       if (options.history !== undefined && options.persistence !== undefined) {
@@ -268,8 +273,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
                 }),
           ),
         )
-      if (validatedResume !== undefined)
-        yield* Ref.get(chat.history).pipe(Effect.flatMap(restoreActivatedSkills))
+      if (validatedResume !== undefined) yield* Ref.get(chat.history).pipe(Effect.flatMap(restoreActivatedSkills))
       const activeSession = Option.isSome(compactionService)
         ? sessionService
         : Option.none<typeof SessionStore.Service>()
@@ -481,10 +485,10 @@ export const streamInternal: {
   <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
     options: RunOptions,
     structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
-  ): (agent: Agent<Tools, R>) => RunStream<StructuredOutputSchema, R>
+  ): (agent: Agent<Tools, R>) => RunStream<Tools, StructuredOutputSchema, R>
   <Tools extends Record<string, Tool.Any>, R, StructuredOutputSchema extends ObjectSchema>(
     agent: Agent<Tools, R>,
     options: RunOptions,
     structured: StructuredRunConfig<StructuredOutputSchema> | undefined,
-  ): RunStream<StructuredOutputSchema, R>
+  ): RunStream<Tools, StructuredOutputSchema, R>
 } = Function.dual(3, streamInternalImpl)

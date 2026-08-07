@@ -23,7 +23,9 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ToolContext extends Context.Service<ToolContext, Interface>()("@batonfx/core/tools/tool-context/ToolContext") {}
+export class ToolContext extends Context.Service<ToolContext, Interface>()(
+  "@batonfx/core/tools/tool-context/ToolContext",
+) {}
 
 /** @experimental */
 export const layerDefault: Layer.Layer<ToolContext> = Layer.sync(ToolContext, () =>

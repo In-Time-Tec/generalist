@@ -1,4 +1,4 @@
-import { Effect, Function, Ref } from "effect"
+import { Effect, Function, Option, Ref } from "effect"
 import { Chat } from "effect/unstable/ai"
 import type { AnyToolCall } from "./agent-tool-result.js"
 import type { RunOptions } from "./agent.js"
@@ -23,7 +23,7 @@ export const runHandoffTool = (input: {
 }): Effect.Effect<
   Outcome,
   import("./agent.js").RunError,
-  HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+  import("../durable/driver-interpreter.js").DriverInterpreter
 > =>
   Effect.gen(function* () {
     const meta = lookupHandoffToolMeta(input.call.name)
@@ -34,8 +34,16 @@ export const runHandoffTool = (input: {
         message: `Handoff metadata missing for ${input.call.name}`,
       })
     }
-    yield* HandoffCatalog
+    const catalog = yield* Effect.serviceOption(HandoffCatalog)
+    if (Option.isNone(catalog)) {
+      return yield* FrameworkFailure.make({
+        stage: "missing-handler",
+        tool: input.call.name,
+        message: `Handoff catalog missing for ${input.call.name}`,
+      })
+    }
     const accepted = yield* executeSameRunHandoff({
+      catalog: catalog.value,
       turn: input.turn,
       toolCallId: input.call.id,
       specialist: meta.specialist,
@@ -71,7 +79,7 @@ export const handoffDispatch: {
     | Effect.Effect<
         Outcome,
         FrameworkFailure | import("./agent.js").RunError,
-        HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+        import("../durable/driver-interpreter.js").DriverInterpreter
       >
     | undefined
   (
@@ -91,7 +99,7 @@ export const handoffDispatch: {
     | Effect.Effect<
         Outcome,
         FrameworkFailure | import("./agent.js").RunError,
-        HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+        import("../durable/driver-interpreter.js").DriverInterpreter
       >
     | undefined
 } = Function.dual(
@@ -113,7 +121,7 @@ export const handoffDispatch: {
     | Effect.Effect<
         Outcome,
         FrameworkFailure | import("./agent.js").RunError,
-        HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+        import("../durable/driver-interpreter.js").DriverInterpreter
       >
     | undefined => {
     const registered = get(registry, request.call.name)

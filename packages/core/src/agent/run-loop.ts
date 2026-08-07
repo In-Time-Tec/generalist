@@ -24,7 +24,14 @@ import { resolvedToolResult, type SuspensionCheckpoint } from "./agent-suspensio
 import type { ResumeResolution, RunError } from "./agent.js"
 import type { Input } from "../turn/steering.js"
 import { applyPromptChain, errorMessage, providerOutputState } from "./agent-message.js"
-import type { ObjectSchema, RunLoopContext, StructuredRunConfig } from "./run-loop-context.js"
+import type {
+  LoopServices,
+  ObjectSchema,
+  RunLoopContext,
+  SchemaServicesD,
+  StructuredRunConfig,
+  TurnServices,
+} from "./run-loop-context.js"
 import type { Request } from "../tools/tool-executor.js"
 import { select } from "../tools/tool-registry.js"
 import {
@@ -47,7 +54,7 @@ export const makeRunLoop = <
   StructuredOutputSchema extends ObjectSchema = ObjectSchema,
 >(
   context: RunLoopContext<Tools, R, StructuredOutputSchema>,
-): Stream.Stream<Event, RunError, R | StructuredOutputSchema["DecodingServices"]> => {
+): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
   const {
     agent,
     options,
@@ -84,7 +91,7 @@ export const makeRunLoop = <
   const structuredFinalEvents = (
     structuredTurn: number,
     config: StructuredRunConfig<StructuredOutputSchema>,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> =>
+  ): Stream.Stream<Event, RunError, TurnServices<StructuredOutputSchema>> =>
     Stream.fromEffect(
       Effect.gen(function* () {
         const transformedPrompt = yield* applyPromptChain(chain, Prompt.make(config.objectPrompt), {
@@ -178,7 +185,7 @@ export const makeRunLoop = <
       readonly events: Stream.Stream<
         Event,
         RunError,
-        LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
+        LanguageModel.LanguageModel | SchemaServicesD<StructuredOutputSchema>
       >
       readonly next?: {
         readonly prompt: Prompt.RawInput
@@ -274,9 +281,8 @@ export const makeRunLoop = <
       let continuationOverrides = decision.overrides
       let continuationPrompt = basePrompt
       if (handoffStateRef !== undefined) {
-        const pendingContinuation = yield* takePendingContinuation(
-          handoffStateRef,
-          (handoff) => setHandoffState(handoff),
+        const pendingContinuation = yield* takePendingContinuation(handoffStateRef, (handoff) =>
+          setHandoffState(handoff),
         )
         if (pendingContinuation !== undefined) {
           continuationPrompt =
@@ -314,7 +320,7 @@ export const makeRunLoop = <
     turn: number,
     prompt: Prompt.RawInput,
     overrides?: TurnOverrides,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> => {
+  ): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
     let next:
       | {
           readonly prompt: Prompt.RawInput
@@ -356,7 +362,7 @@ export const makeRunLoop = <
   }
   const resumeStream = (
     checkpoint: SuspensionCheckpoint,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> => {
+  ): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
     let next:
       | {
           readonly prompt: Prompt.RawInput

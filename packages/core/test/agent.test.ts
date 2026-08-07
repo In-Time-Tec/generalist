@@ -313,6 +313,8 @@ const modelLayer = (
     }),
   )
 
+const unusedModelLayer = modelLayer(() => Stream.make(textDelta("unused")))
+
 class Budget extends Context.Service<Budget, { readonly remaining: (turn: number) => number }>()(
   "@batonfx/core/test/agent.test/Budget",
 ) {}
@@ -1046,7 +1048,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             provider: "test",
             model: "agent-default",
             layer: modelLayer(() => Stream.make(textDelta("registry done"))),
-          }).pipe(Effect.map((registration) => ModelRegistry.layer([Effect.succeed(registration)]))),
+          }).pipe(
+            Effect.map((registration) =>
+              Layer.mergeAll(ModelRegistry.layer([Effect.succeed(registration)]), unusedModelLayer),
+            ),
+          ),
         ),
         Effect.gen(function* () {
           const agent = Agent.make({
@@ -1105,6 +1111,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               unusedExecutor,
               Approvals.layerAutoApprove,
               ModelMiddleware.layerIdentity,
+              unusedModelLayer,
             ),
           ),
         ),
@@ -4027,6 +4034,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const session = yield* Session.SessionStore
@@ -4083,6 +4091,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "fallback-overflow-agent", model: overflowSelection })
@@ -4134,6 +4143,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "error-part-overflow-agent", model: overflowSelection })
@@ -4168,6 +4178,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reactive-compaction-fail-agent", model: overflowSelection })
@@ -4198,6 +4209,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "partial-overflow-agent", model: overflowSelection })
@@ -4235,6 +4247,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         }),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -4267,6 +4280,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "unchanged-overflow-agent", model: overflowSelection })
@@ -4295,6 +4309,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "terminal-overflow-agent", model: overflowSelection })
@@ -5960,6 +5975,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         Approvals.layerAutoApprove,
         ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "terminal-structured-overflow-agent", model: overflowSelection })
@@ -6250,6 +6266,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           classify: (error) => (error === overrideFailure ? "transient" : "terminal"),
         }),
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({

@@ -80,7 +80,9 @@ export interface Interface {
 }
 
 /** @experimental */
-export class McpToolSource extends Context.Service<McpToolSource, Interface>()("@batonfx/mcp/mcp/mcp-tool-source/McpToolSource") {}
+export class McpToolSource extends Context.Service<McpToolSource, Interface>()(
+  "@batonfx/mcp/mcp/mcp-tool-source/McpToolSource",
+) {}
 
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)

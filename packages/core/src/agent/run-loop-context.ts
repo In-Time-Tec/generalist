@@ -1,7 +1,6 @@
 import { type Effect, type Option, type Ref, type Schema, type Stream } from "effect"
 import type { Chat, LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import type { AgentError, AgentSuspended, Event, SteeringDrained } from "./agent-event.js"
-import type { HandoffCatalog } from "../policy/handoff-target.js"
 import type { DriverInterpreter } from "../durable/driver-interpreter.js"
 import type { Agent, RunError } from "./agent.js"
 import type { PendingToolResult, AnyToolCall } from "./agent-tool-result.js"
@@ -25,9 +24,25 @@ export interface StructuredRunConfig<S extends ObjectSchema> {
   readonly objectName: string
   readonly objectPrompt: Prompt.RawInput
 }
+/** @experimental Decoding services a structured-output schema requires, with an unconstrained schema contributing none. */
+export type SchemaServicesD<S extends ObjectSchema> = [unknown] extends [S["DecodingServices"]]
+  ? never
+  : S["DecodingServices"]
 export type StaticToolServices<T extends Record<string, Tool.Any>> =
   | Tool.HandlersFor<T>
   | Exclude<Tool.HandlerServices<T[keyof T]>, ToolContext>
+
+/** @experimental Every service one run loop turn requires. */
+export type LoopServices<Tools extends Record<string, Tool.Any>, R, S extends ObjectSchema> =
+  | R
+  | LanguageModel.LanguageModel
+  | StaticToolServices<Tools>
+  | SchemaServicesD<S>
+  | DriverInterpreter
+
+/** @experimental Every service one model turn requires. */
+export type TurnServices<S extends ObjectSchema> = LanguageModel.LanguageModel | SchemaServicesD<S> | DriverInterpreter
+
 export type ToolState = {
   readonly registry: Registry
   readonly activatedSkillBodies: Map<string, string>
@@ -53,11 +68,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     prompt: Prompt.RawInput,
     registry: Registry,
     overrides?: TurnOverrides,
-  ) => Stream.Stream<
-    Event,
-    RunError,
-    LanguageModel.LanguageModel | R | StaticToolServices<Tools> | DriverInterpreter | HandoffCatalog
-  >
+  ) => Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<Tools> | DriverInterpreter>
   readonly captureStructuredUsage: (
     content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
   ) => Effect.Effect<void>
@@ -102,14 +113,14 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     call: AnyToolCall,
     messages: ReadonlyArray<Prompt.Message>,
     registry: Registry,
-  ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools> | HandoffCatalog | DriverInterpreter>
+  ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools> | DriverInterpreter>
   readonly resumeApproved: (
     turn: number,
     batch: Request["toolCallBatch"],
     index: number,
     call: AnyToolCall,
     registry: Registry,
-  ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools> | HandoffCatalog | DriverInterpreter>
+  ) => Stream.Stream<Event, RunError, R | StaticToolServices<Tools> | DriverInterpreter>
   readonly rememberTurn: (
     turn: number,
     transcript: Prompt.Prompt,

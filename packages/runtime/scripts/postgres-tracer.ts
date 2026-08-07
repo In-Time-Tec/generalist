@@ -3,7 +3,6 @@ import { RunClaims, Runtime } from "../src/index.js"
 import { assistantAddress, completedResult, textPrompt } from "../test/helpers.js"
 import { postgresLayer, postgresUrl, preparePostgres, uniqueSession } from "../test/postgres/helpers.js"
 
-
 const url = postgresUrl
 if (url === undefined || url.length === 0) {
   throw new Error("Set BATON_DATABASE_URL or DATABASE_URL to run the postgres tracer")

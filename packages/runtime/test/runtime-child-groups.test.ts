@@ -252,11 +252,7 @@ it.live("persists one ordered child-group suspension and result across SQLite re
           )
           expect(result.children.map((child) => child.key)).toEqual(["first", "second", "third"])
           expect(result.children.map((child) => child.status)).toEqual(["succeeded", "failed", "succeeded"])
-          expect(result.children.map((child) => child.text)).toEqual([
-            "first persisted",
-            undefined,
-            "third persisted",
-          ])
+          expect(result.children.map((child) => child.text)).toEqual(["first persisted", undefined, "third persisted"])
           const replay = yield* children.awaitGroup({
             parentRunId: admitted.parentRunId,
             toolCallId: "sqlite-await",

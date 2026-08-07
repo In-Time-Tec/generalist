@@ -328,19 +328,17 @@ export const make = (input: {
 export const withTool: {
   (
     implementation: Interface,
-  ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent.Agent<Tools, R>,
-  ) => Agent.Agent<Record<string, Tool.Any>, R>
+  ): <Tools extends Record<string, Tool.Any>, R>(agent: Agent.Agent<Tools, R>) => Agent.Agent<Tools, R>
   <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent.Agent<Tools, R>,
     implementation: Interface,
-  ): Agent.Agent<Record<string, Tool.Any>, R>
+  ): Agent.Agent<Tools, R>
 } = Function.dual(
   2,
   <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent.Agent<Tools, R>,
     implementation: Interface,
-  ): Agent.Agent<Record<string, Tool.Any>, R> => Agent.withTools(agent, [implementation.tool]),
+  ): Agent.Agent<Tools, R> => Agent.withTools(agent, [implementation.tool]),
 )
 
 /** @experimental Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */

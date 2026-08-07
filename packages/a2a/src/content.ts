@@ -18,9 +18,7 @@ export const decode = (message: Message): Effect.Effect<Prompt.Prompt, MessageRe
     if (part.content?.$case === "data" && part.mediaType === "application/json") {
       return Schema.encodeEffect(Schema.UnknownFromJsonString)(part.content!.value).pipe(
         Effect.map((text) => Prompt.makePart("text", { text })),
-        Effect.mapError((cause) =>
-          reject(`application/json part is not serializable: ${cause.message}`, index),
-        ),
+        Effect.mapError((cause) => reject(`application/json part is not serializable: ${cause.message}`, index)),
       )
     }
     return Effect.fail(reject(`unsupported message part or media type '${part.mediaType}'`, index))

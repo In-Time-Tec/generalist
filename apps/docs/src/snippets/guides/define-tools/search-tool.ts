@@ -4,7 +4,9 @@ export interface DocsIndexInterface {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<string>>
 }
 
-export class DocsIndex extends Context.Service<DocsIndex, DocsIndexInterface>()("@batonfx/docs/snippets/guides/define-tools/search-tool/DocsIndex") {}
+export class DocsIndex extends Context.Service<DocsIndex, DocsIndexInterface>()(
+  "@batonfx/docs/snippets/guides/define-tools/search-tool/DocsIndex",
+) {}
 
 export const searchDocsTool = Tool.make("search_docs", {
   description: "Search the documentation index and return matching page titles",

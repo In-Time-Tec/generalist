@@ -301,7 +301,9 @@ export const program = Effect.gen(function* () {
           if (argument === "generate") {
             yield* fileSystem.makeDirectory(path.dirname(graphPath), { recursive: true })
             yield* fileSystem.writeFileString(graphPath, serialized)
-            yield* Console.log(`repository graph generated (${graph.files.length} files, ${graph.imports.length} imports)`)
+            yield* Console.log(
+              `repository graph generated (${graph.files.length} files, ${graph.imports.length} imports)`,
+            )
             return
           }
           if (argument === "check") {
@@ -328,7 +330,9 @@ export const program = Effect.gen(function* () {
                   : [...(packageEdges.get(packageName) ?? [])]
                 : packageName === undefined
                   ? graph.imports.filter((edge) => edge.target === value).map((edge) => edge.source)
-                  : graph.packages.filter((node) => packageEdges.get(node.name)?.has(packageName)).map((node) => node.name)
+                  : graph.packages
+                      .filter((node) => packageEdges.get(node.name)?.has(packageName))
+                      .map((node) => node.name)
             yield* printList(argument, result.toSorted())
             return
           }
@@ -336,9 +340,14 @@ export const program = Effect.gen(function* () {
             if (value === undefined) return yield* graphError("query requires a path, package, or import substring")
             const matches = [
               ...graph.files.map((file) => file.path).filter((file) => file.includes(value)),
-              ...graph.packages.filter((node) => node.name.includes(value) || node.path.includes(value)).map((node) => node.name),
+              ...graph.packages
+                .filter((node) => node.name.includes(value) || node.path.includes(value))
+                .map((node) => node.name),
               ...graph.imports
-                .filter((edge) => edge.source.includes(value) || edge.specifier.includes(value) || edge.target?.includes(value))
+                .filter(
+                  (edge) =>
+                    edge.source.includes(value) || edge.specifier.includes(value) || edge.target?.includes(value),
+                )
                 .map((edge) => `${edge.source} -> ${edge.specifier}`),
             ].toSorted()
             yield* printList("query", [...new Set(matches)])
@@ -349,7 +358,9 @@ export const program = Effect.gen(function* () {
             const packageName = packageForArgument(value)
             const result = graph.relationships
               .filter((relationship) =>
-                packageName === undefined ? relationship.source === value : ownerOf(relationship.source) === packageName,
+                packageName === undefined
+                  ? relationship.source === value
+                  : ownerOf(relationship.source) === packageName,
               )
               .map((relationship) => relationship.test)
             yield* printList("tests", result.toSorted())
@@ -377,5 +388,3 @@ export const program = Effect.gen(function* () {
     { version: "0.13.0" },
   )
 })
-
-

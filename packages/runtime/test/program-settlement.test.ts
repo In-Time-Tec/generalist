@@ -27,25 +27,22 @@ const contracts = programSettledReplayContract.pipe(
   Effect.andThen(programCancellationFenceContract),
 )
 
-layer(Runtime.layerMemory(address(memory.resolver)))(
-  "fences stale Program settlement in memory and SQLite",
-  (it) => {
-    it.effect("fences stale Program settlement in memory and SQLite", () =>
-      contracts.pipe(
-        Effect.andThen(
-          Effect.scoped(
-            Effect.flatMap(
-              Layer.build(
-                Runtime.layerSqlite({
-                  ...address(sqlite.resolver),
-                  filename: tempDbPath("program-settlement-contract"),
-                }),
-              ),
-              (context) => contracts.pipe(Effect.provideContext(context)),
+layer(Runtime.layerMemory(address(memory.resolver)))("fences stale Program settlement in memory and SQLite", (it) => {
+  it.effect("fences stale Program settlement in memory and SQLite", () =>
+    contracts.pipe(
+      Effect.andThen(
+        Effect.scoped(
+          Effect.flatMap(
+            Layer.build(
+              Runtime.layerSqlite({
+                ...address(sqlite.resolver),
+                filename: tempDbPath("program-settlement-contract"),
+              }),
             ),
+            (context) => contracts.pipe(Effect.provideContext(context)),
           ),
         ),
       ),
-    )
-  },
-)
+    ),
+  )
+})

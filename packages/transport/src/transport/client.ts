@@ -1,4 +1,18 @@
-import { Cause, Context, Deferred, Effect, Fiber, Layer, Option, Queue, Ref, Schedule, Scope, Schema, Stream } from "effect"
+import {
+  Cause,
+  Context,
+  Deferred,
+  Effect,
+  Fiber,
+  Layer,
+  Option,
+  Queue,
+  Ref,
+  Schedule,
+  Scope,
+  Schema,
+  Stream,
+} from "effect"
 import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
@@ -43,7 +57,9 @@ export interface Interface {
 }
 
 /** @experimental */
-export class RunClient extends Context.Service<RunClient, Interface>()("@batonfx/transport/transport/client/RunClient") {}
+export class RunClient extends Context.Service<RunClient, Interface>()(
+  "@batonfx/transport/transport/client/RunClient",
+) {}
 
 const transportError = (message: string, kind?: TransportError["kind"]): TransportError =>
   TransportError.make(kind === undefined ? { message } : { message, kind })

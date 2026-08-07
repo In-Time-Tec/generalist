@@ -29,25 +29,32 @@ export class RegistrationError extends Schema.TaggedErrorClass<RegistrationError
   cause: Schema.Unknown,
 }) {}
 
-export interface Registration {
+export interface Registration<Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never> {
   readonly name: string
   readonly run: <O extends RunOptions>(
     options: O,
-  ) => Effect.Effect<RunResult<O>, RunError | RegistrationError, RunRequirements<never, O>>
-  readonly requirements: (value: never) => never
+  ) => Effect.Effect<
+    RunResult<O>,
+    RunError | RegistrationError,
+    Exclude<Exclude<RunRequirements<Tools, R, O>, R>, import("effect/Scope").Scope>
+  >
+  readonly requirements: (value: R) => R
 }
 
 export const register: {
   <R, E>(
     layer: Layer.Layer<R, E, never>,
-  ): <Tools extends Record<string, Tool.Any>>(agent: Agent<Tools, R>) => Registration
-  <Tools extends Record<string, Tool.Any>, R, E>(agent: Agent<Tools, R>, layer: Layer.Layer<R, E, never>): Registration
+  ): <Tools extends Record<string, Tool.Any>>(agent: Agent<Tools, R>) => Registration<Tools, R>
+  <Tools extends Record<string, Tool.Any>, R, E>(
+    agent: Agent<Tools, R>,
+    layer: Layer.Layer<R, E, never>,
+  ): Registration<Tools, R>
 } = Function.dual(
   2,
   <Tools extends Record<string, Tool.Any>, R, E>(
     agent: Agent<Tools, R>,
     layer: Layer.Layer<R, E, never>,
-  ): Registration => {
+  ): Registration<Tools, R> => {
     const registrationLayer = Layer.effectContext(
       Layer.build(layer).pipe(
         Effect.mapError((cause) =>
@@ -91,8 +98,8 @@ export interface HandoffToolOptions {
   readonly maxRepeatedEdge?: number
 }
 
-export interface FanOutChild {
-  readonly registration: Registration
+export interface FanOutChild<Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never> {
+  readonly registration: Registration<Tools, R>
   readonly prompt: Prompt.RawInput
   readonly options?: Omit<RunOptions, "prompt" | "output" | "memory" | "persistence">
 }
@@ -146,9 +153,9 @@ export class FanOutUnsatisfied extends Schema.TaggedErrorClass<FanOutUnsatisfied
   total: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }) {}
 
-export interface Supervisor<R> {
-  readonly agent: Agent<Record<string, Tool.Any>, R | LanguageModel.LanguageModel>
-  readonly toolkit: ClosedToolSet<never, Tool.Any>
+export interface Supervisor<R, Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>> {
+  readonly agent: Agent<Tools, R | LanguageModel.LanguageModel>
+  readonly toolkit: ClosedToolSet<never, Tools[keyof Tools]>
   readonly catalog: Layer.Layer<HandoffCatalog>
 }
 
@@ -211,12 +218,13 @@ const recordCompletion = (
       : { ordinal: completion.ordinal, status: "failed", cause: completion.exit.cause }
 }
 
-const runFanOut = (
-  children: ReadonlyArray<FanOutChild>,
+const runFanOut = <Tools extends Record<string, Tool.Any>, R>(
+  children: ReadonlyArray<FanOutChild<Tools, R>>,
   options: FanOutOptions,
 ): Effect.Effect<
   ReadonlyArray<Result> | ReadonlyArray<FanOutMemberResult>,
-  RunError | RegistrationError | FanOutUnsatisfied
+  RunError | RegistrationError | FanOutUnsatisfied,
+  RunRequirements<Tools, R, { prompt: Prompt.RawInput }>
 > =>
   Effect.gen(function* () {
     const concurrency = yield* positiveConcurrency(options.concurrency)
@@ -237,7 +245,11 @@ const runFanOut = (
       () => undefined,
     )
     const nextOrdinal = yield* Ref.make(0)
-    const worker: Effect.Effect<void, RunError | RegistrationError> = Effect.suspend(() =>
+    const worker: Effect.Effect<
+      void,
+      RunError | RegistrationError,
+      RunRequirements<Tools, R, { prompt: Prompt.RawInput }>
+    > = Effect.suspend(() =>
       Ref.modify(nextOrdinal, (ordinal) =>
         ordinal < children.length ? ([ordinal, ordinal + 1] as const) : ([undefined, ordinal] as const),
       ).pipe(
@@ -310,17 +322,17 @@ const runFanOut = (
 
 type HandoffToolkit = {
   readonly name: string
-  readonly tool: Tool.Any
-  readonly tools: Record<string, Tool.Any>
+  readonly tool: import("../policy/handoff-runtime.js").HandoffToolSpecResult["tool"]
+  readonly tools: Record<string, import("../policy/handoff-runtime.js").HandoffToolSpecResult["tool"]>
   readonly invoke: (params: unknown) => Effect.Effect<unknown, string>
 }
 
-const mergeHandoffTools = (toolkits: ReadonlyArray<HandoffToolkit>): ClosedToolSet<never, Tool.Any> => {
+const mergeHandoffTools = (toolkits: ReadonlyArray<HandoffToolkit>): ClosedToolSet<never, HandoffToolkit["tool"]> => {
   const entries = new Map<string, HandoffToolkit>()
   for (const toolkit of toolkits) {
     if (!entries.has(toolkit.name)) entries.set(toolkit.name, toolkit)
   }
-  const tools: Record<string, Tool.Any> = {}
+  const tools: Record<string, HandoffToolkit["tool"]> = {}
   for (const [name, entry] of entries) tools[name] = entry.tool
   return {
     tools,
@@ -332,20 +344,37 @@ const mergeHandoffTools = (toolkits: ReadonlyArray<HandoffToolkit>): ClosedToolS
 }
 
 export const delegateTool: {
-  <Parameters extends Schema.Top = DefaultDelegateParameters, Success extends Schema.Top = typeof Schema.String>(
+  <
+    Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>,
+    R = never,
+    Parameters extends Schema.Top = DefaultDelegateParameters,
+    Success extends Schema.Top = typeof Schema.String,
+  >(
     options?: DelegateOptions<Parameters, Success>,
-  ): (target: Registration) => AgentToolToolkit<string, Parameters, Success, never>
-  <Parameters extends Schema.Top = DefaultDelegateParameters, Success extends Schema.Top = typeof Schema.String>(
-    target: Registration,
+  ): (
+    target: Registration<Tools, R>,
+  ) => AgentToolToolkit<string, Parameters, Success, RunRequirements<Tools, R, { prompt: Prompt.RawInput }>>
+  <
+    Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>,
+    R = never,
+    Parameters extends Schema.Top = DefaultDelegateParameters,
+    Success extends Schema.Top = typeof Schema.String,
+  >(
+    target: Registration<Tools, R>,
     options?: DelegateOptions<Parameters, Success>,
-  ): AgentToolToolkit<string, Parameters, Success, never>
+  ): AgentToolToolkit<string, Parameters, Success, RunRequirements<Tools, R, { prompt: Prompt.RawInput }>>
 } = Function.dual(
   (args) => args.length !== 1 || "run" in args[0],
-  <Parameters extends Schema.Top = DefaultDelegateParameters, Success extends Schema.Top = typeof Schema.String>(
-    registration: Registration,
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    Parameters extends Schema.Top = DefaultDelegateParameters,
+    Success extends Schema.Top = typeof Schema.String,
+  >(
+    registration: Registration<Tools, R>,
     options: DelegateOptions<Parameters, Success> = {},
-  ): AgentToolToolkit<string, Parameters, Success, never> =>
-    asTool(registration, {
+  ): AgentToolToolkit<string, Parameters, Success, RunRequirements<Tools, R, { prompt: Prompt.RawInput }>> =>
+    asTool<Tools, R, string, Parameters, Success>(registration, {
       name: options.nameOverride ?? `delegate_to_${registration.name}`,
       description: options.description ?? `Delegate to ${registration.name} as an inline child run`,
       ...(options.parameters === undefined ? {} : { parameters: options.parameters }),
@@ -377,33 +406,37 @@ export const sameRunHandoffTool: {
 )
 
 export const fanOut: {
-  (
+  <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
     options: FanOutCollectOptions,
   ): (
-    children: ReadonlyArray<FanOutChild>,
+    children: ReadonlyArray<FanOutChild<Tools, R>>,
   ) => Effect.Effect<ReadonlyArray<FanOutMemberResult>, RunError | RegistrationError | FanOutUnsatisfied>
-  (
+  <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
     options?: FanOutAllSuccessOptions,
-  ): (children: ReadonlyArray<FanOutChild>) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
-  (
+  ): (
+    children: ReadonlyArray<FanOutChild<Tools, R>>,
+  ) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
+  <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
     options: FanOutOptions,
   ): (
-    children: ReadonlyArray<FanOutChild>,
+    children: ReadonlyArray<FanOutChild<Tools, R>>,
   ) => Effect.Effect<
     ReadonlyArray<Result> | ReadonlyArray<FanOutMemberResult>,
     RunError | RegistrationError | FanOutUnsatisfied
   >
-  (): (children: ReadonlyArray<FanOutChild>) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
-  (
-    children: ReadonlyArray<FanOutChild>,
+  <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(): (
+    children: ReadonlyArray<FanOutChild<Tools, R>>,
+  ) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
+  <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
+    children: ReadonlyArray<FanOutChild<Tools, R>>,
     options: FanOutCollectOptions,
   ): Effect.Effect<ReadonlyArray<FanOutMemberResult>, RunError | RegistrationError | FanOutUnsatisfied>
-  (
-    children: ReadonlyArray<FanOutChild>,
+  <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
+    children: ReadonlyArray<FanOutChild<Tools, R>>,
     options?: FanOutAllSuccessOptions,
   ): Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
-  (
-    children: ReadonlyArray<FanOutChild>,
+  <Tools extends Record<string, Tool.Any> = Record<string, Tool.Any>, R = never>(
+    children: ReadonlyArray<FanOutChild<Tools, R>>,
     options: FanOutOptions,
   ): Effect.Effect<
     ReadonlyArray<Result> | ReadonlyArray<FanOutMemberResult>,
@@ -411,11 +444,13 @@ export const fanOut: {
   >
 } = Function.dual(
   (args) => args.length > 1 || globalThis.Array.isArray(args[0]),
-  (children: ReadonlyArray<FanOutChild>, options: FanOutOptions = {}): ReturnType<typeof runFanOut> =>
-    runFanOut(children, options),
+  <Tools extends Record<string, Tool.Any>, R>(
+    children: ReadonlyArray<FanOutChild<Tools, R>>,
+    options: FanOutOptions = {},
+  ): ReturnType<typeof runFanOut> => runFanOut(children, options),
 )
 
-export const supervisor = (options: SupervisorOptions): Supervisor<never> => {
+export const supervisor = (options: SupervisorOptions) => {
   const specialists = options.specialists
   const handoffTools = specialists.map((specialist) => sameRunHandoffTool(specialist, options.handoffOptions ?? {}))
   const toolkit = mergeHandoffTools(handoffTools)
@@ -425,7 +460,8 @@ export const supervisor = (options: SupervisorOptions): Supervisor<never> => {
     tools: Object.values(toolkit.tools),
     ...(options.policy === undefined ? {} : { policy: options.policy }),
   })
-  return {
+  type SupervisorAgentR = typeof agent extends Agent<infer _Tools, infer AgentR> ? AgentR : never
+  const result: Supervisor<SupervisorAgentR, HandoffToolkit["tool"] extends infer T ? Record<string, T> : never> = {
     agent: {
       ...agent,
       toolDeclarations: Array.zip(specialists, handoffTools).flatMap(([specialist, handoff]) =>
@@ -438,6 +474,7 @@ export const supervisor = (options: SupervisorOptions): Supervisor<never> => {
     toolkit,
     catalog: layerCatalog(specialists),
   }
+  return result
 }
 
 export { target, layerCatalog, HandoffCatalog, type HandoffTarget } from "./handoff-target.js"

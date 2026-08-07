@@ -28,12 +28,7 @@ const program = Effect.gen(function* () {
         pending.push(file)
         continue
       }
-      if (
-        !/\.(?:ts|tsx)$/.test(name) ||
-        file.includes("/test/") ||
-        /\.(?:test|spec)\.(?:ts|tsx)$/.test(name)
-      )
-        continue
+      if (!/\.(?:ts|tsx)$/.test(name) || file.includes("/test/") || /\.(?:test|spec)\.(?:ts|tsx)$/.test(name)) continue
       const lines = (yield* fileSystem.readFileString(file)).split("\n").length - 1
       if (lines > 500) violations.push(`${path.relative(root, file)}: ${lines} lines (maximum 500)`)
     }

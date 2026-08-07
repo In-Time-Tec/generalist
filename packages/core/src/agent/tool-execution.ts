@@ -31,7 +31,6 @@ import type { Skill, SkillSourceError } from "../context/skill-source.js"
 import { intercept } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
 import { handoffDispatch } from "./handoff-tool-execution.js"
-import { HandoffCatalog } from "../policy/handoff-target.js"
 
 /**
  * Bound on how long a cancelled run waits for one forked tool or approval fiber to finish tearing down.
@@ -196,7 +195,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
   ): Stream.Stream<
     Event,
     RunError,
-    StaticToolServices<T> | HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+    StaticToolServices<T> | import("../durable/driver-interpreter.js").DriverInterpreter
   > =>
     Stream.concat(
       Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
@@ -265,7 +264,6 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
             | ToolContext
             | Tool.HandlersFor<T>
             | Tool.HandlerServices<T[keyof T]>
-            | HandoffCatalog
             | import("../durable/driver-interpreter.js").DriverInterpreter
           > = isSkillActivationCall(call, registry)
             ? activateSkillOutcome(turn, call)
@@ -325,7 +323,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
   ): Stream.Stream<
     Event,
     RunError,
-    StaticToolServices<T> | R | HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+    StaticToolServices<T> | R | import("../durable/driver-interpreter.js").DriverInterpreter
   > =>
     Stream.unwrap(
       activeAgentName().pipe(
@@ -345,7 +343,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
   ): Stream.Stream<
     Event,
     RunError,
-    StaticToolServices<T> | R | HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+    StaticToolServices<T> | R | import("../durable/driver-interpreter.js").DriverInterpreter
   > => {
     const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: "", sessionId }
     const candidate = get(registry, call.name)

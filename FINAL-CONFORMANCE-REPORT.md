@@ -4,14 +4,15 @@ Branch: `lint/conformance` (50 commits on top of `main` @ ce1f6e4)
 
 ## Headline numbers
 
-| Gate | Baseline (main) | Now |
-| --- | --- | --- |
-| `bunx oxlint packages apps examples scripts test` | 1,389 errors | **13 errors** |
-| `bunx tsc --noEmit` | 0 | **0** |
-| `bun --bun vitest run` | 1,168 pass | **1,168 pass / 0 fail** |
-| `repository-policy` / `install-preflight` / `repository-graph` / `package` | — | **all PASS** |
+| Gate                                                                       | Baseline (main) | Now                     |
+| -------------------------------------------------------------------------- | --------------- | ----------------------- |
+| `bunx oxlint packages apps examples scripts test`                          | 1,389 errors    | **13 errors**           |
+| `bunx tsc --noEmit`                                                        | 0               | **0**                   |
+| `bun --bun vitest run`                                                     | 1,168 pass      | **1,168 pass / 0 fail** |
+| `repository-policy` / `install-preflight` / `repository-graph` / `package` | —               | **all PASS**            |
 
 ## Fixed in wave 22 (this push)
+
 - **Program host `Invocation.execute: Effect<unknown, unknown>` → 0** — introduced a concrete error channel:
   `ProgramInvocationFailure | ProgramSuspended | ProgramCancelled`. The tool/step/agent decoders wrap implementation
   errors into `ProgramInvocationFailure` while passing `ProgramSuspended`/`ProgramCancelled` through unchanged; the
@@ -33,6 +34,7 @@ Branch: `lint/conformance` (50 commits on top of `main` @ ce1f6e4)
    `DecodingServices`/`EncodingServices` are `unknown`.
 
 ## Recommendation
+
 File an upstream issue against `Effect-TS/effect`: `Schema.Encoder` should not hardcode `DecodingServices: unknown`
 (an encoder-shaped schema has no decode step; the type erases the real services of every `generateObject` consumer).
 The 13 are not fixable without that library change or an API redesign; all other gates are green.
@@ -105,7 +107,6 @@ resolving to `any`/`unknown` for broad tool types (the same library `Schema.Cons
 `StaticToolServices` conditionals were probe-verified to break the tool-execution RHS raw (executionBase/
 defaultExecute) — the same tsc wall documented in wave 23.
 
-
 ## Wave 24 revert (2026-08-07) — runtime closed-environment provision
 
 The wave-24 truthful-channel core (RunRequirements/RunStream LanguageModel+HandoffCatalog, run-loop annotations,
@@ -121,6 +122,7 @@ PASS, lint = the 2 original `any-unknown-in-error-context` flags (tool-executor-
 ## Wave 24 final (2026-08-07) — conditional-member experiment + second revert
 
 The conditional service-member design was probe-verified:
+
 - Runtime side: `[LanguageModel] extends [R] ? never : LanguageModel` + `[HandoffCatalog] extends [R] ? never : HandoffCatalog`
   in RunRequirements/RunStream — the execution-host's `Exclude<..., ClosedServices<Tools, R>>` resolves to `never` — **works**.
 - Run-loop side: the raw `HandoffCatalog`/`LanguageModel` members in the makeRunLoop→modelTurn→tool-execution→
@@ -171,6 +173,7 @@ Major wave-25.5 findings (implemented, tsc-verified, then reverted to the cleane
    LanguageModel from the built closed-environment services and re-provide it in the run context.
 
 Remaining blockers (the same library-erasure class, now precisely bounded):
+
 - The delegate/fanOut `RunRequirements<Record<string, Tool.Any>, ...>` produce `StaticToolServices<Record>`
   = `Handler<any> | unknown` — ~24 `any` lint flags in the delegate/fanOut tests/docs.
 - The execution-host's code_mode tool (`HostedTools = Record<string, Tool.Any>`) — the HandlersFor Exclude.
@@ -183,6 +186,7 @@ provisioning.
 ## Wave 26 (2026-08-07) — full wave-25.5 re-application: 466 cleared, quantified tradeoff, reverted
 
 The complete wave-25.5 design was re-applied and verified end-to-end:
+
 - Ambient HandoffCatalog (serviceOption + catalog-as-parameter) — tsc 0, run channel HC-free.
 - Truthful run channels (RunStream/RunRequirements with SchemaServicesD + the generic Registration/fanOut/
   delegateTool/asTool) — **agent.ts:466 CLEARED**; tsc 0 across the workspace after the test-host LM layers.
@@ -200,6 +204,7 @@ tsc 0, 1,168 tests pass, all scripts PASS, lint = agent.ts:466 only, 66 commits.
 
 The last targeted probe: applying the conditional to ONLY the `Exclude<Tool.HandlerServices<...>, ToolContext>`
 member of `StaticToolServices` (leaving `HandlersFor<T>` raw) — verified:
+
 - tsc: 1 error — the `supervisor` helper's `Agent.make` requirements (`OptionRequirements<Record<string, Tool.Any>, ...>`)
   — the conditional changes the supervisor agent's inferred R, breaking the `HandoffAgent` variance.
 - The agent.ts:466 flag is unaffected (it is the OutputRequirement channel, not StaticToolServices).
@@ -213,7 +218,7 @@ service-channel erasure. Upstream `Effect-TS/effect` change required for complet
 
 ## Wave 28 (2026-08-07) — final hypothesis disproven; definitive conclusion
 
-The last hypothesis — that the ~18 `any`-class flags came from the *explicit* `StaticToolServices` member in
+The last hypothesis — that the ~18 `any`-class flags came from the _explicit_ `StaticToolServices` member in
 `RunStream`/`RunRequirements` (while the implicit member in the generic `R` was never flagged) — was tested:
 the RunStream without the explicit `StaticToolServices` member fails tsc at the impl boundary (the makeRunLoop's
 RHS `HandlersFor`/`HandlerServices` is not assignable to `R | LanguageModel | SchemaServicesD`). The member is

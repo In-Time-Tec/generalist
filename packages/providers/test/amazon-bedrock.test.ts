@@ -133,22 +133,22 @@ describe("AmazonBedrock", () => {
   it.effect("keeps the explicit public runtime surface", () =>
     Effect.gen(function* () {
       const module = yield* Effect.promise(() => import("@batonfx/providers/amazon-bedrock"))
-    expect(Object.keys(module).toSorted()).toEqual([
-      "Client",
-      "ClientFailure",
-      "CredentialFailure",
-      "RecoveryFailure",
-      "classifyFailure",
-      "decodeConfig",
-      "defaultChain",
-      "isRecoverableCredentialFailure",
-      "layer",
-      "layerClient",
-      "layerLanguageModel",
-      "make",
-      "makeRequest",
-      "toolJsonSchemaCompiler",
-    ])
+      expect(Object.keys(module).toSorted()).toEqual([
+        "Client",
+        "ClientFailure",
+        "CredentialFailure",
+        "RecoveryFailure",
+        "classifyFailure",
+        "decodeConfig",
+        "defaultChain",
+        "isRecoverableCredentialFailure",
+        "layer",
+        "layerClient",
+        "layerLanguageModel",
+        "make",
+        "makeRequest",
+        "toolJsonSchemaCompiler",
+      ])
     }),
   )
   it.effect("maps complete text, tools, reasoning, usage, and provider metadata", () =>

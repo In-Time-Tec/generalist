@@ -32,7 +32,9 @@ export interface Options {
 export interface Interface {
   readonly execute: (claim: ExecutionClaim) => Effect.Effect<void>
 }
-export class ExecutionHost extends Context.Service<ExecutionHost, Interface>()("@batonfx/runtime/execution-host/ExecutionHost") {}
+export class ExecutionHost extends Context.Service<ExecutionHost, Interface>()(
+  "@batonfx/runtime/execution-host/ExecutionHost",
+) {}
 const failureMessage = (cause: Cause.Cause<unknown>): string => {
   const error = Cause.squash(cause)
   return error instanceof Error ? error.message : String(error)
@@ -121,9 +123,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
             ): Effect.Effect<void, never, Scope.Scope> =>
               Effect.gen(function* () {
                 const baseContext = yield* hostContext({ agent, environment, store, codeMode })
-                const runHosted = <HostedTools extends Record<string, Tool.Any>>(
-                  hostedAgent: Agent.Agent<HostedTools, R>,
-                ): Effect.Effect<void> => {
+                const runHosted = (hostedAgent: Agent.Agent<Tools, R>): Effect.Effect<void> => {
                   const runAgent = (
                     prompt: Prompt.RawInput,
                     history: Prompt.Prompt | undefined,

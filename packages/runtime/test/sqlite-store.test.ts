@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
-import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Handoff, ToolExecutor } from "@batonfx/core"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../src/index.js"
 import { layer as activeExecutionsLayer } from "../src/active-executions.js"
@@ -598,7 +598,19 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
           ]),
       }),
     )
-    const firstServices = Layer.mergeAll(firstModel, ToolExecutor.layerToolkit(supervisor.toolkit), supervisor.catalog)
+    const firstServices = Layer.mergeAll(
+      firstModel,
+      ToolExecutor.layerToolkit(supervisor.toolkit),
+      supervisor.catalog,
+      supervisor.agent.toolkit.toLayer(
+        Object.fromEntries(
+          Object.keys(supervisor.agent.toolkit.tools).map((name) => [
+            name,
+            () => Effect.die("ToolExecutor owns handoff tool execution"),
+          ]),
+        ) as Toolkit.HandlersFrom<typeof supervisor.agent.toolkit.tools>,
+      ),
+    )
     const admittedRef = { ...admittedExecutable, ...admittedExecutable.ref }
     const activeRef = { ...activeExecutable, ...activeExecutable.ref }
     const firstResolver = ExecutableResolver.ExecutableResolver.of({

@@ -41,8 +41,12 @@ export type PlacementResponse =
   | { readonly _tag: "DomainFailure"; readonly failure: unknown }
   | { readonly _tag: "Suspend"; readonly token: string }
 
-type SchemaServicesD<S extends Schema.Constraint> = [unknown] extends [S["DecodingServices"]] ? never : S["DecodingServices"]
-type SchemaServicesE<S extends Schema.Constraint> = [unknown] extends [S["EncodingServices"]] ? never : S["EncodingServices"]
+type SchemaServicesD<S extends Schema.Constraint> = [unknown] extends [S["DecodingServices"]]
+  ? never
+  : S["DecodingServices"]
+type SchemaServicesE<S extends Schema.Constraint> = [unknown] extends [S["EncodingServices"]]
+  ? never
+  : S["EncodingServices"]
 
 export type PlacementSchemaServices<Tools extends Record<string, Tool.Any>> =
   | SchemaServicesD<Tool.ParametersSchema<Tools[keyof Tools]>>

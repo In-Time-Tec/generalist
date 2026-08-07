@@ -19,7 +19,9 @@ const schemaMessage = (error: unknown): string =>
 const frameworkFailure = (stage: FrameworkStage, tool: string, error: unknown): FrameworkFailure =>
   FrameworkFailure.make({ stage, tool, message: schemaMessage(error) })
 
-class SchemaServicesContext extends Context.Service<SchemaServicesContext, unknown>()("@batonfx/core/tools/tool-result-codec/SchemaServicesContext") {}
+class SchemaServicesContext extends Context.Service<SchemaServicesContext, unknown>()(
+  "@batonfx/core/tools/tool-result-codec/SchemaServicesContext",
+) {}
 const schemaServicesContext = Context.make<unknown, unknown>(SchemaServicesContext, undefined)
 
 export type SchemaTool = {
@@ -28,8 +30,12 @@ export type SchemaTool = {
   readonly successSchema: Schema.Constraint
   readonly failureSchema: Schema.Constraint
 }
-type SchemaServicesD<S extends Schema.Constraint> = [unknown] extends [S["DecodingServices"]] ? never : S["DecodingServices"]
-type SchemaServicesE<S extends Schema.Constraint> = [unknown] extends [S["EncodingServices"]] ? never : S["EncodingServices"]
+type SchemaServicesD<S extends Schema.Constraint> = [unknown] extends [S["DecodingServices"]]
+  ? never
+  : S["DecodingServices"]
+type SchemaServicesE<S extends Schema.Constraint> = [unknown] extends [S["EncodingServices"]]
+  ? never
+  : S["EncodingServices"]
 
 export type FailureSchema<T extends SchemaTool> = T["failureSchema"]
 export type ToolSchemaServices<T extends SchemaTool> =

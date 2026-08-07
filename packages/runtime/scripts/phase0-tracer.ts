@@ -7,7 +7,6 @@ const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownF
 
 const filename = tempDbPath("phase0-cli")
 
-
 const runBoundary = (externalCounter: { value: number }) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime

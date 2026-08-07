@@ -70,7 +70,9 @@ export interface TokenStoreInterface {
 }
 
 /** @experimental */
-export class TokenStore extends Context.Service<TokenStore, TokenStoreInterface>()("@batonfx/mcp/mcp/oauth/TokenStore") {}
+export class TokenStore extends Context.Service<TokenStore, TokenStoreInterface>()(
+  "@batonfx/mcp/mcp/oauth/TokenStore",
+) {}
 
 /** @experimental */
 export const layerTokenStoreTest = (implementation: TokenStoreInterface): Layer.Layer<TokenStore> =>

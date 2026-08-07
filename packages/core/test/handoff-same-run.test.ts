@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
-import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentManifest,
@@ -13,6 +13,7 @@ import {
   ToolExecutor,
 } from "../src/index"
 import { ItLayer } from "./it-layer"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -82,6 +83,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -126,6 +128,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     let supervisorCalls = 0
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer((options) => {
           const content = promptText(options.prompt)
           if (content.includes("continue as math")) {
@@ -156,6 +159,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const completedKeys: Array<string> = []
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer((options) =>
           promptText(options.prompt).includes("continue stable")
             ? Stream.make(textDelta("complete"))
@@ -212,8 +216,9 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         parentModel,
-        ToolExecutor.layerToolkit(delegate),
+        ToolExecutor.layerToolkit(delegate).pipe(Layer.provide(parentModel)),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
@@ -221,7 +226,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         const parent = Agent.make({
           name: "parent",
           toolkit: Toolkit.make(delegate.tool),
-        }) as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
+        })
         const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "go" }))
         const last = events.at(-1)
         expect(last?._tag).toBe("Completed")
@@ -236,6 +241,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
         ToolExecutor.layerToolkit(supervisorSetup.toolkit),
         Handoff.layerCatalog([]),
@@ -254,6 +260,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
         ToolExecutor.layerToolkit(supervisorSetup.toolkit),
         supervisorSetup.catalog,

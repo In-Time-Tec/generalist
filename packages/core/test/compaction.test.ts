@@ -7,8 +7,7 @@ import { ItLayer } from "./it-layer"
 import { estimatePromptTokens } from "../src/turn/prompt-token-estimate"
 import { makeThresholdState } from "../src/turn/compaction-threshold-state"
 
-const encodeJsonValue = (value: unknown): string =>
-  Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 

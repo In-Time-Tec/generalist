@@ -3,7 +3,6 @@ import { RunClaims, Runtime } from "../src/index.js"
 import { assistantAddress, completedResult } from "../test/helpers.js"
 import { mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "../test/mysql/helpers.js"
 
-
 const url = mysqlUrl
 if (url === undefined || url.length === 0) {
   throw new Error("Set BATON_MYSQL_URL or MYSQL_URL to run the MySQL tracer")

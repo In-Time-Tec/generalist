@@ -46,7 +46,9 @@ export const make = (options: SqliteOptions): Effect.Effect<SqliteClient, never,
           try {
             return Effect.succeed((prepare(sql, useSafeIntegers).all(...(params as Array<any>)) ?? []) as Array<object>)
           } catch (cause) {
-            return Effect.fail(SqlError.make({ reason: classifyError(cause, "Failed to execute statement", "execute") }))
+            return Effect.fail(
+              SqlError.make({ reason: classifyError(cause, "Failed to execute statement", "execute") }),
+            )
           }
         })
       const runValues = (sql: string, params: ReadonlyArray<unknown> = []) =>

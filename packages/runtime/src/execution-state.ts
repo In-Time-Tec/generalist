@@ -37,9 +37,7 @@ export type ExecutionCheckpoint = typeof ExecutionCheckpoint.Type
 
 /** @experimental Executable-neutral persisted suspension state. */
 /** @experimental */
-export type ExecutionSuspension =
-  | AgentEvent.AgentSuspended
-  | ProgramCapabilities.ProgramSuspended
+export type ExecutionSuspension = AgentEvent.AgentSuspended | ProgramCapabilities.ProgramSuspended
 /** @experimental */
 export const ExecutionSuspension: Schema.Codec<ExecutionSuspension, unknown> = Schema.Union([
   AgentEvent.AgentSuspended,

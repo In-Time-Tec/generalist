@@ -35,9 +35,9 @@ layer(bunLayer)("workspace test discovery", (it) => {
       const fileSystem = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const root = path.resolve(".")
-      const discovered = (
-        yield* Effect.forEach(expectedRoots, (directory) => filesUnder(path.join(root, directory), root, fileSystem, path))
-      )
+      const discovered = (yield* Effect.forEach(expectedRoots, (directory) =>
+        filesUnder(path.join(root, directory), root, fileSystem, path),
+      ))
         .flat()
         .toSorted()
       expect(discovered.length).toBeGreaterThan(0)

@@ -50,7 +50,9 @@ export interface DeliveryInterface {
 }
 
 /** @experimental */
-export class Delivery extends Context.Service<Delivery, DeliveryInterface>()("@batonfx/core/model/model-telemetry-services/Delivery") {}
+export class Delivery extends Context.Service<Delivery, DeliveryInterface>()(
+  "@batonfx/core/model/model-telemetry-services/Delivery",
+) {}
 
 /** @experimental No-op host delivery sink. */
 export const layerNoop: Layer.Layer<Delivery> = Layer.succeed(Delivery, Delivery.of({ deliver: () => Effect.void }))

@@ -19,7 +19,7 @@ import { assemble, type Candidate } from "../tools/tool-registry.js"
 import { intercept, logicalOperationId } from "../durable/driver-run.js"
 import { operationKey, type DriverInterpreter } from "../durable/driver-interpreter.js"
 import { defaultContextProjection, HandoffInput, type ContextProjection } from "./handoff-projection.js"
-import { HandoffCatalog, type HandoffTarget } from "./handoff-target.js"
+import type { HandoffTarget } from "./handoff-target.js"
 import { ModelRegistry } from "../model/model-registry.js"
 import { validateRef } from "../durable/executable-manifest.js"
 
@@ -30,6 +30,7 @@ export class HandoffRejected extends Schema.TaggedErrorClass<HandoffRejected>()(
 }) {}
 
 export interface ExecuteHandoffInput {
+  readonly catalog: import("./handoff-target.js").HandoffCatalogInterface
   readonly turn: number
   readonly toolCallId: string
   readonly specialist: string
@@ -98,8 +99,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
               resolvingToolCallIds: input.resolvingToolCallIds,
             },
           }
-    const catalog = yield* HandoffCatalog
-    const resolved = catalog.resolve(input.specialist)
+    const resolved = input.catalog.resolve(input.specialist)
     if (resolved === undefined) {
       return yield* HandoffTargetMissing.make({ target: input.specialist, turn: input.turn })
     }
@@ -219,7 +219,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
     const durable = yield* Schema.decodeUnknownEffect(HandoffCommit)(commit).pipe(
       Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) })),
     )
-    const committedTarget = catalog.resolve(durable.state.active)
+    const committedTarget = input.catalog.resolve(durable.state.active)
     if (committedTarget === undefined) {
       return yield* HandoffTargetMissing.make({ target: durable.state.active, turn: input.turn })
     }
@@ -241,7 +241,15 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
 
 /** @experimental One same-run handoff tool specification. */
 export interface HandoffToolSpecResult {
-  readonly tool: Tool.Any
+  readonly tool: Tool.Tool<
+    string,
+    {
+      readonly parameters: typeof HandoffInput
+      readonly success: typeof HandoffAccepted
+      readonly failure: typeof Schema.String
+      readonly failureMode: "return"
+    }
+  >
   readonly specialist: string
   readonly projection?: ContextProjection
   readonly maxRepeatedEdge?: number

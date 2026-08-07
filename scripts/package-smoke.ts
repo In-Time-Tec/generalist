@@ -11,10 +11,9 @@ import {
   sortRecord,
 } from "./package-smoke-config.js"
 
-class PackageSmokeFailed extends Schema.TaggedErrorClass<PackageSmokeFailed>()(
-  "@batonfx/scripts/PackageSmokeFailed",
-  { message: Schema.String },
-) {}
+class PackageSmokeFailed extends Schema.TaggedErrorClass<PackageSmokeFailed>()("@batonfx/scripts/PackageSmokeFailed", {
+  message: Schema.String,
+}) {}
 
 const smokeError = (message: string): PackageSmokeFailed => PackageSmokeFailed.make({ message })
 
@@ -221,7 +220,9 @@ const program = Effect.gen(function* () {
       }
       for (const [dependency, dependencyVersion] of Object.entries(manifest[section] ?? {})) {
         if (dependency.startsWith("@batonfx/") && dependencyVersion !== version) {
-          return yield* smokeError(`@batonfx/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`)
+          return yield* smokeError(
+            `@batonfx/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`,
+          )
         }
       }
     }
@@ -316,9 +317,7 @@ server.listen(0, "127.0.0.1", () => {
   const registry = yield* spawner.spawn(ChildProcess.make("node", ["server.mjs"], { cwd: registryDirectory }))
   yield* Effect.addFinalizer(() => registry.kill())
   const registryOrigin = yield* Stream.runHead(Stream.splitLines(Stream.decodeText(registry.stdout))).pipe(
-    Effect.flatMap(
-      Option.match({ onNone: () => smokeError("local registry did not start"), onSome: Effect.succeed }),
-    ),
+    Effect.flatMap(Option.match({ onNone: () => smokeError("local registry did not start"), onSome: Effect.succeed })),
   )
   yield* fileSystem.writeFileString(path.join(consumerDirectory, ".npmrc"), `@batonfx:registry=${registryOrigin}\n`)
   yield* fileSystem.writeFileString(
@@ -388,7 +387,9 @@ console.log(\`imported \${specifiers.length} Baton exports\`)
     .split("\n")
     .filter((entry) => entry.length > 0)
   if (installedEffects.length !== 1) {
-    return yield* smokeError(`consumer installed ${installedEffects.length} Effect copies:\n${installedEffects.join("\n")}`)
+    return yield* smokeError(
+      `consumer installed ${installedEffects.length} Effect copies:\n${installedEffects.join("\n")}`,
+    )
   }
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], consumerDirectory)

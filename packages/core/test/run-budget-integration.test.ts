@@ -275,41 +275,49 @@ describe("RunBudget Agent.stream integration", () => {
   {
     const capture = journalCapture()
     const child = Agent.make({ name: "child-agent", toolkit: Toolkit.empty, budget: { modelCalls: 1 } })
-    const parentTool = AgentTool.asTool(child, { name: "invoke_child" })
+    const parentTool = AgentTool.asTool(child, { name: "invoke_child", success: Schema.String })
     const parent = Agent.make({
       name: "parent-agent",
       toolkit: Toolkit.make(parentTool.tool, echoTool),
       budget: { modelCalls: 3, childRuns: 1, depth: 1 },
-    }) as unknown as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
+    })
     let modelCalls = 0
+    const budgetModelLayer = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return withProviderFinish(
+              Stream.make(
+                Response.makePart("tool-call", {
+                  id: "child-call",
+                  name: "invoke_child",
+                  params: { prompt: "sub" },
+                  providerExecuted: false,
+                }),
+              ),
+            )
+          }
+          if (modelCalls === 2) {
+            return withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "child", delta: "sub" })))
+          }
+          return withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "parent", delta: "done" })))
+        },
+      }),
+    )
     layer(
       Layer.mergeAll(
-        Layer.effect(
-          LanguageModel.LanguageModel,
-          LanguageModel.make({
-            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-            streamText: () => {
-              modelCalls += 1
-              if (modelCalls === 1) {
-                return withProviderFinish(
-                  Stream.make(
-                    Response.makePart("tool-call", {
-                      id: "child-call",
-                      name: "invoke_child",
-                      params: { prompt: "sub" },
-                      providerExecuted: false,
-                    }),
-                  ),
-                )
-              }
-              if (modelCalls === 2) {
-                return withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "child", delta: "sub" })))
-              }
-              return withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "parent", delta: "done" })))
-            },
+        budgetModelLayer,
+        Layer.effectContext(
+          Effect.gen(function* () {
+            const context = yield* Effect.context<LanguageModel.LanguageModel>()
+            return yield* Toolkit.make(parentTool.tool).toHandlers({
+              invoke_child: (params) => parentTool.invoke(params).pipe(Effect.provideContext(context)),
+            })
           }),
-        ),
-        Toolkit.make(parentTool.tool).toLayer({ invoke_child: (params) => parentTool.invoke(params) }),
+        ).pipe(Layer.provide(budgetModelLayer)),
         ToolExecutor.layerTest({
           execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
         }),

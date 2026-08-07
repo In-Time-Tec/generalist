@@ -218,9 +218,10 @@ const collectResponses = (
   stream: HandlerStream,
 ): Effect.Effect<ReadonlyArray<StreamResponse>, { readonly reason: string }> =>
   Stream.fromAsyncIterable(stream, (error) => ({
-    reason: typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string"
-      ? error.reason
-      : String(error),
+    reason:
+      typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string"
+        ? error.reason
+        : String(error),
   })).pipe(Stream.runCollect)
 
 describe("DefaultRequestHandler projection", () => {

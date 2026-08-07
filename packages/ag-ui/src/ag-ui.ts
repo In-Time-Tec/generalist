@@ -4,8 +4,7 @@ import { Cursor, type Address, Errors, Runtime } from "@batonfx/runtime"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
 import { makeState, project, stateSnapshot } from "./projection.js"
 
-const encodeJsonValue = (value: unknown): string =>
-  Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 /** @experimental */
 export interface LayerOptions {

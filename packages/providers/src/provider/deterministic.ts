@@ -39,9 +39,7 @@ export interface DeterministicInput extends RegistrationOptions {
 }
 
 /** @experimental */
-export const registration = (
-  input: DeterministicInput = {},
-): Effect.Effect<ModelRegistry.Registration, never, never> =>
+export const registration = (input: DeterministicInput = {}): Effect.Effect<ModelRegistry.Registration, never, never> =>
   ModelRegistry.registration({
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",

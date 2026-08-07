@@ -65,30 +65,42 @@ export const close: {
 export const withTools: {
   <Tools extends Record<string, Tool.Any>, R>(
     declared: ReadonlyArray<Tool.Any>,
-  ): (agent: Agent<Tools, R>) => Agent<Record<string, Tool.Any>, R>
+  ): (agent: Agent<Tools, R>) => Agent<Tools, R>
   <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent<Tools, R>,
     declared: ReadonlyArray<Tool.Any>,
-  ): Agent<Record<string, Tool.Any>, R>
+  ): Agent<Tools, R>
 } = Function.dual(
   2,
   <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent<Tools, R>,
     declared: ReadonlyArray<Tool.Any>,
-  ): Agent<Record<string, Tool.Any>, R> => {
+  ): Agent<Tools, R> => {
     const existing: ReadonlyArray<Tool.Any> = Object.values(agent.toolkit.tools)
     const staticOrigin = (tool: Tool.Any): ToolDeclaration => ({
       tool,
       origin: { _tag: "Static", agent: agent.name },
     })
-    const hosted: ReadonlyArray<Tool.Any> = [...existing, ...declared]
+    const tools: Tools = Object.assign(
+      Object.create(Object.getPrototypeOf(agent.toolkit.tools) as object),
+      agent.toolkit.tools,
+    )
+    for (const tool of declared) {
+      Object.defineProperty(tools, tool.name, {
+        configurable: true,
+        enumerable: true,
+        value: tool,
+        writable: true,
+      })
+    }
+    const toolkit: Toolkit.Toolkit<Tools> = Object.assign(
+      Object.create(Object.getPrototypeOf(agent.toolkit) as object),
+      agent.toolkit,
+      { tools },
+    )
     return {
       ...agent,
-      [AgentTypeId]: {
-        tools: (value: Record<string, Tool.Any>) => value,
-        requirements: (value: R) => value,
-      },
-      toolkit: Toolkit.make(...hosted),
+      toolkit,
       toolDeclarations: [...(agent.toolDeclarations ?? existing.map(staticOrigin)), ...declared.map(staticOrigin)],
     }
   },

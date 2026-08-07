@@ -1,7 +1,6 @@
 import { Cause, Channel, Effect, Exit, HashMap, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { DriverInterpreter } from "../durable/driver-interpreter.js"
-import type { HandoffCatalog } from "../policy/handoff-target.js"
 import { AgentError, type Event } from "./agent-event.js"
 import { coalesceAdjacentText } from "../context/session-sync.js"
 import { applyPartChain, applyPromptChain } from "./agent-message.js"
@@ -215,11 +214,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     overrides: TurnOverrides | undefined,
     agentName: string,
     toolScheduling: ToolSchedulingPolicy,
-  ): Stream.Stream<
-    Event,
-    RunError,
-    LanguageModel.LanguageModel | R | StaticToolServices<T> | DriverInterpreter | HandoffCatalog
-  > => {
+  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<T> | DriverInterpreter> => {
     const instrumentTurnStream = <A, E>(
       stream: Stream.Stream<A, E, LanguageModel.LanguageModel | DriverInterpreter>,
     ): Stream.Stream<
