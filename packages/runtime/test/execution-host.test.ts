@@ -971,6 +971,160 @@ describe("ExecutionHost", () => {
     }).pipe(Effect.provide(runtimeLayer))
   })
 
+  it.effect("persists distinct suspension checkpoints when one turn suspends twice after a resume", () => {
+    let modelCalls = 0
+    const agent = Agent.make({ name: "durable-double-suspension", toolkit: Toolkit.make(waitTool) })
+    const ref = testExecutable(agent, "double-suspension-v1")
+    const address = Address.make("agent:durable-double-suspension")
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => {
+          modelCalls += 1
+          return Stream.fromIterable<Response.StreamPartEncoded>(
+            modelCalls === 1
+              ? [
+                  Response.makePart("tool-call", {
+                    id: "wait-call-1",
+                    name: "wait_for_human",
+                    params: { question: "First?" },
+                    providerExecuted: false,
+                  }),
+                  finish,
+                ]
+              : modelCalls === 2
+                ? [
+                    Response.makePart("tool-call", {
+                      id: "wait-call-2",
+                      name: "wait_for_human",
+                      params: { question: "Second?" },
+                      providerExecuted: false,
+                    }),
+                    finish,
+                  ]
+                : modelCalls === 3
+                  ? [
+                      Response.makePart("tool-call", {
+                        id: "wait-call-3",
+                        name: "wait_for_human",
+                        params: { question: "Third?" },
+                        providerExecuted: false,
+                      }),
+                      finish,
+                    ]
+                  : [Response.makePart("text-delta", { id: "answer", delta: "continued" }), finish],
+          )
+        },
+      }),
+    )
+    const executor = ToolExecutor.layerTest({
+      execute: (request) =>
+        request.call.params.question === "First?"
+          ? Effect.succeed({ _tag: "Success", result: "first", encodedResult: "first" })
+          : Effect.succeed({ _tag: "Suspend", token: `token:${request.call.id}` }),
+    })
+    const handlers = Toolkit.make(waitTool).toLayer({
+      wait_for_human: () => Effect.die("ToolExecutor test layer owns execution"),
+    })
+    const resolver = ExecutableResolver.ExecutableResolver.of({
+      resolve: () =>
+        Effect.succeed({
+          _tag: "Agent" as const,
+          agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)),
+          attestation: ref,
+        }),
+    })
+    const runtimeLayer = Runtime.layerMemory({
+      resolver,
+      addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
+      scheduler: { pollInterval: "1 day" },
+    })
+
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const host = yield* ExecutionHost.ExecutionHost
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: address,
+        sessionId: "session:double-suspension",
+        idempotencyKey: "message:double-suspension",
+        prompt: "Wait twice and continue.",
+      })
+      const execute = (ownerId: string) =>
+        store
+          .claimExecution({ runId: receipt.runId, ownerId })
+          .pipe(Effect.flatMap((claim) => host.execute(claim)))
+
+      yield* execute("first")
+      expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
+        status: "waiting",
+        wait: { waitId: "wait-call-2" },
+      })
+      yield* runtime.respond({
+        runId: receipt.runId,
+        waitId: "wait-call-2",
+        idempotencyKey: "response:first",
+        resolution: { _tag: "ToolResult", result: "second", encodedResult: "second" },
+      })
+
+      yield* execute("second")
+      expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
+        status: "waiting",
+        wait: { waitId: "wait-call-3" },
+      })
+      yield* runtime.respond({
+        runId: receipt.runId,
+        waitId: "wait-call-3",
+        idempotencyKey: "response:second",
+        resolution: { _tag: "ToolResult", result: "third", encodedResult: "third" },
+      })
+
+      yield* execute("third")
+      expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "succeeded" })
+      expect(modelCalls).toBe(4)
+    }).pipe(Effect.provide(runtimeLayer))
+  })
+
+  it.effect("preserves structured run-budget exhaustion details", () => {
+    const agent = Agent.make({ name: "budget-exhausted", budget: { modelCalls: 0 } })
+    const ref = testExecutable(agent, "budget-exhausted-v1")
+    const address = Address.make("agent:budget-exhausted")
+    const resolver = ExecutableResolver.makeStatic([{ executable: ref, agent: closedTestAgent(agent) }])
+    const runtimeLayer = Runtime.layerMemory({
+      resolver,
+      addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
+      scheduler: { pollInterval: "1 day" },
+    })
+
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const host = yield* ExecutionHost.ExecutionHost
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: address,
+        sessionId: "session:budget-exhausted",
+        idempotencyKey: "message:budget-exhausted",
+        prompt: "run",
+      })
+      yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "budget" }))
+      const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
+      const failed = history.find((event) => event._tag === "RunFailed")
+      expect(failed?._tag).toBe("RunFailed")
+      if (failed?._tag !== "RunFailed") return expect.unreachable()
+      expect(failed.error).toMatchObject({
+        _tag: "@batonfx/runtime/AgentExecutionFailure",
+        message: expect.stringMatching(/\S/),
+        failure: {
+          _tag: "@batonfx/core/RunBudgetExhausted",
+          dimension: "modelCalls",
+          requested: 1,
+          remaining: 0,
+        },
+      })
+    }).pipe(Effect.provide(runtimeLayer))
+  })
+
   it.effect("interrupts an active model when Runtime.cancel commits cancellation", () =>
     Effect.gen(function* () {
       const started = yield* Deferred.make<void>()

@@ -25,6 +25,7 @@ import { makeRunLoop } from "./run-loop.js"
 import { layerForRun } from "../durable/driver-interpreter.js"
 import { resolve as resolveRunBudget } from "../durable/run-budget.js"
 import { operationKey } from "../durable/driver-interpreter.js"
+import { inputDigest } from "../durable/driver-contract.js"
 import { intercept, bindResume, setHandoffState } from "../durable/driver-run.js"
 import { makeHandoffStateRef, takePendingContinuation } from "./handoff-state.js"
 import { LoopDriverState } from "../durable/loop-driver-state.js"
@@ -170,6 +171,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             turn,
             { _tag: "Microcompact", history: checkpoint, prompt: Prompt.empty },
             parentId,
+            inputDigest(Schema.encodeSync(AgentSuspended)(suspension)),
           )
           if (Option.isNone(activeSession)) yield* savePersisted(turn)
           return yield* Ref.get(chat.history)
