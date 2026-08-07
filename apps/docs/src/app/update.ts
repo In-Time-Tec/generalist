@@ -25,6 +25,8 @@ import {
 } from "./message"
 import { ThemePreference, type Model } from "./model"
 import { SearchCommand, initialSearchCommand, itemToPath } from "./searchPalette"
+const encodeJsonValue = (value: unknown): string =>
+  Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 type Update = readonly [Model, ReadonlyArray<Command.Command<Message>>]
 
@@ -249,7 +251,7 @@ const SaveThemePreference = Command.define(
   CompletedSaveThemePreference,
 )(({ preference }) =>
   Effect.sync(() => {
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(preference))
+    localStorage.setItem(THEME_STORAGE_KEY, encodeJsonValue(preference))
     return CompletedSaveThemePreference()
   }),
 )

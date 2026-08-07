@@ -4,6 +4,8 @@ import { Cursor } from "@batonfx/runtime"
 import { Wire } from "../src/index.js"
 import { event } from "./helpers.js"
 
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+
 describe("Wire", () => {
   it.effect("round-trips canonical RunEvents without wrapping their lifecycle", () =>
     Effect.gen(function* () {
@@ -15,7 +17,7 @@ describe("Wire", () => {
   it.effect("lets observers retain unknown future event tags", () =>
     Effect.gen(function* () {
       const value = { ...event(5), _tag: "FutureRuntimeFact", detail: { value: 1 } }
-      expect(yield* Wire.observerCodec.decode(JSON.stringify(value))).toEqual(value)
+      expect(yield* Wire.observerCodec.decode(encodeJson(value))).toEqual(value)
     }),
   )
 

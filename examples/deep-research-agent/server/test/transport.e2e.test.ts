@@ -7,6 +7,8 @@ import { ChildProcess } from "effect/unstable/process"
 import { Cursor } from "@batonfx/runtime"
 import { Client } from "@batonfx/transport"
 
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+
 const RunReceipt = Schema.Struct({
   runId: Schema.String,
   duplicate: Schema.Boolean,
@@ -115,7 +117,7 @@ describe("deep-research-agent Baton transport e2e", () => {
           const approvalRequested = Array.from(first).find((event) => event._tag === "ApprovalRequested")
           const waiting = Array.from(first).find((event) => event._tag === "RunWaiting")
           if (waiting === undefined || waiting._tag !== "RunWaiting") {
-            return yield* Effect.die(`expected RunWaiting: ${JSON.stringify(Array.from(first))}`)
+            return yield* Effect.die(`expected RunWaiting: ${encodeJson(Array.from(first))}`)
           }
 
           yield* postJson(`${baseUrl}/runs/${receipt.runId}/respond`, {

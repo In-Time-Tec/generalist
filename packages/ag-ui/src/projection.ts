@@ -3,6 +3,9 @@ import { Effect, Schema } from "effect"
 import { RunEvent } from "@batonfx/runtime"
 import { EventInvalid, ValueNotSerializable } from "./errors.js"
 
+const encodeJsonValue = (value: unknown): string =>
+  Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+
 /** @experimental */
 export interface ProjectionState {
   textId: string | undefined
@@ -31,9 +34,7 @@ const stringify = (value: unknown, field: string): Effect.Effect<string, ValueNo
   Effect.try({
     try: () => {
       if (typeof value === "string") return value
-      const encoded = JSON.stringify(value)
-      if (encoded === undefined) throw new TypeError("Value has no JSON representation")
-      return encoded
+      return encodeJsonValue(value)
     },
     catch: () => ValueNotSerializable.make({ field }),
   })

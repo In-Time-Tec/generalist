@@ -5,6 +5,7 @@ import { PgClient } from "@effect/sql-pg"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "@batonfx/core"
 import {
+
   Address,
   Cursor,
   Errors,
@@ -38,6 +39,9 @@ import {
   uniqueSession,
 } from "./helpers.js"
 import { testExecutable } from "../identity.js"
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const decodeJson = (text: string): Record<string, any> =>
+  Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Any)))(text)
 
 const describePostgres = postgresAvailable ? describe.sequential : describe.skip
 
@@ -130,10 +134,10 @@ const corruptEventExecutableRef = (runId: string, executableRef: unknown) =>
     const row = (yield* sql<{ event_json: string }>`
       SELECT event_json FROM baton_run_events WHERE run_id = ${runId} ORDER BY sequence LIMIT 1
     `)[0]!
-    const event = JSON.parse(row.event_json) as Record<string, unknown>
+    const event = decodeJson(row.event_json)
     event.executableRef = executableRef
     yield* sql`
-      UPDATE baton_run_events SET event_json = ${JSON.stringify(event)}
+      UPDATE baton_run_events SET event_json = ${encodeJson(event)}
       WHERE run_id = ${runId} AND sequence = 0
     `
   }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
@@ -329,8 +333,8 @@ describePostgres("postgres run store", () => {
           const sql = yield* SqlClient.SqlClient
           yield* sql`
             UPDATE baton_runs SET
-              executable_ref_json = ${JSON.stringify(alternateAssistantRef.ref)},
-              executable_manifest_json = ${JSON.stringify(alternateAssistantRef.manifest)}
+              executable_ref_json = ${encodeJson(alternateAssistantRef.ref)},
+              executable_manifest_json = ${encodeJson(alternateAssistantRef.manifest)}
             WHERE run_id = ${runId}
           `
         }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
@@ -540,7 +544,7 @@ describePostgres("postgres run store", () => {
               yield* sql`
                 UPDATE baton_runs
                 SET owner_worker_id = 'owner-b', attempt_fence = attempt_fence + 1,
-                  transcript_json = ${JSON.stringify(newerTranscript)},
+                  transcript_json = ${encodeJson(newerTranscript)},
                   lease_expires_at = NOW() + INTERVAL '10 seconds', updated_at = NOW()
                 WHERE run_id = ${receipt.runId}
               `
@@ -587,7 +591,7 @@ describePostgres("postgres run store", () => {
         expect(state.run).toEqual({
           owner_worker_id: "owner-b",
           attempt_fence: claim.attemptFence + 1,
-          transcript_json: JSON.stringify(newerTranscript),
+          transcript_json: encodeJson(newerTranscript),
         })
         expect(state.eventCount).toBe(0)
       }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),

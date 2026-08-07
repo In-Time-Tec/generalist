@@ -6,6 +6,8 @@ import { closedTestAgent, testExecutable } from "./identity.js"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
 import { assistant, assistantAddress, assistantRef, completedResult, memoryLayer, registrationsFor } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+
 
 const admitRun = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
@@ -194,7 +196,7 @@ it.live("persists accepted steering across a SQLite close and reopen", () => {
     const claim = yield* store.claimExecution({ runId, ownerId: "reopened" })
     const entries = yield* store.readSteering(claim)
     expect(entries).toHaveLength(1)
-    expect(JSON.stringify(entries[0]?.prompt)).toContain("survive restart")
+    expect(encodeJson(entries[0]?.prompt)).toContain("survive restart")
   }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
   return admit.pipe(Effect.andThen(reopen))
 })

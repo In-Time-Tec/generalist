@@ -1,10 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Layer, Redacted, Stream } from "effect"
+import { Effect, Exit, Layer, Redacted, Schema, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { Errors, MysqlRunSchema, RunClaims, Runtime, RuntimeWorker, RunStore } from "../../src/index.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../src/sql/mysql/schema.js"
 import {
+
   alternateAssistantRef,
   assistantAddress,
   assistantRef,
@@ -15,6 +16,7 @@ import {
   textPrompt,
 } from "../helpers.js"
 import { mysqlAvailable, mysqlClient, mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "./helpers.js"
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
 const url = mysqlUrl!
@@ -161,8 +163,8 @@ describeMysql("mysql run store", () => {
           const sql = yield* SqlClient.SqlClient
           yield* sql`
             UPDATE baton_runs SET
-              executable_ref_json = ${JSON.stringify(alternateAssistantRef.ref)},
-              executable_manifest_json = ${JSON.stringify(alternateAssistantRef.manifest)}
+              executable_ref_json = ${encodeJson(alternateAssistantRef.ref)},
+              executable_manifest_json = ${encodeJson(alternateAssistantRef.manifest)}
             WHERE run_id = ${runId}
           `
         }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)

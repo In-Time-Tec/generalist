@@ -2,6 +2,8 @@ import { describe, expect, it } from "@effect/vitest"
 import { ConfigProvider, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Service, cannedResultsFor, exaLayerFromApiKey, layer, search } from "../src/search-provider"
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+
 const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 
 const httpClientLayer = (
@@ -42,7 +44,7 @@ describe("SearchProvider", () => {
         return HttpClientResponse.fromWeb(
           request,
           new Response(
-            JSON.stringify({
+            encodeJson({
               results: [
                 { title: "Baton transport", url: "https://baton.test/transport", text: "Exa text result" },
                 { title: null, url: "https://baton.test/snippet", snippet: "Exa snippet result" },

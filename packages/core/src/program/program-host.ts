@@ -91,10 +91,12 @@ export interface Interface {
 export class ProgramHost extends Context.Service<ProgramHost, Interface>()("@batonfx/core/ProgramHost") {}
 
 const encodedBytes = (value: unknown): Effect.Effect<number, ProgramSchemaFailure> =>
-  Effect.try({
-    try: () => new TextEncoder().encode(JSON.stringify(value)).byteLength,
-    catch: (error) => ProgramSchemaFailure.make({ boundary: "program-output", message: String(error) }),
-  })
+  Schema.encodeEffect(Schema.UnknownFromJsonString)(value).pipe(
+    Effect.map((encoded) => new TextEncoder().encode(encoded).byteLength),
+    Effect.mapError((error) =>
+      ProgramSchemaFailure.make({ boundary: "program-output", message: error.message }),
+    ),
+  )
 
 const schemaFailure =
   (boundary: ProgramSchemaFailure["boundary"], capability: string | undefined) =>

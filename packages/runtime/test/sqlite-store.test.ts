@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Handoff, ToolExecutor } from "@batonfx/core"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../src/index.js"
@@ -10,6 +10,7 @@ import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../src/sql/sc
 import { markDirty } from "../src/sql/migrate.js"
 import { layer as sqliteClientLayer } from "../src/sql/bun-client.js"
 import {
+
   alternateAssistantAddress,
   alternateAssistantRef,
   alternateResearcherRef,
@@ -26,6 +27,7 @@ import {
 } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 import { closedTestAgent, pinnedTestAgent } from "./identity.js"
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const admitWaitWithClaimedChild = (waitId: string) =>
   Effect.gen(function* () {
@@ -752,7 +754,7 @@ it.live("rejects corrupted persisted executable authority with RuntimeUnavailabl
   const corrupt = Effect.sync(() => {
     const db = new Database(filename)
     db.run("UPDATE baton_runs SET executable_ref_json = ? WHERE run_id = ?", [
-      JSON.stringify(alternateAssistantRef.ref),
+      encodeJson(alternateAssistantRef.ref),
       runId,
     ])
     db.close()

@@ -1,5 +1,5 @@
 import type { Message } from "@a2a-js/sdk"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { MessageRejected } from "./errors.js"
 
@@ -16,10 +16,12 @@ export const decode = (message: Message): Effect.Effect<Prompt.Prompt, MessageRe
       return Effect.succeed(Prompt.makePart("text", { text: part.content.value }))
     }
     if (part.content?.$case === "data" && part.mediaType === "application/json") {
-      return Effect.try({
-        try: () => Prompt.makePart("text", { text: JSON.stringify(part.content!.value) }),
-        catch: (cause) => reject(`application/json part is not serializable: ${String(cause)}`, index),
-      })
+      return Schema.encodeEffect(Schema.UnknownFromJsonString)(part.content!.value).pipe(
+        Effect.map((text) => Prompt.makePart("text", { text })),
+        Effect.mapError((cause) =>
+          reject(`application/json part is not serializable: ${cause.message}`, index),
+        ),
+      )
     }
     return Effect.fail(reject(`unsupported message part or media type '${part.mediaType}'`, index))
   }).pipe(Effect.map((content) => Prompt.fromMessages([Prompt.makeMessage("user", { content })])))

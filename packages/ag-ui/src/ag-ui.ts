@@ -4,6 +4,9 @@ import { Cursor, type Address, Errors, Runtime } from "@batonfx/runtime"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
 import { makeState, project, stateSnapshot } from "./projection.js"
 
+const encodeJsonValue = (value: unknown): string =>
+  Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+
 /** @experimental */
 export interface LayerOptions {
   readonly address: Address.Address
@@ -63,7 +66,7 @@ const finalPrompt = (
 const serializablePayload = (payload: unknown): Effect.Effect<unknown, InputRejected> =>
   Effect.try({
     try: () => {
-      if (JSON.stringify(payload) === undefined) throw new TypeError("Resume payload is not serializable")
+      encodeJsonValue(payload)
       return payload
     },
     catch: () => InputRejected.make({ reason: "invalid-resume" }),

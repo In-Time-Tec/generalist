@@ -1,11 +1,12 @@
 import { expect, it as testIt, layer } from "@effect/vitest"
-import { Effect, Fiber, Ref, Schedule, Stream } from "effect"
+import { Effect, Fiber, Ref, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Pins, ProgramManifest } from "@batonfx/core"
 import { Errors, ExecutableRegistration, RunStore, RunTree, Runtime, RunWait } from "../src/index.js"
 import { makeCursor, type TreeCursor } from "../src/tree-cursor.js"
 import {
+
   analystRef,
   assistantAddress,
   assistantRef,
@@ -17,6 +18,7 @@ import {
   textPrompt,
 } from "./helpers.js"
 import { pinnedTestAgent } from "./identity.js"
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 testIt("retains the exact active Agent registration closure", () => {
   const required = ExecutableRegistration.requiredPinsForActiveExecutable(assistantRef)
@@ -351,7 +353,7 @@ layer(memoryLayer)("RunTree", (it) => {
         "@batonfx/runtime/TreeCursorInvalid",
       )
       const unsupported = RunTree.TreeCursor.make(
-        `baton-tree:${encodeURIComponent(JSON.stringify({ version: 2, projection: "run-tree", rootRunId: first.runId, position: 0 }))}`,
+        `baton-tree:${encodeURIComponent(encodeJson({ version: 2, projection: "run-tree", rootRunId: first.runId, position: 0 }))}`,
       )
       expect(
         (yield* Effect.flip(RunTree.history({ rootRunId: first.runId, cursor: unsupported, limit: 1 })))._tag,

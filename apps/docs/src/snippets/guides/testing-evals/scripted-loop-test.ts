@@ -1,6 +1,8 @@
-import { Console, Effect, Layer, Schema } from "effect"
+import { Console, Effect, Equal, Layer, Schema } from "effect"
 import { Agent, Tool, Toolkit } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
+
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const lookupTool = Tool.make("lookup_order", {
   description: "Look up an order by id",
@@ -41,10 +43,10 @@ const program = Effect.gen(function* () {
   if (result.text !== "Order 42 shipped yesterday.") {
     return yield* Effect.die(`unexpected answer: ${result.text}`)
   }
-  if (JSON.stringify(executedCalls) !== JSON.stringify([{ orderId: "42" }])) {
-    return yield* Effect.die(`unexpected tool params: ${JSON.stringify(executedCalls)}`)
+  if (!Equal.equals(executedCalls, [{ orderId: "42" }])) {
+    return yield* Effect.die(`unexpected tool params: ${encodeJson(executedCalls)}`)
   }
-  if (!JSON.stringify(yield* fixture.prompts).includes("shipped yesterday")) {
+  if (!encodeJson(yield* fixture.prompts).includes("shipped yesterday")) {
     return yield* Effect.die("tool result was not re-fed to the model")
   }
   yield* Console.log("scripted loop test passed")

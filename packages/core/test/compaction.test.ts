@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Json } from "./json"
-import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Deferred, Effect, Equal, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { Compaction, Session, ToolOutput } from "../src/index"
 import { ItLayer } from "./it-layer"
@@ -193,7 +193,7 @@ describe("Compaction", () => {
       Object.defineProperty(firstSubclass, "toJSON", { value: () => ["constant"] })
       Object.defineProperty(secondSubclass, "toJSON", { value: () => ["constant"] })
       expect(firstSubclass[0]).not.toBe(secondSubclass[0])
-      expect(JSON.stringify(firstSubclass)).toBe(JSON.stringify(secondSubclass))
+      expect(Equal.equals(firstSubclass, secondSubclass)).toBe(true)
       const values = [
         [undefined, () => undefined],
         [Number.NaN, Number.POSITIVE_INFINITY],
