@@ -70,6 +70,21 @@ added to the exception list:
 The core tarball budget moved 168,000 → 169,000 bytes for the two added modules, and the generated repository
 graph was regenerated for the new edges.
 
+## Verified against stock `effect`
+
+An earlier stage of this work type-checked inside a worktree whose `node_modules` had hand-edited `effect` `.d.ts`
+files, which made `Schema.decodeUnknownEffect`, `Schema.encodeUnknownEffect`, and `LanguageModel.generateObject`
+appear to return narrowed requirements. That patch was never committed and does not exist for anyone else, so the
+final state was re-derived and re-verified after `rm -rf node_modules && bun install`:
+
+- `ObjectSchema` bounds its service parameters instead of pinning them to `unknown`. A structured-output run now
+  reports `LanguageModel` alone, while a schema carrying real decoding services still propagates them — the
+  behavior the existing type-level assertions in `agent.test.ts` already pinned.
+- The tool result codec reads each schema through one documented codec view rather than the `Schema.Constraint`
+  view, whose services are `unknown` by declaration.
+
+Every number in this report comes from an unpatched dependency tree.
+
 ## Out of scope
 
 `examples/deep-research-agent/web` fails its own `tsc` on FoldKit `Scene` test-harness types. Those files are
