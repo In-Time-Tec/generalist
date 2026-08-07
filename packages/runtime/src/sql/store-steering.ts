@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { SqlClient } from "effect/unstable/sql"
 import { RunNotFound, RunTerminal, SteeringConflict } from "../errors.js"

@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { PgClient } from "@effect/sql-pg"

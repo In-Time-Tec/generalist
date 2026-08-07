@@ -1,4 +1,4 @@
-import { Effect, Equal, Random, Schema, Stream } from "effect"
+import { Effect, Equal, Random, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import {

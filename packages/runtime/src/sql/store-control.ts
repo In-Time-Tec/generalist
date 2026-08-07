@@ -1,4 +1,4 @@
-import { Effect, Equal, Schema } from "effect"
+import { Effect, Equal } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { Prompt } from "effect/unstable/ai"
 import {

@@ -1,6 +1,5 @@
 import { Duration, Effect, Ref, Schedule, Stream, type Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError"
 import { CursorExpired, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { checkpointRef } from "../../executable-manifest.js"
 import type { LayerOptions } from "../../runtime.js"
@@ -37,7 +36,6 @@ import {
   nowIso,
 } from "../store-helpers.js"
 import type { RunRow } from "../rows.js"
-import { withSql } from "../sql-effect.js"
 import { makeEventHub } from "../subscribers.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
 import {
@@ -52,9 +50,8 @@ import { makeMysqlClaims } from "./store-claims.js"
 import { admitFanOut, inspectFanOut } from "../store-fan-out.js"
 import { loadTreeHistory } from "../tree-history.js"
 import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
-import { StringArray, encodeExecutableRef, encodeJson } from "../codecs.js"
+import { encodeExecutableRef, encodeJson } from "../codecs.js"
 import { encodeContinuation } from "../../steering.js"
-import { withConsistentSnapshot } from "../inspection-transaction.js"
 import {
   admitProgramAgents,
   commitProgramLog,
@@ -71,6 +68,7 @@ import { groupIdFromSuspension, resultFromInspection } from "../../child-group.j
 import { encodeReason, WaitResolution } from "../../run-wait.js"
 import { Prompt } from "effect/unstable/ai"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
+import { makeSqlRunner } from "./transaction.js"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
@@ -83,11 +81,6 @@ export type MysqlStoreError =
   | SchemaVersionUnsupported
   | SchemaUpgradeRequired
   | SchemaMigrationFailed
-const isDeadlock = (error: unknown): boolean => {
-  if (!isSqlError(error)) return false
-  const text = `${error.message} ${String(error.reason)}`.toLowerCase()
-  return text.includes("deadlock") || text.includes("1213") || text.includes("40001")
-}
 const initializeReadCommitted = (sql: SqlClient.SqlClient, connections: number) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -139,22 +132,7 @@ export const makeMysqlServices = (
     if (isolation[0]?.isolation !== "READ-COMMITTED") {
       return yield* SchemaMigrationFailed.make({ source, message: "MySQL runtime requires READ COMMITTED" })
     }
-    const transaction = <A, E>(
-      effect: Effect.Effect<A, E, SqlClient.SqlClient>,
-      retries = 4,
-    ): Effect.Effect<A, E | SqlError, SqlClient.SqlClient> =>
-      Effect.suspend(() =>
-        sql.withTransaction(effect).pipe(
-          Effect.catchIf(
-            (error): error is E | SqlError => retries > 0 && isDeadlock(error),
-            () => Effect.sleep("10 millis").pipe(Effect.andThen(transaction(effect, retries - 1))),
-          ),
-        ),
-      )
-    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, transaction(effect))
-    const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
-    const runInspection = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      withSql(sql, withConsistentSnapshot(sql, "mysql", effect))
+    const { run, runNoTxn, runInspection } = makeSqlRunner(sql)
     const lockRun = (runId: string) => sql`SELECT run_id FROM baton_runs WHERE run_id = ${runId} FOR UPDATE`
     const lockParent = (runId: string) =>
       sql<{ parent_run_id: string | null }>`SELECT parent_run_id FROM baton_runs WHERE run_id = ${runId}`.pipe(

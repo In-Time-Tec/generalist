@@ -250,7 +250,6 @@ export const admitInitialFanOuts = (hub: EventHub, parentRunId: string, fanOuts:
   })
 const outcomeFor = (event: RunEvent): Record<string, unknown> =>
   event._tag === "RunCompleted" ? { result: event.result } : event._tag === "RunFailed" ? { error: event.error } : {}
-
 export const reconcileFanOutWith = <E, R>(
   hub: EventHub,
   childRunId: string,
@@ -488,7 +487,6 @@ export const reconcileFanOutWith = <E, R>(
       )
     }
   })
-
 export const reconcileFanOut = (
   hub: EventHub,
   childRunId: string,

@@ -26,7 +26,6 @@ import type { DecodedRun, EventRow, OperationRow, RunRow } from "./rows.js"
 import type { WaitRow } from "./rows.js"
 import { decodeReason, WaitResolution, type RunWait } from "../run-wait.js"
 import { OperationResolution } from "../operation-resolution.js"
-import { Schema } from "effect"
 import type { OperationRecord } from "./operations.js"
 import { decodeContinuation } from "../steering.js"
 import { reconcileFanOut } from "./store-fan-out.js"
@@ -171,8 +170,7 @@ export const loadRunWait = (runId: string, waitId?: string) =>
     if (row === undefined) return undefined
     const openedAt = asIso(row.opened_at)!
     const closedAt = asIso(row.closed_at)
-    const resolution =
-      row.response_json === null ? undefined : decodeJson(WaitResolution, row.response_json)
+    const resolution = row.response_json === null ? undefined : decodeJson(WaitResolution, row.response_json)
     return {
       waitId: row.wait_id,
       reason: decodeReason(row.reason),
