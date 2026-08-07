@@ -1,7 +1,7 @@
 import { Cause, Effect, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { checkpoint, interceptStream, logicalOperationId } from "../durable/driver-run.js"
-import { operationKey } from "../durable/driver-interpreter.js"
+import { DriverInterpreter, operationKey } from "../durable/driver-interpreter.js"
 import { LoopDriverState, modelCallOrdinal } from "../durable/loop-driver-state.js"
 import { DriverStateInvalid } from "../durable/durable-driver.js"
 import type { DuplicateToolCallId } from "./agent-event.js"
@@ -18,7 +18,7 @@ type AttemptBody = (
   retryOverflow: boolean,
   compactOverflow?: boolean,
   overflowCause?: Cause.Cause<RunError>,
-) => Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel>
+) => Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel | DriverInterpreter>
 
 export const wrapDriverAttempt =
   (turn: number, attemptBody: AttemptBody): AttemptBody =>

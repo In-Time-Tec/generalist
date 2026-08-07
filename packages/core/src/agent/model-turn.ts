@@ -1,5 +1,6 @@
 import { Cause, Channel, Effect, Exit, HashMap, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { DriverInterpreter } from "../durable/driver-interpreter.js"
 import { AgentError, type Event } from "./agent-event.js"
 import { coalesceAdjacentText } from "../context/session-sync.js"
 import { applyPartChain, applyPromptChain } from "./agent-message.js"
@@ -24,7 +25,7 @@ import { DuplicateToolCallId, MiddlewareViolation } from "./agent-event.js"
 import type { RunError, ToolSchedulingPolicy } from "./agent.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
 import { wrapDriverAttempt } from "./model-turn-driver.js"
-import { captureFinishPart, captureStructuredUsage, chargeAttemptUsage } from "./model-turn-finish.js"
+import { captureFinishPart, captureStructuredUsage, chargeAttemptUsageWith } from "./model-turn-finish.js"
 import { schedule as scheduleTools } from "./tool-scheduler.js"
 import { attemptText, classifyOtherFailure, isToolNameCollision } from "./model-turn-parts.js"
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
@@ -213,13 +214,13 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     overrides: TurnOverrides | undefined,
     agentName: string,
     toolScheduling: ToolSchedulingPolicy,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<T>> => {
+  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<T> | DriverInterpreter> => {
     const instrumentTurnStream = <A, E>(
-      stream: Stream.Stream<A, E, LanguageModel.LanguageModel>,
+      stream: Stream.Stream<A, E, LanguageModel.LanguageModel | DriverInterpreter>,
     ): Stream.Stream<
       A,
       E | InvalidToolCallParameters | ToolJsonSchemaCompilerMissing | AiError.AiError,
-      LanguageModel.LanguageModel
+      LanguageModel.LanguageModel | DriverInterpreter
     > =>
       Stream.unwrap(
         LanguageModel.LanguageModel.pipe(
@@ -256,7 +257,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         readonly accept: Effect.Effect<void, DuplicateToolCallId>
       },
       RunError,
-      LanguageModel.LanguageModel
+      LanguageModel.LanguageModel | DriverInterpreter
     > => {
       let emitted = false
       let completed = false
@@ -281,12 +282,15 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
           classifyFailure(classifiedFailure) === "context-overflow"
         )
       }
-      return Stream.fromChannel(
-        Channel.acquireUseRelease(
-          Ref.make<ToolCallIdState>({
-            nextIndex: 0,
-            firstIndexes: HashMap.empty(),
-          }),
+      return Stream.unwrap(
+        Effect.gen(function* () {
+          const interpreter = yield* DriverInterpreter
+          return Stream.fromChannel(
+            Channel.acquireUseRelease(
+              Ref.make<ToolCallIdState>({
+                nextIndex: 0,
+                firstIndexes: HashMap.empty(),
+              }),
           (toolCallIds) =>
             Stream.unwrap(
               Effect.gen(function* () {
@@ -386,13 +390,16 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                     ),
                   )
                 }).pipe(
-                  Effect.andThen(chargeAttemptUsage(state)),
+                  Effect.andThen(chargeAttemptUsageWith(interpreter, state)),
                   Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
                   Effect.orDie,
                   Effect.asVoid,
                 ),
-        ),
-      ).pipe(
+            ),
+          )
+        })
+      )
+      .pipe(
         Stream.catchCause((cause) => {
           if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
           if (retryableOverflow(cause, emitted)) {

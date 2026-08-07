@@ -181,7 +181,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       const checkpointPending = (
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
-      ): Effect.Effect<Prompt.Prompt, AgentError> =>
+      ): Effect.Effect<Prompt.Prompt, RunError> =>
         appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint))) as Effect.Effect<
           Prompt.Prompt,
           AgentError

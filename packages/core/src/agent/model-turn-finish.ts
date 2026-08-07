@@ -1,7 +1,8 @@
 import { Effect } from "effect"
 import { Prompt, Response, Telemetry, Tool } from "effect/unstable/ai"
 import { addUsage, type Completed, type TurnCompleted } from "./agent-event.js"
-import { chargeUsage } from "../durable/driver-run.js"
+import { DriverInterpreter } from "../durable/driver-interpreter.js"
+import type { RunBudgetExhausted } from "../durable/run-budget.js"
 import type { RunError } from "./agent.js"
 import type { AgentRunState } from "./agent-run-state.js"
 
@@ -20,17 +21,23 @@ export const terminalCompletedEvent = (state: AgentRunState, turn: number, trans
   ...(state.usage === undefined ? {} : { usage: state.usage }),
 })
 
-export const chargeAttemptUsage = (
+export const chargeAttemptUsageWith = (
+  interpreter: import("../durable/driver-interpreter.js").Interface,
   state: Pick<AgentRunState, "finish" | "currentContextTokens">,
-): Effect.Effect<void, RunError, never> => {
+): Effect.Effect<void, RunError | RunBudgetExhausted> => {
   const input = state.finish?.usage.inputTokens.total ?? 0
   const output = state.finish?.usage.outputTokens.total ?? 0
   const reported = input + output
   const totalTokens = reported > 0 ? reported : state.currentContextTokens
   return totalTokens === undefined || totalTokens <= 0
     ? Effect.void
-    : (chargeUsage({ totalTokens }) as Effect.Effect<void, RunError, never>)
+    : interpreter.chargeUsage({ totalTokens })
 }
+
+export const chargeAttemptUsage = (
+  state: Pick<AgentRunState, "finish" | "currentContextTokens">,
+): Effect.Effect<void, RunError | RunBudgetExhausted, import("../durable/driver-interpreter.js").DriverInterpreter> =>
+  Effect.flatMap(DriverInterpreter, (interpreter) => chargeAttemptUsageWith(interpreter, state))
 
 export const captureFinishPart = (state: AgentRunState, part: Response.FinishPart): Effect.Effect<void> =>
   Effect.gen(function* () {

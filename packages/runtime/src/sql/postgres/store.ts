@@ -22,7 +22,7 @@ import { makeEventHub } from "../subscribers.js"
 import { check as checkSchema } from "./run-schema.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
 import { makePostgresClaims } from "./store-claims.js"
-import { postgresOperations } from "./store-ops.js"
+import { postgresOperations, type RunFn } from "./store-ops.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "../store-execution.js"
 import { decodeRunEffect, hasAdmission, loadRunWait } from "../store-helpers.js"
 import { WaitResolution } from "../../run-wait.js"
@@ -70,12 +70,11 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
     const pg = yield* PgClient.PgClient
-    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient | PgClient.PgClient>) =>
+    const run: RunFn = (effect) =>
       withSql(sql, sql.withTransaction(effect.pipe(Effect.provideService(PgClient.PgClient, pg))))
-    const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient | PgClient.PgClient>) =>
-      withSql(sql, effect.pipe(Effect.provideService(PgClient.PgClient, pg)))
-    const runInspection = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      withSql(sql, withConsistentSnapshot(sql, "postgres", effect))
+    const runNoTxn: RunFn = (effect) => withSql(sql, effect.pipe(Effect.provideService(PgClient.PgClient, pg)))
+    const runInspection: RunFn = (effect) =>
+      withSql(sql, withConsistentSnapshot(sql, "postgres", effect.pipe(Effect.provideService(PgClient.PgClient, pg))))
     const cancelRun = makeCancelRun({ sql, hub: transactionHub })
     const operations = postgresOperations({
       sql,

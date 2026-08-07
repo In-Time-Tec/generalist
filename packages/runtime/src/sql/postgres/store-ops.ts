@@ -17,11 +17,12 @@ import { checkpointRef } from "../../executable-manifest.js"
 import { getProgramOperation, resolveProgramOperation } from "../store-program.js"
 import { settleAdmittedCancellation } from "../store-control.js"
 import { Prompt } from "effect/unstable/ai"
+import type { WithoutSqlError } from "../sql-effect.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
-type RunFn = <A, E>(
-  effect: Effect.Effect<A, E, SqlR>,
-) => Effect.Effect<A, Exclude<E, { readonly _tag: "SqlError" }> | RuntimeUnavailable>
+export type RunFn = <A, E>(
+  effect: Effect.Effect<A, E | SqlError, SqlR>,
+) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
 export const postgresOperations = (input: {
   readonly sql: SqlClient.SqlClient

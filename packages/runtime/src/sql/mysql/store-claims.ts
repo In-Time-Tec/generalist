@@ -8,10 +8,11 @@ import { appendEvent, loadRun } from "../store-helpers.js"
 import type { EventHub } from "../subscribers.js"
 import { StaleClaim } from "../errors.js"
 import { cancel, complete, fail } from "../store-control.js"
+import type { WithoutSqlError } from "../sql-effect.js"
 
-type RunFn = <A, E>(
-  effect: Effect.Effect<A, E, SqlClient.SqlClient>,
-) => Effect.Effect<A, Exclude<E, { readonly _tag: "SqlError" }> | RuntimeUnavailable>
+export type RunFn = <A, E>(
+  effect: Effect.Effect<A, E | SqlError, SqlClient.SqlClient>,
+) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
 export const makeMysqlClaims = (input: {
   readonly sql: SqlClient.SqlClient
