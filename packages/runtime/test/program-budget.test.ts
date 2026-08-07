@@ -1,4 +1,4 @@
-import { it, layer } from "@effect/vitest"
+import { layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { Runtime } from "../src/index.js"
 import { registrationsFor } from "./helpers.js"
