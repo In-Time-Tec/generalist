@@ -1103,7 +1103,7 @@ describe("ExecutionHost", () => {
       yield* execute("third")
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ status: "succeeded" })
       expect(modelCalls).toBe(4)
-    }).pipe(Effect.provide(runtimeLayer))
+    }).pipe(scopedWith(runtimeLayer))
   })
 
   it.effect("preserves structured run-budget exhaustion details", () => {
@@ -1142,7 +1142,7 @@ describe("ExecutionHost", () => {
           remaining: 0,
         },
       })
-    }).pipe(Effect.provide(runtimeLayer))
+    }).pipe(scopedWith(runtimeLayer))
   })
 
   it.effect("interrupts an active model when Runtime.cancel commits cancellation", () =>

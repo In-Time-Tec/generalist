@@ -145,11 +145,10 @@ export const makeRunLoop = <
           Prompt.concat(history, transformedPrompt),
           Prompt.fromResponseParts(response.content),
         )
-        const path = yield* syncSession(structuredTurn, history)
         yield* applyCompactionResult(
           structuredTurn,
           { _tag: "Microcompact", history: transcript, prompt: Prompt.empty },
-          path.at(-1)?.id ?? null,
+          (yield* syncSession(structuredTurn, history)).at(-1)?.id ?? null,
           "structured-output",
         )
         if (Option.isNone(activeSession)) yield* savePersisted(structuredTurn)

@@ -166,7 +166,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
             turn,
             { _tag: "Microcompact", history: checkpoint, prompt: Prompt.empty },
             parentId,
-            inputDigest(Schema.encodeSync(AgentSuspended)(suspension)),
+            inputDigest(suspension),
           )
           if (Option.isNone(activeSession)) yield* savePersisted(turn)
           return yield* Ref.get(chat.history)
