@@ -206,7 +206,7 @@ describe("AgUi", () => {
       events: ({ cursor }) => {
         cursors.push(cursor)
         return cursors.length === 1
-          ? Stream.fail(new RuntimeErrors.SubscriberLagged({ runId: "client-run-1", lastDeliveredSequence: 2 }))
+          ? Stream.fail(RuntimeErrors.SubscriberLagged.make({ runId: "client-run-1", lastDeliveredSequence: 2 }))
           : Stream.empty
       },
       snapshot: () => Effect.succeed(snapshot),
@@ -247,7 +247,7 @@ describe("AgUi", () => {
       events: ({ cursor }) => {
         cursors.push(cursor)
         return cursors.length === 1
-          ? Stream.fail(new RuntimeErrors.CursorExpired({ runId: "client-run-1", cursor: -1, earliestSequence: 7 }))
+          ? Stream.fail(RuntimeErrors.CursorExpired.make({ runId: "client-run-1", cursor: -1, earliestSequence: 7 }))
           : Stream.empty
       },
       snapshot: () => Effect.succeed(snapshot),

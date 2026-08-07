@@ -1,5 +1,5 @@
 import { RunAgentInputSchema, type AGUIEvent, type RunAgentInput } from "@ag-ui/core"
-import { Context, Effect, Layer, Stream } from "effect"
+import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { Cursor, type Address, Errors, Runtime } from "@batonfx/runtime"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
 import { makeState, project, stateSnapshot } from "./projection.js"
@@ -81,7 +81,7 @@ const recover = (
     Stream.flattenIterable,
     Stream.catchIf(
       (error): error is Errors.SubscriberLagged | Errors.CursorExpired =>
-        error instanceof Errors.SubscriberLagged || error instanceof Errors.CursorExpired,
+        Schema.is(Errors.SubscriberLagged)(error) || Schema.is(Errors.CursorExpired)(error),
       () =>
         Stream.unwrap(
           runtime.snapshot(runId).pipe(

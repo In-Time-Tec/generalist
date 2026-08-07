@@ -69,7 +69,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     parentId: string | null,
   ) => Effect.Effect<void, RunError>
   readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
-  readonly deliverPending: () => Effect.Effect<void, DeliveryFailed>
+  readonly deliverPending: Effect.Effect<void, DeliveryFailed>
   readonly flushTelemetry: () => ReadonlyArray<Event>
   readonly telemetryIdentity: {
     readonly current:

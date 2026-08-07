@@ -313,7 +313,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
         publishTelemetry(prepareTelemetry(payload))
       })
     const flushTelemetry = (): ReadonlyArray<AgentEvent> => pendingTelemetry.splice(0, pendingTelemetry.length)
-    const deliverPending = (): Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed> => {
+    const deliverPending: Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed> = (() => {
       if (Option.isNone(deliveryService) || undeliveredTelemetry.length === 0) return Effect.void
       const snapshot = Object.freeze([...undeliveredTelemetry])
       return deliveryService.value.deliver({ sessionId, events: snapshot }).pipe(
@@ -328,7 +328,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
           }),
         ),
       )
-    }
+    })()
     const telemetryIdentity = makeIdentityCell()
     const restoredModelCallOrdinal =
       options.driverCheckpoint === undefined

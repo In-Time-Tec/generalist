@@ -76,7 +76,7 @@ const program = Effect.gen(function* () {
     Effect.provide(pendingLayers),
     Effect.flip,
   )
-  if (!(failure instanceof AgentEvent.AgentSuspended)) {
+  if (!Schema.is(AgentEvent.AgentSuspended)(failure)) {
     return yield* Effect.die("expected the run to suspend")
   }
   yield* Console.log(`suspended reason=${failure.reason} tool=${failure.tool_name} token=${failure.token}`)

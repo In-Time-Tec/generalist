@@ -36,7 +36,7 @@ type CompactionContext = {
   readonly state: AgentRunState
   readonly compactionService: Option.Option<typeof Compaction.Service>
   readonly tokenizerService: Option.Option<typeof Tokenizer.Tokenizer.Service>
-  readonly deliverPending: () => Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed>
+  readonly deliverPending: Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed>
   readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
   readonly undeliveredTelemetry: Array<ModelTelemetryEvent>
   readonly emitTelemetry: (event: import("../model/model-telemetry.js").EventPayload) => Effect.Effect<void>
@@ -263,7 +263,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                   }),
                 ),
           ),
-          Effect.andThen(deliverPending()),
+          Effect.andThen(deliverPending),
         )
       },
       onSome: (session) =>

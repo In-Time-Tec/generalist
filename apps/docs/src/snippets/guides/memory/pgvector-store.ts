@@ -10,7 +10,7 @@ interface PgClientInterface {
 
 class PgClient extends Context.Service<PgClient, PgClientInterface>()("app/PgClient") {}
 
-const storeError = (error: Error) => new VectorStore.VectorStoreError({ message: error.message })
+const storeError = (error: Error) => VectorStore.VectorStoreError.make({ message: error.message })
 
 export const pgvectorLayer: Layer.Layer<VectorStore.VectorStore, never, PgClient> = Layer.effect(
   VectorStore.VectorStore,

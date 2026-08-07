@@ -181,6 +181,7 @@ export const ProgramCapabilities = {
 }
 export namespace ProgramCapabilities {
   export type CapabilityFailure = import("./program/program-capabilities.js").CapabilityFailure
+  export type ProgramSuspended = import("./program/program-capabilities.js").ProgramSuspended
   export type ProgramBudgetExhausted = import("./program/program-capabilities.js").ProgramBudgetExhausted
   export type Interface = import("./program/program-capabilities.js").Interface
   export type ToolCallInput = import("./program/program-capabilities.js").ToolCallInput

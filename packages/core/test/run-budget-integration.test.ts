@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Layer, Option, Schema, Stream } from "effect"
+import { DateTime, Deferred, Effect, Layer, Option, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
@@ -209,7 +209,7 @@ describe("RunBudget Agent.stream integration", () => {
 
   it.effect("fails typed when deadline expires at schedule boundary", () =>
     Effect.gen(function* () {
-      yield* TestClock.setTime(new Date("2026-06-01T00:00:00.000Z").getTime())
+      yield* TestClock.setTime(DateTime.toEpochMillis(DateTime.makeUnsafe("2026-06-01T00:00:00.000Z")))
       const agent = Agent.make({
         name: "deadline-agent",
         toolkit: Toolkit.empty,

@@ -112,7 +112,7 @@ export const makeMysqlServices = (
     const source = options.source ?? "mysql"
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     yield* checkSchema(source)
-    const hub = yield* makeEventHub()
+    const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
     const transactionHub: typeof hub = { ...hub, publish: () => Effect.void }
     const capacity = options.subscriberQueueCapacity ?? 64

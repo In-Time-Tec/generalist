@@ -82,15 +82,14 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               .pipe(Effect.catch((error) => store.fail({ ...claim, error }).pipe(Effect.as(undefined))))
             if (resolution === undefined) return
             const resolved = resolution
-            let identityMatches = false
-            try {
-              identityMatches = equals(
-                decodePinned({ ref: claimed.executableRef, manifest: claimed.executableManifest }),
-                makeAttestation(resolved.attestation),
-              )
-            } catch {
-              identityMatches = false
-            }
+            const identityMatches = yield* Effect.try({
+              try: () =>
+                equals(
+                  decodePinned({ ref: claimed.executableRef, manifest: claimed.executableManifest }),
+                  makeAttestation(resolved.attestation),
+                ),
+              catch: () => false,
+            })
             if (!identityMatches) {
               yield* store.fail({
                 ...claim,

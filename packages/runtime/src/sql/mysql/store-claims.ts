@@ -1,4 +1,4 @@
-import { Duration, Effect } from "effect"
+import { DateTime, Duration, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { AgentExecutionFailure, RuntimeUnavailable } from "../../errors.js"
@@ -79,7 +79,7 @@ export const makeMysqlClaims = (input: {
               run: fresh,
               workerId: claimInput.workerId,
               attemptFence: fresh.attemptFence,
-              leaseExpiresAt: new Date(fresh.leaseExpiresAt!),
+              leaseExpiresAt: DateTime.toDate(DateTime.makeUnsafe(fresh.leaseExpiresAt!)),
             })
           }
           return claimed

@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Clock, Effect, Random, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import {
   AddressNotFound,
@@ -26,7 +26,11 @@ import { make as makeMessage } from "../message.js"
 import { admitInitialFanOuts } from "./store-fan-out.js"
 
 const nextId = (prefix: string): Effect.Effect<string> =>
-  Effect.sync(() => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`)
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const random = yield* Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER)
+    return `${prefix}_${now.toString(36)}_${random.toString(36)}`
+  })
 
 export const admitSend = (
   hub: EventHub,

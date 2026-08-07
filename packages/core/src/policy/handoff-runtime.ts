@@ -128,22 +128,24 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
       }
     }
     const edge = edgeLabel(source, resolved.name)
-    if (input.options.executableRef !== undefined) {
-      if (input.options.executableManifest === undefined || resolved.pin === undefined) {
+    const pinnedRef = input.options.executableRef
+    const pinnedManifest = input.options.executableManifest
+    if (pinnedRef !== undefined) {
+      if (pinnedManifest === undefined || resolved.pin === undefined) {
         return yield* HandoffRejected.make({
           handoffId,
           turn: input.turn,
           reason: "Pinned handoff requires an executable closure and exact target Agent pin",
         })
       }
-      try {
-        validateRef(input.options.executableRef, input.options.executableManifest)
-      } catch (error) {
-        return yield* HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) })
+      const validationFailure = yield* Effect.try({
+        try: () => validateRef(pinnedRef, pinnedManifest),
+        catch: (error) => error,
+      }).pipe(Effect.flip, Effect.option)
+      if (Option.isSome(validationFailure)) {
+        return yield* HandoffRejected.make({ handoffId, turn: input.turn, reason: String(validationFailure.value) })
       }
-      if (
-        !input.options.executableManifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === resolved.pin)
-      ) {
+      if (!pinnedManifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === resolved.pin)) {
         return yield* HandoffRejected.make({
           handoffId,
           turn: input.turn,

@@ -1,4 +1,4 @@
-import { Effect, Layer, Redacted } from "effect"
+import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import { ExecutableResolver, Runtime, RuntimeWorker, RunSchema } from "../../src/index.js"
@@ -15,7 +15,11 @@ import {
 } from "../helpers.js"
 import { closedTestAgent } from "../identity.js"
 
-export const postgresUrl = process.env.BATON_DATABASE_URL ?? process.env.DATABASE_URL
+export const postgresUrl = Effect.runSync(
+  Config.option(Config.string("BATON_DATABASE_URL").pipe(Config.orElse(() => Config.string("DATABASE_URL")))).pipe(
+    Effect.map(Option.getOrUndefined),
+  ),
+)
 
 export const postgresAvailable = typeof postgresUrl === "string" && postgresUrl.length > 0
 
@@ -65,5 +69,6 @@ export const postgresWithWorker = (url: string, workerId: string, concurrency = 
     pollInterval: "50 millis",
   }).pipe(Layer.provideMerge(postgresLayer(url)))
 
+let uniqueSessionCounter = 0
 export const uniqueSession = (label: string) =>
-  `session:${label}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`
+  `session:${label}:${process.pid.toString(36)}:${(uniqueSessionCounter += 1).toString(36)}`

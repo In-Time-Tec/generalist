@@ -80,7 +80,7 @@ export const makeSqliteRunStore = (
     }
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     yield* migrate(options.filename)
-    const hub = yield* makeEventHub()
+    const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient

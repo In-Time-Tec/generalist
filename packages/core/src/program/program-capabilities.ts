@@ -218,7 +218,7 @@ export type CapabilityFailure = typeof CapabilityFailure.Type
 
 /** @experimental Encoded operations visible to sandboxed source. */
 export interface Interface {
-  readonly discoverTools: () => Effect.Effect<ReadonlyArray<ToolSummary>>
+  readonly discoverTools: Effect.Effect<ReadonlyArray<ToolSummary>>
   readonly describeTool: (name: string) => Effect.Effect<ToolDescription, ProgramCapabilityMissing>
   readonly callTool: (input: ToolCallInput) => Effect.Effect<unknown, CapabilityFailure>
   readonly callStep: (input: StepCallInput) => Effect.Effect<unknown, CapabilityFailure>

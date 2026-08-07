@@ -28,7 +28,7 @@ import {
   ProgramToolFailure,
   type StepCallInput,
   type ToolCallInput,
-} from "./program-capabilities.js"
+type ToolSummary, } from "./program-capabilities.js"
 import { ExecutionFailure as SandboxFailure, type Interface as Sandbox } from "./sandbox-executor.js"
 
 const ToolCall = Schema.Struct({ operation: ProgramOperationName, tool: Schema.String, input: Schema.Unknown })
@@ -158,7 +158,7 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
     const agents = new Map(bindings.agents.map((binding) => [binding.selection, binding] as const))
     const describeSchema = (schema: Schema.Top) =>
       Schema.encodeSync(SchemaRepresentation.DocumentFromJson)(SchemaRepresentation.fromAST(schema.ast))
-    const discoverTools = () => Effect.succeed(bindings.tools.map((binding) => ({ name: binding.name })))
+    const discoverTools: Effect.Effect<ReadonlyArray<ToolSummary>> = Effect.succeed(bindings.tools.map((binding) => ({ name: binding.name })))
     const describeTool = (name: string) => {
       const binding = tools.get(name)
       return binding === undefined

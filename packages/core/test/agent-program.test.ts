@@ -153,7 +153,7 @@ it.effect("runs sequential typed tools and steps while filtering a large interme
           Effect.gen(function* () {
             const capabilities = yield* ProgramCapabilities.ProgramCapabilities
             const input = request.input as { readonly value: number }
-            expect(yield* capabilities.discoverTools()).toEqual([{ name: "increment" }])
+            expect(yield* capabilities.discoverTools).toEqual([{ name: "increment" }])
             expect(yield* capabilities.describeTool("increment")).toMatchObject({ name: "increment" })
             const large = yield* capabilities.callTool({ operation: "load", tool: "increment", input: input.value })
             expect(large).toBe(10_000)

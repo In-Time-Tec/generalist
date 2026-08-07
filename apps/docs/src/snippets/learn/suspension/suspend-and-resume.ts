@@ -75,7 +75,7 @@ const program = Effect.gen(function* () {
     ),
     Effect.flatMap(() => Effect.die("expected the run to suspend")),
     Effect.catchIf(
-      (error): error is AgentEvent.AgentSuspended => error instanceof AgentEvent.AgentSuspended,
+      (error): error is AgentEvent.AgentSuspended => Schema.is(AgentEvent.AgentSuspended)(error),
       (error) => Effect.succeed(error),
     ),
   )

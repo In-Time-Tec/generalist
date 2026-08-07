@@ -1,4 +1,4 @@
-import { Cause, Clock, Context, Effect, Exit, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Ref, Schema, Stream } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import {
   type DriverCheckpoint,
@@ -179,7 +179,7 @@ export const makeInline = (input: {
           if (replay === undefined) yield* Ref.set(activePendingRef, decision.operation.key)
           return { operation: decision.operation, replay, nested: false }
         }
-        const nowIso = new Date(yield* Clock.currentTimeMillis).toISOString()
+        const nowIso = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
         yield* assertNotExpired(before.budget, nowIso)
         before = yield* chargeScheduled(before, spec.kind)
         yield* Ref.set(checkpointRef, before)

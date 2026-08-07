@@ -33,7 +33,7 @@ export interface EventHub {
   readonly shutdown: Effect.Effect<void>
 }
 
-export const makeEventHub = (): Effect.Effect<EventHub> =>
+export const makeEventHub: Effect.Effect<EventHub> =
   Effect.gen(function* () {
     const stateRef = yield* SynchronizedRef.make<HubState>({
       nextId: 1,

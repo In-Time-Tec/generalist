@@ -19,7 +19,7 @@ import type { EventHub } from "../subscribers.js"
 import { reconcileFanOutWith } from "../store-fan-out.js"
 import type { DecodedRun, EventRow, OperationRow, RunRow } from "../rows.js"
 import type { OperationRecord } from "../operations.js"
-import { decodePersistedEvents, decodeRunEffect } from "../store-helpers.js"
+import { decodePersistedEvents, decodeRunEffect, nowIso } from "../store-helpers.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
 import type { AgentLoopEvent } from "../../agent-event.js"
 import { PendingRunOutcome, type ExecutionClaim } from "../../run-store.js"
@@ -119,7 +119,7 @@ export const appendEvent = (_hub: EventHub, run: DecodedRun, partial: EventParti
     const sql = yield* SqlClient.SqlClient
     const pg = yield* PgClient.PgClient
     const sequence = yield* allocateSequence(run.runId)
-    const occurredAt = new Date().toISOString()
+    const occurredAt = yield* nowIso
     const event = {
       specVersion: "1" as const,
       eventId: eventIdFor(run.runId, sequence),

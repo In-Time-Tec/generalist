@@ -918,8 +918,9 @@ describe("ExecutionHost", () => {
           Effect.gen(function* () {
             const context = yield* ToolContext.ToolContext
             invocation = context
+            const context0 = yield* Effect.context<never>()
             context.signal.addEventListener("abort", () => {
-              Effect.runSync(Ref.set(interrupted, true))
+              Effect.runSyncWith(context0)(Ref.set(interrupted, true))
             })
             yield* Deferred.succeed(started, undefined)
             return yield* Effect.never

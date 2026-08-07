@@ -473,10 +473,10 @@ export const makeRunLoop = <
     Stream.provideService(CurrentSummaryCall, undefined),
     Stream.mapEffect(
       (event): Effect.Effect<ReadonlyArray<Event>, RunError> =>
-        deliverPending().pipe(Effect.map(() => [...flushTelemetry(), event])),
+        deliverPending.pipe(Effect.map(() => [...flushTelemetry(), event])),
     ),
     Stream.flattenIterable,
-    Stream.concat(Stream.unwrap(deliverPending().pipe(Effect.map(() => Stream.fromIterable(flushTelemetry()))))),
+    Stream.concat(Stream.unwrap(deliverPending.pipe(Effect.map(() => Stream.fromIterable(flushTelemetry()))))),
     Stream.catchCause((cause) => {
       if (Cause.hasInterrupts(cause)) return Stream.failCause<RunError>(cause)
       const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
@@ -484,7 +484,7 @@ export const makeRunLoop = <
         return Stream.failCause<RunError>(cause)
       }
       return Stream.unwrap(
-        deliverPending().pipe(
+        deliverPending.pipe(
           Effect.map(() => Stream.concat(Stream.fromIterable(flushTelemetry()), Stream.failCause<RunError>(cause))),
         ),
       )

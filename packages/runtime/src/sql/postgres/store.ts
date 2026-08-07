@@ -1,4 +1,4 @@
-import { Effect, Equal, Schema, Stream } from "effect"
+import { Effect, Equal, Random, Schema, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import {
@@ -54,13 +54,17 @@ import { associateRegistrations, loadRegistrations } from "../executable-registr
 import { narrow } from "../../executable-registration.js"
 import { PendingRunOutcome } from "../../run-store.js"
 import { approvalResponse } from "../respond-approval.js"
-const nextId = (prefix: string) => Effect.sync(() => `${prefix}_${Math.random().toString(36).slice(2)}`)
+const nextId = (prefix: string): Effect.Effect<string> =>
+  Effect.gen(function* () {
+    const random = yield* Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER)
+    return `${prefix}_${random.toString(36)}`
+  })
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     yield* checkSchema(source)
-    const hub = yield* makeEventHub()
+    const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
     const transactionHub: typeof hub = { ...hub, publish: () => Effect.void }
     const capacity = options.subscriberQueueCapacity ?? 64

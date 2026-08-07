@@ -1,4 +1,4 @@
-import { Effect, Redacted } from "effect"
+import { Config, Effect, Option, Redacted } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { ExecutableResolver, MysqlRunSchema, Runtime } from "../../src/index.js"
@@ -16,7 +16,11 @@ import {
 } from "../helpers.js"
 import { closedTestAgent } from "../identity.js"
 
-export const mysqlUrl = process.env.BATON_MYSQL_URL ?? process.env.MYSQL_URL
+export const mysqlUrl = Effect.runSync(
+  Config.option(Config.string("BATON_MYSQL_URL").pipe(Config.orElse(() => Config.string("MYSQL_URL")))).pipe(
+    Effect.map(Option.getOrUndefined),
+  ),
+)
 export const mysqlAvailable = typeof mysqlUrl === "string" && mysqlUrl.length > 0
 
 const resolver = ExecutableResolver.makeStatic([
@@ -85,5 +89,6 @@ export const mysqlLayer = (url: string) =>
     pollInterval: "20 millis",
   })
 
+let uniqueSessionCounter = 0
 export const uniqueSession = (label: string) =>
-  `session:${label}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`
+  `session:${label}:${process.pid.toString(36)}:${(uniqueSessionCounter += 1).toString(36)}`

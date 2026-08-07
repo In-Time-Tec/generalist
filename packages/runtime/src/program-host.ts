@@ -1,4 +1,4 @@
-import { Clock, Effect, Schema, SchemaRepresentation } from "effect"
+import { Clock, DateTime, Effect, Schema, SchemaRepresentation } from "effect"
 import {
   ProgramCapabilities,
   ProgramHost,
@@ -117,7 +117,7 @@ export const make = (input: {
         if (prepared._tag === "Failure") {
           const failure = failureFromExit(prepared.cause)
           if (Schema.is(ProgramCapabilities.ProgramSuspended)(failure)) {
-            const openedAt = new Date(nowMillis).toISOString()
+            const openedAt = DateTime.formatIso(DateTime.makeUnsafe(nowMillis))
             const wait = programWait({
               runId: input.claim.runId,
               operation: options.operation,
@@ -287,7 +287,7 @@ export const make = (input: {
             waitId: suspension.token!,
             reason: { _tag: "External", capability: "agent" },
             status: "open",
-            openedAt: new Date(nowMillis).toISOString(),
+            openedAt: DateTime.formatIso(DateTime.makeUnsafe(nowMillis)),
           },
         })
         .pipe(Effect.mapError(storeFailure))
@@ -365,7 +365,7 @@ export const make = (input: {
 
   const makeCapabilities = (program: ProgramManifest.PinnedProgram) =>
     ProgramCapabilities.ProgramCapabilities.of({
-      discoverTools: () => Effect.succeed(input.bindings.tools.map(({ name }) => ({ name }))),
+      discoverTools: Effect.succeed(input.bindings.tools.map(({ name }) => ({ name }))),
       describeTool: (name) => {
         const binding = tools.get(name)
         if (binding === undefined)

@@ -130,7 +130,7 @@ export const ChildBinding: Schema.Codec<ChildBinding, ChildBindingEncoded> = Sch
 /** @experimental Closed portable turn-policy constructor data. */
 export const PortablePolicy: Schema.Codec<PortablePolicy, PortablePolicy> = Schema.suspend(() =>
   Schema.Union([
-    Schema.Struct({ _tag: Schema.Literal("Forever") }),
+    Schema.TaggedStruct("Forever", {}),
     Schema.TaggedStruct("Recurs", { count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
     Schema.TaggedStruct("UntilToolCall", { name: Schema.String }),
     Schema.TaggedStruct("Both", { first: PortablePolicy, second: PortablePolicy }),
