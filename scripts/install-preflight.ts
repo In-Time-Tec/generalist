@@ -1,6 +1,5 @@
-import { Effect, FileSystem, Path, Schema } from "effect"
+import { Effect, FileSystem, ManagedRuntime, Path, Schema } from "effect"
 import { layer } from "@effect/platform-bun/BunServices"
-import { runMain } from "@effect/platform-bun/BunRuntime"
 
 class InstallPreflightFailed extends Schema.TaggedErrorClass<InstallPreflightFailed>()(
   "@batonfx/scripts/InstallPreflightFailed",
@@ -52,6 +51,7 @@ const program = Effect.gen(function* () {
     }
   }
   yield* Effect.logInfo(`install preflight passed for Bun ${Bun.version}`)
-}).pipe(Effect.scoped, Effect.provide(layer))
+})
 
-runMain(program)
+const runtime = ManagedRuntime.make(layer)
+await runtime.runPromise(program)

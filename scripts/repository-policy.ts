@@ -1,6 +1,5 @@
-import { Effect, FileSystem, Path, PlatformError, Schema } from "effect"
+import { Effect, FileSystem, ManagedRuntime, Path, PlatformError, Schema } from "effect"
 import { layer } from "@effect/platform-bun/BunServices"
-import { runMain } from "@effect/platform-bun/BunRuntime"
 
 const ignored = new Set(["node_modules", "dist", "coverage", ".turbo", "repos", "generated", ".git"])
 const roots = ["apps", "examples", "packages", "scripts", "tooling"]
@@ -44,6 +43,7 @@ const program = Effect.gen(function* () {
   }
   if (violations.length > 0) return yield* policyError(violations.join("\n"))
   yield* Effect.logInfo("repository policy passed")
-}).pipe(Effect.provide(layer))
+})
 
-runMain(program)
+const runtime = ManagedRuntime.make(layer)
+await runtime.runPromise(program)

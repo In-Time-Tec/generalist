@@ -1,6 +1,5 @@
-import { runMain } from "@effect/platform-bun/BunRuntime"
 import { layer } from "@effect/platform-bun/BunServices"
-import { Config, Console, Effect, Equal, FileSystem, Option, Path, Schema, Stream } from "effect"
+import { Config, Console, Effect, Equal, FileSystem, ManagedRuntime, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
 import {
@@ -135,11 +134,9 @@ const program = Effect.gen(function* () {
     yield* run("bun", ["pm", "pack", "--filename", tarball, "--quiet"], packageDirectory)
     const archive = yield* fileSystem.readFile(tarball)
     if (archive.byteLength > compressedSizeLimits[packageName]) {
-      return yield* 
-        smokeError(
-          `@batonfx/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
-        ),
-      
+      return yield* smokeError(
+        `@batonfx/${packageName} tarball exceeds ${compressedSizeLimits[packageName]} bytes: ${archive.byteLength}`,
+      )
     }
     const listing = yield* run("tar", ["-tzf", tarball], root)
     const entries = listing.split("\n").filter((entry) => entry.length > 0)
@@ -152,9 +149,7 @@ const program = Effect.gen(function* () {
         !/^package\/dist\/.+\.(?:js|d\.ts)$/.test(entry),
     )
     if (unexpected.length > 0) {
-      return yield* 
-        smokeError(`@batonfx/${packageName} contains unexpected files: ${unexpected.join(", ")}`),
-      
+      return yield* smokeError(`@batonfx/${packageName} contains unexpected files: ${unexpected.join(", ")}`)
     }
     if (entries.some((entry) => entry.startsWith("/") || entry.split("/").includes(".."))) {
       return yield* smokeError(`@batonfx/${packageName} contains an unsafe path`)
@@ -226,9 +221,7 @@ const program = Effect.gen(function* () {
       }
       for (const [dependency, dependencyVersion] of Object.entries(manifest[section] ?? {})) {
         if (dependency.startsWith("@batonfx/") && dependencyVersion !== version) {
-          return yield* 
-            smokeError(`@batonfx/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`),
-          
+          return yield* smokeError(`@batonfx/${packageName} must pin ${dependency}@${version}; packed ${dependencyVersion}`)
         }
       }
     }
@@ -237,21 +230,17 @@ const program = Effect.gen(function* () {
     }
     for (const dependency of packedEffectDependencies[packageName]) {
       if (manifest.dependencies?.[dependency] !== effectVersion) {
-        return yield* 
-          smokeError(
-            `@batonfx/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
-          ),
-        
+        return yield* smokeError(
+          `@batonfx/${packageName} must pin ${dependency}@${effectVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
+        )
       }
     }
     if (packageName === "providers") {
       for (const [dependency, dependencyVersion] of Object.entries(packedProviderDependencies)) {
         if (manifest.dependencies?.[dependency] !== dependencyVersion) {
-          return yield* 
-            smokeError(
-              `@batonfx/providers must pin ${dependency}@${dependencyVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
-            ),
-          
+          return yield* smokeError(
+            `@batonfx/providers must pin ${dependency}@${dependencyVersion}; packed ${String(manifest.dependencies?.[dependency])}`,
+          )
         }
       }
     }
@@ -399,9 +388,7 @@ console.log(\`imported \${specifiers.length} Baton exports\`)
     .split("\n")
     .filter((entry) => entry.length > 0)
   if (installedEffects.length !== 1) {
-    return yield* 
-      smokeError(`consumer installed ${installedEffects.length} Effect copies:\n${installedEffects.join("\n")}`),
-    
+    return yield* smokeError(`consumer installed ${installedEffects.length} Effect copies:\n${installedEffects.join("\n")}`)
   }
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], consumerDirectory)
@@ -481,6 +468,7 @@ console.log(\`imported \${specifiers.length} Baton exports\`)
   }
   yield* fileSystem.writeFileString(path.join(tarballDirectory, "SHA256SUMS"), `${checksums.join("\n")}\n`)
   for (const item of evidencePackages) yield* Console.log(`${item.name}: ${item.compressedBytes} compressed bytes`)
-}).pipe(Effect.scoped, Effect.provide(layer))
+})
 
-runMain(program)
+const runtime = ManagedRuntime.make(layer)
+await runtime.runPromise(program.pipe(Effect.scoped))

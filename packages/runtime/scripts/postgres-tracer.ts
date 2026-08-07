@@ -1,25 +1,18 @@
-import { Console, Effect, Schema } from "effect"
+import { Console, Effect, ManagedRuntime, Schema } from "effect"
 import { RunClaims, Runtime } from "../src/index.js"
 import { assistantAddress, completedResult, textPrompt } from "../test/helpers.js"
 import { postgresLayer, postgresUrl, preparePostgres, uniqueSession } from "../test/postgres/helpers.js"
 
-class TracerMissingEnvironment extends Schema.TaggedErrorClass<TracerMissingEnvironment>()(
-  "@batonfx/runtime/TracerMissingEnvironment",
-  { name: Schema.String },
-) {}
 
 const url = postgresUrl
+if (url === undefined || url.length === 0) {
+  throw new Error("Set BATON_DATABASE_URL or DATABASE_URL to run the postgres tracer")
+}
 
-const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const encodeJson = (value: unknown): string => JSON.stringify(value)
 
-const program = Effect.gen(function* () {
-  if (url === undefined || url.length === 0) {
-    yield* Effect.logError("Set BATON_DATABASE_URL or DATABASE_URL to run the postgres tracer")
-    return yield* TracerMissingEnvironment.make({ name: "BATON_DATABASE_URL" })
-  }
-  yield* preparePostgres(url)
-  const sessionId = uniqueSession("cli")
-  const result = yield* Effect.gen(function* () {
+const runTrace = (databaseUrl: string, sessionId: string) =>
+  Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const claims = yield* RunClaims.RunClaims
     const receipt = yield* runtime.send({
@@ -42,14 +35,19 @@ const program = Effect.gen(function* () {
     })
     const tags = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 3 })).map((event) => event._tag)
     return {
-      url: url.replace(/:[^:@/]+@/, ":***@"),
+      url: databaseUrl.replace(/:[^:@/]+@/, ":***@"),
       runId: receipt.runId,
       attemptFence: claimed[0]!.attemptFence,
       tags,
       multiWorker: true,
     }
-  }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped)
+  })
+const program = Effect.gen(function* () {
+  yield* preparePostgres(url)
+  const sessionId = uniqueSession("cli")
+  const result = yield* runTrace(url, sessionId)
   yield* Console.log(encodeJson(result))
 })
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(postgresLayer(url))
+await runtime.runPromise(program)
