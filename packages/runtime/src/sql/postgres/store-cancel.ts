@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import type { PgClient } from "@effect/sql-pg"
 import type { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
@@ -9,7 +9,10 @@ import { afterTerminal, appendEvent, hasUnsettledChild, loadRun, settleParent } 
 import { cancelOwnedFanOuts } from "./store-fan-out.js"
 import { reconcileProgramCancellation } from "../store-program.js"
 
-export const deferCancelledFanOutParent = (sql: SqlClient.SqlClient, runId: string) =>
+export const deferCancelledFanOutParent: {
+  (runId: string): (sql: SqlClient.SqlClient) => Effect.Effect<boolean, SqlError, SqlClient.SqlClient>
+  (sql: SqlClient.SqlClient, runId: string): Effect.Effect<boolean, SqlError, SqlClient.SqlClient>
+} = Function.dual(2, (sql: SqlClient.SqlClient, runId: string) =>
   Effect.gen(function* () {
     const running = yield* sql<{ fan_out_id: string }>`
       SELECT fan_out_id FROM baton_fan_outs WHERE parent_run_id = ${runId} AND status = 'running' LIMIT 1
@@ -17,7 +20,8 @@ export const deferCancelledFanOutParent = (sql: SqlClient.SqlClient, runId: stri
     if (running.length === 0 && !(yield* hasUnsettledChild(runId))) return false
     yield* sql`UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${runId}`
     return true
-  })
+  }),
+)
 
 export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readonly hub: EventHub }) => {
   const cancelRun = (

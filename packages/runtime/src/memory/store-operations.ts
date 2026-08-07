@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { OperationCompletionOutcome, RecordOperationInput } from "../run-store.js"
@@ -15,10 +15,17 @@ const getRun = (state: MemoryState, runId: string) => {
   return run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run)
 }
 
-export const recordOperation = (
-  state: MemoryState,
-  input: RecordOperationInput,
-): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable> =>
+export const recordOperation: {
+  (
+    input: RecordOperationInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+  (
+    state: MemoryState,
+    input: RecordOperationInput,
+  ): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+} = Function.dual(2, (state: MemoryState, input: RecordOperationInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
@@ -91,12 +98,21 @@ export const recordOperation = (
       next = appended
     }
     return [record, next] as const
-  })
+  }),
+)
 
-export const startOperation = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly operationId: string },
-): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable> =>
+export const startOperation: {
+  (input: {
+    readonly runId: string
+    readonly operationId: string
+  }): (
+    state: MemoryState,
+  ) => Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+  (
+    state: MemoryState,
+    input: { readonly runId: string; readonly operationId: string },
+  ): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly operationId: string }) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
@@ -109,11 +125,11 @@ export const startOperation = (
     operations.set(operationMapKey(input.runId, input.operationId), record)
     operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
     return [record, { ...state, operations }] as const
-  })
+  }),
+)
 
-export const completeOperation = (
-  state: MemoryState,
-  input: {
+export const completeOperation: {
+  (input: {
     readonly runId: string
     readonly ownerId: string
     readonly attemptFence: number
@@ -123,65 +139,113 @@ export const completeOperation = (
     readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
     readonly continuation?: import("../steering.js").ExecutionContinuation | null
     readonly steeringEntryIds?: ReadonlyArray<string>
-  },
-): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable> =>
-  Effect.gen(function* () {
-    yield* getRun(state, input.runId)
-    const current = state.operations.get(operationMapKey(input.runId, input.operationId))
-    if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-    if (current.status === "succeeded" || current.status === "failed" || current.status === "unknown") {
-      return [current, state] as const
-    }
-    const run = yield* getRun(state, input.runId)
-    for (const entryId of input.steeringEntryIds ?? []) {
-      const entry = run.steering.find((candidate) => candidate.entryId === entryId)
-      if (entry?.consumedOperationId !== input.operationId) {
-        return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} does not belong to operation` })
+  }): (
+    state: MemoryState,
+  ) => Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+  (
+    state: MemoryState,
+    input: {
+      readonly runId: string
+      readonly ownerId: string
+      readonly attemptFence: number
+      readonly operationId: string
+      readonly outcome: OperationCompletionOutcome
+      readonly checkpoint: import("../execution-state.js").ExecutionCheckpoint
+      readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
+      readonly continuation?: import("../steering.js").ExecutionContinuation | null
+      readonly steeringEntryIds?: ReadonlyArray<string>
+    },
+  ): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+} = Function.dual(
+  2,
+  (
+    state: MemoryState,
+    input: {
+      readonly runId: string
+      readonly ownerId: string
+      readonly attemptFence: number
+      readonly operationId: string
+      readonly outcome: OperationCompletionOutcome
+      readonly checkpoint: import("../execution-state.js").ExecutionCheckpoint
+      readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
+      readonly continuation?: import("../steering.js").ExecutionContinuation | null
+      readonly steeringEntryIds?: ReadonlyArray<string>
+    },
+  ) =>
+    Effect.gen(function* () {
+      yield* getRun(state, input.runId)
+      const current = state.operations.get(operationMapKey(input.runId, input.operationId))
+      if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
+      if (current.status === "succeeded" || current.status === "failed" || current.status === "unknown") {
+        return [current, state] as const
       }
-    }
-    const executableRef = yield* Effect.try({
-      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    const record: OperationRecord =
-      input.outcome._tag === "Succeeded"
-        ? { ...current, status: "succeeded", result: input.outcome.value }
-        : input.outcome._tag === "Failed"
-          ? { ...current, status: "failed", error: input.outcome.error }
-          : { ...current, status: "unknown" }
-    const operations = new Map(state.operations)
-    operations.set(operationMapKey(input.runId, input.operationId), record)
-    operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
-    const updatedRun = {
-      ...run,
-      executableRef,
-      checkpoint: input.checkpoint,
-      ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
-      ...(input.continuation === undefined || input.continuation === null ? {} : { continuation: input.continuation }),
-    }
-    const runs = new Map(state.runs)
-    if (input.continuation === null) {
-      const { continuation: _, ...withoutContinuation } = updatedRun
-      runs.set(run.runId, withoutContinuation)
-    } else {
-      runs.set(run.runId, updatedRun)
-    }
-    const next = { ...state, operations, runs }
-    if (input.outcome._tag !== "Unknown") return [record, next] as const
-    const [, unknown] = yield* appendLifecycle(next, run.runId, makeUnknown(input.operationId), "needs-resolution")
-    return [record, unknown] as const
-  })
+      const run = yield* getRun(state, input.runId)
+      for (const entryId of input.steeringEntryIds ?? []) {
+        const entry = run.steering.find((candidate) => candidate.entryId === entryId)
+        if (entry?.consumedOperationId !== input.operationId) {
+          return yield* RuntimeUnavailable.make({ message: `steering entry ${entryId} does not belong to operation` })
+        }
+      }
+      const executableRef = yield* Effect.try({
+        try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
+        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+      })
+      const record: OperationRecord =
+        input.outcome._tag === "Succeeded"
+          ? { ...current, status: "succeeded", result: input.outcome.value }
+          : input.outcome._tag === "Failed"
+            ? { ...current, status: "failed", error: input.outcome.error }
+            : { ...current, status: "unknown" }
+      const operations = new Map(state.operations)
+      operations.set(operationMapKey(input.runId, input.operationId), record)
+      operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
+      const updatedRun = {
+        ...run,
+        executableRef,
+        checkpoint: input.checkpoint,
+        ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
+        ...(input.continuation === undefined || input.continuation === null
+          ? {}
+          : { continuation: input.continuation }),
+      }
+      const runs = new Map(state.runs)
+      if (input.continuation === null) {
+        const { continuation: _, ...withoutContinuation } = updatedRun
+        runs.set(run.runId, withoutContinuation)
+      } else {
+        runs.set(run.runId, updatedRun)
+      }
+      const next = { ...state, operations, runs }
+      if (input.outcome._tag !== "Unknown") return [record, next] as const
+      const [, unknown] = yield* appendLifecycle(next, run.runId, makeUnknown(input.operationId), "needs-resolution")
+      return [record, unknown] as const
+    }),
+)
 
-export const expireRunningOperation = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly operationId: string },
-): Effect.Effect<
-  readonly [
-    { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },
-    MemoryState,
-  ],
-  RunNotFound | RuntimeUnavailable
-> =>
+export const expireRunningOperation: {
+  (input: {
+    readonly runId: string
+    readonly operationId: string
+  }): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    readonly [
+      { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },
+      MemoryState,
+    ],
+    RunNotFound | RuntimeUnavailable
+  >
+  (
+    state: MemoryState,
+    input: { readonly runId: string; readonly operationId: string },
+  ): Effect.Effect<
+    readonly [
+      { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },
+      MemoryState,
+    ],
+    RunNotFound | RuntimeUnavailable
+  >
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly operationId: string }) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const current = state.operations.get(operationMapKey(input.runId, input.operationId))
@@ -216,32 +280,52 @@ export const expireRunningOperation = (
       { record, outcome: "unknown" as const },
       { ...state, operations },
     ] as const
-  })
+  }),
+)
 
-export const getOperation = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly operationId: string },
-): Effect.Effect<OperationRecord, RunNotFound | RuntimeUnavailable> =>
+export const getOperation: {
+  (input: {
+    readonly runId: string
+    readonly operationId: string
+  }): (state: MemoryState) => Effect.Effect<OperationRecord, RunNotFound | RuntimeUnavailable>
+  (
+    state: MemoryState,
+    input: { readonly runId: string; readonly operationId: string },
+  ): Effect.Effect<OperationRecord, RunNotFound | RuntimeUnavailable>
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly operationId: string }) =>
   Effect.gen(function* () {
     yield* getRun(state, input.runId)
     const current = state.operations.get(operationMapKey(input.runId, input.operationId))
     if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     return current
-  })
+  }),
+)
 
-export const getOperationByKey = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly operationKey: string },
-) =>
+export const getOperationByKey: {
+  (input: {
+    readonly runId: string
+    readonly operationKey: string
+  }): (state: MemoryState) => Effect.Effect<OperationRecord | undefined, RunNotFound | RuntimeUnavailable, never>
+  (
+    state: MemoryState,
+    input: { readonly runId: string; readonly operationKey: string },
+  ): Effect.Effect<OperationRecord | undefined, RunNotFound | RuntimeUnavailable, never>
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly operationKey: string }) =>
   Effect.gen(function* () {
     yield* getRun(state, input.runId)
     return state.operations.get(operationKeyMapKey(input.runId, input.operationKey))
-  })
+  }),
+)
 
-export const resolveOperation = (
-  state: MemoryState,
-  input: ResolveOperationInput,
-): Effect.Effect<MemoryState, RunNotFound | OperationResolutionConflict | RuntimeUnavailable> =>
+export const resolveOperation: {
+  (
+    input: ResolveOperationInput,
+  ): (state: MemoryState) => Effect.Effect<MemoryState, RunNotFound | OperationResolutionConflict | RuntimeUnavailable>
+  (
+    state: MemoryState,
+    input: ResolveOperationInput,
+  ): Effect.Effect<MemoryState, RunNotFound | OperationResolutionConflict | RuntimeUnavailable>
+} = Function.dual(2, (state: MemoryState, input: ResolveOperationInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const current = state.operations.get(operationMapKey(input.runId, input.operationId))
@@ -277,4 +361,5 @@ export const resolveOperation = (
     const { ownerId: _, ...withoutOwner } = run
     runs.set(run.runId, { ...withoutOwner, status: "running" })
     return { ...state, operations, runs }
-  })
+  }),
+)

@@ -1,4 +1,4 @@
-import { Effect, Schema, SchemaParser } from "effect"
+import { Effect, Function, Schema, SchemaParser } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { ExecutableRef } from "./executable-manifest.js"
 import type { AgentLoopEvent } from "./agent-event.js"
@@ -375,4 +375,7 @@ export const RunEvent: Schema.Codec<RunEvent, RunEventEncoded> = Schema.declareC
       ),
 )
 
-export const eventIdFor = (runId: string, sequence: number): string => `${runId}:${sequence}`
+export const eventIdFor: {
+  (sequence: number): (runId: string) => string
+  (runId: string, sequence: number): string
+} = Function.dual(2, (runId: string, sequence: number): string => `${runId}:${sequence}`)

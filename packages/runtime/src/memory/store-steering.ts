@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect"
+import { Effect, Function, Option } from "effect"
 import { RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../errors.js"
 import type { AdmitSteeringInput, ExecutionClaim } from "../run-store.js"
 import { rejectIfTerminal } from "./append.js"
@@ -10,7 +10,17 @@ const requireRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun,
   return run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run)
 }
 
-export const admitSteering = (state: MemoryState, input: AdmitSteeringInput) =>
+export const admitSteering: {
+  (
+    input: AdmitSteeringInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict, never>
+  (
+    state: MemoryState,
+    input: AdmitSteeringInput,
+  ): Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable | SteeringConflict, never>
+} = Function.dual(2, (state: MemoryState, input: AdmitSteeringInput) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     const prior = run.steering.find((entry) => entry.idempotencyKey === input.idempotencyKey)
@@ -41,9 +51,29 @@ export const admitSteering = (state: MemoryState, input: AdmitSteeringInput) =>
       ],
     })
     return { ...state, nextSteeringCounter: state.nextSteeringCounter + 1, runs }
-  })
+  }),
+)
 
-export const readSteering = (state: MemoryState, input: ExecutionClaim) =>
+export const readSteering: {
+  (
+    input: ExecutionClaim,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    (import("../steering.js").SteeringEntry & { readonly consumedOperationId?: string })[],
+    RunNotFound | RuntimeUnavailable,
+    never
+  >
+  (
+    state: MemoryState,
+    input: ExecutionClaim,
+  ): Effect.Effect<
+    (import("../steering.js").SteeringEntry & { readonly consumedOperationId?: string })[],
+    RunNotFound | RuntimeUnavailable,
+    never
+  >
+} = Function.dual(2, (state: MemoryState, input: ExecutionClaim) =>
   Effect.map(requireRun(state, input.runId), (run) =>
     run.steering.filter((entry) => entry.consumedOperationId === undefined),
-  )
+  ),
+)

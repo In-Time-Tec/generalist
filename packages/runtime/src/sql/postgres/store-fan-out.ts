@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import type { PgClient } from "@effect/sql-pg"
 import type { SqlClient } from "effect/unstable/sql"
 import type { Interface as RunStoreInterface } from "../../run-store.js"
@@ -44,7 +44,10 @@ export const fanOutStoreMethods = (input: {
   inspectFanOut: (fanOutId) => input.runNoTxn(inspectFanOut(fanOutId)),
 })
 
-export const cancelOwnedFanOuts = (sql: SqlClient.SqlClient, parentRunId: string) =>
+export const cancelOwnedFanOuts: {
+  (parentRunId: string): (sql: SqlClient.SqlClient) => Effect.Effect<string[], SqlError, never>
+  (sql: SqlClient.SqlClient, parentRunId: string): Effect.Effect<string[], SqlError, never>
+} = Function.dual(2, (sql: SqlClient.SqlClient, parentRunId: string) =>
   Effect.gen(function* () {
     const owned = yield* sql<{ child_run_id: string }>`
       SELECT m.child_run_id FROM baton_fan_outs f
@@ -52,4 +55,5 @@ export const cancelOwnedFanOuts = (sql: SqlClient.SqlClient, parentRunId: string
       WHERE f.parent_run_id = ${parentRunId} AND f.status = 'running' ORDER BY m.ordinal ASC
     `
     return owned.map((row) => row.child_run_id)
-  })
+  }),
+)

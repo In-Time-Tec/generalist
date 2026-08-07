@@ -1,13 +1,19 @@
-import { Effect, Scope } from "effect"
+import { Effect, Function, Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 
 export type InspectionDialect = "postgres" | "mysql"
 
-export const withConsistentSnapshot = <A, E, R>(
-  sql: SqlClient.SqlClient,
-  dialect: InspectionDialect,
-  effect: Effect.Effect<A, E, R>,
-) =>
+export const withConsistentSnapshot: {
+  <A, E, R>(
+    dialect: InspectionDialect,
+    effect: Effect.Effect<A, E, R>,
+  ): (sql: SqlClient.SqlClient) => Effect.Effect<A, E | import("effect/unstable/sql/SqlError").SqlError, R>
+  <A, E, R>(
+    sql: SqlClient.SqlClient,
+    dialect: InspectionDialect,
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | import("effect/unstable/sql/SqlError").SqlError, R>
+} = Function.dual(3, <A, E, R>(sql: SqlClient.SqlClient, dialect: InspectionDialect, effect: Effect.Effect<A, E, R>) =>
   SqlClient.makeWithTransaction({
     transactionService: sql.transactionService,
     spanAttributes: [],
@@ -31,4 +37,5 @@ export const withConsistentSnapshot = <A, E, R>(
     rollback: (connection) => connection.executeUnprepared("ROLLBACK", [], undefined).pipe(Effect.asVoid),
     rollbackSavepoint: (connection, id) =>
       connection.executeUnprepared(`ROLLBACK TO SAVEPOINT baton_inspection_${id}`, [], undefined).pipe(Effect.asVoid),
-  })(effect)
+  })(effect),
+)
