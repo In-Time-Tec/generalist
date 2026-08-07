@@ -18,6 +18,7 @@ import {
 } from "../model/model-telemetry.js"
 import { Permissions, RuleStore } from "../policy/permissions.js"
 import { SessionStore, buildContext } from "../context/session.js"
+import { initialChat, seedFromSession } from "./session-history.js"
 import { SkillSource, selectListings } from "../context/skill-source.js"
 import { Steering } from "../turn/steering.js"
 import { ToolAuthorizerService, make as makeToolAuthorizer } from "../tools/tool-authorization.js"
@@ -57,6 +58,8 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
     const runtimeService = yield* Effect.serviceOption(Runtime)
     const compactionService = yield* Effect.serviceOption(Compaction)
     const sessionService = yield* Effect.serviceOption(SessionStore)
+    // Session is authoritative for model-facing history only when Compaction can maintain it.
+    const activeSession = Option.isSome(compactionService) ? sessionService : Option.none<typeof SessionStore.Service>()
     const persisted: Chat.Persisted | undefined =
       persistenceOptions === undefined
         ? undefined
@@ -119,7 +122,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       yield* Effect.gen(function* () {
         const path = yield* sessionService.value.path()
         const checkpoint = path.at(-1)
-        if (checkpoint?._tag !== "Compaction" || checkpoint.version !== 2) return
+        if (checkpoint?._tag !== "Compaction") return
         const history = yield* Ref.get(persisted.history)
         const before = buildContext(path.slice(0, -1))
         if (!Schema.toEquivalence(Prompt.Prompt)(before, history)) return
@@ -303,8 +306,8 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       const path = yield* sessionService.value
         .path()
         .pipe(Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })))
-      const checkpoint = path.findLast((entry) => entry._tag === "Compaction" && entry.version === 2)
-      if (checkpoint?._tag === "Compaction" && checkpoint.version === 2) {
+      const checkpoint = path.findLast((entry) => entry._tag === "Compaction")
+      if (checkpoint?._tag === "Compaction") {
         for (const event of checkpoint.telemetry) publishTelemetry(event)
       }
     }
@@ -422,12 +425,10 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
         ? system
         : undefined
 
-    const freshChat =
-      options.history !== undefined
-        ? Chat.fromPrompt(options.history)
-        : system !== undefined
-          ? Chat.fromPrompt([Prompt.makeMessage("system", { content: system })])
-          : Chat.empty
+    const sessionHistory = yield* seedFromSession({ activeSession, suppliedHistory: options.history }).pipe(
+      Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
+    )
+    const freshChat = initialChat({ sessionHistory, suppliedHistory: options.history, system })
     const chat: Chat.Service = resumeChat ?? persisted ?? (yield* freshChat)
     return {
       persistenceOptions,
@@ -436,6 +437,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       runtimeService,
       compactionService,
       sessionService,
+      activeSession,
       persisted,
       recoveredHistory,
       resumeChat,

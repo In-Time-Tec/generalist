@@ -37,6 +37,7 @@ import { associateRegistrations, loadRegistrations } from "./executable-registra
 import { narrow } from "../executable-registration.js"
 import type { AdmitStartInput } from "../run-store.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
+import { fanOutMember } from "../child-session.js"
 interface FanOutRow {
   readonly fan_out_id: string
   readonly parent_run_id: string
@@ -230,15 +231,7 @@ export const admitInitialFanOuts = (hub: EventHub, parentRunId: string, fanOuts:
       concurrency: Math.min(fanOut.concurrency, fanOut.members.length),
       join: fanOut.join,
       remainder: fanOut.remainder,
-      members: fanOut.members.map((member, ordinal) => ({
-        ordinal,
-        key: member.key,
-        childRunId: childRunIdFor(fanOutId, ordinal),
-        selection: member.selection,
-        prompt: member.prompt,
-        sessionId: member.sessionId ?? `fanout:${fanOutId}`,
-        metadata: member.metadata ?? {},
-      })),
+      members: fanOut.members.map((member, ordinal) => fanOutMember({ fanOutId, childRunIdFor }, member, ordinal)),
     }).pipe(
       Effect.mapError((error) =>
         error instanceof RunNotFound || error instanceof RunTerminal

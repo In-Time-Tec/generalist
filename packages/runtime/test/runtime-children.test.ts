@@ -13,6 +13,53 @@ import {
 } from "./helpers.js"
 
 layer(memoryLayer)("Runtime children", (it) => {
+  it.effect("isolates each spawned child's Session from its parent and its siblings", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "thread:isolation",
+        idempotencyKey: "isolation-parent",
+        prompt: textPrompt("plan"),
+      })
+      const first = yield* runtime.spawn({
+        parentRunId: parent.runId,
+        invocationId: "invocation:title",
+        selection: "researcher",
+        prompt: textPrompt("name the thread"),
+      })
+      const second = yield* runtime.spawn({
+        parentRunId: parent.runId,
+        invocationId: "invocation:task",
+        selection: "researcher",
+        prompt: textPrompt("do the task"),
+      })
+      const replayed = yield* runtime.spawn({
+        parentRunId: parent.runId,
+        invocationId: "invocation:title",
+        selection: "researcher",
+        prompt: textPrompt("name the thread"),
+      })
+
+      const sessionOf = (runId: string) =>
+        store.loadExecution(runId).pipe(Effect.map((execution) => execution.message.sessionId))
+
+      const parentSession = yield* sessionOf(parent.runId)
+      const firstSession = yield* sessionOf(first.runId)
+      const secondSession = yield* sessionOf(second.runId)
+
+      // A subagent works in isolation, so it must not inherit the thread's conversation.
+      expect(firstSession).not.toBe(parentSession)
+      expect(secondSession).not.toBe(parentSession)
+      // Siblings are separate conversations.
+      expect(firstSession).not.toBe(secondSession)
+      // A replayed spawn reattaches instead of stranding the first attempt's work.
+      expect(replayed.runId).toBe(first.runId)
+      expect(yield* sessionOf(replayed.runId)).toBe(firstSession)
+    }),
+  )
+
   it.effect("links a child on the parent and keeps child detail on the child stream", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime

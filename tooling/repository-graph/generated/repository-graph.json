@@ -1248,6 +1248,11 @@
       "test": false
     },
     {
+      "path": "packages/core/src/agent/session-history.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
       "path": "packages/core/src/agent/setup.ts",
       "package": "@batonfx/core",
       "test": false
@@ -2233,6 +2238,11 @@
       "test": false
     },
     {
+      "path": "packages/runtime/src/child-session.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
       "path": "packages/runtime/src/code-mode.ts",
       "package": "@batonfx/runtime",
       "test": false
@@ -2279,6 +2289,11 @@
     },
     {
       "path": "packages/runtime/src/execution-host.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
+      "path": "packages/runtime/src/execution-interruption.ts",
       "package": "@batonfx/runtime",
       "test": false
     },
@@ -2613,6 +2628,11 @@
       "test": false
     },
     {
+      "path": "packages/runtime/src/sql/session-store.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
       "path": "packages/runtime/src/sql/sql-effect.ts",
       "package": "@batonfx/runtime",
       "test": false
@@ -2704,6 +2724,11 @@
     },
     {
       "path": "packages/runtime/test/address.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/child-session.test.ts",
       "package": "@batonfx/runtime",
       "test": true
     },
@@ -7805,6 +7830,10 @@
     },
     {
       "source": "packages/core/src/agent/compaction-runtime.ts",
+      "specifier": "./session-history.js"
+    },
+    {
+      "source": "packages/core/src/agent/compaction-runtime.ts",
       "specifier": "effect"
     },
     {
@@ -8032,6 +8061,22 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/core/src/agent/session-history.ts",
+      "specifier": "../context/session.js"
+    },
+    {
+      "source": "packages/core/src/agent/session-history.ts",
+      "specifier": "./agent-message.js"
+    },
+    {
+      "source": "packages/core/src/agent/session-history.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/agent/session-history.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
       "source": "packages/core/src/agent/setup.ts",
       "specifier": "../context/instructions.js"
     },
@@ -8118,6 +8163,10 @@
     {
       "source": "packages/core/src/agent/setup.ts",
       "specifier": "./agent-suspension.js"
+    },
+    {
+      "source": "packages/core/src/agent/setup.ts",
+      "specifier": "./session-history.js"
     },
     {
       "source": "packages/core/src/agent/setup.ts",
@@ -11633,6 +11682,10 @@
     },
     {
       "source": "packages/runtime/src/execution-host.ts",
+      "specifier": "./execution-interruption.js"
+    },
+    {
+      "source": "packages/runtime/src/execution-host.ts",
       "specifier": "./program-child-terminal.js"
     },
     {
@@ -11655,6 +11708,14 @@
     {
       "source": "packages/runtime/src/execution-host.ts",
       "specifier": "effect/unstable/ai"
+    },
+    {
+      "source": "packages/runtime/src/execution-interruption.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/execution-interruption.ts",
+      "specifier": "effect"
     },
     {
       "source": "packages/runtime/src/execution-state.ts",
@@ -11913,6 +11974,10 @@
     },
     {
       "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../child-session.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
       "specifier": "../cursor.js"
     },
     {
@@ -11978,6 +12043,10 @@
     {
       "source": "packages/runtime/src/memory/store-admit.ts",
       "specifier": "../address.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-admit.ts",
+      "specifier": "../child-session.js"
     },
     {
       "source": "packages/runtime/src/memory/store-admit.ts",
@@ -12684,6 +12753,10 @@
       "specifier": "effect/unstable/sql"
     },
     {
+      "source": "packages/runtime/src/sql/mysql/store-claims.ts",
+      "specifier": "effect/unstable/sql/SqlError"
+    },
+    {
       "source": "packages/runtime/src/sql/mysql/store.ts",
       "specifier": "../../child-group.js"
     },
@@ -12787,10 +12860,6 @@
     {
       "source": "packages/runtime/src/sql/mysql/store.ts",
       "specifier": "effect/unstable/sql"
-    },
-    {
-      "source": "packages/runtime/src/sql/mysql/store.ts",
-      "specifier": "effect/unstable/sql/SqlError"
     },
     {
       "source": "packages/runtime/src/sql/operations.ts",
@@ -13363,6 +13432,19 @@
       "specifier": "effect"
     },
     {
+      "source": "packages/runtime/src/sql/session-store.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/sql/session-store.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/src/sql/session-store.ts",
+      "specifier": "effect/unstable/sql"
+    },
+    {
       "source": "packages/runtime/src/sql/sql-effect.ts",
       "specifier": "../errors.js"
     },
@@ -13525,6 +13607,10 @@
     {
       "source": "packages/runtime/src/sql/store-fan-out.ts",
       "specifier": "../child-group.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-fan-out.ts",
+      "specifier": "../child-session.js"
     },
     {
       "source": "packages/runtime/src/sql/store-fan-out.ts",
@@ -13749,6 +13835,10 @@
     },
     {
       "source": "packages/runtime/src/sql/store.ts",
+      "specifier": "./session-store.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store.ts",
       "specifier": "./sql-effect.js"
     },
     {
@@ -13914,6 +14004,14 @@
       "specifier": "effect"
     },
     {
+      "source": "packages/runtime/test/child-session.test.ts",
+      "specifier": "../src/child-session.js"
+    },
+    {
+      "source": "packages/runtime/test/child-session.test.ts",
+      "specifier": "vitest"
+    },
+    {
       "source": "packages/runtime/test/code-mode.test.ts",
       "specifier": "../src/active-executions.js"
     },
@@ -14024,6 +14122,10 @@
     {
       "source": "packages/runtime/test/execution-host.test.ts",
       "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/execution-host.test.ts",
+      "specifier": "bun:sqlite"
     },
     {
       "source": "packages/runtime/test/execution-host.test.ts",
@@ -16275,6 +16377,11 @@
     {
       "source": "packages/runtime/test/address.test.ts",
       "test": "packages/runtime/test/address.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/child-session.test.ts",
+      "test": "packages/runtime/test/child-session.test.ts",
       "kind": "same-stem"
     },
     {

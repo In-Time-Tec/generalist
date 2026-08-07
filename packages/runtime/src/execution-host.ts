@@ -22,7 +22,8 @@ import type { AgentLoopEvent } from "./agent-event.js"
 import { commitDeferredProgramChildTerminal, makeDeferredProgramChildTerminal } from "./program-child-terminal.js"
 import { agentBudget } from "./execution-defaults.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "./code-mode.js"
-import { hostContext } from "./execution-context.js"
+import { hostContext, sessionContext } from "./execution-context.js"
+import { settleInterruptedExecution } from "./execution-interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { approvalReason } from "./run-wait.js"
 export interface Options {
@@ -53,19 +54,12 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
         const completingRetrySafeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())
         const deferredProgramChildTerminal = yield* makeDeferredProgramChildTerminal
         const isProgramChild = claimed.message.metadata?.programOperation !== undefined
-        const settleInterruption = Effect.gen(function* () {
-          const operationIds = yield* Ref.get(activeOperationIds)
-          const completingRetrySafe = yield* Ref.get(completingRetrySafeOperationIds)
-          const requiresRecovery = [...operationIds].filter((operationId) => !completingRetrySafe.has(operationId))
-          yield* Effect.forEach(
-            requiresRecovery,
-            (operationId) => store.expireRunningOperation({ ...claim, operationId }),
-            { discard: true },
-          )
-          if (requiresRecovery.length > 0 && (yield* store.inspect(runId)).status === "needs-resolution") return
-          yield* store
-            .fail({ ...claim, error: AgentExecutionFailure.make({ message: "execution interrupted" }) })
-            .pipe(Effect.catch((error) => (Schema.is(RunTerminal)(error) ? Effect.void : Effect.fail(error))))
+        const settleInterruption = settleInterruptedExecution({
+          store,
+          claim,
+          runId,
+          activeOperationIds,
+          completingRetrySafeOperationIds,
         })
 
         const scopedExecution = Effect.scoped(
@@ -121,7 +115,12 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               environment: Layer.Layer<Agent.ClosedServices<Tools, R>>,
             ): Effect.Effect<void, never, Scope.Scope> =>
               Effect.gen(function* () {
-                const baseContext = yield* hostContext({ agent, environment, store, codeMode })
+                // Session owns model-facing history, so a durable store hands each Run the conversation
+                // for its session identity. Without one the Run stays process-bound.
+                const baseContext = Context.merge(
+                  yield* hostContext({ agent, environment, store, codeMode }),
+                  yield* sessionContext(store, claimed.message.sessionId),
+                )
                 const runHosted = <HostedTools extends Record<string, Tool.Any>>(
                   hostedAgent: Agent.Agent<HostedTools, R>,
                 ): Effect.Effect<void> => {

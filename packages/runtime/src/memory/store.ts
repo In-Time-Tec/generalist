@@ -72,6 +72,7 @@ export const makeRunStore = (options: LayerOptions) =>
 
     return RunStore.of({
       info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
+      sessionStore: () => Effect.succeed(undefined),
       hasAdmission: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>

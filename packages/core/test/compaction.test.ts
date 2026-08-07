@@ -104,7 +104,6 @@ describe("Compaction", () => {
 
     expect(Option.isSome(plan)).toBe(true)
     if (Option.isSome(plan)) {
-      expect(plan.value.firstKeptEntryId).toBe("1")
       expect(plan.value.head.map((item) => item.id)).toEqual(["0"])
       expect(plan.value.recent.map((item) => item.id)).toEqual(["1", "2"])
     }
@@ -328,9 +327,7 @@ describe("Compaction", () => {
         shouldCompact: () => true,
         cut: () => {
           cuts += 1
-          return cuts === 2
-            ? Option.some({ head: [path[0]!], recent: [path[1]!], firstKeptEntryId: "1" })
-            : Option.none()
+          return cuts === 2 ? Option.some({ head: [path[0]!], recent: [path[1]!] }) : Option.none()
         },
         summarize: () => Effect.fail(new Compaction.CompactionError({ message: "summary failed" })),
       })
@@ -596,7 +593,7 @@ describe("Compaction", () => {
       Effect.gen(function* () {
         const store = yield* Session.SessionStore
         yield* store.append({ _tag: "Message", message: user("old goal") })
-        const kept = yield* store.append({ _tag: "Message", message: user("recent tail") })
+        yield* store.append({ _tag: "Message", message: user("recent tail") })
         const path = yield* store.path()
         const service = Compaction.make(Compaction.defaultStrategy(), {
           contextWindow: 10,
@@ -625,7 +622,6 @@ describe("Compaction", () => {
           const value = compacted.value
           expect(value._tag).toBe("Summarize")
           if (value._tag === "Summarize") {
-            expect(value.firstKeptEntryId).toBe(kept.id)
             const history = Json.stringify(value.history.content)
             expect(history).toContain("<conversation-checkpoint>")
             expect(history).toContain("checkpoint summary")

@@ -15,14 +15,17 @@ const program = Effect.gen(function* () {
   yield* store.append(message(user("Plan a trip to Boise.")))
   yield* store.append(message(assistant("Three days in Boise, starting downtown.")))
   const kept = yield* store.append(message(user("Add a rafting day.")))
+  const checkpointId = yield* store.reserveEntryId
 
   const before = Session.buildContext(yield* store.path())
   yield* Console.log(`before: ${before.content.map((entry) => entry.role).join(" ")}`)
 
-  yield* store.append({
-    _tag: "Compaction",
+  yield* store.appendCheckpoint({
+    id: checkpointId,
+    parentId: kept.id,
+    projectedHistory: Prompt.fromMessages([user("Planned a three-day Boise trip. Add a rafting day.")]),
+    telemetry: [],
     summary: "Planned a three-day Boise trip.",
-    firstKeptEntryId: kept.id,
   })
 
   const path = yield* store.path()

@@ -609,7 +609,6 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 ]),
                 prompt: request.prompt,
                 summary: "recall-derived summary",
-                firstKeptEntryId: firstKept.id,
               }),
             ).pipe(Compaction.withLifecycle(request))
           },
@@ -989,7 +988,6 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
                 ]),
                 prompt: request.prompt,
                 summary: "summary",
-                firstKeptEntryId: firstKept.id,
               }),
             ).pipe(Compaction.withLifecycle(request))
           },
@@ -1016,7 +1014,9 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         ])
 
         expect(first.text).toBe("first done")
-        expect(projected.content).toHaveLength(2)
+        // The checkpoint stores conversation only; the system message stays derived per run.
+        expect(projected.content).toHaveLength(1)
+        expect(projected.content.every((message) => message.role !== "system")).toBe(true)
 
         const second = yield* Agent.generate(agent, {
           prompt: "second authored",
