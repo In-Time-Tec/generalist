@@ -135,3 +135,22 @@ The conditional service-member design was probe-verified:
 **Final state**: wave-24 reverted a second time; restored to the verified wave-23 state:
 tsc 0, 1,168 tests pass, all scripts PASS, lint = the 2 original `any-unknown-in-error-context` flags
 (tool-executor-routes.ts:58, agent.ts:466). 62 commits on `lint/conformance`. NOT pushed to main.
+
+## Wave 25 (2026-08-07) — tool-executor-routes:58 CLEARED via separate D/E schema conditionals
+
+**Breakthrough**: the wave-24 codec attempt used a combined conditional
+(`[unknown] extends [S["DecodingServices"] | S["EncodingServices"]]`) that mismatched the library patch's
+D-only/E-only conditionals (`[unknown] extends [S["DecodingServices"]]` / `[unknown] extends [S["EncodingServices"]]`),
+causing the tsc conditional-generic assignability errors. Using **separate `SchemaServicesD`/`SchemaServicesE`**
+conditionals matching the patched `Schema.decodeUnknownEffect`/`encodeUnknownEffect` RHS exactly:
+
+- `tool-result-codec.ts`: encode/decode Rs → `SchemaServicesE<S>`/`SchemaServicesD<S>` (identity with the patched RHS — tsc clean).
+- `tool-placement.ts`: `PlacementSchemaServices<Tools>` and `placementOutcomeFromResponse` R → the separate
+  conditionals — **tool-executor-routes.ts:58 CLEARED** (scoped lint 0 errors).
+
+**Remaining**: 1 lint error — agent.ts:466 (the run channel's generic `S["DecodingServices"]`). The 466 requires
+the run-loop's `SchemaServicesD` threading (structuredFinalEvents ← patched top-level generateObject RHS — now
+feasible with the separate D conditional) plus the makeRunLoop/RunStream full truthful channel, whose
+`LanguageModel`/`HandoffCatalog` members require the runtime `execution-host` to provision them explicitly
+(the closed-environment's generic `R` cannot be proven to cover them) — the documented runtime-model
+provisioning investigation.
