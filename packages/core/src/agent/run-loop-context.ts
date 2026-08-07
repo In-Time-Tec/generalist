@@ -88,7 +88,6 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     result: CompactionResult,
     parentId: string | null,
     applicationIdentity: string,
-  ) => Effect.Effect<void, RunError>
   ) => Effect.Effect<void, RunError, DriverInterpreter>
   readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
   readonly deliverPending: Effect.Effect<void, DeliveryFailed>
