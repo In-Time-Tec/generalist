@@ -82,7 +82,9 @@ describe("ExecutionHost", () => {
         resolve: (input) =>
           Effect.sync(() => {
             const registration = input.registrations?.find((item) => item.pin === compaction.service)
-            const policy = Schema.decodeUnknownSync(ExecutableRegistration.CompactionPolicy)(registration?.payload)
+            const policy = Schema.decodeUnknownOption(ExecutableRegistration.CompactionPolicy)(registration?.payload).pipe(
+              Option.getOrUndefined,
+            )
             const strategy: Compaction.Strategy = {
               ...Compaction.defaultStrategy(),
               shouldCompact: (usage) => {
@@ -106,7 +108,7 @@ describe("ExecutionHost", () => {
                       streamText: () => Stream.fromIterable<Response.StreamPartEncoded>([finish]),
                     }),
                   ),
-                  Compaction.layer({ strategy, keepRecentTokens: policy.keepRecentTokens }),
+                  Compaction.layer({ strategy, keepRecentTokens: policy?.keepRecentTokens ?? 0 }),
                 ),
               ),
               runOptions: {
@@ -196,9 +198,9 @@ describe("ExecutionHost", () => {
           Effect.sync(() => {
             const policyRegistration = input.registrations?.find((item) => item.pin === compaction.service)
             const summaryRegistration = input.registrations?.find((item) => item.pin === compaction.summaryModel)
-            const policy = Schema.decodeUnknownSync(ExecutableRegistration.CompactionPolicy)(
+            const policy = Schema.decodeUnknownOption(ExecutableRegistration.CompactionPolicy)(
               policyRegistration?.payload,
-            )
+            ).pipe(Option.getOrUndefined)
             if (
               typeof summaryRegistration?.payload !== "object" ||
               summaryRegistration.payload === null ||
@@ -253,7 +255,7 @@ describe("ExecutionHost", () => {
                   }),
                   Session.layerMemory,
                   Compaction.layer({
-                    keepRecentTokens: policy.keepRecentTokens,
+                    keepRecentTokens: policy?.keepRecentTokens ?? 0,
                     summaryModel,
                   }),
                 ),

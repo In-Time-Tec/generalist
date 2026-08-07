@@ -1,5 +1,5 @@
 import { expect, it, layer } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { AgentEvent } from "@batonfx/core"
 import { ChildRuns, Errors, Runtime, RunStore } from "../src/index.js"
 import { assistantAddress, completedResult, parentRelativeOptions } from "./helpers.js"
@@ -40,7 +40,7 @@ const startGroup = (parentRunId: string, toolCallId = "start-group") =>
       ],
     })
     if (outcome._tag !== "Success") return yield* Effect.die(`group admission returned ${outcome._tag}`)
-    return Schema.decodeUnknownSync(ChildRuns.GroupReceipt)(outcome.result)
+    return yield* Schema.decodeUnknownEffect(ChildRuns.GroupReceipt)(outcome.result)
   })
 
 layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
@@ -48,17 +48,17 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
     Effect.sync(() => {
       const tools = ChildRuns.makeTools({ children: [{ selection: "researcher" }] })
       const parameters = tools.startChildGroup.parametersSchema as typeof ChildRuns.StartGroupParameters
-      const allowed = Schema.decodeUnknownSync(parameters)({
+      const allowed = Schema.decodeUnknownOption(parameters)({
         concurrency: 1,
         members: [{ key: "one", selection: "researcher", prompt: "work" }],
-      })
+      }).pipe(Option.getOrThrow)
       expect(allowed.members[0]!.selection).toBe("researcher")
-      expect(() =>
-        Schema.decodeUnknownSync(parameters)({
+      expect(
+        Schema.decodeUnknownOption(parameters)({
           concurrency: 1,
           members: [{ key: "one", selection: "analyst", prompt: "work" }],
         }),
-      ).toThrow()
+      ).toEqual(Option.none())
       expect(tools.runChild.name).toBe("run_child")
       expect(tools.startChildGroup.name).toBe("start_child_group")
       expect(tools.awaitChildGroup.name).toBe("await_child_group")
@@ -117,7 +117,7 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
       expect(parentInspection.wait).toMatchObject({ waitId: "await-group", status: "signaled" })
       const resolution = parentInspection.wait?.resolution
       expect(resolution?._tag).toBe("Signal")
-      const resumed = Schema.decodeUnknownSync(ChildRuns.GroupResult)(
+      const resumed = yield* Schema.decodeUnknownEffect(ChildRuns.GroupResult)(
         resolution?._tag === "Signal" ? resolution.payload : undefined,
       )
       expect(resumed.children.map((child) => child.key)).toEqual(["first", "second", "third"])

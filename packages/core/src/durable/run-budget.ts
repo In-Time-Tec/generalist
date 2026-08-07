@@ -41,6 +41,7 @@ export class RunBudgetExhausted extends Schema.TaggedErrorClass<RunBudgetExhaust
     ]),
     requested: Schema.Finite,
     remaining: Schema.optionalKey(Schema.Finite),
+    message: Schema.optionalKey(Schema.String),
   },
 ) {}
 
@@ -51,6 +52,7 @@ export class RunBudgetGrantWidened extends Schema.TaggedErrorClass<RunBudgetGran
     dimension: Schema.Literals(["modelCalls", "toolCalls", "totalTokens", "childRuns", "handoffs", "depth"]),
     grant: Schema.Finite,
     remaining: Schema.Finite,
+    message: Schema.optionalKey(Schema.String),
   },
 ) {}
 
@@ -171,7 +173,9 @@ export const allocate = make
 /** @experimental */
 export const charge = (budget: RunBudget, usage: BudgetLimits): Effect.Effect<RunBudget, RunBudgetExhausted> =>
   Effect.gen(function* () {
-    const validUsage = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(usage)
+    const validUsage = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(usage).pipe(
+      Effect.mapError((error) => RunBudgetExhausted.make({ dimension: "modelCalls", requested: 0, message: error.message })),
+    )
     const remaining: Record<string, number | string | undefined> = { ...budget.remaining }
     for (const dimension of chargeDimensions) {
       const amount = validUsage[dimension]
@@ -197,7 +201,9 @@ export const reserveChild = (
   RunBudgetExhausted | RunBudgetGrantWidened
 > =>
   Effect.gen(function* () {
-    grant = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(grant)
+    grant = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(grant).pipe(
+      Effect.mapError((error) => RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message })),
+    )
     const maxDepth = parent.allocation.depth
     const childDepth = parent.depth + 1
     if (maxDepth !== undefined && childDepth > maxDepth) {
@@ -265,7 +271,9 @@ export const narrowChild = (
   narrower: BudgetLimits,
 ): Effect.Effect<{ readonly parent: RunBudget; readonly child: RunBudget }, RunBudgetGrantWidened> =>
   Effect.gen(function* () {
-    narrower = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(narrower)
+    narrower = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(narrower).pipe(
+      Effect.mapError((error) => RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message })),
+    )
     for (const dimension of [...chargeDimensions, "childRuns", "depth"] as const) {
       const next = narrower[dimension]
       if (next === undefined) continue

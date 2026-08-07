@@ -148,7 +148,7 @@ it.live("keeps memory and SQLite failure history and inspection in parity", () =
       expect(snapshot.outcome?._tag).toBe("Failed")
       if (terminal?._tag !== "RunFailed") throw new Error("expected RunFailed")
       expect(terminal.error.constructor).toBe(failure.constructor)
-      return Schema.encodeSync(RunEvent.RunFailure)(terminal.error)
+      return yield* Schema.encodeEffect(RunEvent.RunFailure)(terminal.error)
     }).pipe(
       Effect.provide(backend === "memory" ? memoryLayer : sqliteLayer(tempDbPath("run-event-codec-parity"))),
       Effect.scoped,

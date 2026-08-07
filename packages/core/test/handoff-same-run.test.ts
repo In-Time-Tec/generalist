@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
@@ -75,7 +75,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         Effect.sync(() => {
           if (operation.kind === "handoff" && outcome._tag === "Succeeded") {
             handoffCheckpoint = checkpoint
-            handoffCommit = Schema.decodeUnknownSync(Handoff.HandoffCommit)(outcome.value)
+            handoffCommit = Schema.decodeUnknownOption(Handoff.HandoffCommit)(outcome.value).pipe(Option.getOrUndefined)
           }
         }),
       onCheckpoint: () => Effect.void,

@@ -64,16 +64,18 @@ export const loadRegistrations = (runId: string) =>
       ORDER BY registration.pin
     `
     return yield* Effect.forEach(rows, (row) =>
-      Effect.try({
-        try: () => {
-          const registration = Schema.decodeUnknownSync(Schema.fromJsonString(ExecutableRegistration), {
-            onExcessProperty: "error",
-          })(row.payload_json)
-          if (digest(registration) !== row.registration_digest)
-            throw new TypeError(`registration digest mismatch: ${row.pin}`)
-          return registration
-        },
-        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+      Effect.gen(function* () {
+        const registration = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ExecutableRegistration), {
+          onExcessProperty: "error",
+        })(row.payload_json).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })))
+        const matches = yield* Effect.try({
+          try: () => digest(registration) === row.registration_digest,
+          catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+        })
+        if (!matches) {
+          return yield* RuntimeUnavailable.make({ message: `registration digest mismatch: ${row.pin}` })
+        }
+        return registration
       }),
     )
   })

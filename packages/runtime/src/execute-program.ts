@@ -28,10 +28,9 @@ export const executeProgram = (input: {
   )
   return scopedExecution.pipe(
     Effect.flatMap((value) =>
-      Effect.try({
-        try: () => new TextEncoder().encode(Schema.encodeSync(Schema.UnknownFromJsonString)(value)).byteLength,
-        catch: (error) => AgentExecutionFailure.make({ message: String(error) }),
-      }).pipe(
+      Schema.encodeEffect(Schema.UnknownFromJsonString)(value).pipe(
+        Effect.map((encoded) => new TextEncoder().encode(encoded).byteLength),
+        Effect.mapError((error) => AgentExecutionFailure.make({ message: error.message })),
         Effect.flatMap((outputBytes) =>
           store.completeProgram({
             ...claim,
