@@ -50,4 +50,4 @@ const program = Effect.gen(function* () {
 })
 
 const runtime = ManagedRuntime.make(postgresLayer(url))
-await runtime.runPromise(program)
+await runtime.runPromise(program.pipe(Effect.scoped))

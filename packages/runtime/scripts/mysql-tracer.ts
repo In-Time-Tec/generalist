@@ -54,4 +54,4 @@ const program = Effect.gen(function* () {
 })
 
 const runtime = ManagedRuntime.make(mysqlLayer(url))
-await runtime.runPromise(program)
+await runtime.runPromise(program.pipe(Effect.scoped))

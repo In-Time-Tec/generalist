@@ -336,7 +336,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
           executeApproved(turn, call, { call, toolCallBatch, turn, toolCallIndex, agentName, sessionId }, registry),
         ),
       ),
-    )
+    ) as Stream.Stream<Event, RunError, StaticToolServices<T> | R>
 
   const toolCallEvents = (
     turn: number,
@@ -430,7 +430,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
           ),
         )
       }),
-    )
+    ) as Stream.Stream<Event, RunError, StaticToolServices<T> | R>
   }
   return {
     boundedSuccessResult,
