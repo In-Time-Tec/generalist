@@ -1,6 +1,7 @@
 import { Effect, Function, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool } from "effect/unstable/ai"
 import type { NoExcessProperties } from "effect/Types"
+import { ToolContext } from "../tools/tool-context.js"
 
 /** @internal A broad toolkit used only by the adapter's implementation boundary. */
 type BroadTools = Record<string, Tool.Any>
@@ -11,36 +12,34 @@ type BroadGenerateObjectOptions = LanguageModel.GenerateObjectOptions<
 >
 type BroadGenerateTextResponse = LanguageModel.GenerateTextResponse<BroadTools>
 type BroadGenerateObjectResponse = LanguageModel.GenerateObjectResponse<BroadTools, unknown>
-type BroadGenerateTextRequirements = unknown
-type BroadGenerateObjectRequirements = unknown
 type BroadStreamPart = Response.StreamPart<BroadTools>
 type BroadGenerateError = LanguageModel.ExtractError<LanguageModel.GenerateTextOptions<BroadTools>>
 type BroadGenerateObjectError = LanguageModel.ExtractError<BroadGenerateObjectOptions>
 
-type GenerateTextMiddleware<Extra> = (
+type GenerateTextMiddleware<Extra, R> = (
   options: LanguageModel.GenerateTextOptions<BroadTools>,
   invoke: (
     options?: LanguageModel.GenerateTextOptions<BroadTools>,
-  ) => Effect.Effect<BroadGenerateTextResponse, BroadGenerateError, BroadGenerateTextRequirements>,
-) => Effect.Effect<BroadGenerateTextResponse, BroadGenerateError | Extra, BroadGenerateTextRequirements>
+  ) => Effect.Effect<BroadGenerateTextResponse, BroadGenerateError, R>,
+) => Effect.Effect<BroadGenerateTextResponse, BroadGenerateError | Extra, R>
 
 type GenerateObjectMiddleware<Extra> = (
   options: BroadGenerateObjectOptions,
   invoke: (
     options?: BroadGenerateObjectOptions,
-  ) => Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError, BroadGenerateObjectRequirements>,
-) => Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError | Extra, BroadGenerateObjectRequirements>
+  ) => Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError, unknown>,
+) => Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError | Extra, unknown>
 
 type StreamTextMiddleware<Extra> = (
   options: LanguageModel.GenerateTextOptions<BroadTools>,
   invoke: (
     options?: LanguageModel.GenerateTextOptions<BroadTools>,
-  ) => Stream.Stream<BroadStreamPart, BroadGenerateError, BroadGenerateTextRequirements>,
-) => Stream.Stream<BroadStreamPart | Response.ErrorPart, BroadGenerateError | Extra, BroadGenerateTextRequirements>
+  ) => Stream.Stream<BroadStreamPart, BroadGenerateError, unknown>,
+) => Stream.Stream<BroadStreamPart | Response.ErrorPart, BroadGenerateError | Extra, unknown>
 
 /** @internal Typed operation-level model middleware. */
-export interface Middleware<GenerateError = never, GenerateObjectError = never, StreamError = never> {
-  readonly generateText?: GenerateTextMiddleware<GenerateError>
+export interface Middleware<GenerateError = never, GenerateObjectError = never, StreamError = never, R = ToolContext> {
+  readonly generateText?: GenerateTextMiddleware<GenerateError, R>
   readonly generateObject?: GenerateObjectMiddleware<GenerateObjectError>
   readonly streamText?: StreamTextMiddleware<StreamError>
 }
@@ -62,10 +61,16 @@ const noToolkitOptions = (
 const invokeGenerateTextImpl = (
   model: LanguageModel.Service,
   options: LanguageModel.GenerateTextOptions<BroadTools>,
-) =>
-  options.toolkit === undefined
-    ? model.generateText({ ...noToolkitOptions(options), toolkit: undefined })
-    : model.generateText({ ...options, toolkit: options.toolkit })
+) => {
+  if (options.toolkit === undefined) {
+    return model.generateText({ ...noToolkitOptions(options), toolkit: undefined })
+  }
+  const invoked: Effect.Effect<BroadGenerateTextResponse, BroadGenerateError, ToolContext> = model.generateText({
+    ...options,
+    toolkit: options.toolkit,
+  })
+  return invoked
+}
 
 export const invokeGenerateText: {
   (

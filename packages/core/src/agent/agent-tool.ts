@@ -1,6 +1,6 @@
 import { Cause, Effect, Function, Option, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
-import { type Agent, type Result, type RunOptions, generate } from "./agent.js"
+import { type Agent, type Result, type RunError, generate } from "./agent.js"
 import {
   AgentError,
   AgentSuspended,
@@ -15,8 +15,8 @@ import {
 import { TurnPolicyError } from "../turn/turn-policy.js"
 import { reserveChildBudget, refundChildBudget } from "../durable/driver-run.js"
 import { DriverInterpreter } from "../durable/driver-interpreter.js"
-import { RunBudgetExhausted, RunBudgetGrantWidened } from "../durable/run-budget.js"
-import type { Registration } from "../policy/handoff.js"
+import { RunBudgetExhausted, RunBudgetGrantWidened, type RunBudget } from "../durable/run-budget.js"
+import { RegistrationError, type Registration } from "../policy/handoff.js"
 
 const defaultParameters = Schema.Struct({ prompt: Schema.String })
 
@@ -194,14 +194,17 @@ export const asTool: {
     const handler = (params: unknown): Effect.Effect<unknown, string, R> =>
       Effect.gen(function* () {
         const prompt = yield* promptFor(options.parameters, options.toPrompt, params)
-        const runChild = (runOptions: RunOptions) => {
-          const execution = "run" in agent ? agent.run(runOptions) : generate(agent, runOptions)
-          return execution.pipe(
+        type AgentToolRunOptions = { readonly prompt: Prompt.RawInput; readonly inheritedBudget?: RunBudget }
+        const runChild = (runOptions: AgentToolRunOptions) => {
+          const execution: Effect.Effect<Result, RunError | RegistrationError, R> =
+            "run" in agent ? agent.run(runOptions) : generate(agent, runOptions)
+          const handled: Effect.Effect<Result, string, R> = execution.pipe(
             Effect.catchCause((cause) => {
               if (Cause.hasInterrupts(cause)) return Effect.interrupt
               return Effect.fail(causeMessage(agent.name, cause))
             }),
           )
+          return handled
         }
         const interpreter = yield* Effect.serviceOption(DriverInterpreter)
         if (Option.isNone(interpreter)) {

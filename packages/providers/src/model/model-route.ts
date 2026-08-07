@@ -1,6 +1,6 @@
 import { Cause, Context, Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool } from "effect/unstable/ai"
-import { ModelMiddleware, ModelRegistry } from "@batonfx/core"
+import { ModelMiddleware, ModelRegistry, ToolContext } from "@batonfx/core"
 
 /** @experimental */
 export interface Input {
@@ -49,10 +49,17 @@ const noToolkitOptions = (options: GenerateTextOptions): LanguageModel.GenerateT
   toolkit: undefined,
 })
 
-const invokeGenerateText = (model: LanguageModel.Service, options: GenerateTextOptions) =>
-  options.toolkit === undefined
-    ? model.generateText({ ...noToolkitOptions(options), toolkit: undefined })
-    : model.generateText({ ...options, toolkit: options.toolkit })
+const invokeGenerateText = (model: LanguageModel.Service, options: GenerateTextOptions) => {
+  if (options.toolkit === undefined) {
+    return model.generateText({ ...noToolkitOptions(options), toolkit: undefined })
+  }
+  const invoked: Effect.Effect<
+    LanguageModel.GenerateTextResponse<BroadTools>,
+    LanguageModel.ExtractError<GenerateTextOptions>,
+    ToolContext.ToolContext
+  > = model.generateText({ ...options, toolkit: options.toolkit })
+  return invoked
+}
 
 const invokeGenerateObject = (model: LanguageModel.Service, options: GenerateObjectOptions) =>
   model.generateObject(options)

@@ -1,4 +1,4 @@
-import { Console, Effect, FileSystem, Option, Path, PlatformError, Schema } from "effect"
+import { Console, Effect, FileSystem, Option, Path, Schema } from "effect"
 import { Argument, Command } from "effect/unstable/cli"
 
 type PackageNode = {
@@ -57,22 +57,26 @@ function exportSpecifiers(value: unknown): Array<string> {
 }
 const isTest = (path: string): boolean => path.includes("/test/") || /(?:\.test|\.spec)\.[^.]+$/.test(path)
 
-const buildGraph = (root: string, pathService: Path.Path, fileSystem: FileSystem.FileSystem): Effect.Effect<Graph, PlatformError> =>
+const buildGraph = (root: string, pathService: Path.Path, fileSystem: FileSystem.FileSystem) =>
   Effect.gen(function* () {
     const relativePath = (value: string): string => pathService.relative(root, value).split("\\").join("/")
 
-    const listFiles = (directory: string, pattern: RegExp | undefined): Effect.Effect<Array<string>, PlatformError> =>
+    const listFiles = (directory: string, pattern: RegExp | undefined) =>
       Effect.gen(function* () {
         const result: Array<string> = []
-        const entries = yield* fileSystem.readDirectory(directory)
-        for (const name of entries.toSorted((a, b) => a.localeCompare(b))) {
-          if (ignored.has(name)) continue
-          const file = pathService.join(directory, name)
-          const info = yield* fileSystem.stat(file)
-          if (info.type === "Directory") {
-            result.push(...(yield* listFiles(file, pattern)))
-          } else if (info.type === "File" && (pattern === undefined || pattern.test(name))) {
-            result.push(file)
+        const pending: Array<string> = [directory]
+        while (pending.length > 0) {
+          const current = pending.pop()!
+          const entries = yield* fileSystem.readDirectory(current)
+          for (const name of entries.toSorted((a, b) => a.localeCompare(b)).toReversed()) {
+            if (ignored.has(name)) continue
+            const file = pathService.join(current, name)
+            const info = yield* fileSystem.stat(file)
+            if (info.type === "Directory") {
+              pending.push(file)
+            } else if (info.type === "File" && (pattern === undefined || pattern.test(name))) {
+              result.push(file)
+            }
           }
         }
         return result
@@ -226,7 +230,7 @@ const buildGraph = (root: string, pathService: Path.Path, fileSystem: FileSystem
       ),
     ]
 
-    return {
+    const result: Graph = {
       schemaVersion: 2,
       generatedBy: "Bun.Transpiler.scanImports",
       files: files.map((file) => ({
@@ -239,9 +243,10 @@ const buildGraph = (root: string, pathService: Path.Path, fileSystem: FileSystem
       relationships,
       violations: violations.toSorted(),
     }
+    return result
   })
 
-const printList = (title: string, values: ReadonlyArray<string>): Effect.Effect<void> =>
+const printList = (title: string, values: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     yield* Console.log(`${title}:`)
     for (const value of values) yield* Console.log(`- ${value}`)
@@ -254,7 +259,7 @@ export const program = Effect.gen(function* () {
   const graph = yield* buildGraph(root, path, fileSystem)
   const graphPath = path.join(root, "tooling/repository-graph/generated/repository-graph.json")
   const serialized = `${encodeJson(graph)}\n`
-  const readGraph = (): Effect.Effect<string, PlatformError> => fileSystem.readFileString(graphPath)
+  const readGraph = () => fileSystem.readFileString(graphPath)
   const packageForArgument = (value: string): string | undefined =>
     graph.packages.some((node) => node.name === value)
       ? value

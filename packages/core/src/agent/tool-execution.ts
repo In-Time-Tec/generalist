@@ -159,7 +159,12 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
   ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<T> | Tool.HandlerServices<T[keyof T]>> => {
     const registered = get(registry, request.call.name)
     if (registered?.dispatch === "Static") {
-      return executeToolkit(registry.toolkit, request)
+      const executed: Effect.Effect<
+        Outcome,
+        FrameworkFailure,
+        Tool.HandlersFor<T> | Tool.HandlerServices<T[keyof T]>
+      > = executeToolkit(registry.toolkit, request)
+      return executed
     }
     return registered === undefined
       ? Effect.fail(

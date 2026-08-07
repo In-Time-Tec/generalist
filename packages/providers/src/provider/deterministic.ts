@@ -1,6 +1,5 @@
 import { OpenAiClient } from "@effect/ai-openai"
 import { ModelRegistry } from "@batonfx/core"
-import type { ModelRegistryFacade } from "@batonfx/core"
 import { Config, Effect, Layer, Option, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { HttpClient } from "effect/unstable/http"
@@ -40,7 +39,9 @@ export interface DeterministicInput extends RegistrationOptions {
 }
 
 /** @experimental */
-export const registration = (input: DeterministicInput = {}): ReturnType<ModelRegistryFacade["registration"]> =>
+export const registration = (
+  input: DeterministicInput = {},
+): Effect.Effect<ModelRegistry.Registration, never, never> =>
   ModelRegistry.registration({
     provider: input.provider ?? "deterministic",
     model: input.model ?? "deterministic",
@@ -52,7 +53,7 @@ export const registration = (input: DeterministicInput = {}): ReturnType<ModelRe
 
 /** @experimental */
 export const layer = (input: DeterministicInput = {}): Layer.Layer<ModelRegistry.ModelRegistry> =>
-  ModelRegistry.layer([registration(input)]) as Layer.Layer<ModelRegistry.ModelRegistry>
+  ModelRegistry.layer([registration(input)])
 
 /** @experimental */
 export interface OpenAiFallbackOptions extends LayerOptions {

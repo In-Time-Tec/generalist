@@ -138,29 +138,33 @@ const executeWithClosedSet = <R, T extends SchemaTool>(
     if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
     return toolResultCodec.encodeDomainCandidate<T["failureSchema"]>(tool, error)
   }
-  return toolResultCodec.decodeInput<T["parametersSchema"]>(tool, request.call.params).pipe(
-    Effect.flatMap((params) => toolkit.invoke(request.call.name, params)),
-    Effect.flatMap((result) => toolResultCodec.decodeSuccess<T["successSchema"]>(tool, result)),
-    Effect.catchIf(() => true, handleFailure, handleFailure),
-  )
+  const executed: Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | ToolSchemaServices<T>> =
+    toolResultCodec.decodeInput<T["parametersSchema"]>(tool, request.call.params).pipe(
+      Effect.flatMap((params) => toolkit.invoke(request.call.name, params)),
+      Effect.flatMap((result) => toolResultCodec.decodeSuccess<T["successSchema"]>(tool, result)),
+      Effect.catchIf(() => true, handleFailure, handleFailure),
+    )
+  return executed
 }
 
 const executeWithClosedToolkit = <
-  Name extends string,
-  Parameters extends Schema.Top,
-  SuccessSchema extends Schema.Top,
   R,
+  Name extends string = string,
+  Parameters extends Schema.Top = Schema.Top,
+  SuccessSchema extends Schema.Top = Schema.Top,
 >(
   toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
   request: Request,
-): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext> =>
-  executeWithClosedSet(
+): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext> => {
+  const executed: Effect.Effect<Outcome, FrameworkFailure, R | ToolContext> = executeWithClosedSet(
     {
       tools: toolkit.tools,
       invoke: (name, params) => (name === toolkit.name ? toolkit.invoke(params) : Effect.fail(`Unknown tool ${name}`)),
     },
     request,
   ).pipe(toolResultCodec.provideSchemaServices)
+  return executed
+}
 
 const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
@@ -250,19 +254,20 @@ export function executeToolkit<
   Parameters extends Schema.Top,
   SuccessSchema extends Schema.Top,
   R,
+  T extends SchemaTool = SchemaTool,
 >(
   toolkitOrRequest:
     | ToolkitInput<Tools>
     | AgentToolToolkit<Name, Parameters, SuccessSchema, R>
-    | ClosedToolSet<R>
+    | ClosedToolSet<R, T>
     | Request,
   request?: Request,
 ): unknown {
   if (request === undefined) {
     if (!isRequest(toolkitOrRequest)) return () => Effect.die("executeToolkit pipeable form requires a Request")
     const pipeableRequest = toolkitOrRequest
-    function pipeable(
-      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R>,
+    function pipeable<T extends SchemaTool = SchemaTool>(
+      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R, T>,
     ): unknown
     function pipeable<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
       toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
@@ -285,12 +290,12 @@ export function executeToolkit<
       Tool.HandlersFor<CurrentTools> | Tool.HandlerServices<CurrentTools[keyof CurrentTools]>
     >
     function pipeable(
-      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R>,
+      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R, T>,
     ): unknown {
       if ("invoke" in toolkit) {
         return "name" in toolkit
-          ? executeWithClosedToolkit(toolkit, pipeableRequest)
-          : executeWithClosedSet(toolkit, pipeableRequest)
+          ? executeWithClosedToolkit<R>(toolkit, pipeableRequest)
+          : executeWithClosedSet<R, T>(toolkit, pipeableRequest)
       }
       if ("handle" in toolkit) return executeWithToolkit(toolkit, pipeableRequest)
       const unhandled: Toolkit.Toolkit<Tools> = toolkit
@@ -301,7 +306,7 @@ export function executeToolkit<
   if (isRequest(toolkitOrRequest)) return Effect.die("executeToolkit requires a toolkit when a Request is supplied")
   const toolkit = toolkitOrRequest
   if ("invoke" in toolkit) {
-    return "name" in toolkit ? executeWithClosedToolkit(toolkit, request) : executeWithClosedSet(toolkit, request)
+    return "name" in toolkit ? executeWithClosedToolkit<R>(toolkit, request) : executeWithClosedSet<R, T>(toolkit, request)
   }
   if ("handle" in toolkit) return executeWithToolkit(toolkit, request)
   const unhandled: Toolkit.Toolkit<Tools> = toolkit
