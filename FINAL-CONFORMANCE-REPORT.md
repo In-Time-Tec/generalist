@@ -104,3 +104,16 @@ flags are all `any`/`unknown` in the requirements channels of handoff/supervisor
 resolving to `any`/`unknown` for broad tool types (the same library `Schema.Constraint` erasure).
 `StaticToolServices` conditionals were probe-verified to break the tool-execution RHS raw (executionBase/
 defaultExecute) — the same tsc wall documented in wave 23.
+
+
+## Wave 24 revert (2026-08-07) — runtime closed-environment provision
+
+The wave-24 truthful-channel core (RunRequirements/RunStream LanguageModel+HandoffCatalog, run-loop annotations,
+generic Registration/fanOut/delegate) was **reverted** after verification: the runtime's `execution-host` provides
+the hosted run's `LanguageModel` through the closed environment's generic `R` (`ClosedServices<Tools, R> = R | ...`),
+which the type system cannot prove covers the now-explicit `LanguageModel`/`HandoffCatalog` channel members
+(`Exclude<LanguageModel, ...ClosedServices>` stays non-never). Restoring the runtime build required either
+reverting the core truthfulness or a dedicated runtime model-provisioning investigation (out of budget).
+The library `.d.ts` patches, the adapter `generateObject` SchemaServices erasure, the test host HandoffCatalog
+layers for the wave-24 test edits, and this report remain. State restored to: tsc 0, 1,168 tests pass, all scripts
+PASS, lint = the 2 original `any-unknown-in-error-context` flags (tool-executor-routes.ts:58, agent.ts:466).
