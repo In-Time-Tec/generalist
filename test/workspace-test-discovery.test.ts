@@ -1,5 +1,5 @@
-import { describe, expect, it, layer } from "@effect/vitest"
-import { Effect, FileSystem, Path } from "effect"
+import { expect, layer } from "@effect/vitest"
+import { Effect, FileSystem, Path, PlatformError } from "effect"
 import { layer as bunLayer } from "@effect/platform-bun/BunServices"
 
 const ignored = /(?:^|\/)(?:repos|dist|coverage|node_modules|\.turbo|generated)(?:\/|$)/
@@ -10,7 +10,7 @@ const filesUnder = (
   root: string,
   fileSystem: FileSystem.FileSystem,
   path: Path.Path,
-): Effect.Effect<Array<string>> =>
+): Effect.Effect<Array<string>, PlatformError> =>
   Effect.gen(function* () {
     const exists = yield* fileSystem.exists(directory)
     if (!exists) return []

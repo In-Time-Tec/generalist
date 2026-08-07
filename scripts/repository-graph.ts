@@ -1,17 +1,8 @@
-import { Console, Effect, FileSystem, Option, Path, Schema } from "effect"
+import { Console, Effect, FileSystem, Option, Path, PlatformError, Schema } from "effect"
 import { Argument, Command } from "effect/unstable/cli"
 import { runMain } from "@effect/platform-bun/BunRuntime"
 import { layer } from "@effect/platform-bun/BunServices"
 
-type Manifest = {
-  readonly name?: unknown
-  readonly private?: unknown
-  readonly exports?: unknown
-  readonly dependencies?: Record<string, string>
-  readonly devDependencies?: Record<string, string>
-  readonly peerDependencies?: Record<string, string>
-  readonly workspaces?: unknown
-}
 type PackageNode = {
   readonly name: string
   readonly path: string
@@ -68,17 +59,17 @@ function exportSpecifiers(value: unknown): Array<string> {
 }
 const isTest = (path: string): boolean => path.includes("/test/") || /(?:\.test|\.spec)\.[^.]+$/.test(path)
 
-const buildGraph = (root: string, path: Path.Path, fileSystem: FileSystem.FileSystem): Effect.Effect<Graph> =>
+const buildGraph = (root: string, pathService: Path.Path, fileSystem: FileSystem.FileSystem): Effect.Effect<Graph, PlatformError> =>
   Effect.gen(function* () {
-    const relativePath = (value: string): string => path.relative(root, value).split("\\").join("/")
+    const relativePath = (value: string): string => pathService.relative(root, value).split("\\").join("/")
 
-    const listFiles = (directory: string, pattern: RegExp | undefined): Effect.Effect<Array<string>> =>
+    const listFiles = (directory: string, pattern: RegExp | undefined): Effect.Effect<Array<string>, PlatformError> =>
       Effect.gen(function* () {
         const result: Array<string> = []
         const entries = yield* fileSystem.readDirectory(directory)
         for (const name of entries.toSorted((a, b) => a.localeCompare(b))) {
           if (ignored.has(name)) continue
-          const file = path.join(directory, name)
+          const file = pathService.join(directory, name)
           const info = yield* fileSystem.stat(file)
           if (info.type === "Directory") {
             result.push(...(yield* listFiles(file, pattern)))
@@ -97,7 +88,7 @@ const buildGraph = (root: string, path: Path.Path, fileSystem: FileSystem.FileSy
     for (const manifestPath of manifestPaths) {
       const manifest = parseJson(yield* fileSystem.readFileString(manifestPath))
       if (typeof manifest.name !== "string") continue
-      const packagePath = path.dirname(manifestPath)
+      const packagePath = pathService.dirname(manifestPath)
       const dependencies = Object.keys({
         ...manifest.dependencies,
         ...manifest.devDependencies,
@@ -115,7 +106,7 @@ const buildGraph = (root: string, path: Path.Path, fileSystem: FileSystem.FileSy
     packageNodes.sort((left, right) => left.name.localeCompare(right.name))
 
     const packageByName = new Map(packageNodes.map((node) => [node.name, node]))
-    const packageByPath = packageNodes.toSorted((left, right) => right.path.length - left.path.length)
+    const packageByPath = packageNodes.toSorted((left, right) => right.pathService.length - left.pathService.length)
     const ownerOf = (value: string): string | undefined => {
       const owner = packageByPath.find((node) => value === node.path || value.startsWith(`${node.path}/`))
       return owner?.name
@@ -124,11 +115,11 @@ const buildGraph = (root: string, path: Path.Path, fileSystem: FileSystem.FileSy
     const fileSet = new Set(files)
     const resolveSource = (source: string, specifier: string): string | undefined => {
       if (!specifier.startsWith(".")) return undefined
-      const base = path.resolve(path.dirname(source), specifier)
+      const base = pathService.resolve(pathService.dirname(source), specifier)
       const candidates = [
         base,
         ...[".ts", ".tsx", ".mts", ".cts"].map((extension) => `${base}${extension}`),
-        ...["index.ts", "index.tsx"].map((name) => path.join(base, name)),
+        ...["index.ts", "index.tsx"].map((name) => pathService.join(base, name)),
       ]
       return candidates.map((candidate) => relativePath(candidate)).find((candidate) => fileSet.has(candidate))
     }
@@ -142,12 +133,12 @@ const buildGraph = (root: string, path: Path.Path, fileSystem: FileSystem.FileSy
     {
       const transpiler = new Bun.Transpiler({ loader: "ts" })
       for (const file of files) {
-        const source = path.join(root, file)
+        const source = pathService.join(root, file)
         const sourceText = yield* fileSystem.readFileString(source)
         for (const found of transpiler.scanImports(sourceText)) {
           const target = resolveSource(source, found.path)
           const packageNode = [...packageByName.values()].find(
-            (node) => found.path === node.name || found.path.startsWith(`${node.name}/`),
+            (node) => found.path === node.name || found.pathService.startsWith(`${node.name}/`),
           )
           importNodes.push({
             source: file,
@@ -174,7 +165,7 @@ const buildGraph = (root: string, path: Path.Path, fileSystem: FileSystem.FileSy
         ),
       )
 
-    const explicitPath = path.join(root, "tooling/repository-graph/test-relationships.json")
+    const explicitPath = pathService.join(root, "tooling/repository-graph/test-relationships.json")
     const explicit = parseJsonArray(yield* fileSystem.readFileString(explicitPath)) as ReadonlyArray<TestRelationship>
     const relationships = [...explicit]
       .concat(files.filter(isTest).map((test) => ({ source: test, test, kind: "same-stem" as const })))
@@ -207,8 +198,8 @@ const buildGraph = (root: string, path: Path.Path, fileSystem: FileSystem.FileSy
       const visited = new Set<string>()
       const walk = (node: string, path: Array<string>): void => {
         if (visiting.has(node)) {
-          const start = path.indexOf(node)
-          found.push([...path.slice(start), node].join(" -> "))
+          const start = pathService.indexOf(node)
+          found.push([...pathService.slice(start), node].join(" -> "))
           return
         }
         if (visited.has(node)) return
@@ -264,7 +255,7 @@ const program = Effect.gen(function* () {
   const graph = yield* buildGraph(root, path, fileSystem)
   const graphPath = path.join(root, "tooling/repository-graph/generated/repository-graph.json")
   const serialized = `${encodeJson(graph)}\n`
-  const readGraph = (): Effect.Effect<string> => fileSystem.readFileString(graphPath)
+  const readGraph = (): Effect.Effect<string, PlatformError> => fileSystem.readFileString(graphPath)
   const packageForArgument = (value: string): string | undefined =>
     graph.packages.some((node) => node.name === value)
       ? value

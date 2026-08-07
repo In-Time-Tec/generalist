@@ -1,4 +1,4 @@
-import { describe, expect, it, layer } from "@effect/vitest"
+import { expect, layer } from "@effect/vitest"
 import { Effect, FileSystem, Path } from "effect"
 import { layer as bunLayer } from "@effect/platform-bun/BunServices"
 
