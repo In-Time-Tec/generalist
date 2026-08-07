@@ -117,3 +117,21 @@ reverting the core truthfulness or a dedicated runtime model-provisioning invest
 The library `.d.ts` patches, the adapter `generateObject` SchemaServices erasure, the test host HandoffCatalog
 layers for the wave-24 test edits, and this report remain. State restored to: tsc 0, 1,168 tests pass, all scripts
 PASS, lint = the 2 original `any-unknown-in-error-context` flags (tool-executor-routes.ts:58, agent.ts:466).
+
+## Wave 24 final (2026-08-07) — conditional-member experiment + second revert
+
+The conditional service-member design was probe-verified:
+- Runtime side: `[LanguageModel] extends [R] ? never : LanguageModel` + `[HandoffCatalog] extends [R] ? never : HandoffCatalog`
+  in RunRequirements/RunStream — the execution-host's `Exclude<..., ClosedServices<Tools, R>>` resolves to `never` — **works**.
+- Run-loop side: the raw `HandoffCatalog`/`LanguageModel` members in the makeRunLoop→modelTurn→tool-execution→
+  handoff-tool-execution chain are NOT assignable to the conditional members (`raw HC ⊄ [HC] extends [R] ? never : HC`,
+  probe-verified) — threading the conditional through the chain reaches `yield* HandoffCatalog`, where the raw
+  requirement is irreducible — the same unbounded cascade.
+- A `serviceOption(HandoffCatalog)` redesign (ambient catalog, typed FrameworkFailure on missing catalog) would
+  remove the HandoffCatalog from the run channel, but the LanguageModel member still requires the runtime to
+  provision it explicitly — the runtime's model comes through the closed environment's generic `R`, which the
+  type system cannot prove covers the explicit member.
+
+**Final state**: wave-24 reverted a second time; restored to the verified wave-23 state:
+tsc 0, 1,168 tests pass, all scripts PASS, lint = the 2 original `any-unknown-in-error-context` flags
+(tool-executor-routes.ts:58, agent.ts:466). 62 commits on `lint/conformance`. NOT pushed to main.
