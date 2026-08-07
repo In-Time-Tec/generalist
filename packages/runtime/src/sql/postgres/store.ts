@@ -84,6 +84,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
     })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "postgres", multiWorker: true }),
+      sessionStore: () => Effect.succeed(undefined),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => run(admitSend(transactionHub, addressBindings, nextId, input)),
       admitStart: (input) =>

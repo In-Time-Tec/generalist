@@ -37,6 +37,7 @@ import {
 import { decodeRunEffect, hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
 import { withSql } from "./sql-effect.js"
+import { makeSqliteSessionStore } from "./session-store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "./store-steering.js"
 import { makeEventHub } from "./subscribers.js"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
@@ -104,6 +105,7 @@ export const makeSqliteRunStore = (
 
     return RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
+      sessionStore: (sessionId: string) => withSql(sql, makeSqliteSessionStore({ sessionId })).pipe(Effect.orDie),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => run(admitSend(hub, addressBindings, input)),
       admitStart: (input) => runBuffered((transactionHub) => admitStart(transactionHub, input)),

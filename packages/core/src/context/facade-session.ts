@@ -3,6 +3,7 @@ import {
   SessionConflict as Session_SessionConflict,
   SessionStore as Session_SessionStore,
   checkpointMatches as Session_checkpointMatches,
+  EntryPayload as Session_EntryPayload,
   buildContext as Session_buildContext,
   buildMemoryContext as Session_buildMemoryContext,
   layerMemory as Session_layerMemory,
@@ -13,6 +14,7 @@ export const Session = {
   SessionConflict: Session_SessionConflict,
   SessionStore: Session_SessionStore,
   checkpointMatches: Session_checkpointMatches,
+  EntryPayload: Session_EntryPayload,
   buildContext: Session_buildContext,
   buildMemoryContext: Session_buildMemoryContext,
   layerMemory: Session_layerMemory,
@@ -23,6 +25,7 @@ export namespace Session {
   export type SessionConflict = import("./session.js").SessionConflict
   export type SessionStore = import("./session.js").SessionStore
   export type checkpointMatches = typeof import("./session.js").checkpointMatches
+  export type EntryPayload = import("./session.js").EntryPayload
   export type buildContext = typeof import("./session.js").buildContext
   export type buildMemoryContext = typeof import("./session.js").buildMemoryContext
   export type layerMemory = typeof import("./session.js").layerMemory

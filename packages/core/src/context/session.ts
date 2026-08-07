@@ -77,6 +77,31 @@ export type Entry =
 type AppendEntryInput<Item extends Entry> = Item extends CompactionEntry ? never : Omit<Item, "id" | "parentId">
 /** @experimental Session entry input appended by a store implementation. */
 export type AppendInput = AppendEntryInput<Entry>
+/**
+ * @experimental Durable wire form of a Session entry.
+ *
+ * Session is the authority for model-facing history, so a store that persists entries needs one
+ * shared encoding rather than each backend inventing its own. Entry ids and parent links are stored
+ * as columns by the owning store; only the tag-specific payload is encoded here.
+ */
+export const EntryPayload = Schema.Union([
+  Schema.TaggedStruct("Message", { message: Prompt.Message }),
+  Schema.TaggedStruct("ToolCall", { part: Prompt.ToolCallPart }),
+  Schema.TaggedStruct("ToolResult", { part: Prompt.ToolResultPart }),
+  Schema.TaggedStruct("Memory", { items: Schema.Array(Schema.String) }),
+  Schema.TaggedStruct("Skill", { name: Schema.String, body: Schema.String }),
+  Schema.TaggedStruct("Steering", { message: Prompt.Message }),
+  Schema.TaggedStruct("Handoff", { target: Schema.String, summary: Schema.String }),
+  Schema.TaggedStruct("Compaction", {
+    projectedHistory: Prompt.Prompt,
+    telemetry: Schema.Array(ModelTelemetryEvent),
+    compactionCommit: Schema.optionalKey(CompactionCommit),
+    summary: Schema.optionalKey(Schema.String),
+  }),
+  Schema.TaggedStruct("BranchSummary", { summary: Schema.String }),
+])
+/** @experimental */
+export type EntryPayload = typeof EntryPayload.Type
 /** @experimental Session store operation failure. */
 export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError>()("@batonfx/core/SessionStoreError", {
   message: Schema.String,

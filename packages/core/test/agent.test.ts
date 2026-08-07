@@ -3140,6 +3140,42 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "re-derives Instructions on every Run of a continued Session", () => {
+    const prompts: Array<string> = []
+    let guidance = "GUIDANCE ONE"
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          prompts.push(Json.stringify(options.prompt.content))
+          return Stream.make(
+            Response.makePart("text-start", { id: "text" }),
+            textDelta("ok"),
+            Response.makePart("text-end", { id: "text" }),
+          )
+        }),
+        Instructions.layer([{ id: "workspace", render: () => Effect.succeedSome(guidance) }]),
+        Session.layerMemory,
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        Compaction.layer({ contextWindow: 1_000_000, reserveTokens: 1, keepRecentTokens: 1 }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "session-epoch-agent", instructions: "fallback" })
+
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "one" }))
+        guidance = "GUIDANCE TWO"
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "two" }))
+
+        expect(prompts[0]).toContain("GUIDANCE ONE")
+        // A continued Session renders current guidance instead of the epoch captured on run one.
+        expect(prompts[1]).toContain("GUIDANCE TWO")
+        expect(prompts[1]).not.toContain("GUIDANCE ONE")
+        expect(prompts[1]).toContain("one")
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "continues an active Session across separate Runs", () => {
     const prompts: Array<string> = []
     return [

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 
@@ -210,6 +210,25 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   FOREIGN KEY (pin) REFERENCES baton_executable_registrations(pin)
   )`,
   `CREATE INDEX IF NOT EXISTS baton_run_registrations_pin_idx ON baton_run_registrations(pin)`,
+  `CREATE TABLE IF NOT EXISTS baton_sessions (
+  session_id TEXT PRIMARY KEY,
+  leaf_id TEXT,
+  next_seq INTEGER NOT NULL DEFAULT 0,
+  owner_token TEXT,
+  updated_at TEXT NOT NULL
+)`,
+  `CREATE TABLE IF NOT EXISTS baton_session_entries (
+  session_id TEXT NOT NULL,
+  entry_id TEXT NOT NULL,
+  parent_id TEXT,
+  seq INTEGER NOT NULL,
+  tag TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, entry_id)
+)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS baton_session_entries_seq_idx ON baton_session_entries(session_id, seq)`,
+  `CREATE INDEX IF NOT EXISTS baton_session_entries_parent_idx ON baton_session_entries(session_id, parent_id)`,
 ]
 
 export const schemaChecksum = (): string => {
