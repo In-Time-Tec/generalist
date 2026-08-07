@@ -24,6 +24,7 @@ import { type Address, Cursor, type Run, type RunEvent, type Runtime } from "@ba
 import { Effect, Option, Stream } from "effect"
 import { decode } from "./content.js"
 import { artifactFromEvent, fromRuntime, stateFromRun, statusFromEvent } from "./projection.js"
+import { TaskNotWaiting } from "./errors.js"
 
 /** @experimental One explicit A2A endpoint deployment. */
 export interface Deployment {
@@ -172,7 +173,7 @@ const makeExecutor = (runtime: Runtime.Interface, deployment: Deployment): Agent
       bus.publish(AgentEvent.task(task))
       const wait = snapshot.run.wait
       if (snapshot.run.status !== "waiting" || wait === undefined || wait.status !== "open") {
-        return yield* Effect.fail(new Error(`Task ${context.taskId} is not waiting for input`))
+        return yield* TaskNotWaiting.make({ taskId: context.taskId, message: `Task ${context.taskId} is not waiting for input` })
       }
       if (wait.reason._tag === "Approval") {
         yield* runtime.respondApproval({

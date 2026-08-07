@@ -1,15 +1,22 @@
-import { Effect } from "effect"
+import { Console, Effect, Schema } from "effect"
 import { RunClaims, Runtime } from "../src/index.js"
 import { assistantAddress, completedResult, textPrompt } from "../test/helpers.js"
 import { postgresLayer, postgresUrl, preparePostgres, uniqueSession } from "../test/postgres/helpers.js"
 
+class TracerMissingEnvironment extends Schema.TaggedErrorClass<TracerMissingEnvironment>()(
+  "@batonfx/runtime/TracerMissingEnvironment",
+  { name: Schema.String },
+) {}
+
 const url = postgresUrl
-if (url === undefined || url.length === 0) {
-  console.error("Set BATON_DATABASE_URL or DATABASE_URL to run the postgres tracer")
-  process.exit(1)
-}
+
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const program = Effect.gen(function* () {
+  if (url === undefined || url.length === 0) {
+    yield* Effect.logError("Set BATON_DATABASE_URL or DATABASE_URL to run the postgres tracer")
+    return yield* TracerMissingEnvironment.make({ name: "BATON_DATABASE_URL" })
+  }
   yield* preparePostgres(url)
   const sessionId = uniqueSession("cli")
   const result = yield* Effect.gen(function* () {
@@ -42,7 +49,7 @@ const program = Effect.gen(function* () {
       multiWorker: true,
     }
   }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped)
-  console.log(JSON.stringify(result, null, 2))
+  yield* Console.log(encodeJson(result))
 })
 
 await Effect.runPromise(program)

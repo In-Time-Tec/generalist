@@ -6,6 +6,12 @@ export class MessageRejected extends Schema.TaggedErrorClass<MessageRejected>()(
   part: Schema.optionalKey(Schema.Int),
 }) {}
 
+/** @experimental The task is not in a waitable state for the requested operation. */
+export class TaskNotWaiting extends Schema.TaggedErrorClass<TaskNotWaiting>()("@batonfx/a2a/TaskNotWaiting", {
+  taskId: Schema.String,
+  message: Schema.String,
+}) {}
+
 /** @experimental Runtime state could not be projected to an A2A Task. */
 export class TaskProjectionFailed extends Schema.TaggedErrorClass<TaskProjectionFailed>()(
   "@batonfx/a2a/TaskProjectionFailed",

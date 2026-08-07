@@ -237,7 +237,7 @@ it.live("persists one ordered child-group suspension and result across SQLite re
       const children = ChildRuns.make(store)
       const parent = yield* runtime.inspect(admitted.parentRunId)
       const resolution = parent.wait?.resolution
-      const result = Schema.decodeUnknownSync(ChildRuns.GroupResult)(
+      const result = yield* Schema.decodeUnknownEffect(ChildRuns.GroupResult)(
         resolution?._tag === "Signal" ? resolution.payload : undefined,
       )
       expect(result.children.map((child) => child.key)).toEqual(["first", "second", "third"])

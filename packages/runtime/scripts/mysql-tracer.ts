@@ -1,15 +1,22 @@
-import { Effect, Stream } from "effect"
+import { Console, Effect, Schema, Stream } from "effect"
 import { RunClaims, Runtime } from "../src/index.js"
 import { assistantAddress, completedResult } from "../test/helpers.js"
 import { mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "../test/mysql/helpers.js"
 
+class TracerMissingEnvironment extends Schema.TaggedErrorClass<TracerMissingEnvironment>()(
+  "@batonfx/runtime/TracerMissingEnvironment",
+  { name: Schema.String },
+) {}
+
 const url = mysqlUrl
-if (url === undefined || url.length === 0) {
-  console.error("Set BATON_MYSQL_URL or MYSQL_URL to run the MySQL tracer")
-  process.exit(1)
-}
+
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const program = Effect.gen(function* () {
+  if (url === undefined || url.length === 0) {
+    yield* Effect.logError("Set BATON_MYSQL_URL or MYSQL_URL to run the MySQL tracer")
+    return yield* TracerMissingEnvironment.make({ name: "BATON_MYSQL_URL" })
+  }
   yield* prepareMysql(url)
   const sessionId = uniqueSession("cli")
   const result = yield* Effect.gen(function* () {
@@ -46,7 +53,7 @@ const program = Effect.gen(function* () {
       multiWorker: true,
     }
   }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped)
-  console.log(JSON.stringify(result, null, 2))
+  yield* Console.log(encodeJson(result))
 })
 
 await Effect.runPromise(program)

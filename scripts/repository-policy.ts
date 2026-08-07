@@ -1,43 +1,48 @@
-import { readdirSync } from "node:fs"
-import { join, relative } from "node:path"
-import { Effect, FileSystem, Path } from "effect"
+import { Effect, FileSystem, Path, PlatformError, Schema } from "effect"
 import { layer } from "@effect/platform-bun/BunServices"
 import { runMain } from "@effect/platform-bun/BunRuntime"
 
 const ignored = new Set(["node_modules", "dist", "coverage", ".turbo", "repos", "generated", ".git"])
 const roots = ["apps", "examples", "packages", "scripts", "tooling"]
-const sourceFiles = (root: string): Array<string> => {
-  const files: Array<string> = []
-  const visit = (directory: string): void => {
-    for (const entry of readdirSync(directory, { withFileTypes: true }).toSorted((left, right) =>
-      left.name.localeCompare(right.name),
-    )) {
-      if (ignored.has(entry.name)) continue
-      const file = join(directory, entry.name)
-      if (entry.isDirectory()) visit(file)
-      else if (
-        entry.isFile() &&
-        /\.(?:ts|tsx)$/.test(entry.name) &&
-        !file.includes("/test/") &&
-        !/\.(?:test|spec)\.(?:ts|tsx)$/.test(entry.name)
-      )
-        files.push(file)
-    }
-  }
-  for (const directory of roots) visit(join(root, directory))
-  return files.toSorted()
-}
+
+class RepositoryPolicyFailed extends Schema.TaggedErrorClass<RepositoryPolicyFailed>()(
+  "@batonfx/scripts/RepositoryPolicyFailed",
+  { message: Schema.String },
+) {}
+
+const policyError = (message: string): RepositoryPolicyFailed => RepositoryPolicyFailed.make({ message })
 
 const program = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const root = path.resolve(".")
   const violations: Array<string> = []
-  for (const file of sourceFiles(root)) {
-    const lines = (yield* fileSystem.readFileString(file)).split("\n").length - 1
-    if (lines > 500) violations.push(`${relative(root, file)}: ${lines} lines (maximum 500)`)
+  const visit = (directory: string): Effect.Effect<void, PlatformError> =>
+    Effect.gen(function* () {
+      const entries = yield* fileSystem.readDirectory(directory)
+      for (const name of entries.toSorted((left, right) => left.localeCompare(right))) {
+        if (ignored.has(name)) continue
+        const file = path.join(directory, name)
+        const info = yield* fileSystem.stat(file)
+        const isDirectory = info.type === "Directory"
+        if (isDirectory) {
+          yield* visit(file)
+          continue
+        }
+        if (
+          !/\.(?:ts|tsx)$/.test(name) ||
+          file.includes("/test/") ||
+          /\.(?:test|spec)\.(?:ts|tsx)$/.test(name)
+        )
+          continue
+        const lines = (yield* fileSystem.readFileString(file)).split("\n").length - 1
+        if (lines > 500) violations.push(`${path.relative(root, file)}: ${lines} lines (maximum 500)`)
+      }
+    })
+  for (const directory of roots) {
+    yield* visit(path.join(root, directory))
   }
-  if (violations.length > 0) return yield* Effect.fail(new Error(violations.join("\n")))
+  if (violations.length > 0) return yield* policyError(violations.join("\n"))
   yield* Effect.logInfo("repository policy passed")
 }).pipe(Effect.provide(layer))
 

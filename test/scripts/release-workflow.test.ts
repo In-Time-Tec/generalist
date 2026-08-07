@@ -1,6 +1,6 @@
-import { execFileSync } from "node:child_process"
-import { readFileSync } from "node:fs"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, layer } from "@effect/vitest"
+import { Effect, FileSystem, Path } from "effect"
+import { layer as bunLayer } from "@effect/platform-bun/BunServices"
 
 const pins = new Set([
   "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -12,21 +12,26 @@ const pins = new Set([
   "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
 ])
 
-describe("release workflows", () => {
-  it("requires the behavioral test suite in continuous integration", () => {
-    const source = readFileSync(".github/workflows/ci.yml", "utf8")
-    expect(source).toContain("run: bun run check")
-    expect(source).toContain("run: bun run test")
+const readWorkflow = (name: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    return yield* fileSystem.readFileString(path.resolve(".", `.github/workflows/${name}`))
   })
 
-  it("keeps release recovery immutable, authenticated, and least-privileged", () => {
-    const source = readFileSync(".github/workflows/publish.yml", "utf8")
-    const workflow = JSON.parse(
-      execFileSync("bun", ["-e", "console.log(JSON.stringify(Bun.YAML.parse(await Bun.stdin.text())))"], {
-        input: source,
-        encoding: "utf8",
-      }),
-    ) as any
+layer(bunLayer)("release workflows", (it) => {
+  it.effect("requires the behavioral test suite in continuous integration", () =>
+    Effect.gen(function* () {
+      const source = yield* readWorkflow("ci.yml")
+      expect(source).toContain("run: bun run check")
+      expect(source).toContain("run: bun run test")
+    }),
+  )
+
+  it.effect("keeps release recovery immutable, authenticated, and least-privileged", () =>
+    Effect.gen(function* () {
+      const source = yield* readWorkflow("publish.yml")
+      const workflow = Bun.YAML.parse(source) as any
     expect(workflow.on.workflow_dispatch.inputs).toEqual({
       tag: expect.objectContaining({ required: true, type: "string" }),
       expected_commit: expect.objectContaining({ required: true, type: "string" }),
@@ -78,10 +83,13 @@ describe("release workflows", () => {
     }
     expect(source).not.toMatch(/bun publish|Rewrite package manifests/)
     for (const workflowFile of [".github/workflows/ci.yml", ".github/workflows/publish.yml"]) {
-      const uses = [...readFileSync(workflowFile, "utf8").matchAll(/uses:\s*(\S+)/g)].map((match) => match[1])
+      const uses = [...(yield* readWorkflow(workflowFile.replace(".github/workflows/", ""))).matchAll(/uses:\s*(\S+)/g)].map(
+        (match) => match[1],
+      )
       expect(uses.every((use) => pins.has(use!))).toBe(true)
     }
     const release = source.split("  release:")[1]!.split("  publish:")[0]!
-    expect(release).not.toMatch(/checkout|bun install|npm install|bun run (?:build|package)|pm pack/)
-  })
+      expect(release).not.toMatch(/checkout|bun install|npm install|bun run (?:build|package)|pm pack/)
+    }),
+  )
 })

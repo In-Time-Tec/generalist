@@ -1,7 +1,9 @@
-import { Effect } from "effect"
+import { Console, Effect, Schema } from "effect"
 import { Runtime, RunStore } from "../src/index.js"
 import { assistantAddress, textPrompt } from "../test/helpers.js"
 import { sqliteLayer, tempDbPath } from "../test/sqlite-helpers.js"
+
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const program = Effect.gen(function* () {
   const filename = tempDbPath("phase0-cli")
@@ -36,18 +38,14 @@ const program = Effect.gen(function* () {
     return yield* driver.expireRunningOperation({ ...claim, operationId: boundary.operationId })
   }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
 
-  console.log(
-    JSON.stringify(
-      {
-        filename,
-        externalCounter,
-        outcome: unknown.outcome,
-        status: unknown.record.status,
-        blindRepeat: false,
-      },
-      null,
-      2,
-    ),
+  yield* Console.log(
+    encodeJson({
+      filename,
+      externalCounter,
+      outcome: unknown.outcome,
+      status: unknown.record.status,
+      blindRepeat: false,
+    }),
   )
 })
 
