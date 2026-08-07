@@ -26,6 +26,10 @@ import { layerForRun, type DriverInterpreter } from "../durable/driver-interpret
 import { resolve as resolveRunBudget } from "../durable/run-budget.js"
 import { operationKey } from "../durable/driver-interpreter.js"
 import { inputDigest } from "../durable/driver-contract.js"
+
+/** @experimental Stable identity for one suspension checkpoint, independent of the raw instance shape. */
+const suspensionApplicationIdentity = (suspension: AgentSuspended): string =>
+  Function.pipe(suspension, Schema.encodeUnknownSync(AgentSuspended), inputDigest)
 import { intercept, bindResume, setHandoffState } from "../durable/driver-run.js"
 import { makeHandoffStateRef, takePendingContinuation } from "./handoff-state.js"
 import type { ObjectSchema, SchemaServicesD, StaticToolServices, StructuredRunConfig } from "./run-loop-context.js"
@@ -166,7 +170,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
             turn,
             { _tag: "Microcompact", history: checkpoint, prompt: Prompt.empty },
             parentId,
-            inputDigest(suspension),
+            suspensionApplicationIdentity(suspension),
           )
           if (Option.isNone(activeSession)) yield* savePersisted(turn)
           return yield* Ref.get(chat.history)
