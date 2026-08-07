@@ -83,6 +83,14 @@ export interface AnyTool {
 /** @experimental Host-facing view of one bound named step, with the same hidden input as {@link AnyTool}. */
 export interface AnyStep extends AnyTool {}
 
+/** @experimental A bound tool retaining its exact decoded invocation types. */
+export type TypedTool = AnyTool & {
+  readonly decode: <O, E>(encoded: unknown) => Effect.Effect<Invocation<O, E>, Schema.SchemaError>
+}
+
+/** @experimental A bound step retaining its exact decoded invocation types. */
+export type TypedStep = TypedTool
+
 /** @experimental Host-facing view of one bound Agent, with its decoded input hidden behind {@link AgentInvocation}. */
 export interface AnyAgent {
   readonly selection: string
@@ -106,8 +114,8 @@ const checkUnique = (kind: string, values: ReadonlyArray<readonly [string, strin
 
 /** @experimental Complete live authority available to a ProgramHost. */
 export interface Bindings {
-  readonly tools: ReadonlyArray<AnyTool>
-  readonly steps: ReadonlyArray<AnyStep>
+  readonly tools: ReadonlyArray<TypedTool>
+  readonly steps: ReadonlyArray<TypedStep>
   readonly agents: ReadonlyArray<AnyAgent>
 }
 
@@ -133,7 +141,9 @@ export const tool = <I, IE, O, OE, E>(
 })
 
 /** @experimental Construct a typed named step binding. */
-export const step = <I, IE, O, OE, E>(binding: StepBinding<I, IE, O, OE, E>): AnyStep => tool(binding)
+export const step = <I, IE, O, OE, E>(binding: StepBinding<I, IE, O, OE, E>): TypedStep & {
+  readonly decode: (encoded: unknown) => Effect.Effect<Invocation<O, E>, Schema.SchemaError>
+} => tool(binding)
 
 /** @experimental Construct an exact typed Agent binding. */
 export const agent = <I extends Prompt.RawInput, IE, E>(binding: AgentBinding<I, IE, E>): AnyAgent => ({
