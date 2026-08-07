@@ -54,7 +54,12 @@ export const register = <Tools extends Record<string, Tool.Any>, R, E>(
   )
   return {
     name: agent.name,
-    run: (options) => generate(agent, options).pipe(Effect.provide(registrationLayer)),
+    run: (options) =>
+      Effect.scoped(
+        Effect.flatMap(Layer.build(registrationLayer), (services) =>
+          generate(agent, options).pipe(Effect.provideContext(services)),
+        ),
+      ),
     requirements: (value) => value,
   }
 }

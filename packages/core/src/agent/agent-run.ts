@@ -1,4 +1,4 @@
-import { Effect, Equal, Option, Ref, Schema, Stream } from "effect"
+import { Effect, Equal, Layer, Option, Ref, Schema, Stream } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, type Event } from "./agent-event.js"
 import { type Item, type MemoryError, messageFromRecall, projectTranscript } from "../context/memory.js"
@@ -423,9 +423,9 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       const baseInitialPrompt =
         seedSystem === undefined ? Prompt.make(options.prompt) : withSystem(seedSystem, Prompt.make(options.prompt))
       const runBudget = options.inheritedBudget ?? resolveRunBudget(agent.budget, options.budget)
-      const interpreterLayer = layerForRun(agent, options, baseInitialPrompt, runBudget)
+      const interpreterServices = yield* Layer.build(layerForRun(agent, options, baseInitialPrompt, runBudget))
       const withInterpreter = <A, E, RInner>(effect: Effect.Effect<A, E, RInner>) =>
-        effect.pipe(Effect.provide(interpreterLayer))
+        effect.pipe(Effect.provideContext(interpreterServices))
       if (validatedResume !== undefined) {
         yield* withInterpreter(bindResume(validatedResume.suspension.token))
       }
@@ -486,7 +486,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
             }),
           ),
         ),
-      ).pipe(Stream.provide(interpreterLayer))
+      ).pipe(Stream.provideContext(interpreterServices))
     }),
   ).pipe(Stream.withSpan("Baton.Agent.run", { attributes: { "baton.agent.name": agent.name } })) as RunStream<
     StructuredOutputSchema,

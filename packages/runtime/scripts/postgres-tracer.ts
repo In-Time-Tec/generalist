@@ -1,4 +1,4 @@
-import { Console, Effect, ManagedRuntime, Schema } from "effect"
+import { Console, Effect, ManagedRuntime } from "effect"
 import { RunClaims, Runtime } from "../src/index.js"
 import { assistantAddress, completedResult, textPrompt } from "../test/helpers.js"
 import { postgresLayer, postgresUrl, preparePostgres, uniqueSession } from "../test/postgres/helpers.js"

@@ -1,4 +1,4 @@
-import { Effect, type Layer, Option, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { Agent, AgentEvent, ExecutableManifest, Pins, ProgramManifest, ToolContext, ToolExecutor } from "@batonfx/core"
 import type { AgentManifest } from "@batonfx/core"
@@ -357,9 +357,13 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
         : Option.isSome(options.upstream)
           ? options.upstream.value.execute(request)
           : Effect.flatMap(Effect.context<ToolContext.ToolContext>(), (context) =>
-              ToolExecutor.executeToolkit(options.agent.toolkit, request).pipe(
-                Effect.provideContext(context),
-                Effect.provide(options.environment),
+              Effect.scoped(
+                Effect.flatMap(Layer.build(options.environment), (environment) =>
+                  ToolExecutor.executeToolkit(options.agent.toolkit, request).pipe(
+                    Effect.provideContext(context),
+                    Effect.provideContext(environment),
+                  ),
+                ),
               ),
             ),
   })
