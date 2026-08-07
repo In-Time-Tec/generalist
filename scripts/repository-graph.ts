@@ -142,7 +142,7 @@ const buildGraph = (root: string, pathService: Path.Path, fileSystem: FileSystem
           )
           importNodes.push({
             source: file,
-            specifier: found.path,
+            specifier: String(found.path),
             ...(target === undefined ? {} : { target }),
             ...(packageNode === undefined ? {} : { package: packageNode.name }),
           })
@@ -215,7 +215,8 @@ const buildGraph = (root: string, pathService: Path.Path, fileSystem: FileSystem
       ...cycles().map((cycle) => `package cycle: ${cycle}`),
       ...imports.flatMap((edge) => {
         const packageNode = edge.package === undefined ? undefined : packageByName.get(edge.package)
-        if (packageNode === undefined || !edge.specifier.startsWith(`${packageNode.name}/`)) return []
+        if (packageNode === undefined) return []
+        if (edge.specifier.startsWith(`${packageNode.name}/`) !== true) return []
         return publicSpecifier(edge.specifier, packageNode)
           ? []
           : [`non-public package import: ${edge.source} -> ${edge.specifier}`]

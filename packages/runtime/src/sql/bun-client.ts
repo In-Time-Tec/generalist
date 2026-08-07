@@ -66,7 +66,7 @@ export const make = (options: SqliteOptions): Effect.Effect<SqliteClient, never,
           params: ReadonlyArray<unknown>,
           transformRows: ((rows: ReadonlyArray<object>) => ReadonlyArray<object>) | undefined,
         ) {
-          return transformRows ? Effect.map(run(sql, params), transformRows) : run(sql, params)
+          return transformRows !== undefined ? Effect.map(run(sql, params), transformRows) : run(sql, params)
         },
         executeRaw(sql: string, params: ReadonlyArray<unknown>) {
           return run(sql, params)

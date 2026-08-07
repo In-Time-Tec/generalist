@@ -77,8 +77,8 @@ export const sidebarMenuButton = <ParentMessage>(
     [
       h.Type("button"),
       ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
-      ...(config.isDisabled ? [h.Disabled(true)] : []),
-      ...(config.isActive ? [h.DataAttribute("active", "")] : []),
+      ...(config.isDisabled === true ? [h.Disabled(true)] : []),
+      ...(config.isActive === true ? [h.DataAttribute("active", "")] : []),
       h.DataAttribute("size", String(size)),
       ...(config.attributes ?? []),
       h.DataAttribute("slot", "sidebar-menu-button"),
@@ -174,7 +174,7 @@ export const sidebarMenuSkeleton = <ParentMessage>(config: SidebarMenuSkeletonCo
       h.Class(cn("flex h-8 items-center gap-2 rounded-md px-2", config.class)),
     ],
     [
-      ...(config.showIcon
+      ...(config.showIcon === true
         ? [
             skeleton<ParentMessage>({
               class: "size-4 rounded-md",
@@ -249,7 +249,7 @@ export const sidebarMenuSubButton = <ParentMessage>(
     [
       ...(config.href === undefined ? [] : [h.Href(config.href)]),
       ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
-      ...(config.isActive ? [h.DataAttribute("active", "")] : []),
+      ...(config.isActive === true ? [h.DataAttribute("active", "")] : []),
       h.DataAttribute("size", size),
       ...(config.attributes ?? []),
       h.DataAttribute("slot", "sidebar-menu-sub-button"),

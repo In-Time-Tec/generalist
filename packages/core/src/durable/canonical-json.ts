@@ -150,7 +150,7 @@ const canonicalize = (value: unknown, seen: Set<object>): unknown => {
       for (let index = 0; index < value.length; index += 1) {
         const descriptor = descriptors[String(index)]
         if (descriptor === undefined) throw new TypeError("Sparse array")
-        if (!("value" in descriptor) || !descriptor.enumerable) {
+        if (!("value" in descriptor) || descriptor.enumerable !== true) {
           throw new TypeError("Unsupported array property")
         }
       }
@@ -166,7 +166,7 @@ const canonicalize = (value: unknown, seen: Set<object>): unknown => {
     if (Object.getOwnPropertySymbols(value).length > 0) throw new TypeError("Unsupported symbol property")
     const descriptors = Object.getOwnPropertyDescriptors(value)
     for (const descriptor of Object.values(descriptors)) {
-      if (!("value" in descriptor) || !descriptor.enumerable) {
+      if (!("value" in descriptor) || descriptor.enumerable !== true) {
         throw new TypeError("Unsupported property")
       }
     }

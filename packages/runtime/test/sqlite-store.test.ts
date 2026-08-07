@@ -1065,7 +1065,7 @@ it.live("attempt fencing is monotonic across promote", () =>
         Effect.map((chunk) => [...chunk]),
       )
       const started = firstEvents.find((event) => event._tag === "RunAttemptStarted")
-      expect(started && started._tag === "RunAttemptStarted" ? started.attempt : 0).toBe(1)
+      expect(started !== undefined && started._tag === "RunAttemptStarted" ? started.attempt : 0).toBe(1)
       yield* driver.complete({
         ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
         runId: first.runId,
@@ -1077,7 +1077,7 @@ it.live("attempt fencing is monotonic across promote", () =>
         Effect.map((chunk) => [...chunk]),
       )
       const secondStarted = secondEvents.find((event) => event._tag === "RunAttemptStarted")
-      expect(secondStarted && secondStarted._tag === "RunAttemptStarted" ? secondStarted.attempt : 0).toBe(1)
+      expect(secondStarted !== undefined && secondStarted._tag === "RunAttemptStarted" ? secondStarted.attempt : 0).toBe(1)
     }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
   }).pipe(Effect.asVoid),
 )

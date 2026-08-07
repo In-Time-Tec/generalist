@@ -152,7 +152,7 @@ export const link = <ParentMessage>(
   return h.a(
     [
       ...(config.href === undefined ? [] : [h.Href(config.href)]),
-      ...(config.isActive ? [h.DataAttribute("active", "")] : []),
+      ...(config.isActive === true ? [h.DataAttribute("active", "")] : []),
       ...(config.attributes ?? []),
       h.DataAttribute("slot", "navigation-menu-link"),
       h.Class(cn(linkClass, config.class)),
