@@ -1,4 +1,5 @@
 import { expect, it as testIt, layer } from "@effect/vitest"
+import { provideScoped } from "./scoped-provide.js"
 import { Deferred, Effect, Fiber, Ref, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { RunStore, RunTree, Runtime } from "../src/index.js"
@@ -199,25 +200,27 @@ layer(sqliteLayer(tempDbPath("tree-follow")))("RunTree replay-then-follow SQLite
 testIt.effect("replays a terminal SQLite tree immediately after restart", () => {
   const filename = tempDbPath("tree-follow-restart")
   return Effect.gen(function* () {
-    const seeded = yield* Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
-      const root = yield* startRoot("tree-follow:restart")
-      const before = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
-      const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "restart" })
-      yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 13 } })
-      yield* store.complete({ ...claim, result: completedResult("done") })
-      const tail = yield* RunTree.history({ rootRunId: root.runId, cursor: before.cursor, limit: 100 })
-      return {
-        rootRunId: root.runId,
-        cursor: before.cursor,
-        eventIds: tail.events.map(({ event }) => event.eventId),
-      }
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+    const seeded = yield* provideScoped(
+      sqliteLayer(filename),
+      Effect.gen(function* () {
+        const store = yield* RunStore.RunStore
+        const root = yield* startRoot("tree-follow:restart")
+        const before = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
+        const claim = yield* store.claimExecution({ runId: root.runId, ownerId: "restart" })
+        yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 13 } })
+        yield* store.complete({ ...claim, result: completedResult("done") })
+        const tail = yield* RunTree.history({ rootRunId: root.runId, cursor: before.cursor, limit: 100 })
+        return {
+          rootRunId: root.runId,
+          cursor: before.cursor,
+          eventIds: tail.events.map(({ event }) => event.eventId),
+        }
+      }),
+    )
 
-    const replayed = yield* RunTree.watch({ rootRunId: seeded.rootRunId, cursor: seeded.cursor }).pipe(
-      Stream.runCollect,
-      Effect.provide(sqliteLayer(filename)),
-      Effect.scoped,
+    const replayed = yield* provideScoped(
+      sqliteLayer(filename),
+      RunTree.watch({ rootRunId: seeded.rootRunId, cursor: seeded.cursor }).pipe(Stream.runCollect),
     )
     expect(Array.from(replayed, ({ event }) => event.eventId)).toEqual(seeded.eventIds)
   })

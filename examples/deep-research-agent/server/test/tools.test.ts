@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it as standalone, layer as layerHost } from "@effect/vitest"
 import { ConfigProvider, Effect, Fiber, Layer, SchemaAST, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { cannedResultsFor, layer, testLayer } from "../src/search-provider"
@@ -8,7 +8,7 @@ const withEnv = (env: Record<string, string>) => ConfigProvider.layer(ConfigProv
 
 const runWebSearch = (query: string) =>
   Effect.gen(function* () {
-    const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitLayer))
+    const handledToolkit = yield* toolkit
     const fiber = yield* handledToolkit.handle("web_search", { query }).pipe(
       Effect.flatMap(Stream.runCollect),
       Effect.map((chunk) => [...chunk]),
@@ -20,34 +20,40 @@ const runWebSearch = (query: string) =>
   })
 
 describe("web_search tool", () => {
-  it.effect("returns results from an injected SearchProvider", () =>
-    Effect.gen(function* () {
-      const output = yield* runWebSearch("anything").pipe(
-        Effect.provide(
-          testLayer({
-            search: () =>
-              Effect.succeed([{ title: "Injected", url: "https://example.test", snippet: "from fake provider" }]),
-          }),
-        ),
-      )
+  layerHost(
+    Layer.provideMerge(
+      toolkitLayer,
+      testLayer({
+        search: () =>
+          Effect.succeed([{ title: "Injected", url: "https://example.test", snippet: "from fake provider" }]),
+      }),
+    ),
+  )("returns results from an injected SearchProvider", (it) => {
+    it.effect("returns results from an injected SearchProvider", () =>
+      Effect.gen(function* () {
+        const output = yield* runWebSearch("anything")
 
-      expect(output).toEqual({
-        results: [{ title: "Injected", url: "https://example.test", snippet: "from fake provider" }],
-      })
-    }),
+        expect(output).toEqual({
+          results: [{ title: "Injected", url: "https://example.test", snippet: "from fake provider" }],
+        })
+      }),
+    )
+  })
+
+  layerHost(Layer.provideMerge(toolkitLayer, layer.pipe(Layer.provide(withEnv({})))))(
+    "uses the canned search path when no EXA_API_KEY is configured",
+    (it) => {
+      it.effect("uses the canned search path when no EXA_API_KEY is configured", () =>
+        Effect.gen(function* () {
+          const output = yield* runWebSearch("baton agent framework")
+
+          expect(output).toEqual({ results: cannedResultsFor("baton agent framework") })
+        }),
+      )
+    },
   )
 
-  it.effect("uses the canned search path when no EXA_API_KEY is configured", () =>
-    Effect.gen(function* () {
-      const output = yield* runWebSearch("baton agent framework").pipe(
-        Effect.provide(layer.pipe(Layer.provide(withEnv({})))),
-      )
-
-      expect(output).toEqual({ results: cannedResultsFor("baton agent framework") })
-    }),
-  )
-
-  it("keeps a concrete model-facing parameters schema", () => {
+  standalone("keeps a concrete model-facing parameters schema", () => {
     expect(SchemaAST.isUnknown(webSearchTool.parametersSchema.ast)).toBe(false)
   })
 })

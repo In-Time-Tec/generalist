@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Schedule, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Schedule, Scope, Stream } from "effect"
 import { AiError, LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ModelResilience, ToolExecutor } from "@batonfx/core"
 import { ModelRoute } from "../src/index.js"
@@ -61,17 +61,25 @@ const registration = (
     isAvailabilityFailure,
   })
 
+const provideScoped = <A, E, R, A2, E2, R2>(
+  layer: Layer.Layer<A2, E2, R2>,
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>> =>
+  Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
+
 const run = (route: ModelRoute.Route, resilience: ModelResilience.Interface = ModelResilience.none) =>
   Stream.runCollect(Agent.stream(Agent.make({ name: "route", model: route.selection }), { prompt: "go" })).pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        ModelRegistry.layer([Effect.succeed(route.registration)]),
-        ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool") }),
-        Approvals.layerAutoApprove,
-        ModelMiddleware.layerIdentity,
-        ModelResilience.layerTest(resilience).pipe(Layer.orDie),
+    (effect) =>
+      provideScoped(
+        Layer.mergeAll(
+          ModelRegistry.layer([Effect.succeed(route.registration)]),
+          ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool") }),
+          Approvals.layerAutoApprove,
+          ModelMiddleware.layerIdentity,
+          ModelResilience.layerTest(resilience).pipe(Layer.orDie),
+        ),
+        effect,
       ),
-    ),
   )
 
 describe("ordered model route", () => {

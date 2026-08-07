@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { RunClaims, Runtime, RunStore } from "../../src/index.js"
 import { assistantAddress, completedResult, openWait, suspension, textPrompt } from "../helpers.js"
@@ -9,11 +9,11 @@ const describePostgres = postgresAvailable ? describe.sequential : describe.skip
 const url = postgresUrl!
 
 describePostgres("postgres process tracer", () => {
-  it.live("traces multi-worker admit claim commit replay", () =>
-    Effect.gen(function* () {
-      yield* preparePostgres(url)
-      const sessionId = uniqueSession("tracer")
-      const trace = yield* Effect.gen(function* () {
+  layer(postgresLayer(url), { excludeTestServices: true })("traces multi-worker admit claim commit replay", (suite) => {
+    suite.effect("traces multi-worker admit claim commit replay", () =>
+      Effect.gen(function* () {
+        yield* preparePostgres(url)
+        const sessionId = uniqueSession("tracer")
         const runtime = yield* Runtime.Runtime
         const claims = yield* RunClaims.RunClaims
         const driver = yield* RunStore.RunStore
@@ -68,20 +68,20 @@ describePostgres("postgres process tracer", () => {
           Stream.runCollect,
           Effect.map((chunk) => [...chunk].map((event) => event._tag)),
         )
-        return {
+        const trace = {
           duplicate: dup.duplicate,
           firstRunId: first.runId,
           secondRunId: second.runId,
           history,
           workers: ["tracer-a", "tracer-b"],
         }
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped)
 
-      expect(trace.duplicate).toBe(true)
-      expect(trace.history[0]).toBe("RunAccepted")
-      expect(trace.history).toContain("RunCompleted")
-    }),
-  )
+        expect(trace.duplicate).toBe(true)
+        expect(trace.history[0]).toBe("RunAccepted")
+        expect(trace.history).toContain("RunCompleted")
+      }),
+    )
+  })
 })
 
 if (!postgresAvailable) {

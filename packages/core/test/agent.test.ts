@@ -7807,11 +7807,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         prompt: "continue",
         logicalOperationId: "journal-restart",
         executableRef: executable.ref,
-      }).pipe(
-        Stream.runDrain,
-        Effect.provide(Layer.succeed(DurableDriver.DriverJournalService, crashingJournal)),
-        Effect.exit,
-      )
+      }).pipe(Stream.runDrain, Effect.provideService(DurableDriver.DriverJournalService, crashingJournal), Effect.exit)
       expect(pending).toBeDefined()
 
       const scheduled: Array<string> = []
@@ -7828,7 +7824,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         logicalOperationId: "journal-restart",
         executableRef: executable.ref,
         driverCheckpoint: pending!,
-      }).pipe(Stream.runCollect, Effect.provide(Layer.succeed(DurableDriver.DriverJournalService, resumedJournal)))
+      }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, resumedJournal))
       expect(scheduled.find((key) => key.includes(":model:"))).toContain(":model:0:0:conversation")
       const call = events.find((event) => event._tag === "ModelCallStarted")
       const attempt = events.find((event) => event._tag === "ModelAttemptStarted")

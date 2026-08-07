@@ -1,6 +1,6 @@
 import { connect, createServer } from "node:net"
 import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
-import { describe, expect, live } from "@effect/vitest"
+import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
@@ -93,9 +93,11 @@ const waitForServerReady = (port: number, attempts: number): Effect.Effect<void,
   )
 
 describe("deep-research-agent Baton transport e2e", () => {
-  live(
-    "admits a deterministic run, resolves its approval, and replays canonical SSE events",
-    () =>
+  layer(FetchHttpClient.layer.pipe(Layer.provideMerge(bunServicesLayer)), {
+    excludeTestServices: true,
+    timeout: 60_000,
+  })("admits a deterministic run, resolves its approval, and replays canonical SSE events", (it) => {
+    it.effect("admits a deterministic run, resolves its approval, and replays canonical SSE events", () =>
       Effect.scoped(
         Effect.gen(function* () {
           const port = yield* freePort
@@ -176,7 +178,7 @@ describe("deep-research-agent Baton transport e2e", () => {
           expect(completed.result.text).toContain("Based on 2 sources")
           expect(completed.result.text).toContain("https://github.com/batonfx/batonfx")
         }),
-      ).pipe(Effect.provide(FetchHttpClient.layer.pipe(Layer.provideMerge(bunServicesLayer)))),
-    60_000,
-  )
+      ),
+    )
+  })
 })

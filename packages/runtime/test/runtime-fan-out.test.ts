@@ -1,4 +1,5 @@
 import { expect, layer } from "@effect/vitest"
+import { provideScoped } from "./scoped-provide.js"
 import { Effect, Ref } from "effect"
 import { Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../src/index.js"
 import { makeRuntime } from "../src/memory/runtime-layer.js"
@@ -247,15 +248,18 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
                 ),
               ),
       })
-      const racingRuntime = yield* makeRuntime({
-        resolver: ExecutableResolver.makeStatic([
-          { executable: assistantRef, agent: closedTestAgent(assistant) },
-          { executable: researcherRef, agent: closedTestAgent(researcher) },
-        ]),
-        addresses: [
-          { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
-        ],
-      }).pipe(Effect.provideService(RunStore.RunStore, racingStore), Effect.provide(activeExecutionsLayer))
+      const racingRuntime = yield* provideScoped(
+        activeExecutionsLayer,
+        makeRuntime({
+          resolver: ExecutableResolver.makeStatic([
+            { executable: assistantRef, agent: closedTestAgent(assistant) },
+            { executable: researcherRef, agent: closedTestAgent(researcher) },
+          ]),
+          addresses: [
+            { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+          ],
+        }).pipe(Effect.provideService(RunStore.RunStore, racingStore)),
+      )
       expect((yield* racingRuntime.awaitFanOut(receipt.fanOutId)).status).toBe("succeeded")
     }),
   )

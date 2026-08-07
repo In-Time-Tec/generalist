@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Queue, Ref, Stream } from "effect"
+import { Deferred, Effect, Function, Layer, Queue, Ref, Scope, Stream } from "effect"
 import { Headers, HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Errors as RuntimeErrors } from "@batonfx/runtime"
@@ -34,6 +34,23 @@ const makeFakeSocket = (): Effect.Effect<FakeSocket> =>
     }
   })
 
+const provideScoped = Function.dual<
+  <A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+  ) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>>,
+  <A, E, R, A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>>
+>(
+  2,
+  <A, E, R, A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>> =>
+    Effect.scoped(Effect.flatMap(Layer.build(provided), (context) => effect.pipe(Effect.provideContext(context)))),
+)
+
 const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest =>
   ({
     url: "http://test/ws",
@@ -43,12 +60,10 @@ const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest =>
   }) as unknown as HttpServerRequest.HttpServerRequest
 
 const run = (fake: FakeSocket, layer = runtimeLayer()) =>
-  Ws.handle.pipe(
-    Effect.provideService(HttpServerRequest.HttpServerRequest, request(fake.socket)),
-    Effect.provide(layer),
-    Effect.scoped,
-    Effect.forkChild,
-  )
+  provideScoped(
+    layer,
+    Ws.handle.pipe(Effect.provideService(HttpServerRequest.HttpServerRequest, request(fake.socket))),
+  ).pipe(Effect.forkChild)
 
 describe("Ws", () => {
   it.live("replays after the attached cursor and cancels only on an explicit command", () =>

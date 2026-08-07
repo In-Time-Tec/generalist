@@ -1,4 +1,5 @@
 import { Config, Effect, Option, Redacted } from "effect"
+import { provideScoped } from "../scoped-provide.js"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { ExecutableResolver, MysqlRunSchema, Runtime } from "../../src/index.js"
@@ -35,42 +36,44 @@ const addresses = [
 
 export const mysqlClient = (url: string) => MysqlClient.layer({ url: Redacted.make(url), maxConnections: 4 })
 
-export const applySchema = (url: string) =>
-  MysqlRunSchema.apply("mysql-test").pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
+export const applySchema = (url: string) => provideScoped(mysqlClient(url), MysqlRunSchema.apply("mysql-test"))
 
 export const resetRuntimeTables = (url: string) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    yield* sql.withTransaction(
-      Effect.gen(function* () {
-        yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=0")
-        for (const table of [
-          "baton_run_registrations",
-          "baton_executable_registrations",
-          "baton_program_operations",
-          "baton_program_runs",
-          "baton_tree_event_index",
-          "baton_tree_roots",
-          "baton_fan_out_members",
-          "baton_fan_outs",
-          "baton_run_steering",
-          "baton_run_links",
-          "baton_run_waits",
-          "baton_run_operations",
-          "baton_run_events",
-          "baton_runs",
-          "baton_lanes",
-        ])
-          yield* sql.unsafe(`TRUNCATE ${table}`)
-        yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=1")
-        yield* sql`
+  provideScoped(
+    mysqlClient(url),
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* sql.withTransaction(
+        Effect.gen(function* () {
+          yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=0")
+          for (const table of [
+            "baton_run_registrations",
+            "baton_executable_registrations",
+            "baton_program_operations",
+            "baton_program_runs",
+            "baton_tree_event_index",
+            "baton_tree_roots",
+            "baton_fan_out_members",
+            "baton_fan_outs",
+            "baton_run_steering",
+            "baton_run_links",
+            "baton_run_waits",
+            "baton_run_operations",
+            "baton_run_events",
+            "baton_runs",
+            "baton_lanes",
+          ])
+            yield* sql.unsafe(`TRUNCATE ${table}`)
+          yield* sql.unsafe("SET FOREIGN_KEY_CHECKS=1")
+          yield* sql`
       UPDATE baton_schema_meta
       SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0
       WHERE id = 1
     `
-      }),
-    )
-  }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
+        }),
+      )
+    }),
+  )
 
 export const prepareMysql = (url: string) =>
   Effect.gen(function* () {

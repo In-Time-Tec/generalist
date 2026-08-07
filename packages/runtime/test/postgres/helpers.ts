@@ -1,4 +1,5 @@
 import { Config, Effect, Layer, Option, Redacted } from "effect"
+import { provideScoped } from "../scoped-provide.js"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import { ExecutableResolver, Runtime, RuntimeWorker, RunSchema } from "../../src/index.js"
@@ -45,17 +46,20 @@ const addresses = [
 ]
 
 export const applySchema = (url: string) =>
-  RunSchema.apply("postgres").pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+  provideScoped(PgClient.layer({ url: Redacted.make(url) }), RunSchema.apply("postgres"))
 
 const resetRuntimeSchema = (url: string) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    yield* sql.unsafe(`DROP TABLE IF EXISTS
+  provideScoped(
+    PgClient.layer({ url: Redacted.make(url) }),
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* sql.unsafe(`DROP TABLE IF EXISTS
       baton_run_registrations, baton_executable_registrations,
       baton_program_operations, baton_program_runs, baton_tree_event_index, baton_tree_roots, baton_fan_out_members, baton_fan_outs, baton_run_steering,
       baton_run_links, baton_run_waits, baton_run_operations, baton_run_events, baton_runs, baton_lanes,
       baton_runtime_locks, baton_sql_migrations, baton_schema_meta CASCADE`)
-  }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+    }),
+  )
 
 export const preparePostgres = (url: string) =>
   Effect.gen(function* () {

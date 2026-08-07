@@ -272,64 +272,61 @@ describe("RunBudget Agent.stream integration", () => {
     })
   }
 
-  standalone.effect("reserves and refunds child agent-tool budget without widening", () =>
-    Effect.gen(function* () {
-      const capture = journalCapture()
-      const child = Agent.make({ name: "child-agent", toolkit: Toolkit.empty, budget: { modelCalls: 1 } })
-      const parentTool = AgentTool.asTool(child, { name: "invoke_child" })
-      const parent = Agent.make({
-        name: "parent-agent",
-        toolkit: Toolkit.make(parentTool.tool, echoTool),
-        budget: { modelCalls: 3, childRuns: 1, depth: 1 },
-      }) as unknown as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
-      let modelCalls = 0
-      yield* Agent.stream(parent, { prompt: "child", logicalOperationId: "parent-child" }).pipe(
-        Stream.runDrain,
-        Effect.provide(
-          Layer.mergeAll(
-            Layer.effect(
-              LanguageModel.LanguageModel,
-              LanguageModel.make({
-                generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-                streamText: () => {
-                  modelCalls += 1
-                  if (modelCalls === 1) {
-                    return withProviderFinish(
-                      Stream.make(
-                        Response.makePart("tool-call", {
-                          id: "child-call",
-                          name: "invoke_child",
-                          params: { prompt: "sub" },
-                          providerExecuted: false,
-                        }),
-                      ),
-                    )
-                  }
-                  if (modelCalls === 2) {
-                    return withProviderFinish(
-                      Stream.make(Response.makePart("text-delta", { id: "child", delta: "sub" })),
-                    )
-                  }
-                  return withProviderFinish(
-                    Stream.make(Response.makePart("text-delta", { id: "parent", delta: "done" })),
-                  )
-                },
-              }),
-            ),
-            Toolkit.make(parentTool.tool).toLayer({ invoke_child: (params) => parentTool.invoke(params) }),
-            ToolExecutor.layerTest({
-              execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
-            }),
-            Approvals.layerAutoApprove,
-            capture.journalLayer,
-            unusedToolHandlerLayer,
-          ),
+  {
+    const capture = journalCapture()
+    const child = Agent.make({ name: "child-agent", toolkit: Toolkit.empty, budget: { modelCalls: 1 } })
+    const parentTool = AgentTool.asTool(child, { name: "invoke_child" })
+    const parent = Agent.make({
+      name: "parent-agent",
+      toolkit: Toolkit.make(parentTool.tool, echoTool),
+      budget: { modelCalls: 3, childRuns: 1, depth: 1 },
+    }) as unknown as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
+    let modelCalls = 0
+    layer(
+      Layer.mergeAll(
+        Layer.effect(
+          LanguageModel.LanguageModel,
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+            streamText: () => {
+              modelCalls += 1
+              if (modelCalls === 1) {
+                return withProviderFinish(
+                  Stream.make(
+                    Response.makePart("tool-call", {
+                      id: "child-call",
+                      name: "invoke_child",
+                      params: { prompt: "sub" },
+                      providerExecuted: false,
+                    }),
+                  ),
+                )
+              }
+              if (modelCalls === 2) {
+                return withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "child", delta: "sub" })))
+              }
+              return withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "parent", delta: "done" })))
+            },
+          }),
         ),
+        Toolkit.make(parentTool.tool).toLayer({ invoke_child: (params) => parentTool.invoke(params) }),
+        ToolExecutor.layerTest({
+          execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
+        }),
+        Approvals.layerAutoApprove,
+        capture.journalLayer,
+        unusedToolHandlerLayer,
+      ),
+    )("reserves and refunds child agent-tool budget without widening", (it) => {
+      it.effect("reserves and refunds child agent-tool budget without widening", () =>
+        Effect.gen(function* () {
+          yield* Agent.stream(parent, { prompt: "child", logicalOperationId: "parent-child" }).pipe(Stream.runDrain)
+          expect(modelCalls).toBeGreaterThanOrEqual(2)
+          expect(capture.lastCheckpoint?.budget.remaining.modelCalls).toBeGreaterThanOrEqual(0)
+        }),
       )
-      expect(modelCalls).toBeGreaterThanOrEqual(2)
-      expect(capture.lastCheckpoint?.budget.remaining.modelCalls).toBeGreaterThanOrEqual(0)
-    }),
-  )
+    })
+  }
 
   standalone.effect("rejects child grant wider than parent remaining", () =>
     Effect.gen(function* () {
@@ -387,45 +384,46 @@ describe("RunBudget Agent.stream integration", () => {
     })
   }
 
-  standalone.effect("records session sync operation keys", () =>
-    Effect.gen(function* () {
-      const capture = journalCapture()
-      const persistenceLayer = Chat.layerPersisted({ storeId: "budget-session-test" }).pipe(
-        Layer.provide(Persistence.layerBackingMemory),
+  {
+    const capture = journalCapture()
+    const persistenceLayer = Chat.layerPersisted({ storeId: "budget-session-test" }).pipe(
+      Layer.provide(Persistence.layerBackingMemory),
+    )
+    const agent = Agent.make({
+      name: "session-budget-agent",
+      toolkit: Toolkit.make(echoTool),
+    })
+    layer(
+      Layer.mergeAll(
+        makeToolCallModelLayer(),
+        ToolExecutor.layerTest({
+          execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
+        }),
+        Approvals.layerAutoApprove,
+        Session.layerMemory,
+        Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
+        ModelMiddleware.layerIdentity,
+        persistenceLayer,
+        capture.journalLayer,
+        Agent.layerRuntime,
+        unusedToolHandlerLayer,
+      ),
+    )("records session sync operation keys", (it) => {
+      it.effect("records session sync operation keys", () =>
+        Effect.gen(function* () {
+          yield* Agent.stream(agent, {
+            prompt: "sync",
+            logicalOperationId: "logical-sync",
+            sessionId: "session-sync",
+            persistence: { chatId: "chat-sync" },
+          }).pipe(Stream.runDrain)
+          expect(
+            capture.scheduled.some((operation) => operation.kind === "memory" && operation.key.includes("sync")),
+          ).toBe(true)
+        }),
       )
-      const agent = Agent.make({
-        name: "session-budget-agent",
-        toolkit: Toolkit.make(echoTool),
-      })
-      yield* Agent.stream(agent, {
-        prompt: "sync",
-        logicalOperationId: "logical-sync",
-        sessionId: "session-sync",
-        persistence: { chatId: "chat-sync" },
-      }).pipe(
-        Stream.runDrain,
-        Effect.provide(
-          Layer.mergeAll(
-            makeToolCallModelLayer(),
-            ToolExecutor.layerTest({
-              execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
-            }),
-            Approvals.layerAutoApprove,
-            Session.layerMemory,
-            Compaction.layerTest({ maybeCompact: () => Effect.succeed(Option.none()) }),
-            ModelMiddleware.layerIdentity,
-            persistenceLayer,
-            capture.journalLayer,
-            Agent.layerRuntime,
-            unusedToolHandlerLayer,
-          ),
-        ),
-      )
-      expect(capture.scheduled.some((operation) => operation.kind === "memory" && operation.key.includes("sync"))).toBe(
-        true,
-      )
-    }),
-  )
+    })
+  }
 
   {
     const capture = journalCapture()

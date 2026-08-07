@@ -9,7 +9,7 @@ import {
   ProgramHost,
   SandboxExecutor,
 } from "../src/index.js"
-import { Deferred, Effect, Fiber, Schema } from "effect"
+import { Deferred, Effect, Fiber, Function, Layer, Schema, Scope } from "effect"
 import { expect } from "vitest"
 
 const Input = Schema.Struct({ value: Schema.Finite })
@@ -132,18 +132,38 @@ const bindings = (options?: { readonly toolOutput?: number; readonly agentDelay?
     ],
   })
 
-const runWith = <E>(
-  fixture: SandboxExecutor.Interface["execute"],
-  live = bindings(),
-): ((
-  effect: Effect.Effect<{ readonly value: number }, E, ProgramHost.ProgramHost | import("effect").Scope.Scope>,
-) => Effect.Effect<{ readonly value: number }, E, import("effect").Scope.Scope>) =>
-  Effect.provide(
-    ProgramHost.layerDirect({
-      sandbox: SandboxExecutor.makeTest(fixture, { ...SandboxExecutor.testIdentity, fixture: "agent-program" }),
-      bindings: live,
-    }),
-  )
+const provideScoped = Function.dual<
+  <A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+  ) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>>,
+  <A, E, R, A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>>
+>(
+  2,
+  <A, E, R, A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>> =>
+    Effect.scoped(Effect.flatMap(Layer.build(provided), (context) => effect.pipe(Effect.provideContext(context)))),
+)
+
+const runWith =
+  <E>(
+    fixture: SandboxExecutor.Interface["execute"],
+    live = bindings(),
+  ): ((
+    effect: Effect.Effect<{ readonly value: number }, E, ProgramHost.ProgramHost | import("effect").Scope.Scope>,
+  ) => Effect.Effect<{ readonly value: number }, E, import("effect").Scope.Scope>) =>
+  (effect) =>
+    provideScoped(
+      ProgramHost.layerDirect({
+        sandbox: SandboxExecutor.makeTest(fixture, { ...SandboxExecutor.testIdentity, fixture: "agent-program" }),
+        bindings: live,
+      }),
+      effect,
+    )
 
 it.effect("runs sequential typed tools and steps while filtering a large intermediate", () =>
   Effect.scoped(
@@ -176,10 +196,10 @@ it.effect("denies bindings outside the exact manifest closure and rejects pin mi
         ...SandboxExecutor.testIdentity,
         fixture: "closed-program",
       })
-      const extra = yield* AgentProgram.run(closed, { value: 1 }).pipe(
-        Effect.provide(ProgramHost.layerDirect({ sandbox: fixture, bindings: bindings() })),
-        Effect.flip,
-      )
+      const extra = yield* provideScoped(
+        ProgramHost.layerDirect({ sandbox: fixture, bindings: bindings() }),
+        AgentProgram.run(closed, { value: 1 }),
+      ).pipe(Effect.flip)
       expect(extra).toBeInstanceOf(ProgramHost.ProgramBindingMismatch)
 
       const wrong = ProgramBindings.make({
@@ -187,10 +207,10 @@ it.effect("denies bindings outside the exact manifest closure and rejects pin mi
         steps: [],
         agents: [],
       })
-      const mismatch = yield* AgentProgram.run(closed, { value: 1 }).pipe(
-        Effect.provide(ProgramHost.layerDirect({ sandbox: fixture, bindings: wrong })),
-        Effect.flip,
-      )
+      const mismatch = yield* provideScoped(
+        ProgramHost.layerDirect({ sandbox: fixture, bindings: wrong }),
+        AgentProgram.run(closed, { value: 1 }),
+      ).pipe(Effect.flip)
       expect(mismatch).toBeInstanceOf(ProgramHost.ProgramBindingMismatch)
     }),
   ),

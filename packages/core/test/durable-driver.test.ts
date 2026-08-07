@@ -1,5 +1,5 @@
-import { describe, expect, it } from "@effect/vitest"
-import { Cause, Effect, Layer, Schema, Stream } from "effect"
+import { describe, expect, it, layer } from "@effect/vitest"
+import { Cause, Effect, Function, Layer, Schema, Scope, Stream } from "effect"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, AgentManifest, DurableDriver, ExecutableManifest, Pins, RunBudget, ToolExecutor } from "../src/index"
@@ -619,6 +619,23 @@ const makeToolCallModelLayer = () => {
   )
 }
 
+const provideScoped = Function.dual<
+  <A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+  ) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>>,
+  <A, E, R, A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>>
+>(
+  2,
+  <A, E, R, A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>> =>
+    Effect.scoped(Effect.flatMap(Layer.build(provided), (context) => effect.pipe(Effect.provideContext(context)))),
+)
+
 const captureJournal = () => {
   const scheduled = new Array<{ readonly kind: string; readonly key: string; readonly replayPolicy: string }>()
   const journal: DurableDriver.DriverJournal = {
@@ -633,19 +650,23 @@ const captureJournal = () => {
 }
 
 describe("DurableDriver Agent.stream integration", () => {
-  it.effect("rejects a checkpoint with no executable identity for another standalone Agent", () =>
-    Effect.gen(function* () {
-      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "first", sessionId: "first" })
-      const checkpoint = yield* driver.initial({ prompt: Prompt.make("first"), budget: RunBudget.allocate({}) })
-      const second = Agent.make({ name: "second" })
-      const failure = yield* Agent.stream(second, { prompt: "second", driverCheckpoint: checkpoint }).pipe(
-        Stream.runDrain,
-        Effect.provide(makeToolCallModelLayer()),
-        Effect.flip,
+  layer(makeToolCallModelLayer())(
+    "rejects a checkpoint with no executable identity for another standalone Agent",
+    (suite) => {
+      suite.effect("rejects a checkpoint with no executable identity for another standalone Agent", () =>
+        Effect.gen(function* () {
+          const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "first", sessionId: "first" })
+          const checkpoint = yield* driver.initial({ prompt: Prompt.make("first"), budget: RunBudget.allocate({}) })
+          const second = Agent.make({ name: "second" })
+          const failure = yield* Agent.stream(second, { prompt: "second", driverCheckpoint: checkpoint }).pipe(
+            Stream.runDrain,
+            Effect.flip,
+          )
+          expect(failure._tag).toBe("@batonfx/core/DriverStateInvalid")
+          expect(failure.message).toContain("explicit executable identity")
+        }),
       )
-      expect(failure._tag).toBe("@batonfx/core/DriverStateInvalid")
-      expect(failure.message).toContain("explicit executable identity")
-    }),
+    },
   )
 
   for (const kind of ["model", "structured-output"] as const) {
@@ -747,28 +768,29 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
-  it.effect("records model and tool operations through the driver journal seam", () =>
-    Effect.gen(function* () {
-      const { scheduled, journalLayer } = captureJournal()
-      const agent = Agent.make({ name: "driver-seam-agent", toolkit: Toolkit.make(echoTool) })
-      yield* Agent.stream(agent, { prompt: "use echo", logicalOperationId: "stable-run" }).pipe(
-        Stream.runDrain,
-        Effect.provide(
-          Layer.mergeAll(
-            makeToolCallModelLayer(),
-            ToolExecutor.layerTest({
-              execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
-            }),
-            journalLayer,
-            unusedToolHandlerLayer,
-          ),
-        ),
+  {
+    const { scheduled, journalLayer } = captureJournal()
+    const agent = Agent.make({ name: "driver-seam-agent", toolkit: Toolkit.make(echoTool) })
+    layer(
+      Layer.mergeAll(
+        makeToolCallModelLayer(),
+        ToolExecutor.layerTest({
+          execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
+        }),
+        journalLayer,
+        unusedToolHandlerLayer,
+      ),
+    )("records model and tool operations through the driver journal seam", (suite) => {
+      suite.effect("records model and tool operations through the driver journal seam", () =>
+        Effect.gen(function* () {
+          yield* Agent.stream(agent, { prompt: "use echo", logicalOperationId: "stable-run" }).pipe(Stream.runDrain)
+          expect(scheduled.some((operation) => operation.kind === "model")).toBe(true)
+          expect(scheduled.some((operation) => operation.kind === "tool")).toBe(true)
+          expect(scheduled.find((operation) => operation.kind === "tool")?.replayPolicy).toBe("never")
+        }),
       )
-      expect(scheduled.some((operation) => operation.kind === "model")).toBe(true)
-      expect(scheduled.some((operation) => operation.kind === "tool")).toBe(true)
-      expect(scheduled.find((operation) => operation.kind === "tool")?.replayPolicy).toBe("never")
-    }),
-  )
+    })
+  }
 
   it.effect("keeps operation keys stable across equivalent runs", () =>
     Effect.gen(function* () {
@@ -776,22 +798,20 @@ describe("DurableDriver Agent.stream integration", () => {
         Effect.gen(function* () {
           const { scheduled, journalLayer } = captureJournal()
           const agent = Agent.make({ name: "key-stable-agent", toolkit: Toolkit.make(echoTool) })
-          yield* Agent.stream(agent, {
-            prompt: "use echo",
-            logicalOperationId: "logical-1",
-            sessionId: "session-1",
-          }).pipe(
-            Stream.runDrain,
-            Effect.provide(
-              Layer.mergeAll(
-                makeToolCallModelLayer(),
-                ToolExecutor.layerTest({
-                  execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
-                }),
-                journalLayer,
-                unusedToolHandlerLayer,
-              ),
+          yield* provideScoped(
+            Layer.mergeAll(
+              makeToolCallModelLayer(),
+              ToolExecutor.layerTest({
+                execute: () => Effect.succeed({ _tag: "Success", result: "ok", encodedResult: "ok" }),
+              }),
+              journalLayer,
+              unusedToolHandlerLayer,
             ),
+            Agent.stream(agent, {
+              prompt: "use echo",
+              logicalOperationId: "logical-1",
+              sessionId: "session-1",
+            }).pipe(Stream.runDrain),
           )
           return scheduled.map((operation) => operation.key)
         })
@@ -946,7 +966,7 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
-  it.effect("binds suspension checkpoints to resume tokens", () => {
+  {
     const { scheduled, journalLayer } = captureJournal()
     let streamPhase: "suspend" | "resume" = "suspend"
     const suspendResumeModelLayer = Layer.effect(
@@ -981,27 +1001,31 @@ describe("DurableDriver Agent.stream integration", () => {
       Agent.layerRuntime,
       unusedToolHandlerLayer,
     )
-    return Effect.gen(function* () {
-      const agent = Agent.make({ name: "driver-suspend-agent", toolkit: Toolkit.make(echoTool) })
-      const suspended = yield* Agent.stream(agent, {
-        prompt: "wait",
-        logicalOperationId: "suspend-run",
-        persistence: { chatId: "driver-suspend" },
-      }).pipe(Stream.runDrain, Effect.flip)
-      if (suspended._tag !== "@batonfx/core/AgentSuspended") return expect.unreachable()
-      expect(scheduled.some((operation) => operation.kind === "wait" && operation.key === suspended.tool_call_id)).toBe(
-        true,
+    layer(services)("binds suspension checkpoints to resume tokens", (suite) => {
+      suite.effect("binds suspension checkpoints to resume tokens", () =>
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "driver-suspend-agent", toolkit: Toolkit.make(echoTool) })
+          const suspended = yield* Agent.stream(agent, {
+            prompt: "wait",
+            logicalOperationId: "suspend-run",
+            persistence: { chatId: "driver-suspend" },
+          }).pipe(Stream.runDrain, Effect.flip)
+          if (suspended._tag !== "@batonfx/core/AgentSuspended") return expect.unreachable()
+          expect(
+            scheduled.some((operation) => operation.kind === "wait" && operation.key === suspended.tool_call_id),
+          ).toBe(true)
+          streamPhase = "resume"
+          yield* Agent.stream(agent, {
+            prompt: "ignored",
+            logicalOperationId: "suspend-run",
+            persistence: { chatId: "driver-suspend" },
+            resume: { suspension: suspended },
+          }).pipe(Stream.runDrain)
+          expect(
+            scheduled.some((operation) => operation.kind === "wait" && operation.key === "resume:wait-token-1"),
+          ).toBe(true)
+        }),
       )
-      streamPhase = "resume"
-      yield* Agent.stream(agent, {
-        prompt: "ignored",
-        logicalOperationId: "suspend-run",
-        persistence: { chatId: "driver-suspend" },
-        resume: { suspension: suspended },
-      }).pipe(Stream.runDrain)
-      expect(scheduled.some((operation) => operation.kind === "wait" && operation.key === "resume:wait-token-1")).toBe(
-        true,
-      )
-    }).pipe(Effect.provide(services))
-  })
+    })
+  }
 })
