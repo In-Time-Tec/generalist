@@ -1,4 +1,4 @@
-import { Console, Effect, Schema } from "effect"
+import { Console, Effect, Layer, Schema } from "effect"
 import { Agent, Tool, Toolkit } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
 
@@ -24,15 +24,18 @@ const program = Effect.gen(function* () {
     TestModel.text("Order 42 shipped yesterday."),
   ])
   const result = yield* Agent.generate(agent, { prompt: "Where is order 42?" }).pipe(
-    Effect.provide(fixture.layer),
     Effect.provide(
-      toolkit.toLayer({
-        lookup_order: (params) =>
-          Effect.sync(() => {
-            executedCalls.push(params)
-            return "shipped yesterday"
+      fixture.layer.pipe(
+        Layer.provideMerge(
+          toolkit.toLayer({
+            lookup_order: (params) =>
+              Effect.sync(() => {
+                executedCalls.push(params)
+                return "shipped yesterday"
+              }),
           }),
-      }),
+        ),
+      ),
     ),
   )
   if (result.text !== "Order 42 shipped yesterday.") {

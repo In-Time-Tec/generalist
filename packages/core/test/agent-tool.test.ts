@@ -143,7 +143,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       ToolContext.ToolContext | PlacementPrefix
     > = route.execute(request("service-placement", { value: "value" }))
     return [
-      Layer.mergeAll(ToolContext.layerDefault, Layer.succeed(PlacementPrefix, PlacementPrefix.of("!"))),
+      Layer.mergeAll(Layer.succeed(PlacementPrefix, PlacementPrefix.of("!"))).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       needsPrefix.pipe(
         Effect.tap((outcome) => Effect.sync(() => expect(outcome).toMatchObject({ _tag: "Success", result: "ok" }))),
       ),
@@ -163,8 +163,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Layer.mergeAll(
         handlers,
         ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const outcome = yield* ToolExecutor.ToolExecutor.use((executor) => executor.execute(request("failing", {})))
 
@@ -190,8 +189,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Layer.mergeAll(
         handlers,
         ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const outcome = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("overlapping_failure", {})),
@@ -214,8 +212,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Layer.mergeAll(
         handlers,
         ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const outcome = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("failing_error_mode", {})),
@@ -247,8 +244,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Layer.mergeAll(
         handlers,
         ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const decode = yield* Effect.flip(executor.execute(request("lookup_stages", { id: 1 })))
@@ -285,8 +281,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Layer.mergeAll(
         handlers,
         ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const failure = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("undeclared_failure", {})),
@@ -308,8 +303,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Layer.mergeAll(
         handlers,
         ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const exit = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("interrupting", {})),
@@ -331,8 +325,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Layer.mergeAll(
         handlers,
         ToolExecutor.layerToolkit(toolkit).pipe(Layer.provide(handlers)),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const exit = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("defective", {})),
@@ -364,8 +357,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
               }),
           }),
         ]).pipe(Layer.provide(toolkit.toLayer({ lookup: ({ id }) => Effect.succeed({ source: "toolkit", id }) }))),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const lookup = yield* executor.execute(request("lookup", { id: "local" }))
@@ -411,8 +403,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
               ),
           }),
         ]),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const success = yield* executor.execute(request("select_file", {}))
@@ -446,8 +437,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             execute: () => Effect.succeed({ _tag: "DomainFailure", failure: { code: "invalid" } }),
           }),
         ]),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const failure = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("deploy", {})),
@@ -475,8 +465,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             },
           }),
         ]),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const failure = yield* ToolExecutor.ToolExecutor.use((executor) =>
           executor.execute(request("deploy_input", { id: 1 })),
@@ -522,8 +511,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
               }),
           }),
         ]),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const recovered = yield* executor.execute(request("run_ci", {}))
@@ -566,8 +554,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             },
           }),
         ]),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const failed = yield* Effect.flip(executor.execute(request("run_ci", {})))
@@ -607,8 +594,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
               }),
           }),
         ]),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const outcome = yield* executor.execute(request("charge", { amount: 10 }))
@@ -830,8 +816,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
             execute: () => Effect.succeed({ _tag: "Success", result: { source: "sandbox" } }),
           }),
         ]),
-        ToolContext.layerDefault,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const mcp = yield* executor.execute(request("github_search", { query: "baton" }))
@@ -861,8 +846,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
                   : { _tag: "DomainFailure", failure: input.call.id, encodedFailure: input.call.id },
               ),
           }),
-          ToolContext.layerDefault,
-        ),
+          ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
         Effect.gen(function* () {
           const executor = yield* ToolExecutor.ToolExecutor
           const outcomes = yield* Effect.all(
@@ -1002,10 +986,9 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
         ToolExecutor.layerRouter([ToolExecutor.routeToolkit(childTool), ToolExecutor.routeToolkit(toolkit)]).pipe(
           Layer.provide(toolkit.toLayer({ gated: ({ text }) => Effect.succeed(text) })),
         ),
-        ToolContext.layerDefault,
         Layer.succeed(AuthorizationDependency, "available"),
         ModelMiddleware.layerIdentity,
-      ),
+      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const outcome = yield* executor.execute(request("ask_authorized_child", { prompt: "child task" }))

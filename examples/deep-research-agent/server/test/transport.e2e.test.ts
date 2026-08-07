@@ -1,7 +1,7 @@
 import { connect, createServer } from "node:net"
 import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
 import { describe, expect, live } from "@effect/vitest"
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Layer, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { Cursor } from "@batonfx/runtime"
@@ -176,7 +176,7 @@ describe("deep-research-agent Baton transport e2e", () => {
           expect(completed.result.text).toContain("Based on 2 sources")
           expect(completed.result.text).toContain("https://github.com/batonfx/batonfx")
         }),
-      ).pipe(Effect.provide(FetchHttpClient.layer), Effect.provide(bunServicesLayer)),
+      ).pipe(Effect.provide(FetchHttpClient.layer.pipe(Layer.provideMerge(bunServicesLayer)))),
     60_000,
   )
 })

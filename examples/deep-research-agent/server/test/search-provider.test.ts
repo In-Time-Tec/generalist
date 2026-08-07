@@ -19,7 +19,7 @@ describe("SearchProvider", () => {
       const results = yield* search("effect typescript")
 
       expect(results).toEqual(cannedResultsFor("effect typescript"))
-    }).pipe(Effect.provide(layer), Effect.provide(withEnv({}))),
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(withEnv({}))))),
   )
 
   it.effect("sends Exa search requests with the expected endpoint, header, body, and Schema decode", () => {
@@ -75,7 +75,7 @@ describe("SearchProvider", () => {
           },
         },
       ])
-    }).pipe(Effect.provide(exaLayerFromApiKey(Redacted.make("exa-test"))), Effect.provide(client))
+    }).pipe(Effect.provide(exaLayerFromApiKey(Redacted.make("exa-test")).pipe(Layer.provide(client))))
   })
 
   it.effect("builds the configured Exa provider when EXA_API_KEY is present", () =>
@@ -83,7 +83,7 @@ describe("SearchProvider", () => {
       const service = yield* Service
 
       expect(service.search).toBeTypeOf("function")
-    }).pipe(Effect.provide(layer), Effect.provide(withEnv({ EXA_API_KEY: "exa-env-test" }))),
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(withEnv({ EXA_API_KEY: "exa-env-test" }))))),
   )
 
   it.effect("falls back to the canned corpus on Exa failure", () =>
@@ -92,8 +92,7 @@ describe("SearchProvider", () => {
         Effect.succeed(HttpClientResponse.fromWeb(request, new Response("not available", { status: 500 }))),
       )
       const results = yield* search("baton agent framework").pipe(
-        Effect.provide(exaLayerFromApiKey(Redacted.make("exa-test"))),
-        Effect.provide(client),
+        Effect.provide(exaLayerFromApiKey(Redacted.make("exa-test")).pipe(Layer.provide(client))),
       )
 
       expect(results).toEqual(cannedResultsFor("baton agent framework"))
