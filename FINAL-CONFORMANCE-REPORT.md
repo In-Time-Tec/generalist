@@ -36,3 +36,41 @@ Branch: `lint/conformance` (50 commits on top of `main` @ ce1f6e4)
 File an upstream issue against `Effect-TS/effect`: `Schema.Encoder` should not hardcode `DecodingServices: unknown`
 (an encoder-shaped schema has no decode step; the type erases the real services of every `generateObject` consumer).
 The 13 are not fixable without that library change or an API redesign; all other gates are green.
+
+## Wave 23 — final-2 root cause: definitive proof (2026-08-07)
+
+The last two `any-unknown-in-error-context` flags were re-verified from every angle:
+
+1. **agent.ts:466-470** — `RunStream<S, R> = Stream<Event, RunError, R | S["DecodingServices"]>`:
+   - The raw `S["DecodingServices"]` for generic `S extends ObjectSchema` resolves to `unknown`
+     via `ObjectSchema = Schema.Codec<unknown, Record<string, unknown>, unknown, unknown>` (RD param = unknown).
+   - The raw enters at `run-loop.ts` `structuredFinalEvents` via the top-level `LanguageModel.generateObject`,
+     whose declared R is `ExtractServices<Options> | StructuredOutputSchema["DecodingServices"] | LanguageModel`
+     (library: `node_modules/.bun/effect@4.0.0-beta.98/.../LanguageModel.d.ts` line 564).
+   - The `OutputRequirement` conditional (`[unknown] extends [X] ? never : X`) clears 466 but the flag
+     moves to 470 (same node) because the RunStream channel still resolves to `unknown`.
+   - Erasing RunStream via the conditional breaks tsc at `agent-run.ts:60`: the run-loop's RHS still
+     carries the raw `Exclude<StructuredOutputSchema["DecodingServices"], ...>` which is not assignable
+     to `R | SchemaServices<S>` (probe-verified: `S["DecodingServices"] ⊄ SchemaServices<S>` for generic S).
+   - Erasing at the `StructuredRunConfig.schema` boundary (`S & { DecodingServices: SchemaServices<S> }`)
+     breaks the caller construction at agent.ts:388/421: generic `S`'s unknown-D is not assignable to never-D
+     (probe-verified with both intersection and conditional schema types).
+   - Erasing via the adapted-service overloads fails because the model is typed `LanguageModel.Service`
+     (the library interface) in the context/registry — the precise adapter overloads are erased there.
+   - The truthful channel is `R | LanguageModel | StaticToolServices<Tools> | SchemaServices<S> | HandoffCatalog`
+     (DriverInterpreter is provided by `Stream.provideContext(interpreterServices)` at agent-run.ts:476).
+
+2. **tool-executor-routes.ts:58** — `PlacementSchemaServices<Tools>`:
+   - Derives from `Tool.Any`'s schemas via `Tool.ParametersSchema`/`Tool.SuccessSchema`/`Tool.ResultDecodingServices`,
+     whose `Schema.Constraint`-typed channels hardcode `DecodingServices: unknown`, `EncodingServices: unknown`
+     (library: `Schema.d.ts` `interface Constraint`).
+   - The conditional erasure clears the flag but breaks tsc at the route's `execute`: the RHS decode/encode
+     chain (`toolResultCodec.decodeInput/decodeSuccess/encodeDomainFailure` → `Schema.decodeUnknownEffect`/
+     `Schema.encodeUnknownEffect`) carries the raw schema services, not assignable to the erased channel.
+
+**Conclusion**: both flags trace to Effect 4.0.0-beta.98's `Schema.Constraint`/`Schema.Encoder` interfaces
+hardcoding `DecodingServices: unknown`/`EncodingServices: unknown`. Every sound type-level erasure fails
+(probe-verified): generic schemas' unknown-D is not assignable to never-D at construction sites, and the
+raw is embedded in effect-chain RHSes. Resolution requires an upstream `Effect-TS/effect` change
+(`Schema.Constraint`/`Encoder` should not hardcode `unknown` service channels), an API redesign with
+unbounded cascade, or a sanctioned carve-out (forbidden by the goal).
