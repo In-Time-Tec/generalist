@@ -18,7 +18,7 @@ import {
 } from "../model/model-telemetry.js"
 import { Permissions, RuleStore } from "../policy/permissions.js"
 import { SessionStore, buildContext } from "../context/session.js"
-import { initialChat, seedFromSession } from "./session-history.js"
+import { initialChat, restoreCheckpointTelemetry, seedFromSession } from "./session-history.js"
 import { SkillSource, selectListings } from "../context/skill-source.js"
 import { Steering } from "../turn/steering.js"
 import { ToolAuthorizerService, make as makeToolAuthorizer } from "../tools/tool-authorization.js"
@@ -303,13 +303,9 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       undeliveredTelemetry.push(event)
     }
     if (options.driverCheckpoint !== undefined && Option.isSome(sessionService)) {
-      const path = yield* sessionService.value
-        .path()
-        .pipe(Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })))
-      const checkpoint = path.findLast((entry) => entry._tag === "Compaction")
-      if (checkpoint?._tag === "Compaction") {
-        for (const event of checkpoint.telemetry) publishTelemetry(event)
-      }
+      yield* restoreCheckpointTelemetry(sessionService.value, undeliveredTelemetry).pipe(
+        Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
+      )
     }
     const emitTelemetry = (payload: ModelTelemetryEventPayload): Effect.Effect<void> =>
       Effect.sync(() => {

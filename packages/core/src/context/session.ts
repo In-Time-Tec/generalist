@@ -94,10 +94,7 @@ export const EntryPayload = Schema.Union([
   Schema.TaggedStruct("Handoff", { target: Schema.String, summary: Schema.String }),
   Schema.TaggedStruct("Compaction", {
     projectedHistory: Prompt.Prompt,
-    // Telemetry is stored structurally rather than through its own schema: Effect AI usage fields
-    // are UndefinedOr, and their encoded form drops the key that decoding then requires. A durable
-    // store must return exactly what it was given.
-    telemetry: Schema.Array(Schema.Unknown),
+    telemetry: Schema.Array(ModelTelemetryEvent),
     compactionCommit: Schema.optionalKey(CompactionCommit),
     summary: Schema.optionalKey(Schema.String),
   }),

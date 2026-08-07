@@ -24,12 +24,35 @@ interface SessionRow {
 
 const storeError = (message: string) => Session.SessionStoreError.make({ message })
 
-// JSON.stringify drops keys whose value is undefined, but Effect AI usage fields are
-// UndefinedOr and require the key to be present. Encoding through the schema's own JSON
-// string codec keeps a persisted entry decodable.
-const PayloadJson = Schema.fromJsonString(Session.EntryPayload)
-const decodePayload = Schema.decodeUnknownSync(PayloadJson)
-const encodePayload = Schema.encodeSync(PayloadJson)
+const decodeEntry = Schema.decodeUnknownSync(Session.EntryPayload)
+const encodeEntry = Schema.encodeSync(Session.EntryPayload)
+
+/**
+ * Effect AI usage fields are `UndefinedOr`: decoding requires the key even when its value is
+ * undefined, but both `JSON.stringify` and the schema's own JSON codec drop it. A durable store
+ * must return exactly what it was given, so undefined is persisted explicitly and restored on read.
+ */
+const UNDEFINED = "@batonfx/runtime/undefined"
+
+const withUndefinedMarkers = (value: unknown): unknown => {
+  if (value === undefined) return UNDEFINED
+  if (Array.isArray(value)) return value.map(withUndefinedMarkers)
+  if (typeof value !== "object" || value === null) return value
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, withUndefinedMarkers(item)]))
+}
+
+const withoutUndefinedMarkers = (value: unknown): unknown => {
+  if (value === UNDEFINED) return undefined
+  if (Array.isArray(value)) return value.map(withoutUndefinedMarkers)
+  if (typeof value !== "object" || value === null) return value
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, withoutUndefinedMarkers(item)]))
+}
+
+const decodePayload = (text: string): Session.EntryPayload =>
+  decodeEntry(withoutUndefinedMarkers(JSON.parse(text) as unknown))
+
+const encodePayload = (payload: Session.EntryPayload): string =>
+  JSON.stringify(withUndefinedMarkers(encodeEntry(payload))) ?? "null"
 
 const toEntry = (row: EntryRow): Entry =>
   ({
