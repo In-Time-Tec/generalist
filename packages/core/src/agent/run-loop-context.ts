@@ -18,7 +18,7 @@ import type { SessionStore, Entry } from "../context/session.js"
 import type { Steering, Input } from "../turn/steering.js"
 import type { ToolContext } from "../tools/tool-context.js"
 
-export type ObjectSchema = Schema.Codec<unknown, Record<string, unknown>, unknown, unknown>
+export type ObjectSchema = Schema.Codec<unknown, Record<string, unknown>, any, any>
 export interface StructuredRunConfig<S extends ObjectSchema> {
   readonly schema: S
   readonly objectName: string

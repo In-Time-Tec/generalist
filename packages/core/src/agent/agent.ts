@@ -304,7 +304,7 @@ export interface RunOptions {
 
 type OperationRequirements<O> = [PresentOption<O, "memory">] extends [never] ? never : Memory
 
-type ObjectSchema = Schema.Codec<unknown, Record<string, unknown>, unknown, unknown>
+type ObjectSchema = Schema.Codec<unknown, Record<string, unknown>, any, any>
 type NoOutputSchema = Schema.Codec<unknown, Record<string, unknown>, never, never>
 
 /** @experimental Default prompt for the terminal structured-output turn. */

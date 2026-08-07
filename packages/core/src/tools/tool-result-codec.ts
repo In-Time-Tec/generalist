@@ -37,6 +37,15 @@ type SchemaServicesE<S extends Schema.Constraint> = [unknown] extends [S["Encodi
   ? never
   : S["EncodingServices"]
 
+/**
+ * Read one schema through its codec view. `Schema.Constraint` reports `unknown` services, which would leak into
+ * every codec signature; the codec view restates the services the schema was actually built with.
+ */
+const codecView = <S extends Schema.Constraint>(
+  schema: S,
+): Schema.Codec<S["Type"], S["Encoded"], SchemaServicesD<S>, SchemaServicesE<S>> =>
+  schema as unknown as Schema.Codec<S["Type"], S["Encoded"], SchemaServicesD<S>, SchemaServicesE<S>>
+
 export type FailureSchema<T extends SchemaTool> = T["failureSchema"]
 export type ToolSchemaServices<T extends SchemaTool> =
   | T["parametersSchema"]["EncodingServices"]
@@ -49,7 +58,7 @@ const encodeSuccess = <S extends Schema.Constraint>(
   tool: { readonly name: string; readonly successSchema: S },
   result: unknown,
 ): Effect.Effect<Success, FrameworkFailure, SchemaServicesE<S>> =>
-  Schema.encodeUnknownEffect<S>(tool.successSchema)(result).pipe(
+  Schema.encodeUnknownEffect(codecView(tool.successSchema))(result).pipe(
     Effect.map((encodedResult): Success => ({ _tag: "Success", result, encodedResult })),
     Effect.mapError((error) => frameworkFailure("encode-success", tool.name, error)),
   )
@@ -58,7 +67,7 @@ const encodeDomainFailure = <S extends Schema.Constraint>(
   tool: { readonly name: string; readonly failureSchema: S },
   failure: unknown,
 ): Effect.Effect<DomainFailure, FrameworkFailure, SchemaServicesE<S>> =>
-  Schema.encodeUnknownEffect<S>(tool.failureSchema)(failure).pipe(
+  Schema.encodeUnknownEffect(codecView(tool.failureSchema))(failure).pipe(
     Effect.map((encodedFailure): DomainFailure => ({ _tag: "DomainFailure", failure, encodedFailure })),
     Effect.mapError((error) => frameworkFailure("encode-domain-failure", tool.name, error)),
   )
@@ -75,7 +84,7 @@ const decodeInput = <S extends Schema.Constraint>(
   tool: { readonly name: string; readonly parametersSchema: S },
   input: unknown,
 ): Effect.Effect<S["Type"], FrameworkFailure, SchemaServicesD<S>> =>
-  Schema.decodeUnknownEffect<S>(tool.parametersSchema)(input).pipe(
+  Schema.decodeUnknownEffect(codecView(tool.parametersSchema))(input).pipe(
     Effect.mapError((error) => frameworkFailure("decode-input", tool.name, error)),
   )
 
@@ -83,7 +92,7 @@ const decodeSuccess = <S extends Schema.Constraint>(
   tool: { readonly name: string; readonly successSchema: S },
   result: unknown,
 ): Effect.Effect<Success, FrameworkFailure, SchemaServicesD<S> | SchemaServicesE<S>> =>
-  Schema.decodeUnknownEffect<S>(tool.successSchema)(result).pipe(
+  Schema.decodeUnknownEffect(codecView(tool.successSchema))(result).pipe(
     Effect.mapError((error) => frameworkFailure("encode-success", tool.name, error)),
     Effect.flatMap((decoded) => encodeSuccess(tool, decoded)),
   )
