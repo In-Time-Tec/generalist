@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.18.3
+
+- Persist distinct durable checkpoints when one logical Agent turn suspends more than once. Suspension checkpoints now derive their idempotent compaction-application identity from the encoded suspension itself, so a child-group join followed by a `run_child` retry in the same turn can no longer replay the first suspension's checkpoint and fail rehydration with a blank `ResumeMismatch`.
+- Preserve structured terminal failures on `AgentExecutionFailure`: the runtime now carries the exact `RunBudgetExhausted` or `ResumeMismatch` value on the optional `failure` field and always produces a non-empty actionable message instead of `Cause.squash(...).message` being blank.
+- Remove the implicit cumulative total-token cap from the Runtime fallback budget. A spawned subagent with a pinned Compaction policy is now governed by that policy like the main agent instead of being killed by accumulated input charges after ~17 turns; explicit agent-authored `totalTokens` budgets still enforce.
+
 ## 0.15.0
 
 - Add exact durable executable registration, admission validation, and restart reconstruction from persisted registrations.

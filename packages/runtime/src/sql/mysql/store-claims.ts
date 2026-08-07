@@ -2,7 +2,7 @@ import { Duration, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { isSqlError } from "effect/unstable/sql/SqlError"
-import { AgentExecutionFailure, RuntimeUnavailable } from "../../errors.js"
+import { AgentExecutionFailure, RuntimeUnavailable, failureMessage } from "../../errors.js"
 import { RunClaims, type ClaimedRun, type Interface as ClaimsInterface } from "../run-claims.js"
 import type { RunRow } from "../rows.js"
 import { appendEvent, loadRun } from "../store-helpers.js"
@@ -165,7 +165,7 @@ export const makeMysqlClaims = (input: {
           } else {
             yield* fail(hub, {
               runId: commitInput.runId,
-              error: AgentExecutionFailure.make({ message: commitInput.error?.message ?? "failed" }),
+              error: AgentExecutionFailure.make({ message: failureMessage(commitInput.error?.message ?? "failed") }),
             })
           }
           yield* clearClaim(commitInput.runId)

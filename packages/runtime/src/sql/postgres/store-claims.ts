@@ -2,9 +2,8 @@ import { Effect } from "effect"
 import type { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
+import { AgentExecutionFailure, RunNotFound, RunTerminal, RuntimeUnavailable, failureMessage } from "../../errors.js"
 import { isTerminal } from "../../run.js"
-import { AgentExecutionFailure } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
 import type { RunRow } from "../rows.js"
 import { decodeRunEffect } from "../store-helpers.js"
@@ -102,7 +101,7 @@ export const makePostgresClaims = (input: {
             loaded,
             {
               _tag: "RunFailed",
-              error: AgentExecutionFailure.make({ message: commitInput.error?.message ?? "failed" }),
+              error: AgentExecutionFailure.make({ message: failureMessage(commitInput.error?.message ?? "failed") }),
             },
             "failed",
           )

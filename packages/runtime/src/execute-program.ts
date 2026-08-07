@@ -2,7 +2,7 @@ import { DateTime, Effect, Layer, Schema, Scope } from "effect"
 import { AgentProgram, ProgramCapabilities, ProgramHost } from "@batonfx/core"
 import type { ProgramResolution } from "./executable-resolver.js"
 import type { ExecutionClaim, ExecutionRecord, Interface as RunStore } from "./run-store.js"
-import { AgentExecutionFailure, RunTerminal } from "./errors.js"
+import { AgentExecutionFailure, RunTerminal, failureMessage } from "./errors.js"
 import { make as makeProgramHost } from "./program-host.js"
 import { programWait } from "./program-approval.js"
 
@@ -30,7 +30,7 @@ export const executeProgram = (input: {
     Effect.flatMap((value) =>
       Effect.try({
         try: () => new TextEncoder().encode(JSON.stringify(value)).byteLength,
-        catch: (error) => AgentExecutionFailure.make({ message: String(error) }),
+        catch: (error) => AgentExecutionFailure.make({ message: failureMessage(String(error)) }),
       }).pipe(
         Effect.flatMap((outputBytes) =>
           store.completeProgram({
@@ -73,7 +73,7 @@ export const executeProgram = (input: {
                   ...claim,
                   error: Schema.is(ProgramHost.ExecutionFailure)(error)
                     ? error
-                    : AgentExecutionFailure.make({ message: String(error) }),
+                    : AgentExecutionFailure.make({ message: failureMessage(String(error)) }),
                 }),
         ),
         Effect.catch((failure) => (Schema.is(RunTerminal)(failure) ? Effect.void : Effect.fail(failure))),

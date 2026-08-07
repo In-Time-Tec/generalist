@@ -25,7 +25,7 @@ it("runtime default budget does not impose a cumulative total-token cap", () => 
   expect(agentBudget.childRuns).toBeGreaterThan(0)
 })
 
-it("a spawned child with default budget survives cumulative usage beyond one million tokens", () => {
+it.effect("a spawned child with default budget survives cumulative usage beyond one million tokens", () => {
   const noop = Tool.make("noop", {
     parameters: Schema.Struct({}),
     success: Schema.String,

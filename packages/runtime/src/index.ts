@@ -242,6 +242,7 @@ import {
   ChildSelectionMissing as Errors_ChildSelectionMissing,
   StartInvalid as Errors_StartInvalid,
   OperationResolutionConflict as Errors_OperationResolutionConflict,
+  StructuredAgentFailure as Errors_StructuredAgentFailure,
 } from "./errors.js"
 import {
   SchemaDirty as Errors_SchemaDirty,
@@ -281,6 +282,7 @@ export const Errors = {
   ChildSelectionMissing: Errors_ChildSelectionMissing,
   StartInvalid: Errors_StartInvalid,
   OperationResolutionConflict: Errors_OperationResolutionConflict,
+  StructuredAgentFailure: Errors_StructuredAgentFailure,
   SchemaDirty: Errors_SchemaDirty,
   SchemaChecksumMismatch: Errors_SchemaChecksumMismatch,
   SchemaVersionUnsupported: Errors_SchemaVersionUnsupported,
@@ -318,6 +320,7 @@ export namespace Errors {
   export type ChildSelectionMissing = import("./errors.js").ChildSelectionMissing
   export type StartInvalid = import("./errors.js").StartInvalid
   export type OperationResolutionConflict = import("./errors.js").OperationResolutionConflict
+  export type StructuredAgentFailure = import("./errors.js").StructuredAgentFailure
   export type SchemaDirty = import("./sql/errors.js").SchemaDirty
   export type SchemaChecksumMismatch = import("./sql/errors.js").SchemaChecksumMismatch
   export type SchemaVersionUnsupported = import("./sql/errors.js").SchemaVersionUnsupported

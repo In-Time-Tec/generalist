@@ -55,6 +55,12 @@ export class AgentExecutionFailure extends Schema.TaggedErrorClass<AgentExecutio
   },
 ) {}
 
+/** @experimental Guarantee an actionable non-empty terminal message. */
+export const failureMessage = (message: string): string => {
+  const trimmed = message.trim()
+  return trimmed.length === 0 ? "Agent execution failed" : trimmed
+}
+
 /** @experimental Internal canonical failure for resolver-owned compaction option drift. */
 export const compactionOptionsMismatch = AgentExecutionFailure.make({
   message: "Resolved compaction options do not match Agent manifest",
