@@ -1,3 +1,4 @@
+import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
 import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
@@ -73,7 +74,7 @@ const systemMessageCount = (chatId: string) =>
     return history.content.filter((message) => message.role === "system").length
   })
 
-layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persistence", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime, layerHandoffCatalogTest))("Agent persistence", (it) => {
   ItLayer.make(
     it,
     "continuity: a second run sees the first run's user and assistant messages",

@@ -1,3 +1,4 @@
+import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
@@ -42,7 +43,7 @@ const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text
 const toolCallPart = (id: string, name: string, params: unknown) =>
   Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 
-layer(unusedToolHandlerLayer)("Guardrail", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, layerHandoffCatalogTest))("Guardrail", (it) => {
   ItLayer.make(it, "validateInput allows Option.none and receives context", () => {
     let modelCalled = false
     let seenContext: ModelMiddleware.TurnContext | undefined

@@ -1,6 +1,6 @@
 import { Cause, Effect, Function, Option, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
-import { type Agent, type Result, type RunError, generate } from "./agent.js"
+import { type Agent, type Result, type RunError, type RunRequirements, generate } from "./agent.js"
 import {
   AgentError,
   AgentSuspended,
@@ -17,6 +17,8 @@ import {} from "../durable/driver-run.js"
 import { DriverInterpreter } from "../durable/driver-interpreter.js"
 import { RunBudgetExhausted, RunBudgetGrantWidened, type RunBudget } from "../durable/run-budget.js"
 import { RegistrationError, type Registration } from "../policy/handoff.js"
+
+type AgentToolRunOptions = { readonly prompt: Prompt.RawInput; readonly inheritedBudget?: RunBudget }
 
 const defaultParameters = Schema.Struct({ prompt: Schema.String })
 
@@ -164,8 +166,8 @@ export const asTool: {
   >(
     options?: AsToolOptions<Name, Parameters, Success>,
   ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R> | Registration,
-  ) => AgentToolToolkit<Name, Parameters, Success, R>
+    agent: Agent<Tools, R> | Registration<Tools, R>,
+  ) => AgentToolToolkit<Name, Parameters, Success, RunRequirements<Tools, R, AgentToolRunOptions>>
   <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -173,9 +175,9 @@ export const asTool: {
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
   >(
-    agent: Agent<Tools, R> | Registration,
+    agent: Agent<Tools, R> | Registration<Tools, R>,
     options?: AsToolOptions<Name, Parameters, Success>,
-  ): AgentToolToolkit<Name, Parameters, Success, R>
+  ): AgentToolToolkit<Name, Parameters, Success, RunRequirements<Tools, R, AgentToolRunOptions>>
 } = Function.dual(
   (args) => args.length !== 1 || "name" in args[0],
   <
@@ -185,20 +187,21 @@ export const asTool: {
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
   >(
-    agent: Agent<Tools, R> | Registration,
+    agent: Agent<Tools, R> | Registration<Tools, R>,
     options: AsToolOptions<Name, Parameters, Success> = {},
-  ): AgentToolToolkit<Name, Parameters, Success, R> => {
+  ): AgentToolToolkit<Name, Parameters, Success, RunRequirements<Tools, R, AgentToolRunOptions>> => {
     const name = options.name ?? agent.name
     const parameters = options.parameters ?? defaultParameters
     const success = options.success ?? Schema.String
-    const handler = (params: unknown): Effect.Effect<unknown, string, R> =>
+    const handler = (
+      params: unknown,
+    ): Effect.Effect<unknown, string, RunRequirements<Tools, R, AgentToolRunOptions>> =>
       Effect.gen(function* () {
         const prompt = yield* promptFor(options.parameters, options.toPrompt, params)
-        type AgentToolRunOptions = { readonly prompt: Prompt.RawInput; readonly inheritedBudget?: RunBudget }
         const runChild = (runOptions: AgentToolRunOptions) => {
-          const execution: Effect.Effect<Result, RunError | RegistrationError, R> =
+          const execution: Effect.Effect<Result, RunError | RegistrationError, RunRequirements<Tools, R, AgentToolRunOptions>> =
             "run" in agent ? agent.run(runOptions) : generate(agent, runOptions)
-          const handled: Effect.Effect<Result, string, R> = execution.pipe(
+          const handled: Effect.Effect<Result, string, RunRequirements<Tools, R, AgentToolRunOptions>> = execution.pipe(
             Effect.catchCause((cause) => {
               if (Cause.hasInterrupts(cause)) return Effect.interrupt
               return Effect.fail(causeMessage(agent.name, cause))

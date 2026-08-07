@@ -1,3 +1,4 @@
+import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -26,12 +27,14 @@ const modelLayer = (streamText: ModelParams["streamText"]) =>
     }),
   )
 
+const unusedModelLayer = modelLayer(() => Stream.make(textDelta("unused")))
+
 const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 const toolCallPart = (id: string, name: string, params: unknown) =>
   Response.makePart("tool-call", { id, name, params, providerExecuted: false })
 const promptText = (prompt: Prompt.Prompt): string => JSON.stringify(prompt.content)
 
-layer(Layer.empty)("Handoff same-run", (it) => {
+layer(Layer.mergeAll(Layer.empty, layerHandoffCatalogTest, unusedModelLayer))("Handoff same-run", (it) => {
   ItLayer.make(it, "persists the exact active Agent pin and resumes from it", () => {
     const model = Pins.makeModel({ model: "handoff-test" })
     const childAgent = Agent.make({ name: "pinned-math" })
@@ -216,6 +219,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         ToolExecutor.layerToolkit(delegate),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        layerHandoffCatalogTest,
       ),
       Effect.gen(function* () {
         const parent = Agent.make({
