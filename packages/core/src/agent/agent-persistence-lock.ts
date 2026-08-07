@@ -10,7 +10,9 @@ export interface RuntimeInterface {
 }
 
 /** @experimental Application-scoped owner for resources shared across agent runs. */
-export class Runtime extends Context.Service<Runtime, RuntimeInterface>()("@batonfx/core/Runtime") {}
+export class Runtime extends Context.Service<Runtime, RuntimeInterface>()(
+  "@batonfx/core/agent/agent-persistence-lock/Runtime",
+) {}
 
 /** @experimental Build one application-scoped agent runtime. */
 export const makeRuntime: Effect.Effect<RuntimeInterface, never, Scope.Scope> = Effect.gen(function* () {

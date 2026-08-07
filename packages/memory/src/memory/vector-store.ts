@@ -47,7 +47,9 @@ export interface Interface {
 }
 
 /** @experimental */
-export class VectorStore extends Context.Service<VectorStore, Interface>()("@batonfx/memory/VectorStore") {}
+export class VectorStore extends Context.Service<VectorStore, Interface>()(
+  "@batonfx/memory/memory/vector-store/VectorStore",
+) {}
 
 const storageKey = (key: Memory.Key, id: string): string => JSON.stringify([key.agent, key.subject, id])
 

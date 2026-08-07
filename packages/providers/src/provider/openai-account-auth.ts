@@ -50,7 +50,7 @@ export interface HostInterface {
 }
 /** @experimental */
 export class OpenAiAccountAuthHost extends Context.Service<OpenAiAccountAuthHost, HostInterface>()(
-  "@batonfx/providers/OpenAiAccountAuthHost",
+  "@batonfx/providers/provider/openai-account-auth/OpenAiAccountAuthHost",
 ) {}
 
 /** @experimental */
@@ -65,7 +65,7 @@ export interface PresenterInterface {
 }
 /** @experimental */
 export class OpenAiAccountDevicePresenter extends Context.Service<OpenAiAccountDevicePresenter, PresenterInterface>()(
-  "@batonfx/providers/OpenAiAccountDevicePresenter",
+  "@batonfx/providers/provider/openai-account-auth/OpenAiAccountDevicePresenter",
 ) {}
 
 /** @experimental */
@@ -106,7 +106,7 @@ export interface HttpInterface {
 }
 /** @experimental */
 export class OpenAiAccountAuthHttp extends Context.Service<OpenAiAccountAuthHttp, HttpInterface>()(
-  "@batonfx/providers/OpenAiAccountAuthHttp",
+  "@batonfx/providers/provider/openai-account-auth/OpenAiAccountAuthHttp",
 ) {}
 
 /** @experimental */
@@ -153,7 +153,7 @@ export interface StoreInterface {
 }
 /** @experimental */
 export class OpenAiAccountCredentialStore extends Context.Service<OpenAiAccountCredentialStore, StoreInterface>()(
-  "@batonfx/providers/OpenAiAccountCredentialStore",
+  "@batonfx/providers/provider/openai-account-auth/OpenAiAccountCredentialStore",
 ) {}
 
 const utf8 = (value: string) =>
@@ -288,7 +288,7 @@ export interface ServiceInterface {
 }
 /** @experimental */
 export class OpenAiAccountAuth extends Context.Service<OpenAiAccountAuth, ServiceInterface>()(
-  "@batonfx/providers/OpenAiAccountAuth",
+  "@batonfx/providers/provider/openai-account-auth/OpenAiAccountAuth",
 ) {}
 
 /** @experimental */

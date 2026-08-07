@@ -57,7 +57,9 @@ export interface Interface {
 }
 
 /** @experimental */
-export class RunClient extends Context.Service<RunClient, Interface>()("@batonfx/transport/RunClient") {}
+export class RunClient extends Context.Service<RunClient, Interface>()(
+  "@batonfx/transport/transport/client/RunClient",
+) {}
 
 const transportError = (message: string, kind?: TransportError["kind"]): TransportError =>
   TransportError.make(kind === undefined ? { message } : { message, kind })

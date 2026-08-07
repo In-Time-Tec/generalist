@@ -27,7 +27,7 @@ export interface HandoffCatalogInterface {
 }
 
 export class HandoffCatalog extends Context.Service<HandoffCatalog, HandoffCatalogInterface>()(
-  "@batonfx/core/HandoffCatalog",
+  "@batonfx/core/policy/handoff-target/HandoffCatalog",
 ) {}
 
 export const layerCatalog = (targets: ReadonlyArray<HandoffTarget>): Layer.Layer<HandoffCatalog> => {
