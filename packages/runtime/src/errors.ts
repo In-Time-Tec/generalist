@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { AgentEvent, RunBudget } from "@batonfx/core"
 import { Address } from "./address.js"
 import { Cursor } from "./cursor.js"
 import { ExecutableRef } from "./executable-manifest.js"
@@ -37,9 +38,21 @@ export class ExecutableIdentityMismatch extends Schema.TaggedErrorClass<Executab
   },
 ) {}
 
+/** @experimental The structured Agent failures a durable terminal event preserves verbatim. */
+export type StructuredAgentFailure = RunBudget.RunBudgetExhausted | AgentEvent.ResumeMismatch
+
+export const StructuredAgentFailure: Schema.Codec<
+  StructuredAgentFailure,
+  typeof RunBudget.RunBudgetExhausted.Encoded | typeof AgentEvent.ResumeMismatch.Encoded
+> = Schema.Union([RunBudget.RunBudgetExhausted, AgentEvent.ResumeMismatch])
+
 export class AgentExecutionFailure extends Schema.TaggedErrorClass<AgentExecutionFailure>()(
   "@batonfx/runtime/AgentExecutionFailure",
-  { message: Schema.String, cause: Schema.optionalKey(Schema.Defect()) },
+  {
+    message: Schema.String,
+    failure: Schema.optionalKey(StructuredAgentFailure),
+    cause: Schema.optionalKey(Schema.Defect()),
+  },
 ) {}
 
 /** @experimental Internal canonical failure for resolver-owned compaction option drift. */

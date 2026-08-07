@@ -142,6 +142,7 @@ export const makeRunLoop = <
           structuredTurn,
           { _tag: "Microcompact", history: transcript, prompt: Prompt.empty },
           path.at(-1)?.id ?? null,
+          "structured-output",
         )
         if (Option.isNone(activeSession)) yield* savePersisted(structuredTurn)
         const structuredOutput: StructuredOutput = {

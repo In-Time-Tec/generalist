@@ -26,6 +26,7 @@ import { hostContext, sessionContext } from "./execution-context.js"
 import { settleInterruptedExecution } from "./execution-interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { approvalReason } from "./run-wait.js"
+import { makeAgentExecutionFailure } from "./agent-execution-failure.js"
 export interface Options {
   readonly workerId: string
   readonly resolver: ExecutableResolverInterface
@@ -34,10 +35,6 @@ export interface Interface {
   readonly execute: (claim: ExecutionClaim) => Effect.Effect<void>
 }
 export class ExecutionHost extends Context.Service<ExecutionHost, Interface>()("@batonfx/runtime/ExecutionHost") {}
-const failureMessage = (cause: Cause.Cause<unknown>): string => {
-  const error = Cause.squash(cause)
-  return error instanceof Error ? error.message : String(error)
-}
 export const make = (options: Options): Effect.Effect<Interface, never, RunStore | ActiveExecutions> =>
   Effect.gen(function* () {
     const store = yield* RunStore
@@ -449,7 +446,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         return
                       }
                       if ((yield* store.inspect(runId)).status === "needs-resolution") return
-                      const failure = AgentExecutionFailure.make({ message: failureMessage(exit.cause) })
+                      const failure = makeAgentExecutionFailure(exit.cause)
                       if (isProgramChild) {
                         yield* Ref.set(deferredProgramChildTerminal, { _tag: "Fail", error: failure })
                         return

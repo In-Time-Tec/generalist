@@ -19,7 +19,7 @@ import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
 import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../context/session.js"
 import { intercept } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
-
+import { inputDigest } from "../durable/driver-contract.js"
 import type { MemoryError } from "../context/memory.js"
 import type { SkillSourceError } from "../context/skill-source.js"
 type CompactionContext = {
@@ -356,18 +356,19 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     turn: number,
     result: CompactionResult,
     parentId: string | null,
+    applicationIdentity: string,
     commitData?: Omit<CompactionCommit, "checkpointId" | "summaryModelCallId">,
     onCommitted?: () => void,
   ): Effect.Effect<void, RunError> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-    const applyKey = commitData?.compactionId ?? "apply"
     return intercept(
       {
         kind: "compaction",
-        key: operationKey(logicalId, "compaction", "apply", turn, applyKey),
+        key: operationKey(logicalId, "compaction", "apply", turn, applicationIdentity),
         input: {
           turn,
           tag: result._tag,
+          applicationIdentity,
           ...(commitData === undefined ? {} : { compactionId: commitData.compactionId }),
         },
         replayPolicy: "pure",
@@ -469,6 +470,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
               turn,
               compacted.value,
               path.at(-1)?.id ?? null,
+              compactionId,
               {
                 compactionId,
                 contextTokensBefore: usage.contextTokens,
