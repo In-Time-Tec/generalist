@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Ref, Schema, SchemaRepresentation, Scope, Semaphore } from "effect"
+import { Context, Effect, Function, Layer, Ref, Schema, SchemaRepresentation, Scope, Semaphore } from "effect"
 import { digest } from "../durable/canonical-json.js"
 import { make as makeProgramManifest, type PinnedProgram, type ProgramBudget } from "../durable/program-manifest.js"
 import type { Bindings, Invocation } from "./program-bindings.js"
@@ -28,7 +28,8 @@ import {
   ProgramToolFailure,
   type StepCallInput,
   type ToolCallInput,
-type ToolSummary, } from "./program-capabilities.js"
+  type ToolSummary,
+} from "./program-capabilities.js"
 import { ExecutionFailure as SandboxFailure, type Interface as Sandbox } from "./sandbox-executor.js"
 
 const ToolCall = Schema.Struct({ operation: ProgramOperationName, tool: Schema.String, input: Schema.Unknown })
@@ -88,14 +89,14 @@ export interface Interface {
 }
 
 /** @experimental Owner of Agent Program execution and its host policy. */
-export class ProgramHost extends Context.Service<ProgramHost, Interface>()("@batonfx/core/program/program-host/ProgramHost") {}
+export class ProgramHost extends Context.Service<ProgramHost, Interface>()(
+  "@batonfx/core/program/program-host/ProgramHost",
+) {}
 
 const encodedBytes = (value: unknown): Effect.Effect<number, ProgramSchemaFailure> =>
   Schema.encodeEffect(Schema.UnknownFromJsonString)(value).pipe(
     Effect.map((encoded) => new TextEncoder().encode(encoded).byteLength),
-    Effect.mapError((error) =>
-      ProgramSchemaFailure.make({ boundary: "program-output", message: error.message }),
-    ),
+    Effect.mapError((error) => ProgramSchemaFailure.make({ boundary: "program-output", message: error.message })),
   )
 
 const schemaFailure =
@@ -103,42 +104,54 @@ const schemaFailure =
   (error: Schema.SchemaError): ProgramSchemaFailure =>
     ProgramSchemaFailure.make({ boundary, ...(capability === undefined ? {} : { capability }), message: String(error) })
 
-const exactClosure = (program: PinnedProgram, bindings: Bindings): Effect.Effect<void, ProgramBindingMismatch> =>
-  Effect.gen(function* () {
-    const check = (
-      kind: "tool" | "step" | "agent",
-      expectedByName: ReadonlyMap<string, string>,
-      actualByName: ReadonlyMap<string, string>,
-    ): Effect.Effect<void, ProgramBindingMismatch> =>
-      Effect.gen(function* () {
-        for (const [name, pin] of expectedByName) {
-          const bound = actualByName.get(name)
-          if (bound === undefined)
-            return yield* ProgramBindingMismatch.make({ kind, name, reason: "declared capability is not bound" })
-          if (bound !== pin)
-            return yield* ProgramBindingMismatch.make({ kind, name, reason: "binding pin does not match" })
-        }
-        for (const name of actualByName.keys()) {
-          if (!expectedByName.has(name))
-            return yield* ProgramBindingMismatch.make({ kind, name, reason: "binding is outside the manifest closure" })
-        }
-      })
-    yield* check(
-      "tool",
-      new Map(program.manifest.capabilities.tools.map((entry) => [entry.name, entry.pin])),
-      new Map(bindings.tools.map((entry) => [entry.name, entry.pin])),
-    )
-    yield* check(
-      "step",
-      new Map(program.manifest.capabilities.steps.map((entry) => [entry.name, entry.pin])),
-      new Map(bindings.steps.map((entry) => [entry.name, entry.pin])),
-    )
-    yield* check(
-      "agent",
-      new Map(program.manifest.capabilities.agents.map((entry) => [entry.selection, `${entry.agent}\0${entry.input}`])),
-      new Map(bindings.agents.map((entry) => [entry.selection, `${entry.agent}\0${entry.inputPin}`])),
-    )
-  })
+const exactClosure: {
+  (bindings: Bindings): (program: PinnedProgram) => Effect.Effect<void, ProgramBindingMismatch>
+  (program: PinnedProgram, bindings: Bindings): Effect.Effect<void, ProgramBindingMismatch>
+} = Function.dual(
+  2,
+  (program: PinnedProgram, bindings: Bindings): Effect.Effect<void, ProgramBindingMismatch> =>
+    Effect.gen(function* () {
+      const check = (
+        kind: "tool" | "step" | "agent",
+        expectedByName: ReadonlyMap<string, string>,
+        actualByName: ReadonlyMap<string, string>,
+      ): Effect.Effect<void, ProgramBindingMismatch> =>
+        Effect.gen(function* () {
+          for (const [name, pin] of expectedByName) {
+            const bound = actualByName.get(name)
+            if (bound === undefined)
+              return yield* ProgramBindingMismatch.make({ kind, name, reason: "declared capability is not bound" })
+            if (bound !== pin)
+              return yield* ProgramBindingMismatch.make({ kind, name, reason: "binding pin does not match" })
+          }
+          for (const name of actualByName.keys()) {
+            if (!expectedByName.has(name))
+              return yield* ProgramBindingMismatch.make({
+                kind,
+                name,
+                reason: "binding is outside the manifest closure",
+              })
+          }
+        })
+      yield* check(
+        "tool",
+        new Map(program.manifest.capabilities.tools.map((entry) => [entry.name, entry.pin])),
+        new Map(bindings.tools.map((entry) => [entry.name, entry.pin])),
+      )
+      yield* check(
+        "step",
+        new Map(program.manifest.capabilities.steps.map((entry) => [entry.name, entry.pin])),
+        new Map(bindings.steps.map((entry) => [entry.name, entry.pin])),
+      )
+      yield* check(
+        "agent",
+        new Map(
+          program.manifest.capabilities.agents.map((entry) => [entry.selection, `${entry.agent}\0${entry.input}`]),
+        ),
+        new Map(bindings.agents.map((entry) => [entry.selection, `${entry.agent}\0${entry.inputPin}`])),
+      )
+    }),
+)
 
 /** @experimental Verify that live Program bindings exactly match persisted manifest authority. */
 export const validateBindings = exactClosure
@@ -160,7 +173,9 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
     const agents = new Map(bindings.agents.map((binding) => [binding.selection, binding] as const))
     const describeSchema = (schema: Schema.Top) =>
       Schema.encodeSync(SchemaRepresentation.DocumentFromJson)(SchemaRepresentation.fromAST(schema.ast))
-    const discoverTools: Effect.Effect<ReadonlyArray<ToolSummary>> = Effect.succeed(bindings.tools.map((binding) => ({ name: binding.name })))
+    const discoverTools: Effect.Effect<ReadonlyArray<ToolSummary>> = Effect.succeed(
+      bindings.tools.map((binding) => ({ name: binding.name })),
+    )
     const describeTool = (name: string) => {
       const binding = tools.get(name)
       return binding === undefined

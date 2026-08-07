@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import {
   currentDriverVersion,
   type DriverCheckpoint,
@@ -35,24 +35,27 @@ const encodeCheckpoint = (
 })
 
 /** @internal Apply the exact successful handoff value to both durable authorities. */
-export const applyHandoffCommit = (
-  checkpoint: DriverCheckpoint,
-  value: unknown,
-): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
-  Effect.gen(function* () {
-    const state = yield* decodeState(checkpoint)
-    const commit = yield* Schema.decodeUnknownEffect(HandoffCommit)(value).pipe(
-      Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid handoff commit: ${error}` })),
-    )
-    const executable =
-      checkpoint.executable === undefined || commit.targetAgentPin === undefined
-        ? checkpoint.executable
-        : { ...checkpoint.executable, active: commit.targetAgentPin }
-    return encodeCheckpoint(
-      { ...checkpoint, ...(executable === undefined ? {} : { executable }) },
-      { ...state, handoff: commit.state },
-    )
-  })
+export const applyHandoffCommit: {
+  (value: unknown): (checkpoint: DriverCheckpoint) => Effect.Effect<DriverCheckpoint, DriverStateInvalid>
+  (checkpoint: DriverCheckpoint, value: unknown): Effect.Effect<DriverCheckpoint, DriverStateInvalid>
+} = Function.dual(
+  2,
+  (checkpoint: DriverCheckpoint, value: unknown): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
+    Effect.gen(function* () {
+      const state = yield* decodeState(checkpoint)
+      const commit = yield* Schema.decodeUnknownEffect(HandoffCommit)(value).pipe(
+        Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid handoff commit: ${error}` })),
+      )
+      const executable =
+        checkpoint.executable === undefined || commit.targetAgentPin === undefined
+          ? checkpoint.executable
+          : { ...checkpoint.executable, active: commit.targetAgentPin }
+      return encodeCheckpoint(
+        { ...checkpoint, ...(executable === undefined ? {} : { executable }) },
+        { ...state, handoff: commit.state },
+      )
+    }),
+)
 
 const chargeForKind = (budget: RunBudget, kind: DriverOperationKind): Effect.Effect<RunBudget, RunBudgetExhausted> => {
   if (kind === "model" || kind === "structured-output") {
@@ -68,41 +71,64 @@ const chargeForKind = (budget: RunBudget, kind: DriverOperationKind): Effect.Eff
 }
 
 /** @experimental Charge budget at operation schedule time before execution begins. */
-export const chargeScheduled = (
-  checkpoint: DriverCheckpoint,
-  kind: DriverOperationKind,
-): Effect.Effect<DriverCheckpoint, RunBudgetExhausted | DriverStateInvalid> =>
-  Effect.gen(function* () {
-    const budget = yield* chargeForKind(checkpoint.budget, kind)
-    if (kind !== "model" && kind !== "structured-output") {
-      return { ...checkpoint, budget }
-    }
-    const state = yield* decodeState(checkpoint)
-    return encodeCheckpoint(checkpoint, { ...state, modelCallOrdinal: state.modelCallOrdinal + 1 }, budget)
-  })
+export const chargeScheduled: {
+  (
+    kind: DriverOperationKind,
+  ): (checkpoint: DriverCheckpoint) => Effect.Effect<DriverCheckpoint, RunBudgetExhausted | DriverStateInvalid>
+  (
+    checkpoint: DriverCheckpoint,
+    kind: DriverOperationKind,
+  ): Effect.Effect<DriverCheckpoint, RunBudgetExhausted | DriverStateInvalid>
+} = Function.dual(
+  2,
+  (
+    checkpoint: DriverCheckpoint,
+    kind: DriverOperationKind,
+  ): Effect.Effect<DriverCheckpoint, RunBudgetExhausted | DriverStateInvalid> =>
+    Effect.gen(function* () {
+      const budget = yield* chargeForKind(checkpoint.budget, kind)
+      if (kind !== "model" && kind !== "structured-output") {
+        return { ...checkpoint, budget }
+      }
+      const state = yield* decodeState(checkpoint)
+      return encodeCheckpoint(checkpoint, { ...state, modelCallOrdinal: state.modelCallOrdinal + 1 }, budget)
+    }),
+)
 
 /** @experimental Apply token usage after a model boundary without scheduling a new operation. */
-export const chargeUsage = (
-  checkpoint: DriverCheckpoint,
-  usage: BudgetLimits,
-): Effect.Effect<DriverCheckpoint, RunBudgetExhausted> =>
-  Effect.gen(function* () {
-    const budget = yield* charge(checkpoint.budget, usage)
-    return { ...checkpoint, budget }
-  })
+export const chargeUsage: {
+  (usage: BudgetLimits): (checkpoint: DriverCheckpoint) => Effect.Effect<DriverCheckpoint, RunBudgetExhausted>
+  (checkpoint: DriverCheckpoint, usage: BudgetLimits): Effect.Effect<DriverCheckpoint, RunBudgetExhausted>
+} = Function.dual(
+  2,
+  (checkpoint: DriverCheckpoint, usage: BudgetLimits): Effect.Effect<DriverCheckpoint, RunBudgetExhausted> =>
+    Effect.gen(function* () {
+      const budget = yield* charge(checkpoint.budget, usage)
+      return { ...checkpoint, budget }
+    }),
+)
 
 /** @experimental Replace checkpoint budget after child reservation or refund. */
-export const withBudget = (checkpoint: DriverCheckpoint, budget: RunBudget): DriverCheckpoint => ({
-  ...checkpoint,
-  budget,
-})
+export const withBudget: {
+  (budget: RunBudget): (checkpoint: DriverCheckpoint) => DriverCheckpoint
+  (checkpoint: DriverCheckpoint, budget: RunBudget): DriverCheckpoint
+} = Function.dual(
+  2,
+  (checkpoint: DriverCheckpoint, budget: RunBudget): DriverCheckpoint => ({
+    ...checkpoint,
+    budget,
+  }),
+)
 
 /** @internal Replace the durable handoff control snapshot without scheduling an operation. */
-export const withHandoffState = (
-  checkpoint: DriverCheckpoint,
-  handoff: HandoffControlState,
-): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
-  decodeState(checkpoint).pipe(Effect.map((state) => encodeCheckpoint(checkpoint, { ...state, handoff })))
+export const withHandoffState: {
+  (handoff: HandoffControlState): (checkpoint: DriverCheckpoint) => Effect.Effect<DriverCheckpoint, DriverStateInvalid>
+  (checkpoint: DriverCheckpoint, handoff: HandoffControlState): Effect.Effect<DriverCheckpoint, DriverStateInvalid>
+} = Function.dual(
+  2,
+  (checkpoint: DriverCheckpoint, handoff: HandoffControlState): Effect.Effect<DriverCheckpoint, DriverStateInvalid> =>
+    decodeState(checkpoint).pipe(Effect.map((state) => encodeCheckpoint(checkpoint, { ...state, handoff }))),
+)
 
 /** @experimental Production durable driver backing inline Agent.stream runs. */
 export const makeLoopDriver = (options: LoopDriverOptions): DurableAgentDriver => ({
@@ -201,7 +227,10 @@ export const makeLoopDriver = (options: LoopDriverOptions): DurableAgentDriver =
 })
 
 /** @experimental Attach the next pending operation before interpreter decide. */
-export const withPending = (checkpoint: DriverCheckpoint, pending: PendingOperation): DriverCheckpoint => {
+export const withPending: {
+  (pending: PendingOperation): (checkpoint: DriverCheckpoint) => DriverCheckpoint
+  (checkpoint: DriverCheckpoint, pending: PendingOperation): DriverCheckpoint
+} = Function.dual(2, (checkpoint: DriverCheckpoint, pending: PendingOperation): DriverCheckpoint => {
   const state = Schema.decodeUnknownSync(LoopDriverState)(checkpoint.state)
   return { ...checkpoint, state: { ...state, pending } }
-}
+})

@@ -1,3 +1,4 @@
+import { Function } from "effect"
 import type { ContextProjection } from "./handoff-projection.js"
 
 export interface HandoffToolMeta {
@@ -8,9 +9,12 @@ export interface HandoffToolMeta {
 
 const registry = new Map<string, HandoffToolMeta>()
 
-export const registerHandoffToolMeta = (toolName: string, meta: HandoffToolMeta): void => {
+export const registerHandoffToolMeta: {
+  (meta: HandoffToolMeta): (toolName: string) => void
+  (toolName: string, meta: HandoffToolMeta): void
+} = Function.dual(2, (toolName: string, meta: HandoffToolMeta): void => {
   registry.set(toolName, meta)
-}
+})
 
 export const lookupHandoffToolMeta = (toolName: string): HandoffToolMeta | undefined => registry.get(toolName)
 

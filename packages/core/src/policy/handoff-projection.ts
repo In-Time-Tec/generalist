@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 
 export const HandoffInput = Schema.Struct({
@@ -40,30 +40,46 @@ const hasUnresolvedToolCall = (
   return pending.size > 0
 }
 
-export const defaultContextProjection: ContextProjection = (history, input) => {
-  const excluding =
-    input.context !== undefined &&
-    typeof input.context === "object" &&
-    input.context !== null &&
-    "resolvingToolCallIds" in input.context &&
-    Array.isArray((input.context as { resolvingToolCallIds: unknown }).resolvingToolCallIds)
-      ? new Set((input.context as { resolvingToolCallIds: ReadonlyArray<string> }).resolvingToolCallIds.map(String))
-      : new Set<string>()
-  if (hasUnresolvedToolCall(history.content, excluding)) {
-    return Effect.fail(
-      HandoffProjectionInvalid.make({
-        message: "Handoff context projection cannot include unresolved tool calls",
-      }),
-    )
-  }
-  const prompt =
-    input.prompt === undefined
-      ? Prompt.empty
-      : typeof input.prompt === "string"
-        ? Prompt.make(input.prompt)
-        : Prompt.make(input.prompt)
-  return Effect.succeed({ history, prompt })
-}
+export const defaultContextProjection: {
+  (
+    input: HandoffInput,
+  ): (
+    history: Prompt.Prompt,
+  ) => Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, HandoffProjectionInvalid>
+  (
+    history: Prompt.Prompt,
+    input: HandoffInput,
+  ): Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, HandoffProjectionInvalid>
+} = Function.dual(
+  2,
+  (
+    history: Prompt.Prompt,
+    input: HandoffInput,
+  ): Effect.Effect<{ readonly history: Prompt.Prompt; readonly prompt: Prompt.RawInput }, HandoffProjectionInvalid> => {
+    const excluding =
+      input.context !== undefined &&
+      typeof input.context === "object" &&
+      input.context !== null &&
+      "resolvingToolCallIds" in input.context &&
+      Array.isArray((input.context as { resolvingToolCallIds: unknown }).resolvingToolCallIds)
+        ? new Set((input.context as { resolvingToolCallIds: ReadonlyArray<string> }).resolvingToolCallIds.map(String))
+        : new Set<string>()
+    if (hasUnresolvedToolCall(history.content, excluding)) {
+      return Effect.fail(
+        HandoffProjectionInvalid.make({
+          message: "Handoff context projection cannot include unresolved tool calls",
+        }),
+      )
+    }
+    const prompt =
+      input.prompt === undefined
+        ? Prompt.empty
+        : typeof input.prompt === "string"
+          ? Prompt.make(input.prompt)
+          : Prompt.make(input.prompt)
+    return Effect.succeed({ history, prompt })
+  },
+)
 
 export const filterContextProjection =
   (predicate: (message: Prompt.Message) => boolean): ContextProjection =>

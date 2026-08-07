@@ -1,4 +1,5 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
+import type { ParseOptions } from "effect/SchemaAST"
 
 /** @experimental Finite resource limits for one run or child grant. */
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
@@ -161,85 +162,124 @@ const subtractLimits = (
   })
 
 /** @experimental */
-export const make = (allocation: BudgetLimits, depth = 0): RunBudget => {
-  const validAllocation = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(allocation)
-  const validDepth = Schema.decodeUnknownSync(Count)(depth)
-  return { allocation: validAllocation, remaining: { ...validAllocation }, depth: validDepth }
-}
+export const make: {
+  (depth?: number): (allocation: BudgetLimits) => RunBudget
+  (allocation: BudgetLimits, depth?: number): RunBudget
+} = Function.dual(
+  (args) => args.length > 1 || typeof args[0] === "object",
+  (allocation: BudgetLimits, depth = 0): RunBudget => {
+    const validAllocation = Schema.decodeUnknownSync(BudgetLimits, { onExcessProperty: "error" })(allocation)
+    const validDepth = Schema.decodeUnknownSync(Count)(depth)
+    return { allocation: validAllocation, remaining: { ...validAllocation }, depth: validDepth }
+  },
+)
 
 /** @experimental */
 export const allocate = make
 
 /** @experimental */
-export const charge = (budget: RunBudget, usage: BudgetLimits): Effect.Effect<RunBudget, RunBudgetExhausted> =>
-  Effect.gen(function* () {
-    const validUsage = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(usage).pipe(
-      Effect.mapError((error) => RunBudgetExhausted.make({ dimension: "modelCalls", requested: 0, message: error.message })),
-    )
-    const remaining: Record<string, number | string | undefined> = { ...budget.remaining }
-    for (const dimension of chargeDimensions) {
-      const amount = validUsage[dimension]
-      if (amount === undefined || amount === 0) continue
-      remaining[dimension] = yield* subtractFinite(limitValue(remaining as BudgetLimits, dimension), amount, dimension)
-    }
-    if (validUsage.handoffs !== undefined && validUsage.handoffs !== 0) {
-      remaining.handoffs = yield* subtractFinite(
-        limitValue(remaining as BudgetLimits, "handoffs"),
-        validUsage.handoffs,
-        "handoffs",
+export const charge: {
+  (usage: BudgetLimits): (budget: RunBudget) => Effect.Effect<RunBudget, RunBudgetExhausted>
+  (budget: RunBudget, usage: BudgetLimits): Effect.Effect<RunBudget, RunBudgetExhausted>
+} = Function.dual(
+  2,
+  (budget: RunBudget, usage: BudgetLimits): Effect.Effect<RunBudget, RunBudgetExhausted> =>
+    Effect.gen(function* () {
+      const validUsage = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(usage).pipe(
+        Effect.mapError((error) =>
+          RunBudgetExhausted.make({ dimension: "modelCalls", requested: 0, message: error.message }),
+        ),
       )
-    }
-    return { ...budget, remaining: remaining as BudgetLimits }
-  })
+      const remaining: Record<string, number | string | undefined> = { ...budget.remaining }
+      for (const dimension of chargeDimensions) {
+        const amount = validUsage[dimension]
+        if (amount === undefined || amount === 0) continue
+        remaining[dimension] = yield* subtractFinite(
+          limitValue(remaining as BudgetLimits, dimension),
+          amount,
+          dimension,
+        )
+      }
+      if (validUsage.handoffs !== undefined && validUsage.handoffs !== 0) {
+        remaining.handoffs = yield* subtractFinite(
+          limitValue(remaining as BudgetLimits, "handoffs"),
+          validUsage.handoffs,
+          "handoffs",
+        )
+      }
+      return { ...budget, remaining: remaining as BudgetLimits }
+    }),
+)
 
 /** @experimental */
-export const reserveChild = (
-  parent: RunBudget,
-  grant: BudgetLimits,
-): Effect.Effect<
-  { readonly parent: RunBudget; readonly child: RunBudget },
-  RunBudgetExhausted | RunBudgetGrantWidened
-> =>
-  Effect.gen(function* () {
-    grant = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(grant).pipe(
-      Effect.mapError((error) => RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message })),
-    )
-    const maxDepth = parent.allocation.depth
-    const childDepth = parent.depth + 1
-    if (maxDepth !== undefined && childDepth > maxDepth) {
-      return yield* RunBudgetExhausted.make({
-        dimension: "depth",
-        requested: childDepth,
-        remaining: maxDepth,
-      })
-    }
-    if (parent.remaining.childRuns !== undefined && parent.remaining.childRuns < 1) {
-      return yield* RunBudgetExhausted.make({
-        dimension: "childRuns",
-        requested: 1,
-        remaining: parent.remaining.childRuns,
-      })
-    }
-    const reserved = yield* subtractLimits(parent.remaining, grant)
-    const childRunsRemaining =
-      parent.remaining.childRuns === undefined
-        ? undefined
-        : yield* subtractFinite(parent.remaining.childRuns, 1, "childRuns")
-    return {
-      parent: {
-        ...parent,
-        remaining: {
-          ...reserved,
-          ...(childRunsRemaining === undefined ? {} : { childRuns: childRunsRemaining }),
+export const reserveChild: {
+  (
+    grant: BudgetLimits,
+  ): (
+    parent: RunBudget,
+  ) => Effect.Effect<
+    { readonly parent: RunBudget; readonly child: RunBudget },
+    RunBudgetExhausted | RunBudgetGrantWidened
+  >
+  (
+    parent: RunBudget,
+    grant: BudgetLimits,
+  ): Effect.Effect<
+    { readonly parent: RunBudget; readonly child: RunBudget },
+    RunBudgetExhausted | RunBudgetGrantWidened
+  >
+} = Function.dual(
+  2,
+  (
+    parent: RunBudget,
+    grant: BudgetLimits,
+  ): Effect.Effect<
+    { readonly parent: RunBudget; readonly child: RunBudget },
+    RunBudgetExhausted | RunBudgetGrantWidened
+  > =>
+    Effect.gen(function* () {
+      grant = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(grant).pipe(
+        Effect.mapError((error) =>
+          RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message }),
+        ),
+      )
+      const maxDepth = parent.allocation.depth
+      const childDepth = parent.depth + 1
+      if (maxDepth !== undefined && childDepth > maxDepth) {
+        return yield* RunBudgetExhausted.make({
+          dimension: "depth",
+          requested: childDepth,
+          remaining: maxDepth,
+        })
+      }
+      if (parent.remaining.childRuns !== undefined && parent.remaining.childRuns < 1) {
+        return yield* RunBudgetExhausted.make({
+          dimension: "childRuns",
+          requested: 1,
+          remaining: parent.remaining.childRuns,
+        })
+      }
+      const reserved = yield* subtractLimits(parent.remaining, grant)
+      const childRunsRemaining =
+        parent.remaining.childRuns === undefined
+          ? undefined
+          : yield* subtractFinite(parent.remaining.childRuns, 1, "childRuns")
+      return {
+        parent: {
+          ...parent,
+          remaining: {
+            ...reserved,
+            ...(childRunsRemaining === undefined ? {} : { childRuns: childRunsRemaining }),
+          },
         },
-      },
-      child: {
-        allocation: grant,
-        remaining: { ...grant },
-        depth: childDepth,
-      },
-    }
-  })
+        child: {
+          allocation: grant,
+          remaining: { ...grant },
+          depth: childDepth,
+        },
+      }
+    }),
+)
 
 const allocationRefund = (allocation: BudgetLimits, narrower: BudgetLimits): BudgetLimits => {
   const refunded: Record<string, number> = {}
@@ -265,66 +305,133 @@ const intersectLimits = (current: BudgetLimits, cap: BudgetLimits): BudgetLimits
 }
 
 /** @experimental */
-export const narrowChild = (
-  parent: RunBudget,
-  child: RunBudget,
-  narrower: BudgetLimits,
-): Effect.Effect<{ readonly parent: RunBudget; readonly child: RunBudget }, RunBudgetGrantWidened> =>
-  Effect.gen(function* () {
-    narrower = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(narrower).pipe(
-      Effect.mapError((error) => RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message })),
-    )
-    for (const dimension of [...chargeDimensions, "childRuns", "depth"] as const) {
-      const next = narrower[dimension]
-      if (next === undefined) continue
-      const current = child.allocation[dimension]
-      if (current !== undefined && next > current) {
-        return yield* RunBudgetGrantWidened.make({
-          dimension,
-          grant: next,
-          remaining: current,
-        })
+export const narrowChild: {
+  (
+    child: RunBudget,
+    narrower: BudgetLimits,
+  ): (
+    parent: RunBudget,
+  ) => Effect.Effect<{ readonly parent: RunBudget; readonly child: RunBudget }, RunBudgetGrantWidened>
+  (
+    parent: RunBudget,
+    child: RunBudget,
+    narrower: BudgetLimits,
+  ): Effect.Effect<{ readonly parent: RunBudget; readonly child: RunBudget }, RunBudgetGrantWidened>
+} = Function.dual(
+  3,
+  (
+    parent: RunBudget,
+    child: RunBudget,
+    narrower: BudgetLimits,
+  ): Effect.Effect<{ readonly parent: RunBudget; readonly child: RunBudget }, RunBudgetGrantWidened> =>
+    Effect.gen(function* () {
+      narrower = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(narrower).pipe(
+        Effect.mapError((error) =>
+          RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message }),
+        ),
+      )
+      for (const dimension of [...chargeDimensions, "childRuns", "depth"] as const) {
+        const next = narrower[dimension]
+        if (next === undefined) continue
+        const current = child.allocation[dimension]
+        if (current !== undefined && next > current) {
+          return yield* RunBudgetGrantWidened.make({
+            dimension,
+            grant: next,
+            remaining: current,
+          })
+        }
       }
-    }
-    const refunded = allocationRefund(child.allocation, narrower)
-    return {
-      parent: { ...parent, remaining: mergeRemaining(parent.remaining, refunded) },
-      child: {
-        allocation: narrower,
-        remaining: intersectLimits(child.remaining, narrower),
-        depth: child.depth,
-      },
-    }
-  })
+      const refunded = allocationRefund(child.allocation, narrower)
+      return {
+        parent: { ...parent, remaining: mergeRemaining(parent.remaining, refunded) },
+        child: {
+          allocation: narrower,
+          remaining: intersectLimits(child.remaining, narrower),
+          depth: child.depth,
+        },
+      }
+    }),
+)
 
 /** @experimental */
-export const refundUnused = (parent: RunBudget, child: RunBudget): RunBudget => ({
-  ...parent,
-  remaining: mergeRemaining(parent.remaining, child.remaining),
+export const refundUnused: {
+  (child: RunBudget): (parent: RunBudget) => RunBudget
+  (parent: RunBudget, child: RunBudget): RunBudget
+} = Function.dual(
+  2,
+  (parent: RunBudget, child: RunBudget): RunBudget => ({
+    ...parent,
+    remaining: mergeRemaining(parent.remaining, child.remaining),
+  }),
+)
+
+/** @experimental */
+export const isDeadlineExpired: {
+  (nowIso: string): (budget: RunBudget) => boolean
+  (budget: RunBudget, nowIso: string): boolean
+} = Function.dual(2, (budget: RunBudget, nowIso: string): boolean => {
+  const deadline = budget.remaining.deadline ?? budget.allocation.deadline
+  return deadline !== undefined && nowIso >= deadline
 })
 
 /** @experimental */
-export const isDeadlineExpired = (budget: RunBudget, nowIso: string): boolean => {
-  const deadline = budget.remaining.deadline ?? budget.allocation.deadline
-  return deadline !== undefined && nowIso >= deadline
-}
+export const assertNotExpired: {
+  (nowIso: string): (budget: RunBudget) => Effect.Effect<void, RunBudgetExhausted>
+  (budget: RunBudget, nowIso: string): Effect.Effect<void, RunBudgetExhausted>
+} = Function.dual(
+  2,
+  (budget: RunBudget, nowIso: string): Effect.Effect<void, RunBudgetExhausted> =>
+    isDeadlineExpired(budget, nowIso)
+      ? Effect.fail(RunBudgetExhausted.make({ dimension: "deadline", requested: 1 }))
+      : Effect.void,
+)
 
 /** @experimental */
-export const assertNotExpired = (budget: RunBudget, nowIso: string): Effect.Effect<void, RunBudgetExhausted> =>
-  isDeadlineExpired(budget, nowIso)
-    ? Effect.fail(RunBudgetExhausted.make({ dimension: "deadline", requested: 1 }))
-    : Effect.void
-
-/** @experimental */
-export const resolve = (agentDefault?: BudgetLimits, runOverride?: BudgetLimits): RunBudget =>
-  make(runOverride === undefined ? (agentDefault ?? {}) : narrowLimits(agentDefault ?? {}, runOverride))
+export const resolve: {
+  (runOverride?: BudgetLimits): (agentDefault?: BudgetLimits) => RunBudget
+  (agentDefault?: BudgetLimits, runOverride?: BudgetLimits): RunBudget
+} = Function.dual(
+  2,
+  (agentDefault: BudgetLimits | undefined, runOverride: BudgetLimits | undefined): RunBudget =>
+    make(runOverride === undefined ? (agentDefault ?? {}) : narrowLimits(agentDefault ?? {}, runOverride)),
+)
 
 /** @experimental Narrow a base budget with optional per-run overrides; omitted dimensions stay unchanged. */
-export const narrowLimits = (base?: BudgetLimits, override?: BudgetLimits): BudgetLimits =>
-  override === undefined ? (base ?? {}) : intersectLimits(base ?? {}, override)
+export const narrowLimits: {
+  (override?: BudgetLimits): (base?: BudgetLimits) => BudgetLimits
+  (base?: BudgetLimits, override?: BudgetLimits): BudgetLimits
+} = Function.dual(
+  2,
+  (base: BudgetLimits | undefined, override: BudgetLimits | undefined): BudgetLimits =>
+    override === undefined ? (base ?? {}) : intersectLimits(base ?? {}, override),
+)
+
+const isParseOptions = (value: unknown): value is ParseOptions =>
+  typeof value === "object" &&
+  value !== null &&
+  ("errors" in value ||
+    "onExcessProperty" in value ||
+    "propertyOrder" in value ||
+    "disableChecks" in value ||
+    "concurrency" in value)
 
 /** @experimental */
-export const encode = Schema.encodeEffect(RunBudget)
+export const encode: {
+  (input: RunBudget, options?: ParseOptions): Effect.Effect<typeof RunBudget.Encoded, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: RunBudget) => Effect.Effect<typeof RunBudget.Encoded, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (input: RunBudget, options?: ParseOptions): Effect.Effect<typeof RunBudget.Encoded, Schema.SchemaError, never> =>
+    Schema.encodeEffect(RunBudget)(input, options),
+)
 
 /** @experimental */
-export const decode = Schema.decodeEffect(RunBudget)
+export const decode: {
+  (input: typeof RunBudget.Encoded, options?: ParseOptions): Effect.Effect<RunBudget, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: typeof RunBudget.Encoded) => Effect.Effect<RunBudget, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (input: typeof RunBudget.Encoded, options?: ParseOptions): Effect.Effect<RunBudget, Schema.SchemaError, never> =>
+    Schema.decodeEffect(RunBudget)(input, options),
+)

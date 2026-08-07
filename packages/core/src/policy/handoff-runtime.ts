@@ -1,4 +1,4 @@
-import { Effect, Option, Ref, Schema } from "effect"
+import { Effect, Function, Option, Ref, Schema } from "effect"
 import { Chat, Tool } from "effect/unstable/ai"
 import {
   edgeCount,
@@ -239,34 +239,56 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
     return accepted
   })
 
-export const handoffToolSpec = (
-  handoffTarget: HandoffTarget,
-  options: {
-    readonly nameOverride?: string
-    readonly description?: string
-    readonly projection?: ContextProjection
-    readonly maxRepeatedEdge?: number
-  } = {},
-): {
+/** @experimental One same-run handoff tool specification. */
+export interface HandoffToolSpecResult {
   readonly tool: Tool.Any
   readonly specialist: string
   readonly projection?: ContextProjection
   readonly maxRepeatedEdge?: number
-} => {
-  const name = options.nameOverride ?? `handoff_to_${handoffTarget.name}`
-  const tool = Tool.make(name, {
-    ...(options.description === undefined
-      ? { description: `Hand off to ${handoffTarget.name} for subsequent turns in this run` }
-      : { description: options.description }),
-    parameters: HandoffInput,
-    success: HandoffAccepted,
-    failure: Schema.String,
-    failureMode: "return",
-  })
-  return {
-    tool,
-    specialist: handoffTarget.name,
-    ...(options.projection === undefined ? {} : { projection: options.projection }),
-    ...(options.maxRepeatedEdge === undefined ? {} : { maxRepeatedEdge: options.maxRepeatedEdge }),
-  }
 }
+
+export const handoffToolSpec: {
+  (options?: {
+    readonly nameOverride?: string
+    readonly description?: string
+    readonly projection?: ContextProjection
+    readonly maxRepeatedEdge?: number
+  }): (handoffTarget: HandoffTarget) => HandoffToolSpecResult
+  (
+    handoffTarget: HandoffTarget,
+    options?: {
+      readonly nameOverride?: string
+      readonly description?: string
+      readonly projection?: ContextProjection
+      readonly maxRepeatedEdge?: number
+    },
+  ): HandoffToolSpecResult
+} = Function.dual(
+  (args) => args.length > 1 || "agent" in args[0],
+  (
+    handoffTarget: HandoffTarget,
+    options: {
+      readonly nameOverride?: string
+      readonly description?: string
+      readonly projection?: ContextProjection
+      readonly maxRepeatedEdge?: number
+    } = {},
+  ): HandoffToolSpecResult => {
+    const name = options.nameOverride ?? `handoff_to_${handoffTarget.name}`
+    const tool = Tool.make(name, {
+      ...(options.description === undefined
+        ? { description: `Hand off to ${handoffTarget.name} for subsequent turns in this run` }
+        : { description: options.description }),
+      parameters: HandoffInput,
+      success: HandoffAccepted,
+      failure: Schema.String,
+      failureMode: "return",
+    })
+    return {
+      tool,
+      specialist: handoffTarget.name,
+      ...(options.projection === undefined ? {} : { projection: options.projection }),
+      ...(options.maxRepeatedEdge === undefined ? {} : { maxRepeatedEdge: options.maxRepeatedEdge }),
+    }
+  },
+)

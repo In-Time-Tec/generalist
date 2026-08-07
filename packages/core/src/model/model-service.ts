@@ -1,4 +1,4 @@
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Function, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool } from "effect/unstable/ai"
 import type { NoExcessProperties } from "effect/Types"
 
@@ -59,7 +59,7 @@ const noToolkitOptions = (
   toolkit: undefined,
 })
 
-export const invokeGenerateText = (
+const invokeGenerateTextImpl = (
   model: LanguageModel.Service,
   options: LanguageModel.GenerateTextOptions<BroadTools>,
 ) =>
@@ -67,18 +67,45 @@ export const invokeGenerateText = (
     ? model.generateText({ ...noToolkitOptions(options), toolkit: undefined })
     : model.generateText({ ...options, toolkit: options.toolkit })
 
-export const invokeGenerateObject = (
+export const invokeGenerateText: {
+  (
+    options: LanguageModel.GenerateTextOptions<BroadTools>,
+  ): (model: LanguageModel.Service) => ReturnType<typeof invokeGenerateTextImpl>
+  (
+    model: LanguageModel.Service,
+    options: LanguageModel.GenerateTextOptions<BroadTools>,
+  ): ReturnType<typeof invokeGenerateTextImpl>
+} = Function.dual(2, invokeGenerateTextImpl)
+
+const invokeGenerateObjectImpl = (
   model: LanguageModel.Service,
   options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
 ) => model.generateObject(options)
 
-export const invokeStreamText = (
-  model: LanguageModel.Service,
-  options: LanguageModel.GenerateTextOptions<BroadTools>,
-) =>
+export const invokeGenerateObject: {
+  (
+    options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
+  ): (model: LanguageModel.Service) => ReturnType<typeof invokeGenerateObjectImpl>
+  (
+    model: LanguageModel.Service,
+    options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
+  ): ReturnType<typeof invokeGenerateObjectImpl>
+} = Function.dual(2, invokeGenerateObjectImpl)
+
+const invokeStreamTextImpl = (model: LanguageModel.Service, options: LanguageModel.GenerateTextOptions<BroadTools>) =>
   options.toolkit === undefined
     ? model.streamText({ ...noToolkitOptions(options), toolkit: undefined })
     : model.streamText({ ...options, toolkit: options.toolkit })
+
+export const invokeStreamText: {
+  (
+    options: LanguageModel.GenerateTextOptions<BroadTools>,
+  ): (model: LanguageModel.Service) => ReturnType<typeof invokeStreamTextImpl>
+  (
+    model: LanguageModel.Service,
+    options: LanguageModel.GenerateTextOptions<BroadTools>,
+  ): ReturnType<typeof invokeStreamTextImpl>
+} = Function.dual(2, invokeStreamTextImpl)
 
 /** @internal Adapt all three LanguageModel operations without re-declaring their implementation overloads. */
 type MetadataCopier = (source: LanguageModel.Service, target: LanguageModel.Service) => void
@@ -92,116 +119,131 @@ const copyMetadata = (source: LanguageModel.Service, target: LanguageModel.Servi
   for (const copier of metadataCopiers) copier(source, target)
 }
 
-export const adapt = <GenerateError = never, GenerateObjectError = never, StreamError = never>(
-  model: LanguageModel.Service,
-  middleware: Middleware<GenerateError, GenerateObjectError, StreamError>,
-): LanguageModel.Service => {
-  function generateText<Options extends NoExcessProperties<LanguageModel.GenerateTextOptions<{}>, Options>>(
-    options: Options & { readonly toolkit?: undefined } & LanguageModel.GenerateTextOptions<{}>,
-  ): Effect.Effect<
-    LanguageModel.GenerateTextResponse<{}>,
-    LanguageModel.ExtractError<Options>,
-    LanguageModel.ExtractServices<Options>
-  >
-  function generateText<
-    Tools extends Record<string, Tool.Any>,
-    Options extends NoExcessProperties<
-      LanguageModel.GenerateTextOptions<Tools> & { readonly toolkit: LanguageModel.ToolkitInput<Tools> },
-      Options
-    >,
-  >(
-    options: Options &
-      LanguageModel.GenerateTextOptions<Tools> & {
-        readonly toolkit: LanguageModel.ToolkitInput<Tools>
-      },
-  ): Effect.Effect<
-    LanguageModel.GenerateTextResponse<Tools>,
-    LanguageModel.ExtractError<Options>,
-    LanguageModel.ExtractServices<Options>
-  >
-  function generateText<
-    Options extends {
-      readonly toolkit: LanguageModel.ToolkitOption<Record<string, Tool.Any>>
-    } & NoExcessProperties<LanguageModel.GenerateTextOptions<Record<string, Tool.Any>>, Options>,
-  >(
-    options: Options &
-      LanguageModel.GenerateTextOptions<LanguageModel.ExtractTools<Options>> & {
-        readonly toolkit: Options["toolkit"]
-      },
-  ): Effect.Effect<
-    LanguageModel.GenerateTextResponse<LanguageModel.ExtractTools<Options>>,
-    LanguageModel.ExtractError<Options>,
-    LanguageModel.ExtractServices<Options>
-  >
-  function generateText(options: LanguageModel.GenerateTextOptions<BroadTools>) {
-    const invoke = (input = options) => invokeGenerateText(model, input)
-    return middleware.generateText === undefined ? invoke() : middleware.generateText(options, invoke)
-  }
+export const adapt: {
+  <GenerateError = never, GenerateObjectError = never, StreamError = never>(
+    middleware: Middleware<GenerateError, GenerateObjectError, StreamError>,
+  ): (model: LanguageModel.Service) => LanguageModel.Service
+  <GenerateError = never, GenerateObjectError = never, StreamError = never>(
+    model: LanguageModel.Service,
+    middleware: Middleware<GenerateError, GenerateObjectError, StreamError>,
+  ): LanguageModel.Service
+} = Function.dual(
+  2,
+  <GenerateError = never, GenerateObjectError = never, StreamError = never>(
+    model: LanguageModel.Service,
+    middleware: Middleware<GenerateError, GenerateObjectError, StreamError>,
+  ): LanguageModel.Service => {
+    function generateText<Options extends NoExcessProperties<LanguageModel.GenerateTextOptions<{}>, Options>>(
+      options: Options & { readonly toolkit?: undefined } & LanguageModel.GenerateTextOptions<{}>,
+    ): Effect.Effect<
+      LanguageModel.GenerateTextResponse<{}>,
+      LanguageModel.ExtractError<Options>,
+      LanguageModel.ExtractServices<Options>
+    >
+    function generateText<
+      Tools extends Record<string, Tool.Any>,
+      Options extends NoExcessProperties<
+        LanguageModel.GenerateTextOptions<Tools> & { readonly toolkit: LanguageModel.ToolkitInput<Tools> },
+        Options
+      >,
+    >(
+      options: Options &
+        LanguageModel.GenerateTextOptions<Tools> & {
+          readonly toolkit: LanguageModel.ToolkitInput<Tools>
+        },
+    ): Effect.Effect<
+      LanguageModel.GenerateTextResponse<Tools>,
+      LanguageModel.ExtractError<Options>,
+      LanguageModel.ExtractServices<Options>
+    >
+    function generateText<
+      Options extends {
+        readonly toolkit: LanguageModel.ToolkitOption<Record<string, Tool.Any>>
+      } & NoExcessProperties<LanguageModel.GenerateTextOptions<Record<string, Tool.Any>>, Options>,
+    >(
+      options: Options &
+        LanguageModel.GenerateTextOptions<LanguageModel.ExtractTools<Options>> & {
+          readonly toolkit: Options["toolkit"]
+        },
+    ): Effect.Effect<
+      LanguageModel.GenerateTextResponse<LanguageModel.ExtractTools<Options>>,
+      LanguageModel.ExtractError<Options>,
+      LanguageModel.ExtractServices<Options>
+    >
+    function generateText(options: LanguageModel.GenerateTextOptions<BroadTools>) {
+      const invoke = (input = options) => invokeGenerateText(model, input)
+      return middleware.generateText === undefined ? invoke() : middleware.generateText(options, invoke)
+    }
 
-  function streamText<Options extends NoExcessProperties<LanguageModel.GenerateTextOptions<{}>, Options>>(
-    options: Options & { readonly toolkit?: undefined } & LanguageModel.GenerateTextOptions<{}>,
-  ): Stream.Stream<Response.StreamPart<{}>, LanguageModel.ExtractError<Options>, LanguageModel.ExtractServices<Options>>
-  function streamText<
-    Tools extends Record<string, Tool.Any>,
-    Options extends NoExcessProperties<
-      LanguageModel.GenerateTextOptions<Tools> & { readonly toolkit: LanguageModel.ToolkitInput<Tools> },
-      Options
-    >,
-  >(
-    options: Options &
-      LanguageModel.GenerateTextOptions<Tools> & {
-        readonly toolkit: LanguageModel.ToolkitInput<Tools>
-      },
-  ): Stream.Stream<
-    Response.StreamPart<Tools>,
-    LanguageModel.ExtractError<Options>,
-    LanguageModel.ExtractServices<Options>
-  >
-  function streamText<
-    Options extends {
-      readonly toolkit: LanguageModel.ToolkitOption<Record<string, Tool.Any>>
-    } & NoExcessProperties<LanguageModel.GenerateTextOptions<Record<string, Tool.Any>>, Options>,
-  >(
-    options: Options &
-      LanguageModel.GenerateTextOptions<LanguageModel.ExtractTools<Options>> & {
-        readonly toolkit: Options["toolkit"]
-      },
-  ): Stream.Stream<
-    Response.StreamPart<LanguageModel.ExtractTools<Options>>,
-    LanguageModel.ExtractError<Options>,
-    LanguageModel.ExtractServices<Options>
-  >
-  function streamText(options: LanguageModel.GenerateTextOptions<BroadTools>) {
-    const invoke = (input = options) => invokeStreamText(model, input)
-    return middleware.streamText === undefined ? invoke() : middleware.streamText(options, invoke)
-  }
+    function streamText<Options extends NoExcessProperties<LanguageModel.GenerateTextOptions<{}>, Options>>(
+      options: Options & { readonly toolkit?: undefined } & LanguageModel.GenerateTextOptions<{}>,
+    ): Stream.Stream<
+      Response.StreamPart<{}>,
+      LanguageModel.ExtractError<Options>,
+      LanguageModel.ExtractServices<Options>
+    >
+    function streamText<
+      Tools extends Record<string, Tool.Any>,
+      Options extends NoExcessProperties<
+        LanguageModel.GenerateTextOptions<Tools> & { readonly toolkit: LanguageModel.ToolkitInput<Tools> },
+        Options
+      >,
+    >(
+      options: Options &
+        LanguageModel.GenerateTextOptions<Tools> & {
+          readonly toolkit: LanguageModel.ToolkitInput<Tools>
+        },
+    ): Stream.Stream<
+      Response.StreamPart<Tools>,
+      LanguageModel.ExtractError<Options>,
+      LanguageModel.ExtractServices<Options>
+    >
+    function streamText<
+      Options extends {
+        readonly toolkit: LanguageModel.ToolkitOption<Record<string, Tool.Any>>
+      } & NoExcessProperties<LanguageModel.GenerateTextOptions<Record<string, Tool.Any>>, Options>,
+    >(
+      options: Options &
+        LanguageModel.GenerateTextOptions<LanguageModel.ExtractTools<Options>> & {
+          readonly toolkit: Options["toolkit"]
+        },
+    ): Stream.Stream<
+      Response.StreamPart<LanguageModel.ExtractTools<Options>>,
+      LanguageModel.ExtractError<Options>,
+      LanguageModel.ExtractServices<Options>
+    >
+    function streamText(options: LanguageModel.GenerateTextOptions<BroadTools>) {
+      const invoke = (input = options) => invokeStreamText(model, input)
+      return middleware.streamText === undefined ? invoke() : middleware.streamText(options, invoke)
+    }
 
-  function generateObject<
-    ObjectEncoded extends Record<string, Tool.Any>,
-    StructuredOutputSchema extends Schema.Encoder<ObjectEncoded, unknown>,
-    Options extends NoExcessProperties<
-      LanguageModel.GenerateObjectOptions<Record<string, Tool.Any>, StructuredOutputSchema>,
-      Options
-    >,
-    Tools extends Record<string, Tool.Any> = {},
-  >(
-    options: Options & LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
-  ): Effect.Effect<
-    LanguageModel.GenerateObjectResponse<Tools, StructuredOutputSchema["Type"]>,
-    LanguageModel.ExtractError<Options>,
-    LanguageModel.ExtractServices<Options> | StructuredOutputSchema["DecodingServices"]
-  >
-  function generateObject(
-    options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
-  ) {
-    const invoke = (input = options) => invokeGenerateObject(model, input)
-    return middleware.generateObject === undefined ? invoke() : middleware.generateObject(options, invoke)
-  }
+    function generateObject<
+      ObjectEncoded extends Record<string, Tool.Any>,
+      StructuredOutputSchema extends Schema.Encoder<ObjectEncoded, unknown>,
+      Options extends NoExcessProperties<
+        LanguageModel.GenerateObjectOptions<Record<string, Tool.Any>, StructuredOutputSchema>,
+        Options
+      >,
+      Tools extends Record<string, Tool.Any> = {},
+    >(
+      options: Options & LanguageModel.GenerateObjectOptions<Tools, StructuredOutputSchema>,
+    ): Effect.Effect<
+      LanguageModel.GenerateObjectResponse<Tools, StructuredOutputSchema["Type"]>,
+      LanguageModel.ExtractError<Options>,
+      LanguageModel.ExtractServices<Options> | StructuredOutputSchema["DecodingServices"]
+    >
+    function generateObject(
+      options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
+    ) {
+      const invoke = (input = options) => invokeGenerateObject(model, input)
+      return middleware.generateObject === undefined ? invoke() : middleware.generateObject(options, invoke)
+    }
 
-  const adapted = { ...model, generateText, generateObject, streamText }
-  copyMetadata(model, adapted)
-  return adapted
-}
+    const adapted = { ...model, generateText, generateObject, streamText }
+    copyMetadata(model, adapted)
+    return adapted
+  },
+)
 
 export const identity: Middleware = {}
 

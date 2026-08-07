@@ -37,32 +37,40 @@ export interface Registration {
   readonly requirements: (value: never) => never
 }
 
-export const register = <Tools extends Record<string, Tool.Any>, R, E>(
-  agent: Agent<Tools, R>,
-  layer: Layer.Layer<R, E, never>,
-): Registration => {
-  const registrationLayer = Layer.effectContext(
-    Layer.build(layer).pipe(
-      Effect.mapError((cause) =>
-        RegistrationError.make({
-          agent: agent.name,
-          message: `Failed to build services for agent '${agent.name}'`,
-          cause,
-        }),
-      ),
-    ),
-  )
-  return {
-    name: agent.name,
-    run: (options) =>
-      Effect.scoped(
-        Effect.flatMap(Layer.build(registrationLayer), (services) =>
-          generate(agent, options).pipe(Effect.provideContext(services)),
+export const register: {
+  <R, E>(
+    layer: Layer.Layer<R, E, never>,
+  ): <Tools extends Record<string, Tool.Any>>(agent: Agent<Tools, R>) => Registration
+  <Tools extends Record<string, Tool.Any>, R, E>(agent: Agent<Tools, R>, layer: Layer.Layer<R, E, never>): Registration
+} = Function.dual(
+  2,
+  <Tools extends Record<string, Tool.Any>, R, E>(
+    agent: Agent<Tools, R>,
+    layer: Layer.Layer<R, E, never>,
+  ): Registration => {
+    const registrationLayer = Layer.effectContext(
+      Layer.build(layer).pipe(
+        Effect.mapError((cause) =>
+          RegistrationError.make({
+            agent: agent.name,
+            message: `Failed to build services for agent '${agent.name}'`,
+            cause,
+          }),
         ),
       ),
-    requirements: (value) => value,
-  }
-}
+    )
+    return {
+      name: agent.name,
+      run: (options) =>
+        Effect.scoped(
+          Effect.flatMap(Layer.build(registrationLayer), (services) =>
+            generate(agent, options).pipe(Effect.provideContext(services)),
+          ),
+        ),
+      requirements: (value) => value,
+    }
+  },
+)
 
 export interface DelegateOptions<
   Parameters extends Schema.Top = DefaultDelegateParameters,
@@ -347,20 +355,26 @@ export const delegateTool: {
     }),
 )
 
-export const sameRunHandoffTool = (handoffTarget: HandoffTarget, options: HandoffToolOptions = {}): HandoffToolkit => {
-  const spec = handoffToolSpec(handoffTarget, options)
-  registerHandoffToolMeta(spec.tool.name, {
-    specialist: spec.specialist,
-    ...(spec.projection === undefined ? {} : { projection: spec.projection }),
-    ...(spec.maxRepeatedEdge === undefined ? {} : { maxRepeatedEdge: spec.maxRepeatedEdge }),
-  })
-  return {
-    name: spec.tool.name,
-    tool: spec.tool,
-    tools: { [spec.tool.name]: spec.tool },
-    invoke: () => Effect.fail("Same-run handoff tools execute through the agent loop, not direct invocation"),
-  }
-}
+export const sameRunHandoffTool: {
+  (options?: HandoffToolOptions): (handoffTarget: HandoffTarget) => HandoffToolkit
+  (handoffTarget: HandoffTarget, options?: HandoffToolOptions): HandoffToolkit
+} = Function.dual(
+  (args) => args.length > 1 || "agent" in args[0],
+  (handoffTarget: HandoffTarget, options: HandoffToolOptions = {}): HandoffToolkit => {
+    const spec = handoffToolSpec(handoffTarget, options)
+    registerHandoffToolMeta(spec.tool.name, {
+      specialist: spec.specialist,
+      ...(spec.projection === undefined ? {} : { projection: spec.projection }),
+      ...(spec.maxRepeatedEdge === undefined ? {} : { maxRepeatedEdge: spec.maxRepeatedEdge }),
+    })
+    return {
+      name: spec.tool.name,
+      tool: spec.tool,
+      tools: { [spec.tool.name]: spec.tool },
+      invoke: () => Effect.fail("Same-run handoff tools execute through the agent loop, not direct invocation"),
+    }
+  },
+)
 
 export const fanOut: {
   (
@@ -369,8 +383,16 @@ export const fanOut: {
     children: ReadonlyArray<FanOutChild>,
   ) => Effect.Effect<ReadonlyArray<FanOutMemberResult>, RunError | RegistrationError | FanOutUnsatisfied>
   (
-    options: FanOutAllSuccessOptions,
+    options?: FanOutAllSuccessOptions,
   ): (children: ReadonlyArray<FanOutChild>) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
+  (
+    options: FanOutOptions,
+  ): (
+    children: ReadonlyArray<FanOutChild>,
+  ) => Effect.Effect<
+    ReadonlyArray<Result> | ReadonlyArray<FanOutMemberResult>,
+    RunError | RegistrationError | FanOutUnsatisfied
+  >
   (): (children: ReadonlyArray<FanOutChild>) => Effect.Effect<ReadonlyArray<Result>, RunError | RegistrationError>
   (
     children: ReadonlyArray<FanOutChild>,

@@ -1,4 +1,5 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
+import type { ParseOptions } from "effect/SchemaAST"
 import { AgentManifest, make as makeManifest, type PinnedAgent } from "./agent-manifest.js"
 import { ProgramManifest, make as makeProgramManifest, type PinnedProgram } from "./program-manifest.js"
 import { AgentPin, ExecutablePin, makeCapability, makeExecutable, makeModel, ProgramPin } from "./pin.js"
@@ -168,17 +169,41 @@ export const makeTest = (name: string, revision = "1"): PinnedExecutable => {
 }
 
 /** @experimental Verify that a durable reference is exactly owned by a closure. */
-export const validateRef = (ref: ExecutableRef, manifest: ExecutableManifest): void => {
+export const validateRef: {
+  (manifest: ExecutableManifest): (ref: ExecutableRef) => void
+  (ref: ExecutableRef, manifest: ExecutableManifest): void
+} = Function.dual(2, (ref: ExecutableRef, manifest: ExecutableManifest): void => {
   validate({ ref, manifest })
-}
+})
 
 const PinnedExecutableSchema: Schema.Codec<PinnedExecutable, PinnedExecutableEncoded> = Schema.Struct({
   ref: ExecutableRef,
   manifest: ExecutableManifest,
 })
 
+const isParseOptions = (value: unknown): value is ParseOptions =>
+  typeof value === "object" &&
+  value !== null &&
+  ("errors" in value ||
+    "onExcessProperty" in value ||
+    "propertyOrder" in value ||
+    "disableChecks" in value ||
+    "concurrency" in value)
+
 /** @experimental Encode one constructor-validated executable authority. */
-export const encode = Schema.encodeEffect(PinnedExecutableSchema)
+export const encode: {
+  (input: PinnedExecutable, options?: ParseOptions): Effect.Effect<PinnedExecutableEncoded, Schema.SchemaError, never>
+  (
+    options?: ParseOptions,
+  ): (input: PinnedExecutable) => Effect.Effect<PinnedExecutableEncoded, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (
+    input: PinnedExecutable,
+    options?: ParseOptions,
+  ): Effect.Effect<PinnedExecutableEncoded, Schema.SchemaError, never> =>
+    Schema.encodeEffect(PinnedExecutableSchema)(input, options),
+)
 
 /** @experimental Decode and verify one complete pinned executable authority. */
 export const decode = (input: unknown) =>

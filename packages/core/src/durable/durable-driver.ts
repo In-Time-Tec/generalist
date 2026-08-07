@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import type { ExecutableRef } from "./executable-manifest.js"
 import type { DriverCheckpoint, DriverDecision, OperationOutcome } from "./driver-contract.js"
@@ -47,10 +47,13 @@ export class DriverStateInvalid extends Schema.TaggedErrorClass<DriverStateInval
 ) {}
 
 /** @experimental */
-export const requireDriverVersion = (
-  checkpoint: Pick<DriverCheckpoint, "driverVersion">,
-  version: string,
-): Effect.Effect<void, DriverVersionMismatch> =>
-  checkpoint.driverVersion === version
-    ? Effect.void
-    : Effect.fail(DriverVersionMismatch.make({ expected: version, actual: checkpoint.driverVersion }))
+export const requireDriverVersion: {
+  (version: string): (checkpoint: Pick<DriverCheckpoint, "driverVersion">) => Effect.Effect<void, DriverVersionMismatch>
+  (checkpoint: Pick<DriverCheckpoint, "driverVersion">, version: string): Effect.Effect<void, DriverVersionMismatch>
+} = Function.dual(
+  2,
+  (checkpoint: Pick<DriverCheckpoint, "driverVersion">, version: string): Effect.Effect<void, DriverVersionMismatch> =>
+    checkpoint.driverVersion === version
+      ? Effect.void
+      : Effect.fail(DriverVersionMismatch.make({ expected: version, actual: checkpoint.driverVersion })),
+)
