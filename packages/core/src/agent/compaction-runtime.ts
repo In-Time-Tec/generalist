@@ -11,6 +11,7 @@ import {
 import { diagnose as diagnoseSessionSync, equivalentMessages } from "../context/session-sync.js"
 import { checkpointMatches, buildContext } from "../context/session.js"
 import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "./agent-message.js"
+import { conversationOnly, withDerivedSystem } from "./session-history.js"
 import { type CompactionCommit, type Event as ModelTelemetryEvent, generateId } from "../model/model-telemetry.js"
 import type { RunError, RunOptions } from "./agent.js"
 import type { AgentRunState } from "./agent-run-state.js"
@@ -31,6 +32,7 @@ type CompactionContext = {
     readonly ownerToken?: string
   }
   readonly chat: Chat.Service
+  readonly system: string | undefined
   readonly persisted: Chat.Persisted | undefined
   readonly options: RunOptions
   readonly state: AgentRunState
@@ -58,6 +60,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     sessionOwnerToken,
     sessionAppendOptions,
     chat,
+    system,
     options,
     state,
     compactionService,
@@ -103,7 +106,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             const checkpoint = path.at(-1)
             const before = buildContext(path.slice(0, -1))
             if (checkpoint?._tag === "Compaction" && promptEquivalence(before, transcript)) {
-              yield* Ref.set(chat.history, projection)
+              yield* Ref.set(chat.history, withDerivedSystem(system, projection))
               yield* savePersisted(turn)
               return path
             }
@@ -120,7 +123,10 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             })
           }
           let expectedLeafId = path.at(-1)?.id ?? null
+          // The system message is derived per Run from live instructions, so it never becomes a Session
+          // entry. Persisting it would pin a resumed Session to the instructions captured on its first Run.
           for (const message of transcript.content.slice(cursor.value)) {
+            if (message.role === "system") continue
             const appended = yield* session.append({ _tag: "Message", message }, sessionAppendOptions(expectedLeafId))
             expectedLeafId = appended.id
           }
@@ -293,13 +299,14 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                   commit: compactionCommit,
                 })
           const telemetry = Object.freeze([...telemetryBeforeApplied, ...(applied === undefined ? [] : [applied])])
+          const projectedHistory = conversationOnly(result.history)
           yield* Effect.uninterruptibleMask((restore) =>
             restore(
               session
                 .appendCheckpoint({
                   id,
                   parentId,
-                  projectedHistory: result.history,
+                  projectedHistory,
                   telemetry,
                   ...(compactionCommit === undefined ? {} : { compactionCommit }),
                   ...(result._tag === "Summarize" ? { summary: result.summary } : {}),
@@ -311,7 +318,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                       checkpointMatches(appended.checkpoint, {
                         id,
                         parentId,
-                        projectedHistory: result.history,
+                        projectedHistory,
                         telemetry,
                         ...(compactionCommit === undefined ? {} : { compactionCommit }),
                         ...(result._tag === "Summarize" ? { summary: result.summary } : {}),
@@ -333,7 +340,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
               ),
               Effect.flatMap((appended) => restore(session.path(appended.leafId))),
               Effect.map(buildContext),
-              Effect.tap((projection) => Ref.set(chat.history, projection)),
+              Effect.tap((projection) => Ref.set(chat.history, withDerivedSystem(system, projection))),
               Effect.tap(() =>
                 Effect.sync(() => {
                   state.reportedContextUsage = undefined

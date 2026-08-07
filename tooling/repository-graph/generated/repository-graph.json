@@ -1248,6 +1248,11 @@
       "test": false
     },
     {
+      "path": "packages/core/src/agent/session-history.ts",
+      "package": "@batonfx/core",
+      "test": false
+    },
+    {
       "path": "packages/core/src/agent/setup.ts",
       "package": "@batonfx/core",
       "test": false
@@ -7805,6 +7810,10 @@
     },
     {
       "source": "packages/core/src/agent/compaction-runtime.ts",
+      "specifier": "./session-history.js"
+    },
+    {
+      "source": "packages/core/src/agent/compaction-runtime.ts",
       "specifier": "effect"
     },
     {
@@ -8032,6 +8041,22 @@
       "specifier": "effect/unstable/ai"
     },
     {
+      "source": "packages/core/src/agent/session-history.ts",
+      "specifier": "../context/session.js"
+    },
+    {
+      "source": "packages/core/src/agent/session-history.ts",
+      "specifier": "./agent-message.js"
+    },
+    {
+      "source": "packages/core/src/agent/session-history.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/core/src/agent/session-history.ts",
+      "specifier": "effect/unstable/ai"
+    },
+    {
       "source": "packages/core/src/agent/setup.ts",
       "specifier": "../context/instructions.js"
     },
@@ -8118,6 +8143,10 @@
     {
       "source": "packages/core/src/agent/setup.ts",
       "specifier": "./agent-suspension.js"
+    },
+    {
+      "source": "packages/core/src/agent/setup.ts",
+      "specifier": "./session-history.js"
     },
     {
       "source": "packages/core/src/agent/setup.ts",
