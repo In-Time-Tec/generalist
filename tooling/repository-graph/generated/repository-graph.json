@@ -2238,6 +2238,11 @@
       "test": false
     },
     {
+      "path": "packages/runtime/src/child-session.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
       "path": "packages/runtime/src/code-mode.ts",
       "package": "@batonfx/runtime",
       "test": false
@@ -2719,6 +2724,11 @@
     },
     {
       "path": "packages/runtime/test/address.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/child-session.test.ts",
       "package": "@batonfx/runtime",
       "test": true
     },
@@ -11964,6 +11974,10 @@
     },
     {
       "source": "packages/runtime/src/memory/runtime-layer.ts",
+      "specifier": "../child-session.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/runtime-layer.ts",
       "specifier": "../cursor.js"
     },
     {
@@ -12029,6 +12043,10 @@
     {
       "source": "packages/runtime/src/memory/store-admit.ts",
       "specifier": "../address.js"
+    },
+    {
+      "source": "packages/runtime/src/memory/store-admit.ts",
+      "specifier": "../child-session.js"
     },
     {
       "source": "packages/runtime/src/memory/store-admit.ts",
@@ -13592,6 +13610,10 @@
     },
     {
       "source": "packages/runtime/src/sql/store-fan-out.ts",
+      "specifier": "../child-session.js"
+    },
+    {
+      "source": "packages/runtime/src/sql/store-fan-out.ts",
       "specifier": "../errors.js"
     },
     {
@@ -13980,6 +14002,14 @@
     {
       "source": "packages/runtime/test/address.test.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/child-session.test.ts",
+      "specifier": "../src/child-session.js"
+    },
+    {
+      "source": "packages/runtime/test/child-session.test.ts",
+      "specifier": "vitest"
     },
     {
       "source": "packages/runtime/test/code-mode.test.ts",
@@ -16343,6 +16373,11 @@
     {
       "source": "packages/runtime/test/address.test.ts",
       "test": "packages/runtime/test/address.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/child-session.test.ts",
+      "test": "packages/runtime/test/child-session.test.ts",
       "kind": "same-stem"
     },
     {
