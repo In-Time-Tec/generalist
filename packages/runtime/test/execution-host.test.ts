@@ -188,6 +188,62 @@ describe("ExecutionHost", () => {
     }),
   )
 
+  it.effect("round-trips a checkpoint whose telemetry carries absent usage fields", () =>
+    Effect.gen(function* () {
+      const filename = tempDbPath("session-usage-roundtrip")
+      const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
+      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
+
+      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* RunStore.RunStore
+            const session = yield* store.sessionStore("thread:usage")
+            if (session === undefined) return yield* Effect.die("expected a durable Session")
+            return yield* body(session)
+          }).pipe(Effect.provide(layerSqlite())),
+        )
+
+      // A real provider reports partial usage. These fields are UndefinedOr, so the key must survive
+      // persistence even when its value is undefined.
+      const telemetry = [
+        {
+          _tag: "ModelAttemptCompleted" as const,
+          deliveryId: "delivery-1",
+          turn: 0,
+          modelCallId: "call-1",
+          modelAttemptId: "attempt-1",
+          attempt: 0,
+          modelId: "test",
+          providerId: "test",
+          usage: Response.Usage.make({
+            inputTokens: { uncached: undefined, total: 5, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+          }),
+          usageAt: 1,
+          finishReason: "stop" as const,
+          completedAt: 2,
+        },
+      ]
+
+      const id = yield* withSession((session) => session.reserveEntryId.pipe(Effect.orDie))
+      yield* withSession((session) =>
+        session
+          .appendCheckpoint({ id, parentId: null, projectedHistory: Prompt.fromMessages([user("kept")]), telemetry })
+          .pipe(Effect.orDie),
+      )
+      const path = yield* withSession((session) => session.path().pipe(Effect.orDie))
+      const checkpoint = path.at(-1)
+
+      expect(checkpoint?._tag).toBe("Compaction")
+      if (checkpoint?._tag === "Compaction") {
+        expect(checkpoint.telemetry).toHaveLength(1)
+        expect(Session.buildContext(path).content).toHaveLength(1)
+      }
+    }),
+  )
+
   it.effect("appends and reads one durable Session across store reopens", () =>
     Effect.gen(function* () {
       const filename = tempDbPath("durable-session-store")
