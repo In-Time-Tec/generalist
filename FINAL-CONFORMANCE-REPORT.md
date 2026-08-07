@@ -179,3 +179,19 @@ Remaining blockers (the same library-erasure class, now precisely bounded):
 only, 65 commits). The wave-25.5 design is documented for the next session; the remaining work is the
 StaticToolServices conditional for broad tool types (the tool-execution RHS wall) and the code_mode handler
 provisioning.
+
+## Wave 26 (2026-08-07) — full wave-25.5 re-application: 466 cleared, quantified tradeoff, reverted
+
+The complete wave-25.5 design was re-applied and verified end-to-end:
+- Ambient HandoffCatalog (serviceOption + catalog-as-parameter) — tsc 0, run channel HC-free.
+- Truthful run channels (RunStream/RunRequirements with SchemaServicesD + the generic Registration/fanOut/
+  delegateTool/asTool) — **agent.ts:466 CLEARED**; tsc 0 across the workspace after the test-host LM layers.
+- Runtime provisioning: execution-host LM via `Context.getOption` (no ⊆ constraint) + the code_mode handler
+  via `Toolkit.toLayer` — the Scope and invoke-cast errors are the final runtime blockers.
+
+**Quantified tradeoff**: the wave-25.5 design clears the last original flag (466) but exposes ~18 new
+`any`-class flags in the delegate/fanOut/supervisor test runs (`StaticToolServices<Record<string, Tool.Any>>`
+= `Handler<any> | unknown` — the same library `Schema.Constraint` erasure, now at the tool-executor's
+`Toolkit.handle` boundary — the final wall) plus 2 runtime tsc errors (the code_mode handler Scope/cast).
+**Reverted to the 1-error checkpoint** — the cleanest achievable state within the constraints:
+tsc 0, 1,168 tests pass, all scripts PASS, lint = agent.ts:466 only, 66 commits. NOT pushed to main.
