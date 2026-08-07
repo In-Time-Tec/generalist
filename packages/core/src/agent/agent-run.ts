@@ -28,7 +28,7 @@ import { makeToolExecution } from "./tool-execution.js"
 import { makeCompactionRuntime } from "./compaction-runtime.js"
 import { setupRun } from "./setup.js"
 import { makeRunLoop } from "./run-loop.js"
-import { layerForRun } from "../durable/driver-interpreter.js"
+import { layerForRun, type DriverInterpreter } from "../durable/driver-interpreter.js"
 import { resolve as resolveRunBudget } from "../durable/run-budget.js"
 import { operationKey } from "../durable/driver-interpreter.js"
 import { intercept, bindResume, setHandoffState } from "../durable/driver-run.js"
@@ -171,11 +171,8 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
       const checkpointPending = (
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
-      ): Effect.Effect<Prompt.Prompt, RunError> =>
-        appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint))) as Effect.Effect<
-          Prompt.Prompt,
-          AgentError
-        >
+      ): Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter> =>
+        appendPending(turn, pending).pipe(Effect.tap((checkpoint) => syncSession(turn, checkpoint)))
       const state: AgentRunState = {
         text: "",
         turn: 0,
@@ -295,7 +292,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
           ? Prompt.fromMessages([first, memoryMessage, ...rest])
           : Prompt.fromMessages([memoryMessage, ...prompt.content])
       }
-      const recallInitialPrompt = (prompt: Prompt.Prompt): Effect.Effect<Prompt.Prompt, RunError> =>
+      const recallInitialPrompt = (prompt: Prompt.Prompt): Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter> =>
         Effect.gen(function* () {
           const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
           const recallEffect =
@@ -320,7 +317,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         transcript: Prompt.Prompt,
         terminal: boolean,
         path: ReadonlyArray<Entry>,
-      ): Effect.Effect<void, RunError> =>
+      ): Effect.Effect<void, RunError, DriverInterpreter> =>
         Effect.gen(function* () {
           const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
           const rememberEffect =

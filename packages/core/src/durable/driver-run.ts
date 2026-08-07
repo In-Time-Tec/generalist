@@ -24,15 +24,15 @@ export const logicalOperationId = checkpoint.pipe(
 export const intercept: {
   (spec: OperationSpec): <A, E, R>(
     effect: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>
+  ) => Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R | DriverInterpreter>
   <A, E, R>(
     spec: OperationSpec,
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>
+  ): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R | DriverInterpreter>
 } = Function.dual(2, <A, E, R>(
   spec: OperationSpec,
   effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R> =>
+): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R | DriverInterpreter> =>
   Effect.gen(function* () {
     const interpreter = yield* DriverInterpreter
     return yield* interpreter.run(spec, effect)
@@ -43,15 +43,15 @@ export const intercept: {
 export const interceptStream: {
   (spec: OperationSpec): <A, E, R>(
     stream: Stream.Stream<A, E, R>,
-  ) => Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>
+  ) => Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R | DriverInterpreter>
   <A, E, R>(
     spec: OperationSpec,
     stream: Stream.Stream<A, E, R>,
-  ): Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>
+  ): Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R | DriverInterpreter>
 } = Function.dual(2, <A, E, R>(
   spec: OperationSpec,
   stream: Stream.Stream<A, E, R>,
-): Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R> =>
+): Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R | DriverInterpreter> =>
   Stream.unwrap(
     Effect.gen(function* () {
       const interpreter = yield* DriverInterpreter

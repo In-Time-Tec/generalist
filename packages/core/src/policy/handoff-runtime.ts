@@ -17,7 +17,7 @@ import {
 import type { RunOptions } from "../agent/agent.js"
 import { assemble, type Candidate } from "../tools/tool-registry.js"
 import { intercept, logicalOperationId } from "../durable/driver-run.js"
-import { operationKey } from "../durable/driver-interpreter.js"
+import { operationKey, type DriverInterpreter } from "../durable/driver-interpreter.js"
 import { defaultContextProjection, HandoffInput, type ContextProjection } from "./handoff-projection.js"
 import { HandoffCatalog, type HandoffTarget } from "./handoff-target.js"
 import { ModelRegistry } from "../model/model-registry.js"
@@ -51,7 +51,7 @@ const recordRejected = (
   turn: number,
   handoffId: string,
   reason: string,
-): Effect.Effect<void, import("../agent/agent.js").RunError> =>
+): Effect.Effect<void, import("../agent/agent.js").RunError, DriverInterpreter> =>
   intercept(
     {
       kind: "handoff",

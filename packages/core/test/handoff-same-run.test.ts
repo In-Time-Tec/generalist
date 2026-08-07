@@ -250,7 +250,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
   })
 
   ItLayer.make(it, "rejects projection that would leave unresolved tool calls", () => {
-    const mathTarget = Handoff.target(Agent.make({ name: "math" }) as never)
+    const mathTarget = Handoff.target(Agent.make({ name: "math" }) as never, undefined)
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(

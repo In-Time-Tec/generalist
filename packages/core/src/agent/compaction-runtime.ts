@@ -17,7 +17,7 @@ import type { AgentRunState } from "./agent-run-state.js"
 import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
 import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../context/session.js"
 import { intercept } from "../durable/driver-run.js"
-import { operationKey } from "../durable/driver-interpreter.js"
+import { operationKey, type DriverInterpreter } from "../durable/driver-interpreter.js"
 
 import type { MemoryError } from "../context/memory.js"
 import type { SkillSourceError } from "../context/skill-source.js"
@@ -133,7 +133,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
     })
 
-  const syncSession = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, RunError> => {
+  const syncSession = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
     return intercept(
       {
@@ -355,7 +355,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     parentId: string | null,
     commitData?: Omit<CompactionCommit, "checkpointId" | "summaryModelCallId">,
     onCommitted?: () => void,
-  ): Effect.Effect<void, RunError> => {
+  ): Effect.Effect<void, RunError, DriverInterpreter> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
     const applyKey = commitData?.compactionId ?? "apply"
     return intercept(

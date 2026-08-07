@@ -35,6 +35,7 @@ import {
   setHandoffState,
 } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
+import { type DriverInterpreter } from "../durable/driver-interpreter.js"
 import { LoopDriverState, modelCallOrdinal } from "../durable/loop-driver-state.js"
 import { takePendingContinuation } from "./handoff-state.js"
 import { DriverStateInvalid } from "../durable/durable-driver.js"
@@ -186,7 +187,7 @@ export const makeRunLoop = <
       readonly structuredTurn?: number
     },
     AgentError | TurnPolicyError | RunError,
-    R
+    R | DriverInterpreter
   > =>
     Effect.gen(function* () {
       const pending = pendingResults()
@@ -275,7 +276,7 @@ export const makeRunLoop = <
       if (handoffStateRef !== undefined) {
         const pendingContinuation = yield* takePendingContinuation(
           handoffStateRef,
-          (handoff) => setHandoffState(handoff) as Effect.Effect<void, DriverStateInvalid, R>,
+          (handoff) => setHandoffState(handoff),
         )
         if (pendingContinuation !== undefined) {
           continuationPrompt =

@@ -43,7 +43,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly structured: StructuredRunConfig<S> | undefined
   readonly validatedResume: SuspensionCheckpoint | undefined
   readonly seedSystem: string | undefined
-  readonly recallInitialPrompt: (prompt: Prompt.Prompt) => Effect.Effect<Prompt.Prompt, RunError>
+  readonly recallInitialPrompt: (prompt: Prompt.Prompt) => Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter>
   readonly initialPrompt: Prompt.RawInput
   readonly toolState: Ref.Ref<ToolState>
   readonly handoffStateRef?: Ref.Ref<HandoffRunState>
@@ -63,12 +63,12 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly withAgentModel: <A, E, R2>(
     effect: Effect.Effect<A, E, R2>,
   ) => Effect.Effect<A, E | LanguageModelNotRegistered, R2>
-  readonly syncSession: (turn: number, transcript: Prompt.Prompt) => Effect.Effect<ReadonlyArray<Entry>, RunError>
+  readonly syncSession: (turn: number, transcript: Prompt.Prompt) => Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter>
   readonly applyCompactionResult: (
     turn: number,
     result: CompactionResult,
     parentId: string | null,
-  ) => Effect.Effect<void, RunError>
+  ) => Effect.Effect<void, RunError, DriverInterpreter>
   readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
   readonly deliverPending: Effect.Effect<void, DeliveryFailed>
   readonly flushTelemetry: () => ReadonlyArray<Event>
@@ -80,7 +80,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly checkpointPending: (
     turn: number,
     pending: ReadonlyArray<PendingToolResult>,
-  ) => Effect.Effect<Prompt.Prompt, RunError>
+  ) => Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter>
   readonly checkpointSuspended: (
     turn: number,
     pending: ReadonlyArray<PendingToolResult>,
@@ -107,7 +107,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     transcript: Prompt.Prompt,
     terminal: boolean,
     path: ReadonlyArray<Entry>,
-  ) => Effect.Effect<void, RunError>
+  ) => Effect.Effect<void, RunError, DriverInterpreter>
   readonly withSystem: (system: string, prompt: Prompt.Prompt) => Prompt.Prompt
   readonly steeringDrainedEvent: (
     turn: number,
