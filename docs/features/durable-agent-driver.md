@@ -20,7 +20,7 @@ Canonical identity uses synchronous pure TypeScript SHA-256 over canonical UTF-8
 
 `allocate` / `make` construct a root budget; `reserveChild` deducts an explicit child grant and consumes one child-run slot; `narrowChild` reduces a fresh child grant and returns the difference to the parent; `charge` deducts usage; `refundUnused` merges a completed child's remaining grant back into the parent. Grants cannot widen parent remaining on any dimension. Exhaustion fails typed as `RunBudgetExhausted` at schedule boundaries (before execution begins), never mid-provider-stream; widening fails as `RunBudgetGrantWidened`.
 
-Inline `AgentTool` children call `reserveChildBudget` before the nested run and `refundChildBudget` after, passing the reserved grant through `RunOptions.inheritedBudget`. When no limits are configured, runs remain unconstrained until a host or agent author sets explicit defaults.
+Inline `AgentTool` children call `reserveChildBudget` before the nested run and `refundChildBudget` after, passing the reserved grant through `RunOptions.inheritedBudget`. When no limits are configured, runs remain unconstrained until a host or agent author sets explicit defaults. The Runtime fallback `agentBudget` follows the same rule: it bounds model calls, tool calls, child runs, handoffs, and depth, but carries no cumulative total-token cap, so a long subagent is governed by its pinned Compaction policy rather than dying from accumulated input charges.
 
 ## Driver contract
 

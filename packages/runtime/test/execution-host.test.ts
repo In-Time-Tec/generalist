@@ -1020,7 +1020,7 @@ describe("ExecutionHost", () => {
     )
     const executor = ToolExecutor.layerTest({
       execute: (request) =>
-        request.call.params.question === "First?"
+        (request.call.params as { readonly question?: string }).question === "First?"
           ? Effect.succeed({ _tag: "Success", result: "first", encodedResult: "first" })
           : Effect.succeed({ _tag: "Suspend", token: `token:${request.call.id}` }),
     })
@@ -1052,9 +1052,7 @@ describe("ExecutionHost", () => {
         prompt: "Wait twice and continue.",
       })
       const execute = (ownerId: string) =>
-        store
-          .claimExecution({ runId: receipt.runId, ownerId })
-          .pipe(Effect.flatMap((claim) => host.execute(claim)))
+        store.claimExecution({ runId: receipt.runId, ownerId }).pipe(Effect.flatMap((claim) => host.execute(claim)))
 
       yield* execute("first")
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({

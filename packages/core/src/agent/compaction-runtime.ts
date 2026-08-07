@@ -19,7 +19,6 @@ import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
 import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../context/session.js"
 import { intercept } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
-import { inputDigest } from "../durable/driver-contract.js"
 import type { MemoryError } from "../context/memory.js"
 import type { SkillSourceError } from "../context/skill-source.js"
 type CompactionContext = {
@@ -351,7 +350,6 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           )
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
     })
-
   const applyCompactionResult = (
     turn: number,
     result: CompactionResult,

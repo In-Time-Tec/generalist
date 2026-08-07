@@ -2223,6 +2223,11 @@
       "test": false
     },
     {
+      "path": "packages/runtime/src/agent-execution-failure.ts",
+      "package": "@batonfx/runtime",
+      "test": false
+    },
+    {
       "path": "packages/runtime/src/approval.ts",
       "package": "@batonfx/runtime",
       "test": false
@@ -2724,6 +2729,11 @@
     },
     {
       "path": "packages/runtime/test/address.test.ts",
+      "package": "@batonfx/runtime",
+      "test": true
+    },
+    {
+      "path": "packages/runtime/test/child-compaction.test.ts",
       "package": "@batonfx/runtime",
       "test": true
     },
@@ -7582,6 +7592,10 @@
     },
     {
       "source": "packages/core/src/agent/agent-run.ts",
+      "specifier": "../durable/driver-contract.js"
+    },
+    {
+      "source": "packages/core/src/agent/agent-run.ts",
       "specifier": "../durable/driver-interpreter.js"
     },
     {
@@ -11457,6 +11471,19 @@
       "specifier": "effect"
     },
     {
+      "source": "packages/runtime/src/agent-execution-failure.ts",
+      "specifier": "./errors.js"
+    },
+    {
+      "source": "packages/runtime/src/agent-execution-failure.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/agent-execution-failure.ts",
+      "specifier": "effect"
+    },
+    {
       "source": "packages/runtime/src/approval.ts",
       "specifier": "./runtime.js"
     },
@@ -11565,6 +11592,11 @@
     },
     {
       "source": "packages/runtime/src/errors.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/src/errors.ts",
       "specifier": "effect"
     },
     {
@@ -11655,6 +11687,10 @@
     {
       "source": "packages/runtime/src/execution-host.ts",
       "specifier": "./active-executions.js"
+    },
+    {
+      "source": "packages/runtime/src/execution-host.ts",
+      "specifier": "./agent-execution-failure.js"
     },
     {
       "source": "packages/runtime/src/execution-host.ts",
@@ -14006,6 +14042,39 @@
     {
       "source": "packages/runtime/test/address.test.ts",
       "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/child-compaction.test.ts",
+      "specifier": "../src/execution-defaults.js"
+    },
+    {
+      "source": "packages/runtime/test/child-compaction.test.ts",
+      "specifier": "../src/index.js"
+    },
+    {
+      "source": "packages/runtime/test/child-compaction.test.ts",
+      "specifier": "./helpers.js"
+    },
+    {
+      "source": "packages/runtime/test/child-compaction.test.ts",
+      "specifier": "./identity.js"
+    },
+    {
+      "source": "packages/runtime/test/child-compaction.test.ts",
+      "specifier": "@batonfx/core",
+      "package": "@batonfx/core"
+    },
+    {
+      "source": "packages/runtime/test/child-compaction.test.ts",
+      "specifier": "@effect/vitest"
+    },
+    {
+      "source": "packages/runtime/test/child-compaction.test.ts",
+      "specifier": "effect"
+    },
+    {
+      "source": "packages/runtime/test/child-compaction.test.ts",
+      "specifier": "effect/unstable/ai"
     },
     {
       "source": "packages/runtime/test/child-session.test.ts",
@@ -16381,6 +16450,11 @@
     {
       "source": "packages/runtime/test/address.test.ts",
       "test": "packages/runtime/test/address.test.ts",
+      "kind": "same-stem"
+    },
+    {
+      "source": "packages/runtime/test/child-compaction.test.ts",
+      "test": "packages/runtime/test/child-compaction.test.ts",
       "kind": "same-stem"
     },
     {

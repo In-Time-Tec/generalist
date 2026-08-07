@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { Schema } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, AgentManifest, ExecutableManifest, ToolExecutor } from "@batonfx/core"
+import { Agent, ExecutableManifest, ToolExecutor } from "@batonfx/core"
 import { agentBudget } from "../src/execution-defaults.js"
 import { Address, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
 import { closedTestAgent, pinnedTestAgent } from "./identity.js"
@@ -19,7 +19,7 @@ const finish = (inputTokens: number) =>
   })
 
 it("runtime default budget does not impose a cumulative total-token cap", () => {
-  expect(agentBudget.totalTokens).toBeUndefined()
+  expect((agentBudget as { readonly totalTokens?: number }).totalTokens).toBeUndefined()
   expect(agentBudget.modelCalls).toBeGreaterThan(0)
   expect(agentBudget.toolCalls).toBeGreaterThan(0)
   expect(agentBudget.childRuns).toBeGreaterThan(0)
@@ -30,11 +30,14 @@ it("a spawned child with default budget survives cumulative usage beyond one mil
     parameters: Schema.Struct({}),
     success: Schema.String,
   })
-  const child = Agent.make({ name: "child-heavy", toolkit: Toolkit.make(noop) })
-  const childPinned = pinnedTestAgent(child)
-  const parent = Agent.make({ name: "parent-heavy" })
-  const parentPinned = pinnedTestAgent(parent, "1", [{ selection: "child", agent: childPinned.pin }])
-  const entries = [parentPinned, childPinned].map((entry) => ({ _tag: "Agent" as const, ...entry }))
+  const childAgent = Agent.make({ name: "child-heavy", toolkit: Toolkit.make(noop) })
+  const childPinned = pinnedTestAgent(childAgent)
+  const parentAgent = Agent.make({ name: "parent-heavy" })
+  const parentPinned = pinnedTestAgent(parentAgent, "1", [{ selection: "child", agent: childPinned.pin }])
+  const entries = [
+    { _tag: "Agent" as const, ...parentPinned },
+    { _tag: "Agent" as const, ...childPinned },
+  ]
   const parentExecutable = ExecutableManifest.make({ root: parentPinned.pin, entries })
   const parentRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
     ...parentExecutable,
@@ -84,8 +87,8 @@ it("a spawned child with default budget survives cumulative usage beyond one mil
   const handlers = Toolkit.make(noop).toLayer({ noop: () => Effect.die("ToolExecutor test layer owns execution") })
   const runtimeLayer = Runtime.layerMemory({
     resolver: ExecutableResolver.makeStatic([
-      { executable: parentRef, agent: closedTestAgent(parent) },
-      { executable: childRef, agent: Agent.close(child, Layer.mergeAll(model, executor, handlers)) },
+      { executable: parentRef, agent: closedTestAgent(parentAgent) },
+      { executable: childRef, agent: Agent.close(childAgent, Layer.mergeAll(model, executor, handlers)) },
     ]),
     addresses: [{ address, executable: parentRef, registrations: registrationsFor(parentRef) }],
     scheduler: { pollInterval: "1 day" },
@@ -95,14 +98,14 @@ it("a spawned child with default budget survives cumulative usage beyond one mil
     const runtime = yield* Runtime.Runtime
     const host = yield* ExecutionHost.ExecutionHost
     const store = yield* RunStore.RunStore
-    const parent = yield* runtime.send({
+    const parentReceipt = yield* runtime.send({
       to: address,
       sessionId: "thread:heavy",
       idempotencyKey: "heavy-parent",
       prompt: Prompt.make("spawn"),
     })
     const child = yield* runtime.spawn({
-      parentRunId: parent.runId,
+      parentRunId: parentReceipt.runId,
       invocationId: "invocation:heavy",
       selection: "child",
       prompt: Prompt.make("heavy work"),
@@ -111,8 +114,9 @@ it("a spawned child with default budget survives cumulative usage beyond one mil
     const inspection = yield* runtime.inspect(child.runId)
     expect(modelCalls).toBe(4)
     expect(inspection.status).toBe("succeeded")
-    expect(inspection.usage).toMatchObject({
-      inputTokens: { total: 1_200_000 },
-    })
+    const snapshot = yield* runtime.snapshot(child.runId)
+    const completedFacts = snapshot.usage.filter((fact) => fact._tag === "Completed")
+    expect(completedFacts).toHaveLength(4)
+    expect(completedFacts.reduce((sum, fact) => sum + (fact.usage.inputTokens.total ?? 0), 0)).toBe(1_200_000)
   }).pipe(Effect.provide(runtimeLayer))
 })

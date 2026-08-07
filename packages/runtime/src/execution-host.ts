@@ -3,13 +3,7 @@ import { Prompt, type Tool } from "effect/unstable/ai"
 import { Agent, AgentEvent, DurableDriver, Handoff, Steering } from "@batonfx/core"
 import { RunStore, type ExecutionClaim } from "./run-store.js"
 import { ActiveExecutions } from "./active-executions.js"
-import {
-  AgentExecutionFailure,
-  compactionOptionsMismatch,
-  ExecutableIdentityMismatch,
-  RunTerminal,
-  undecodableSuspension,
-} from "./errors.js"
+import { compactionOptionsMismatch, ExecutableIdentityMismatch, RunTerminal, undecodableSuspension } from "./errors.js"
 import {
   makeAttestation,
   makeInput,
