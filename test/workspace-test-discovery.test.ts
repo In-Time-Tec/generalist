@@ -10,7 +10,7 @@ const filesUnder = (
   root: string,
   fileSystem: FileSystem.FileSystem,
   path: Path.Path,
-): Effect.Effect<Array<string>, PlatformError> =>
+): Effect.Effect<Array<string>, PlatformError.PlatformError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function* () {
     const exists = yield* fileSystem.exists(directory)
     if (!exists) return []

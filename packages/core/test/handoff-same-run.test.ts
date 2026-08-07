@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
-import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
   AgentManifest,
@@ -221,7 +221,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         const parent = Agent.make({
           name: "parent",
           toolkit: Toolkit.make(delegate.tool),
-        })
+        }) as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
         const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "go" }))
         const last = events.at(-1)
         expect(last?._tag).toBe("Completed")

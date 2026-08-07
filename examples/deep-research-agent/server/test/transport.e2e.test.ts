@@ -2,7 +2,7 @@ import { connect, createServer } from "node:net"
 import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
 import { describe, expect, live } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
-import { FetchHttpClient, HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
+import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { Cursor } from "@batonfx/runtime"
 import { Client } from "@batonfx/transport"
@@ -25,7 +25,7 @@ const postJson = (url: string, body: unknown) =>
 const admitRun = (
   baseUrl: string,
   attempts: number,
-): Effect.Effect<typeof RunReceipt.Type, unknown, HttpClient.HttpClient> =>
+): Effect.Effect<typeof RunReceipt.Type, HttpClientError.HttpClientError | Schema.SchemaError, HttpClient.HttpClient> =>
   postJson(`${baseUrl}/runs`, {
     runId: "deep-research-e2e-run",
     sessionId: "deep-research-e2e-session",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Ref, Stream } from "effect"
+import { Effect, Ref, Schema, Stream } from "effect"
 import { Sse as SseEncoding } from "effect/unstable/encoding"
 import { Headers, HttpBody, HttpServerRequest } from "effect/unstable/http"
 import { Sse, Wire } from "../src/index.js"
@@ -8,13 +8,18 @@ import { runtimeLayer } from "./helpers.js"
 const request = (url: string, headers: Headers.Input = {}): HttpServerRequest.HttpServerRequest =>
   ({ url, originalUrl: url, headers: Headers.fromInput(headers) }) as HttpServerRequest.HttpServerRequest
 
-const bodyText = (body: HttpBody.HttpBody) =>
+class BodyReadError extends Schema.TaggedErrorClass<BodyReadError>()("@batonfx/transport/BodyReadError", {
+  message: Schema.String,
+}) {}
+
+const bodyText = (body: HttpBody.HttpBody): Effect.Effect<string, BodyReadError> =>
   body._tag === "Stream"
     ? body.stream.pipe(
         Stream.take(1),
         Stream.decodeText,
         Stream.runCollect,
         Effect.map((chunks) => chunks.join("")),
+        Effect.mapError((error) => BodyReadError.make({ message: String(error) })),
       )
     : Effect.die("expected stream body")
 

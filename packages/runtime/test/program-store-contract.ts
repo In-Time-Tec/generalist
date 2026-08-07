@@ -2,7 +2,8 @@ import { expect } from "@effect/vitest"
 import { Clock, Effect, Option } from "effect"
 import { Pins, ProgramCapabilities } from "@batonfx/core"
 import { Errors, ExecutionHost, RunClaims, Runtime, RunStore } from "../src/index.js"
-import type { ExecutionClaim } from "../src/run-store.js"
+import type { ExecutionClaim, WorkerMutationError } from "../src/run-store.js"
+import type { ProgramStoreFailure } from "../src/program-store.js"
 import { program, programAddress } from "./program-fixture.js"
 
 const reserve = (
@@ -59,7 +60,9 @@ const claimProgram = (label: string) =>
 
 type ProgramContractServices = Runtime.Runtime | RunStore.RunStore
 
-export const programBudgetContract: Effect.Effect<void, unknown, ProgramContractServices> = Effect.gen(function* () {
+type ProgramContractError = Runtime.SendError | WorkerMutationError | ProgramStoreFailure
+
+export const programBudgetContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> = Effect.gen(function* () {
   const store = yield* RunStore.RunStore
   let run = 0
   const claim = (dimension: string) => claimProgram(`${dimension}-${++run}`)
@@ -77,7 +80,7 @@ export const programBudgetContract: Effect.Effect<void, unknown, ProgramContract
               : { activeSlots: budget.concurrency + 1 }
       expect(
         yield* reserve(store, execution, dimension, budget, reservation, yield* Clock.currentTimeMillis).pipe(
-          Effect.flip,
+          Effect.flip, Effect.orDie,
         ),
       ).toMatchObject({ dimension, limit: dimension === "concurrency" ? budget.concurrency : 0 })
     })
@@ -109,16 +112,16 @@ export const programBudgetContract: Effect.Effect<void, unknown, ProgramContract
   const wallBudget = { ...program.pinned.manifest.budget, wallClockMillis: 0 }
   yield* reserve(store, wallClaim, "wall-start", wallBudget, {}, startedAt)
   expect(
-    yield* reserve(store, wallClaim, "wall-expired", wallBudget, {}, startedAt + 1).pipe(Effect.flip),
+    yield* reserve(store, wallClaim, "wall-expired", wallBudget, {}, startedAt + 1).pipe(Effect.flip, Effect.orDie),
   ).toMatchObject({ dimension: "wallClockMillis", limit: 0 })
 
   const outputClaim = yield* claim("outputBytes")
   expect(
-    yield* store.completeProgram({ ...outputClaim, output: "x", outputBytes: 1, outputLimit: 0 }).pipe(Effect.flip),
+    yield* store.completeProgram({ ...outputClaim, output: "x", outputBytes: 1, outputLimit: 0 }).pipe(Effect.flip, Effect.orDie),
   ).toMatchObject({ dimension: "outputBytes", limit: 0 })
 })
 
-export const programReplayDivergenceContract: Effect.Effect<void, unknown, ProgramContractServices> = Effect.gen(
+export const programReplayDivergenceContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> = Effect.gen(
   function* () {
     const store = yield* RunStore.RunStore
     const execution = yield* claimProgram("replay-divergence")
@@ -134,7 +137,7 @@ export const programReplayDivergenceContract: Effect.Effect<void, unknown, Progr
       { toolCalls: 1 },
       nowMillis,
       { value: "changed" },
-    ).pipe(Effect.flip)
+    ).pipe(Effect.flip, Effect.orDie)
     expect(divergence).toMatchObject({ _tag: "@batonfx/core/ProgramReplayDivergence", operation: "same-operation" })
     expect(yield* store.loadProgramState(execution.runId)).toMatchObject({ toolCalls: 1 })
     expect(yield* store.getProgramOperation({ runId: execution.runId, operation: "same-operation" })).toMatchObject({
@@ -144,7 +147,7 @@ export const programReplayDivergenceContract: Effect.Effect<void, unknown, Progr
   },
 )
 
-export const programCancellationFenceContract: Effect.Effect<void, unknown, ProgramContractServices> = Effect.gen(
+export const programCancellationFenceContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> = Effect.gen(
   function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
@@ -167,7 +170,7 @@ export const programCancellationFenceContract: Effect.Effect<void, unknown, Prog
         outcome: { _tag: "Succeeded", value: "stale value" },
         releaseSlots: 1,
       })
-      .pipe(Effect.flip)
+      .pipe(Effect.flip, Effect.orDie)
     expect(staleCommit).toBeInstanceOf(Errors.StaleClaim)
     expect(
       yield* store.getProgramOperation({ runId: execution.runId, operation: "cancelled-operation" }),
@@ -178,7 +181,7 @@ export const programCancellationFenceContract: Effect.Effect<void, unknown, Prog
   },
 )
 
-export const programSettledReplayContract: Effect.Effect<void, unknown, ProgramContractServices> = Effect.gen(
+export const programSettledReplayContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> = Effect.gen(
   function* () {
     const store = yield* RunStore.RunStore
     const success = yield* claimProgram("settled-replay-success")
@@ -216,7 +219,7 @@ export const programSettledReplayContract: Effect.Effect<void, unknown, ProgramC
         outcome: { _tag: "Succeeded", value: { value: "changed" } },
         releaseSlots: 1,
       })
-      .pipe(Effect.flip)
+      .pipe(Effect.flip, Effect.orDie)
     expect(divergentSuccess).toBeInstanceOf(Errors.StaleClaim)
 
     const failure = yield* claimProgram("settled-replay-failure")
@@ -253,7 +256,7 @@ export const programSettledReplayContract: Effect.Effect<void, unknown, ProgramC
         outcome: { _tag: "Failed", error: { _tag: "test", message: "changed" } },
         releaseSlots: 1,
       })
-      .pipe(Effect.flip)
+      .pipe(Effect.flip, Effect.orDie)
     expect(divergentFailure).toBeInstanceOf(Errors.StaleClaim)
 
     const unknown = yield* claimProgram("settled-replay-unknown")
@@ -289,12 +292,12 @@ export const programSettledReplayContract: Effect.Effect<void, unknown, ProgramC
         outcome: { _tag: "Succeeded", value: "late" },
         releaseSlots: 1,
       })
-      .pipe(Effect.flip)
+      .pipe(Effect.flip, Effect.orDie)
     expect(divergentUnknown).toBeInstanceOf(Errors.StaleClaim)
   },
 )
 
-export const programCancellationFinalizerContract: Effect.Effect<void, unknown, ProgramContractServices> = Effect.gen(
+export const programCancellationFinalizerContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> = Effect.gen(
   function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
@@ -331,7 +334,7 @@ export const programCancellationFinalizerContract: Effect.Effect<void, unknown, 
 
 export const programUnknownOutcomeContract = (
   resolutionIdempotencyKey: string,
-): Effect.Effect<void, unknown, ProgramContractServices | ExecutionHost.ExecutionHost> =>
+): Effect.Effect<void, ProgramContractError | Errors.OperationResolutionConflict, ProgramContractServices | ExecutionHost.ExecutionHost> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore

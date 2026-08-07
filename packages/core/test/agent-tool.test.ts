@@ -931,7 +931,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Effect.gen(function* () {
         const child = Agent.make({ name: "child" })
         const childTool = AgentTool.asTool(child, { name: "ask_child" })
-        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_child!) })
+        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_child!) }) as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
 
         const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
 
@@ -1033,7 +1033,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       Effect.gen(function* () {
         const child = Agent.make({ name: "reviewer", toolkit: Toolkit.make(gatedTool) })
         const childTool = AgentTool.asTool(child, { name: "ask_reviewer" })
-        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_reviewer!) })
+        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_reviewer!) }) as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
 
         const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
 
@@ -1080,7 +1080,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           toPrompt: () => "callback prompt",
           fromResult: (result) => `mapped:${result.text}`,
         })
-        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_callback!) })
+        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_callback!) }) as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
         const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
         const toolCompleted = events.find((event) => event._tag === "ToolExecutionCompleted")
         expect(toolCompleted?._tag === "ToolExecutionCompleted" && toolCompleted.result.result).toBe(
@@ -1124,7 +1124,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
           toPrompt: (params) => params.question,
           fromResult: (result) => ({ answer: result.text }),
         })
-        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_custom!) })
+        const parent = Agent.make({ name: "parent", toolkit: Toolkit.make(childTool.tools.ask_custom!) }) as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
 
         const events = yield* Stream.runCollect(Agent.stream(parent, { prompt: "parent task" }))
 

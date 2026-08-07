@@ -281,7 +281,7 @@ describe("RunBudget Agent.stream integration", () => {
         name: "parent-agent",
         toolkit: Toolkit.make(parentTool.tool, echoTool),
         budget: { modelCalls: 3, childRuns: 1, depth: 1 },
-      })
+      }) as unknown as Agent.Agent<Record<string, Tool.Any>, LanguageModel.LanguageModel>
       let modelCalls = 0
       yield* Agent.stream(parent, { prompt: "child", logicalOperationId: "parent-child" }).pipe(
         Stream.runDrain,
