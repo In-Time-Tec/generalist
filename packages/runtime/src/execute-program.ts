@@ -35,19 +35,12 @@ export const executeProgram = (input: {
   )
   return scopedExecution.pipe(
     Effect.flatMap((value) =>
-<<<<<<< HEAD
-      Effect.try({
-        try: () => new TextEncoder().encode(JSON.stringify(value)).byteLength,
-        catch: (error) => AgentExecutionFailure.make({ message: failureMessage(String(error)) }),
-      }).pipe(
-=======
       (value === undefined
         ? Effect.succeed("undefined")
         : Schema.encodeEffect(Schema.UnknownFromJsonString)(value)
       ).pipe(
         Effect.map((encoded) => new TextEncoder().encode(encoded).byteLength),
-        Effect.mapError((error) => AgentExecutionFailure.make({ message: error.message })),
->>>>>>> origin/main
+        Effect.mapError((error) => AgentExecutionFailure.make({ message: failureMessage(error.message) })),
         Effect.flatMap((outputBytes) =>
           store.completeProgram({
             ...claim,

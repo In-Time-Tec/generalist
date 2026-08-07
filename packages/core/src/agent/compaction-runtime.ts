@@ -18,12 +18,7 @@ import type { AgentRunState } from "./agent-run-state.js"
 import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
 import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../context/session.js"
 import { intercept } from "../durable/driver-run.js"
-<<<<<<< HEAD
 import { operationKey } from "../durable/driver-interpreter.js"
-=======
-import { operationKey, type DriverInterpreter } from "../durable/driver-interpreter.js"
-
->>>>>>> origin/main
 import type { MemoryError } from "../context/memory.js"
 import type { SkillSourceError } from "../context/skill-source.js"
 type CompactionContext = {
