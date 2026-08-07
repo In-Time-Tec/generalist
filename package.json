@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "package": "bun scripts/package-smoke.ts",
     "test": "bun run build && bun --bun vitest run",
-    "typecheck": "ast-grep scan --config sgconfig.yml --filter '^effect-' --report-style short && bun turbo typecheck && bun tsc --noEmit -p tsconfig.json"
+    "typecheck": "ast-grep scan --config sgconfig.yml --filter '^effect-' --report-style short && bun turbo typecheck && bun tsc --noEmit -p tsconfig.json",
+    "prepare": "effect-tsgo patch --no-typescript --oxlint"
   },
   "workspaces": {
     "packages": [
@@ -40,7 +41,7 @@
       "@effect/sql-mysql2": "4.0.0-beta.98",
       "@effect/sql-sqlite-bun": "4.0.0-beta.98",
       "@effect/sql-pg": "4.0.0-beta.98",
-      "@effect/tsgo": "0.21.0",
+      "@effect/tsgo": "0.33.0",
       "@effect/vitest": "4.0.0-beta.98",
       "@foldkit/ui": "0.122.0",
       "@foldkit/vite-plugin": "0.10.0",
@@ -55,8 +56,8 @@
       "effect": "4.0.0-beta.98",
       "foldkit": "0.122.0",
       "happy-dom": "20.10.6",
-      "oxlint": "1.60.0",
-      "oxlint-tsgolint": "0.21.0",
+      "oxlint": "1.77.0",
+      "oxlint-tsgolint": "7.0.2001",
       "prettier": "3.6.2",
       "tailwind-merge": "3.6.0",
       "tailwindcss": "4.3.2",

@@ -321,7 +321,7 @@ describe("DefaultRequestHandler projection", () => {
     const injected = { ...message("bad"), role: Role.ROLE_AGENT }
     await expect(async () => {
       for await (const _response of handler.sendMessageStream(request(injected), new ServerCallContext())) {
-        // The request must fail before an SDK Task or Runtime Run exists.
+        void _response // The request must fail before an SDK Task or Runtime Run exists.
       }
     }).rejects.toMatchObject({ reason: "CONTENT_TYPE_NOT_SUPPORTED" })
     expect(fixture.sentRunIds).toEqual([])

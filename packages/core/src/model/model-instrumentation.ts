@@ -5,7 +5,6 @@ import {
   type StreamTextOptions,
   type StreamTextPart,
 } from "./model-call-correction.js"
-import type { IdentityCell } from "./model-attempt-identity.js"
 import { CurrentModelCallOrdinal } from "../durable/operation-context.js"
 import {
   attemptModel,

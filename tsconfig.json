@@ -114,7 +114,15 @@
           "unnecessaryPipe": "error",
           "unnecessaryPipeChain": "error",
           "unnecessaryTypeofType": "error",
-          "unsafeEffectTypeAssertion": "error"
+          "unsafeEffectTypeAssertion": "error",
+          "catchChainToFirstSuccessOf": "error",
+          "catchTagToCatchReason": "error",
+          "floatingEffectInVitest": "error",
+          "preferSchemaTypeProperty": "error",
+          "preferTypedSchemaDecoder": "error",
+          "schemaLiteralNonFinite": "error",
+          "schemaOpaqueInstanceMember": "error",
+          "syncToSucceed": "error"
         }
       }
     ],
