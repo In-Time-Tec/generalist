@@ -6,10 +6,9 @@ import { ToolContext } from "../tools/tool-context.js"
 /** @internal A broad toolkit used only by the adapter's implementation boundary. */
 type BroadTools = Record<string, Tool.Any>
 
-type BroadGenerateObjectOptions = LanguageModel.GenerateObjectOptions<
-  BroadTools,
-  Schema.Encoder<Record<string, Tool.Any>, unknown>
->
+const broadObjectSchema = Schema.Struct({ value: Schema.String })
+
+type BroadGenerateObjectOptions = LanguageModel.GenerateObjectOptions<BroadTools, typeof broadObjectSchema>
 type BroadGenerateTextResponse = LanguageModel.GenerateTextResponse<BroadTools>
 type BroadGenerateObjectResponse = LanguageModel.GenerateObjectResponse<BroadTools, unknown>
 type BroadStreamPart = Response.StreamPart<BroadTools>
@@ -23,12 +22,12 @@ type GenerateTextMiddleware<Extra, R> = (
   ) => Effect.Effect<BroadGenerateTextResponse, BroadGenerateError, R>,
 ) => Effect.Effect<BroadGenerateTextResponse, BroadGenerateError | Extra, R>
 
-type GenerateObjectMiddleware<Extra> = (
+type GenerateObjectMiddleware<Extra, R = ToolContext> = (
   options: BroadGenerateObjectOptions,
   invoke: (
     options?: BroadGenerateObjectOptions,
-  ) => Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError, unknown>,
-) => Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError | Extra, unknown>
+  ) => Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError, R>,
+) => Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError | Extra, R>
 
 type StreamTextMiddleware<Extra> = (
   options: LanguageModel.GenerateTextOptions<BroadTools>,
@@ -84,17 +83,12 @@ export const invokeGenerateText: {
 
 const invokeGenerateObjectImpl = (
   model: LanguageModel.Service,
-  options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
-) => model.generateObject(options)
+  options: BroadGenerateObjectOptions,
+): Effect.Effect<BroadGenerateObjectResponse, BroadGenerateObjectError, ToolContext> => model.generateObject(options)
 
 export const invokeGenerateObject: {
-  (
-    options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
-  ): (model: LanguageModel.Service) => ReturnType<typeof invokeGenerateObjectImpl>
-  (
-    model: LanguageModel.Service,
-    options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
-  ): ReturnType<typeof invokeGenerateObjectImpl>
+  (options: BroadGenerateObjectOptions): (model: LanguageModel.Service) => ReturnType<typeof invokeGenerateObjectImpl>
+  (model: LanguageModel.Service, options: BroadGenerateObjectOptions): ReturnType<typeof invokeGenerateObjectImpl>
 } = Function.dual(2, invokeGenerateObjectImpl)
 
 const invokeStreamTextImpl = (model: LanguageModel.Service, options: LanguageModel.GenerateTextOptions<BroadTools>) =>
@@ -237,9 +231,7 @@ export const adapt: {
       LanguageModel.ExtractError<Options>,
       LanguageModel.ExtractServices<Options> | StructuredOutputSchema["DecodingServices"]
     >
-    function generateObject(
-      options: LanguageModel.GenerateObjectOptions<BroadTools, Schema.Encoder<Record<string, Tool.Any>, unknown>>,
-    ) {
+    function generateObject(options: BroadGenerateObjectOptions) {
       const invoke = (input = options) => invokeGenerateObject(model, input)
       return middleware.generateObject === undefined ? invoke() : middleware.generateObject(options, invoke)
     }
