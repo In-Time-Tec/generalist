@@ -1,19 +1,30 @@
 import { Prompt } from "effect/unstable/ai"
-import { Agent, AgentEvent } from "@batonfx/core"
+import { Agent, AgentEvent, AgentManifest } from "@batonfx/core"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "../src/index.js"
 import { closedTestAgent, pinnedTestAgent } from "./identity.js"
 
 /** Exact registration set covering every pin an executable requires. */
-export const registrationsFor = (
-  executable: ExecutableManifest.PinnedExecutable,
-  suffix = "1",
-): ReadonlyArray<ExecutableRegistration.ExecutableRegistration> =>
-  [...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
+export const registrationsFor: {
+  (
+    suffix?: string,
+  ): (executable: ExecutableManifest.PinnedExecutable) => ReadonlyArray<ExecutableRegistration.ExecutableRegistration>
+  (
+    executable: ExecutableManifest.PinnedExecutable,
+    suffix?: string,
+  ): ReadonlyArray<ExecutableRegistration.ExecutableRegistration>
+} = (executableOrSuffix?: ExecutableManifest.PinnedExecutable | string, maybeSuffix?: string): any => {
+  if (executableOrSuffix === undefined || typeof executableOrSuffix === "string") {
+    return (executable: ExecutableManifest.PinnedExecutable) => registrationsFor(executable, executableOrSuffix)
+  }
+  const executable = executableOrSuffix
+  const suffix = maybeSuffix ?? "1"
+  return [...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
     pin,
     codec: "test",
     version: "1",
     payload: { fixture: suffix },
   }))
+}
 
 export const assistant: Agent.Agent = Agent.make({ name: "assistant" })
 export const researcher: Agent.Agent = Agent.make({ name: "researcher" })
@@ -25,7 +36,7 @@ const assistantPinned = pinnedTestAgent(assistant, "1", [
   { selection: "analyst", agent: analystPinned.pin },
   { selection: "researcher", agent: researcherPinned.pin },
 ])
-const entries = (...agents: ReadonlyArray<ReturnType<typeof pinnedTestAgent>>) =>
+const entries = (...agents: ReadonlyArray<AgentManifest.PinnedAgent>) =>
   agents.map((agent) => ({ _tag: "Agent" as const, pin: agent.pin, manifest: agent.manifest }))
 const executable = ExecutableManifest.make({
   root: assistantPinned.pin,

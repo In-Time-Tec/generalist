@@ -23,6 +23,17 @@ export const postgresUrl = Effect.runSync(
 
 export const postgresAvailable = typeof postgresUrl === "string" && postgresUrl.length > 0
 
+type PostgresWorkerLayer = Layer.Layer<
+  | import("../../src/execution-host.js").ExecutionHost
+  | import("../../src/sql/run-claims.js").RunClaims
+  | import("../../src/run-store.js").RunStore
+  | import("../../src/runtime.js").Runtime
+  | import("../../src/sql/postgres/worker.js").RuntimeWorker,
+  | import("effect/unstable/sql/SqlError").SqlError
+  | import("../../src/sql/postgres/runtime-layer.js").PostgresStoreError,
+  never
+>
+
 const resolver = ExecutableResolver.makeStatic([
   { executable: assistantRef, agent: closedTestAgent(assistant) },
   { executable: researcherRef, agent: closedTestAgent(researcher) },
@@ -61,13 +72,24 @@ export const postgresLayer = (url: string) =>
     subscriberQueueCapacity: 8,
   })
 
-export const postgresWithWorker = (url: string, workerId: string, concurrency = 4) =>
-  RuntimeWorker.layerWorker({
+export const postgresWithWorker: {
+  (url: string, workerId: string, concurrency?: number): PostgresWorkerLayer
+  (workerId: string, concurrency?: number): (url: string) => PostgresWorkerLayer
+} = (urlOrWorkerId: string, maybeWorkerIdOrConcurrency?: string | number, maybeConcurrency?: number): any => {
+  if (maybeWorkerIdOrConcurrency === undefined || typeof maybeWorkerIdOrConcurrency === "number") {
+    const workerId = urlOrWorkerId
+    const concurrency = typeof maybeWorkerIdOrConcurrency === "number" ? maybeWorkerIdOrConcurrency : maybeConcurrency
+    return (url: string) => postgresWithWorker(url, workerId, concurrency)
+  }
+  const url = urlOrWorkerId
+  const workerId = maybeWorkerIdOrConcurrency
+  return RuntimeWorker.layerWorker({
     workerId,
-    concurrency,
+    concurrency: maybeConcurrency ?? 4,
     lease: "5 seconds",
     pollInterval: "50 millis",
   }).pipe(Layer.provideMerge(postgresLayer(url)))
+}
 
 let uniqueSessionCounter = 0
 export const uniqueSession = (label: string) =>

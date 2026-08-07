@@ -1,10 +1,11 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { SqlClient } from "effect/unstable/sql"
-import { RunNotFound, RunTerminal, SteeringConflict } from "../errors.js"
+import { RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { AdmitSteeringInput, ExecutionClaim } from "../run-store.js"
 import { encodeContinuation, type ExecutionContinuation, type SteeringEntry } from "../steering.js"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { ExecutionResult } from "../execution-state.js"
 import { loadRun } from "./store-helpers.js"
 import { decodeJson, encodeJson } from "./codecs.js"
@@ -78,7 +79,16 @@ const readPendingSteering = (runId: string) =>
 
 export const readSteering = (input: ExecutionClaim) => readPendingSteering(input.runId)
 
-export const saveCompletionContinuation = (runId: string, result: ExecutionResult) =>
+type ContinuationEffect = Effect.Effect<
+  ExecutionContinuation | undefined,
+  RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+
+export const saveCompletionContinuation: {
+  (runId: string, result: ExecutionResult): ContinuationEffect
+  (result: ExecutionResult): (runId: string) => ContinuationEffect
+} = Function.dual(2, (runId: string, result: ExecutionResult) =>
   Effect.gen(function* () {
     if (!("transcript" in result)) return undefined
     const run = yield* loadRun(runId)
@@ -102,4 +112,5 @@ export const saveCompletionContinuation = (runId: string, result: ExecutionResul
       WHERE run_id = ${runId}
     `
     return continuation
-  })
+  }),
+)

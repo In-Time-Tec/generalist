@@ -2,8 +2,15 @@ import { Effect } from "effect"
 import { TreeCursorInvalid } from "./errors.js"
 import { decodeCursor, TreeCursor, type TreeCursor as TreeCursorType } from "./tree-cursor.js"
 
-export const parseCursor = (rootRunId: string, cursor?: TreeCursorType): Effect.Effect<number, TreeCursorInvalid> =>
-  Effect.try({
+export const parseCursor: {
+  (rootRunId: string, cursor?: TreeCursorType): Effect.Effect<number, TreeCursorInvalid>
+  (cursor?: TreeCursorType): (rootRunId: string) => Effect.Effect<number, TreeCursorInvalid>
+} = (...args: [string?, TreeCursorType?]): any => {
+  const [rootRunIdOrCursor, cursor] = args
+  if (args.length < 2)
+    return (rootRunId: string) => parseCursor(rootRunId, rootRunIdOrCursor as TreeCursorType | undefined)
+  const rootRunId = rootRunIdOrCursor as string
+  return Effect.try({
     try: () => {
       if (cursor === undefined) return -1
       const value = decodeCursor(cursor)
@@ -20,3 +27,4 @@ export const parseCursor = (rootRunId: string, cursor?: TreeCursorType): Effect.
         message: cause instanceof Error ? cause.message : String(cause),
       }),
   })
+}

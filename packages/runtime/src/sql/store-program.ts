@@ -1,9 +1,14 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { ProgramCapabilities } from "@batonfx/core"
-import { RuntimeUnavailable } from "../errors.js"
-import { OperationResolutionConflict } from "../errors.js"
+import {
+  ChildSelectionMissing,
+  FanOutConflict,
+  FanOutInvalid,
+  OperationResolutionConflict,
+  RuntimeUnavailable,
+} from "../errors.js"
 import {
   ProgramOperationRecord,
   ProgramRunState,
@@ -200,7 +205,34 @@ export const reserveProgramOperation = (
     return yield* decodeOperation((yield* operationRows(input.runId, input.operation))[0]!)
   })
 
-export const settleProgramOperation = (hub: EventHub, input: SettleProgramOperationInput) =>
+type ProgramOperation = ProgramOperationRecord
+type SettleEffect = Effect.Effect<ProgramOperation, RuntimeUnavailable | SqlError | StaleClaim, SqlClient.SqlClient>
+type SuspendProgramEffect = Effect.Effect<
+  ProgramOperation,
+  ProgramStoreFailure | WorkerMutationError,
+  SqlClient.SqlClient
+>
+type AdmitAgentsEffect = Effect.Effect<
+  ProgramOperation,
+  ChildSelectionMissing | FanOutConflict | FanOutInvalid | ProgramStoreFailure | WorkerMutationError,
+  SqlClient.SqlClient
+>
+type CommitLogEffect = Effect.Effect<
+  ProgramOperation,
+  RuntimeUnavailable | SqlError | StaleClaim | ProgramStoreFailure,
+  SqlClient.SqlClient
+>
+type ResolveProgramEffect = Effect.Effect<
+  undefined,
+  OperationResolutionConflict | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+type CancelProgramEffect = Effect.Effect<void, SqlError, SqlClient.SqlClient>
+
+export const settleProgramOperation: {
+  (input: SettleProgramOperationInput): (hub: EventHub) => SettleEffect
+  (hub: EventHub, input: SettleProgramOperationInput): SettleEffect
+} = Function.dual(2, (hub: EventHub, input: SettleProgramOperationInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const row = (yield* operationRows(input.runId, input.operation))[0]
@@ -240,14 +272,26 @@ export const settleProgramOperation = (hub: EventHub, input: SettleProgramOperat
     if (run === undefined) return yield* RuntimeUnavailable.make({ message: `Run ${input.runId} is missing` })
     yield* appendEvent(hub, run, { _tag: "OperationUnknown", operationId: input.operation }, "needs-resolution")
     return record
-  })
+  }),
+)
 
-export const resolveProgramOperation = (
-  input: ResolveOperationInput,
-  claimableStatus: "running" | "queued",
-  clearLease = false,
-) =>
-  Effect.gen(function* () {
+export const resolveProgramOperation: {
+  (input: ResolveOperationInput, claimableStatus: "running" | "queued", clearLease?: boolean): ResolveProgramEffect
+  (claimableStatus: "running" | "queued", clearLease?: boolean): (input: ResolveOperationInput) => ResolveProgramEffect
+} = (
+  inputOrClaimable: ResolveOperationInput | string,
+  maybeClaimable?: "running" | "queued" | boolean,
+  maybeClearLease?: boolean,
+): any => {
+  if (typeof inputOrClaimable === "string") {
+    const claimableStatus = inputOrClaimable as "running" | "queued"
+    const clearLease = maybeClaimable as boolean
+    return (input: ResolveOperationInput) => resolveProgramOperation(input, claimableStatus, clearLease)
+  }
+  const input = inputOrClaimable
+  const claimableStatus = maybeClaimable
+  const clearLease = maybeClearLease ?? false
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* loadRun(input.runId)
     const row = (yield* operationRows(input.runId, input.operationId))[0]
@@ -291,6 +335,7 @@ export const resolveProgramOperation = (
       `
     }
   })
+}
 
 export const startProgramOperation = (input: { readonly runId: string; readonly operation: string }) =>
   Effect.gen(function* () {
@@ -305,8 +350,14 @@ export const startProgramOperation = (input: { readonly runId: string; readonly 
     return yield* decodeOperation(row)
   })
 
-export const reconcileProgramCancellation = (runId: string, reason?: string) =>
-  Effect.gen(function* () {
+export const reconcileProgramCancellation: {
+  (runId: string, reason?: string): CancelProgramEffect
+  (reason?: string): (runId: string) => CancelProgramEffect
+} = (...args: [string?, string?]): any => {
+  const [runIdOrReason, reason] = args
+  if (args.length < 2) return (runId: string) => reconcileProgramCancellation(runId, runIdOrReason)
+  const runId = runIdOrReason as string
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const failure = ProgramCapabilities.ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
     yield* sql`
@@ -315,17 +366,17 @@ export const reconcileProgramCancellation = (runId: string, reason?: string) =>
     `
     yield* sql`UPDATE baton_program_runs SET active_slots = 0 WHERE run_id = ${runId}`
   })
+}
 
 type SuspendParent = (
   hub: EventHub,
   input: Parameters<import("../run-store.js").Interface["suspend"]>[0],
 ) => Effect.Effect<void, WorkerMutationError, SqlClient.SqlClient>
 
-export const suspendProgramOperation = (
-  hub: EventHub,
-  input: SuspendProgramOperationInput,
-  suspendParent: SuspendParent,
-) =>
+export const suspendProgramOperation: {
+  (input: SuspendProgramOperationInput, suspendParent: SuspendParent): (hub: EventHub) => SuspendProgramEffect
+  (hub: EventHub, input: SuspendProgramOperationInput, suspendParent: SuspendParent): SuspendProgramEffect
+} = Function.dual(3, (hub: EventHub, input: SuspendProgramOperationInput, suspendParent: SuspendParent) =>
   Effect.gen(function* () {
     const reserved = yield* reserveProgramOperation(input)
     if (reserved.status === "waiting") return reserved
@@ -336,9 +387,13 @@ export const suspendProgramOperation = (
     `
     yield* suspendParent(hub, input)
     return yield* decodeOperation((yield* operationRows(input.runId, input.operation))[0]!)
-  })
+  }),
+)
 
-export const admitProgramAgents = (hub: EventHub, input: AdmitProgramAgentsInput, suspendParent: SuspendParent) =>
+export const admitProgramAgents: {
+  (input: AdmitProgramAgentsInput, suspendParent: SuspendParent): (hub: EventHub) => AdmitAgentsEffect
+  (hub: EventHub, input: AdmitProgramAgentsInput, suspendParent: SuspendParent): AdmitAgentsEffect
+} = Function.dual(3, (hub: EventHub, input: AdmitProgramAgentsInput, suspendParent: SuspendParent) =>
   Effect.gen(function* () {
     const reserved = yield* reserveProgramOperation(input)
     if (reserved.childRunIds.length > 0) return reserved
@@ -351,9 +406,13 @@ export const admitProgramAgents = (hub: EventHub, input: AdmitProgramAgentsInput
     `
     yield* suspendParent(hub, { ...input, checkpoint: { _tag: "Program", version: "1" } })
     return yield* decodeOperation((yield* operationRows(input.runId, input.operation))[0]!)
-  })
+  }),
+)
 
-export const commitProgramLog = (hub: EventHub, input: CommitProgramLogInput) =>
+export const commitProgramLog: {
+  (input: CommitProgramLogInput): (hub: EventHub) => CommitLogEffect
+  (hub: EventHub, input: CommitProgramLogInput): CommitLogEffect
+} = Function.dual(2, (hub: EventHub, input: CommitProgramLogInput) =>
   Effect.gen(function* () {
     const prior = yield* reserveProgramOperation(input)
     if (prior.status === "succeeded") return prior
@@ -371,4 +430,5 @@ export const commitProgramLog = (hub: EventHub, input: CommitProgramLogInput) =>
       outcome: { _tag: "Succeeded", value: undefined },
       releaseSlots: 0,
     })
-  })
+  }),
+)

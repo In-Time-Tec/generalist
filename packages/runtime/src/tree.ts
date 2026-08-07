@@ -1,4 +1,5 @@
 import { Effect, Option, Pull, Schedule, Schema, Stream } from "effect"
+import type { ParseOptions } from "effect/SchemaAST"
 import { RunEvent } from "./run-event.js"
 import { CompactionInspection, isTerminal, RawUsageFact, RunInspection, RunOutcome } from "./run.js"
 import { Runtime, type Interface as RuntimeInterface } from "./runtime.js"
@@ -34,8 +35,34 @@ export const TreeEvent: Schema.Codec<TreeEvent, TreeEventEncoded> = Schema.Struc
   cursor: TreeCursor,
 })
 
-export const encodeTreeEvent = Schema.encodeEffect(TreeEvent)
-export const decodeTreeEvent = Schema.decodeEffect(TreeEvent)
+const isParseOptions = (value: unknown): value is ParseOptions =>
+  typeof value === "object" &&
+  value !== null &&
+  ("errors" in value ||
+    "onExcessProperty" in value ||
+    "propertyOrder" in value ||
+    "disableChecks" in value ||
+    "concurrency" in value)
+
+export const encodeTreeEvent: {
+  (input: TreeEvent, options?: ParseOptions): Effect.Effect<TreeEventEncoded, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: TreeEvent) => Effect.Effect<TreeEventEncoded, Schema.SchemaError, never>
+} = (inputOrOptions?: TreeEvent | ParseOptions, maybeOptions?: ParseOptions): any => {
+  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
+    return (input: TreeEvent) => encodeTreeEvent(input, inputOrOptions as ParseOptions)
+  }
+  return Schema.encodeEffect(TreeEvent)(inputOrOptions as TreeEvent, maybeOptions)
+}
+
+export const decodeTreeEvent: {
+  (input: TreeEventEncoded, options?: ParseOptions): Effect.Effect<TreeEvent, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: TreeEventEncoded) => Effect.Effect<TreeEvent, Schema.SchemaError, never>
+} = (inputOrOptions?: TreeEventEncoded | ParseOptions, maybeOptions?: ParseOptions): any => {
+  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
+    return (input: TreeEventEncoded) => decodeTreeEvent(input, inputOrOptions as ParseOptions)
+  }
+  return Schema.decodeEffect(TreeEvent)(inputOrOptions as TreeEventEncoded, maybeOptions)
+}
 
 export interface TreePage {
   readonly events: ReadonlyArray<TreeEvent>
@@ -54,8 +81,25 @@ export const TreePage: Schema.Codec<TreePage, TreePageEncoded> = Schema.Struct({
   hasMore: Schema.Boolean,
 })
 
-export const encodeTreePage = Schema.encodeEffect(TreePage)
-export const decodeTreePage = Schema.decodeEffect(TreePage)
+export const encodeTreePage: {
+  (input: TreePage, options?: ParseOptions): Effect.Effect<TreePageEncoded, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: TreePage) => Effect.Effect<TreePageEncoded, Schema.SchemaError, never>
+} = (inputOrOptions?: TreePage | ParseOptions, maybeOptions?: ParseOptions): any => {
+  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
+    return (input: TreePage) => encodeTreePage(input, inputOrOptions as ParseOptions)
+  }
+  return Schema.encodeEffect(TreePage)(inputOrOptions as TreePage, maybeOptions)
+}
+
+export const decodeTreePage: {
+  (input: TreePageEncoded, options?: ParseOptions): Effect.Effect<TreePage, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: TreePageEncoded) => Effect.Effect<TreePage, Schema.SchemaError, never>
+} = (inputOrOptions?: TreePageEncoded | ParseOptions, maybeOptions?: ParseOptions): any => {
+  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
+    return (input: TreePageEncoded) => decodeTreePage(input, inputOrOptions as ParseOptions)
+  }
+  return Schema.decodeEffect(TreePage)(inputOrOptions as TreePageEncoded, maybeOptions)
+}
 
 export interface HistoryInput {
   readonly rootRunId: string
@@ -127,8 +171,25 @@ export const Inspection: Schema.Codec<Inspection, InspectionEncoded> = Schema.Un
   Schema.TaggedStruct("Terminal", InspectionBase),
 ])
 
-export const encodeInspection = Schema.encodeEffect(Inspection)
-export const decodeInspection = Schema.decodeEffect(Inspection)
+export const encodeInspection: {
+  (input: Inspection, options?: ParseOptions): Effect.Effect<InspectionEncoded, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: Inspection) => Effect.Effect<InspectionEncoded, Schema.SchemaError, never>
+} = (inputOrOptions?: Inspection | ParseOptions, maybeOptions?: ParseOptions): any => {
+  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
+    return (input: Inspection) => encodeInspection(input, inputOrOptions as ParseOptions)
+  }
+  return Schema.encodeEffect(Inspection)(inputOrOptions as Inspection, maybeOptions)
+}
+
+export const decodeInspection: {
+  (input: InspectionEncoded, options?: ParseOptions): Effect.Effect<Inspection, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: InspectionEncoded) => Effect.Effect<Inspection, Schema.SchemaError, never>
+} = (inputOrOptions?: InspectionEncoded | ParseOptions, maybeOptions?: ParseOptions): any => {
+  if (maybeOptions === undefined && (inputOrOptions === undefined || isParseOptions(inputOrOptions))) {
+    return (input: InspectionEncoded) => decodeInspection(input, inputOrOptions as ParseOptions)
+  }
+  return Schema.decodeEffect(Inspection)(inputOrOptions as InspectionEncoded, maybeOptions)
+}
 
 export const history = (input: HistoryInput) => Runtime.use((runtime) => runtime.treeHistory(input))
 

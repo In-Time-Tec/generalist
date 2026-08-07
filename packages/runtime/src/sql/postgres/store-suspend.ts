@@ -1,6 +1,8 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RuntimeUnavailable, RunTerminal } from "../../errors.js"
+import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
+import { StaleClaim } from "../errors.js"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 import { checkpointRef } from "../../executable-manifest.js"
 import { isTerminal } from "../../run.js"
 import type { Interface as RunStoreInterface } from "../../run-store.js"
@@ -15,7 +17,16 @@ import { inspectFanOut } from "../store-fan-out.js"
 import { Prompt } from "effect/unstable/ai"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
 
-export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]) =>
+type SuspendEffect = Effect.Effect<
+  undefined,
+  RunNotFound | RunTerminal | RuntimeUnavailable | SqlError | StaleClaim,
+  SqlClient.SqlClient
+>
+
+export const suspend: {
+  (input: Parameters<RunStoreInterface["suspend"]>[0]): (hub: EventHub) => SuspendEffect
+  (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]): SuspendEffect
+} = Function.dual(2, (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* lockRun(input.runId)
@@ -80,4 +91,5 @@ export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["susp
       }
     }
     yield* sql`UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}`
-  })
+  }),
+)

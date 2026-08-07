@@ -133,8 +133,13 @@ export const hasAdmission = (input: {
     return rows.length > 0
   })
 
-export const decodePersistedEvents = (rows: ReadonlyArray<EventRow>, manifest: ExecutableManifest) =>
-  Effect.forEach(rows, (row) =>
+export const decodePersistedEvents: {
+  (rows: EventRows, manifest: ExecutableManifest): Effect.Effect<RunEvent[], RuntimeUnavailable, never>
+  (manifest: ExecutableManifest): (rows: EventRows) => Effect.Effect<RunEvent[], RuntimeUnavailable, never>
+} = (self: EventRows | ExecutableManifest, manifest?: ExecutableManifest): any => {
+  if (manifest === undefined) return (rows: EventRows) => decodePersistedEvents(rows, self as ExecutableManifest)
+  const rows = self as EventRows
+  return Effect.forEach(rows, (row) =>
     Effect.try({
       try: () => {
         const event = decodeEvent(row.event_json)
@@ -145,9 +150,14 @@ export const decodePersistedEvents = (rows: ReadonlyArray<EventRow>, manifest: E
         RuntimeUnavailable.make({ message: `invalid persisted Run event ${row.event_id}: ${String(error)}` }),
     }),
   )
-
-export const loadEventsAfter = (runId: string, cursor: number) =>
-  Effect.gen(function* () {
+}
+export const loadEventsAfter: {
+  (runId: string, cursor: number): Effect.Effect<RunEvent[], RuntimeUnavailable | SqlError, SqlClient.SqlClient>
+  (cursor: number): (runId: string) => Effect.Effect<RunEvent[], RuntimeUnavailable | SqlError, SqlClient.SqlClient>
+} = (runIdOrCursor: string | number, cursor?: number): any => {
+  if (cursor === undefined) return (runId: string) => loadEventsAfter(runId, runIdOrCursor as number)
+  const runId = runIdOrCursor as string
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* loadRun(runId)
     if (run === undefined) return []
@@ -158,9 +168,16 @@ export const loadEventsAfter = (runId: string, cursor: number) =>
     `
     return yield* decodePersistedEvents(rows, run.executableManifest)
   })
+}
 
-export const loadRunWait = (runId: string, waitId?: string) =>
-  Effect.gen(function* () {
+export const loadRunWait: {
+  (runId: string, waitId?: string): Effect.Effect<RunWait | undefined, SqlError, SqlClient.SqlClient>
+  (waitId?: string): (runId: string) => Effect.Effect<RunWait | undefined, SqlError, SqlClient.SqlClient>
+} = (...args: [string?, string?]): any => {
+  const [runIdOrWaitId, waitId] = args
+  if (args.length < 2) return (runId: string) => loadRunWait(runId, runIdOrWaitId)
+  const runId = runIdOrWaitId as string
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows =
       waitId === undefined
@@ -180,57 +197,79 @@ export const loadRunWait = (runId: string, waitId?: string) =>
       ...(closedAt === undefined ? {} : { closedAt }),
     } satisfies RunWait
   })
-
+}
 export type EventPartial = { readonly _tag: string } & Record<string, unknown>
-
-export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    const sequence = run.lastSequence + 1
-    const occurredAt = yield* nowIso
-    const event = {
-      specVersion: "1" as const,
-      eventId: eventIdFor(run.runId, sequence),
-      runId: run.runId,
-      sequence,
-      executableRef: run.executableRef,
-      rootRunId: run.rootRunId,
-      occurredAt,
-      ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
-      ...(run.message.causationId === undefined ? {} : { causationId: run.message.causationId }),
-      ...(run.message.correlationId === undefined ? {} : { correlationId: run.message.correlationId }),
-      ...(run.attempt > 0 ? { attemptId: `${run.runId}:attempt:${run.attempt}` } : {}),
-      ...partial,
-    } as RunEvent
-    yield* sql`
+type EventRows = ReadonlyArray<EventRow>
+type EventEffect = Effect.Effect<RunEvent, SqlError, SqlClient.SqlClient>
+type TerminalEffect = Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient>
+export const appendEvent: {
+  (run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus): (hub: EventHub) => EventEffect
+  (hub: EventHub, run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus): EventEffect
+} = (
+  hubOrRun: EventHub | DecodedRun,
+  runOrPartial?: DecodedRun | EventPartial,
+  partialOrNextStatus?: EventPartial | RunStatus,
+  nextStatus?: RunStatus,
+): any => {
+  if (partialOrNextStatus === undefined && nextStatus === undefined) {
+    return (hub: EventHub) => appendEvent(hub, hubOrRun as DecodedRun, runOrPartial as EventPartial)
+  }
+  if ("publish" in hubOrRun) {
+    const hub = hubOrRun
+    const run = runOrPartial as DecodedRun
+    const partial = partialOrNextStatus as EventPartial
+    return Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const sequence = run.lastSequence + 1
+      const occurredAt = yield* nowIso
+      const event = {
+        specVersion: "1" as const,
+        eventId: eventIdFor(run.runId, sequence),
+        runId: run.runId,
+        sequence,
+        executableRef: run.executableRef,
+        rootRunId: run.rootRunId,
+        occurredAt,
+        ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
+        ...(run.message.causationId === undefined ? {} : { causationId: run.message.causationId }),
+        ...(run.message.correlationId === undefined ? {} : { correlationId: run.message.correlationId }),
+        ...(run.attempt > 0 ? { attemptId: `${run.runId}:attempt:${run.attempt}` } : {}),
+        ...partial,
+      } as RunEvent
+      yield* sql`
       INSERT INTO baton_run_events (run_id, sequence, event_id, event_json)
       VALUES (${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)})
     `
-    yield* sql`UPDATE baton_tree_roots SET last_position = last_position + 1 WHERE root_run_id = ${run.rootRunId}`
-    const treeRoot = (yield* sql<{ last_position: number }>`
+      yield* sql`UPDATE baton_tree_roots SET last_position = last_position + 1 WHERE root_run_id = ${run.rootRunId}`
+      const treeRoot = (yield* sql<{ last_position: number }>`
       SELECT last_position FROM baton_tree_roots WHERE root_run_id = ${run.rootRunId}
     `)[0]!
-    yield* sql`
+      yield* sql`
       INSERT INTO baton_tree_event_index (root_run_id, position, run_id, run_sequence, event_id)
       VALUES (${run.rootRunId}, ${Number(treeRoot.last_position)}, ${run.runId}, ${sequence}, ${event.eventId})
     `
-    const status = nextStatus ?? run.status
-    const activeWaitId =
-      event._tag === "RunWaiting" ? event.wait.waitId : event._tag === "RunResumed" ? null : (run.activeWaitId ?? null)
-    const terminalEventId =
-      event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
-        ? event.eventId
-        : (run.terminalEventId ?? null)
-    const cancellationRequested = event._tag === "RunCancellationRequested" || run.cancellationRequested
-    const cancelReason =
-      event._tag === "RunCancellationRequested" && "reason" in event && typeof event.reason === "string"
-        ? event.reason
-        : (run.cancelReason ?? null)
-    const attempt = event._tag === "RunAttemptStarted" ? event.attempt : run.attempt
-    const updated = yield* nowIso
-    const terminalPartial = event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
-    if (terminalPartial) {
-      yield* sql`
+      const status = nextStatus ?? run.status
+      const activeWaitId =
+        event._tag === "RunWaiting"
+          ? event.wait.waitId
+          : event._tag === "RunResumed"
+            ? null
+            : (run.activeWaitId ?? null)
+      const terminalEventId =
+        event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
+          ? event.eventId
+          : (run.terminalEventId ?? null)
+      const cancellationRequested = event._tag === "RunCancellationRequested" || run.cancellationRequested
+      const cancelReason =
+        event._tag === "RunCancellationRequested" && "reason" in event && typeof event.reason === "string"
+          ? event.reason
+          : (run.cancelReason ?? null)
+      const attempt = event._tag === "RunAttemptStarted" ? event.attempt : run.attempt
+      const updated = yield* nowIso
+      const terminalPartial =
+        event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
+      if (terminalPartial) {
+        yield* sql`
         UPDATE baton_runs SET
           status = ${status},
           last_sequence = ${sequence},
@@ -246,8 +285,8 @@ export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartia
           AND last_sequence = ${run.lastSequence}
           AND status NOT IN ('succeeded', 'failed', 'cancelled')
       `
-    } else {
-      yield* sql`
+      } else {
+        yield* sql`
         UPDATE baton_runs SET
           status = ${status},
           last_sequence = ${sequence},
@@ -260,13 +299,22 @@ export const appendEvent = (hub: EventHub, run: DecodedRun, partial: EventPartia
         WHERE run_id = ${run.runId}
           AND last_sequence = ${run.lastSequence}
       `
-    }
-    yield* hub.publish(run.runId, event)
-    return event
-  })
+      }
+      yield* hub.publish(run.runId, event)
+      return event
+    })
+  }
+  return (hub: EventHub) =>
+    appendEvent(hub, hubOrRun as DecodedRun, runOrPartial as EventPartial, partialOrNextStatus as RunStatus)
+}
 
-export const promoteHead = (hub: EventHub, address: string, sessionId: string) =>
-  Effect.gen(function* () {
+export const promoteHead: {
+  (hub: EventHub, address: string, sessionId: string): TerminalEffect
+  (address: string, sessionId: string): (hub: EventHub) => TerminalEffect
+} = (hubOrAddress: EventHub | string, address?: string, sessionId?: string): any => {
+  if (sessionId === undefined) return (hub: EventHub) => promoteHead(hub, hubOrAddress as string, address as string)
+  const hub = hubOrAddress as EventHub
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ queue_json: string }>`
       SELECT queue_json FROM baton_lanes WHERE address = ${address} AND session_id = ${sessionId}
@@ -282,9 +330,15 @@ export const promoteHead = (hub: EventHub, address: string, sessionId: string) =
     yield* sql`UPDATE baton_runs SET attempt_fence = ${attempt} WHERE run_id = ${headId} AND attempt_fence = ${head.attemptFence}`
     yield* appendEvent(hub, { ...head, attempt }, { _tag: "RunAttemptStarted", attempt }, "running")
   })
+}
 
-export const removeFromLane = (address: string, sessionId: string, runId: string) =>
-  Effect.gen(function* () {
+export const removeFromLane: {
+  (address: string, sessionId: string, runId: string): Effect.Effect<void, SqlError, SqlClient.SqlClient>
+  (sessionId: string, runId: string): (address: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
+} = (addressOrSessionId: string, sessionId?: string, runId?: string): any => {
+  if (runId === undefined) return (address: string) => removeFromLane(address, addressOrSessionId, sessionId as string)
+  const address = addressOrSessionId
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ queue_json: string; accepted_sequence: number }>`
       SELECT queue_json, accepted_sequence FROM baton_lanes WHERE address = ${address} AND session_id = ${sessionId}
@@ -301,12 +355,19 @@ export const removeFromLane = (address: string, sessionId: string, runId: string
       `
     }
   })
+}
 
-export const afterTerminal = (hub: EventHub, run: DecodedRun) =>
-  Effect.gen(function* () {
+export const afterTerminal: {
+  (run: DecodedRun): (hub: EventHub) => Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient>
+  (hub: EventHub, run: DecodedRun): Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient>
+} = (hubOrRun: EventHub | DecodedRun, run?: DecodedRun): any => {
+  if (run === undefined) return (hub: EventHub) => afterTerminal(hub, hubOrRun as DecodedRun)
+  const hub = hubOrRun as EventHub
+  return Effect.gen(function* () {
     yield* removeFromLane(run.address, run.sessionId, run.runId)
     yield* promoteHead(hub, run.address, run.sessionId)
   })
+}
 
 /** A Run stays non-terminal while it still owns unsettled children. */
 export const hasUnsettledChild = (
@@ -324,12 +385,15 @@ export const hasUnsettledChild = (
     return pending.length > 0
   })
 
-export const settleParent = (
-  hub: EventHub,
-  child: DecodedRun,
-  terminalEventId: string,
-): Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient> =>
-  Effect.gen(function* () {
+export const settleParent: {
+  (hub: EventHub, child: DecodedRun, terminalEventId: string): TerminalEffect
+  (child: DecodedRun, terminalEventId: string): (hub: EventHub) => TerminalEffect
+} = (hubChild: EventHub | DecodedRun, maybeChild?: DecodedRun | string, maybeTerminalEventId?: string): any => {
+  if (typeof maybeChild === "string") return (hub: EventHub) => settleParent(hub, hubChild as DecodedRun, maybeChild)
+  const hub = hubChild as EventHub
+  const child = maybeChild as DecodedRun
+  const terminalEventId = maybeTerminalEventId as string
+  return Effect.gen(function* () {
     if (child.parentRunId === undefined) return
     const sql = yield* SqlClient.SqlClient
     const parent = yield* loadRun(child.parentRunId)
@@ -379,6 +443,7 @@ export const settleParent = (
     yield* settleParent(hub, settledParent, cancelled.eventId)
     yield* afterTerminal(hub, settledParent)
   })
+}
 
 export const insertRun = (input: {
   readonly runId: string

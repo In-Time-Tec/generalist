@@ -1,4 +1,4 @@
-import { Clock, Effect, Random } from "effect"
+import { Clock, Effect, Function, Random } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
@@ -6,7 +6,7 @@ import { ExecutionCheckpoint } from "../execution-state.js"
 import { Prompt } from "effect/unstable/ai"
 import type { RecordOperationInput } from "../run-store.js"
 import { decodeJson, encodeExecutableRef, encodeJson, encodeJsonValue } from "./codecs.js"
-import { canBlindRetry } from "./operations.js"
+import { canBlindRetry, type OperationRecord } from "./operations.js"
 import type { OperationRow } from "./rows.js"
 import { appendEvent, loadRun, nowIso, toOperationRecord } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
@@ -14,6 +14,7 @@ import { encodeContinuation } from "../steering.js"
 import { checkpointRef } from "../executable-manifest.js"
 
 import { OperationResolution, digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 
 const nextId = (prefix: string): Effect.Effect<string> =>
   Effect.gen(function* () {
@@ -32,7 +33,37 @@ const requireRun = (runId: string) =>
     Effect.flatMap((run) => (run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run))),
   )
 
-export const recordOperation = (hub: EventHub, input: RecordOperationInput) =>
+type CompleteOperationInput = {
+  readonly runId: string
+  readonly operationId: string
+  readonly outcome: import("../run-store.js").OperationCompletionOutcome
+  readonly checkpoint: import("../execution-state.js").ExecutionCheckpoint
+  readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
+  readonly continuation?: import("../steering.js").ExecutionContinuation | null
+  readonly steeringEntryIds?: ReadonlyArray<string>
+}
+type OperationEffect = Effect.Effect<
+  OperationRecord,
+  RunNotFound | RunTerminal | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+type CompleteEffect = Effect.Effect<OperationRecord, RunNotFound | RuntimeUnavailable | SqlError, SqlClient.SqlClient>
+type ExpireEffect = Effect.Effect<
+  | { record: OperationRecord; outcome: "failed" | "requested" | "succeeded" | "unknown" }
+  | { record: OperationRecord; outcome: "retried" },
+  RunNotFound | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+type ResolveOperationEffect = Effect.Effect<
+  undefined,
+  OperationResolutionConflict | RunNotFound | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+
+export const recordOperation: {
+  (input: RecordOperationInput): (hub: EventHub) => OperationEffect
+  (hub: EventHub, input: RecordOperationInput): OperationEffect
+} = Function.dual(2, (hub: EventHub, input: RecordOperationInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
@@ -104,7 +135,8 @@ export const recordOperation = (hub: EventHub, input: RecordOperationInput) =>
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${operationId}
     `
     return toOperationRecord(rows[0]!)
-  })
+  }),
+)
 
 export const startOperation = (input: { readonly runId: string; readonly operationId: string }) =>
   Effect.gen(function* () {
@@ -125,18 +157,10 @@ export const startOperation = (input: { readonly runId: string; readonly operati
     return toOperationRecord(row)
   })
 
-export const completeOperation = (
-  hub: EventHub,
-  input: {
-    readonly runId: string
-    readonly operationId: string
-    readonly outcome: import("../run-store.js").OperationCompletionOutcome
-    readonly checkpoint: import("../execution-state.js").ExecutionCheckpoint
-    readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
-    readonly continuation?: import("../steering.js").ExecutionContinuation | null
-    readonly steeringEntryIds?: ReadonlyArray<string>
-  },
-) =>
+export const completeOperation: {
+  (input: CompleteOperationInput): (hub: EventHub) => CompleteEffect
+  (hub: EventHub, input: CompleteOperationInput): CompleteEffect
+} = Function.dual(2, (hub: EventHub, input: CompleteOperationInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
@@ -207,12 +231,13 @@ export const completeOperation = (
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     return toOperationRecord(row)
-  })
+  }),
+)
 
-export const expireRunningOperation = (
-  hub: EventHub,
-  input: { readonly runId: string; readonly operationId: string },
-) =>
+export const expireRunningOperation: {
+  (input: { readonly runId: string; readonly operationId: string }): (hub: EventHub) => ExpireEffect
+  (hub: EventHub, input: { readonly runId: string; readonly operationId: string }): ExpireEffect
+} = Function.dual(2, (hub: EventHub, input: { readonly runId: string; readonly operationId: string }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
@@ -245,7 +270,8 @@ export const expireRunningOperation = (
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     return { record: toOperationRecord(next[0]!), outcome: "unknown" as const }
-  })
+  }),
+)
 
 export const getOperation = (input: { readonly runId: string; readonly operationId: string }) =>
   Effect.gen(function* () {
@@ -269,12 +295,26 @@ export const getOperationByKey = (input: { readonly runId: string; readonly oper
     return rows[0] === undefined ? undefined : toOperationRecord(rows[0])
   })
 
-export const resolveOperation = (
-  input: ResolveOperationInput,
-  claimableStatus: "queued" | "running" = "queued",
-  clearLease = false,
-) =>
-  Effect.gen(function* () {
+export const resolveOperation: {
+  (input: ResolveOperationInput, claimableStatus?: "queued" | "running", clearLease?: boolean): ResolveOperationEffect
+  (
+    claimableStatus?: "queued" | "running",
+    clearLease?: boolean,
+  ): (input: ResolveOperationInput) => ResolveOperationEffect
+} = (
+  inputOrClaimable?: ResolveOperationInput | string,
+  maybeClaimable?: "queued" | "running" | boolean,
+  maybeClearLease?: boolean,
+): any => {
+  if (typeof inputOrClaimable === "string") {
+    const claimableStatus = inputOrClaimable as "queued" | "running"
+    const clearLease = maybeClaimable as boolean
+    return (input: ResolveOperationInput) => resolveOperation(input, claimableStatus, clearLease)
+  }
+  const input = inputOrClaimable as ResolveOperationInput
+  const claimableStatus = maybeClaimable
+  const clearLease = maybeClearLease ?? false
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     const rows = yield* sql<OperationRow>`
@@ -335,3 +375,4 @@ export const resolveOperation = (
       `
     }
   })
+}
