@@ -1,4 +1,3 @@
-import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
@@ -25,7 +24,7 @@ const unusedExecutor = ToolExecutor.layerTest({
 
 const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text", delta })
 
-layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime, layerHandoffCatalogTest))("Session fencing", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fencing", (it) => {
   ItLayer.make(it, "forwards the session owner token on every message append", () => {
     const appendOptions: Array<Session.AppendOptions | undefined> = []
     const capturingSession = Layer.effect(

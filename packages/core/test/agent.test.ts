@@ -1,5 +1,3 @@
-import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
-import { HandoffCatalog } from "../src/policy/handoff-target.js"
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
 import {
@@ -185,54 +183,54 @@ const agentRequirementProofs: ReadonlyArray<true> = [
     >
   >,
   true satisfies Assert<
-    Equal<EffectRequirements<typeof memoryRequiredRun>, LanguageModel.LanguageModel | Memory.Memory | HandoffCatalog>
+    Equal<EffectRequirements<typeof memoryRequiredRun>, LanguageModel.LanguageModel | Memory.Memory>
   >,
   true satisfies Assert<
-    Equal<EffectRequirements<typeof runMemoryRequired>, LanguageModel.LanguageModel | Memory.Memory | HandoffCatalog>
+    Equal<EffectRequirements<typeof runMemoryRequired>, LanguageModel.LanguageModel | Memory.Memory>
   >,
-  true satisfies Assert<Equal<StreamRequirements<typeof plainStreamRequired>, LanguageModel.LanguageModel | HandoffCatalog>>,
-  true satisfies Assert<Equal<EffectRequirements<typeof plainGenerateRequired>, LanguageModel.LanguageModel | HandoffCatalog>>,
+  true satisfies Assert<Equal<StreamRequirements<typeof plainStreamRequired>, LanguageModel.LanguageModel>>,
+  true satisfies Assert<Equal<EffectRequirements<typeof plainGenerateRequired>, LanguageModel.LanguageModel>>,
   true satisfies Assert<Equal<EffectSuccess<typeof plainGenerateRequired>, Agent.Result>>,
   true satisfies Assert<
-    Equal<StreamRequirements<typeof persistedRequired>, LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime | HandoffCatalog>
+    Equal<StreamRequirements<typeof persistedRequired>, LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime>
   >,
   true satisfies Assert<
     Equal<
       EffectRequirements<typeof generatedPersistedRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime | HandoffCatalog
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
     >
   >,
   true satisfies Assert<
     Equal<
       StreamRequirements<typeof persistedObjectRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime | HandoffCatalog
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
     >
   >,
   true satisfies Assert<
     Equal<
       EffectRequirements<typeof generatedPersistedObjectRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime | HandoffCatalog
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
     >
   >,
-  true satisfies Assert<Equal<StreamRequirements<typeof runBoundaryModelProvided>, Memory.Memory | ModelDependency | HandoffCatalog>>,
+  true satisfies Assert<Equal<StreamRequirements<typeof runBoundaryModelProvided>, Memory.Memory | ModelDependency>>,
   true satisfies Assert<
-    Equal<StreamRequirements<typeof decodingRequired>, LanguageModel.LanguageModel | SchemaDependency | HandoffCatalog>
+    Equal<StreamRequirements<typeof decodingRequired>, LanguageModel.LanguageModel | SchemaDependency>
   >,
   true satisfies Assert<
-    Equal<EffectRequirements<typeof decodingGenerated>, LanguageModel.LanguageModel | SchemaDependency | HandoffCatalog>
+    Equal<EffectRequirements<typeof decodingGenerated>, LanguageModel.LanguageModel | SchemaDependency>
   >,
   true satisfies Assert<Equal<EffectSuccess<typeof decodingGenerated>, Agent.ObjectResult<{ readonly value: string }>>>,
   true satisfies Assert<
     Equal<
       StreamRequirements<typeof optionalPersistenceRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime | HandoffCatalog
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
     >
   >,
   true satisfies Assert<
-    Equal<StreamRequirements<typeof optionalOutputRequired>, LanguageModel.LanguageModel | SchemaDependency | HandoffCatalog>
+    Equal<StreamRequirements<typeof optionalOutputRequired>, LanguageModel.LanguageModel | SchemaDependency>
   >,
   true satisfies Assert<
-    Equal<EffectRequirements<typeof optionalOutputGenerated>, LanguageModel.LanguageModel | SchemaDependency | HandoffCatalog>
+    Equal<EffectRequirements<typeof optionalOutputGenerated>, LanguageModel.LanguageModel | SchemaDependency>
   >,
   true satisfies Assert<
     Equal<EffectSuccess<typeof optionalOutputGenerated>, Agent.Result | Agent.ObjectResult<{ readonly value: string }>>
@@ -246,11 +244,11 @@ const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<
     Equal<
       StreamRequirements<typeof curriedPersistenceRequired>,
-      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime | HandoffCatalog
+      LanguageModel.LanguageModel | Chat.Persistence | Agent.Runtime
     >
   >,
   true satisfies Assert<
-    Equal<EffectRequirements<typeof curriedOutputRequired>, LanguageModel.LanguageModel | SchemaDependency | HandoffCatalog>
+    Equal<EffectRequirements<typeof curriedOutputRequired>, LanguageModel.LanguageModel | SchemaDependency>
   >,
   true satisfies Assert<
     Equal<EffectSuccess<typeof curriedOutputRequired>, Agent.ObjectResult<{ readonly value: string }>>
@@ -314,9 +312,6 @@ const modelLayer = (
       streamText: (options) => withProviderFinish(streamText(options)),
     }),
   )
-
-const unusedModelLayer = modelLayer(() => Stream.make(textDelta("unused")))
-
 
 class Budget extends Context.Service<Budget, { readonly remaining: (turn: number) => number }>()(
   "@batonfx/core/test/agent.test/Budget",
@@ -498,7 +493,7 @@ const retryTransientModelError = ModelResilience.layer({
   classify: (error) => (error === transientModelError ? "transient" : "terminal"),
 })
 
-layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime, layerHandoffCatalogTest, unusedModelLayer))("Agent", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) => {
   expect(agentRequirementProofs.every(Boolean)).toBe(true)
   expect(toolkitRequirementProof).toBe(true)
 

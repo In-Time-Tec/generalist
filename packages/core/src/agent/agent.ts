@@ -27,7 +27,6 @@ import type { InvalidToolCallParameters, ToolJsonSchemaCompilerMissing } from ".
 import { type Key, Memory } from "../context/memory.js"
 import { type LanguageModelNotRegistered, type ModelSelection, ModelRegistry } from "../model/model-registry.js"
 import type { ToolAuthorizer } from "../tools/tool-authorization.js"
-import type { HandoffCatalog } from "../policy/handoff-target.js"
 import { ToolContext } from "../tools/tool-context.js"
 import { FrameworkFailure } from "../tools/tool-executor.js"
 import { HandoffLimitExceeded, HandoffRequirementsMissing, HandoffTargetMissing } from "./handoff-state.js"
@@ -357,21 +356,10 @@ export interface ObjectResult<A> extends Result {
 type SchemaFromOutput<Output> = Output extends { readonly schema: infer S extends ObjectSchema } ? S : never
 type SchemaOf<O> = SchemaFromOutput<PresentOption<O, "output">>
 type PersistenceRequirement<O> = [PresentOption<O, "persistence">] extends [never] ? never : Chat.Persistence | Runtime
-type OutputRequirement<O> = [SchemaOf<O>] extends [never]
-  ? never
-  : [unknown] extends [SchemaOf<O>["DecodingServices"]]
-    ? never
-    : SchemaOf<O>["DecodingServices"]
+type OutputRequirement<O> = [SchemaOf<O>] extends [never] ? never : SchemaOf<O>["DecodingServices"]
 
 /** @experimental Services required by one run option set. */
-export type RunRequirements<Tools extends Record<string, Tool.Any>, R, O> =
-  | R
-  | LanguageModel.LanguageModel
-  | StaticToolServices<Tools>
-  | OperationRequirements<O>
-  | PersistenceRequirement<O>
-  | OutputRequirement<O>
-  | HandoffCatalog
+export type RunRequirements<R, O> = R | OperationRequirements<O> | PersistenceRequirement<O> | OutputRequirement<O>
 
 /** @experimental Result selected by one run option set. */
 export type RunResult<O> = O extends unknown
@@ -388,11 +376,11 @@ export const stream: {
     options: O,
   ): <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent<Tools, R>,
-  ) => Stream.Stream<Event, RunError, RunRequirements<Tools, R, O>>
+  ) => Stream.Stream<Event, RunError, RunRequirements<R, O>>
   <Tools extends Record<string, Tool.Any>, R, O extends RunOptions>(
     agent: Agent<Tools, R>,
     options: O,
-  ): Stream.Stream<Event, RunError, RunRequirements<Tools, R, O>>
+  ): Stream.Stream<Event, RunError, RunRequirements<R, O>>
 } = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
   streamInternal(
     agent,
@@ -467,11 +455,11 @@ export const generate: {
     options: O,
   ): <Tools extends Record<string, Tool.Any>, R>(
     agent: Agent<Tools, R>,
-  ) => Effect.Effect<RunResult<O>, RunError, RunRequirements<Tools, R, O>>
+  ) => Effect.Effect<RunResult<O>, RunError, RunRequirements<R, O>>
   <Tools extends Record<string, Tool.Any>, R, O extends RunOptions>(
     agent: Agent<Tools, R>,
     options: O,
-  ): Effect.Effect<RunResult<O>, RunError, RunRequirements<Tools, R, O>>
+  ): Effect.Effect<RunResult<O>, RunError, RunRequirements<R, O>>
 } = dual(2, <Tools extends Record<string, Tool.Any>, R>(agent: Agent<Tools, R>, options: RunOptions) =>
   options.output === undefined
     ? generateText(agent, options)

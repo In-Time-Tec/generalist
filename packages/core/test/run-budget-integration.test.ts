@@ -1,4 +1,3 @@
-import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { DateTime, Deferred, Effect, Layer, Option, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -104,7 +103,6 @@ const baseLayers = (journalLayer: Layer.Layer<DurableDriver.DriverJournalService
     Approvals.layerAutoApprove,
     journalLayer,
     unusedToolHandlerLayer,
-    layerHandoffCatalogTest,
   )
 
 describe("RunBudget Agent.stream integration", () => {
@@ -142,7 +140,6 @@ describe("RunBudget Agent.stream integration", () => {
           }),
         ),
         unusedToolHandlerLayer,
-        layerHandoffCatalogTest,
       ),
     )("fails typed at schedule boundary when model calls are exhausted", (it) => {
       it.effect("fails when model calls are exhausted", () =>
@@ -202,7 +199,6 @@ describe("RunBudget Agent.stream integration", () => {
         ),
         capture.journalLayer,
         unusedToolHandlerLayer,
-        layerHandoffCatalogTest,
       ),
     )("charges reported token usage after model finish", (it) => {
       it.effect("charges reported token usage", () =>
@@ -230,7 +226,6 @@ describe("RunBudget Agent.stream integration", () => {
           }),
         ),
         unusedToolHandlerLayer,
-        layerHandoffCatalogTest,
       ),
     )("fails typed when deadline expires at schedule boundary", (it) => {
       it.effect("fails when the deadline expires", () =>
@@ -265,7 +260,6 @@ describe("RunBudget Agent.stream integration", () => {
         ),
         capture.journalLayer,
         unusedToolHandlerLayer,
-        layerHandoffCatalogTest,
       ),
     )("narrows per-run budget below agent default", (it) => {
       it.effect("narrows the per-run budget", () =>
@@ -322,7 +316,6 @@ describe("RunBudget Agent.stream integration", () => {
         Approvals.layerAutoApprove,
         capture.journalLayer,
         unusedToolHandlerLayer,
-        layerHandoffCatalogTest,
       ),
     )("reserves and refunds child agent-tool budget without widening", (it) => {
       it.effect("reserves and refunds child agent-tool budget without widening", () =>
@@ -378,7 +371,6 @@ describe("RunBudget Agent.stream integration", () => {
             }),
         }),
         Approvals.layerAutoApprove,
-        layerHandoffCatalogTest,
       ),
     )("auto-approves gated tools only with explicit layerAutoApprove", (it) => {
       it.effect("auto-approves gated tools", () =>
@@ -415,7 +407,6 @@ describe("RunBudget Agent.stream integration", () => {
         capture.journalLayer,
         Agent.layerRuntime,
         unusedToolHandlerLayer,
-        layerHandoffCatalogTest,
       ),
     )("records session sync operation keys", (it) => {
       it.effect("records session sync operation keys", () =>
@@ -471,7 +462,6 @@ describe("RunBudget Agent.stream integration", () => {
         Toolkit.make(gatedTool).toLayer({ gated: () => Effect.succeed({ ok: true }) }),
         Approvals.layerTest({ resolve: () => Deferred.await(approval) }),
         unusedToolHandlerLayer,
-        layerHandoffCatalogTest,
       ),
     )("rejects resume when driver suspension token does not match", (it) => {
       it.effect("rejects a stale suspension token", () =>
