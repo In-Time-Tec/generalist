@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect"
 import { Chat, Prompt } from "effect/unstable/ai"
 import { SessionStore, buildContext } from "../context/session.js"
+import type { Event as ModelTelemetryEvent } from "../model/model-telemetry.js"
 import { withSystem } from "./agent-message.js"
 
 /**
@@ -52,3 +53,25 @@ export const initialChat = (input: {
     ? Chat.empty
     : Chat.fromPrompt([Prompt.makeMessage("system", { content: input.system })])
 }
+
+/**
+ * @experimental Reopen the delivery outbox for a recovered checkpoint.
+ *
+ * Checkpoint telemetry was already observed live and recorded by the host. Restoring it lets an
+ * unacknowledged batch be retried, but re-emitting it would replay events the run log already holds
+ * and read as a conflicting model call.
+ */
+export const restoreCheckpointTelemetry = (
+  session: typeof SessionStore.Service,
+  undelivered: Array<ModelTelemetryEvent>,
+): Effect.Effect<void, import("../context/session.js").SessionStoreError> =>
+  session.path().pipe(
+    Effect.map((path) => path.findLast((entry) => entry._tag === "Compaction")),
+    Effect.map((checkpoint) => {
+      if (checkpoint?._tag !== "Compaction") return
+      for (const event of checkpoint.telemetry) {
+        if (undelivered.some((current) => current.deliveryId === event.deliveryId)) continue
+        undelivered.push(event)
+      }
+    }),
+  )
