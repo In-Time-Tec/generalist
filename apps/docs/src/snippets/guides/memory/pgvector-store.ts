@@ -8,7 +8,7 @@ interface PgClientInterface {
   ) => Effect.Effect<ReadonlyArray<Record<string, unknown>>, Error>
 }
 
-class PgClient extends Context.Service<PgClient, PgClientInterface>()("app/PgClient") {}
+class PgClient extends Context.Service<PgClient, PgClientInterface>()("@batonfx/docs/snippets/guides/memory/pgvector-store/PgClient") {}
 
 const storeError = (error: Error) => VectorStore.VectorStoreError.make({ message: error.message })
 

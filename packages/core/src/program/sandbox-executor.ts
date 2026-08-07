@@ -57,7 +57,7 @@ export interface Interface {
 }
 
 /** @experimental Host-supplied isolated source executor. Baton does not provide a production implementation. */
-export class SandboxExecutor extends Context.Service<SandboxExecutor, Interface>()("@batonfx/core/SandboxExecutor") {}
+export class SandboxExecutor extends Context.Service<SandboxExecutor, Interface>()("@batonfx/core/program/sandbox-executor/SandboxExecutor") {}
 
 /** @experimental Identity carried by trusted fixture executors. No production host may claim it. */
 export const testIdentity: Identity = Object.freeze({

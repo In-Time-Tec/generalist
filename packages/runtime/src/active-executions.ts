@@ -14,7 +14,7 @@ interface ActiveExecution {
 }
 
 export class ActiveExecutions extends Context.Service<ActiveExecutions, Interface>()(
-  "@batonfx/runtime/ActiveExecutions",
+  "@batonfx/runtime/active-executions/ActiveExecutions",
 ) {}
 
 export const layer: Layer.Layer<ActiveExecutions> = Layer.effect(

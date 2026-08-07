@@ -400,4 +400,4 @@ export interface Interface {
   ) => Effect.Effect<ProgramOperationRecord, WorkerMutationError | ProgramStoreFailure>
 }
 
-export class RunStore extends Context.Service<RunStore, Interface>()("@batonfx/runtime/RunStore") {}
+export class RunStore extends Context.Service<RunStore, Interface>()("@batonfx/runtime/run-store/RunStore") {}

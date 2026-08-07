@@ -66,7 +66,7 @@ export interface DriverJournal {
 
 /** @experimental Optional host journal service merged into Agent.stream driver layers. */
 export class DriverJournalService extends Context.Service<DriverJournalService, DriverJournal>()(
-  "@batonfx/core/DriverJournal",
+  "@batonfx/core/durable/driver-interpreter/DriverJournalService",
 ) {}
 
 /** @experimental Inline interpreter executing driver operations through Effect services. */
@@ -108,7 +108,7 @@ export class DriverUnknownReplay extends Schema.TaggedErrorClass<DriverUnknownRe
 
 /** @experimental */
 export class DriverInterpreter extends Context.Service<DriverInterpreter, Interface>()(
-  "@batonfx/core/DriverInterpreter",
+  "@batonfx/core/durable/driver-interpreter/DriverInterpreter",
 ) {}
 
 const noopJournal: DriverJournal = {

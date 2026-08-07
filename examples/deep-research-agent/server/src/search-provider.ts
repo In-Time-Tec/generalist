@@ -113,7 +113,7 @@ export interface Interface {
 
 /** @experimental */
 export class Service extends Context.Service<Service, Interface>()(
-  "@batonfx/example-deep-research-agent/SearchProvider",
+  "@batonfx/example-deep-research-agent-server/search-provider/Service",
 ) {}
 
 const exaSearchBody = (query: string) => ({

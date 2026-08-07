@@ -193,7 +193,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ModelRegistry extends Context.Service<ModelRegistry, Interface>()("@batonfx/core/ModelRegistry") {}
+export class ModelRegistry extends Context.Service<ModelRegistry, Interface>()("@batonfx/core/model/model-registry/ModelRegistry") {}
 
 /** @experimental */
 export type ModelEnvironment = LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName

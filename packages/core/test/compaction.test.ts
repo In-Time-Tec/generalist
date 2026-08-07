@@ -193,7 +193,7 @@ describe("Compaction", () => {
       Object.defineProperty(firstSubclass, "toJSON", { value: () => ["constant"] })
       Object.defineProperty(secondSubclass, "toJSON", { value: () => ["constant"] })
       expect(firstSubclass[0]).not.toBe(secondSubclass[0])
-      expect(Equal.equals(firstSubclass, secondSubclass)).toBe(true)
+      expect(Schema.encodeSync(Schema.UnknownFromJsonString)(firstSubclass)).toBe(Schema.encodeSync(Schema.UnknownFromJsonString)(secondSubclass))
       const values = [
         [undefined, () => undefined],
         [Number.NaN, Number.POSITIVE_INFINITY],

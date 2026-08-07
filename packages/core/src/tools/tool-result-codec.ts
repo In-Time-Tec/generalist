@@ -19,7 +19,7 @@ const schemaMessage = (error: unknown): string =>
 const frameworkFailure = (stage: FrameworkStage, tool: string, error: unknown): FrameworkFailure =>
   FrameworkFailure.make({ stage, tool, message: schemaMessage(error) })
 
-class SchemaServicesContext extends Context.Service<SchemaServicesContext, unknown>()("@batonfx/core/SchemaServices") {}
+class SchemaServicesContext extends Context.Service<SchemaServicesContext, unknown>()("@batonfx/core/tools/tool-result-codec/SchemaServicesContext") {}
 const schemaServicesContext = Context.make<unknown, unknown>(SchemaServicesContext, undefined)
 
 export type SchemaTool = {

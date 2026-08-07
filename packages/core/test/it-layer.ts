@@ -1,5 +1,5 @@
 import type { Vitest } from "@effect/vitest"
-import type { Effect, Layer, Scope } from "effect"
+import type { Effect, Layer } from "effect"
 
 export const ItLayer = {
   make: <R, R2, E, A, E2>(

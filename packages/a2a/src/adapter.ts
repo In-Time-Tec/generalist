@@ -103,6 +103,20 @@ const makeTaskStore = (runtime: Runtime.Interface): TaskStore => ({
   },
 })
 
+const toAsyncGenerator = <A>(iterable: AsyncIterable<A>): AsyncGenerator<A, void, undefined> => {
+  const iterator = iterable[Symbol.asyncIterator]()
+  return {
+    [Symbol.asyncIterator]() {
+      return this
+    },
+    next: () => iterator.next(),
+    return: (value) => (iterator.return === undefined ? Promise.resolve({ done: true, value }) : iterator.return(value)),
+    throw: (error) => (iterator.throw === undefined ? Promise.reject(error) : iterator.throw(error)),
+    [Symbol.asyncDispose]: () =>
+      iterator.return === undefined ? Promise.resolve() : iterator.return(undefined).then(() => undefined),
+  }
+}
+
 const isBoundary = (event: RunEvent.RunEvent): boolean =>
   event._tag === "RunWaiting" ||
   event._tag === "RunCompleted" ||
@@ -252,11 +266,13 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     context: ServerCallContext,
   ): AsyncGenerator<StreamResponse, void, undefined> {
     const stream = () => super.sendMessageStream(params, context)
-    return Stream.toAsyncIterable(
-      Stream.fromEffect(Effect.promise(() => validateRequest(params))).pipe(
-        Stream.flatMap(() => Stream.fromAsyncIterable(stream(), (error): never => { throw error })),
+    return toAsyncGenerator(
+      Stream.toAsyncIterable(
+        Stream.fromEffect(Effect.promise(() => validateRequest(params))).pipe(
+          Stream.flatMap(() => Stream.fromAsyncIterable(stream(), (error): never => { throw error })),
+        ),
       ),
-    ) as AsyncGenerator<StreamResponse, void, undefined>
+    )
   }
 
   override cancelTask(params: CancelTaskRequest, _context: ServerCallContext): Promise<Task> {
@@ -317,14 +333,15 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
         Stream.flatMap((responses) => Stream.fromIterable(responses)),
       )
     }
-    return Stream.toAsyncIterable(
-      Stream.fromEffect(
-        Effect.gen(function* () {
-          const snapshot = yield* runtime.snapshot(params.id)
-          const task = yield* fromRuntime(runtime, params.id)
-          return { snapshot, task }
-        }),
-      ).pipe(
+    return toAsyncGenerator(
+      Stream.toAsyncIterable(
+        Stream.fromEffect(
+          Effect.gen(function* () {
+            const snapshot = yield* runtime.snapshot(params.id)
+            const task = yield* fromRuntime(runtime, params.id)
+            return { snapshot, task }
+          }),
+        ).pipe(
         Stream.flatMap(({ snapshot, task }) => {
           const head = Stream.make({ payload: { $case: "task", value: task } })
           if (
@@ -339,8 +356,9 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
           )
         }),
       ),
-    ) as AsyncGenerator<StreamResponse, void, undefined>
-  }
+    ),
+  )
+}
 }
 
 /** @experimental Construct the SDK handler while keeping Runtime as task authority. */
