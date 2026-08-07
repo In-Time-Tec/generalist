@@ -1,4 +1,4 @@
-import { Effect, Ref } from "effect"
+import { Effect, Function, Ref } from "effect"
 import { Chat } from "effect/unstable/ai"
 import type { AnyToolCall } from "./agent-tool-result.js"
 import type { RunOptions } from "./agent.js"
@@ -51,28 +51,74 @@ export const runHandoffTool = (input: {
     return { _tag: "Success", result: accepted, encodedResult: accepted } satisfies Success
   })
 
-export const handoffDispatch = (
-  request: { readonly turn: number; readonly call: AnyToolCall },
-  registry: Registry,
-  input: {
-    readonly options: RunOptions
-    readonly handoffState: Ref.Ref<HandoffRunState>
-    readonly chat: Chat.Service
-    readonly toolState: Ref.Ref<{
-      readonly registry: Registry
-      readonly activatedSkillBodies: Map<string, string>
-    }>
-    readonly resolvingToolCallIds?: ReadonlyArray<string>
+export const handoffDispatch: {
+  (
+    registry: Registry,
+    input: {
+      readonly options: RunOptions
+      readonly handoffState: Ref.Ref<HandoffRunState>
+      readonly chat: Chat.Service
+      readonly toolState: Ref.Ref<{
+        readonly registry: Registry
+        readonly activatedSkillBodies: Map<string, string>
+      }>
+      readonly resolvingToolCallIds?: ReadonlyArray<string>
+    },
+  ): (request: {
+    readonly turn: number
+    readonly call: AnyToolCall
+  }) =>
+    | Effect.Effect<
+        Outcome,
+        FrameworkFailure | import("./agent.js").RunError,
+        HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+      >
+    | undefined
+  (
+    request: { readonly turn: number; readonly call: AnyToolCall },
+    registry: Registry,
+    input: {
+      readonly options: RunOptions
+      readonly handoffState: Ref.Ref<HandoffRunState>
+      readonly chat: Chat.Service
+      readonly toolState: Ref.Ref<{
+        readonly registry: Registry
+        readonly activatedSkillBodies: Map<string, string>
+      }>
+      readonly resolvingToolCallIds?: ReadonlyArray<string>
+    },
+  ):
+    | Effect.Effect<
+        Outcome,
+        FrameworkFailure | import("./agent.js").RunError,
+        HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+      >
+    | undefined
+} = Function.dual(
+  3,
+  (
+    request: { readonly turn: number; readonly call: AnyToolCall },
+    registry: Registry,
+    input: {
+      readonly options: RunOptions
+      readonly handoffState: Ref.Ref<HandoffRunState>
+      readonly chat: Chat.Service
+      readonly toolState: Ref.Ref<{
+        readonly registry: Registry
+        readonly activatedSkillBodies: Map<string, string>
+      }>
+      readonly resolvingToolCallIds?: ReadonlyArray<string>
+    },
+  ):
+    | Effect.Effect<
+        Outcome,
+        FrameworkFailure | import("./agent.js").RunError,
+        HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+      >
+    | undefined => {
+    const registered = get(registry, request.call.name)
+    return registered?.dispatch === "Handoff"
+      ? runHandoffTool({ turn: request.turn, call: request.call, ...input })
+      : undefined
   },
-):
-  | Effect.Effect<
-      Outcome,
-      FrameworkFailure | import("./agent.js").RunError,
-      HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
-    >
-  | undefined => {
-  const registered = get(registry, request.call.name)
-  return registered?.dispatch === "Handoff"
-    ? runHandoffTool({ turn: request.turn, call: request.call, ...input })
-    : undefined
-}
+)

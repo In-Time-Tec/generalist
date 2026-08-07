@@ -1,4 +1,4 @@
-import type { Layer } from "effect"
+import { Function, type Layer } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { AgentTypeId, type Agent, type ToolDeclaration, type ToolSchedulingPolicy } from "./agent.js"
 import type { BudgetLimits } from "../durable/run-budget.js"
@@ -45,29 +45,51 @@ export interface Closed extends Any {
 }
 
 /** @experimental Close one Agent over the exact environment it requires. */
-export const close = <Tools extends Record<string, Tool.Any>, R>(
-  agent: Agent<Tools, R>,
-  environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,
-): Closed => ({ ...agent, open: (f) => f(agent, environment) })
+export const close: {
+  <Tools extends Record<string, Tool.Any>, R>(
+    environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,
+  ): (agent: Agent<Tools, R>) => Closed
+  <Tools extends Record<string, Tool.Any>, R>(
+    agent: Agent<Tools, R>,
+    environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,
+  ): Closed
+} = Function.dual(
+  2,
+  <Tools extends Record<string, Tool.Any>, R>(
+    agent: Agent<Tools, R>,
+    environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,
+  ): Closed => ({ ...agent, open: (f) => f(agent, environment) }),
+)
 
 /** @experimental Declare additional host-owned tools on an Agent without changing the services it requires. */
-export const withTools = <Tools extends Record<string, Tool.Any>, R>(
-  agent: Agent<Tools, R>,
-  declared: ReadonlyArray<Tool.Any>,
-): Agent<Record<string, Tool.Any>, R> => {
-  const existing: ReadonlyArray<Tool.Any> = Object.values(agent.toolkit.tools)
-  const staticOrigin = (tool: Tool.Any): ToolDeclaration => ({
-    tool,
-    origin: { _tag: "Static", agent: agent.name },
-  })
-  const hosted: ReadonlyArray<Tool.Any> = [...existing, ...declared]
-  return {
-    ...agent,
-    [AgentTypeId]: {
-      tools: (value: Record<string, Tool.Any>) => value,
-      requirements: (value: R) => value,
-    },
-    toolkit: Toolkit.make(...hosted),
-    toolDeclarations: [...(agent.toolDeclarations ?? existing.map(staticOrigin)), ...declared.map(staticOrigin)],
-  }
-}
+export const withTools: {
+  <Tools extends Record<string, Tool.Any>, R>(
+    declared: ReadonlyArray<Tool.Any>,
+  ): (agent: Agent<Tools, R>) => Agent<Record<string, Tool.Any>, R>
+  <Tools extends Record<string, Tool.Any>, R>(
+    agent: Agent<Tools, R>,
+    declared: ReadonlyArray<Tool.Any>,
+  ): Agent<Record<string, Tool.Any>, R>
+} = Function.dual(
+  2,
+  <Tools extends Record<string, Tool.Any>, R>(
+    agent: Agent<Tools, R>,
+    declared: ReadonlyArray<Tool.Any>,
+  ): Agent<Record<string, Tool.Any>, R> => {
+    const existing: ReadonlyArray<Tool.Any> = Object.values(agent.toolkit.tools)
+    const staticOrigin = (tool: Tool.Any): ToolDeclaration => ({
+      tool,
+      origin: { _tag: "Static", agent: agent.name },
+    })
+    const hosted: ReadonlyArray<Tool.Any> = [...existing, ...declared]
+    return {
+      ...agent,
+      [AgentTypeId]: {
+        tools: (value: Record<string, Tool.Any>) => value,
+        requirements: (value: R) => value,
+      },
+      toolkit: Toolkit.make(...hosted),
+      toolDeclarations: [...(agent.toolDeclarations ?? existing.map(staticOrigin)), ...declared.map(staticOrigin)],
+    }
+  },
+)

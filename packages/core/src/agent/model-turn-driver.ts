@@ -1,4 +1,4 @@
-import { Cause, Effect, Schema, Stream } from "effect"
+import { Cause, Effect, Function, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { checkpoint, interceptStream, logicalOperationId } from "../durable/driver-run.js"
 import { DriverInterpreter, operationKey } from "../durable/driver-interpreter.js"
@@ -20,25 +20,30 @@ type AttemptBody = (
   overflowCause?: Cause.Cause<RunError>,
 ) => Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel | DriverInterpreter>
 
-export const wrapDriverAttempt =
+export const wrapDriverAttempt: {
+  (attemptBody: AttemptBody): (turn: number) => AttemptBody
+  (turn: number, attemptBody: AttemptBody): AttemptBody
+} = Function.dual(
+  2,
   (turn: number, attemptBody: AttemptBody): AttemptBody =>
-  (activePrompt, retryOverflow, compactOverflow = false, overflowCause) =>
-    Stream.unwrap(
-      Effect.gen(function* () {
-        const logicalId = yield* logicalOperationId
-        const current = yield* checkpoint
-        const driverState = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
-          Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
-        )
-        const ordinal = modelCallOrdinal(driverState)
-        return interceptStream(
-          {
-            kind: "model",
-            key: operationKey(logicalId, "model", turn, ordinal, "conversation"),
-            input: { turn, modelCallOrdinal: ordinal, purpose: "conversation" },
-            replayPolicy: "provider-idempotent",
-          },
-          attemptBody(activePrompt, retryOverflow, compactOverflow, overflowCause),
-        )
-      }),
-    ) as Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel>
+    (activePrompt, retryOverflow, compactOverflow = false, overflowCause) =>
+      Stream.unwrap(
+        Effect.gen(function* () {
+          const logicalId = yield* logicalOperationId
+          const current = yield* checkpoint
+          const driverState = yield* Schema.decodeUnknownEffect(LoopDriverState)(current.state).pipe(
+            Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
+          )
+          const ordinal = modelCallOrdinal(driverState)
+          return interceptStream(
+            {
+              kind: "model",
+              key: operationKey(logicalId, "model", turn, ordinal, "conversation"),
+              input: { turn, modelCallOrdinal: ordinal, purpose: "conversation" },
+              replayPolicy: "provider-idempotent",
+            },
+            attemptBody(activePrompt, retryOverflow, compactOverflow, overflowCause),
+          )
+        }),
+      ) as Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel>,
+)
