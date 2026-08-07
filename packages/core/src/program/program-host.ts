@@ -20,6 +20,7 @@ import {
   ProgramCapabilityDenied,
   ProgramCapabilityMissing,
   ProgramMemberKey,
+  ProgramInvocationFailure,
   ProgramOperationName,
   ProgramReplayDivergence,
   ProgramSchemaFailure,
@@ -246,7 +247,13 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
               (cause): Effect.Effect<never, ProgramSuspended | ProgramCancelled | ProgramAgentFailure> =>
                 Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
                   ? Effect.fail(cause)
-                  : Effect.fail(ProgramAgentFailure.make({ selection, operation, cause })),
+                  : Effect.fail(
+                      ProgramAgentFailure.make({
+                        selection,
+                        operation,
+                        cause: Schema.is(ProgramInvocationFailure)(cause) ? cause.cause : cause,
+                      }),
+                    ),
             ),
           )
         const result = yield* Schema.decodeUnknownEffect(AgentResult, { onExcessProperty: "error" })(raw).pipe(
@@ -276,7 +283,13 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
               (cause): Effect.Effect<never, ProgramSuspended | ProgramCancelled | ProgramToolFailure> =>
                 Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
                   ? Effect.fail(cause)
-                  : Effect.fail(ProgramToolFailure.make({ tool: input.tool, operation: input.operation, cause })),
+                  : Effect.fail(
+                      ProgramToolFailure.make({
+                        tool: input.tool,
+                        operation: input.operation,
+                        cause: Schema.is(ProgramInvocationFailure)(cause) ? cause.cause : cause,
+                      }),
+                    ),
             ),
           )
         return yield* Schema.encodeEffect(binding.output)(output).pipe(
@@ -303,7 +316,13 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
               (cause): Effect.Effect<never, ProgramSuspended | ProgramCancelled | ProgramStepFailure> =>
                 Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
                   ? Effect.fail(cause)
-                  : Effect.fail(ProgramStepFailure.make({ step: input.step, operation: input.operation, cause })),
+                  : Effect.fail(
+                      ProgramStepFailure.make({
+                        step: input.step,
+                        operation: input.operation,
+                        cause: Schema.is(ProgramInvocationFailure)(cause) ? cause.cause : cause,
+                      }),
+                    ),
             ),
           )
         return yield* Schema.encodeEffect(binding.output)(output).pipe(

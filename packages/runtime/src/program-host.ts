@@ -351,8 +351,16 @@ export const make = (input: {
         dispatch: invocation.execute.pipe(
           Effect.mapError((cause) =>
             kind === "tool"
-              ? ProgramCapabilities.ProgramToolFailure.make({ tool: capability, operation, cause })
-              : ProgramCapabilities.ProgramStepFailure.make({ step: capability, operation, cause }),
+              ? ProgramCapabilities.ProgramToolFailure.make({
+                  tool: capability,
+                  operation,
+                  cause: Schema.is(ProgramCapabilities.ProgramInvocationFailure)(cause) ? cause.cause : cause,
+                })
+              : ProgramCapabilities.ProgramStepFailure.make({
+                  step: capability,
+                  operation,
+                  cause: Schema.is(ProgramCapabilities.ProgramInvocationFailure)(cause) ? cause.cause : cause,
+                }),
           ),
           Effect.flatMap((output) =>
             Schema.encodeEffect(binding.output, { onExcessProperty: "error" })(output).pipe(
