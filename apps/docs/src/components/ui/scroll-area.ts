@@ -1,5 +1,6 @@
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
@@ -11,10 +12,10 @@ export type ScrollAreaConfig<ParentMessage> = SlotConfig<ParentMessage> &
     fade?: boolean
   }>
 
-export const scrollArea = <ParentMessage>(
-  config: ScrollAreaConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const scrollArea: {
+  <ParentMessage>(config: ScrollAreaConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: ScrollAreaConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: ScrollAreaConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -30,4 +31,4 @@ export const scrollArea = <ParentMessage>(
     ],
     [...children],
   )
-}
+})

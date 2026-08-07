@@ -5,6 +5,8 @@
 // highlighter is a poor fit — a small hand-tokenizer gives legible, themeable
 // highlighting inline with the view.
 
+import { dual } from "effect/Function"
+
 export type Token = Readonly<{ text: string; cls: string }>
 
 const KEYWORDS = new Set([
@@ -172,7 +174,10 @@ const isHighlightable = (language: string): boolean =>
   ["ts", "typescript", "tsx", "js", "javascript", "jsx", ""].includes(language.toLowerCase())
 
 /** Tokenize `code` into lines of tokens. Unsupported languages render as one plain token per line. */
-export const highlight = (code: string, language: string): ReadonlyArray<ReadonlyArray<Token>> => {
+export const highlight: {
+  (code: string, language: string): ReadonlyArray<ReadonlyArray<Token>>
+  (language: string): (code: string) => ReadonlyArray<ReadonlyArray<Token>>
+} = dual(2, (code: string, language: string): ReadonlyArray<ReadonlyArray<Token>> => {
   const tokens: ReadonlyArray<Token> = isHighlightable(language)
     ? tokenize(code)
     : code
@@ -190,4 +195,4 @@ export const highlight = (code: string, language: string): ReadonlyArray<Readonl
     })
   }
   return lines
-}
+})

@@ -2,6 +2,7 @@ import { Message, Model, OutMessage, close, descriptionId, init, open, titleId, 
 import type { InitConfig, RenderInfo, ViewInputs } from "@foldkit/ui/dialog"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
@@ -27,14 +28,20 @@ export const DialogOutMessage = OutMessage
 export { close, open, update }
 export const dialogClose = close
 export const dialogOpen = open
-export const dialogUpdate = update
+export const dialogUpdate: {
+  (model: Model, message: Message): ReturnType<typeof update>
+  (message: Message): (model: Model) => ReturnType<typeof update>
+} = dual(2, update)
 
 // VIEW
 
 export { descriptionId, titleId, view }
 export const dialogDescriptionId = descriptionId
 export const dialogTitleId = titleId
-export const dialogView = view
+export const dialogView: {
+  (model: Parameters<typeof view>[0], viewInputs: Parameters<typeof view>[1]): ReturnType<typeof view>
+  (viewInputs: Parameters<typeof view>[1]): (model: Parameters<typeof view>[0]) => ReturnType<typeof view>
+} = dual(2, view)
 
 const dialogClass = "items-center justify-center bg-transparent p-0 open:flex"
 
@@ -79,45 +86,48 @@ export type DialogContentConfig = ContentConfig
  * content panel. `toChildren` receives the primitive's close-button
  * attributes so any element inside can dismiss the dialog.
  */
-export const content = (
-  config: ContentConfig,
-  toChildren: (slots: ContentSlots) => ReadonlyArray<Html>,
-): ViewInputs => ({
-  toView: ({ backdrop, closeButton, dialog, isVisible, panel }) => {
-    const h = html<DialogMessage>()
-    const showCloseButton = config.showCloseButton ?? true
+export const content: {
+  (config: ContentConfig, toChildren: (slots: ContentSlots) => ReadonlyArray<Html>): ViewInputs
+  (toChildren: (slots: ContentSlots) => ReadonlyArray<Html>): (config: ContentConfig) => ViewInputs
+} = dual(
+  2,
+  (config: ContentConfig, toChildren: (slots: ContentSlots) => ReadonlyArray<Html>): ViewInputs => ({
+    toView: ({ backdrop, closeButton, dialog, isVisible, panel }) => {
+      const h = html<DialogMessage>()
+      const showCloseButton = config.showCloseButton ?? true
 
-    return h.dialog(
-      [...dialog, h.Class(dialogClass)],
-      isVisible
-        ? [
-            h.div([...backdrop, h.DataAttribute("slot", "dialog-overlay"), h.Class(overlayClass)], []),
-            h.div(
-              [...panel, h.DataAttribute("slot", "dialog-content"), h.Class(cn(contentClass, config.class))],
-              [
-                ...toChildren({ close: closeButton }),
-                ...(showCloseButton
-                  ? [
-                      h.button(
-                        [...closeButton, h.DataAttribute("slot", "dialog-close"), h.Class(closeClass)],
-                        [xIcon(), h.span([h.Class("sr-only")], ["Close"])],
-                      ),
-                    ]
-                  : []),
-              ],
-            ),
-          ]
-        : [],
-    )
-  },
-})
+      return h.dialog(
+        [...dialog, h.Class(dialogClass)],
+        isVisible
+          ? [
+              h.div([...backdrop, h.DataAttribute("slot", "dialog-overlay"), h.Class(overlayClass)], []),
+              h.div(
+                [...panel, h.DataAttribute("slot", "dialog-content"), h.Class(cn(contentClass, config.class))],
+                [
+                  ...toChildren({ close: closeButton }),
+                  ...(showCloseButton
+                    ? [
+                        h.button(
+                          [...closeButton, h.DataAttribute("slot", "dialog-close"), h.Class(closeClass)],
+                          [xIcon(), h.span([h.Class("sr-only")], ["Close"])],
+                        ),
+                      ]
+                    : []),
+                ],
+              ),
+            ]
+          : [],
+      )
+    },
+  }),
+)
 
 export const dialogContent = content
 
-export const header = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const header: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -127,44 +137,66 @@ export const header = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
-export const title = <ParentMessage>(
-  config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  return h.h2(
-    [
-      ...(config.attributes ?? []),
-      h.Id(titleId(config.model)),
-      h.DataAttribute("slot", "dialog-title"),
-      h.Class(cn("text-lg leading-none font-semibold", config.class)),
-    ],
-    [...children],
-  )
-}
+export const title: {
+  <ParentMessage>(
+    config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>,
+    children: ReadonlyArray<Html | string>,
+  ): Html
+  <ParentMessage>(
+    children: ReadonlyArray<Html | string>,
+  ): (config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>) => Html
+} = dual(
+  2,
+  <ParentMessage>(
+    config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>,
+    children: ReadonlyArray<Html | string>,
+  ): Html => {
+    const h = html<ParentMessage>()
+    return h.h2(
+      [
+        ...(config.attributes ?? []),
+        h.Id(titleId(config.model)),
+        h.DataAttribute("slot", "dialog-title"),
+        h.Class(cn("text-lg leading-none font-semibold", config.class)),
+      ],
+      [...children],
+    )
+  },
+)
 
-export const description = <ParentMessage>(
-  config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  return h.p(
-    [
-      ...(config.attributes ?? []),
-      h.Id(descriptionId(config.model)),
-      h.DataAttribute("slot", "dialog-description"),
-      h.Class(cn("text-sm text-muted-foreground", config.class)),
-    ],
-    [...children],
-  )
-}
+export const description: {
+  <ParentMessage>(
+    config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>,
+    children: ReadonlyArray<Html | string>,
+  ): Html
+  <ParentMessage>(
+    children: ReadonlyArray<Html | string>,
+  ): (config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>) => Html
+} = dual(
+  2,
+  <ParentMessage>(
+    config: SlotConfig<ParentMessage> & Readonly<{ model: DialogModel }>,
+    children: ReadonlyArray<Html | string>,
+  ): Html => {
+    const h = html<ParentMessage>()
+    return h.p(
+      [
+        ...(config.attributes ?? []),
+        h.Id(descriptionId(config.model)),
+        h.DataAttribute("slot", "dialog-description"),
+        h.Class(cn("text-sm text-muted-foreground", config.class)),
+      ],
+      [...children],
+    )
+  },
+)
 
-export const footer = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const footer: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -174,4 +206,4 @@ export const footer = <ParentMessage>(
     ],
     [...children],
   )
-}
+})

@@ -1,5 +1,6 @@
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
@@ -12,18 +13,20 @@ const kbdClass = cn(
   "[[data-slot=tooltip-content]_&]:bg-background/20 [[data-slot=tooltip-content]_&]:text-background dark:[[data-slot=tooltip-content]_&]:bg-background/10",
 )
 
-export const kbd = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+export const kbd: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.kbd(
     [...(config.attributes ?? []), h.DataAttribute("slot", "kbd"), h.Class(cn(kbdClass, config.class))],
     [...children],
   )
-}
-
-export const kbdGroup = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+})
+export const kbdGroup: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.kbd(
     [
@@ -33,4 +36,4 @@ export const kbdGroup = <ParentMessage>(
     ],
     [...children],
   )
-}
+})

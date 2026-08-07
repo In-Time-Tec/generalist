@@ -1,5 +1,6 @@
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import { button } from "@/components/ui/button"
 import { commandDialog, item, root } from "@/components/ui/command"
@@ -250,23 +251,29 @@ const mobileNavDrawer = (model: Model): Html => {
   )
 }
 
-export const shell = (model: Model, content: Html): Html =>
-  h.div(
-    [],
-    [
-      h.a(
-        [
-          h.Href("#main-content"),
-          h.Class(
-            "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:shadow-md focus:ring-2 focus:ring-ring",
-          ),
-        ],
-        ["Skip to content"],
-      ),
-      header(model),
-      content,
-      footer(),
-      mobileNavDrawer(model),
-      searchPalette(model),
-    ],
-  )
+export const shell: {
+  (model: Model, content: Html): Html
+  (content: Html): (model: Model) => Html
+} = dual(
+  2,
+  (model: Model, content: Html): Html =>
+    h.div(
+      [],
+      [
+        h.a(
+          [
+            h.Href("#main-content"),
+            h.Class(
+              "sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:shadow-md focus:ring-2 focus:ring-ring",
+            ),
+          ],
+          ["Skip to content"],
+        ),
+        header(model),
+        content,
+        footer(),
+        mobileNavDrawer(model),
+        searchPalette(model),
+      ],
+    ),
+)

@@ -1,5 +1,6 @@
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import {
   breadcrumb,
@@ -112,7 +113,10 @@ const breadcrumbs = (title: string): Html =>
     ]),
   ])
 
-export const docsLayout = (model: Model, page: DocsPageView): Html => {
+export const docsLayout: {
+  (model: Model, page: DocsPageView): Html
+  (page: DocsPageView): (model: Model) => Html
+} = dual(2, (model: Model, page: DocsPageView): Html => {
   const path = toPath(model.route)
   return h.div(
     [h.Class("mx-auto flex w-full max-w-7xl gap-8 px-4 sm:px-6")],
@@ -136,4 +140,4 @@ export const docsLayout = (model: Model, page: DocsPageView): Html => {
       tableOfContents(page.toc, model.maybeActiveSectionId),
     ],
   )
-}
+})

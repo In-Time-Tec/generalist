@@ -4,8 +4,12 @@ import { html } from "foldkit/html"
 import { skeleton } from "@/components/ui/skeleton"
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
+import { dual } from "effect/Function"
 
-export const sidebarMenu = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const sidebarMenu: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.ul(
     [
@@ -16,12 +20,11 @@ export const sidebarMenu = <ParentMessage>(config: SlotConfig<ParentMessage>, ch
     ],
     [...children],
   )
-}
-
-export const sidebarMenuItem = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+})
+export const sidebarMenuItem: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.li(
     [
@@ -32,8 +35,7 @@ export const sidebarMenuItem = <ParentMessage>(
     ],
     [...children],
   )
-}
-
+})
 export const sidebarMenuButtonVariants = cva(
   "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active]:bg-sidebar-accent data-[active]:font-medium data-[active]:text-sidebar-accent-foreground data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
   {
@@ -67,68 +69,72 @@ export type SidebarMenuButtonConfig<ParentMessage> = SlotConfig<ParentMessage> &
  * collapsed-state tooltip is not ported (gap); compose the tooltip component
  * around this part if you need it.
  */
-export const sidebarMenuButton = <ParentMessage>(
-  config: SidebarMenuButtonConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  const size = config.size ?? "default"
-  return h.button(
-    [
-      h.Type("button"),
-      ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
-      ...(config.isDisabled === true ? [h.Disabled(true)] : []),
-      ...(config.isActive === true ? [h.DataAttribute("active", "")] : []),
-      h.DataAttribute("size", String(size)),
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "sidebar-menu-button"),
-      h.DataAttribute("sidebar", "menu-button"),
-      h.Class(cn(sidebarMenuButtonVariants({ size, variant: config.variant }), config.class)),
-    ],
-    [...children],
-  )
-}
-
+export const sidebarMenuButton: {
+  <ParentMessage>(config: SidebarMenuButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SidebarMenuButtonConfig<ParentMessage>) => Html
+} = dual(
+  2,
+  <ParentMessage>(config: SidebarMenuButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    const size = config.size ?? "default"
+    return h.button(
+      [
+        h.Type("button"),
+        ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
+        ...(config.isDisabled === true ? [h.Disabled(true)] : []),
+        ...(config.isActive === true ? [h.DataAttribute("active", "")] : []),
+        h.DataAttribute("size", String(size)),
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "sidebar-menu-button"),
+        h.DataAttribute("sidebar", "menu-button"),
+        h.Class(cn(sidebarMenuButtonVariants({ size, variant: config.variant }), config.class)),
+      ],
+      [...children],
+    )
+  },
+)
 export type SidebarMenuActionConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
     onClick?: ParentMessage
     showOnHover?: boolean
   }>
 
-export const sidebarMenuAction = <ParentMessage>(
-  config: SidebarMenuActionConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  return h.button(
-    [
-      h.Type("button"),
-      ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "sidebar-menu-action"),
-      h.DataAttribute("sidebar", "menu-action"),
-      h.Class(
-        cn(
-          "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform peer-hover/menu-button:text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-          "after:absolute after:-inset-2 md:after:hidden",
-          "peer-data-[size=sm]/menu-button:top-1",
-          "peer-data-[size=default]/menu-button:top-1.5",
-          "peer-data-[size=lg]/menu-button:top-2.5",
-          "group-data-[collapsible=icon]:hidden",
-          config.showOnHover &&
-            "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-[active]/menu-button:text-sidebar-accent-foreground data-open:opacity-100 md:opacity-0",
-          config.class,
+export const sidebarMenuAction: {
+  <ParentMessage>(config: SidebarMenuActionConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SidebarMenuActionConfig<ParentMessage>) => Html
+} = dual(
+  2,
+  <ParentMessage>(config: SidebarMenuActionConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    return h.button(
+      [
+        h.Type("button"),
+        ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "sidebar-menu-action"),
+        h.DataAttribute("sidebar", "menu-action"),
+        h.Class(
+          cn(
+            "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform peer-hover/menu-button:text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+            "after:absolute after:-inset-2 md:after:hidden",
+            "peer-data-[size=sm]/menu-button:top-1",
+            "peer-data-[size=default]/menu-button:top-1.5",
+            "peer-data-[size=lg]/menu-button:top-2.5",
+            "group-data-[collapsible=icon]:hidden",
+            config.showOnHover &&
+              "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-[active]/menu-button:text-sidebar-accent-foreground data-open:opacity-100 md:opacity-0",
+            config.class,
+          ),
         ),
-      ),
-    ],
-    [...children],
-  )
-}
-
-export const sidebarMenuBadge = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+      ],
+      [...children],
+    )
+  },
+)
+export const sidebarMenuBadge: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -149,8 +155,7 @@ export const sidebarMenuBadge = <ParentMessage>(
     ],
     [...children],
   )
-}
-
+})
 const DEFAULT_SKELETON_TEXT_WIDTH = "70%"
 
 export type SidebarMenuSkeletonConfig<ParentMessage> = SlotConfig<ParentMessage> &
@@ -193,10 +198,10 @@ export const sidebarMenuSkeleton = <ParentMessage>(config: SidebarMenuSkeletonCo
   )
 }
 
-export const sidebarMenuSub = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const sidebarMenuSub: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.ul(
     [
@@ -213,12 +218,11 @@ export const sidebarMenuSub = <ParentMessage>(
     ],
     [...children],
   )
-}
-
-export const sidebarMenuSubItem = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+})
+export const sidebarMenuSubItem: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.li(
     [
@@ -229,8 +233,7 @@ export const sidebarMenuSubItem = <ParentMessage>(
     ],
     [...children],
   )
-}
-
+})
 export type SidebarMenuSubButtonConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
     href?: string
@@ -239,32 +242,35 @@ export type SidebarMenuSubButtonConfig<ParentMessage> = SlotConfig<ParentMessage
     onClick?: ParentMessage
   }>
 
-export const sidebarMenuSubButton = <ParentMessage>(
-  config: SidebarMenuSubButtonConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  const size = config.size ?? "md"
-  return h.a(
-    [
-      ...(config.href === undefined ? [] : [h.Href(config.href)]),
-      ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
-      ...(config.isActive === true ? [h.DataAttribute("active", "")] : []),
-      h.DataAttribute("size", size),
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "sidebar-menu-sub-button"),
-      h.DataAttribute("sidebar", "menu-sub-button"),
-      h.Class(
-        cn(
-          "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
-          "data-[active]:bg-sidebar-accent data-[active]:text-sidebar-accent-foreground",
-          size === "sm" && "text-xs",
-          size === "md" && "text-sm",
-          "group-data-[collapsible=icon]:hidden",
-          config.class,
+export const sidebarMenuSubButton: {
+  <ParentMessage>(config: SidebarMenuSubButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SidebarMenuSubButtonConfig<ParentMessage>) => Html
+} = dual(
+  2,
+  <ParentMessage>(config: SidebarMenuSubButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    const size = config.size ?? "md"
+    return h.a(
+      [
+        ...(config.href === undefined ? [] : [h.Href(config.href)]),
+        ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
+        ...(config.isActive === true ? [h.DataAttribute("active", "")] : []),
+        h.DataAttribute("size", size),
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "sidebar-menu-sub-button"),
+        h.DataAttribute("sidebar", "menu-sub-button"),
+        h.Class(
+          cn(
+            "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+            "data-[active]:bg-sidebar-accent data-[active]:text-sidebar-accent-foreground",
+            size === "sm" && "text-xs",
+            size === "md" && "text-sm",
+            "group-data-[collapsible=icon]:hidden",
+            config.class,
+          ),
         ),
-      ),
-    ],
-    [...children],
-  )
-}
+      ],
+      [...children],
+    )
+  },
+)

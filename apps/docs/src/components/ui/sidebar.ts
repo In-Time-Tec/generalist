@@ -1,4 +1,5 @@
 import { Match, Schema } from "effect"
+import { dual } from "effect/Function"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 import { m } from "foldkit/message"
@@ -57,14 +58,20 @@ export type Message = typeof Message.Type
 // UPDATE
 
 /** Processes a sidebar message and returns the next model. Produces no commands and no OutMessages. */
-export const update = (model: Model, message: Message): Model =>
-  Match.value(message).pipe(
-    Match.tagsExhaustive({
-      ToggledSidebar: () => evo(model, { state: (state) => (state === "Expanded" ? "Collapsed" : "Expanded") }),
-      OpenedMobile: () => evo(model, { isMobileOpen: () => true }),
-      ClosedMobile: () => evo(model, { isMobileOpen: () => false }),
-    }),
-  )
+export const update: {
+  (model: Model, message: Message): Model
+  (message: Message): (model: Model) => Model
+} = dual(
+  2,
+  (model: Model, message: Message): Model =>
+    Match.value(message).pipe(
+      Match.tagsExhaustive({
+        ToggledSidebar: () => evo(model, { state: (state) => (state === "Expanded" ? "Collapsed" : "Expanded") }),
+        OpenedMobile: () => evo(model, { isMobileOpen: () => true }),
+        ClosedMobile: () => evo(model, { isMobileOpen: () => false }),
+      }),
+    ),
+)
 
 // VIEW
 
@@ -103,10 +110,10 @@ const panelLeftIcon = <ParentMessage>(): Html => {
  * CSS variables and the `group/sidebar-wrapper` marker. Wrap the `sidebar`
  * part and `sidebarInset` in it.
  */
-export const sidebarWrapper = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const sidebarWrapper: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -117,7 +124,7 @@ export const sidebarWrapper = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 export type SidebarConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -144,10 +151,10 @@ const mobilePanelClass =
  * `onDismissedMobile` fires when the mobile backdrop is clicked; map it to
  * `ClosedMobile`.
  */
-export const sidebar = <ParentMessage>(
-  config: SidebarConfig<ParentMessage>,
-  toChildren: () => ReadonlyArray<Html>,
-): Html => {
+export const sidebar: {
+  <ParentMessage>(config: SidebarConfig<ParentMessage>, toChildren: () => ReadonlyArray<Html>): Html
+  <ParentMessage>(toChildren: () => ReadonlyArray<Html>): (config: SidebarConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SidebarConfig<ParentMessage>, toChildren: () => ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   const side = config.side ?? "left"
   const variant = config.variant ?? "sidebar"
@@ -251,7 +258,7 @@ export const sidebar = <ParentMessage>(
         : []),
     ],
   )
-}
+})
 
 export type SidebarTriggerConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -308,7 +315,10 @@ export const sidebarRail = <ParentMessage>(config: SidebarRailConfig<ParentMessa
 }
 
 /** Main content area that sits beside the sidebar. */
-export const sidebarInset = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const sidebarInset: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.main(
     [
@@ -324,7 +334,7 @@ export const sidebarInset = <ParentMessage>(config: SlotConfig<ParentMessage>, c
     ],
     [...children],
   )
-}
+})
 
 /** Search input styled for the sidebar, composing the input component. */
 export const sidebarInput = <ParentMessage>(config: InputConfig<ParentMessage>): Html => {
@@ -336,10 +346,10 @@ export const sidebarInput = <ParentMessage>(config: InputConfig<ParentMessage>):
   })
 }
 
-export const sidebarHeader = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const sidebarHeader: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -350,12 +360,12 @@ export const sidebarHeader = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
-export const sidebarFooter = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const sidebarFooter: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -366,7 +376,7 @@ export const sidebarFooter = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 /** Horizontal rule between sidebar sections, composing the separator component. */
 export const sidebarSeparator = <ParentMessage>(config: SlotConfig<ParentMessage>): Html => {
@@ -377,10 +387,10 @@ export const sidebarSeparator = <ParentMessage>(config: SlotConfig<ParentMessage
   })
 }
 
-export const sidebarContent = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const sidebarContent: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -396,9 +406,12 @@ export const sidebarContent = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
-export const sidebarGroup = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const sidebarGroup: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -409,12 +422,12 @@ export const sidebarGroup = <ParentMessage>(config: SlotConfig<ParentMessage>, c
     ],
     [...children],
   )
-}
+})
 
-export const sidebarGroupLabel = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const sidebarGroupLabel: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -431,42 +444,45 @@ export const sidebarGroupLabel = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 export type SidebarGroupActionConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
     onClick?: ParentMessage
   }>
 
-export const sidebarGroupAction = <ParentMessage>(
-  config: SidebarGroupActionConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  return h.button(
-    [
-      h.Type("button"),
-      ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "sidebar-group-action"),
-      h.DataAttribute("sidebar", "group-action"),
-      h.Class(
-        cn(
-          "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-          "after:absolute after:-inset-2 md:after:hidden",
-          "group-data-[collapsible=icon]:hidden",
-          config.class,
+export const sidebarGroupAction: {
+  <ParentMessage>(config: SidebarGroupActionConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SidebarGroupActionConfig<ParentMessage>) => Html
+} = dual(
+  2,
+  <ParentMessage>(config: SidebarGroupActionConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    return h.button(
+      [
+        h.Type("button"),
+        ...(config.onClick === undefined ? [] : [h.OnClick(config.onClick)]),
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "sidebar-group-action"),
+        h.DataAttribute("sidebar", "group-action"),
+        h.Class(
+          cn(
+            "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+            "after:absolute after:-inset-2 md:after:hidden",
+            "group-data-[collapsible=icon]:hidden",
+            config.class,
+          ),
         ),
-      ),
-    ],
-    [...children],
-  )
-}
+      ],
+      [...children],
+    )
+  },
+)
 
-export const sidebarGroupContent = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const sidebarGroupContent: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -477,7 +493,7 @@ export const sidebarGroupContent = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 export {
   sidebarMenu,

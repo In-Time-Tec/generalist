@@ -1,5 +1,6 @@
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import { button } from "@/components/ui/button"
 import { highlight } from "@/lib/highlight"
@@ -56,10 +57,10 @@ export type CodeBlockConfig<ParentMessage> = SlotConfig<ParentMessage> &
  * has no syntax highlighter (gap), so `codeBlockContent` renders plain
  * monospace text. Consumers may pass pre-highlighted children instead.
  */
-export const codeBlock = <ParentMessage>(
-  config: CodeBlockConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const codeBlock: {
+  <ParentMessage>(config: CodeBlockConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: CodeBlockConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: CodeBlockConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -72,12 +73,11 @@ export const codeBlock = <ParentMessage>(
     ],
     [...children],
   )
-}
-
-export const codeBlockHeader = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+})
+export const codeBlockHeader: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -92,12 +92,11 @@ export const codeBlockHeader = <ParentMessage>(
     ],
     [...children],
   )
-}
-
-export const codeBlockTitle = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+})
+export const codeBlockTitle: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -107,12 +106,11 @@ export const codeBlockTitle = <ParentMessage>(
     ],
     [...children],
   )
-}
-
-export const codeBlockFilename = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+})
+export const codeBlockFilename: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.span(
     [
@@ -122,12 +120,11 @@ export const codeBlockFilename = <ParentMessage>(
     ],
     [...children],
   )
-}
-
-export const codeBlockActions = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+})
+export const codeBlockActions: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -137,8 +134,7 @@ export const codeBlockActions = <ParentMessage>(
     ],
     [...children],
   )
-}
-
+})
 const lineNumberClass = cn(
   "block",
   "before:content-[counter(line)]",
@@ -205,23 +201,29 @@ export type CodeBlockCopyButtonConfig<ParentMessage> = SlotConfig<ParentMessage>
  * `onCopied` and the consumer writes the code to the clipboard in a Command,
  * flipping `isCopied` (and clearing it after a timeout) in its Model.
  */
-export const codeBlockCopyButton = <ParentMessage>(
-  config: CodeBlockCopyButtonConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string> = [],
-): Html => {
-  const h = html<ParentMessage>()
-  const defaultChildren: ReadonlyArray<Html> = [
-    config.isCopied ? checkIcon<ParentMessage>() : copyIcon<ParentMessage>(),
-  ]
-  return button<ParentMessage>(
-    {
-      variant: "ghost",
-      size: "icon",
-      onClick: config.onCopied,
-      class: cn("shrink-0", config.class),
-      dataSlot: "code-block-copy-button",
-      attributes: [h.AriaLabel("Copy"), ...(config.attributes ?? [])],
-    },
-    children.length > 0 ? children : defaultChildren,
-  )
-}
+export const codeBlockCopyButton: {
+  <ParentMessage>(config: CodeBlockCopyButtonConfig<ParentMessage>, children?: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children?: ReadonlyArray<Html | string>): (config: CodeBlockCopyButtonConfig<ParentMessage>) => Html
+} = dual(
+  (args) => args.length > 0 && !Array.isArray(args[0]),
+  <ParentMessage>(
+    config: CodeBlockCopyButtonConfig<ParentMessage>,
+    children: ReadonlyArray<Html | string> = [],
+  ): Html => {
+    const h = html<ParentMessage>()
+    const defaultChildren: ReadonlyArray<Html> = [
+      config.isCopied ? checkIcon<ParentMessage>() : copyIcon<ParentMessage>(),
+    ]
+    return button<ParentMessage>(
+      {
+        variant: "ghost",
+        size: "icon",
+        onClick: config.onCopied,
+        class: cn("shrink-0", config.class),
+        dataSlot: "code-block-copy-button",
+        attributes: [h.AriaLabel("Copy"), ...(config.attributes ?? [])],
+      },
+      children.length > 0 ? children : defaultChildren,
+    )
+  },
+)

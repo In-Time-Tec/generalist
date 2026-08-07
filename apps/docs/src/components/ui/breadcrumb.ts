@@ -3,6 +3,7 @@ import { html } from "foldkit/html"
 
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
+import { dual } from "effect/Function"
 
 // VIEW
 
@@ -43,10 +44,10 @@ const moreHorizontalIcon = <ParentMessage>(): Html => {
   )
 }
 
-export const breadcrumb = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const breadcrumb: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.nav(
     [
@@ -57,12 +58,11 @@ export const breadcrumb = <ParentMessage>(
     ],
     [...children],
   )
-}
-
-export const breadcrumbList = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+})
+export const breadcrumbList: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.ol(
     [
@@ -74,12 +74,11 @@ export const breadcrumbList = <ParentMessage>(
     ],
     [...children],
   )
-}
-
-export const breadcrumbItem = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+})
+export const breadcrumbItem: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.li(
     [
@@ -89,33 +88,34 @@ export const breadcrumbItem = <ParentMessage>(
     ],
     [...children],
   )
-}
-
+})
 export type BreadcrumbLinkConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
     href?: string
   }>
 
-export const breadcrumbLink = <ParentMessage>(
-  config: BreadcrumbLinkConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  return h.a(
-    [
-      ...(config.href === undefined ? [] : [h.Href(config.href)]),
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "breadcrumb-link"),
-      h.Class(cn("transition-colors hover:text-foreground", config.class)),
-    ],
-    [...children],
-  )
-}
-
-export const breadcrumbPage = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const breadcrumbLink: {
+  <ParentMessage>(config: BreadcrumbLinkConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: BreadcrumbLinkConfig<ParentMessage>) => Html
+} = dual(
+  2,
+  <ParentMessage>(config: BreadcrumbLinkConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    return h.a(
+      [
+        ...(config.href === undefined ? [] : [h.Href(config.href)]),
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "breadcrumb-link"),
+        h.Class(cn("transition-colors hover:text-foreground", config.class)),
+      ],
+      [...children],
+    )
+  },
+)
+export const breadcrumbPage: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.span(
     [
@@ -128,25 +128,26 @@ export const breadcrumbPage = <ParentMessage>(
     ],
     [...children],
   )
-}
-
-export const breadcrumbSeparator = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children?: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  return h.li(
-    [
-      ...(config.attributes ?? []),
-      h.Attribute("role", "presentation"),
-      h.AriaHidden(true),
-      h.DataAttribute("slot", "breadcrumb-separator"),
-      h.Class(cn("[&>svg]:size-3.5", config.class)),
-    ],
-    children === undefined ? [chevronRightIcon<ParentMessage>()] : [...children],
-  )
-}
-
+})
+export const breadcrumbSeparator: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children?: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children?: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(
+  (args) => args.length > 0 && !Array.isArray(args[0]),
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children?: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    return h.li(
+      [
+        ...(config.attributes ?? []),
+        h.Attribute("role", "presentation"),
+        h.AriaHidden(true),
+        h.DataAttribute("slot", "breadcrumb-separator"),
+        h.Class(cn("[&>svg]:size-3.5", config.class)),
+      ],
+      children === undefined ? [chevronRightIcon<ParentMessage>()] : [...children],
+    )
+  },
+)
 export const breadcrumbEllipsis = <ParentMessage>(config: SlotConfig<ParentMessage>): Html => {
   const h = html<ParentMessage>()
   return h.span(
