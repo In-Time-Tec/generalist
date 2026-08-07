@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import {
   Agent,
   Approvals,
@@ -106,19 +106,18 @@ const program = Effect.gen(function* () {
   )
   yield* Console.log(`skills=${skills.length} chatEntries=${renderedChat.entries.length} text=${result.text}`)
   yield* Effect.succeed(filesystemSkillLayer)
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      Deterministic.layer({ model: "capstone" }),
-      toolkitLayer,
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      SkillSource.layerSkills([researchSkill]),
-      WorkingMemory.layer({ maxMessages: 4 }),
-      Connection.layerTest({ frames: () => Stream.empty, send: () => Effect.void }),
-      compactionLayer,
-    ),
-  ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  Deterministic.layer({ model: "capstone" }),
+  toolkitLayer,
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+  SkillSource.layerSkills([researchSkill]),
+  WorkingMemory.layer({ maxMessages: 4 }),
+  Connection.layerTest({ frames: () => Stream.empty, send: () => Effect.void }),
+  compactionLayer,
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

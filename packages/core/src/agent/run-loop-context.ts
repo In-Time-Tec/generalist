@@ -63,7 +63,10 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
   readonly withAgentModel: <A, E, R2>(
     effect: Effect.Effect<A, E, R2>,
   ) => Effect.Effect<A, E | LanguageModelNotRegistered, R2>
-  readonly syncSession: (turn: number, transcript: Prompt.Prompt) => Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter>
+  readonly syncSession: (
+    turn: number,
+    transcript: Prompt.Prompt,
+  ) => Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter>
   readonly applyCompactionResult: (
     turn: number,
     result: CompactionResult,
@@ -85,7 +88,7 @@ export interface RunLoopContext<Tools extends Record<string, Tool.Any>, R, S ext
     turn: number,
     pending: ReadonlyArray<PendingToolResult>,
     suspension: AgentSuspended,
-  ) => Effect.Effect<Prompt.Prompt, RunError>
+  ) => Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter>
   readonly pendingResults: () => ReadonlyArray<PendingToolResult>
   readonly toolCallEvents: (
     turn: number,

@@ -1,7 +1,14 @@
 import { Function } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentEvent, AgentManifest } from "@batonfx/core"
-import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "../src/index.js"
+import {
+  Address,
+  ExecutableManifest,
+  ExecutableRegistration,
+  ExecutableResolver,
+  RunWait,
+  Runtime,
+} from "../src/index.js"
 import { closedTestAgent, pinnedTestAgent } from "./identity.js"
 
 /** Exact registration set covering every pin an executable requires. */
@@ -145,17 +152,7 @@ export const completedResult = (text: string) => ({
   transcript: emptyTranscript,
 })
 
-type OpenWait = {
-  readonly waitId: string
-  readonly reason:
-    | { _tag: "Approval"; request: object }
-    | { _tag: "ToolWait" }
-    | { _tag: "Signal"; name: string }
-    | { _tag: "Timer" }
-    | { _tag: "External" }
-  readonly status: "open"
-  readonly openedAt: string
-}
+type OpenWait = RunWait.RunWait
 
 type OpenWaitReason = "tool-wait" | "approval" | "signal" | "timer" | "external"
 

@@ -133,7 +133,10 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
     })
 
-  const syncSession = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> => {
+  const syncSession = (
+    turn: number,
+    transcript: Prompt.Prompt,
+  ): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
     return intercept(
       {
@@ -379,7 +382,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
   ): Effect.Effect<
     { readonly prompt: Prompt.Prompt; readonly changed: boolean },
     RunError,
-    LanguageModel.LanguageModel
+    LanguageModel.LanguageModel | DriverInterpreter
   > =>
     Option.match(compactionService, {
       onNone: () => Effect.succeed({ prompt, changed: false }),

@@ -1,5 +1,5 @@
 import { Chat, Connection } from "@batonfx/foldkit"
-import { Cause, Effect, Function, Schema } from "effect"
+import { Cause, Effect, Function, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 import { define, mapMessage, mapMessages, type Command } from "foldkit/command"
 import type { Document, Html } from "foldkit/html"
@@ -90,11 +90,14 @@ export const OpenSession = define(
   FailedOpenSession,
 )(
   Effect.gen(function* () {
-    const httpResponse = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, { body: HttpBody.jsonUnsafe({}) })
+    const httpClient = yield* Layer.build(FetchHttpClient.layer)
+    const httpResponse = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, {
+      body: HttpBody.jsonUnsafe({}),
+    }).pipe(Effect.provideContext(httpClient))
     const body = (yield* httpResponse.json) as { readonly sessionId: string }
     return OpenedSession({ sessionId: body.sessionId })
   }).pipe(
-    Effect.provide(FetchHttpClient.layer),
+    Effect.scoped,
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
   ),
 )

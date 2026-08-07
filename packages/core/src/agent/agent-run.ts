@@ -113,7 +113,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
         suspension: AgentSuspended,
-      ): Effect.Effect<Prompt.Prompt, RunError> =>
+      ): Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter> =>
         Effect.gen(function* () {
           const withPending = yield* appendPending(turn, pending)
           const unresolved = unresolvedToolCall(withPending.content, suspension.tool_call_id)

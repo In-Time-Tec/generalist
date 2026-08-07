@@ -5,7 +5,6 @@ import { PgClient } from "@effect/sql-pg"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "@batonfx/core"
 import {
-
   Address,
   Cursor,
   Errors,
@@ -1158,7 +1157,11 @@ describePostgres("postgres run store", () => {
           .resume({ runId, waitId: "approval", resolution: { _tag: "Approved" } })
           .pipe(Effect.flip)
         expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
-        yield* store.suspend({ ...claim, wait: openWait("approval"), suspension: suspension("approval") })
+        yield* store.suspend({
+          ...claim,
+          wait: openWait("approval", undefined),
+          suspension: suspension("approval", undefined),
+        })
         const inspection = yield* runtime.inspect(runId)
         expect(inspection.status).toBe("cancelling")
         expect(inspection.wait).toMatchObject({ status: "cancelled" })
