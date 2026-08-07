@@ -15,6 +15,12 @@ type BroadStreamPart = Response.StreamPart<BroadTools>
 type BroadGenerateError = LanguageModel.ExtractError<LanguageModel.GenerateTextOptions<BroadTools>>
 type BroadGenerateObjectError = LanguageModel.ExtractError<BroadGenerateObjectOptions>
 
+type SchemaServices<S extends Schema.Encoder<Record<string, Tool.Any>, unknown>> = [unknown] extends [
+  S["DecodingServices"]
+]
+  ? never
+  : S["DecodingServices"]
+
 type GenerateTextMiddleware<Extra, R> = (
   options: LanguageModel.GenerateTextOptions<BroadTools>,
   invoke: (
@@ -229,7 +235,7 @@ export const adapt: {
     ): Effect.Effect<
       LanguageModel.GenerateObjectResponse<Tools, StructuredOutputSchema["Type"]>,
       LanguageModel.ExtractError<Options>,
-      LanguageModel.ExtractServices<Options> | StructuredOutputSchema["DecodingServices"]
+      LanguageModel.ExtractServices<Options> | SchemaServices<StructuredOutputSchema>
     >
     function generateObject(options: BroadGenerateObjectOptions) {
       const invoke = (input = options) => invokeGenerateObject(model, input)
