@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import {
   currentDriverVersion,
@@ -244,11 +244,24 @@ export const makeTracer = (script: ReadonlyArray<TracerModelStep>): DurableAgent
 })
 
 /** @experimental Advance one Execute decision using a supplied outcome. */
-export const applyOperation = (
-  driver: DurableAgentDriver,
-  checkpoint: DriverCheckpoint,
-  outcome: OperationOutcome,
-): Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid> => driver.apply(checkpoint, outcome)
+export const applyOperation: {
+  (
+    checkpoint: DriverCheckpoint,
+    outcome: OperationOutcome,
+  ): (driver: DurableAgentDriver) => Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid>
+  (
+    driver: DurableAgentDriver,
+    checkpoint: DriverCheckpoint,
+    outcome: OperationOutcome,
+  ): Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid>
+} = Function.dual(
+  3,
+  (
+    driver: DurableAgentDriver,
+    checkpoint: DriverCheckpoint,
+    outcome: OperationOutcome,
+  ): Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid> => driver.apply(checkpoint, outcome),
+)
 
 /** @experimental Produce a Complete decision from a terminal tracer checkpoint. */
 export const completeFromCheckpoint = (

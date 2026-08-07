@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import {
   Agent,
   AgentEvent,
@@ -75,7 +75,7 @@ const program = Effect.gen(function* () {
     ),
     Effect.flatMap(() => Effect.die("expected the run to suspend")),
     Effect.catchIf(
-      (error): error is AgentEvent.AgentSuspended => error instanceof AgentEvent.AgentSuspended,
+      (error): error is AgentEvent.AgentSuspended => Schema.is(AgentEvent.AgentSuspended)(error),
       (error) => Effect.succeed(error),
     ),
   )
@@ -86,6 +86,7 @@ const program = Effect.gen(function* () {
     resume: { suspension },
   })
   yield* Console.log(result.text)
-}).pipe(Effect.provide(layers))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(layers)
+await runtime.runPromise(program)

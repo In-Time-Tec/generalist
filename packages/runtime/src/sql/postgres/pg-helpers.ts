@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { PgClient } from "@effect/sql-pg"
@@ -7,11 +7,15 @@ import type { ExecutableManifest, ExecutableRef } from "../../executable-manifes
 import type { Message } from "../../message.js"
 import { isTerminal, type RunStatus } from "../../run.js"
 import {
+  StringArray,
+  decodeJson,
+  decodeJsonValue,
   decodeMessage,
   decodeQueue,
   encodeExecutableManifest,
   encodeExecutableRef,
   encodeEvent,
+  encodeJson,
   encodeMessage,
   encodeQueue,
 } from "../codecs.js"
@@ -19,14 +23,25 @@ import type { EventHub } from "../subscribers.js"
 import { reconcileFanOutWith } from "../store-fan-out.js"
 import type { DecodedRun, EventRow, OperationRow, RunRow } from "../rows.js"
 import type { OperationRecord } from "../operations.js"
-import { decodePersistedEvents, decodeRunEffect } from "../store-helpers.js"
+import { decodePersistedEvents, decodeRunEffect, nowIso } from "../store-helpers.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
 import type { AgentLoopEvent } from "../../agent-event.js"
 import { PendingRunOutcome, type ExecutionClaim } from "../../run-store.js"
 import type { ExecutionResult } from "../../execution-state.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
+import { OperationResolution } from "../../operation-resolution.js"
+import { Prompt } from "effect/unstable/ai"
 
+type StoreError = RuntimeUnavailable | SqlError
+type StoreEffect<A> = Effect.Effect<A, StoreError, SqlClient.SqlClient>
+type SqlOnlyEffect<A> = Effect.Effect<A, SqlError, SqlClient.SqlClient>
+type RunEventEffect = Effect.Effect<RunEvent, SqlError, SqlClient.SqlClient>
+type LaneEffect = Effect.Effect<{ acceptedSequence: number; isHead: boolean }, SqlError, SqlClient.SqlClient>
+type AgentEventError = RunNotFound | RunTerminal | StoreError | StaleClaim
+type AgentEventEffect = Effect.Effect<undefined, AgentEventError, SqlClient.SqlClient>
+type CompleteRunEffect = Effect.Effect<undefined, RunTerminal | StoreError, SqlClient.SqlClient>
+type SettleParentEffect = Effect.Effect<void, StoreError, SqlClient.SqlClient | PgClient.PgClient>
 export type EventPartial = { readonly _tag: string } & Record<string, unknown>
 
 export const loadRun = (runId: string) =>
@@ -66,7 +81,10 @@ export const lockSpawnParent = (runId: string) =>
     return parent
   })
 
-export const emitAgentEvent = (hub: EventHub, input: ExecutionClaim & { readonly event: AgentLoopEvent }) =>
+export const emitAgentEvent: {
+  (input: ExecutionClaim & { readonly event: AgentLoopEvent }): (hub: EventHub) => AgentEventEffect
+  (hub: EventHub, input: ExecutionClaim & { readonly event: AgentLoopEvent }): AgentEventEffect
+} = Function.dual(2, (hub: EventHub, input: ExecutionClaim & { readonly event: AgentLoopEvent }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${input.runId} FOR UPDATE`
@@ -83,13 +101,17 @@ export const emitAgentEvent = (hub: EventHub, input: ExecutionClaim & { readonly
     yield* appendEvent(hub, loaded, input.event as EventPartial)
     if (input.event._tag === "TurnCompleted") {
       yield* sql`
-        UPDATE baton_runs SET transcript_json = ${JSON.stringify(input.event.transcript)}, continuation_json = NULL
+        UPDATE baton_runs SET transcript_json = ${encodeJson(Prompt.Prompt, input.event.transcript)}, continuation_json = NULL
         WHERE run_id = ${loaded.runId}
       `
     }
-  })
+  }),
+)
 
-export const loadEventsAfter = (runId: string, cursor: number) =>
+export const loadEventsAfter: {
+  (cursor: number): (runId: string) => StoreEffect<RunEvent[]>
+  (runId: string, cursor: number): StoreEffect<RunEvent[]>
+} = Function.dual(2, (runId: string, cursor: number) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* loadRun(runId)
@@ -100,7 +122,8 @@ export const loadEventsAfter = (runId: string, cursor: number) =>
       ORDER BY sequence ASC
     `
     return yield* decodePersistedEvents(rows, run.executableManifest)
-  })
+  }),
+)
 
 export const allocateSequence = (runId: string) =>
   Effect.gen(function* () {
@@ -114,54 +137,64 @@ export const allocateSequence = (runId: string) =>
     return Number(rows[0]!.last_sequence)
   })
 
-export const appendEvent = (_hub: EventHub, run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    const pg = yield* PgClient.PgClient
-    const sequence = yield* allocateSequence(run.runId)
-    const occurredAt = new Date().toISOString()
-    const event = {
-      specVersion: "1" as const,
-      eventId: eventIdFor(run.runId, sequence),
-      runId: run.runId,
-      sequence,
-      executableRef: run.executableRef,
-      rootRunId: run.rootRunId,
-      occurredAt,
-      ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
-      ...(run.message.causationId === undefined ? {} : { causationId: run.message.causationId }),
-      ...(run.message.correlationId === undefined ? {} : { correlationId: run.message.correlationId }),
-      ...(run.attempt > 0 ? { attemptId: `${run.runId}:attempt:${run.attempt}` } : {}),
-      ...partial,
-    } as RunEvent
-    yield* sql`
+export const appendEvent: {
+  (run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus): (hub: EventHub) => RunEventEffect
+  (hub: EventHub, run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus): RunEventEffect
+} = Function.dual(
+  (args) => args.length >= 4 || (args.length === 3 && !("runId" in args[0])),
+  (_hub: EventHub, run: DecodedRun, partial: EventPartial, nextStatus?: RunStatus) =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const pg = yield* PgClient.PgClient
+      const sequence = yield* allocateSequence(run.runId)
+      const occurredAt = yield* nowIso
+      const event = {
+        specVersion: "1" as const,
+        eventId: eventIdFor(run.runId, sequence),
+        runId: run.runId,
+        sequence,
+        executableRef: run.executableRef,
+        rootRunId: run.rootRunId,
+        occurredAt,
+        ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
+        ...(run.message.causationId === undefined ? {} : { causationId: run.message.causationId }),
+        ...(run.message.correlationId === undefined ? {} : { correlationId: run.message.correlationId }),
+        ...(run.attempt > 0 ? { attemptId: `${run.runId}:attempt:${run.attempt}` } : {}),
+        ...partial,
+      } as RunEvent
+      yield* sql`
       INSERT INTO baton_run_events (run_id, sequence, event_id, event_json)
       VALUES (${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)})
     `
-    const treeRoot = (yield* sql<{ last_position: number }>`
+      const treeRoot = (yield* sql<{ last_position: number }>`
       UPDATE baton_tree_roots SET last_position = last_position + 1
       WHERE root_run_id = ${run.rootRunId} RETURNING last_position
     `)[0]!
-    yield* sql`
+      yield* sql`
       INSERT INTO baton_tree_event_index (root_run_id, position, run_id, run_sequence, event_id)
       VALUES (${run.rootRunId}, ${Number(treeRoot.last_position)}, ${run.runId}, ${sequence}, ${event.eventId})
     `
-    const status = nextStatus ?? run.status
-    const activeWaitId =
-      event._tag === "RunWaiting" ? event.wait.waitId : event._tag === "RunResumed" ? null : (run.activeWaitId ?? null)
-    const terminalEventId =
-      event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
-        ? event.eventId
-        : (run.terminalEventId ?? null)
-    const cancellationRequested = event._tag === "RunCancellationRequested" || run.cancellationRequested
-    const cancelReason =
-      event._tag === "RunCancellationRequested" && "reason" in event && typeof event.reason === "string"
-        ? event.reason
-        : (run.cancelReason ?? null)
-    const attempt = event._tag === "RunAttemptStarted" ? event.attempt : run.attempt
-    const terminalPartial = event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
-    if (terminalPartial) {
-      yield* sql`
+      const status = nextStatus ?? run.status
+      const activeWaitId =
+        event._tag === "RunWaiting"
+          ? event.wait.waitId
+          : event._tag === "RunResumed"
+            ? null
+            : (run.activeWaitId ?? null)
+      const terminalEventId =
+        event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
+          ? event.eventId
+          : (run.terminalEventId ?? null)
+      const cancellationRequested = event._tag === "RunCancellationRequested" || run.cancellationRequested
+      const cancelReason =
+        event._tag === "RunCancellationRequested" && "reason" in event && typeof event.reason === "string"
+          ? event.reason
+          : (run.cancelReason ?? null)
+      const attempt = event._tag === "RunAttemptStarted" ? event.attempt : run.attempt
+      const terminalPartial =
+        event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled"
+      if (terminalPartial) {
+        yield* sql`
         UPDATE baton_runs SET
           status = ${status},
           active_wait_id = ${activeWaitId},
@@ -177,8 +210,8 @@ export const appendEvent = (_hub: EventHub, run: DecodedRun, partial: EventParti
         WHERE run_id = ${run.runId}
           AND status NOT IN ('succeeded', 'failed', 'cancelled')
       `
-    } else {
-      yield* sql`
+      } else {
+        yield* sql`
         UPDATE baton_runs SET
           status = ${status},
           active_wait_id = ${activeWaitId},
@@ -189,12 +222,16 @@ export const appendEvent = (_hub: EventHub, run: DecodedRun, partial: EventParti
           updated_at = NOW()
         WHERE run_id = ${run.runId}
       `
-    }
-    yield* pg.notify(NOTIFY_CHANNEL, run.runId)
-    return event
-  })
+      }
+      yield* pg.notify(NOTIFY_CHANNEL, run.runId)
+      return event
+    }),
+)
 
-export const promoteHead = (hub: EventHub, address: string, sessionId: string) =>
+export const promoteHead: {
+  (address: string, sessionId: string): (hub: EventHub) => StoreEffect<void>
+  (hub: EventHub, address: string, sessionId: string): StoreEffect<void>
+} = Function.dual(3, (hub: EventHub, address: string, sessionId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ head_run_id: string | null; queue_json: string }>`
@@ -215,9 +252,13 @@ export const promoteHead = (hub: EventHub, address: string, sessionId: string) =
     }
     const head = yield* loadRun(headId)
     if (head === undefined || head.status !== "queued" || head.cancellationRequested) return
-  })
+  }),
+)
 
-export const removeFromLane = (address: string, sessionId: string, runId: string) =>
+export const removeFromLane: {
+  (sessionId: string, runId: string): (address: string) => SqlOnlyEffect<void>
+  (address: string, sessionId: string, runId: string): SqlOnlyEffect<void>
+} = Function.dual(3, (address: string, sessionId: string, runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ queue_json: string }>`
@@ -237,13 +278,18 @@ export const removeFromLane = (address: string, sessionId: string, runId: string
         WHERE address = ${address} AND session_id = ${sessionId}
       `
     }
-  })
+  }),
+)
 
-export const afterTerminal = (hub: EventHub, run: DecodedRun) =>
+export const afterTerminal: {
+  (run: DecodedRun): (hub: EventHub) => StoreEffect<void>
+  (hub: EventHub, run: DecodedRun): StoreEffect<void>
+} = Function.dual(2, (hub: EventHub, run: DecodedRun) =>
   Effect.gen(function* () {
     yield* removeFromLane(run.address, run.sessionId, run.runId)
     yield* promoteHead(hub, run.address, run.sessionId)
-  })
+  }),
+)
 
 export const hasUnsettledChild = (runId: string) =>
   Effect.gen(function* () {
@@ -258,7 +304,10 @@ export const hasUnsettledChild = (runId: string) =>
     return rows.length > 0
   })
 
-export const completeRun = (hub: EventHub, run: DecodedRun, result: ExecutionResult) =>
+export const completeRun: {
+  (run: DecodedRun, result: ExecutionResult): (hub: EventHub) => CompleteRunEffect
+  (hub: EventHub, run: DecodedRun, result: ExecutionResult): CompleteRunEffect
+} = Function.dual(3, (hub: EventHub, run: DecodedRun, result: ExecutionResult) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
@@ -289,7 +338,7 @@ export const completeRun = (hub: EventHub, run: DecodedRun, result: ExecutionRes
     if (runningFanOut.length > 0) {
       yield* sql`
         UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
-          pending_outcome_json = ${JSON.stringify(Schema.encodeSync(PendingRunOutcome)({ _tag: "Completed", result }))}
+          pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Completed", result })}
         WHERE run_id = ${run.runId}
       `
       return
@@ -298,13 +347,13 @@ export const completeRun = (hub: EventHub, run: DecodedRun, result: ExecutionRes
     const settled = (yield* loadRun(run.runId))!
     yield* settleParent(hub, settled, event.eventId)
     yield* afterTerminal(hub, settled)
-  })
+  }),
+)
 
-export const settleParent = (
-  hub: EventHub,
-  child: DecodedRun,
-  terminalEventId: string,
-): Effect.Effect<void, RuntimeUnavailable | SqlError, SqlClient.SqlClient | PgClient.PgClient> =>
+export const settleParent: {
+  (child: DecodedRun, terminalEventId: string): (hub: EventHub) => SettleParentEffect
+  (hub: EventHub, child: DecodedRun, terminalEventId: string): SettleParentEffect
+} = Function.dual(3, (hub: EventHub, child: DecodedRun, terminalEventId: string) =>
   Effect.gen(function* () {
     if (child.parentRunId === undefined) return
     const sql = yield* SqlClient.SqlClient
@@ -363,7 +412,8 @@ export const settleParent = (
     const settledParent = (yield* loadRun(parent.runId))!
     yield* settleParent(hub, settledParent, cancelled.eventId)
     yield* afterTerminal(hub, settledParent)
-  })
+  }),
+)
 
 export const insertRun = (input: {
   readonly runId: string
@@ -392,7 +442,7 @@ export const insertRun = (input: {
         ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
         ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
         NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, FALSE, NULL, NULL, ${input.acceptedSequence},
-        ${JSON.stringify([])}, NULL, NULL, NOW(), NOW()
+        ${encodeJson(StringArray, [])}, NULL, NULL, NOW(), NOW()
       )
     `
     if (input.runId === input.rootRunId) {
@@ -400,7 +450,10 @@ export const insertRun = (input: {
     }
   })
 
-export const enqueueLane = (address: string, sessionId: string, runId: string) =>
+export const enqueueLane: {
+  (sessionId: string, runId: string): (address: string) => LaneEffect
+  (address: string, sessionId: string, runId: string): LaneEffect
+} = Function.dual(3, (address: string, sessionId: string, runId: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const lanes = yield* sql<{ accepted_sequence: string | number; queue_json: string; head_run_id: string | null }>`
@@ -425,7 +478,8 @@ export const enqueueLane = (address: string, sessionId: string, runId: string) =
       WHERE address = ${address} AND session_id = ${sessionId}
     `
     return { acceptedSequence, isHead: head === runId }
-  })
+  }),
+)
 
 export const toOperationRecord = (row: OperationRow): OperationRecord => ({
   runId: row.run_id,
@@ -434,13 +488,13 @@ export const toOperationRecord = (row: OperationRow): OperationRecord => ({
   kind: row.kind,
   status: row.status,
   inputDigest: row.input_digest,
-  input: JSON.parse(row.input_json) as unknown,
+  input: decodeJsonValue(row.input_json),
   replayPolicy: row.replay_policy,
   attempt: Number(row.attempt),
-  ...(row.result_json === null ? {} : { result: JSON.parse(row.result_json) as unknown }),
-  ...(row.error_json === null ? {} : { error: JSON.parse(row.error_json) as unknown }),
+  ...(row.result_json === null ? {} : { result: decodeJsonValue(row.result_json) }),
+  ...(row.error_json === null ? {} : { error: decodeJsonValue(row.error_json) }),
   ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
-  ...(row.resolution_json === null ? {} : { resolution: JSON.parse(row.resolution_json) }),
+  ...(row.resolution_json === null ? {} : { resolution: decodeJson(OperationResolution, row.resolution_json) }),
 })
 
 export { decodeMessage, encodeQueue, decodeQueue }

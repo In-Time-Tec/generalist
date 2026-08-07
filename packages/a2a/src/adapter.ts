@@ -21,9 +21,10 @@ import {
   type TaskStore,
 } from "@a2a-js/sdk/server"
 import { type Address, Cursor, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
-import { Effect, Stream } from "effect"
+import { Effect, Function, Option, Stream } from "effect"
 import { decode } from "./content.js"
 import { artifactFromEvent, fromRuntime, stateFromRun, statusFromEvent } from "./projection.js"
+import { TaskNotWaiting } from "./errors.js"
 
 /** @experimental One explicit A2A endpoint deployment. */
 export interface Deployment {
@@ -66,15 +67,17 @@ const makeTaskStore = (runtime: Runtime.Interface): TaskStore => ({
   load: (taskId: string, _context: ServerCallContext) =>
     Effect.runPromise(
       fromRuntime(runtime, taskId).pipe(
+        Effect.map(Option.some),
         Effect.catchTag("@batonfx/a2a/TaskProjectionFailed", (failure) =>
           failure.cause !== undefined &&
           typeof failure.cause === "object" &&
           failure.cause !== null &&
           "_tag" in failure.cause &&
           failure.cause._tag === "@batonfx/runtime/RunNotFound"
-            ? Effect.succeed(undefined)
+            ? Effect.succeed(Option.none<Task>())
             : Effect.fail(failure),
         ),
+        Effect.map(Option.getOrUndefined),
       ),
     ),
   list: (params: ListTasksRequest, _context: ServerCallContext): Promise<ListTasksResponse> => {
@@ -99,6 +102,21 @@ const makeTaskStore = (runtime: Runtime.Interface): TaskStore => ({
     return Effect.runPromise(effect)
   },
 })
+
+const toAsyncGenerator = <A>(iterable: AsyncIterable<A>): AsyncGenerator<A, void, undefined> => {
+  const iterator = iterable[Symbol.asyncIterator]()
+  return {
+    [Symbol.asyncIterator]() {
+      return this
+    },
+    next: () => iterator.next(),
+    return: (value) =>
+      iterator.return === undefined ? Promise.resolve({ done: true, value }) : iterator.return(value),
+    throw: (error) => (iterator.throw === undefined ? Promise.reject(error) : iterator.throw(error)),
+    [Symbol.asyncDispose]: () =>
+      iterator.return === undefined ? Promise.resolve() : iterator.return(undefined).then(() => undefined),
+  }
+}
 
 const isBoundary = (event: RunEvent.RunEvent): boolean =>
   event._tag === "RunWaiting" ||
@@ -170,7 +188,10 @@ const makeExecutor = (runtime: Runtime.Interface, deployment: Deployment): Agent
       bus.publish(AgentEvent.task(task))
       const wait = snapshot.run.wait
       if (snapshot.run.status !== "waiting" || wait === undefined || wait.status !== "open") {
-        return yield* Effect.fail(new Error(`Task ${context.taskId} is not waiting for input`))
+        return yield* TaskNotWaiting.make({
+          taskId: context.taskId,
+          message: `Task ${context.taskId} is not waiting for input`,
+        })
       }
       if (wait.reason._tag === "Approval") {
         yield* runtime.respondApproval({
@@ -249,10 +270,17 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     context: ServerCallContext,
   ): AsyncGenerator<StreamResponse, void, undefined> {
     const stream = () => super.sendMessageStream(params, context)
-    return (async function* () {
-      await validateRequest(params)
-      yield* stream()
-    })()
+    return toAsyncGenerator(
+      Stream.toAsyncIterable(
+        Stream.fromEffect(Effect.promise(() => validateRequest(params))).pipe(
+          Stream.flatMap(() =>
+            Stream.fromAsyncIterable(stream(), (error): never => {
+              throw error
+            }),
+          ),
+        ),
+      ),
+    )
   }
 
   override cancelTask(params: CancelTaskRequest, _context: ServerCallContext): Promise<Task> {
@@ -274,50 +302,79 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     _context: ServerCallContext,
   ): AsyncGenerator<StreamResponse, void, undefined> {
     const runtime = this.runtime
-    return (async function* () {
-      const snapshot = await Effect.runPromise(runtime.snapshot(params.id))
-      const task = await Effect.runPromise(fromRuntime(runtime, params.id))
-      yield { payload: { $case: "task", value: task } }
-      if (
-        snapshot.run.status === "succeeded" ||
-        snapshot.run.status === "failed" ||
-        snapshot.run.status === "cancelled"
-      ) {
-        return
-      }
+    const resubscribeResponses = (
+      task: Task,
+      events: Stream.Stream<RunEvent.RunEvent, Runtime.EventsError>,
+    ): Stream.Stream<StreamResponse, Runtime.EventsError> => {
       const preceding: Array<RunEvent.RunEvent> = []
-      for await (const event of Stream.toAsyncIterable(runtime.events({ runId: params.id, cursor: snapshot.cursor }))) {
-        if (event._tag === "RunCompleted") {
-          yield {
-            payload: {
-              $case: "artifactUpdate",
-              value: {
-                taskId: task.id,
-                contextId: task.contextId,
-                artifact: artifactFromEvent(event, preceding),
-                append: false,
-                lastChunk: true,
-                metadata: {},
+      return events.pipe(
+        Stream.takeUntil(isBoundary),
+        Stream.map((event) => {
+          const responses: Array<StreamResponse> = []
+          if (event._tag === "RunCompleted") {
+            responses.push({
+              payload: {
+                $case: "artifactUpdate",
+                value: {
+                  taskId: task.id,
+                  contextId: task.contextId,
+                  artifact: artifactFromEvent(event, preceding),
+                  append: false,
+                  lastChunk: true,
+                  metadata: {},
+                },
               },
-            },
+            })
           }
-        }
-        const status = statusFromEvent(task, event)
-        if (status !== undefined) {
-          yield {
-            payload: {
-              $case: "statusUpdate",
-              value: { taskId: task.id, contextId: task.contextId, status, metadata: {} },
-            },
+          const status = statusFromEvent(task, event)
+          if (status !== undefined) {
+            responses.push({
+              payload: {
+                $case: "statusUpdate",
+                value: { taskId: task.id, contextId: task.contextId, status, metadata: {} },
+              },
+            })
           }
-        }
-        preceding.push(event)
-        if (isBoundary(event)) return
-      }
-    })()
+          preceding.push(event)
+          return responses
+        }),
+        Stream.flatMap((responses) => Stream.fromIterable(responses)),
+      )
+    }
+    return toAsyncGenerator(
+      Stream.toAsyncIterable(
+        Stream.fromEffect(
+          Effect.gen(function* () {
+            const snapshot = yield* runtime.snapshot(params.id)
+            const task = yield* fromRuntime(runtime, params.id)
+            return { snapshot, task }
+          }),
+        ).pipe(
+          Stream.flatMap(({ snapshot, task }) => {
+            const head = Stream.make({ payload: { $case: "task", value: task } })
+            if (
+              snapshot.run.status === "succeeded" ||
+              snapshot.run.status === "failed" ||
+              snapshot.run.status === "cancelled"
+            ) {
+              return head
+            }
+            return head.pipe(
+              Stream.concat(resubscribeResponses(task, runtime.events({ runId: params.id, cursor: snapshot.cursor }))),
+            )
+          }),
+        ),
+      ),
+    )
   }
 }
 
 /** @experimental Construct the SDK handler while keeping Runtime as task authority. */
-export const makeHandler = (runtime: Runtime.Interface, deployment: Deployment): DefaultRequestHandler =>
-  new RuntimeRequestHandler(deployment.card, makeTaskStore(runtime), makeExecutor(runtime, deployment), runtime)
+export const makeHandler: {
+  (runtime: Runtime.Interface, deployment: Deployment): DefaultRequestHandler
+  (deployment: Deployment): (runtime: Runtime.Interface) => DefaultRequestHandler
+} = Function.dual(
+  2,
+  (runtime: Runtime.Interface, deployment: Deployment): DefaultRequestHandler =>
+    new RuntimeRequestHandler(deployment.card, makeTaskStore(runtime), makeExecutor(runtime, deployment), runtime),
+)

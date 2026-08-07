@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Function, Schema } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import type { Agent, ToolSchedulingPolicy } from "../agent/agent.js"
 import { validationFailure as toolSchedulingFailure } from "../agent/tool-scheduler.js"
@@ -54,7 +54,7 @@ export interface ProgramAuthority {
   readonly tools: ReadonlyArray<NamedCapability>
   readonly agents: ReadonlyArray<ProgramAgentCapability>
   readonly steps: ReadonlyArray<NamedCapability>
-  readonly budget: typeof ProgramBudget.Type
+  readonly budget: ProgramBudget
 }
 
 /** @experimental Closed, reconstructable identity contract for one Agent. */
@@ -70,7 +70,7 @@ export interface AgentManifest {
   readonly toolScheduling: ToolSchedulingPolicy
   readonly compaction?: CompactionIdentity
   readonly programAuthority?: ProgramAuthority
-  readonly budget: typeof BudgetLimits.Type
+  readonly budget: BudgetLimits
   readonly children: ReadonlyArray<ChildBinding>
 }
 
@@ -130,17 +130,17 @@ export const ChildBinding: Schema.Codec<ChildBinding, ChildBindingEncoded> = Sch
 /** @experimental Closed portable turn-policy constructor data. */
 export const PortablePolicy: Schema.Codec<PortablePolicy, PortablePolicy> = Schema.suspend(() =>
   Schema.Union([
-    Schema.Struct({ _tag: Schema.Literal("Forever") }),
-    Schema.Struct({ _tag: Schema.Literal("Recurs"), count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
-    Schema.Struct({ _tag: Schema.Literal("UntilToolCall"), name: Schema.String }),
-    Schema.Struct({ _tag: Schema.Literal("Both"), first: PortablePolicy, second: PortablePolicy }),
+    Schema.TaggedStruct("Forever", {}),
+    Schema.TaggedStruct("Recurs", { count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
+    Schema.TaggedStruct("UntilToolCall", { name: Schema.String }),
+    Schema.TaggedStruct("Both", { first: PortablePolicy, second: PortablePolicy }),
   ]),
 )
 
 /** @experimental Exact identity of either a portable policy or an opaque policy capability. */
 export const PolicyIdentity: Schema.Codec<PolicyIdentity, PolicyIdentityEncoded> = Schema.Union([
-  Schema.Struct({ _tag: Schema.Literal("Portable"), policy: PortablePolicy }),
-  Schema.Struct({ _tag: Schema.Literal("Pinned"), pin: CapabilityPin }),
+  Schema.TaggedStruct("Portable", { policy: PortablePolicy }),
+  Schema.TaggedStruct("Pinned", { pin: CapabilityPin }),
 ])
 const ToolSchedulingPolicySchema = Schema.Struct({
   maxConcurrency: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -266,9 +266,8 @@ export const make = (input: Omit<AgentManifest, "version"> & { readonly version?
 }
 
 /** @experimental Build an exact manifest for a live Agent using explicitly supplied opaque dependencies. */
-export const fromLiveAgent = <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(
-  agent: Agent<Tools, R, PolicyServices, AuthorizationServices>,
-  identity: {
+export const fromLiveAgent: {
+  <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(identity: {
     readonly model: ModelPin
     readonly tools: ReadonlyArray<NamedCapability>
     readonly skills: ReadonlyArray<NamedCapability>
@@ -276,29 +275,59 @@ export const fromLiveAgent = <Tools extends Record<string, Tool.Any>, R, PolicyS
     readonly policy: PolicyIdentity
     readonly compaction?: CompactionIdentity
     readonly programAuthority?: ProgramAuthority
-    readonly budget: typeof BudgetLimits.Type
+    readonly budget: BudgetLimits
     readonly children: ReadonlyArray<ChildBinding>
-  },
-): PinnedAgent => {
-  const actualTools = Object.keys(agent.toolkit.tools).toSorted()
-  const pinnedTools = identity.tools.map(({ name }) => name).toSorted()
-  if (actualTools.length !== pinnedTools.length || actualTools.some((name, index) => name !== pinnedTools[index])) {
-    throw new TypeError("Tool pins must exactly match the live Agent toolkit")
-  }
-  if (identity.policy._tag === "Portable") {
-    if (agent.policy.snapshot === undefined || digest(agent.policy.snapshot) !== digest(identity.policy.policy)) {
-      throw new TypeError("Portable policy must exactly match the live Agent policy snapshot")
+  }): (agent: Agent<Tools, R, PolicyServices, AuthorizationServices>) => PinnedAgent
+  <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices>,
+    identity: {
+      readonly model: ModelPin
+      readonly tools: ReadonlyArray<NamedCapability>
+      readonly skills: ReadonlyArray<NamedCapability>
+      readonly services: ReadonlyArray<NamedCapability>
+      readonly policy: PolicyIdentity
+      readonly compaction?: CompactionIdentity
+      readonly programAuthority?: ProgramAuthority
+      readonly budget: BudgetLimits
+      readonly children: ReadonlyArray<ChildBinding>
+    },
+  ): PinnedAgent
+} = Function.dual(
+  2,
+  <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices>,
+    identity: {
+      readonly model: ModelPin
+      readonly tools: ReadonlyArray<NamedCapability>
+      readonly skills: ReadonlyArray<NamedCapability>
+      readonly services: ReadonlyArray<NamedCapability>
+      readonly policy: PolicyIdentity
+      readonly compaction?: CompactionIdentity
+      readonly programAuthority?: ProgramAuthority
+      readonly budget: BudgetLimits
+      readonly children: ReadonlyArray<ChildBinding>
+    },
+  ): PinnedAgent => {
+    const actualTools = Object.keys(agent.toolkit.tools).toSorted()
+    const pinnedTools = identity.tools.map(({ name }) => name).toSorted()
+    if (actualTools.length !== pinnedTools.length || actualTools.some((name, index) => name !== pinnedTools[index])) {
+      throw new TypeError("Tool pins must exactly match the live Agent toolkit")
     }
-  } else if (agent.policy.snapshot !== undefined) {
-    throw new TypeError("Pinned policy identity is only valid for an opaque live Agent policy")
-  }
-  if (digest(agent.budget ?? {}) !== digest(identity.budget)) {
-    throw new TypeError("Budget must exactly match the live Agent budget")
-  }
-  return make({
-    name: agent.name,
-    ...(agent.instructions === undefined ? {} : { instructions: agent.instructions }),
-    ...identity,
-    toolScheduling: agent.toolScheduling,
-  })
-}
+    if (identity.policy._tag === "Portable") {
+      if (agent.policy.snapshot === undefined || digest(agent.policy.snapshot) !== digest(identity.policy.policy)) {
+        throw new TypeError("Portable policy must exactly match the live Agent policy snapshot")
+      }
+    } else if (agent.policy.snapshot !== undefined) {
+      throw new TypeError("Pinned policy identity is only valid for an opaque live Agent policy")
+    }
+    if (digest(agent.budget ?? {}) !== digest(identity.budget)) {
+      throw new TypeError("Budget must exactly match the live Agent budget")
+    }
+    return make({
+      name: agent.name,
+      ...(agent.instructions === undefined ? {} : { instructions: agent.instructions }),
+      ...identity,
+      toolScheduling: agent.toolScheduling,
+    })
+  },
+)

@@ -1,11 +1,13 @@
 import { connect, createServer } from "node:net"
 import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
-import { describe, expect, live } from "@effect/vitest"
-import { Effect, Schema, Stream } from "effect"
-import { FetchHttpClient, HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http"
+import { describe, expect, layer } from "@effect/vitest"
+import { Effect, Layer, Schema, Stream } from "effect"
+import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { Cursor } from "@batonfx/runtime"
 import { Client } from "@batonfx/transport"
+
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const RunReceipt = Schema.Struct({
   runId: Schema.String,
@@ -23,7 +25,7 @@ const postJson = (url: string, body: unknown) =>
 const admitRun = (
   baseUrl: string,
   attempts: number,
-): Effect.Effect<typeof RunReceipt.Type, unknown, HttpClient.HttpClient> =>
+): Effect.Effect<typeof RunReceipt.Type, HttpClientError.HttpClientError | Schema.SchemaError, HttpClient.HttpClient> =>
   postJson(`${baseUrl}/runs`, {
     runId: "deep-research-e2e-run",
     sessionId: "deep-research-e2e-session",
@@ -38,18 +40,17 @@ const admitRun = (
     ),
   )
 
-const freePort = Effect.tryPromise({
-  try: () =>
-    new Promise<number>((resolve, reject) => {
-      const server = createServer()
-      server.once("error", reject)
-      server.listen(0, "127.0.0.1", () => {
-        const address = server.address()
-        const port = typeof address === "object" && address !== null ? address.port : 0
-        server.close(() => resolve(port))
-      })
-    }),
-  catch: (error) => new TransportTestError({ message: `could not allocate a test port: ${String(error)}` }),
+const freePort = Effect.callback<number, TransportTestError>((resume) => {
+  const server = createServer()
+  server.once("error", (error) => {
+    server.close()
+    resume(Effect.fail(TransportTestError.make({ message: `could not allocate a test port: ${String(error)}` })))
+  })
+  server.listen(0, "127.0.0.1", () => {
+    const address = server.address()
+    const port = typeof address === "object" && address !== null ? address.port : 0
+    server.close(() => resume(Effect.succeed(port)))
+  })
 })
 
 const startServer = (port: number) =>
@@ -65,22 +66,21 @@ const startServer = (port: number) =>
     stderr: "inherit",
   })
 
-const probePort = (port: number) =>
-  Effect.tryPromise({
-    try: () =>
-      new Promise<void>((resolve, reject) => {
-        const socket = connect({ port, host: "127.0.0.1" })
-        socket.once("connect", () => {
-          socket.destroy()
-          resolve()
-        })
-        socket.once("error", (error) => {
-          socket.destroy()
-          reject(error)
-        })
-      }),
-    catch: (error) =>
-      new TransportTestError({ message: `server on port ${port} did not accept a connection: ${String(error)}` }),
+const probePort = (port: number): Effect.Effect<void, TransportTestError> =>
+  Effect.callback<void, TransportTestError>((resume) => {
+    const socket = connect({ port, host: "127.0.0.1" })
+    socket.once("connect", () => {
+      socket.destroy()
+      resume(Effect.void)
+    })
+    socket.once("error", (error) => {
+      socket.destroy()
+      resume(
+        Effect.fail(
+          TransportTestError.make({ message: `server on port ${port} did not accept a connection: ${String(error)}` }),
+        ),
+      )
+    })
   })
 
 const waitForServerReady = (port: number, attempts: number): Effect.Effect<void, TransportTestError> =>
@@ -93,9 +93,11 @@ const waitForServerReady = (port: number, attempts: number): Effect.Effect<void,
   )
 
 describe("deep-research-agent Baton transport e2e", () => {
-  live(
-    "admits a deterministic run, resolves its approval, and replays canonical SSE events",
-    () =>
+  layer(FetchHttpClient.layer.pipe(Layer.provideMerge(bunServicesLayer)), {
+    excludeTestServices: true,
+    timeout: 60_000,
+  })("admits a deterministic run, resolves its approval, and replays canonical SSE events", (it) => {
+    it.effect("admits a deterministic run, resolves its approval, and replays canonical SSE events", () =>
       Effect.scoped(
         Effect.gen(function* () {
           const port = yield* freePort
@@ -117,7 +119,7 @@ describe("deep-research-agent Baton transport e2e", () => {
           const approvalRequested = Array.from(first).find((event) => event._tag === "ApprovalRequested")
           const waiting = Array.from(first).find((event) => event._tag === "RunWaiting")
           if (waiting === undefined || waiting._tag !== "RunWaiting") {
-            return yield* Effect.die(`expected RunWaiting: ${JSON.stringify(Array.from(first))}`)
+            return yield* Effect.die(`expected RunWaiting: ${encodeJson(Array.from(first))}`)
           }
 
           yield* postJson(`${baseUrl}/runs/${receipt.runId}/respond`, {
@@ -176,7 +178,7 @@ describe("deep-research-agent Baton transport e2e", () => {
           expect(completed.result.text).toContain("Based on 2 sources")
           expect(completed.result.text).toContain("https://github.com/batonfx/batonfx")
         }),
-      ).pipe(Effect.provide(FetchHttpClient.layer), Effect.provide(bunServicesLayer)),
-    60_000,
-  )
+      ),
+    )
+  })
 })

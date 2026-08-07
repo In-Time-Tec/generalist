@@ -4,6 +4,7 @@ import type { Attribute, ChildAttribute, Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
 import { cn } from "@/lib/utils"
+import { dual } from "effect/Function"
 
 // VIEW
 
@@ -46,10 +47,10 @@ export type ButtonConfig<ParentMessage> = Readonly<{
   attributes?: ReadonlyArray<Attribute<ParentMessage> | ChildAttribute>
 }>
 
-export const button = <ParentMessage>(
-  config: ButtonConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const button: {
+  <ParentMessage>(config: ButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: ButtonConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: ButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   const { attributes = [], class: className, dataSlot = "button", size, variant, ...primitiveConfig } = config
 
@@ -66,4 +67,4 @@ export const button = <ParentMessage>(
         [...children],
       ),
   })
-}
+})

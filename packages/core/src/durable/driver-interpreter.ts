@@ -1,4 +1,4 @@
-import { Cause, Clock, Context, Effect, Exit, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Cause, Context, DateTime, Effect, Exit, Function, Layer, Option, Ref, Schema, Stream } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import {
   type DriverCheckpoint,
@@ -55,7 +55,7 @@ export interface DriverJournal {
   readonly onScheduled: (
     operation: DriverOperation,
     checkpoint: DriverCheckpoint,
-  ) => Effect.Effect<OperationOutcome | undefined>
+  ) => Effect.Effect<OperationOutcome | void>
   readonly onCompleted: (
     operation: DriverOperation,
     outcome: OperationOutcome,
@@ -66,7 +66,7 @@ export interface DriverJournal {
 
 /** @experimental Optional host journal service merged into Agent.stream driver layers. */
 export class DriverJournalService extends Context.Service<DriverJournalService, DriverJournal>()(
-  "@batonfx/core/DriverJournal",
+  "@batonfx/core/DriverJournalService",
 ) {}
 
 /** @experimental Inline interpreter executing driver operations through Effect services. */
@@ -112,7 +112,7 @@ export class DriverInterpreter extends Context.Service<DriverInterpreter, Interf
 ) {}
 
 const noopJournal: DriverJournal = {
-  onScheduled: () => Effect.succeed(undefined),
+  onScheduled: () => Effect.void,
   onCompleted: () => Effect.void,
   onCheckpoint: () => Effect.void,
 }
@@ -126,13 +126,16 @@ const outcomeFromExit = <E>(operation: DriverOperation, exit: Exit.Exit<unknown,
 }
 
 /** @experimental */
-export const guardUnknownNeverReplay = (
-  operation: DriverOperation,
-  outcome: OperationOutcome,
-): Effect.Effect<void, DriverUnknownReplay> =>
-  outcome._tag === "Unknown" && operation.replayPolicy === "never"
-    ? DriverUnknownReplay.make({ operationKey: operation.key, operationId: outcome.operationId })
-    : Effect.void
+export const guardUnknownNeverReplay: {
+  (outcome: OperationOutcome): (operation: DriverOperation) => Effect.Effect<void, DriverUnknownReplay>
+  (operation: DriverOperation, outcome: OperationOutcome): Effect.Effect<void, DriverUnknownReplay>
+} = Function.dual(
+  2,
+  (operation: DriverOperation, outcome: OperationOutcome): Effect.Effect<void, DriverUnknownReplay> =>
+    outcome._tag === "Unknown" && operation.replayPolicy === "never"
+      ? DriverUnknownReplay.make({ operationKey: operation.key, operationId: outcome.operationId })
+      : Effect.void,
+)
 
 /** @experimental */
 export const makeInline = (input: {
@@ -179,7 +182,7 @@ export const makeInline = (input: {
           if (replay === undefined) yield* Ref.set(activePendingRef, decision.operation.key)
           return { operation: decision.operation, replay, nested: false }
         }
-        const nowIso = new Date(yield* Clock.currentTimeMillis).toISOString()
+        const nowIso = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
         yield* assertNotExpired(before.budget, nowIso)
         before = yield* chargeScheduled(before, spec.kind)
         yield* Ref.set(checkpointRef, before)
@@ -396,53 +399,70 @@ export const layerInline = (input: {
   )
 
 /** @experimental */
-export const layerForRun = <Tools extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(
-  agent: Agent<Tools, R>,
-  options: RunOptions,
-  prompt: Prompt.Prompt,
-  budget?: RunBudget,
-): Layer.Layer<DriverInterpreter> => {
-  const sessionId = options.sessionId ?? agent.name
-  const logicalOperationId = options.logicalOperationId ?? sessionId
-  const driver = makeLoopDriver({
-    logicalOperationId,
-    sessionId,
-    ...(options.modelCallOrdinalStart === undefined ? {} : { modelCallOrdinalStart: options.modelCallOrdinalStart }),
-  })
-  const initial: Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid> = Effect.gen(function* () {
-    if (options.driverCheckpoint === undefined) {
-      return yield* driver.initial({
-        ...(options.executableRef === undefined ? {} : { executable: options.executableRef }),
-        prompt,
-        budget: budget ?? allocate({}),
-      })
-    }
-    const checkpoint = options.driverCheckpoint
-    if (options.executableRef === undefined || checkpoint.executable === undefined) {
-      return yield* DriverStateInvalid.make({
-        message: "Persisted driver checkpoints require an explicit executable identity",
-      })
-    }
-    if (
-      checkpoint.driverVersion !== currentDriverVersion ||
-      checkpoint.executable?.executable !== options.executableRef?.executable ||
-      checkpoint.executable?.active !== options.executableRef?.active
-    ) {
-      return yield* DriverStateInvalid.make({ message: "Persisted driver checkpoint does not match the active Agent" })
-    }
-    return checkpoint
-  })
-  return Layer.unwrap(
-    initial.pipe(
-      Effect.map((checkpoint) =>
-        layerInline({
-          driver,
-          initial: checkpoint,
-        }),
+export const layerForRun: {
+  <Tools extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(
+    options: RunOptions,
+    prompt: Prompt.Prompt,
+    budget?: RunBudget,
+  ): (agent: Agent<Tools, R>) => Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
+  <Tools extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(
+    agent: Agent<Tools, R>,
+    options: RunOptions,
+    prompt: Prompt.Prompt,
+    budget?: RunBudget,
+  ): Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
+} = Function.dual(
+  (args) => args.length >= 1 && typeof args[0] === "object" && args[0] !== null && "toolkit" in args[0],
+  <Tools extends Record<string, import("effect/unstable/ai").Tool.Any>, R>(
+    agent: Agent<Tools, R>,
+    options: RunOptions,
+    prompt: Prompt.Prompt,
+    budget?: RunBudget,
+  ): Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid> => {
+    const sessionId = options.sessionId ?? agent.name
+    const logicalOperationId = options.logicalOperationId ?? sessionId
+    const driver = makeLoopDriver({
+      logicalOperationId,
+      sessionId,
+      ...(options.modelCallOrdinalStart === undefined ? {} : { modelCallOrdinalStart: options.modelCallOrdinalStart }),
+    })
+    const initial: Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid> = Effect.gen(function* () {
+      if (options.driverCheckpoint === undefined) {
+        return yield* driver.initial({
+          ...(options.executableRef === undefined ? {} : { executable: options.executableRef }),
+          prompt,
+          budget: budget ?? allocate({}),
+        })
+      }
+      const checkpoint = options.driverCheckpoint
+      if (options.executableRef === undefined || checkpoint.executable === undefined) {
+        return yield* DriverStateInvalid.make({
+          message: "Persisted driver checkpoints require an explicit executable identity",
+        })
+      }
+      if (
+        checkpoint.driverVersion !== currentDriverVersion ||
+        checkpoint.executable?.executable !== options.executableRef?.executable ||
+        checkpoint.executable?.active !== options.executableRef?.active
+      ) {
+        return yield* DriverStateInvalid.make({
+          message: "Persisted driver checkpoint does not match the active Agent",
+        })
+      }
+      return checkpoint
+    })
+    return Layer.unwrap(
+      initial.pipe(
+        Effect.map((checkpoint) =>
+          layerInline({
+            driver,
+            initial: checkpoint,
+          }),
+        ),
       ),
-    ),
-  ) as Layer.Layer<DriverInterpreter>
-}
+    )
+  },
+)
 
 /** @experimental */
 export const layerTest = (input: {

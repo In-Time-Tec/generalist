@@ -19,11 +19,13 @@ import type { EventHub } from "../subscribers.js"
 import { completeRun, requireRun } from "./pg-helpers.js"
 import { suspend } from "./store-suspend.js"
 import { admitProgramChild } from "../store-admit.js"
+import type { WithoutSqlError } from "../sql-effect.js"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
-type Run = <A, E>(
-  effect: Effect.Effect<A, E, SqlR>,
-) => Effect.Effect<A, Exclude<E, { readonly _tag: "SqlError" }> | RuntimeUnavailable>
+export type Run = <A, E>(
+  effect: Effect.Effect<A, E | SqlError, SqlR>,
+) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
 export const programStoreMethods = (input: {
   readonly sql: SqlClient.SqlClient

@@ -19,10 +19,13 @@ export const conversationOnly = (prompt: Prompt.Prompt): Prompt.Prompt =>
     : prompt
 
 /** @experimental Restore a Session projection into a Chat by prepending the derived system message. */
-export const withDerivedSystem = (system: string | undefined, projection: Prompt.Prompt): Prompt.Prompt =>
-  system === undefined || projection.content.some((message) => message.role === "system")
-    ? projection
-    : withSystem(system, projection)
+export const withDerivedSystem = (input: {
+  readonly system: string | undefined
+  readonly projection: Prompt.Prompt
+}): Prompt.Prompt =>
+  input.system === undefined || input.projection.content.some((message) => message.role === "system")
+    ? input.projection
+    : withSystem(input.system, input.projection)
 
 /**
  * @experimental Seed a new Chat from the active Session path.
@@ -33,21 +36,22 @@ export const withDerivedSystem = (system: string | undefined, projection: Prompt
 export const seedFromSession = (input: {
   readonly activeSession: Option.Option<typeof SessionStore.Service>
   readonly suppliedHistory: Prompt.RawInput | undefined
-}): Effect.Effect<Prompt.Prompt | undefined, import("../context/session.js").SessionStoreError> =>
+}): Effect.Effect<Option.Option<Prompt.Prompt>, import("../context/session.js").SessionStoreError> =>
   input.suppliedHistory !== undefined || Option.isNone(input.activeSession)
-    ? Effect.succeed(undefined)
+    ? Effect.succeedNone
     : input.activeSession.value.path().pipe(
         Effect.map(buildContext),
-        Effect.map((projection) => (projection.content.length === 0 ? undefined : projection)),
+        Effect.map((projection) => (projection.content.length === 0 ? Option.none() : Option.some(projection))),
       )
 
 /** @experimental Build the Chat a run starts from, preferring an active Session over supplied history. */
 export const initialChat = (input: {
-  readonly sessionHistory: Prompt.Prompt | undefined
+  readonly sessionHistory: Option.Option<Prompt.Prompt>
   readonly suppliedHistory: Prompt.RawInput | undefined
   readonly system: string | undefined
 }): Effect.Effect<Chat.Service> => {
-  if (input.sessionHistory !== undefined) return Chat.fromPrompt(withDerivedSystem(input.system, input.sessionHistory))
+  if (Option.isSome(input.sessionHistory))
+    return Chat.fromPrompt(withDerivedSystem({ system: input.system, projection: input.sessionHistory.value }))
   if (input.suppliedHistory !== undefined) return Chat.fromPrompt(input.suppliedHistory)
   return input.system === undefined
     ? Chat.empty
@@ -61,17 +65,17 @@ export const initialChat = (input: {
  * unacknowledged batch be retried, but re-emitting it would replay events the run log already holds
  * and read as a conflicting model call.
  */
-export const restoreCheckpointTelemetry = (
-  session: typeof SessionStore.Service,
-  undelivered: Array<ModelTelemetryEvent>,
-): Effect.Effect<void, import("../context/session.js").SessionStoreError> =>
-  session.path().pipe(
+export const restoreCheckpointTelemetry = (input: {
+  readonly session: typeof SessionStore.Service
+  readonly undelivered: Array<ModelTelemetryEvent>
+}): Effect.Effect<void, import("../context/session.js").SessionStoreError> =>
+  input.session.path().pipe(
     Effect.map((path) => path.findLast((entry) => entry._tag === "Compaction")),
     Effect.map((checkpoint) => {
       if (checkpoint?._tag !== "Compaction") return
       for (const event of checkpoint.telemetry) {
-        if (undelivered.some((current) => current.deliveryId === event.deliveryId)) continue
-        undelivered.push(event)
+        if (input.undelivered.some((current) => current.deliveryId === event.deliveryId)) continue
+        input.undelivered.push(event)
       }
     }),
   )

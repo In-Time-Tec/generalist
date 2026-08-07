@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { ExecutionClaim, ExecutionRecord } from "../run-store.js"
@@ -34,26 +34,44 @@ const executionRecord = (
   registrations: run.registrations,
 })
 
-export const loadExecution = (state: MemoryState, runId: string) =>
+export const loadExecution: {
+  (runId: string): (state: MemoryState) => Effect.Effect<ExecutionRecord, RunNotFound | RuntimeUnavailable>
+  (state: MemoryState, runId: string): Effect.Effect<ExecutionRecord, RunNotFound | RuntimeUnavailable>
+} = Function.dual(2, (state: MemoryState, runId: string) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, runId)
     return executionRecord(run)
-  })
+  }),
+)
 
-export const requireExecutionClaim = (state: MemoryState, input: ExecutionClaim) => {
+export const requireExecutionClaim: {
+  (input: ExecutionClaim): (state: MemoryState) => Effect.Effect<void, never, never> | StaleClaim
+  (state: MemoryState, input: ExecutionClaim): Effect.Effect<void, never, never> | StaleClaim
+} = Function.dual(2, (state: MemoryState, input: ExecutionClaim) => {
   const run = state.runs.get(input.runId)
   return run !== undefined && run.ownerId === input.ownerId && run.attemptFence === input.attemptFence
     ? Effect.void
     : StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: input.attemptFence })
-}
+})
 
-export const claimExecution = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly ownerId: string },
-): Effect.Effect<
-  readonly [ExecutionRecord & ExecutionClaim, MemoryState],
-  RunNotFound | RunTerminal | RuntimeUnavailable
-> =>
+export const claimExecution: {
+  (input: {
+    readonly runId: string
+    readonly ownerId: string
+  }): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    readonly [ExecutionRecord & ExecutionClaim, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable
+  >
+  (
+    state: MemoryState,
+    input: { readonly runId: string; readonly ownerId: string },
+  ): Effect.Effect<
+    readonly [ExecutionRecord & ExecutionClaim, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable
+  >
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly ownerId: string }) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
@@ -72,36 +90,56 @@ export const claimExecution = (
       { ...executionRecord(claimed), ownerId: input.ownerId },
       { ...state, runs },
     ] as const
-  })
+  }),
+)
 
-export const saveExecution = (
-  state: MemoryState,
-  input: ExecutionClaim & {
-    readonly checkpoint?: ExecutionRecord["checkpoint"]
-    readonly suspension?: ExecutionRecord["suspension"]
-    readonly transcript?: ExecutionRecord["transcript"]
-  },
-): Effect.Effect<MemoryState, RunNotFound | RuntimeUnavailable | StaleClaim> =>
-  Effect.gen(function* () {
-    const run = yield* requireRun(state, input.runId)
-    if (run.ownerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
-      return yield* StaleClaim.make({
-        runId: input.runId,
-        workerId: input.ownerId,
-        attemptFence: input.attemptFence,
+export const saveExecution: {
+  (
+    input: ExecutionClaim & {
+      readonly checkpoint?: ExecutionRecord["checkpoint"]
+      readonly suspension?: ExecutionRecord["suspension"]
+      readonly transcript?: ExecutionRecord["transcript"]
+    },
+  ): (state: MemoryState) => Effect.Effect<MemoryState, RunNotFound | RuntimeUnavailable | StaleClaim>
+  (
+    state: MemoryState,
+    input: ExecutionClaim & {
+      readonly checkpoint?: ExecutionRecord["checkpoint"]
+      readonly suspension?: ExecutionRecord["suspension"]
+      readonly transcript?: ExecutionRecord["transcript"]
+    },
+  ): Effect.Effect<MemoryState, RunNotFound | RuntimeUnavailable | StaleClaim>
+} = Function.dual(
+  2,
+  (
+    state: MemoryState,
+    input: ExecutionClaim & {
+      readonly checkpoint?: ExecutionRecord["checkpoint"]
+      readonly suspension?: ExecutionRecord["suspension"]
+      readonly transcript?: ExecutionRecord["transcript"]
+    },
+  ) =>
+    Effect.gen(function* () {
+      const run = yield* requireRun(state, input.runId)
+      if (run.ownerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
+        return yield* StaleClaim.make({
+          runId: input.runId,
+          workerId: input.ownerId,
+          attemptFence: input.attemptFence,
+        })
+      }
+      const executableRef = yield* Effect.try({
+        try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
+        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
       })
-    }
-    const executableRef = yield* Effect.try({
-      try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    const runs = new Map(state.runs)
-    runs.set(run.runId, {
-      ...run,
-      executableRef,
-      ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
-      ...(input.suspension === undefined ? {} : { suspension: input.suspension }),
-      ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
-    })
-    return { ...state, runs }
-  })
+      const runs = new Map(state.runs)
+      runs.set(run.runId, {
+        ...run,
+        executableRef,
+        ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
+        ...(input.suspension === undefined ? {} : { suspension: input.suspension }),
+        ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
+      })
+      return { ...state, runs }
+    }),
+)

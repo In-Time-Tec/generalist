@@ -1,4 +1,4 @@
-import { Console, Effect, Layer } from "effect"
+import { Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, Chat } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
@@ -21,6 +21,7 @@ const program = Effect.gen(function* () {
     persistence: { chatId: "user-42" },
   })
   yield* Console.log(result.text)
-}).pipe(Effect.provide(applicationLayer))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(applicationLayer)
+await runtime.runPromise(program)

@@ -1,4 +1,18 @@
-import { Cause, Context, Deferred, Effect, Fiber, Layer, Option, Queue, Ref, Schedule, Scope, Stream } from "effect"
+import {
+  Cause,
+  Context,
+  Deferred,
+  Effect,
+  Fiber,
+  Layer,
+  Option,
+  Queue,
+  Ref,
+  Schedule,
+  Scope,
+  Schema,
+  Stream,
+} from "effect"
 import { Sse } from "effect/unstable/encoding"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
@@ -75,7 +89,7 @@ export const sseEvents = (options: {
       return Effect.succeed(event.data)
     }),
     Stream.mapError((error) =>
-      error instanceof TransportError ? error : transportError(errorMessage(error), "protocol"),
+      Schema.is(TransportError)(error) ? error : transportError(errorMessage(error), "protocol"),
     ),
   )
 

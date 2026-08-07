@@ -1,3 +1,4 @@
+import { Function } from "effect"
 import { Message, Model, Orientation, OutMessage, Selected, buttonId, create, init } from "@foldkit/ui/listbox"
 import type { AnchorConfig, GroupHeading, InitConfig, ViewInputs } from "@foldkit/ui/listbox"
 import type { Html } from "foldkit/html"
@@ -8,14 +9,14 @@ import { cn } from "@/lib/utils"
 // MODEL
 
 export { Model, Orientation, init }
-export type SelectModel = typeof Model.Type
-export type SelectOrientation = typeof Orientation.Type
+export type SelectModel = Model
+export type SelectOrientation = Orientation
 export type { AnchorConfig, InitConfig }
 
 // MESSAGE
 
 export { Message, OutMessage, Selected }
-export type SelectMessage = typeof Message.Type
+export type SelectMessage = Message
 export type SelectSelected<Value extends string = string> = Readonly<{
   readonly _tag: "Selected"
   readonly value: Value
@@ -180,7 +181,10 @@ export type ItemConfig = Readonly<{
  * check-icon indicator that shows via CSS when the option carries the
  * primitive's `data-selected` attribute.
  */
-export const item = (config: ItemConfig, children: ReadonlyArray<Html | string>): PrimitiveItemConfig => {
+export const item: {
+  (config: ItemConfig, children: ReadonlyArray<Html | string>): PrimitiveItemConfig
+  (children: ReadonlyArray<Html | string>): (config: ItemConfig) => PrimitiveItemConfig
+} = Function.dual(2, (config: ItemConfig, children: ReadonlyArray<Html | string>): PrimitiveItemConfig => {
   const h = html<SelectMessage>()
   return {
     className: cn(itemClass, config.class),
@@ -189,17 +193,20 @@ export const item = (config: ItemConfig, children: ReadonlyArray<Html | string>)
       [...children, h.span([h.DataAttribute("slot", "select-item-indicator"), h.Class(indicatorClass)], [checkIcon()])],
     ),
   }
-}
+})
 
 export type LabelConfig = Readonly<{
   class?: string
 }>
 
 /** Styled group label for `groupToHeading`: returns the primitive's `GroupHeading`. */
-export const label = (config: LabelConfig, children: ReadonlyArray<Html | string>): GroupHeading => {
+export const label: {
+  (config: LabelConfig, children: ReadonlyArray<Html | string>): GroupHeading
+  (children: ReadonlyArray<Html | string>): (config: LabelConfig) => GroupHeading
+} = Function.dual(2, (config: LabelConfig, children: ReadonlyArray<Html | string>): GroupHeading => {
   const h = html<SelectMessage>()
   return {
     className: cn(labelClass, config.class),
     content: h.span([h.DataAttribute("slot", "select-label")], [...children]),
   }
-}
+})

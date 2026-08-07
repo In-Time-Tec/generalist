@@ -143,7 +143,8 @@ export const toolkitHandlersLayer = toolkitLayer.pipe(Layer.provideMerge(searchP
 
 const toolExecutorLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitHandlersLayer))
+    const handlers = yield* Layer.build(toolkitHandlersLayer)
+    const handledToolkit = yield* toolkit.pipe(Effect.provideContext(handlers))
     return ToolExecutor.layerToolkit(handledToolkit)
   }),
 )

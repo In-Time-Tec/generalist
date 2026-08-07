@@ -1,4 +1,4 @@
-import { Config, Console, Effect, Layer } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry } from "@batonfx/core"
 import { route } from "@batonfx/mcp/baton"
 import { OpenRouter } from "@batonfx/providers"
@@ -15,23 +15,28 @@ const program = Effect.gen(function* () {
     instructions: "Use the filesystem tools to answer.",
     toolkit: tools.toolkit,
   })
-  const result = yield* ModelRegistry.operate(
-    { provider: "openrouter", model: "openai/gpt-4o-mini" },
-    Agent.generate(agent, { prompt: "List the markdown files in this project." }),
-  ).pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        OpenRouter.layer({
-          model: "openai/gpt-4o-mini",
-          apiKey: Config.redacted("OPENROUTER_API_KEY"),
-        }),
-        tools.executorLayer,
-        Approvals.layerAutoApprove,
-        ModelMiddleware.layerIdentity,
+  const result = yield* Effect.scoped(
+    Effect.flatMap(
+      Layer.build(
+        Layer.mergeAll(
+          OpenRouter.layer({
+            model: "openai/gpt-4o-mini",
+            apiKey: Config.redacted("OPENROUTER_API_KEY"),
+          }),
+          tools.executorLayer,
+          Approvals.layerAutoApprove,
+          ModelMiddleware.layerIdentity,
+        ),
       ),
+      (services) =>
+        ModelRegistry.operate(
+          { provider: "openrouter", model: "openai/gpt-4o-mini" },
+          Agent.generate(agent, { prompt: "List the markdown files in this project." }),
+        ).pipe(Effect.provideContext(services)),
     ),
   )
   yield* Console.log(result.text)
-}).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+}).pipe(Effect.scoped)
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(FetchHttpClient.layer)
+await runtime.runPromise(program)

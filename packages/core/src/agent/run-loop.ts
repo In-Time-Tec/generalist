@@ -24,7 +24,14 @@ import { resolvedToolResult, type SuspensionCheckpoint } from "./agent-suspensio
 import type { ResumeResolution, RunError } from "./agent.js"
 import type { Input } from "../turn/steering.js"
 import { applyPromptChain, errorMessage, providerOutputState } from "./agent-message.js"
-import type { ObjectSchema, RunLoopContext, StructuredRunConfig } from "./run-loop-context.js"
+import type {
+  LoopServices,
+  ObjectSchema,
+  RunLoopContext,
+  SchemaServicesD,
+  StructuredRunConfig,
+  TurnServices,
+} from "./run-loop-context.js"
 import type { Request } from "../tools/tool-executor.js"
 import { select } from "../tools/tool-registry.js"
 import {
@@ -35,6 +42,7 @@ import {
   setHandoffState,
 } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
+import { type DriverInterpreter } from "../durable/driver-interpreter.js"
 import { LoopDriverState, modelCallOrdinal } from "../durable/loop-driver-state.js"
 import { takePendingContinuation } from "./handoff-state.js"
 import { DriverStateInvalid } from "../durable/durable-driver.js"
@@ -46,7 +54,7 @@ export const makeRunLoop = <
   StructuredOutputSchema extends ObjectSchema = ObjectSchema,
 >(
   context: RunLoopContext<Tools, R, StructuredOutputSchema>,
-): Stream.Stream<Event, RunError, R | StructuredOutputSchema["DecodingServices"]> => {
+): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
   const {
     agent,
     options,
@@ -83,7 +91,7 @@ export const makeRunLoop = <
   const structuredFinalEvents = (
     structuredTurn: number,
     config: StructuredRunConfig<StructuredOutputSchema>,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> =>
+  ): Stream.Stream<Event, RunError, TurnServices<StructuredOutputSchema>> =>
     Stream.fromEffect(
       Effect.gen(function* () {
         const transformedPrompt = yield* applyPromptChain(chain, Prompt.make(config.objectPrompt), {
@@ -178,7 +186,7 @@ export const makeRunLoop = <
       readonly events: Stream.Stream<
         Event,
         RunError,
-        LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
+        LanguageModel.LanguageModel | SchemaServicesD<StructuredOutputSchema>
       >
       readonly next?: {
         readonly prompt: Prompt.RawInput
@@ -187,7 +195,7 @@ export const makeRunLoop = <
       readonly structuredTurn?: number
     },
     AgentError | TurnPolicyError | RunError,
-    R
+    R | DriverInterpreter
   > =>
     Effect.gen(function* () {
       const pending = pendingResults()
@@ -274,9 +282,8 @@ export const makeRunLoop = <
       let continuationOverrides = decision.overrides
       let continuationPrompt = basePrompt
       if (handoffStateRef !== undefined) {
-        const pendingContinuation = yield* takePendingContinuation(
-          handoffStateRef,
-          (handoff) => setHandoffState(handoff) as Effect.Effect<void, DriverStateInvalid, R>,
+        const pendingContinuation = yield* takePendingContinuation(handoffStateRef, (handoff) =>
+          setHandoffState(handoff),
         )
         if (pendingContinuation !== undefined) {
           continuationPrompt =
@@ -314,7 +321,7 @@ export const makeRunLoop = <
     turn: number,
     prompt: Prompt.RawInput,
     overrides?: TurnOverrides,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> => {
+  ): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
     let next:
       | {
           readonly prompt: Prompt.RawInput
@@ -356,7 +363,7 @@ export const makeRunLoop = <
   }
   const resumeStream = (
     checkpoint: SuspensionCheckpoint,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> => {
+  ): Stream.Stream<Event, RunError, LoopServices<Tools, R, StructuredOutputSchema>> => {
     let next:
       | {
           readonly prompt: Prompt.RawInput
@@ -474,10 +481,10 @@ export const makeRunLoop = <
     Stream.provideService(CurrentSummaryCall, undefined),
     Stream.mapEffect(
       (event): Effect.Effect<ReadonlyArray<Event>, RunError> =>
-        deliverPending().pipe(Effect.map(() => [...flushTelemetry(), event])),
+        deliverPending.pipe(Effect.map(() => [...flushTelemetry(), event])),
     ),
     Stream.flattenIterable,
-    Stream.concat(Stream.unwrap(deliverPending().pipe(Effect.map(() => Stream.fromIterable(flushTelemetry()))))),
+    Stream.concat(Stream.unwrap(deliverPending.pipe(Effect.map(() => Stream.fromIterable(flushTelemetry()))))),
     Stream.catchCause((cause) => {
       if (Cause.hasInterrupts(cause)) return Stream.failCause<RunError>(cause)
       const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
@@ -485,7 +492,7 @@ export const makeRunLoop = <
         return Stream.failCause<RunError>(cause)
       }
       return Stream.unwrap(
-        deliverPending().pipe(
+        deliverPending.pipe(
           Effect.map(() => Stream.concat(Stream.fromIterable(flushTelemetry()), Stream.failCause<RunError>(cause))),
         ),
       )

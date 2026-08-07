@@ -7,8 +7,10 @@ import { StaleClaim } from "./errors.js"
 import { loadRun, loadRunWait, nowIso } from "./store-helpers.js"
 import type { DecodedRun } from "./rows.js"
 import { checkpointRef } from "../executable-manifest.js"
-import { encodeExecutableRef } from "./codecs.js"
+import { encodeExecutableRef, encodeJson } from "./codecs.js"
 import { loadRegistrations } from "./executable-registrations.js"
+import { Prompt } from "effect/unstable/ai"
+import { ExecutionCheckpoint, ExecutionSuspension } from "../execution-state.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))))
@@ -99,10 +101,10 @@ export const saveExecution = (
     const updated = yield* nowIso
     const rows = yield* sql<{ run_id: string }>`
       UPDATE baton_runs SET
-        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
-        suspension_json = COALESCE(${input.suspension === undefined ? null : JSON.stringify(input.suspension)}, suspension_json),
-        transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+        suspension_json = COALESCE(${input.suspension === undefined ? null : encodeJson(ExecutionSuspension, input.suspension)}, suspension_json),
+        transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
         updated_at = ${updated}
       WHERE run_id = ${input.runId}
         AND owner_worker_id = ${input.ownerId}

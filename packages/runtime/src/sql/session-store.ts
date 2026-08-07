@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema } from "effect"
+import { DateTime, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { Session } from "@batonfx/core"
 type Entry = Session.Entry
@@ -80,7 +80,7 @@ export const makeSqliteSessionStore = (options: {
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
 
-    const now = Effect.sync(() => new Date().toISOString())
+    const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
     const sessionRow = Effect.gen(function* () {
       const rows = yield* sql<SessionRow>`
@@ -152,20 +152,19 @@ export const makeSqliteSessionStore = (options: {
       WHERE session_id = ${options.sessionId}
     `
 
-    const asStoreError = <A, E>(effect: Effect.Effect<A, E>) =>
-      Effect.catchIf(
-        effect,
-        (error): error is Exclude<E, Session.SessionConflict | Session.SessionStoreError> =>
-          !Schema.is(Session.SessionConflict)(error) && !Schema.is(Session.SessionStoreError)(error),
-        (error) => storeError(String(error)),
-      ) as Effect.Effect<A, Session.SessionConflict | Session.SessionStoreError>
+    const asStoreError = <A, E>(
+      effect: Effect.Effect<A, E>,
+    ): Effect.Effect<A, Session.SessionConflict | Session.SessionStoreError> =>
+      Effect.mapError(effect, (error) =>
+        Schema.is(Session.SessionConflict)(error) || Schema.is(Session.SessionStoreError)(error)
+          ? error
+          : storeError(String(error)),
+      )
 
-    const asReadError = <A, E>(effect: Effect.Effect<A, E>) =>
-      Effect.catchIf(
-        effect,
-        (error): error is Exclude<E, Session.SessionStoreError> => !Schema.is(Session.SessionStoreError)(error),
-        (error) => storeError(String(error)),
-      ) as Effect.Effect<A, Session.SessionStoreError>
+    const asReadError = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, Session.SessionStoreError> =>
+      Effect.mapError(effect, (error) =>
+        Schema.is(Session.SessionStoreError)(error) ? error : storeError(String(error)),
+      )
 
     const append = (entry: AppendInput, appendOptions?: AppendOptions) =>
       sql.withTransaction(

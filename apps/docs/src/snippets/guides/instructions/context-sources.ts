@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, Instructions, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 const persona = Instructions.staticSource("persona", "You are the release-notes assistant.")
@@ -27,16 +27,15 @@ const modelLayer = Layer.effect(
 const program = Effect.gen(function* () {
   const result = yield* Agent.generate(agent, { prompt: "What are your instructions?" })
   yield* Console.log(result.text)
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      instructionsLayer,
-    ),
-  ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+  instructionsLayer,
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

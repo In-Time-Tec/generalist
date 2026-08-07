@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "@batonfx/core"
 
 const weatherTool = Tool.make("get_weather", {
@@ -51,7 +51,7 @@ const layers = Layer.mergeAll(
 
 const program = Agent.stream(agent, { prompt: "Should I bring a jacket in Boise?" }).pipe(
   Stream.runForEach((event) => Console.log(event._tag)),
-  Effect.provide(layers),
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(layers)
+await runtime.runPromise(program)

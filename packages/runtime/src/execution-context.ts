@@ -47,12 +47,15 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
  * continues the conversation instead of starting empty. A store without durable Session returns
  * undefined and the Run falls back to whatever Session its environment provides.
  */
-export const sessionContext = (
-  store: RunStoreInterface,
-  sessionId: string,
-): Effect.Effect<Context.Context<never> | Context.Context<Session.SessionStore>> =>
-  store
-    .sessionStore(sessionId)
-    .pipe(
-      Effect.map((session) => (session === undefined ? Context.empty() : Context.make(Session.SessionStore, session))),
-    )
+export const sessionContext = (input: {
+  readonly store: RunStoreInterface
+  readonly sessionId: string
+}): Effect.Effect<Context.Context<never> | Context.Context<Session.SessionStore>> =>
+  input.store.sessionStore(input.sessionId).pipe(
+    Effect.map(
+      Option.match({
+        onNone: () => Context.empty(),
+        onSome: (session) => Context.make(Session.SessionStore, session),
+      }),
+    ),
+  )

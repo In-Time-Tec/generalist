@@ -5,8 +5,9 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { OperationResolution, digest as resolutionDigest } from "../../operation-resolution.js"
 import { isTerminal } from "../../run.js"
+import { ExecutionCheckpoint } from "../../execution-state.js"
 import type { Interface as RunStoreInterface } from "../../run-store.js"
-import { decodeJson, encodeExecutableRef, encodeJson } from "../codecs.js"
+import { decodeJson, encodeExecutableRef, encodeJson, encodeJsonValue } from "../codecs.js"
 import { canBlindRetry } from "../operations.js"
 import type { DecodedRun, OperationRow } from "../rows.js"
 import type { EventHub } from "../subscribers.js"
@@ -15,11 +16,13 @@ import { encodeContinuation } from "../../steering.js"
 import { checkpointRef } from "../../executable-manifest.js"
 import { getProgramOperation, resolveProgramOperation } from "../store-program.js"
 import { settleAdmittedCancellation } from "../store-control.js"
+import { Prompt } from "effect/unstable/ai"
+import type { WithoutSqlError } from "../sql-effect.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
-type RunFn = <A, E>(
-  effect: Effect.Effect<A, E, SqlR>,
-) => Effect.Effect<A, Exclude<E, { readonly _tag: "SqlError" }> | RuntimeUnavailable>
+export type RunFn = <A, E>(
+  effect: Effect.Effect<A, E | SqlError, SqlR>,
+) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
 export const postgresOperations = (input: {
   readonly sql: SqlClient.SqlClient
@@ -97,16 +100,16 @@ export const postgresOperations = (input: {
               result_json, error_json, replay_policy, attempt, owner_worker_id, lease_expires_at, started_at, finished_at
             ) VALUES (
               ${op.runId}, ${operationId}, ${op.operationKey}, ${op.kind}, 'requested',
-              ${op.inputDigest}, ${encodeJson(op.input)}, NULL, NULL, ${op.replayPolicy},
+              ${op.inputDigest}, ${encodeJsonValue(op.input)}, NULL, NULL, ${op.replayPolicy},
               ${op.attempt}, NULL, NULL, NULL, NULL
             )
           `
           if (op.checkpoint !== undefined || op.transcript !== undefined || op.continuation !== undefined) {
             yield* sql`
               UPDATE baton_runs SET
-                driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : JSON.stringify(op.checkpoint)}, driver_checkpoint_json),
+                driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, op.checkpoint)}, driver_checkpoint_json),
                 executable_ref_json = ${encodeExecutableRef(executableRef)},
-                transcript_json = COALESCE(${op.transcript === undefined ? null : JSON.stringify(op.transcript)}, transcript_json),
+                transcript_json = COALESCE(${op.transcript === undefined ? null : encodeJson(Prompt.Prompt, op.transcript)}, transcript_json),
                 continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
                   THEN ${op.continuation === null || op.continuation === undefined ? null : encodeContinuation(op.continuation)}
                   ELSE continuation_json END
@@ -185,14 +188,14 @@ export const postgresOperations = (input: {
           if (op.outcome._tag === "Succeeded") {
             yield* sql`
               UPDATE baton_run_operations
-              SET status = 'succeeded', result_json = ${encodeJson(op.outcome.value)}, finished_at = NOW()
+              SET status = 'succeeded', result_json = ${encodeJsonValue(op.outcome.value)}, finished_at = NOW()
               WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
                 AND status IN ('requested', 'running')
             `
           } else if (op.outcome._tag === "Failed") {
             yield* sql`
               UPDATE baton_run_operations
-              SET status = 'failed', error_json = ${encodeJson(op.outcome.error)}, finished_at = NOW()
+              SET status = 'failed', error_json = ${encodeJsonValue(op.outcome.error)}, finished_at = NOW()
               WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
                 AND status IN ('requested', 'running')
             `
@@ -205,9 +208,9 @@ export const postgresOperations = (input: {
           }
           yield* sql`
             UPDATE baton_runs SET
-              driver_checkpoint_json = ${JSON.stringify(op.checkpoint)},
+              driver_checkpoint_json = ${encodeJson(ExecutionCheckpoint, op.checkpoint)},
               executable_ref_json = ${encodeExecutableRef(executableRef)},
-              transcript_json = COALESCE(${op.transcript === undefined ? null : JSON.stringify(op.transcript)}, transcript_json),
+              transcript_json = COALESCE(${op.transcript === undefined ? null : encodeJson(Prompt.Prompt, op.transcript)}, transcript_json),
               continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
                 THEN ${op.continuation === null || op.continuation === undefined ? null : encodeContinuation(op.continuation)}
                 ELSE continuation_json END,
@@ -298,7 +301,7 @@ export const postgresOperations = (input: {
             FOR UPDATE
           `
           const row = rows[0]
-          const resolutionJson = encodeJson(op.resolution)
+          const resolutionJson = encodeJsonValue(op.resolution)
           const conflict = () =>
             OperationResolutionConflict.make({
               runId: op.runId,
@@ -320,14 +323,14 @@ export const postgresOperations = (input: {
           if (loaded.status !== "needs-resolution" || row.status !== "unknown") return yield* conflict()
           if (op.resolution._tag === "Succeeded") {
             yield* sql`
-              UPDATE baton_run_operations SET status = 'succeeded', result_json = ${encodeJson(op.resolution.value)},
+              UPDATE baton_run_operations SET status = 'succeeded', result_json = ${encodeJsonValue(op.resolution.value)},
                 resolution_idempotency_key = ${op.idempotencyKey}, resolution_json = ${resolutionJson},
                 owner_worker_id = NULL, lease_expires_at = NULL, finished_at = NOW()
               WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'unknown'
             `
           } else if (op.resolution._tag === "Failed") {
             yield* sql`
-              UPDATE baton_run_operations SET status = 'failed', error_json = ${encodeJson(op.resolution.error)},
+              UPDATE baton_run_operations SET status = 'failed', error_json = ${encodeJsonValue(op.resolution.error)},
                 resolution_idempotency_key = ${op.idempotencyKey}, resolution_json = ${resolutionJson},
                 owner_worker_id = NULL, lease_expires_at = NULL, finished_at = NOW()
               WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'unknown'

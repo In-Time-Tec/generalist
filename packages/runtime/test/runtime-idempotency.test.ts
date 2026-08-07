@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { Errors, Runtime } from "../src/index.js"
 import { assistantAddress, memoryLayer, textPrompt } from "./helpers.js"
 import { alternateAssistantRef, assistantRef, registrationsFor } from "./helpers.js"
@@ -73,7 +73,7 @@ layer(memoryLayer)("Runtime idempotency", (it) => {
         })
         .pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.IdempotencyConflict)
-      if (error instanceof Errors.IdempotencyConflict) {
+      if (Schema.is(Errors.IdempotencyConflict)(error)) {
         expect(error.existingRunId).toBe(first.runId)
       }
     }),

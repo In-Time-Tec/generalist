@@ -1,4 +1,5 @@
 import { Option } from "effect"
+import { dual } from "effect/Function"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -42,37 +43,42 @@ const tableOfContentsEntryView = (entry: TocEntry, isActive: boolean): Html =>
     ],
   )
 
-export const tableOfContents = (entries: ReadonlyArray<TocEntry>, maybeActiveSectionId: Option.Option<string>): Html =>
-  h.aside(
-    [
-      h.Class(
-        "sticky top-[var(--header-height)] hidden h-[calc(100vh-var(--header-height))] w-56 shrink-0 overflow-y-auto py-10 xl:block",
-      ),
-    ],
-    entries.length === 0
-      ? []
-      : [
-          h.p(
-            [h.Class("mb-2 text-xs font-semibold tracking-wider text-gray-900 uppercase dark:text-white")],
-            ["On this page"],
-          ),
-          h.nav(
-            [h.AriaLabel("Table of contents")],
-            [
-              h.ul(
-                [h.Class("space-y-2 text-sm")],
-                entries.map((entry) => tableOfContentsEntryView(entry, isEntryActive(entry, maybeActiveSectionId))),
-              ),
-            ],
-          ),
-        ],
-  )
+export const tableOfContents: {
+  (entries: ReadonlyArray<TocEntry>, maybeActiveSectionId: Option.Option<string>): Html
+  (maybeActiveSectionId: Option.Option<string>): (entries: ReadonlyArray<TocEntry>) => Html
+} = dual(
+  2,
+  (entries: ReadonlyArray<TocEntry>, maybeActiveSectionId: Option.Option<string>): Html =>
+    h.aside(
+      [
+        h.Class(
+          "sticky top-[var(--header-height)] hidden h-[calc(100vh-var(--header-height))] w-56 shrink-0 overflow-y-auto py-10 xl:block",
+        ),
+      ],
+      entries.length === 0
+        ? []
+        : [
+            h.p(
+              [h.Class("mb-2 text-xs font-semibold tracking-wider text-gray-900 uppercase dark:text-white")],
+              ["On this page"],
+            ),
+            h.nav(
+              [h.AriaLabel("Table of contents")],
+              [
+                h.ul(
+                  [h.Class("space-y-2 text-sm")],
+                  entries.map((entry) => tableOfContentsEntryView(entry, isEntryActive(entry, maybeActiveSectionId))),
+                ),
+              ],
+            ),
+          ],
+    ),
+)
 
-export const mobileTableOfContents = (
-  entries: ReadonlyArray<TocEntry>,
-  maybeActiveSectionId: Option.Option<string>,
-  isOpen: boolean,
-): Html => {
+export const mobileTableOfContents: {
+  (entries: ReadonlyArray<TocEntry>, maybeActiveSectionId: Option.Option<string>, isOpen: boolean): Html
+  (maybeActiveSectionId: Option.Option<string>, isOpen: boolean): (entries: ReadonlyArray<TocEntry>) => Html
+} = dual(3, (entries: ReadonlyArray<TocEntry>, maybeActiveSectionId: Option.Option<string>, isOpen: boolean): Html => {
   if (entries.length === 0) {
     return h.empty
   }
@@ -152,4 +158,4 @@ export const mobileTableOfContents = (
       ),
     ],
   )
-}
+})

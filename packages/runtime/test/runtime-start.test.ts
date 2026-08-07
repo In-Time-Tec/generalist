@@ -1,4 +1,5 @@
 import { expect, it as standalone, layer } from "@effect/vitest"
+import { provideScoped } from "./scoped-provide.js"
 import { Effect, Ref } from "effect"
 import { Database } from "bun:sqlite"
 import { AgentManifest, ExecutableManifest, Pins } from "@batonfx/core"
@@ -324,7 +325,8 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
         },
       ],
     }
-    const first = yield* Effect.scoped(
+    const first = yield* provideScoped(
+      Runtime.layerSqlite(options),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         expect(
@@ -354,9 +356,10 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
         })
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("running")
         return receipt
-      }).pipe(Effect.provide(Runtime.layerSqlite(options))),
+      }),
     )
-    const duplicate = yield* Effect.scoped(
+    const duplicate = yield* provideScoped(
+      Runtime.layerSqlite(options),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const receipt = yield* runtime.start(input)
@@ -370,7 +373,7 @@ standalone.effect("reopens an atomic SQLite root and initial child admission", (
           prompt: textPrompt("child"),
         })
         return receipt
-      }).pipe(Effect.provide(Runtime.layerSqlite(options))),
+      }),
     )
     expect(duplicate).toEqual({ ...first, duplicate: true })
   }),
@@ -390,7 +393,8 @@ standalone.effect("reloads SQLite registrations without address binding and clos
       addresses: [],
       resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     })
-    const receipt = yield* Effect.scoped(
+    const receipt = yield* provideScoped(
+      firstLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         return yield* runtime.start({
@@ -400,7 +404,7 @@ standalone.effect("reloads SQLite registrations without address binding and clos
           idempotencyKey: "start",
           prompt: "recover",
         })
-      }).pipe(Effect.provide(firstLayer)),
+      }),
     )
 
     const finalizers = yield* Ref.make(0)
@@ -421,7 +425,8 @@ standalone.effect("reloads SQLite registrations without address binding and clos
         ),
     })
     const reopened = Runtime.layerSqlite({ filename, addresses: [], resolver })
-    yield* Effect.scoped(
+    yield* provideScoped(
+      reopened,
       Effect.gen(function* () {
         const store = yield* RunStore.RunStore
         const execution = yield* store.loadExecution(receipt.runId)
@@ -433,7 +438,7 @@ standalone.effect("reloads SQLite registrations without address binding and clos
             registrations: execution.registrations,
           }),
         )
-      }).pipe(Effect.provide(reopened)),
+      }),
     )
     expect(yield* Ref.get(finalizers)).toBe(1)
 
@@ -457,7 +462,12 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
       payload: { credentialRef: "credential:addressed" },
     }))
     const address = Address.make("agent:addressed")
-    const receipt = yield* Effect.scoped(
+    const receipt = yield* provideScoped(
+      Runtime.layerSqlite({
+        filename,
+        addresses: [{ address, executable: assistantRef, registrations }],
+        resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+      }),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         return yield* runtime.send({
@@ -466,15 +476,7 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
           idempotencyKey: "addressed",
           prompt: "recover",
         })
-      }).pipe(
-        Effect.provide(
-          Runtime.layerSqlite({
-            filename,
-            addresses: [{ address, executable: assistantRef, registrations }],
-            resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-          }),
-        ),
-      ),
+      }),
     )
 
     const reopened = Runtime.layerSqlite({
@@ -482,19 +484,20 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
       addresses: [],
       resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
     })
-    yield* Effect.scoped(
+    yield* provideScoped(
+      reopened,
       Effect.gen(function* () {
         const store = yield* RunStore.RunStore
         const execution = yield* store.loadExecution(receipt.runId)
         expect(execution.registrations).toEqual(
           [...registrations].toSorted((left, right) => (left.pin < right.pin ? -1 : left.pin > right.pin ? 1 : 0)),
         )
-      }).pipe(Effect.provide(reopened)),
+      }),
     )
   }),
 )
 
-standalone.effect("requires both pinned compaction registrations and conflicts on changed policy", () => {
+{
   const compaction = {
     service: Pins.makeCapability({ service: "compaction", revision: 1 }),
     summaryModel: Pins.makeModel({ model: "summary", revision: 1 }),
@@ -537,63 +540,72 @@ standalone.effect("requires both pinned compaction registrations and conflicts o
     ]),
   })
 
-  return Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
-    const base = {
-      executable,
-      registrations,
-      sessionId: "compaction-registration",
-      idempotencyKey: "compaction-registration",
-      prompt: "run",
-    }
-    const invalidPolicy = registrations.map((registration) => ({
-      pin: registration.pin,
-      codec: registration.codec,
-      version: registration.version,
-      payload:
-        registration.pin === compaction.service
-          ? {
-              keepRecentTokens: 8_000,
-              strategyIdentity: "default:v1",
-              summaryPromptIdentity: "summary:v1",
-              resolvedSecret: "must-not-persist",
-            }
-          : registration.payload,
-    }))
-    expect(
-      yield* runtime
-        .start({ ...base, idempotencyKey: "invalid-policy", registrations: invalidPolicy })
-        .pipe(Effect.flip),
-    ).toBeInstanceOf(Errors.ExecutableRegistrationInvalid)
-    const missingService = yield* runtime
-      .start({
-        ...base,
-        idempotencyKey: "missing-service",
-        registrations: registrations.filter((item) => item.pin !== compaction.service),
-      })
-      .pipe(Effect.flip)
-    const missingSummary = yield* runtime
-      .start({
-        ...base,
-        idempotencyKey: "missing-summary",
-        registrations: registrations.filter((item) => item.pin !== compaction.summaryModel),
-      })
-      .pipe(Effect.flip)
-    expect(missingService).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
-    expect(missingSummary).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
+  layer(compactionRuntimeLayer)(
+    "requires both pinned compaction registrations and conflicts on changed policy",
+    (it) => {
+      it.effect("requires both pinned compaction registrations and conflicts on changed policy", () =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const base = {
+            executable,
+            registrations,
+            sessionId: "compaction-registration",
+            idempotencyKey: "compaction-registration",
+            prompt: "run",
+          }
+          const invalidPolicy = registrations.map((registration) => ({
+            pin: registration.pin,
+            codec: registration.codec,
+            version: registration.version,
+            payload:
+              registration.pin === compaction.service
+                ? {
+                    keepRecentTokens: 8_000,
+                    strategyIdentity: "default:v1",
+                    summaryPromptIdentity: "summary:v1",
+                    resolvedSecret: "must-not-persist",
+                  }
+                : registration.payload,
+          }))
+          expect(
+            yield* runtime
+              .start({ ...base, idempotencyKey: "invalid-policy", registrations: invalidPolicy })
+              .pipe(Effect.flip),
+          ).toBeInstanceOf(Errors.ExecutableRegistrationInvalid)
+          const missingService = yield* runtime
+            .start({
+              ...base,
+              idempotencyKey: "missing-service",
+              registrations: registrations.filter((item) => item.pin !== compaction.service),
+            })
+            .pipe(Effect.flip)
+          const missingSummary = yield* runtime
+            .start({
+              ...base,
+              idempotencyKey: "missing-summary",
+              registrations: registrations.filter((item) => item.pin !== compaction.summaryModel),
+            })
+            .pipe(Effect.flip)
+          expect(missingService).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
+          expect(missingSummary).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
 
-    yield* runtime.start(base)
-    const changed = registrations.map((registration) => ({
-      pin: registration.pin,
-      codec: registration.codec,
-      version: registration.version,
-      payload:
-        registration.pin === compaction.service
-          ? { keepRecentTokens: 4_000, strategyIdentity: "default:v1", summaryPromptIdentity: "summary:v1" }
-          : registration.payload,
-    }))
-    expect(
-      yield* runtime.start({ ...base, idempotencyKey: "changed-policy", registrations: changed }).pipe(Effect.flip),
-    ).toBeInstanceOf(Errors.ExecutableRegistrationInvalid)
-  }).pipe(Effect.provide(compactionRuntimeLayer))
-})
+          yield* runtime.start(base)
+          const changed = registrations.map((registration) => ({
+            pin: registration.pin,
+            codec: registration.codec,
+            version: registration.version,
+            payload:
+              registration.pin === compaction.service
+                ? { keepRecentTokens: 4_000, strategyIdentity: "default:v1", summaryPromptIdentity: "summary:v1" }
+                : registration.payload,
+          }))
+          expect(
+            yield* runtime
+              .start({ ...base, idempotencyKey: "changed-policy", registrations: changed })
+              .pipe(Effect.flip),
+          ).toBeInstanceOf(Errors.ExecutableRegistrationInvalid)
+        }),
+      )
+    },
+  )
+}

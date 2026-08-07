@@ -1,4 +1,4 @@
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Function, Schema, Stream } from "effect"
 import { adapt } from "./model-service.js"
 import { AiError, LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { ModelProviderUsage, providerUsage } from "./model-attempt-observation.js"
@@ -111,19 +111,22 @@ const project = (
   })
 
 /** @experimental Project a toolkit with the active provider's exact JSON Schema compiler. */
-export const projectToolkit = (
-  original: Toolkit.Any,
-  compile: ToolJsonSchemaCompiler,
-): Effect.Effect<ProjectedToolkit, AiError.AiError> =>
-  Effect.gen(function* () {
-    const tools: Array<Tool.Any> = []
-    for (const tool of toolkitTools(original)) {
-      if (Tool.isProviderDefined(tool)) tools.push(projectProviderDefined(tool))
-      else if (Tool.isDynamic(tool) && tool.jsonSchema !== undefined) tools.push(tool)
-      else tools.push(yield* projectCompiled(tool, compile))
-    }
-    return { toolkit: makeToolkit(tools) }
-  })
+export const projectToolkit: {
+  (compile: ToolJsonSchemaCompiler): (original: Toolkit.Any) => Effect.Effect<ProjectedToolkit, AiError.AiError>
+  (original: Toolkit.Any, compile: ToolJsonSchemaCompiler): Effect.Effect<ProjectedToolkit, AiError.AiError>
+} = Function.dual(
+  2,
+  (original: Toolkit.Any, compile: ToolJsonSchemaCompiler): Effect.Effect<ProjectedToolkit, AiError.AiError> =>
+    Effect.gen(function* () {
+      const tools: Array<Tool.Any> = []
+      for (const tool of toolkitTools(original)) {
+        if (Tool.isProviderDefined(tool)) tools.push(projectProviderDefined(tool))
+        else if (Tool.isDynamic(tool) && tool.jsonSchema !== undefined) tools.push(tool)
+        else tools.push(yield* projectCompiled(tool, compile))
+      }
+      return { toolkit: makeToolkit(tools) }
+    }),
+)
 
 const findTool = (toolkit: Toolkit.Any, name: string): Tool.Any | undefined => toolkit.tools[name]
 
@@ -136,32 +139,54 @@ const invalid = (name: string, usage?: Response.Usage): InvalidToolCallParameter
 }
 
 /** @experimental Decode one raw model tool call with the original Effect parameter schema. */
-export const decodeToolCall = (
-  toolkit: Toolkit.Any,
-  part: Response.ToolCallPart<string, unknown>,
-): Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters> => {
-  const tool = findTool(toolkit, part.name)
-  if (tool === undefined) return Effect.fail(invalid(part.name))
-  const schema = Schema.toType(tool.parametersSchema)
-  return Schema.decodeUnknownEffect(schema)(part.params).pipe(
-    Effect.map((params) => ({ ...part, params })),
-    Effect.mapError(() => invalid(part.name)),
-  )
-}
+export const decodeToolCall: {
+  (
+    part: Response.ToolCallPart<string, unknown>,
+  ): (toolkit: Toolkit.Any) => Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters>
+  (
+    toolkit: Toolkit.Any,
+    part: Response.ToolCallPart<string, unknown>,
+  ): Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters>
+} = Function.dual(
+  2,
+  (
+    toolkit: Toolkit.Any,
+    part: Response.ToolCallPart<string, unknown>,
+  ): Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters> => {
+    const tool = findTool(toolkit, part.name)
+    if (tool === undefined) return Effect.fail(invalid(part.name))
+    const schema = Schema.toType(tool.parametersSchema)
+    return Schema.decodeUnknownEffect(schema)(part.params).pipe(
+      Effect.map((params) => ({ ...part, params })),
+      Effect.mapError(() => invalid(part.name)),
+    )
+  },
+)
 
 /** @experimental Validate a middleware-produced call against the decoded side of its original schema. */
-export const validateDecodedToolCall = (
-  toolkit: Toolkit.Any,
-  part: Response.ToolCallPart<string, unknown>,
-): Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters> => {
-  const tool = findTool(toolkit, part.name)
-  if (tool === undefined) return Effect.fail(invalid(part.name))
-  const schema = Schema.toType(tool.parametersSchema)
-  return Schema.decodeUnknownEffect(schema)(part.params).pipe(
-    Effect.map((params) => ({ ...part, params })),
-    Effect.mapError(() => invalid(part.name)),
-  )
-}
+export const validateDecodedToolCall: {
+  (
+    part: Response.ToolCallPart<string, unknown>,
+  ): (toolkit: Toolkit.Any) => Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters>
+  (
+    toolkit: Toolkit.Any,
+    part: Response.ToolCallPart<string, unknown>,
+  ): Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters>
+} = Function.dual(
+  2,
+  (
+    toolkit: Toolkit.Any,
+    part: Response.ToolCallPart<string, unknown>,
+  ): Effect.Effect<Response.ToolCallPart<string, unknown>, InvalidToolCallParameters> => {
+    const tool = findTool(toolkit, part.name)
+    if (tool === undefined) return Effect.fail(invalid(part.name))
+    const schema = Schema.toType(tool.parametersSchema)
+    return Schema.decodeUnknownEffect(schema)(part.params).pipe(
+      Effect.map((params) => ({ ...part, params })),
+      Effect.mapError(() => invalid(part.name)),
+    )
+  },
+)
 
 const isBuffered = (part: Response.StreamPart<Record<string, Tool.Any>>): boolean =>
   part.type === "response-metadata" ||
@@ -227,35 +252,63 @@ const validatedStream = (
   })
 
 /** @experimental Wrap a model so Baton can validate tool calls before output escapes. */
-export const wrap = (
-  model: LanguageModel.Service,
-  original: Toolkit.Any,
-  projected: Toolkit.Toolkit<Record<string, Tool.Any>>,
-): LanguageModel.Service =>
-  adapt<AiError.AiError | InvalidToolCallParameters, AiError.AiError, AiError.AiError | InvalidToolCallParameters>(
-    model,
-    {
-      streamText: (options, invoke) =>
-        options.disableToolCallResolution === true
-          ? validatedStream(invoke({ ...options, toolkit: projected }), original)
-          : invoke(),
-    },
-  )
+export const wrap: {
+  (
+    original: Toolkit.Any,
+    projected: Toolkit.Toolkit<Record<string, Tool.Any>>,
+  ): (model: LanguageModel.Service) => LanguageModel.Service
+  (
+    model: LanguageModel.Service,
+    original: Toolkit.Any,
+    projected: Toolkit.Toolkit<Record<string, Tool.Any>>,
+  ): LanguageModel.Service
+} = Function.dual(
+  3,
+  (
+    model: LanguageModel.Service,
+    original: Toolkit.Any,
+    projected: Toolkit.Toolkit<Record<string, Tool.Any>>,
+  ): LanguageModel.Service =>
+    adapt<AiError.AiError | InvalidToolCallParameters, AiError.AiError, AiError.AiError | InvalidToolCallParameters>(
+      model,
+      {
+        streamText: (options, invoke) =>
+          options.disableToolCallResolution === true
+            ? validatedStream(invoke({ ...options, toolkit: projected }), original)
+            : invoke(),
+      },
+    ),
+)
 
 /** @experimental Prepare correction validation for the active direct or registered model. */
-export const prepare = (
-  model: LanguageModel.Service,
-  original: Toolkit.Any,
-  correctionLimit: number,
-): Effect.Effect<LanguageModel.Service, ToolJsonSchemaCompilerMissing | AiError.AiError> => {
-  if (correctionLimit === 0 || Object.keys(original.tools).length === 0) return Effect.succeed(model)
-  const compile = toolJsonSchemaCompiler(model)
-  const requiresCompiler = toolkitTools(original).some(
-    (tool) => !Tool.isProviderDefined(tool) && (!Tool.isDynamic(tool) || tool.jsonSchema === undefined),
-  )
-  if (requiresCompiler && compile === undefined) return Effect.fail(ToolJsonSchemaCompilerMissing.make({}))
-  return project(original, compile).pipe(Effect.map((projected) => wrap(model, original, projected.toolkit)))
-}
+export const prepare: {
+  (
+    original: Toolkit.Any,
+    correctionLimit: number,
+  ): (
+    model: LanguageModel.Service,
+  ) => Effect.Effect<LanguageModel.Service, ToolJsonSchemaCompilerMissing | AiError.AiError>
+  (
+    model: LanguageModel.Service,
+    original: Toolkit.Any,
+    correctionLimit: number,
+  ): Effect.Effect<LanguageModel.Service, ToolJsonSchemaCompilerMissing | AiError.AiError>
+} = Function.dual(
+  3,
+  (
+    model: LanguageModel.Service,
+    original: Toolkit.Any,
+    correctionLimit: number,
+  ): Effect.Effect<LanguageModel.Service, ToolJsonSchemaCompilerMissing | AiError.AiError> => {
+    if (correctionLimit === 0 || Object.keys(original.tools).length === 0) return Effect.succeed(model)
+    const compile = toolJsonSchemaCompiler(model)
+    const requiresCompiler = toolkitTools(original).some(
+      (tool) => !Tool.isProviderDefined(tool) && (!Tool.isDynamic(tool) || tool.jsonSchema === undefined),
+    )
+    if (requiresCompiler && compile === undefined) return Effect.fail(ToolJsonSchemaCompilerMissing.make({}))
+    return project(original, compile).pipe(Effect.map((projected) => wrap(model, original, projected.toolkit)))
+  },
+)
 
 /** @experimental Test whether a failure is the precise Baton-owned correction signal. */
 export const isInvalidToolCallParameters = Schema.is(InvalidToolCallParameters)

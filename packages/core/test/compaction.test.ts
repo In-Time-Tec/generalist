@@ -7,6 +7,8 @@ import { ItLayer } from "./it-layer"
 import { estimatePromptTokens } from "../src/turn/prompt-token-estimate"
 import { makeThresholdState } from "../src/turn/compaction-threshold-state"
 
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
 const user = (text: string): Prompt.Message =>
@@ -192,7 +194,7 @@ describe("Compaction", () => {
       Object.defineProperty(firstSubclass, "toJSON", { value: () => ["constant"] })
       Object.defineProperty(secondSubclass, "toJSON", { value: () => ["constant"] })
       expect(firstSubclass[0]).not.toBe(secondSubclass[0])
-      expect(JSON.stringify(firstSubclass)).toBe(JSON.stringify(secondSubclass))
+      expect(encodeJsonValue(firstSubclass)).toBe(encodeJsonValue(secondSubclass))
       const values = [
         [undefined, () => undefined],
         [Number.NaN, Number.POSITIVE_INFINITY],
@@ -329,7 +331,7 @@ describe("Compaction", () => {
           cuts += 1
           return cuts === 2 ? Option.some({ head: [path[0]!], recent: [path[1]!] }) : Option.none()
         },
-        summarize: () => Effect.fail(new Compaction.CompactionError({ message: "summary failed" })),
+        summarize: () => Effect.fail(Compaction.CompactionError.make({ message: "summary failed" })),
       })
       const request = {
         compactionId: "failed-overflow",

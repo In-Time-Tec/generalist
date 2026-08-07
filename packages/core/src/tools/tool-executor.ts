@@ -6,6 +6,7 @@ import type { Route, RouteInput } from "./tool-placement.js"
 import { client, mcp, remote, route, sandbox } from "./tool-executor-routes.js"
 export { client, mcp, remote, route, sandbox }
 import { toolResultCodec } from "./tool-result-codec.js"
+import { executeWithClosedSet, executeWithClosedToolkit } from "./tool-closed-execution.js"
 import type { SchemaTool, ToolSchemaServices } from "./tool-result-codec.js"
 /** @experimental */
 export interface Request {
@@ -118,50 +119,6 @@ const resolveTools = <Tools extends Record<string, Tool.Any>>(
   }
   return resolved
 }
-const executeWithClosedSet = <R, T extends SchemaTool>(
-  toolkit: ClosedToolSet<R, T>,
-  request: Request,
-): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext | ToolSchemaServices<T>> => {
-  const tool = Object.hasOwn(toolkit.tools, request.call.name) ? toolkit.tools[request.call.name] : undefined
-  if (tool === undefined) {
-    return Effect.fail(
-      toolResultCodec.frameworkFailure(
-        "missing-handler",
-        request.call.name,
-        `Tool ${request.call.name} is not registered`,
-      ),
-    )
-  }
-  const handleFailure = (
-    error: unknown,
-  ): Effect.Effect<Outcome, FrameworkFailure, T["failureSchema"]["EncodingServices"]> => {
-    if (Schema.is(FrameworkFailure)(error)) return Effect.fail(error)
-    return toolResultCodec.encodeDomainCandidate<T["failureSchema"]>(tool, error)
-  }
-  return toolResultCodec.decodeInput<T["parametersSchema"]>(tool, request.call.params).pipe(
-    Effect.flatMap((params) => toolkit.invoke(request.call.name, params)),
-    Effect.flatMap((result) => toolResultCodec.decodeSuccess<T["successSchema"]>(tool, result)),
-    Effect.catchIf(() => true, handleFailure, handleFailure),
-  )
-}
-
-const executeWithClosedToolkit = <
-  Name extends string,
-  Parameters extends Schema.Top,
-  SuccessSchema extends Schema.Top,
-  R,
->(
-  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-  request: Request,
-): Effect.Effect<Outcome, FrameworkFailure, R | ToolContext> =>
-  executeWithClosedSet(
-    {
-      tools: toolkit.tools,
-      invoke: (name, params) => (name === toolkit.name ? toolkit.invoke(params) : Effect.fail(`Unknown tool ${name}`)),
-    },
-    request,
-  ).pipe(toolResultCodec.provideSchemaServices)
-
 const executeWithToolkit = <Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
   request: Request,
@@ -250,19 +207,20 @@ export function executeToolkit<
   Parameters extends Schema.Top,
   SuccessSchema extends Schema.Top,
   R,
+  T extends SchemaTool = SchemaTool,
 >(
   toolkitOrRequest:
     | ToolkitInput<Tools>
     | AgentToolToolkit<Name, Parameters, SuccessSchema, R>
-    | ClosedToolSet<R>
+    | ClosedToolSet<R, T>
     | Request,
   request?: Request,
 ): unknown {
   if (request === undefined) {
     if (!isRequest(toolkitOrRequest)) return () => Effect.die("executeToolkit pipeable form requires a Request")
     const pipeableRequest = toolkitOrRequest
-    function pipeable(
-      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R>,
+    function pipeable<T extends SchemaTool = SchemaTool>(
+      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R, T>,
     ): unknown
     function pipeable<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
       toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
@@ -285,12 +243,12 @@ export function executeToolkit<
       Tool.HandlersFor<CurrentTools> | Tool.HandlerServices<CurrentTools[keyof CurrentTools]>
     >
     function pipeable(
-      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R>,
+      toolkit: ToolkitInput<Tools> | AgentToolToolkit<Name, Parameters, SuccessSchema, R> | ClosedToolSet<R, T>,
     ): unknown {
       if ("invoke" in toolkit) {
         return "name" in toolkit
-          ? executeWithClosedToolkit(toolkit, pipeableRequest)
-          : executeWithClosedSet(toolkit, pipeableRequest)
+          ? executeWithClosedToolkit<R>(toolkit, pipeableRequest)
+          : executeWithClosedSet<R, T>(toolkit, pipeableRequest)
       }
       if ("handle" in toolkit) return executeWithToolkit(toolkit, pipeableRequest)
       const unhandled: Toolkit.Toolkit<Tools> = toolkit
@@ -301,7 +259,9 @@ export function executeToolkit<
   if (isRequest(toolkitOrRequest)) return Effect.die("executeToolkit requires a toolkit when a Request is supplied")
   const toolkit = toolkitOrRequest
   if ("invoke" in toolkit) {
-    return "name" in toolkit ? executeWithClosedToolkit(toolkit, request) : executeWithClosedSet(toolkit, request)
+    return "name" in toolkit
+      ? executeWithClosedToolkit<R>(toolkit, request)
+      : executeWithClosedSet<R, T>(toolkit, request)
   }
   if ("handle" in toolkit) return executeWithToolkit(toolkit, request)
   const unhandled: Toolkit.Toolkit<Tools> = toolkit
@@ -342,13 +302,13 @@ const layerClosedToolSet = <R, T extends SchemaTool>(
   )
 
 /** @experimental */
+export function layerToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
+  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
+): Layer.Layer<ToolExecutor, never, R>
 export function layerToolkit<R>(toolkit: ClosedToolSet<R, Tool.Any>): Layer.Layer<ToolExecutor, never, R>
 export function layerToolkit<R, T extends SchemaTool>(
   toolkit: ClosedToolSet<R, T>,
 ): Layer.Layer<ToolExecutor, never, R | ToolSchemaServices<T>>
-export function layerToolkit<Name extends string, Parameters extends Schema.Top, SuccessSchema extends Schema.Top, R>(
-  toolkit: AgentToolToolkit<Name, Parameters, SuccessSchema, R>,
-): Layer.Layer<ToolExecutor, never, R>
 export function layerToolkit<Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,
 ): Layer.Layer<ToolExecutor>

@@ -1,6 +1,13 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import { ProgramCapabilities } from "@batonfx/core"
-import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
+import {
+  FanOutConflict,
+  FanOutInvalid,
+  OperationResolutionConflict,
+  RunNotFound,
+  RunTerminal,
+  RuntimeUnavailable,
+} from "../errors.js"
 import { StaleClaim } from "../sql/errors.js"
 import type {
   CompleteProgramInput,
@@ -44,13 +51,23 @@ const requireRun = (state: MemoryState, runId: string) => {
   return run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run)
 }
 
-export const reserveProgramOperation = (
-  state: MemoryState,
-  input: ReserveProgramOperationInput,
-): Effect.Effect<
-  readonly [ProgramOperationRecord, MemoryState],
-  RunNotFound | RunTerminal | RuntimeUnavailable | ProgramStoreFailure
-> =>
+export const reserveProgramOperation: {
+  (
+    input: ReserveProgramOperationInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    readonly [ProgramOperationRecord, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable | ProgramStoreFailure
+  >
+  (
+    state: MemoryState,
+    input: ReserveProgramOperationInput,
+  ): Effect.Effect<
+    readonly [ProgramOperationRecord, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable | ProgramStoreFailure
+  >
+} = Function.dual(2, (state: MemoryState, input: ReserveProgramOperationInput) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     if (run.status === "succeeded" || run.status === "failed" || run.status === "cancelled")
@@ -131,9 +148,20 @@ export const reserveProgramOperation = (
     const programOperations = new Map(state.programOperations)
     programOperations.set(key(input.runId, input.operation), record)
     return [record, { ...state, programStates, programOperations }] as const
-  })
+  }),
+)
 
-export const resolveProgramOperation = (state: MemoryState, input: ResolveOperationInput) =>
+export const resolveProgramOperation: {
+  (
+    input: ResolveOperationInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<MemoryState, OperationResolutionConflict | RunNotFound | RuntimeUnavailable, never>
+  (
+    state: MemoryState,
+    input: ResolveOperationInput,
+  ): Effect.Effect<MemoryState, OperationResolutionConflict | RunNotFound | RuntimeUnavailable, never>
+} = Function.dual(2, (state: MemoryState, input: ResolveOperationInput) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     const mapKey = key(input.runId, input.operationId)
@@ -168,9 +196,24 @@ export const resolveProgramOperation = (state: MemoryState, input: ResolveOperat
     const { ownerId: _, ...withoutOwner } = run
     runs.set(run.runId, { ...withoutOwner, status: "running" })
     return { ...state, programOperations, runs }
-  })
+  }),
+)
 
-export const settleProgramOperation = (state: MemoryState, input: SettleProgramOperationInput) =>
+export const settleProgramOperation: {
+  (
+    input: SettleProgramOperationInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    readonly [ProgramOperationRecord, MemoryState],
+    RunNotFound | RuntimeUnavailable | StaleClaim,
+    never
+  >
+  (
+    state: MemoryState,
+    input: SettleProgramOperationInput,
+  ): Effect.Effect<readonly [ProgramOperationRecord, MemoryState], RunNotFound | RuntimeUnavailable | StaleClaim, never>
+} = Function.dual(2, (state: MemoryState, input: SettleProgramOperationInput) =>
   Effect.gen(function* () {
     yield* requireRun(state, input.runId)
     const mapKey = key(input.runId, input.operation)
@@ -212,9 +255,40 @@ export const settleProgramOperation = (state: MemoryState, input: SettleProgramO
       "needs-resolution",
     )
     return [record, unresolved] as const
-  })
+  }),
+)
 
-export const admitProgramAgents = (state: MemoryState, input: AdmitProgramAgentsInput) =>
+export const admitProgramAgents: {
+  (
+    input: AdmitProgramAgentsInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    readonly [ProgramOperationRecord, MemoryState],
+    | import("../errors.js").ChildSelectionMissing
+    | FanOutConflict
+    | FanOutInvalid
+    | RunNotFound
+    | RunTerminal
+    | RuntimeUnavailable
+    | ProgramStoreFailure,
+    never
+  >
+  (
+    state: MemoryState,
+    input: AdmitProgramAgentsInput,
+  ): Effect.Effect<
+    readonly [ProgramOperationRecord, MemoryState],
+    | import("../errors.js").ChildSelectionMissing
+    | FanOutConflict
+    | FanOutInvalid
+    | RunNotFound
+    | RunTerminal
+    | RuntimeUnavailable
+    | ProgramStoreFailure,
+    never
+  >
+} = Function.dual(2, (state: MemoryState, input: AdmitProgramAgentsInput) =>
   Effect.gen(function* () {
     const [reserved, reservedState] = yield* reserveProgramOperation(state, input)
     if (reserved.childRunIds.length > 0) return [reserved, reservedState] as const
@@ -233,9 +307,28 @@ export const admitProgramAgents = (state: MemoryState, input: AdmitProgramAgents
       { ...input, suspension: input.suspension, wait: input.wait, checkpoint: { _tag: "Program", version: "1" } },
     )
     return [record, waitingState] as const
-  })
+  }),
+)
 
-export const suspendProgramOperation = (state: MemoryState, input: SuspendProgramOperationInput) =>
+export const suspendProgramOperation: {
+  (
+    input: SuspendProgramOperationInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    readonly [ProgramOperationRecord, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable | ProgramStoreFailure,
+    never
+  >
+  (
+    state: MemoryState,
+    input: SuspendProgramOperationInput,
+  ): Effect.Effect<
+    readonly [ProgramOperationRecord, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable | ProgramStoreFailure,
+    never
+  >
+} = Function.dual(2, (state: MemoryState, input: SuspendProgramOperationInput) =>
   Effect.gen(function* () {
     const [reserved, reservedState] = yield* reserveProgramOperation(state, input)
     if (reserved.status === "waiting") return [reserved, reservedState] as const
@@ -252,9 +345,28 @@ export const suspendProgramOperation = (state: MemoryState, input: SuspendProgra
       },
     )
     return [record, waiting] as const
-  })
+  }),
+)
 
-export const commitProgramLog = (state: MemoryState, input: CommitProgramLogInput) =>
+export const commitProgramLog: {
+  (
+    input: CommitProgramLogInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    readonly [ProgramOperationRecord, MemoryState],
+    RunNotFound | RuntimeUnavailable | StaleClaim | ProgramStoreFailure,
+    never
+  >
+  (
+    state: MemoryState,
+    input: CommitProgramLogInput,
+  ): Effect.Effect<
+    readonly [ProgramOperationRecord, MemoryState],
+    RunNotFound | RuntimeUnavailable | StaleClaim | ProgramStoreFailure,
+    never
+  >
+} = Function.dual(2, (state: MemoryState, input: CommitProgramLogInput) =>
   Effect.gen(function* () {
     const [existing, reserved] = yield* reserveProgramOperation(state, input)
     if (existing.status === "succeeded") return [existing, state] as const
@@ -270,12 +382,21 @@ export const commitProgramLog = (state: MemoryState, input: CommitProgramLogInpu
       outcome: { _tag: "Succeeded", value: undefined },
       releaseSlots: 0,
     })
-  })
+  }),
+)
 
-export const startProgramOperation = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly operation: string },
-) =>
+export const startProgramOperation: {
+  (input: {
+    readonly runId: string
+    readonly operation: string
+  }): (
+    state: MemoryState,
+  ) => Effect.Effect<readonly [ProgramOperationRecord, MemoryState], RunNotFound | RuntimeUnavailable, never>
+  (
+    state: MemoryState,
+    input: { readonly runId: string; readonly operation: string },
+  ): Effect.Effect<readonly [ProgramOperationRecord, MemoryState], RunNotFound | RuntimeUnavailable, never>
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly operation: string }) =>
   Effect.gen(function* () {
     yield* requireRun(state, input.runId)
     const mapKey = key(input.runId, input.operation)
@@ -287,15 +408,26 @@ export const startProgramOperation = (
     const programOperations = new Map(state.programOperations)
     programOperations.set(mapKey, record)
     return [record, { ...state, programOperations }] as const
-  })
+  }),
+)
 
-export const completeProgram = (
-  state: MemoryState,
-  input: CompleteProgramInput,
-): Effect.Effect<
-  readonly [CompletionOutcome, MemoryState],
-  RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramCapabilities.ProgramBudgetExhausted>
-> =>
+export const completeProgram: {
+  (
+    input: CompleteProgramInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    readonly [CompletionOutcome, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramCapabilities.ProgramBudgetExhausted>
+  >
+  (
+    state: MemoryState,
+    input: CompleteProgramInput,
+  ): Effect.Effect<
+    readonly [CompletionOutcome, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable | InstanceType<typeof ProgramCapabilities.ProgramBudgetExhausted>
+  >
+} = Function.dual(2, (state: MemoryState, input: CompleteProgramInput) =>
   Effect.gen(function* () {
     if (input.outputBytes > input.outputLimit)
       return yield* ProgramCapabilities.ProgramBudgetExhausted.make({
@@ -304,4 +436,5 @@ export const completeProgram = (
       })
     const next = yield* complete(state, { runId: input.runId, result: { _tag: "Program", value: input.output } })
     return [{ _tag: "Completed" } satisfies CompletionOutcome, next] as const
-  })
+  }),
+)

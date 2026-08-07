@@ -1,5 +1,5 @@
 import { Clock, Effect, Equal, Exit, Option, Ref, Schema } from "effect"
-import { Chat, LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
+import { Chat, Prompt, Tokenizer } from "effect/unstable/ai"
 import { AgentError, MiddlewareViolation } from "./agent-event.js"
 import {
   Compaction,
@@ -18,7 +18,12 @@ import type { AgentRunState } from "./agent-run-state.js"
 import { estimatePromptTokens } from "../turn/prompt-token-estimate.js"
 import { SessionConflict, SessionStore, type Entry, type SessionStoreError } from "../context/session.js"
 import { intercept } from "../durable/driver-run.js"
+<<<<<<< HEAD
 import { operationKey } from "../durable/driver-interpreter.js"
+=======
+import { operationKey, type DriverInterpreter } from "../durable/driver-interpreter.js"
+
+>>>>>>> origin/main
 import type { MemoryError } from "../context/memory.js"
 import type { SkillSourceError } from "../context/skill-source.js"
 type CompactionContext = {
@@ -37,7 +42,7 @@ type CompactionContext = {
   readonly state: AgentRunState
   readonly compactionService: Option.Option<typeof Compaction.Service>
   readonly tokenizerService: Option.Option<typeof Tokenizer.Tokenizer.Service>
-  readonly deliverPending: () => Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed>
+  readonly deliverPending: Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed>
   readonly savePersisted: (turn: number) => Effect.Effect<void, AgentError>
   readonly undeliveredTelemetry: Array<ModelTelemetryEvent>
   readonly emitTelemetry: (event: import("../model/model-telemetry.js").EventPayload) => Effect.Effect<void>
@@ -105,7 +110,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             const checkpoint = path.at(-1)
             const before = buildContext(path.slice(0, -1))
             if (checkpoint?._tag === "Compaction" && promptEquivalence(before, transcript)) {
-              yield* Ref.set(chat.history, withDerivedSystem(system, projection))
+              yield* Ref.set(chat.history, withDerivedSystem({ system, projection }))
               yield* savePersisted(turn)
               return path
             }
@@ -134,7 +139,10 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
         }).pipe(Effect.mapError((error) => (Schema.is(AgentError)(error) ? error : sessionError(turn, error)))),
     })
 
-  const syncSession = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, RunError> => {
+  const syncSession = (
+    turn: number,
+    transcript: Prompt.Prompt,
+  ): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
     return intercept(
       {
@@ -264,7 +272,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
                   }),
                 ),
           ),
-          Effect.andThen(deliverPending()),
+          Effect.andThen(deliverPending),
         )
       },
       onSome: (session) =>
@@ -339,7 +347,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
               ),
               Effect.flatMap((appended) => restore(session.path(appended.leafId))),
               Effect.map(buildContext),
-              Effect.tap((projection) => Ref.set(chat.history, withDerivedSystem(system, projection))),
+              Effect.tap((projection) => Ref.set(chat.history, withDerivedSystem({ system, projection }))),
               Effect.tap(() =>
                 Effect.sync(() => {
                   state.reportedContextUsage = undefined
@@ -357,7 +365,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     applicationIdentity: string,
     commitData?: Omit<CompactionCommit, "checkpointId" | "summaryModelCallId">,
     onCommitted?: () => void,
-  ): Effect.Effect<void, RunError> => {
+  ): Effect.Effect<void, RunError, DriverInterpreter> => {
     const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
     return intercept(
       {
@@ -374,15 +382,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       applyCompactionResultBody(turn, result, parentId, commitData, onCommitted),
     )
   }
-  const preparePrompt = (
-    turn: number,
-    prompt: Prompt.Prompt,
-    overflow: boolean,
-  ): Effect.Effect<
-    { readonly prompt: Prompt.Prompt; readonly changed: boolean },
-    RunError,
-    LanguageModel.LanguageModel
-  > =>
+  const preparePrompt = (turn: number, prompt: Prompt.Prompt, overflow: boolean) =>
     Option.match(compactionService, {
       onNone: () => Effect.succeed({ prompt, changed: false }),
       onSome: (compaction) =>
@@ -491,10 +491,6 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             ),
           )
         }),
-    }) as Effect.Effect<
-      { readonly prompt: Prompt.Prompt; readonly changed: boolean },
-      RunError,
-      LanguageModel.LanguageModel
-    >
+    })
   return { preparePrompt, applyCompactionResult, compactionUsage, countTokens, syncSession }
 }

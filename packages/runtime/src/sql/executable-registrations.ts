@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { ExecutableRegistration, digest, encodeJson } from "../executable-registration.js"
 import { ExecutableRegistrationConflict, RuntimeUnavailable } from "../errors.js"
@@ -43,13 +43,22 @@ export const persistRegistrations = (registrations: ReadonlyArray<ExecutableRegi
     return
   })
 
-export const associateRegistrations = (runId: string, registrations: ReadonlyArray<ExecutableRegistration>) =>
+export const associateRegistrations: {
+  (
+    registrations: ReadonlyArray<ExecutableRegistration>,
+  ): (runId: string) => Effect.Effect<void, import("effect/unstable/sql/SqlError").SqlError, SqlClient.SqlClient>
+  (
+    runId: string,
+    registrations: ReadonlyArray<ExecutableRegistration>,
+  ): Effect.Effect<void, import("effect/unstable/sql/SqlError").SqlError, SqlClient.SqlClient>
+} = Function.dual(2, (runId: string, registrations: ReadonlyArray<ExecutableRegistration>) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     for (const registration of registrations) {
       yield* sql`INSERT INTO baton_run_registrations (run_id, pin) VALUES (${runId}, ${registration.pin})`
     }
-  })
+  }),
+)
 
 export const loadRegistrations = (runId: string) =>
   Effect.gen(function* () {
@@ -64,16 +73,18 @@ export const loadRegistrations = (runId: string) =>
       ORDER BY registration.pin
     `
     return yield* Effect.forEach(rows, (row) =>
-      Effect.try({
-        try: () => {
-          const registration = Schema.decodeUnknownSync(ExecutableRegistration, { onExcessProperty: "error" })(
-            JSON.parse(row.payload_json),
-          )
-          if (digest(registration) !== row.registration_digest)
-            throw new TypeError(`registration digest mismatch: ${row.pin}`)
-          return registration
-        },
-        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+      Effect.gen(function* () {
+        const registration = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ExecutableRegistration), {
+          onExcessProperty: "error",
+        })(row.payload_json).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })))
+        const matches = yield* Effect.try({
+          try: () => digest(registration) === row.registration_digest,
+          catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+        })
+        if (!matches) {
+          return yield* RuntimeUnavailable.make({ message: `registration digest mismatch: ${row.pin}` })
+        }
+        return registration
       }),
     )
   })

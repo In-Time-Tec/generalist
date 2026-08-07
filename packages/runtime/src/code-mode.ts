@@ -1,4 +1,4 @@
-import { Effect, type Layer, Option, Schema } from "effect"
+import { Effect, Function, Layer, Option, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { Agent, AgentEvent, ExecutableManifest, Pins, ProgramManifest, ToolContext, ToolExecutor } from "@batonfx/core"
 import type { AgentManifest } from "@batonfx/core"
@@ -325,10 +325,21 @@ export const make = (input: {
 }
 
 /** @experimental Add the Runtime-owned declaration without changing the resolved Agent identity. */
-export const withTool = <Tools extends Record<string, Tool.Any>, R>(
-  agent: Agent.Agent<Tools, R>,
-  implementation: Interface,
-): Agent.Agent<Record<string, Tool.Any>, R> => Agent.withTools(agent, [implementation.tool])
+export const withTool: {
+  (
+    implementation: Interface,
+  ): <Tools extends Record<string, Tool.Any>, R>(agent: Agent.Agent<Tools, R>) => Agent.Agent<Tools, R>
+  <Tools extends Record<string, Tool.Any>, R>(
+    agent: Agent.Agent<Tools, R>,
+    implementation: Interface,
+  ): Agent.Agent<Tools, R>
+} = Function.dual(
+  2,
+  <Tools extends Record<string, Tool.Any>, R>(
+    agent: Agent.Agent<Tools, R>,
+    implementation: Interface,
+  ): Agent.Agent<Tools, R> => Agent.withTools(agent, [implementation.tool]),
+)
 
 /** @experimental Route only code_mode to Runtime and preserve the resolved Agent's existing executor behavior. */
 export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options: {
@@ -357,9 +368,13 @@ export const makeExecutor = <Tools extends Record<string, Tool.Any>, R>(options:
         : Option.isSome(options.upstream)
           ? options.upstream.value.execute(request)
           : Effect.flatMap(Effect.context<ToolContext.ToolContext>(), (context) =>
-              ToolExecutor.executeToolkit(options.agent.toolkit, request).pipe(
-                Effect.provideContext(context),
-                Effect.provide(options.environment),
+              Effect.scoped(
+                Effect.flatMap(Layer.build(options.environment), (environment) =>
+                  ToolExecutor.executeToolkit(options.agent.toolkit, request).pipe(
+                    Effect.provideContext(context),
+                    Effect.provideContext(environment),
+                  ),
+                ),
               ),
             ),
   })

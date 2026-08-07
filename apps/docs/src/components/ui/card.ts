@@ -1,20 +1,26 @@
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 
 // VIEW
 
-const part =
-  (slot: string, baseClass: string) =>
-  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+const part = (
+  slot: string,
+  baseClass: string,
+): {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} =>
+  dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
     const h = html<ParentMessage>()
     return h.div(
       [...(config.attributes ?? []), h.DataAttribute("slot", slot), h.Class(cn(baseClass, config.class))],
       [...children],
     )
-  }
+  })
 
 export const card = part("card", "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm")
 

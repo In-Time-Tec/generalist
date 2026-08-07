@@ -31,7 +31,6 @@ import type { Skill, SkillSourceError } from "../context/skill-source.js"
 import { intercept } from "../durable/driver-run.js"
 import { operationKey } from "../durable/driver-interpreter.js"
 import { handoffDispatch } from "./handoff-tool-execution.js"
-import { HandoffCatalog } from "../policy/handoff-target.js"
 
 /**
  * Bound on how long a cancelled run waits for one forked tool or approval fiber to finish tearing down.
@@ -133,15 +132,11 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
           const invocationPath =
             handoffState === undefined ? undefined : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
           const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
-          return yield* Effect.fail(
-            suspended(call, toolCallBatch, toolCallIndex, outcome.token, "tool-wait", {
-              active_tools: registry.entries.map((entry) => entry.tool.name),
-              activated_skills: activatedSkills,
-              ...(invocationPath === undefined || invocationPath.length === 0
-                ? {}
-                : { invocation_path: invocationPath }),
-            }),
-          )
+          return yield* suspended(call, toolCallBatch, toolCallIndex, outcome.token, "tool-wait", {
+            active_tools: registry.entries.map((entry) => entry.tool.name),
+            activated_skills: activatedSkills,
+            ...(invocationPath === undefined || invocationPath.length === 0 ? {} : { invocation_path: invocationPath }),
+          })
         })
     }
   }
@@ -159,7 +154,9 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
   ): Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<T> | Tool.HandlerServices<T[keyof T]>> => {
     const registered = get(registry, request.call.name)
     if (registered?.dispatch === "Static") {
-      return executeToolkit(registry.toolkit, request)
+      const executed: Effect.Effect<Outcome, FrameworkFailure, Tool.HandlersFor<T> | Tool.HandlerServices<T[keyof T]>> =
+        executeToolkit(registry.toolkit, request)
+      return executed
     }
     return registered === undefined
       ? Effect.fail(
@@ -198,7 +195,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
   ): Stream.Stream<
     Event,
     RunError,
-    StaticToolServices<T> | HandoffCatalog | import("../durable/driver-interpreter.js").DriverInterpreter
+    StaticToolServices<T> | import("../durable/driver-interpreter.js").DriverInterpreter
   > =>
     Stream.concat(
       Stream.fromIterable<Event>([{ _tag: "ToolExecutionStarted", turn, call }]),
@@ -267,7 +264,6 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
             | ToolContext
             | Tool.HandlersFor<T>
             | Tool.HandlerServices<T[keyof T]>
-            | HandoffCatalog
             | import("../durable/driver-interpreter.js").DriverInterpreter
           > = isSkillActivationCall(call, registry)
             ? activateSkillOutcome(turn, call)
@@ -324,14 +320,18 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
     toolCallIndex: number,
     call: AnyToolCall,
     registry: Registry,
-  ): Stream.Stream<Event, RunError, StaticToolServices<T> | R> =>
+  ): Stream.Stream<
+    Event,
+    RunError,
+    StaticToolServices<T> | R | import("../durable/driver-interpreter.js").DriverInterpreter
+  > =>
     Stream.unwrap(
       activeAgentName().pipe(
         Effect.map((agentName) =>
           executeApproved(turn, call, { call, toolCallBatch, turn, toolCallIndex, agentName, sessionId }, registry),
         ),
       ),
-    ) as Stream.Stream<Event, RunError, StaticToolServices<T> | R>
+    )
 
   const toolCallEvents = (
     turn: number,
@@ -340,7 +340,11 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
     call: AnyToolCall,
     messages: ReadonlyArray<Prompt.Message>,
     registry: Registry,
-  ): Stream.Stream<Event, RunError, StaticToolServices<T> | R> => {
+  ): Stream.Stream<
+    Event,
+    RunError,
+    StaticToolServices<T> | R | import("../durable/driver-interpreter.js").DriverInterpreter
+  > => {
     const request: Request = { call, toolCallBatch, turn, toolCallIndex, agentName: "", sessionId }
     const candidate = get(registry, call.name)
     if (candidate === undefined)
@@ -404,7 +408,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
                         handoffState === undefined
                           ? undefined
                           : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
-                      return yield* Effect.fail(
+                      return Stream.fail(
                         AgentSuspended.make({
                           token: decision.suspension.token,
                           reason: "approval",
@@ -425,9 +429,9 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
               }
             }),
           ),
-        ) as Stream.Stream<Event, RunError, StaticToolServices<T> | R>
+        )
       }),
-    ) as Stream.Stream<Event, RunError, StaticToolServices<T> | R>
+    )
   }
   return {
     boundedSuccessResult,

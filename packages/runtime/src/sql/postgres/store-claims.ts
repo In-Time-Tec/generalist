@@ -11,11 +11,12 @@ import type { EventHub } from "../subscribers.js"
 import { claimReadyRuns, refreshLease, releaseClaim } from "./claims.js"
 import { RunClaims, type Interface as ClaimsInterface } from "../run-claims.js"
 import { afterTerminal, appendEvent, completeRun, loadEventsAfter, loadRun, settleParent } from "./pg-helpers.js"
+import type { WithoutSqlError } from "../sql-effect.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
-type RunFn = <A, E>(
-  effect: Effect.Effect<A, E, SqlR>,
-) => Effect.Effect<A, Exclude<E, { readonly _tag: "SqlError" }> | RuntimeUnavailable>
+export type RunFn = <A, E>(
+  effect: Effect.Effect<A, E | SqlError, SqlR>,
+) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
 export const makePostgresClaims = (input: {
   readonly sql: SqlClient.SqlClient

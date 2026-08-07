@@ -1,6 +1,8 @@
-import { Console, Effect, Schema } from "effect"
+import { Console, Effect, Equal, Layer, Schema } from "effect"
 import { Agent, Tool, Toolkit } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
+
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const lookupTool = Tool.make("lookup_order", {
   description: "Look up an order by id",
@@ -23,25 +25,31 @@ const program = Effect.gen(function* () {
     TestModel.toolCall("lookup_order", { orderId: "42" }, { id: "lookup-1" }),
     TestModel.text("Order 42 shipped yesterday."),
   ])
-  const result = yield* Agent.generate(agent, { prompt: "Where is order 42?" }).pipe(
-    Effect.provide(fixture.layer),
-    Effect.provide(
-      toolkit.toLayer({
-        lookup_order: (params) =>
-          Effect.sync(() => {
-            executedCalls.push(params)
-            return "shipped yesterday"
-          }),
-      }),
+  const result = yield* Effect.scoped(
+    Effect.flatMap(
+      Layer.build(
+        fixture.layer.pipe(
+          Layer.provideMerge(
+            toolkit.toLayer({
+              lookup_order: (params) =>
+                Effect.sync(() => {
+                  executedCalls.push(params)
+                  return "shipped yesterday"
+                }),
+            }),
+          ),
+        ),
+      ),
+      (services) => Agent.generate(agent, { prompt: "Where is order 42?" }).pipe(Effect.provideContext(services)),
     ),
   )
   if (result.text !== "Order 42 shipped yesterday.") {
     return yield* Effect.die(`unexpected answer: ${result.text}`)
   }
-  if (JSON.stringify(executedCalls) !== JSON.stringify([{ orderId: "42" }])) {
-    return yield* Effect.die(`unexpected tool params: ${JSON.stringify(executedCalls)}`)
+  if (!Equal.equals(executedCalls, [{ orderId: "42" }])) {
+    return yield* Effect.die(`unexpected tool params: ${encodeJson(executedCalls)}`)
   }
-  if (!JSON.stringify(yield* fixture.prompts).includes("shipped yesterday")) {
+  if (!encodeJson(yield* fixture.prompts).includes("shipped yesterday")) {
     return yield* Effect.die("tool result was not re-fed to the model")
   }
   yield* Console.log("scripted loop test passed")

@@ -1,5 +1,5 @@
 import { Pins } from "@batonfx/core"
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import type { PinnedExecutable } from "./executable-manifest.js"
 import { ExecutableRegistrationInvalid, ExecutableRegistrationMissing } from "./errors.js"
 
@@ -135,66 +135,83 @@ const encoded = (registration: ExecutableRegistration): string =>
   })
 
 /** @experimental Validate and canonicalize the complete registration set for one exact executable. */
-export const validate = (
-  executable: PinnedExecutable,
-  registrations: ReadonlyArray<ExecutableRegistration>,
-  required: ReadonlySet<string> = requiredPins(executable),
-): Effect.Effect<
-  ReadonlyArray<ExecutableRegistration>,
-  ExecutableRegistrationInvalid | ExecutableRegistrationMissing
-> =>
-  Effect.gen(function* () {
-    if (registrations.length > MAX_REGISTRATIONS) {
-      return yield* ExecutableRegistrationInvalid.make({ message: `registration count exceeds ${MAX_REGISTRATIONS}` })
-    }
-    const policies = yield* Effect.try({
-      try: () => compactionPolicies(executable),
-      catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
-    })
-    const byPin = new Map<string, ExecutableRegistration>()
-    for (const input of registrations) {
-      const registration = yield* Schema.decodeUnknownEffect(ExecutableRegistration, {
-        onExcessProperty: "error",
-      })(input).pipe(Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: String(error) })))
-      const expectedPolicy = policies.get(registration.pin)
-      if (expectedPolicy !== undefined) {
-        const policy = yield* Schema.decodeUnknownEffect(CompactionPolicy, { onExcessProperty: "error" })(
-          registration.payload,
-        ).pipe(Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: String(error) })))
-        if (Pins.digest(policy) !== Pins.digest(expectedPolicy)) {
+export const validate: {
+  (
+    registrations: ReadonlyArray<ExecutableRegistration>,
+    required?: ReadonlySet<string>,
+  ): (
+    executable: PinnedExecutable,
+  ) => Effect.Effect<
+    ReadonlyArray<ExecutableRegistration>,
+    ExecutableRegistrationInvalid | ExecutableRegistrationMissing
+  >
+  (
+    executable: PinnedExecutable,
+    registrations: ReadonlyArray<ExecutableRegistration>,
+    required?: ReadonlySet<string>,
+  ): Effect.Effect<ReadonlyArray<ExecutableRegistration>, ExecutableRegistrationInvalid | ExecutableRegistrationMissing>
+} = Function.dual(
+  (args) => typeof args[0] === "object" && args[0] !== null && "ref" in args[0] && "manifest" in args[0],
+  (
+    executable: PinnedExecutable,
+    registrations: ReadonlyArray<ExecutableRegistration>,
+    required: ReadonlySet<string> = requiredPins(executable),
+  ) =>
+    Effect.gen(function* () {
+      if (registrations.length > MAX_REGISTRATIONS) {
+        return yield* ExecutableRegistrationInvalid.make({ message: `registration count exceeds ${MAX_REGISTRATIONS}` })
+      }
+      const policies = yield* Effect.try({
+        try: () => compactionPolicies(executable),
+        catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
+      })
+      const byPin = new Map<string, ExecutableRegistration>()
+      for (const input of registrations) {
+        const registration = yield* Schema.decodeUnknownEffect(ExecutableRegistration, {
+          onExcessProperty: "error",
+        })(input).pipe(Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: String(error) })))
+        const expectedPolicy = policies.get(registration.pin)
+        if (expectedPolicy !== undefined) {
+          const policy = yield* Schema.decodeUnknownEffect(CompactionPolicy, { onExcessProperty: "error" })(
+            registration.payload,
+          ).pipe(Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: String(error) })))
+          if (Pins.digest(policy) !== Pins.digest(expectedPolicy)) {
+            return yield* ExecutableRegistrationInvalid.make({
+              message: `compaction registration does not match executable identity: ${registration.pin}`,
+            })
+          }
+        }
+        if (!required.has(registration.pin)) {
           return yield* ExecutableRegistrationInvalid.make({
-            message: `compaction registration does not match executable identity: ${registration.pin}`,
+            message: `registration pin is not required by executable: ${registration.pin}`,
           })
         }
-      }
-      if (!required.has(registration.pin)) {
-        return yield* ExecutableRegistrationInvalid.make({
-          message: `registration pin is not required by executable: ${registration.pin}`,
+        if (byPin.has(registration.pin)) {
+          return yield* ExecutableRegistrationInvalid.make({
+            message: `duplicate registration pin: ${registration.pin}`,
+          })
+        }
+        const json = yield* Effect.try({
+          try: () => encoded(registration),
+          catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
         })
-      }
-      if (byPin.has(registration.pin)) {
-        return yield* ExecutableRegistrationInvalid.make({ message: `duplicate registration pin: ${registration.pin}` })
-      }
-      const json = yield* Effect.try({
-        try: () => encoded(registration),
-        catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
-      })
-      if (new TextEncoder().encode(json).byteLength > MAX_PAYLOAD_BYTES) {
-        return yield* ExecutableRegistrationInvalid.make({
-          message: `registration payload exceeds ${MAX_PAYLOAD_BYTES} bytes: ${registration.pin}`,
+        if (new TextEncoder().encode(json).byteLength > MAX_PAYLOAD_BYTES) {
+          return yield* ExecutableRegistrationInvalid.make({
+            message: `registration payload exceeds ${MAX_PAYLOAD_BYTES} bytes: ${registration.pin}`,
+          })
+        }
+        yield* Effect.try({
+          try: () => Pins.digest(registration.payload),
+          catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
         })
+        byPin.set(registration.pin, registration)
       }
-      yield* Effect.try({
-        try: () => Pins.digest(registration.payload),
-        catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
-      })
-      byPin.set(registration.pin, registration)
-    }
-    for (const pin of required) {
-      if (!byPin.has(pin)) return yield* ExecutableRegistrationMissing.make({ pin })
-    }
-    return [...byPin.values()].toSorted((left, right) => (left.pin < right.pin ? -1 : left.pin > right.pin ? 1 : 0))
-  })
+      for (const pin of required) {
+        if (!byPin.has(pin)) return yield* ExecutableRegistrationMissing.make({ pin })
+      }
+      return [...byPin.values()].toSorted((left, right) => (left.pin < right.pin ? -1 : left.pin > right.pin ? 1 : 0))
+    }),
+)
 
 /** @experimental Stable persisted identity of one registration. */
 export const digest = (registration: ExecutableRegistration): string => Pins.digest(registration)
@@ -202,17 +219,33 @@ export const digest = (registration: ExecutableRegistration): string => Pins.dig
 export const encodeJson = encoded
 
 /** @experimental Select and validate the exact registrations required by a narrowed executable. */
-export const narrow = (
-  executable: PinnedExecutable,
-  registrations: ReadonlyArray<ExecutableRegistration>,
-): Effect.Effect<
-  ReadonlyArray<ExecutableRegistration>,
-  ExecutableRegistrationInvalid | ExecutableRegistrationMissing
-> => {
-  const required = requiredPinsForActiveExecutable(executable)
-  return validate(
-    executable,
-    registrations.filter((registration) => required.has(registration.pin)),
-    required,
-  )
-}
+export const narrow: {
+  (
+    registrations: ReadonlyArray<ExecutableRegistration>,
+  ): (
+    executable: PinnedExecutable,
+  ) => Effect.Effect<
+    ReadonlyArray<ExecutableRegistration>,
+    ExecutableRegistrationInvalid | ExecutableRegistrationMissing
+  >
+  (
+    executable: PinnedExecutable,
+    registrations: ReadonlyArray<ExecutableRegistration>,
+  ): Effect.Effect<ReadonlyArray<ExecutableRegistration>, ExecutableRegistrationInvalid | ExecutableRegistrationMissing>
+} = Function.dual(
+  2,
+  (
+    executable: PinnedExecutable,
+    registrations: ReadonlyArray<ExecutableRegistration>,
+  ): Effect.Effect<
+    ReadonlyArray<ExecutableRegistration>,
+    ExecutableRegistrationInvalid | ExecutableRegistrationMissing
+  > => {
+    const required = requiredPinsForActiveExecutable(executable)
+    return validate(
+      executable,
+      registrations.filter((registration) => required.has(registration.pin)),
+      required,
+    )
+  },
+)

@@ -41,10 +41,18 @@ export type PlacementResponse =
   | { readonly _tag: "DomainFailure"; readonly failure: unknown }
   | { readonly _tag: "Suspend"; readonly token: string }
 
+type SchemaServicesD<S extends Schema.Constraint> = [unknown] extends [S["DecodingServices"]]
+  ? never
+  : S["DecodingServices"]
+type SchemaServicesE<S extends Schema.Constraint> = [unknown] extends [S["EncodingServices"]]
+  ? never
+  : S["EncodingServices"]
+
 export type PlacementSchemaServices<Tools extends Record<string, Tool.Any>> =
-  | Tool.ParametersSchema<Tools[keyof Tools]>["DecodingServices"]
-  | Tool.ResultDecodingServices<Tools[keyof Tools]>
-  | Tool.ResultEncodingServices<Tools[keyof Tools]>
+  | SchemaServicesD<Tool.ParametersSchema<Tools[keyof Tools]>>
+  | SchemaServicesD<Tool.SuccessSchema<Tools[keyof Tools]>>
+  | SchemaServicesE<Tool.SuccessSchema<Tools[keyof Tools]>>
+  | SchemaServicesE<Schema.Constraint>
 
 type PlacementTool<Tools extends Record<string, Tool.Any>> = Tools[keyof Tools] & {
   readonly parametersSchema: Tool.ParametersSchema<Tools[keyof Tools]>
@@ -96,7 +104,7 @@ const placementOutcomeFromResponse = <SuccessSchema extends Schema.Constraint, F
 ): Effect.Effect<
   Outcome,
   FrameworkFailure,
-  SuccessSchema["DecodingServices"] | SuccessSchema["EncodingServices"] | FailureSchema["EncodingServices"]
+  SchemaServicesD<SuccessSchema> | SchemaServicesE<SuccessSchema> | SchemaServicesE<FailureSchema>
 > => {
   if (typeof response !== "object" || response === null || !("_tag" in response)) {
     return Effect.fail(

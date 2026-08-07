@@ -1,4 +1,4 @@
-import { Context, Layer } from "effect"
+import { Context, Function, Layer } from "effect"
 import type { Any as AnyAgent } from "../agent/agent-closure.js"
 import type { AgentPin } from "../durable/pin.js"
 
@@ -9,11 +9,17 @@ export interface HandoffTarget {
   readonly pin?: AgentPin
 }
 
-export const target = (agent: AnyAgent, pin?: AgentPin): HandoffTarget => ({
-  name: agent.name,
-  agent,
-  ...(pin === undefined ? {} : { pin }),
-})
+export const target: {
+  (pin?: AgentPin): (agent: AnyAgent) => HandoffTarget
+  (agent: AnyAgent, pin?: AgentPin): HandoffTarget
+} = Function.dual(
+  (args) => args.length > 1 || typeof args[0] === "object",
+  (agent: AnyAgent, pin?: AgentPin): HandoffTarget => ({
+    name: agent.name,
+    agent,
+    ...(pin === undefined ? {} : { pin }),
+  }),
+)
 
 export interface HandoffCatalogInterface {
   readonly resolve: (name: string) => HandoffTarget | undefined

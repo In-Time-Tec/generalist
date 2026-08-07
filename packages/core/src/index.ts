@@ -81,6 +81,7 @@ import {
   ProgramCapabilities as ProgramCapabilitiesService,
   ProgramCapabilityDenied,
   ProgramCapabilityMissing,
+  ProgramInvocationFailure,
   ProgramMemberKey,
   ProgramOperationUnknown,
   ProgramOperationName,
@@ -172,6 +173,7 @@ export const ProgramCapabilities = {
   ProgramCapabilityMissing,
   ProgramMemberKey,
   ProgramOperationUnknown,
+  ProgramInvocationFailure,
   ProgramOperationName,
   ProgramReplayDivergence,
   ProgramSchemaFailure,
@@ -181,6 +183,7 @@ export const ProgramCapabilities = {
 }
 export namespace ProgramCapabilities {
   export type CapabilityFailure = import("./program/program-capabilities.js").CapabilityFailure
+  export type ProgramSuspended = import("./program/program-capabilities.js").ProgramSuspended
   export type ProgramBudgetExhausted = import("./program/program-capabilities.js").ProgramBudgetExhausted
   export type Interface = import("./program/program-capabilities.js").Interface
   export type ToolCallInput = import("./program/program-capabilities.js").ToolCallInput
@@ -204,6 +207,8 @@ export const ProgramBindings = {
 }
 export namespace ProgramBindings {
   export type Bindings = import("./program/program-bindings.js").Bindings
+  export type TypedTool = import("./program/program-bindings.js").TypedTool
+  export type TypedStep = import("./program/program-bindings.js").TypedStep
   export type ToolBinding<I, IE, O, OE, E = never> = import("./program/program-bindings.js").ToolBinding<
     I,
     IE,

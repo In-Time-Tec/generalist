@@ -1,4 +1,4 @@
-import { Effect, Equal } from "effect"
+import { Effect, Equal, Function } from "effect"
 import { RuntimeUnavailable } from "./errors.js"
 import type { RunEvent } from "./run-event.js"
 import { isTerminal, type CompactionInspection, type RawUsageFact, type RunInspection, type RunOutcome } from "./run.js"
@@ -16,13 +16,13 @@ export interface InspectionRun {
 
 const corruption = (message: string) => RuntimeUnavailable.make({ message })
 
-const outcomeFor = (run: InspectionRun): Effect.Effect<RunOutcome | undefined, RuntimeUnavailable> => {
+const outcomeFor = (run: InspectionRun): Effect.Effect<RunOutcome | void, RuntimeUnavailable> => {
   const terminalEvents = run.events.filter(
     (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
   )
   if (!isTerminal(run.inspection.status)) {
     return terminalEvents.length === 0
-      ? Effect.succeed(undefined)
+      ? Effect.void
       : Effect.fail(corruption(`Non-terminal Run ${run.inspection.runId} has a terminal event`))
   }
   const event = terminalEvents.find((candidate) => candidate.eventId === run.terminalEventId)
@@ -240,51 +240,80 @@ export const projectRunSnapshot = (run: InspectionRun) =>
     }
   })
 
-export const projectTreeInspection = (
-  rootRunId: string,
-  cursor: import("./tree-cursor.js").TreeCursor,
-  input: ReadonlyArray<InspectionRun>,
-) =>
-  Effect.gen(function* () {
-    const positions = new Set<number>()
-    for (const run of input) {
-      if (!Number.isSafeInteger(run.firstTreePosition) || run.firstTreePosition < 0) {
-        return yield* corruption(`Run ${run.inspection.runId} has no canonical first tree position`)
-      }
-      if (positions.has(run.firstTreePosition)) {
-        return yield* corruption(`Tree ${rootRunId} has duplicate first position ${run.firstTreePosition}`)
-      }
-      positions.add(run.firstTreePosition)
+type TreeInspectionResult =
+  | {
+      readonly _tag: "Terminal"
+      readonly rootRunId: string
+      readonly cursor: import("./tree-cursor.js").TreeCursor
+      readonly runs: TreeRunInspection[]
+      readonly usage: readonly RawUsageFact[]
+      readonly compactions: readonly CompactionInspection[]
     }
-    const runs = [...input].toSorted(
-      (left, right) =>
-        left.firstTreePosition - right.firstTreePosition || left.inspection.runId.localeCompare(right.inspection.runId),
-    )
-    const inspected = yield* Effect.forEach(runs, (item) =>
-      outcomeFor(item).pipe(
-        Effect.map((outcome) => {
-          const projected: {
-            run: RunInspection
-            parentRunId?: string
-            invocationId?: string
-            outcome?: RunOutcome
-          } = { run: item.inspection }
-          if (item.parentRunId !== undefined) projected.parentRunId = item.parentRunId
-          if (item.invocationId !== undefined) projected.invocationId = item.invocationId
-          if (outcome !== undefined) projected.outcome = outcome
-          return projected satisfies TreeRunInspection
-        }),
-      ),
-    )
-    const activeRunIds = inspected.filter(({ run }) => !isTerminal(run.status)).map(({ run }) => run.runId)
-    const common = {
-      rootRunId,
-      cursor,
-      runs: inspected,
-      usage: yield* factsFor(runs),
-      compactions: yield* compactionsFor(runs),
+  | {
+      readonly _tag: "Active"
+      readonly rootRunId: string
+      readonly cursor: import("./tree-cursor.js").TreeCursor
+      readonly runs: TreeRunInspection[]
+      readonly usage: readonly RawUsageFact[]
+      readonly compactions: readonly CompactionInspection[]
+      readonly activeRunIds: string[]
     }
-    return activeRunIds.length === 0
-      ? ({ _tag: "Terminal", ...common } as const)
-      : ({ _tag: "Active", ...common, activeRunIds } as const)
-  })
+
+export const projectTreeInspection: {
+  (
+    cursor: import("./tree-cursor.js").TreeCursor,
+    input: ReadonlyArray<InspectionRun>,
+  ): (rootRunId: string) => Effect.Effect<TreeInspectionResult, RuntimeUnavailable>
+  (
+    rootRunId: string,
+    cursor: import("./tree-cursor.js").TreeCursor,
+    input: ReadonlyArray<InspectionRun>,
+  ): Effect.Effect<TreeInspectionResult, RuntimeUnavailable>
+} = Function.dual(
+  3,
+  (rootRunId: string, cursor: import("./tree-cursor.js").TreeCursor, input: ReadonlyArray<InspectionRun>) =>
+    Effect.gen(function* () {
+      const positions = new Set<number>()
+      for (const run of input) {
+        if (!Number.isSafeInteger(run.firstTreePosition) || run.firstTreePosition < 0) {
+          return yield* corruption(`Run ${run.inspection.runId} has no canonical first tree position`)
+        }
+        if (positions.has(run.firstTreePosition)) {
+          return yield* corruption(`Tree ${rootRunId} has duplicate first position ${run.firstTreePosition}`)
+        }
+        positions.add(run.firstTreePosition)
+      }
+      const runs = [...input].toSorted(
+        (left, right) =>
+          left.firstTreePosition - right.firstTreePosition ||
+          left.inspection.runId.localeCompare(right.inspection.runId),
+      )
+      const inspected = yield* Effect.forEach(runs, (item) =>
+        outcomeFor(item).pipe(
+          Effect.map((outcome) => {
+            const projected: {
+              run: RunInspection
+              parentRunId?: string
+              invocationId?: string
+              outcome?: RunOutcome
+            } = { run: item.inspection }
+            if (item.parentRunId !== undefined) projected.parentRunId = item.parentRunId
+            if (item.invocationId !== undefined) projected.invocationId = item.invocationId
+            if (outcome !== undefined) projected.outcome = outcome
+            return projected satisfies TreeRunInspection
+          }),
+        ),
+      )
+      const activeRunIds = inspected.filter(({ run }) => !isTerminal(run.status)).map(({ run }) => run.runId)
+      const common = {
+        rootRunId,
+        cursor,
+        runs: inspected,
+        usage: yield* factsFor(runs),
+        compactions: yield* compactionsFor(runs),
+      }
+      return activeRunIds.length === 0
+        ? ({ _tag: "Terminal", ...common } as const)
+        : ({ _tag: "Active", ...common, activeRunIds } as const)
+    }),
+)

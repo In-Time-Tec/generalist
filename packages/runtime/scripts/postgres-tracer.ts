@@ -1,18 +1,17 @@
-import { Effect } from "effect"
+import { Console, Effect, ManagedRuntime } from "effect"
 import { RunClaims, Runtime } from "../src/index.js"
 import { assistantAddress, completedResult, textPrompt } from "../test/helpers.js"
 import { postgresLayer, postgresUrl, preparePostgres, uniqueSession } from "../test/postgres/helpers.js"
 
 const url = postgresUrl
 if (url === undefined || url.length === 0) {
-  console.error("Set BATON_DATABASE_URL or DATABASE_URL to run the postgres tracer")
-  process.exit(1)
+  throw new Error("Set BATON_DATABASE_URL or DATABASE_URL to run the postgres tracer")
 }
 
-const program = Effect.gen(function* () {
-  yield* preparePostgres(url)
-  const sessionId = uniqueSession("cli")
-  const result = yield* Effect.gen(function* () {
+const encodeJson = (value: unknown): string => JSON.stringify(value)
+
+const runTrace = (databaseUrl: string, sessionId: string) =>
+  Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const claims = yield* RunClaims.RunClaims
     const receipt = yield* runtime.send({
@@ -35,14 +34,19 @@ const program = Effect.gen(function* () {
     })
     const tags = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 3 })).map((event) => event._tag)
     return {
-      url: url.replace(/:[^:@/]+@/, ":***@"),
+      url: databaseUrl.replace(/:[^:@/]+@/, ":***@"),
       runId: receipt.runId,
       attemptFence: claimed[0]!.attemptFence,
       tags,
       multiWorker: true,
     }
-  }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped)
-  console.log(JSON.stringify(result, null, 2))
+  })
+const program = Effect.gen(function* () {
+  yield* preparePostgres(url)
+  const sessionId = uniqueSession("cli")
+  const result = yield* runTrace(url, sessionId)
+  yield* Console.log(encodeJson(result))
 })
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(postgresLayer(url))
+await runtime.runPromise(program.pipe(Effect.scoped))

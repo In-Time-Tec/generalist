@@ -1,4 +1,4 @@
-import { Duration, Effect } from "effect"
+import { Clock, DateTime, Duration, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { StaleClaim } from "../errors.js"
 import type { ClaimedRun } from "../run-claims.js"
@@ -63,7 +63,7 @@ export const claimReadyRuns = (options: ClaimOptions) =>
         run,
         workerId: options.workerId,
         attemptFence: run.attemptFence,
-        leaseExpiresAt: new Date(run.leaseExpiresAt ?? Date.now()),
+        leaseExpiresAt: DateTime.toDate(DateTime.makeUnsafe(run.leaseExpiresAt ?? (yield* Clock.currentTimeMillis))),
       })
     }
     return out

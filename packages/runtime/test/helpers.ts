@@ -1,19 +1,38 @@
+import { Function } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Agent, AgentEvent } from "@batonfx/core"
-import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "../src/index.js"
+import { Agent, AgentEvent, AgentManifest } from "@batonfx/core"
+import {
+  Address,
+  ExecutableManifest,
+  ExecutableRegistration,
+  ExecutableResolver,
+  RunWait,
+  Runtime,
+} from "../src/index.js"
 import { closedTestAgent, pinnedTestAgent } from "./identity.js"
 
 /** Exact registration set covering every pin an executable requires. */
-export const registrationsFor = (
-  executable: ExecutableManifest.PinnedExecutable,
-  suffix = "1",
-): ReadonlyArray<ExecutableRegistration.ExecutableRegistration> =>
-  [...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
+export const registrationsFor: {
+  (
+    suffix?: string,
+  ): (executable: ExecutableManifest.PinnedExecutable) => ReadonlyArray<ExecutableRegistration.ExecutableRegistration>
+  (
+    executable: ExecutableManifest.PinnedExecutable,
+    suffix?: string,
+  ): ReadonlyArray<ExecutableRegistration.ExecutableRegistration>
+} = (executableOrSuffix?: ExecutableManifest.PinnedExecutable | string, maybeSuffix?: string): any => {
+  if (executableOrSuffix === undefined || typeof executableOrSuffix === "string") {
+    return (executable: ExecutableManifest.PinnedExecutable) => registrationsFor(executable, executableOrSuffix)
+  }
+  const executable = executableOrSuffix
+  const suffix = maybeSuffix ?? "1"
+  return [...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
     pin,
     codec: "test",
     version: "1",
     payload: { fixture: suffix },
   }))
+}
 
 export const assistant: Agent.Agent = Agent.make({ name: "assistant" })
 export const researcher: Agent.Agent = Agent.make({ name: "researcher" })
@@ -25,7 +44,7 @@ const assistantPinned = pinnedTestAgent(assistant, "1", [
   { selection: "analyst", agent: analystPinned.pin },
   { selection: "researcher", agent: researcherPinned.pin },
 ])
-const entries = (...agents: ReadonlyArray<ReturnType<typeof pinnedTestAgent>>) =>
+const entries = (...agents: ReadonlyArray<AgentManifest.PinnedAgent>) =>
   agents.map((agent) => ({ _tag: "Agent" as const, pin: agent.pin, manifest: agent.manifest }))
 const executable = ExecutableManifest.make({
   root: assistantPinned.pin,
@@ -133,34 +152,50 @@ export const completedResult = (text: string) => ({
   transcript: emptyTranscript,
 })
 
-export const openWait = (
-  waitId: string,
-  reason: "tool-wait" | "approval" | "signal" | "timer" | "external" = "tool-wait",
-) => ({
-  waitId,
-  reason:
-    reason === "approval"
-      ? {
-          _tag: "Approval" as const,
-          request: { approvalId: waitId, operation: waitId, capability: "test", input: {} },
-        }
-      : reason === "tool-wait"
-        ? { _tag: "ToolWait" as const }
-        : reason === "signal"
-          ? { _tag: "Signal" as const, name: waitId }
-          : reason === "timer"
-            ? { _tag: "Timer" as const }
-            : { _tag: "External" as const },
-  status: "open" as const,
-  openedAt: "2026-08-03T00:00:00.000Z",
-})
+type OpenWait = RunWait.RunWait
 
-export const suspension = (waitId: string, reason: "tool-wait" | "approval" = "tool-wait"): AgentEvent.AgentSuspended =>
-  AgentEvent.AgentSuspended.make({
-    token: waitId,
-    reason,
-    tool_call_id: waitId,
-    tool_name: "test",
-    tool_params: {},
-    tool_call_batch: [],
-  })
+type OpenWaitReason = "tool-wait" | "approval" | "signal" | "timer" | "external"
+
+const isOpenWaitReason = (value: string): value is OpenWaitReason =>
+  value === "tool-wait" || value === "approval" || value === "signal" || value === "timer" || value === "external"
+
+export const openWait: {
+  (reason?: OpenWaitReason): (waitId: string) => OpenWait
+  (waitId: string, reason?: OpenWaitReason): OpenWait
+} = Function.dual(
+  (args) => args.length > 1 || !isOpenWaitReason(args[0]),
+  (waitId: string, reason: OpenWaitReason = "tool-wait"): OpenWait => ({
+    waitId,
+    reason:
+      reason === "approval"
+        ? {
+            _tag: "Approval" as const,
+            request: { approvalId: waitId, operation: waitId, capability: "test", input: {} },
+          }
+        : reason === "tool-wait"
+          ? { _tag: "ToolWait" as const }
+          : reason === "signal"
+            ? { _tag: "Signal" as const, name: waitId }
+            : reason === "timer"
+              ? { _tag: "Timer" as const }
+              : { _tag: "External" as const },
+    status: "open" as const,
+    openedAt: "2026-08-03T00:00:00.000Z",
+  }),
+)
+
+export const suspension: {
+  (reason?: "tool-wait" | "approval"): (waitId: string) => AgentEvent.AgentSuspended
+  (waitId: string, reason?: "tool-wait" | "approval"): AgentEvent.AgentSuspended
+} = Function.dual(
+  (args) => args.length > 1 || !(args[0] === "tool-wait" || args[0] === "approval"),
+  (waitId: string, reason: "tool-wait" | "approval" = "tool-wait"): AgentEvent.AgentSuspended =>
+    AgentEvent.AgentSuspended.make({
+      token: waitId,
+      reason,
+      tool_call_id: waitId,
+      tool_name: "test",
+      tool_params: {},
+      tool_call_batch: [],
+    }),
+)

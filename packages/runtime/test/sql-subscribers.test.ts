@@ -19,7 +19,7 @@ const event = (sequence: number): RunEvent => ({
 
 it.effect("bridges replay and live events without a gap or overlap", () =>
   Effect.gen(function* () {
-    const hub = yield* makeEventHub()
+    const hub = yield* makeEventHub
     const loading = yield* Deferred.make<void>()
     const release = yield* Deferred.make<void>()
     const stream = hub.subscribe({

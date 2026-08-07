@@ -1,5 +1,6 @@
 import { Cause, Channel, Effect, Exit, HashMap, Option, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { DriverInterpreter } from "../durable/driver-interpreter.js"
 import { AgentError, type Event } from "./agent-event.js"
 import { coalesceAdjacentText } from "../context/session-sync.js"
 import { applyPartChain, applyPromptChain } from "./agent-message.js"
@@ -24,7 +25,7 @@ import { DuplicateToolCallId, MiddlewareViolation } from "./agent-event.js"
 import type { RunError, ToolSchedulingPolicy } from "./agent.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
 import { wrapDriverAttempt } from "./model-turn-driver.js"
-import { captureFinishPart, captureStructuredUsage, chargeAttemptUsage } from "./model-turn-finish.js"
+import { captureFinishPart, captureStructuredUsage, chargeAttemptUsageWith } from "./model-turn-finish.js"
 import { schedule as scheduleTools } from "./tool-scheduler.js"
 import { attemptText, classifyOtherFailure, isToolNameCollision } from "./model-turn-parts.js"
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
@@ -213,13 +214,13 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     overrides: TurnOverrides | undefined,
     agentName: string,
     toolScheduling: ToolSchedulingPolicy,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<T>> => {
+  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<T> | DriverInterpreter> => {
     const instrumentTurnStream = <A, E>(
-      stream: Stream.Stream<A, E, LanguageModel.LanguageModel>,
+      stream: Stream.Stream<A, E, LanguageModel.LanguageModel | DriverInterpreter>,
     ): Stream.Stream<
       A,
       E | InvalidToolCallParameters | ToolJsonSchemaCompilerMissing | AiError.AiError,
-      LanguageModel.LanguageModel
+      LanguageModel.LanguageModel | DriverInterpreter
     > =>
       Stream.unwrap(
         LanguageModel.LanguageModel.pipe(
@@ -256,7 +257,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         readonly accept: Effect.Effect<void, DuplicateToolCallId>
       },
       RunError,
-      LanguageModel.LanguageModel
+      LanguageModel.LanguageModel | DriverInterpreter
     > => {
       let emitted = false
       let completed = false
@@ -281,117 +282,126 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
           classifyFailure(classifiedFailure) === "context-overflow"
         )
       }
-      return Stream.fromChannel(
-        Channel.acquireUseRelease(
-          Ref.make<ToolCallIdState>({
-            nextIndex: 0,
-            firstIndexes: HashMap.empty(),
-          }),
-          (toolCallIds) =>
-            Stream.unwrap(
-              Effect.gen(function* () {
-                const activeModel = yield* LanguageModel.LanguageModel
-                classifyFailure = (error) => classifyModelFailure(activeModel, error)
-                const prepared = yield* preparePrompt(turn, activePrompt, compactOverflow)
-                if (compactOverflow && !prepared.changed && overflowCause !== undefined) {
-                  return yield* Effect.failCause(overflowCause)
-                }
-                const coalescedContent = prepared.prompt.content.map(coalesceAdjacentText)
-                const preparedPrompt = coalescedContent.some(
-                  (message: Prompt.Message, index: number) => message !== prepared.prompt.content[index],
-                )
-                  ? Prompt.fromMessages(coalescedContent)
-                  : prepared.prompt
-                const history = yield* Ref.get(chat.history)
-                preparedState = { history, preparedPrompt }
-                const responsePrompt = Prompt.concat(history, preparedPrompt)
-                if (Option.isSome(compactionService)) {
-                  state.currentContext = responsePrompt
-                  state.currentContextTokens = yield* countTokens(turn, responsePrompt)
-                }
-                const messages = responsePrompt.content
-                const rawParts = LanguageModel.streamText({
-                  prompt: responsePrompt,
-                  toolkit: activeRegistry.toolkit,
-                  disableToolCallResolution: true,
-                }).pipe(
-                  Stream.mapEffect((part) =>
-                    part.type === "error"
-                      ? Effect.fail(
-                          isToolNameCollision(part.error)
-                            ? part.error
-                            : AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }),
-                        )
-                      : Effect.succeed(part),
-                  ),
-                  Stream.tap((part) =>
-                    part.type === "response-metadata"
-                      ? Effect.void
-                      : Effect.sync(() => {
-                          emitted = true
-                          captureProviderOutput(part)
-                        }),
-                  ),
-                  Stream.catchCause((cause): Stream.Stream<Response.StreamPart<Record<string, Tool.Any>>, RunError> => {
-                    if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
-                    if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
-                    const error = singleFailure(cause)
-                    if (Option.isNone(error)) return Stream.failCause(cause)
-                    if (
-                      Schema.is(AgentError)(error.value) ||
-                      isToolNameCollision(error.value) ||
-                      isInvalidToolCallParameters(error.value)
-                    ) {
-                      return Stream.fail(error.value)
-                    }
-                    return Stream.make(Response.makePart("error", { error: error.value }))
-                  }),
-                )
-                return rawParts.pipe(
-                  Stream.mapEffect((part) => transformPart(turn, activeRegistry.toolkit, part)),
-                  Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
-                  Stream.map((part) => ({
-                    part,
-                    messages,
-                    accept: validateToolCallId(toolCallIds, part).pipe(
-                      Effect.andThen(
-                        Effect.sync(() => {
-                          transformedParts.push(part)
-                        }),
-                      ),
-                    ),
-                  })),
-                  Stream.concat(
-                    Stream.fromEffect(
-                      Effect.sync(() => {
-                        completed = true
-                      }),
-                    ).pipe(Stream.drain),
-                  ),
-                )
+      return Stream.unwrap(
+        Effect.gen(function* () {
+          const interpreter = yield* DriverInterpreter
+          return Stream.fromChannel(
+            Channel.acquireUseRelease(
+              Ref.make<ToolCallIdState>({
+                nextIndex: 0,
+                firstIndexes: HashMap.empty(),
               }),
-            ).pipe(Stream.toChannel),
-          (_toolCallIds, exit: Exit.Exit<unknown, RunError>) =>
-            preparedState === undefined ||
-            !completed ||
-            (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
-              ? Effect.void
-              : Effect.suspend(() => {
-                  state.text = `${state.text}${attemptText(transformedParts)}`
-                  return Ref.set(
-                    chat.history,
-                    Prompt.concat(
-                      Prompt.concat(preparedState!.history, preparedState!.preparedPrompt),
-                      Prompt.fromMessages(Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText)),
+              (toolCallIds) =>
+                Stream.unwrap(
+                  Effect.gen(function* () {
+                    const activeModel = yield* LanguageModel.LanguageModel
+                    classifyFailure = (error) => classifyModelFailure(activeModel, error)
+                    const prepared = yield* preparePrompt(turn, activePrompt, compactOverflow)
+                    if (compactOverflow && !prepared.changed && overflowCause !== undefined) {
+                      return yield* Effect.failCause(overflowCause)
+                    }
+                    const coalescedContent = prepared.prompt.content.map(coalesceAdjacentText)
+                    const preparedPrompt = coalescedContent.some(
+                      (message: Prompt.Message, index: number) => message !== prepared.prompt.content[index],
+                    )
+                      ? Prompt.fromMessages(coalescedContent)
+                      : prepared.prompt
+                    const history = yield* Ref.get(chat.history)
+                    preparedState = { history, preparedPrompt }
+                    const responsePrompt = Prompt.concat(history, preparedPrompt)
+                    if (Option.isSome(compactionService)) {
+                      state.currentContext = responsePrompt
+                      state.currentContextTokens = yield* countTokens(turn, responsePrompt)
+                    }
+                    const messages = responsePrompt.content
+                    const rawParts = LanguageModel.streamText({
+                      prompt: responsePrompt,
+                      toolkit: activeRegistry.toolkit,
+                      disableToolCallResolution: true,
+                    }).pipe(
+                      Stream.mapEffect((part) =>
+                        part.type === "error"
+                          ? Effect.fail(
+                              isToolNameCollision(part.error)
+                                ? part.error
+                                : AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }),
+                            )
+                          : Effect.succeed(part),
+                      ),
+                      Stream.tap((part) =>
+                        part.type === "response-metadata"
+                          ? Effect.void
+                          : Effect.sync(() => {
+                              emitted = true
+                              captureProviderOutput(part)
+                            }),
+                      ),
+                      Stream.catchCause(
+                        (cause): Stream.Stream<Response.StreamPart<Record<string, Tool.Any>>, RunError> => {
+                          if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
+                          if (retryableOverflow(cause, emitted)) return Stream.failCause(cause)
+                          const error = singleFailure(cause)
+                          if (Option.isNone(error)) return Stream.failCause(cause)
+                          if (
+                            Schema.is(AgentError)(error.value) ||
+                            isToolNameCollision(error.value) ||
+                            isInvalidToolCallParameters(error.value)
+                          ) {
+                            return Stream.fail(error.value)
+                          }
+                          return Stream.make(Response.makePart("error", { error: error.value }))
+                        },
+                      ),
+                    )
+                    return rawParts.pipe(
+                      Stream.mapEffect((part) => transformPart(turn, activeRegistry.toolkit, part)),
+                      Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
+                      Stream.map((part) => ({
+                        part,
+                        messages,
+                        accept: validateToolCallId(toolCallIds, part).pipe(
+                          Effect.andThen(
+                            Effect.sync(() => {
+                              transformedParts.push(part)
+                            }),
+                          ),
+                        ),
+                      })),
+                      Stream.concat(
+                        Stream.fromEffect(
+                          Effect.sync(() => {
+                            completed = true
+                          }),
+                        ).pipe(Stream.drain),
+                      ),
+                    )
+                  }),
+                ).pipe(Stream.toChannel),
+              (_toolCallIds, exit: Exit.Exit<unknown, RunError>) =>
+                preparedState === undefined ||
+                !completed ||
+                (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
+                  ? Effect.void
+                  : Effect.suspend(() => {
+                      state.text = `${state.text}${attemptText(transformedParts)}`
+                      return Ref.set(
+                        chat.history,
+                        Prompt.concat(
+                          Prompt.concat(preparedState!.history, preparedState!.preparedPrompt),
+                          Prompt.fromMessages(
+                            Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText),
+                          ),
+                        ),
+                      )
+                    }).pipe(
+                      Effect.andThen(chargeAttemptUsageWith(interpreter, state)),
+                      Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
+                      Effect.orDie,
+                      Effect.asVoid,
                     ),
-                  )
-                }).pipe(
-                  Effect.andThen(chargeAttemptUsage(state)),
-                  Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
-                  Effect.orDie,
-                  Effect.asVoid,
-                ),
-        ),
+            ),
+          )
+        }),
       ).pipe(
         Stream.catchCause((cause) => {
           if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)

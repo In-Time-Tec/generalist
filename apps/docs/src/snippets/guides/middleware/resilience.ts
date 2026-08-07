@@ -1,4 +1,4 @@
-import { Config, Console, Effect, Layer, Schedule } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Schedule } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ModelResilience, ToolExecutor } from "@batonfx/core"
 import { OpenRouter } from "@batonfx/providers"
 import { FetchHttpClient } from "effect/unstable/http"
@@ -15,20 +15,18 @@ const resilienceLayer = ModelResilience.layer({
 const program = ModelRegistry.operate(
   { provider: "openrouter", model: "openai/gpt-4o-mini" },
   Agent.generate(agent, { prompt: "Summarize today's alerts." }),
-).pipe(
-  Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(
-    Layer.mergeAll(
-      OpenRouter.layer({
-        model: "openai/gpt-4o-mini",
-        apiKey: Config.redacted("OPENROUTER_API_KEY"),
-      }),
-      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      resilienceLayer,
-    ),
-  ),
-)
+).pipe(Effect.flatMap((result) => Console.log(result.text)))
 
-await Effect.runPromise(program.pipe(Effect.provide(FetchHttpClient.layer)))
+const runtimeLayer = Layer.mergeAll(
+  OpenRouter.layer({
+    model: "openai/gpt-4o-mini",
+    apiKey: Config.redacted("OPENROUTER_API_KEY"),
+  }),
+  ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+  resilienceLayer,
+).pipe(Layer.provideMerge(FetchHttpClient.layer))
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

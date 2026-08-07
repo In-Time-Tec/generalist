@@ -1,4 +1,5 @@
 import { Effect, Match, Option, Schema } from "effect"
+import { dual } from "effect/Function"
 import { Command } from "foldkit"
 import { load, pushUrl, replaceUrl } from "foldkit/navigation"
 import { evo } from "foldkit/struct"
@@ -25,44 +26,64 @@ import {
 } from "./message"
 import { ThemePreference, type Model } from "./model"
 import { SearchCommand, initialSearchCommand, itemToPath } from "./searchPalette"
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 type Update = readonly [Model, ReadonlyArray<Command.Command<Message>>]
 
-export const update = (model: Model, message: Message): Update =>
-  Match.value(message).pipe(
-    Match.withReturnType<Update>(),
-    Match.tagsExhaustive({
-      ClickedLink: ({ request }) =>
-        Match.value(request).pipe(
-          Match.withReturnType<Update>(),
-          Match.tagsExhaustive({
-            Internal: ({ url }) => [model, [NavigateInternal({ url: toString(url) })]],
-            External: ({ href }) => [model, [LoadExternal({ href })]],
-          }),
-        ),
-      ChangedUrl: ({ url }) => {
-        const route = urlToRoute(url)
-        const redirectTarget = legacyRedirects.get(toPath(route))
-        if (redirectTarget !== undefined) {
-          return [model, [RedirectLegacy({ url: redirectTarget })]]
-        }
-        return [
-          evo(model, {
-            route: () => route,
-            url: () => url,
-            isMobileNavOpen: () => false,
-            isMobileTocOpen: () => false,
-            maybeActiveSectionId: () => Option.none(),
-          }),
-          [],
-        ]
-      },
-      PressedSearchShortcut: () => {
-        if (model.searchDialog.isOpen) {
-          const [closedDialog, dialogCommands] = dialogClose(model.searchDialog)
-          const [closedCommand, commandCommands] = SearchCommand.close(model.searchCommand)
+export const update: {
+  (model: Model, message: Message): Update
+  (message: Message): (model: Model) => Update
+} = dual(
+  2,
+  (model: Model, message: Message): Update =>
+    Match.value(message).pipe(
+      Match.withReturnType<Update>(),
+      Match.tagsExhaustive({
+        ClickedLink: ({ request }) =>
+          Match.value(request).pipe(
+            Match.withReturnType<Update>(),
+            Match.tagsExhaustive({
+              Internal: ({ url }) => [model, [NavigateInternal({ url: toString(url) })]],
+              External: ({ href }) => [model, [LoadExternal({ href })]],
+            }),
+          ),
+        ChangedUrl: ({ url }) => {
+          const route = urlToRoute(url)
+          const redirectTarget = legacyRedirects.get(toPath(route))
+          if (redirectTarget !== undefined) {
+            return [model, [RedirectLegacy({ url: redirectTarget })]]
+          }
           return [
-            evo(model, { searchDialog: () => closedDialog, searchCommand: () => closedCommand }),
+            evo(model, {
+              route: () => route,
+              url: () => url,
+              isMobileNavOpen: () => false,
+              isMobileTocOpen: () => false,
+              maybeActiveSectionId: () => Option.none(),
+            }),
+            [],
+          ]
+        },
+        PressedSearchShortcut: () => {
+          if (model.searchDialog.isOpen) {
+            const [closedDialog, dialogCommands] = dialogClose(model.searchDialog)
+            const [closedCommand, commandCommands] = SearchCommand.close(model.searchCommand)
+            return [
+              evo(model, { searchDialog: () => closedDialog, searchCommand: () => closedCommand }),
+              [
+                ...Command.mapMessages(dialogCommands, (childMessage) =>
+                  GotSearchDialogMessage({ message: childMessage }),
+                ),
+                ...Command.mapMessages(commandCommands, (childMessage) =>
+                  GotSearchCommandMessage({ message: childMessage }),
+                ),
+              ],
+            ]
+          }
+          const [nextDialog, dialogCommands] = dialogOpen(model.searchDialog)
+          const [nextCommand, commandCommands] = SearchCommand.open(initialSearchCommand())
+          return [
+            evo(model, { searchDialog: () => nextDialog, searchCommand: () => nextCommand }),
             [
               ...Command.mapMessages(dialogCommands, (childMessage) =>
                 GotSearchDialogMessage({ message: childMessage }),
@@ -72,38 +93,40 @@ export const update = (model: Model, message: Message): Update =>
               ),
             ],
           ]
-        }
-        const [nextDialog, dialogCommands] = dialogOpen(model.searchDialog)
-        const [nextCommand, commandCommands] = SearchCommand.open(initialSearchCommand())
-        return [
-          evo(model, { searchDialog: () => nextDialog, searchCommand: () => nextCommand }),
-          [
-            ...Command.mapMessages(dialogCommands, (childMessage) => GotSearchDialogMessage({ message: childMessage })),
-            ...Command.mapMessages(commandCommands, (childMessage) =>
-              GotSearchCommandMessage({ message: childMessage }),
-            ),
-          ],
-        ]
-      },
-      GotSearchDialogMessage: ({ message: dialogMessage }) => {
-        const [nextDialog, dialogCommands] = dialogUpdate(model.searchDialog, dialogMessage)
-        return [
-          evo(model, { searchDialog: () => nextDialog }),
-          Command.mapMessages(dialogCommands, (childMessage) => GotSearchDialogMessage({ message: childMessage })),
-        ]
-      },
-      GotSearchCommandMessage: ({ message: commandMessage }) => {
-        const [nextCommand, commandCommands, maybeOutMessage] = SearchCommand.update(
-          model.searchCommand,
-          commandMessage,
-        )
-        const forwardedCommands = Command.mapMessages(commandCommands, (childMessage) =>
-          GotSearchCommandMessage({ message: childMessage }),
-        )
-        const commandJustDismissed = model.searchCommand.isOpen && !nextCommand.isOpen
-        return Option.match(maybeOutMessage, {
-          onNone: (): Update => {
-            if (commandJustDismissed) {
+        },
+        GotSearchDialogMessage: ({ message: dialogMessage }) => {
+          const [nextDialog, dialogCommands] = dialogUpdate(model.searchDialog, dialogMessage)
+          return [
+            evo(model, { searchDialog: () => nextDialog }),
+            Command.mapMessages(dialogCommands, (childMessage) => GotSearchDialogMessage({ message: childMessage })),
+          ]
+        },
+        GotSearchCommandMessage: ({ message: commandMessage }) => {
+          const [nextCommand, commandCommands, maybeOutMessage] = SearchCommand.update(
+            model.searchCommand,
+            commandMessage,
+          )
+          const forwardedCommands = Command.mapMessages(commandCommands, (childMessage) =>
+            GotSearchCommandMessage({ message: childMessage }),
+          )
+          const commandJustDismissed = model.searchCommand.isOpen && !nextCommand.isOpen
+          return Option.match(maybeOutMessage, {
+            onNone: (): Update => {
+              if (commandJustDismissed) {
+                const [closedDialog, closeCommands] = dialogClose(model.searchDialog)
+                return [
+                  evo(model, { searchCommand: () => nextCommand, searchDialog: () => closedDialog }),
+                  [
+                    ...forwardedCommands,
+                    ...Command.mapMessages(closeCommands, (childMessage) =>
+                      GotSearchDialogMessage({ message: childMessage }),
+                    ),
+                  ],
+                ]
+              }
+              return [evo(model, { searchCommand: () => nextCommand }), forwardedCommands]
+            },
+            onSome: (outMessage): Update => {
               const [closedDialog, closeCommands] = dialogClose(model.searchDialog)
               return [
                 evo(model, { searchCommand: () => nextCommand, searchDialog: () => closedDialog }),
@@ -112,66 +135,59 @@ export const update = (model: Model, message: Message): Update =>
                   ...Command.mapMessages(closeCommands, (childMessage) =>
                     GotSearchDialogMessage({ message: childMessage }),
                   ),
+                  NavigateInternal({ url: itemToPath(outMessage.value) }),
                 ],
               ]
-            }
-            return [evo(model, { searchCommand: () => nextCommand }), forwardedCommands]
-          },
-          onSome: (outMessage): Update => {
-            const [closedDialog, closeCommands] = dialogClose(model.searchDialog)
-            return [
-              evo(model, { searchCommand: () => nextCommand, searchDialog: () => closedDialog }),
-              [
-                ...forwardedCommands,
-                ...Command.mapMessages(closeCommands, (childMessage) =>
-                  GotSearchDialogMessage({ message: childMessage }),
-                ),
-                NavigateInternal({ url: itemToPath(outMessage.value) }),
-              ],
-            ]
-          },
-        })
-      },
-      ClickedCopyCode: ({ source }) => [evo(model, { copiedCode: () => Option.some(source) }), [CopyCode({ source })]],
-      CompletedCopyCode: ({ source }) => [model, [ScheduleClearCopiedCode({ source })]],
-      ClearedCopiedCode: ({ source }) => [
-        Option.contains(model.copiedCode, source) ? evo(model, { copiedCode: () => Option.none() }) : model,
-        [],
-      ],
-      SelectedThemePreference: ({ preference }) => [
-        evo(model, { themePreference: () => preference }),
-        [ApplyTheme({ preference }), SaveThemePreference({ preference })],
-      ],
-      GotThemePreference: ({ preference }) => [
-        evo(model, { themePreference: () => preference }),
-        [ApplyTheme({ preference })],
-      ],
-      ChangedSystemTheme: () => [model, [ApplyTheme({ preference: model.themePreference })]],
-      ToggledSidebarGroup: ({ group }) => {
-        const open = {
-          ...model.openSidebarGroups,
-          [group]: !isSidebarGroupOpen(model.openSidebarGroups, group),
-        }
-        return [evo(model, { openSidebarGroups: () => open }), [SaveSidebarGroups({ open })]]
-      },
-      GotSidebarGroups: ({ open }) => [evo(model, { openSidebarGroups: () => open }), []],
-      ChangedActiveSection: ({ sectionId }) => [evo(model, { maybeActiveSectionId: () => Option.some(sectionId) }), []],
-      ToggledMobileTableOfContents: ({ isOpen }) => [evo(model, { isMobileTocOpen: () => isOpen }), []],
-      ClickedMobileTableOfContentsLink: ({ sectionId }) => [
-        evo(model, {
-          maybeActiveSectionId: () => Option.some(sectionId),
-          isMobileTocOpen: () => false,
-        }),
-        [],
-      ],
-      ToggledMobileNav: ({ isOpen }) => [evo(model, { isMobileNavOpen: () => isOpen }), []],
-      CompletedApplyTheme: () => [model, []],
-      CompletedSaveThemePreference: () => [model, []],
-      CompletedSaveSidebarGroups: () => [model, []],
-      CompletedNavigateInternal: () => [model, []],
-      CompletedLoadExternal: () => [model, []],
-    }),
-  )
+            },
+          })
+        },
+        ClickedCopyCode: ({ source }) => [
+          evo(model, { copiedCode: () => Option.some(source) }),
+          [CopyCode({ source })],
+        ],
+        CompletedCopyCode: ({ source }) => [model, [ScheduleClearCopiedCode({ source })]],
+        ClearedCopiedCode: ({ source }) => [
+          Option.contains(model.copiedCode, source) ? evo(model, { copiedCode: () => Option.none() }) : model,
+          [],
+        ],
+        SelectedThemePreference: ({ preference }) => [
+          evo(model, { themePreference: () => preference }),
+          [ApplyTheme({ preference }), SaveThemePreference({ preference })],
+        ],
+        GotThemePreference: ({ preference }) => [
+          evo(model, { themePreference: () => preference }),
+          [ApplyTheme({ preference })],
+        ],
+        ChangedSystemTheme: () => [model, [ApplyTheme({ preference: model.themePreference })]],
+        ToggledSidebarGroup: ({ group }) => {
+          const open = {
+            ...model.openSidebarGroups,
+            [group]: !isSidebarGroupOpen(model.openSidebarGroups, group),
+          }
+          return [evo(model, { openSidebarGroups: () => open }), [SaveSidebarGroups({ open })]]
+        },
+        GotSidebarGroups: ({ open }) => [evo(model, { openSidebarGroups: () => open }), []],
+        ChangedActiveSection: ({ sectionId }) => [
+          evo(model, { maybeActiveSectionId: () => Option.some(sectionId) }),
+          [],
+        ],
+        ToggledMobileTableOfContents: ({ isOpen }) => [evo(model, { isMobileTocOpen: () => isOpen }), []],
+        ClickedMobileTableOfContentsLink: ({ sectionId }) => [
+          evo(model, {
+            maybeActiveSectionId: () => Option.some(sectionId),
+            isMobileTocOpen: () => false,
+          }),
+          [],
+        ],
+        ToggledMobileNav: ({ isOpen }) => [evo(model, { isMobileNavOpen: () => isOpen }), []],
+        CompletedApplyTheme: () => [model, []],
+        CompletedSaveThemePreference: () => [model, []],
+        CompletedSaveSidebarGroups: () => [model, []],
+        CompletedNavigateInternal: () => [model, []],
+        CompletedLoadExternal: () => [model, []],
+      }),
+    ),
+)
 
 const NavigateInternal = Command.define(
   "NavigateInternal",
@@ -249,7 +265,7 @@ const SaveThemePreference = Command.define(
   CompletedSaveThemePreference,
 )(({ preference }) =>
   Effect.sync(() => {
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(preference))
+    localStorage.setItem(THEME_STORAGE_KEY, encodeJsonValue(preference))
     return CompletedSaveThemePreference()
   }),
 )

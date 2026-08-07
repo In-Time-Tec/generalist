@@ -12,6 +12,7 @@ import {
   Option,
   Redacted,
   Schema,
+  Scope,
   Semaphore,
 } from "effect"
 import { TestClock } from "effect/testing"
@@ -125,13 +126,13 @@ const dependencies = (
 const provideLayer: {
   <O, OE, IR>(
     provided: Layer.Layer<O, OE, IR>,
-  ): <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | OE, IR | Exclude<R, O>>
+  ): <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | OE, Scope.Scope | IR | Exclude<R, O>>
   <A, E, R, O, OE, IR>(
     effect: Effect.Effect<A, E, R>,
     provided: Layer.Layer<O, OE, IR>,
-  ): Effect.Effect<A, E | OE, IR | Exclude<R, O>>
+  ): Effect.Effect<A, E | OE, Scope.Scope | IR | Exclude<R, O>>
 } = Function.dual(2, <A, E, R, O, OE, IR>(effect: Effect.Effect<A, E, R>, provided: Layer.Layer<O, OE, IR>) =>
-  Effect.provide(effect, provided),
+  Effect.scoped(Effect.flatMap(Layer.build(provided), (context) => effect.pipe(Effect.provideContext(context)))),
 )
 const challenge = (verifier: string) =>
   Effect.promise(() =>

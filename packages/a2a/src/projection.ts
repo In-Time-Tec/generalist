@@ -1,7 +1,7 @@
 import type { Artifact, Message, Part, Task, TaskStatus } from "@a2a-js/sdk"
 import { Role, TaskState } from "@a2a-js/sdk"
 import { ExecutionState, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { TaskProjectionFailed } from "./errors.js"
 
 const textPart = (text: string): Part => ({
@@ -97,33 +97,41 @@ const artifactFrom = (event: RunEvent.RunCompleted, events: ReadonlyArray<RunEve
 }
 
 /** @experimental Project one Runtime snapshot and its canonical history to an A2A Task. */
-export const fromRuntime = (runtime: Runtime.Interface, taskId: string): Effect.Effect<Task, TaskProjectionFailed> =>
-  Effect.gen(function* () {
-    const snapshot = yield* runtime.snapshot(taskId)
-    const events = yield* runtime.history({ runId: taskId, limit: snapshot.cursor + 1 })
-    const contextId = contextIdFrom(taskId, events)
-    const completed = events.findLast((event): event is RunEvent.RunCompleted => event._tag === "RunCompleted")
-    return {
-      id: taskId,
-      contextId,
-      status: statusFrom(snapshot.run, events, contextId),
-      artifacts: completed === undefined ? [] : [artifactFrom(completed, events)],
-      history: [],
-      metadata: { batonCursor: snapshot.cursor },
-    }
-  }).pipe(
-    Effect.mapError(
-      (cause) =>
-        new TaskProjectionFailed({
+export const fromRuntime: {
+  (runtime: Runtime.Interface, taskId: string): Effect.Effect<Task, TaskProjectionFailed>
+  (taskId: string): (runtime: Runtime.Interface) => Effect.Effect<Task, TaskProjectionFailed>
+} = Function.dual(
+  2,
+  (runtime: Runtime.Interface, taskId: string): Effect.Effect<Task, TaskProjectionFailed> =>
+    Effect.gen(function* () {
+      const snapshot = yield* runtime.snapshot(taskId)
+      const events = yield* runtime.history({ runId: taskId, limit: snapshot.cursor + 1 })
+      const contextId = contextIdFrom(taskId, events)
+      const completed = events.findLast((event): event is RunEvent.RunCompleted => event._tag === "RunCompleted")
+      return {
+        id: taskId,
+        contextId,
+        status: statusFrom(snapshot.run, events, contextId),
+        artifacts: completed === undefined ? [] : [artifactFrom(completed, events)],
+        history: [],
+        metadata: { batonCursor: snapshot.cursor },
+      }
+    }).pipe(
+      Effect.mapError((cause) =>
+        TaskProjectionFailed.make({
           taskId,
           message: "Runtime task projection failed",
           cause,
         }),
+      ),
     ),
-  )
+)
 
 /** @experimental Build a status update for one canonical Runtime event. */
-export const statusFromEvent = (task: Task, event: RunEvent.RunEvent): TaskStatus | undefined => {
+export const statusFromEvent: {
+  (task: Task, event: RunEvent.RunEvent): TaskStatus | undefined
+  (event: RunEvent.RunEvent): (task: Task) => TaskStatus | undefined
+} = Function.dual(2, (task: Task, event: RunEvent.RunEvent): TaskStatus | undefined => {
   switch (event._tag) {
     case "RunAttemptStarted":
     case "RunResumed":
@@ -154,10 +162,14 @@ export const statusFromEvent = (task: Task, event: RunEvent.RunEvent): TaskStatu
     default:
       return undefined
   }
-}
+})
 
 /** @experimental Build the completion artifact update for a Runtime completion. */
-export const artifactFromEvent = (
-  event: RunEvent.RunCompleted,
-  preceding: ReadonlyArray<RunEvent.RunEvent>,
-): Artifact => artifactFrom(event, preceding)
+export const artifactFromEvent: {
+  (event: RunEvent.RunCompleted, preceding: ReadonlyArray<RunEvent.RunEvent>): Artifact
+  (preceding: ReadonlyArray<RunEvent.RunEvent>): (event: RunEvent.RunCompleted) => Artifact
+} = Function.dual(
+  2,
+  (event: RunEvent.RunCompleted, preceding: ReadonlyArray<RunEvent.RunEvent>): Artifact =>
+    artifactFrom(event, preceding),
+)

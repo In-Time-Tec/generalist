@@ -1,137 +1,67 @@
-import { Effect } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 import {
-  AddressNotFound,
+  ChildSelectionMissing,
+  ExecutableRegistrationConflict,
+  FanOutConflict,
+  FanOutInvalid,
   IdempotencyConflict,
   RunIdConflict,
   RunNotFound,
   RunTerminal,
-  ChildSelectionMissing,
   RuntimeUnavailable,
   StartInvalid,
 } from "../errors.js"
-import { decodePinned, equals, resolveChild, type PinnedExecutable } from "../executable-manifest.js"
-import { childDigest, messageDigest, startDigest } from "../memory/digest.js"
-import type { AdmitProgramChildInput, AdmitSendInput, AdmitStartInput } from "../run-store.js"
+import { decodePinned, equals, resolveChild } from "../executable-manifest.js"
+import { childDigest, startDigest } from "../memory/digest.js"
+import type { AdmitProgramChildInput, AdmitStartInput } from "../run-store.js"
 import type { SpawnInput } from "../runtime.js"
 import type { Message } from "../message.js"
-import { decodePinnedExecutable, decodeQueue, encodeQueue } from "./codecs.js"
+import { decodePinnedExecutable } from "./codecs.js"
 import type { RunRow } from "./rows.js"
-import { appendEvent, insertRun, loadRun, nowIso, promoteHead } from "./store-helpers.js"
+import { appendEvent, insertRun, loadRun, nowIso } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
 import { associateRegistrations, loadRegistrations, persistRegistrations } from "./executable-registrations.js"
 import { narrow } from "../executable-registration.js"
 import { make as makeAddress } from "../address.js"
 import { make as makeMessage } from "../message.js"
 import { admitInitialFanOuts } from "./store-fan-out.js"
+import { nextId } from "./store-admit-send.js"
 
-const nextId = (prefix: string): Effect.Effect<string> =>
-  Effect.sync(() => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`)
+type SendReceipt = { runId: string; messageId: string; acceptedSequence: number; duplicate: boolean }
+type StartReceipt = SendReceipt & {
+  childRunIds: string[]
+  fanOuts: Array<import("../fan-out.js").FanOutReceipt>
+}
+type StartEffect = Effect.Effect<
+  StartReceipt,
+  | ChildSelectionMissing
+  | ExecutableRegistrationConflict
+  | FanOutConflict
+  | FanOutInvalid
+  | IdempotencyConflict
+  | RunIdConflict
+  | RuntimeUnavailable
+  | SqlError
+  | StartInvalid,
+  SqlClient.SqlClient
+>
+type SpawnEffect = Effect.Effect<
+  SendReceipt,
+  ChildSelectionMissing | IdempotencyConflict | RunNotFound | RunTerminal | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+type ChildEffect = Effect.Effect<
+  SendReceipt,
+  IdempotencyConflict | RunIdConflict | RunNotFound | RunTerminal | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
 
-export const admitSend = (
-  hub: EventHub,
-  addressBindings: ReadonlyMap<string, PinnedExecutable>,
-  input: AdmitSendInput,
-  options?: { readonly promote?: boolean },
-) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    const bound = addressBindings.get(input.message.to)
-    if (bound === undefined) return yield* AddressNotFound.make({ address: input.message.to })
-    const admitted = yield* Effect.try({
-      try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    const binding = yield* Effect.try({
-      try: () => decodePinned(bound),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    if (!equals(binding, admitted)) return yield* AddressNotFound.make({ address: input.message.to })
-    const digest = messageDigest(input.message)
-    const existing = yield* sql<RunRow>`
-      SELECT * FROM baton_runs
-      WHERE address = ${input.message.to}
-        AND session_id = ${input.message.sessionId}
-        AND idempotency_key = ${input.message.idempotencyKey}
-    `
-    const prior = existing[0]
-    if (prior !== undefined) {
-      if (input.runId !== undefined && input.runId !== prior.run_id) {
-        return yield* RunIdConflict.make({ runId: input.runId, existingRunId: prior.run_id })
-      }
-      const priorExecutable = yield* Effect.try({
-        try: () => decodePinnedExecutable(prior.executable_ref_json, prior.executable_manifest_json),
-        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-      })
-      if (prior.message_digest !== digest || !equals(priorExecutable, admitted)) {
-        return yield* IdempotencyConflict.make({
-          address: input.message.to,
-          sessionId: input.message.sessionId,
-          idempotencyKey: input.message.idempotencyKey,
-          existingRunId: prior.run_id,
-        })
-      }
-      return {
-        runId: prior.run_id,
-        messageId: prior.message_id,
-        acceptedSequence: Number(prior.accepted_sequence),
-        duplicate: true,
-      }
-    }
-    if (input.runId !== undefined) {
-      const byId = yield* sql<RunRow>`SELECT * FROM baton_runs WHERE run_id = ${input.runId}`
-      if (byId[0] !== undefined) return yield* RunIdConflict.make({ runId: input.runId, existingRunId: byId[0].run_id })
-    }
-    const runId = input.runId ?? (yield* nextId("run"))
-    const lanes = yield* sql<{ accepted_sequence: number; queue_json: string }>`
-      SELECT accepted_sequence, queue_json FROM baton_lanes
-      WHERE address = ${input.message.to} AND session_id = ${input.message.sessionId}
-    `
-    const lane = lanes[0]
-    const acceptedSequence = lane === undefined ? 0 : Number(lane.accepted_sequence) + 1
-    const queue = lane === undefined ? [runId] : [...decodeQueue(lane.queue_json), runId]
-    if (lane === undefined) {
-      yield* sql`
-        INSERT INTO baton_lanes (address, session_id, accepted_sequence, queue_json)
-        VALUES (${input.message.to}, ${input.message.sessionId}, ${acceptedSequence}, ${encodeQueue(queue)})
-      `
-    } else {
-      yield* sql`
-        UPDATE baton_lanes
-        SET accepted_sequence = ${acceptedSequence}, queue_json = ${encodeQueue(queue)}
-        WHERE address = ${input.message.to} AND session_id = ${input.message.sessionId}
-      `
-    }
-    yield* insertRun({
-      runId,
-      status: "queued",
-      message: input.message,
-      digest,
-      executableRef: input.executableRef,
-      executableManifest: input.executableManifest,
-      rootRunId: runId,
-      acceptedSequence,
-    })
-    yield* persistRegistrations(input.registrations)
-    yield* associateRegistrations(runId, input.registrations)
-    const run = (yield* loadRun(runId))!
-    yield* appendEvent(
-      hub,
-      run,
-      {
-        _tag: "RunAccepted",
-        messageId: input.message.id,
-        address: input.message.to,
-      },
-      "queued",
-    )
-    if (options?.promote !== false && queue[0] === runId) {
-      yield* promoteHead(hub, input.message.to, input.message.sessionId)
-    }
-    return { runId, messageId: input.message.id, acceptedSequence, duplicate: false }
-  })
-
-export const admitStart = (hub: EventHub, input: AdmitStartInput) =>
+export const admitStart: {
+  (input: AdmitStartInput): (hub: EventHub) => StartEffect
+  (hub: EventHub, input: AdmitStartInput): StartEffect
+} = Function.dual(2, (hub: EventHub, input: AdmitStartInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const admitted = yield* Effect.try({
@@ -293,7 +223,7 @@ export const admitStart = (hub: EventHub, input: AdmitStartInput) =>
       })
       const receipt = yield* admitSpawn(hub, { ...child, parentRunId: runId, message }).pipe(
         Effect.mapError((error) =>
-          error instanceof RunNotFound || error instanceof RunTerminal
+          Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
             ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial child admission" })
             : error,
         ),
@@ -302,12 +232,13 @@ export const admitStart = (hub: EventHub, input: AdmitStartInput) =>
     }
     const fanOuts = yield* admitInitialFanOuts(hub, runId, input.initialFanOuts)
     return { runId, messageId: input.message.id, acceptedSequence: 0, duplicate: false, childRunIds, fanOuts }
-  })
+  }),
+)
 
-export const admitSpawn = (
-  hub: EventHub,
-  input: SpawnInput & { readonly message: Message; readonly parentRunId: string },
-) =>
+export const admitSpawn: {
+  (input: SpawnInput & { readonly message: Message; readonly parentRunId: string }): (hub: EventHub) => SpawnEffect
+  (hub: EventHub, input: SpawnInput & { readonly message: Message; readonly parentRunId: string }): SpawnEffect
+} = Function.dual(2, (hub: EventHub, input: SpawnInput & { readonly message: Message; readonly parentRunId: string }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const parent = yield* loadRun(input.parentRunId)
@@ -397,9 +328,13 @@ export const admitSpawn = (
     yield* sql`UPDATE baton_runs SET attempt_fence = 1 WHERE run_id = ${runId}`
     yield* appendEvent(hub, { ...started, attempt: 1 }, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
     return { runId, messageId: input.message.id, acceptedSequence: 0, duplicate: false }
-  })
+  }),
+)
 
-export const admitProgramChild = (hub: EventHub, input: AdmitProgramChildInput) =>
+export const admitProgramChild: {
+  (input: AdmitProgramChildInput): (hub: EventHub) => ChildEffect
+  (hub: EventHub, input: AdmitProgramChildInput): ChildEffect
+} = Function.dual(2, (hub: EventHub, input: AdmitProgramChildInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const parent = yield* loadRun(input.runId)
@@ -486,4 +421,7 @@ export const admitProgramChild = (hub: EventHub, input: AdmitProgramChildInput) 
     yield* sql`UPDATE baton_runs SET attempt_fence = 1 WHERE run_id = ${input.childRunId}`
     yield* appendEvent(hub, { ...started, attempt: 1 }, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
     return { runId: input.childRunId, messageId: input.message.id, acceptedSequence: 0, duplicate: false }
-  })
+  }),
+)
+
+export { admitSend } from "./store-admit-send.js"

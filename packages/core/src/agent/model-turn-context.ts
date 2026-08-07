@@ -3,6 +3,7 @@ import type { Chat, LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import type { AgentRunState } from "./agent-run-state.js"
 import type { AgentError, Event } from "./agent-event.js"
 import type { AnyToolCall } from "./agent-tool-result.js"
+import type { DriverInterpreter } from "../durable/driver-interpreter.js"
 import type { HandoffRunState } from "./handoff-state.js"
 import type { RunError, ToolSchedulingPolicy } from "./agent.js"
 import type { Middleware } from "../model/model-middleware.js"
@@ -41,7 +42,7 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   ) => Effect.Effect<
     { readonly prompt: Prompt.Prompt; readonly changed: boolean },
     RunError,
-    LanguageModel.LanguageModel
+    LanguageModel.LanguageModel | DriverInterpreter
   >
   readonly countTokens: (turn: number, prompt: Prompt.Prompt) => Effect.Effect<number, AgentError>
   readonly emitTelemetry: (payload: DeliveryEventPayload) => Effect.Effect<void>
@@ -57,5 +58,5 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
     call: AnyToolCall,
     messages: ReadonlyArray<Prompt.Message>,
     registry: Registry,
-  ) => Stream.Stream<Event, RunError, R | StaticToolServices<T>>
+  ) => Stream.Stream<Event, RunError, R | StaticToolServices<T> | DriverInterpreter>
 }

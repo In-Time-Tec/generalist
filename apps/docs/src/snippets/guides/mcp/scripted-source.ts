@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "@batonfx/core"
 import { McpToolSource } from "@batonfx/mcp"
 import { layerToolkit, toolkit } from "@batonfx/mcp/baton"
@@ -47,15 +47,19 @@ const modelLayer = Layer.effect(
   }),
 )
 
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  layerToolkit(source),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+)
+
 const program = Effect.gen(function* () {
   const mcpToolkit = yield* toolkit(source)
   const agent = Agent.make({ name: "mcp-agent", toolkit: mcpToolkit })
-  const result = yield* Agent.generate(agent, { prompt: "Find the setup docs" }).pipe(
-    Effect.provide(
-      Layer.mergeAll(modelLayer, layerToolkit(source), Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
-    ),
-  )
+  const result = yield* Agent.generate(agent, { prompt: "Find the setup docs" })
   yield* Console.log(result.text)
 })
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

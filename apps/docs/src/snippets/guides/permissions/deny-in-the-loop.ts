@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Permissions, Response, Tool, Toolkit } from "@batonfx/core"
 
 const dropTableTool = Tool.make("drop_table", {
@@ -38,15 +38,15 @@ const program = Effect.gen(function* () {
   Effect.catchTag("@batonfx/core/FrameworkFailure", (failure) =>
     Console.log(`${failure.tool} ${failure.stage}: ${failure.message}`),
   ),
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      toolkit.toLayer({ drop_table: () => Effect.die("denied calls never reach the handler") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      permissionsLayer,
-    ),
-  ),
 )
 
-await Effect.runPromise(program)
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  toolkit.toLayer({ drop_table: () => Effect.die("denied calls never reach the handler") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+  permissionsLayer,
+)
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

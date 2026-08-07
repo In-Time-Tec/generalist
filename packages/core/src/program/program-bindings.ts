@@ -6,8 +6,8 @@ import type {
   ProgramAuthorizationFailure,
   ProgramCapabilityDenied,
   ProgramOperationName,
-  ProgramSuspended,
 } from "./program-capabilities.js"
+import { ProgramCancelled, ProgramInvocationFailure, ProgramSuspended } from "./program-capabilities.js"
 
 /** @experimental Replay behavior selected by the host, never by program source. */
 export const ProgramReplayPolicy = Schema.Literals(["recorded", "idempotent", "non-idempotent"])
@@ -51,11 +51,11 @@ export interface AgentBinding<I extends Prompt.RawInput, IE, E = never> {
  * @experimental One decoded invocation of a bound tool or step. The decoded input stays inside the binding, so
  * authorization and execution keep the exact type the binding declared.
  */
-export interface Invocation {
+export interface Invocation<O = unknown, E = ProgramInvocationFailure | ProgramSuspended | ProgramCancelled> {
   readonly authorize: (
     operation: ProgramOperationName,
   ) => Effect.Effect<boolean, ProgramAuthorizationFailure | ProgramCapabilityDenied | ProgramSuspended>
-  readonly execute: Effect.Effect<unknown, unknown>
+  readonly execute: Effect.Effect<O, E>
 }
 
 /** @experimental One decoded Agent invocation, exposing only the prompt every Agent input must produce. */
@@ -64,7 +64,7 @@ export interface AgentInvocation {
   readonly authorize: (
     operation: ProgramOperationName,
   ) => Effect.Effect<boolean, ProgramAuthorizationFailure | ProgramCapabilityDenied | ProgramSuspended>
-  readonly execute: Effect.Effect<AgentRunResult, unknown>
+  readonly execute: Effect.Effect<AgentRunResult, ProgramInvocationFailure | ProgramSuspended | ProgramCancelled>
 }
 
 /**
@@ -82,6 +82,14 @@ export interface AnyTool {
 
 /** @experimental Host-facing view of one bound named step, with the same hidden input as {@link AnyTool}. */
 export interface AnyStep extends AnyTool {}
+
+/** @experimental A bound tool retaining its exact decoded invocation types. */
+export type TypedTool = AnyTool & {
+  readonly decode: (encoded: unknown) => Effect.Effect<Invocation, Schema.SchemaError>
+}
+
+/** @experimental A bound step retaining its exact decoded invocation types. */
+export type TypedStep = TypedTool
 
 /** @experimental Host-facing view of one bound Agent, with its decoded input hidden behind {@link AgentInvocation}. */
 export interface AnyAgent {
@@ -106,8 +114,8 @@ const checkUnique = (kind: string, values: ReadonlyArray<readonly [string, strin
 
 /** @experimental Complete live authority available to a ProgramHost. */
 export interface Bindings {
-  readonly tools: ReadonlyArray<AnyTool>
-  readonly steps: ReadonlyArray<AnyStep>
+  readonly tools: ReadonlyArray<TypedTool>
+  readonly steps: ReadonlyArray<TypedStep>
   readonly agents: ReadonlyArray<AnyAgent>
 }
 
@@ -115,21 +123,39 @@ const decodeInput = <I, IE>(codec: Schema.Codec<I, IE>, encoded: unknown): Effec
   Schema.decodeUnknownEffect(codec, { onExcessProperty: "error" })(encoded)
 
 /** @experimental Construct a typed tool binding. */
-export const tool = <I, IE, O, OE, E>(binding: ToolBinding<I, IE, O, OE, E>): AnyTool => ({
+export const tool = <I, IE, O, OE, E>(
+  binding: ToolBinding<I, IE, O, OE, E>,
+): TypedTool & {
+  readonly decode: (encoded: unknown) => Effect.Effect<Invocation<O>, Schema.SchemaError>
+} => ({
   name: binding.name,
   pin: binding.pin,
   input: binding.input,
   output: binding.output,
   replay: binding.replay,
   decode: (encoded) =>
-    Effect.map(decodeInput(binding.input, encoded), (input) => ({
-      authorize: (operation) => binding.authorize({ operation, input }),
-      execute: Effect.suspend(() => binding.execute(input)),
-    })),
+    Effect.map(
+      decodeInput(binding.input, encoded),
+      (input): Invocation<O> => ({
+        authorize: (operation) => binding.authorize({ operation, input }),
+        execute: Effect.suspend(() => binding.execute(input)).pipe(
+          Effect.catch(
+            (cause): Effect.Effect<O, ProgramInvocationFailure | ProgramSuspended | ProgramCancelled> =>
+              Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
+                ? Effect.fail(cause)
+                : Effect.fail(ProgramInvocationFailure.make({ cause })),
+          ),
+        ),
+      }),
+    ),
 })
 
 /** @experimental Construct a typed named step binding. */
-export const step = <I, IE, O, OE, E>(binding: StepBinding<I, IE, O, OE, E>): AnyStep => tool(binding)
+export const step = <I, IE, O, OE, E>(
+  binding: StepBinding<I, IE, O, OE, E>,
+): TypedStep & {
+  readonly decode: (encoded: unknown) => Effect.Effect<Invocation<O>, Schema.SchemaError>
+} => tool(binding)
 
 /** @experimental Construct an exact typed Agent binding. */
 export const agent = <I extends Prompt.RawInput, IE, E>(binding: AgentBinding<I, IE, E>): AnyAgent => ({
@@ -139,11 +165,21 @@ export const agent = <I extends Prompt.RawInput, IE, E>(binding: AgentBinding<I,
   input: binding.input,
   replay: binding.replay,
   decode: (encoded) =>
-    Effect.map(decodeInput(binding.input, encoded), (input) => ({
-      prompt: input,
-      authorize: (operation) => binding.authorize({ operation, input }),
-      execute: Effect.suspend(() => binding.execute(input)),
-    })),
+    Effect.map(
+      decodeInput(binding.input, encoded),
+      (input): AgentInvocation => ({
+        prompt: input,
+        authorize: (operation) => binding.authorize({ operation, input }),
+        execute: Effect.suspend(() => binding.execute(input)).pipe(
+          Effect.catch(
+            (cause): Effect.Effect<AgentRunResult, ProgramInvocationFailure | ProgramSuspended | ProgramCancelled> =>
+              Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
+                ? Effect.fail(cause)
+                : Effect.fail(ProgramInvocationFailure.make({ cause })),
+          ),
+        ),
+      }),
+    ),
 })
 
 /** @experimental Construct the host's complete live Program binding set. */

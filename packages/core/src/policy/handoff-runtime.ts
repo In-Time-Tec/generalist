@@ -1,4 +1,4 @@
-import { Effect, Option, Ref, Schema } from "effect"
+import { Effect, Function, Option, Ref, Schema } from "effect"
 import { Chat, Tool } from "effect/unstable/ai"
 import {
   edgeCount,
@@ -17,9 +17,9 @@ import {
 import type { RunOptions } from "../agent/agent.js"
 import { assemble, type Candidate } from "../tools/tool-registry.js"
 import { intercept, logicalOperationId } from "../durable/driver-run.js"
-import { operationKey } from "../durable/driver-interpreter.js"
+import { operationKey, type DriverInterpreter } from "../durable/driver-interpreter.js"
 import { defaultContextProjection, HandoffInput, type ContextProjection } from "./handoff-projection.js"
-import { HandoffCatalog, type HandoffTarget } from "./handoff-target.js"
+import type { HandoffTarget } from "./handoff-target.js"
 import { ModelRegistry } from "../model/model-registry.js"
 import { validateRef } from "../durable/executable-manifest.js"
 
@@ -30,6 +30,7 @@ export class HandoffRejected extends Schema.TaggedErrorClass<HandoffRejected>()(
 }) {}
 
 export interface ExecuteHandoffInput {
+  readonly catalog: import("./handoff-target.js").HandoffCatalogInterface
   readonly turn: number
   readonly toolCallId: string
   readonly specialist: string
@@ -51,7 +52,7 @@ const recordRejected = (
   turn: number,
   handoffId: string,
   reason: string,
-): Effect.Effect<void, import("../agent/agent.js").RunError> =>
+): Effect.Effect<void, import("../agent/agent.js").RunError, DriverInterpreter> =>
   intercept(
     {
       kind: "handoff",
@@ -98,8 +99,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
               resolvingToolCallIds: input.resolvingToolCallIds,
             },
           }
-    const catalog = yield* HandoffCatalog
-    const resolved = catalog.resolve(input.specialist)
+    const resolved = input.catalog.resolve(input.specialist)
     if (resolved === undefined) {
       return yield* HandoffTargetMissing.make({ target: input.specialist, turn: input.turn })
     }
@@ -128,22 +128,21 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
       }
     }
     const edge = edgeLabel(source, resolved.name)
-    if (input.options.executableRef !== undefined) {
-      if (input.options.executableManifest === undefined || resolved.pin === undefined) {
+    const pinnedRef = input.options.executableRef
+    const pinnedManifest = input.options.executableManifest
+    if (pinnedRef !== undefined) {
+      if (pinnedManifest === undefined || resolved.pin === undefined) {
         return yield* HandoffRejected.make({
           handoffId,
           turn: input.turn,
           reason: "Pinned handoff requires an executable closure and exact target Agent pin",
         })
       }
-      try {
-        validateRef(input.options.executableRef, input.options.executableManifest)
-      } catch (error) {
-        return yield* HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) })
-      }
-      if (
-        !input.options.executableManifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === resolved.pin)
-      ) {
+      yield* Effect.try({
+        try: () => validateRef(pinnedRef, pinnedManifest),
+        catch: (error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) }),
+      })
+      if (!pinnedManifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === resolved.pin)) {
         return yield* HandoffRejected.make({
           handoffId,
           turn: input.turn,
@@ -220,7 +219,7 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
     const durable = yield* Schema.decodeUnknownEffect(HandoffCommit)(commit).pipe(
       Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) })),
     )
-    const committedTarget = catalog.resolve(durable.state.active)
+    const committedTarget = input.catalog.resolve(durable.state.active)
     if (committedTarget === undefined) {
       return yield* HandoffTargetMissing.make({ target: durable.state.active, turn: input.turn })
     }
@@ -240,34 +239,64 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
     return accepted
   })
 
-export const handoffToolSpec = (
-  handoffTarget: HandoffTarget,
-  options: {
+/** @experimental One same-run handoff tool specification. */
+export interface HandoffToolSpecResult {
+  readonly tool: Tool.Tool<
+    string,
+    {
+      readonly parameters: typeof HandoffInput
+      readonly success: typeof HandoffAccepted
+      readonly failure: typeof Schema.String
+      readonly failureMode: "return"
+    }
+  >
+  readonly specialist: string
+  readonly projection?: ContextProjection
+  readonly maxRepeatedEdge?: number
+}
+
+export const handoffToolSpec: {
+  (options?: {
     readonly nameOverride?: string
     readonly description?: string
     readonly projection?: ContextProjection
     readonly maxRepeatedEdge?: number
-  } = {},
-): {
-  readonly tool: Tool.Any
-  readonly specialist: string
-  readonly projection?: ContextProjection
-  readonly maxRepeatedEdge?: number
-} => {
-  const name = options.nameOverride ?? `handoff_to_${handoffTarget.name}`
-  const tool = Tool.make(name, {
-    ...(options.description === undefined
-      ? { description: `Hand off to ${handoffTarget.name} for subsequent turns in this run` }
-      : { description: options.description }),
-    parameters: HandoffInput,
-    success: HandoffAccepted,
-    failure: Schema.String,
-    failureMode: "return",
-  })
-  return {
-    tool,
-    specialist: handoffTarget.name,
-    ...(options.projection === undefined ? {} : { projection: options.projection }),
-    ...(options.maxRepeatedEdge === undefined ? {} : { maxRepeatedEdge: options.maxRepeatedEdge }),
-  }
-}
+  }): (handoffTarget: HandoffTarget) => HandoffToolSpecResult
+  (
+    handoffTarget: HandoffTarget,
+    options?: {
+      readonly nameOverride?: string
+      readonly description?: string
+      readonly projection?: ContextProjection
+      readonly maxRepeatedEdge?: number
+    },
+  ): HandoffToolSpecResult
+} = Function.dual(
+  (args) => args.length > 1 || "agent" in args[0],
+  (
+    handoffTarget: HandoffTarget,
+    options: {
+      readonly nameOverride?: string
+      readonly description?: string
+      readonly projection?: ContextProjection
+      readonly maxRepeatedEdge?: number
+    } = {},
+  ): HandoffToolSpecResult => {
+    const name = options.nameOverride ?? `handoff_to_${handoffTarget.name}`
+    const tool = Tool.make(name, {
+      ...(options.description === undefined
+        ? { description: `Hand off to ${handoffTarget.name} for subsequent turns in this run` }
+        : { description: options.description }),
+      parameters: HandoffInput,
+      success: HandoffAccepted,
+      failure: Schema.String,
+      failureMode: "return",
+    })
+    return {
+      tool,
+      specialist: handoffTarget.name,
+      ...(options.projection === undefined ? {} : { projection: options.projection }),
+      ...(options.maxRepeatedEdge === undefined ? {} : { maxRepeatedEdge: options.maxRepeatedEdge }),
+    }
+  },
+)

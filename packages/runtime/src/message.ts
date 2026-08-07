@@ -1,5 +1,6 @@
-import { Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import type { ParseOptions } from "effect/SchemaAST"
 import { Address } from "./address.js"
 
 export const Metadata = Schema.Record(Schema.String, Schema.Unknown)
@@ -43,5 +44,27 @@ export const make = (input: {
   ...(input.inReplyTo === undefined ? {} : { inReplyTo: input.inReplyTo }),
 })
 
-export const encode = Schema.encodeEffect(Message)
-export const decode = Schema.decodeEffect(Message)
+const isParseOptions = (value: unknown): value is ParseOptions =>
+  typeof value === "object" &&
+  value !== null &&
+  ("errors" in value ||
+    "onExcessProperty" in value ||
+    "propertyOrder" in value ||
+    "disableChecks" in value ||
+    "concurrency" in value)
+
+export const encode: {
+  (input: Message, options?: ParseOptions): Effect.Effect<typeof Message.Encoded, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: Message) => Effect.Effect<typeof Message.Encoded, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length >= 2 || !isParseOptions(args[0]),
+  (input: Message, options?: ParseOptions) => Schema.encodeEffect(Message)(input, options),
+)
+
+export const decode: {
+  (input: typeof Message.Encoded, options?: ParseOptions): Effect.Effect<Message, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: typeof Message.Encoded) => Effect.Effect<Message, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length >= 2 || !isParseOptions(args[0]),
+  (input: typeof Message.Encoded, options?: ParseOptions) => Schema.decodeEffect(Message)(input, options),
+)

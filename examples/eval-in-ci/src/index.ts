@@ -1,4 +1,4 @@
-import { Console, Effect, Layer } from "effect"
+import { Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { Deterministic } from "@batonfx/providers"
 
@@ -13,15 +13,14 @@ const program = Effect.gen(function* () {
     return yield* Effect.die(`Unexpected eval output: ${result.text}`)
   }
   yield* Console.log("eval passed")
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      Deterministic.layer({ model: "local" }),
-      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  Deterministic.layer({ model: "local" }),
+  ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

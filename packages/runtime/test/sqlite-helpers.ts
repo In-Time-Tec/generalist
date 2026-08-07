@@ -12,8 +12,9 @@ import {
 } from "./helpers.js"
 import { closedTestAgent } from "./identity.js"
 
+let tempPathCounter = 0
 export const tempDbPath = (label = "baton-runtime"): string => {
-  const dir = `/tmp/${label}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  const dir = `/tmp/${label}-${process.pid.toString(36)}-${(tempPathCounter += 1).toString(36)}`
   Bun.spawnSync(["mkdir", "-p", dir])
   return `${dir}/runtime.sqlite`
 }

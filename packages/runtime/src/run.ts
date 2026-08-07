@@ -1,9 +1,10 @@
-import { Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { ProgramHost } from "@batonfx/core"
 import { decodePinned, ExecutableManifest, ExecutableRef } from "./executable-manifest.js"
 import { RunWait } from "./run-wait.js"
 import { Cursor } from "./cursor.js"
 import { ModelTelemetry } from "@batonfx/core"
+import type { ParseOptions } from "effect/SchemaAST"
 import {
   AgentExecutionFailure,
   ExecutableIdentityMismatch,
@@ -53,10 +54,10 @@ export const RunReceipt: Schema.Codec<RunReceipt, RunReceiptEncoded> = Schema.St
 export interface RunInspection {
   readonly runId: RunId
   readonly status: RunStatus
-  readonly executableRef: typeof ExecutableRef.Type
-  readonly executableManifest: typeof ExecutableManifest.Type
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly parentRunId?: RunId
-  readonly wait?: typeof RunWait.Type
+  readonly wait?: RunWait
   readonly lastSequence: number
   readonly durability: "ephemeral" | "durable"
 }
@@ -96,11 +97,11 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
 )
 
 export type RunFailure =
-  | typeof AgentExecutionFailure.Type
-  | typeof ExecutablePinMissing.Type
-  | typeof ExecutableIdentityMismatch.Type
-  | typeof ExecutableRegistrationInvalid.Type
-  | typeof ExecutableRegistrationMissing.Type
+  | AgentExecutionFailure
+  | ExecutablePinMissing
+  | ExecutableIdentityMismatch
+  | ExecutableRegistrationInvalid
+  | ExecutableRegistrationMissing
   | ProgramHost.ExecutionFailure
 
 export const RunFailure: Schema.Codec<RunFailure, unknown> = Schema.Union([
@@ -261,7 +262,7 @@ export const CompactionInspection: Schema.Codec<CompactionInspection, Compaction
 
 export interface RunSnapshot {
   readonly run: RunInspection
-  readonly cursor: typeof Cursor.Type
+  readonly cursor: Cursor
   readonly outcome?: RunOutcome
   readonly usage: ReadonlyArray<RawUsageFact>
   readonly compactions: ReadonlyArray<CompactionInspection>
@@ -286,13 +287,13 @@ export const RunSnapshot: Schema.Codec<RunSnapshot, RunSnapshotEncoded> = Schema
 export interface Run {
   readonly runId: RunId
   readonly status: RunStatus
-  readonly executableRef: typeof ExecutableRef.Type
-  readonly executableManifest: typeof ExecutableManifest.Type
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly messageId: string
   readonly sessionId: string
   readonly rootRunId: RunId
   readonly parentRunId?: RunId
-  readonly wait?: typeof RunWait.Type
+  readonly wait?: RunWait
   readonly lastSequence: number
   readonly attempt: number
 }
@@ -326,9 +327,63 @@ export const Run: Schema.Codec<Run, RunEncoded> = Schema.Struct({
 export const isTerminal = (status: RunStatus): status is "succeeded" | "failed" | "cancelled" =>
   status === "succeeded" || status === "failed" || status === "cancelled"
 
-export const encodeReceipt = Schema.encodeEffect(RunReceipt)
-export const decodeReceipt = Schema.decodeEffect(RunReceipt)
-export const encodeInspection = Schema.encodeEffect(RunInspection)
-export const decodeInspection = Schema.decodeEffect(RunInspection)
-export const encodeSnapshot = Schema.encodeEffect(RunSnapshot)
-export const decodeSnapshot = Schema.decodeEffect(RunSnapshot)
+const isParseOptions = (value: unknown): value is ParseOptions =>
+  typeof value === "object" &&
+  value !== null &&
+  ("errors" in value ||
+    "onExcessProperty" in value ||
+    "propertyOrder" in value ||
+    "disableChecks" in value ||
+    "concurrency" in value)
+
+export const encodeReceipt: {
+  (input: RunReceipt, options?: ParseOptions): Effect.Effect<typeof RunReceipt.Encoded, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: RunReceipt) => Effect.Effect<typeof RunReceipt.Encoded, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length >= 2 || !isParseOptions(args[0]),
+  (input: RunReceipt, options?: ParseOptions) => Schema.encodeEffect(RunReceipt)(input, options),
+)
+
+export const decodeReceipt: {
+  (input: typeof RunReceipt.Encoded, options?: ParseOptions): Effect.Effect<RunReceipt, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: typeof RunReceipt.Encoded) => Effect.Effect<RunReceipt, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length >= 2 || !isParseOptions(args[0]),
+  (input: typeof RunReceipt.Encoded, options?: ParseOptions) => Schema.decodeEffect(RunReceipt)(input, options),
+)
+
+export const encodeInspection: {
+  (input: RunInspection, options?: ParseOptions): Effect.Effect<typeof RunInspection.Encoded, Schema.SchemaError, never>
+  (
+    options?: ParseOptions,
+  ): (input: RunInspection) => Effect.Effect<typeof RunInspection.Encoded, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length >= 2 || !isParseOptions(args[0]),
+  (input: RunInspection, options?: ParseOptions) => Schema.encodeEffect(RunInspection)(input, options),
+)
+
+export const decodeInspection: {
+  (input: typeof RunInspection.Encoded, options?: ParseOptions): Effect.Effect<RunInspection, Schema.SchemaError, never>
+  (
+    options?: ParseOptions,
+  ): (input: typeof RunInspection.Encoded) => Effect.Effect<RunInspection, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length >= 2 || !isParseOptions(args[0]),
+  (input: typeof RunInspection.Encoded, options?: ParseOptions) => Schema.decodeEffect(RunInspection)(input, options),
+)
+
+export const encodeSnapshot: {
+  (input: RunSnapshot, options?: ParseOptions): Effect.Effect<typeof RunSnapshot.Encoded, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: RunSnapshot) => Effect.Effect<typeof RunSnapshot.Encoded, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length >= 2 || !isParseOptions(args[0]),
+  (input: RunSnapshot, options?: ParseOptions) => Schema.encodeEffect(RunSnapshot)(input, options),
+)
+
+export const decodeSnapshot: {
+  (input: typeof RunSnapshot.Encoded, options?: ParseOptions): Effect.Effect<RunSnapshot, Schema.SchemaError, never>
+  (options?: ParseOptions): (input: typeof RunSnapshot.Encoded) => Effect.Effect<RunSnapshot, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length >= 2 || !isParseOptions(args[0]),
+  (input: typeof RunSnapshot.Encoded, options?: ParseOptions) => Schema.decodeEffect(RunSnapshot)(input, options),
+)

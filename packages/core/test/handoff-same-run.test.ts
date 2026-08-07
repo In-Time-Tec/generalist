@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
@@ -13,6 +13,7 @@ import {
   ToolExecutor,
 } from "../src/index"
 import { ItLayer } from "./it-layer"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -66,7 +67,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     let handoffCommit: Handoff.HandoffCommit | undefined
     let calls = 0
     const journal = Layer.succeed(DurableDriver.DriverJournalService, {
-      onScheduled: () => Effect.succeed(undefined),
+      onScheduled: () => Effect.void,
       onCompleted: (
         operation: DurableDriver.DriverOperation,
         outcome: DurableDriver.OperationOutcome,
@@ -75,13 +76,14 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         Effect.sync(() => {
           if (operation.kind === "handoff" && outcome._tag === "Succeeded") {
             handoffCheckpoint = checkpoint
-            handoffCommit = Schema.decodeUnknownSync(Handoff.HandoffCommit)(outcome.value)
+            handoffCommit = Schema.decodeUnknownOption(Handoff.HandoffCommit)(outcome.value).pipe(Option.getOrUndefined)
           }
         }),
       onCheckpoint: () => Effect.void,
     })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer(() => {
           calls += 1
           return calls === 1
@@ -126,6 +128,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     let supervisorCalls = 0
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer((options) => {
           const content = promptText(options.prompt)
           if (content.includes("continue as math")) {
@@ -156,6 +159,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const completedKeys: Array<string> = []
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer((options) =>
           promptText(options.prompt).includes("continue stable")
             ? Stream.make(textDelta("complete"))
@@ -166,7 +170,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Layer.succeed(DurableDriver.DriverJournalService, {
-          onScheduled: () => Effect.succeed(undefined),
+          onScheduled: () => Effect.void,
           onCompleted: (operation: DurableDriver.DriverOperation) =>
             Effect.sync(() => {
               if (operation.kind === "handoff") {
@@ -212,8 +216,9 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         parentModel,
-        ToolExecutor.layerToolkit(delegate),
+        ToolExecutor.layerToolkit(delegate).pipe(Layer.provide(parentModel)),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
       ),
@@ -236,6 +241,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
         ToolExecutor.layerToolkit(supervisorSetup.toolkit),
         Handoff.layerCatalog([]),
@@ -250,10 +256,11 @@ layer(Layer.empty)("Handoff same-run", (it) => {
   })
 
   ItLayer.make(it, "rejects projection that would leave unresolved tool calls", () => {
-    const mathTarget = Handoff.target(Agent.make({ name: "math" }) as never)
+    const mathTarget = Handoff.target(Agent.make({ name: "math" }) as never, undefined)
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer(() => Stream.make(toolCallPart("h1", "handoff_to_math", { prompt: "go" }))),
         ToolExecutor.layerToolkit(supervisorSetup.toolkit),
         supervisorSetup.catalog,

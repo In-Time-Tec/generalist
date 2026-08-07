@@ -1,5 +1,6 @@
 import { view } from "@foldkit/ui/button"
 import { type VariantProps, cva } from "class-variance-authority"
+import { Function } from "effect"
 import type { Attribute, ChildAttribute, Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -46,24 +47,27 @@ export type ButtonConfig<ParentMessage> = Readonly<{
   attributes?: ReadonlyArray<Attribute<ParentMessage> | ChildAttribute>
 }>
 
-export const button = <ParentMessage>(
-  config: ButtonConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  const { attributes = [], class: className, dataSlot = "button", size, variant, ...primitiveConfig } = config
+export const button: {
+  <ParentMessage>(config: ButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: ButtonConfig<ParentMessage>) => Html
+} = Function.dual(
+  2,
+  <ParentMessage>(config: ButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    const { attributes = [], class: className, dataSlot = "button", size, variant, ...primitiveConfig } = config
 
-  return view<ParentMessage>({
-    ...primitiveConfig,
-    toView: (buttonAttributes) =>
-      h.button(
-        [
-          ...buttonAttributes.button,
-          ...attributes,
-          h.DataAttribute("slot", dataSlot),
-          h.Class(cn(buttonVariants({ size, variant }), className)),
-        ],
-        [...children],
-      ),
-  })
-}
+    return view<ParentMessage>({
+      ...primitiveConfig,
+      toView: (buttonAttributes) =>
+        h.button(
+          [
+            ...buttonAttributes.button,
+            ...attributes,
+            h.DataAttribute("slot", dataSlot),
+            h.Class(cn(buttonVariants({ size, variant }), className)),
+          ],
+          [...children],
+        ),
+    })
+  },
+)

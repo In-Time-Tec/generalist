@@ -43,11 +43,14 @@ const OpenSession = define(
   FailedOpenSession,
 )(
   Effect.gen(function* () {
-    const response = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, { body: HttpBody.jsonUnsafe({}) })
+    const httpClient = yield* Layer.build(FetchHttpClient.layer)
+    const response = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, {
+      body: HttpBody.jsonUnsafe({}),
+    }).pipe(Effect.provideContext(httpClient))
     const body = (yield* response.json) as { readonly sessionId: string }
     return OpenedSession({ sessionId: body.sessionId })
   }).pipe(
-    Effect.provide(FetchHttpClient.layer),
+    Effect.scoped,
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
   ),
 )

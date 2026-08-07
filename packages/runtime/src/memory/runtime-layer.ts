@@ -167,7 +167,7 @@ export const makeRuntime = (
           childRunId: childRunIdFor(fanOutId, ordinal),
           selection: member.selection,
           prompt: normalizePrompt(member.prompt),
-          sessionId: member.sessionId ?? fanOutMemberSessionId(fanOutId, member.key),
+          sessionId: member.sessionId ?? fanOutMemberSessionId({ fanOutId, key: member.key }),
           metadata: member.metadata ?? {},
         }))
         return {
@@ -304,7 +304,8 @@ export const makeRuntime = (
         }),
       spawn: (input: SpawnInput) =>
         Effect.gen(function* () {
-          const sessionId = input.sessionId ?? childSessionId(input.parentRunId, input.invocationId)
+          const sessionId =
+            input.sessionId ?? childSessionId({ parentRunId: input.parentRunId, invocationId: input.invocationId })
           const idempotencyKey = input.idempotencyKey ?? `spawn:${input.parentRunId}:${input.invocationId}`
           const address = makeAddress(`spawn:${input.parentRunId}`)
           const prompt = normalizePrompt(input.prompt)

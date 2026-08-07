@@ -1,5 +1,6 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect"
+import { provideScoped } from "./scoped-provide.js"
 import { Prompt } from "effect/unstable/ai"
 import {
   AgentProgram,
@@ -52,8 +53,8 @@ const makeFixture = (
       ProgramBindings.tool({
         name: "echo",
         pin: program.pinned.manifest.capabilities.tools[0]!.pin,
-        input: Schema.Struct({ value: Schema.Number }),
-        output: Schema.Struct({ value: Schema.Number }),
+        input: Schema.Struct({ value: Schema.Finite }),
+        output: Schema.Struct({ value: Schema.Finite }),
         replay: "recorded",
         authorize: () => Effect.succeed(true),
         execute: () => Effect.succeed((options?.toolOutput ?? { value: 1 }) as { value: number }),
@@ -99,16 +100,21 @@ describe("durable Program host boundary", () => {
     ["undefined-input", { operation: "echo", tool: "echo", input: undefined }],
     ["non-json-input", { operation: "echo", tool: "echo", input: { value: undefined } }],
   ] as const) {
-    it.effect(`rejects ${name} before journal access`, () => {
-      const fixture = makeFixture(name, () =>
-        Effect.flatMap(ProgramCapabilities.ProgramCapabilities, (host) => host.callTool(request as never)),
+    const fixture = makeFixture(name, () =>
+      Effect.flatMap(ProgramCapabilities.ProgramCapabilities, (host) => host.callTool(request as never)),
+    )
+    layer(fixture.layer)(`rejects ${name} before journal access`, (suite) => {
+      suite.effect(`rejects ${name} before journal access`, () =>
+        Effect.gen(function* () {
+          const result = yield* execute(fixture.address)
+          const store = yield* RunStore.RunStore
+          expect(result.outcome).toMatchObject({
+            _tag: "Failed",
+            error: { _tag: "@batonfx/core/ProgramSchemaFailure" },
+          })
+          expect(yield* store.getProgramOperation({ runId: result.runId, operation: "echo" })).toBeUndefined()
+        }),
       )
-      return Effect.gen(function* () {
-        const result = yield* execute(fixture.address)
-        const store = yield* RunStore.RunStore
-        expect(result.outcome).toMatchObject({ _tag: "Failed", error: { _tag: "@batonfx/core/ProgramSchemaFailure" } })
-        expect(yield* store.getProgramOperation({ runId: result.runId, operation: "echo" })).toBeUndefined()
-      }).pipe(Effect.provide(fixture.layer))
     })
   }
 
@@ -129,24 +135,29 @@ describe("durable Program host boundary", () => {
         return yield* host.callTool({ operation: "echo", tool: "echo", input: { value: ++calls } })
       }),
     )
-    return execute(excess.address).pipe(
-      Effect.tap(({ outcome }) =>
-        Effect.sync(() =>
-          expect(outcome).toMatchObject({ _tag: "Failed", error: { _tag: "@batonfx/core/ProgramSchemaFailure" } }),
+    return provideScoped(
+      excess.layer,
+      execute(excess.address).pipe(
+        Effect.tap(({ outcome }) =>
+          Effect.sync(() =>
+            expect(outcome).toMatchObject({ _tag: "Failed", error: { _tag: "@batonfx/core/ProgramSchemaFailure" } }),
+          ),
         ),
       ),
-      Effect.provide(excess.layer),
+    ).pipe(
       Effect.andThen(
-        execute(replay.address).pipe(
-          Effect.tap(({ outcome }) =>
-            Effect.sync(() =>
-              expect(outcome).toMatchObject({
-                _tag: "Failed",
-                error: { _tag: "@batonfx/core/ProgramReplayDivergence" },
-              }),
+        provideScoped(
+          replay.layer,
+          execute(replay.address).pipe(
+            Effect.tap(({ outcome }) =>
+              Effect.sync(() =>
+                expect(outcome).toMatchObject({
+                  _tag: "Failed",
+                  error: { _tag: "@batonfx/core/ProgramReplayDivergence" },
+                }),
+              ),
             ),
           ),
-          Effect.provide(replay.layer),
         ),
       ),
     )
@@ -155,17 +166,22 @@ describe("durable Program host boundary", () => {
   it.live("enforces wall-clock and output limits when the sandbox ignores them", () => {
     const wall = makeFixture("wall-limit", () => Effect.never, { wallClockMillis: 5 })
     const output = makeFixture("output-limit", () => Effect.succeed("too large"), { outputBytes: 3 })
-    return execute(wall.address).pipe(
-      Effect.tap(({ outcome }) =>
-        Effect.sync(() => expect(outcome).toMatchObject({ _tag: "Failed", error: { dimension: "wallClockMillis" } })),
+    return provideScoped(
+      wall.layer,
+      execute(wall.address).pipe(
+        Effect.tap(({ outcome }) =>
+          Effect.sync(() => expect(outcome).toMatchObject({ _tag: "Failed", error: { dimension: "wallClockMillis" } })),
+        ),
       ),
-      Effect.provide(wall.layer),
+    ).pipe(
       Effect.andThen(
-        execute(output.address).pipe(
-          Effect.tap(({ outcome }) =>
-            Effect.sync(() => expect(outcome).toMatchObject({ _tag: "Failed", error: { dimension: "outputBytes" } })),
+        provideScoped(
+          output.layer,
+          execute(output.address).pipe(
+            Effect.tap(({ outcome }) =>
+              Effect.sync(() => expect(outcome).toMatchObject({ _tag: "Failed", error: { dimension: "outputBytes" } })),
+            ),
           ),
-          Effect.provide(output.layer),
         ),
       ),
     )
@@ -192,26 +208,29 @@ describe("durable Program host boundary", () => {
         ),
       { services: services as Layer.Layer<any> },
     )
-    return Effect.gen(function* () {
-      started = yield* Deferred.make<void>()
-      const runtime = yield* Runtime.Runtime
-      store = yield* RunStore.RunStore
-      const host = yield* ExecutionHost.ExecutionHost
-      const receipt = yield* runtime.send({
-        to: fixture.address,
-        sessionId: "cancel",
-        idempotencyKey: "cancel",
-        prompt: "run",
-      })
-      runId = receipt.runId
-      const fiber = yield* host
-        .execute(yield* store.claimExecution({ runId, ownerId: "cancel" }))
-        .pipe(Effect.forkChild({ startImmediately: true }))
-      yield* Deferred.await(started)
-      yield* runtime.cancel({ runId, reason: "stop" })
-      yield* Fiber.await(fiber)
-      expect((yield* runtime.inspect(runId)).status).toBe("cancelled")
-      expect(lifecycle).toEqual(["service:cancelling", "sandbox-active:cancelling"])
-    }).pipe(Effect.provide(fixture.layer))
+    return provideScoped(
+      fixture.layer,
+      Effect.gen(function* () {
+        started = yield* Deferred.make<void>()
+        const runtime = yield* Runtime.Runtime
+        store = yield* RunStore.RunStore
+        const host = yield* ExecutionHost.ExecutionHost
+        const receipt = yield* runtime.send({
+          to: fixture.address,
+          sessionId: "cancel",
+          idempotencyKey: "cancel",
+          prompt: "run",
+        })
+        runId = receipt.runId
+        const fiber = yield* host
+          .execute(yield* store.claimExecution({ runId, ownerId: "cancel" }))
+          .pipe(Effect.forkChild({ startImmediately: true }))
+        yield* Deferred.await(started)
+        yield* runtime.cancel({ runId, reason: "stop" })
+        yield* Fiber.await(fiber)
+        expect((yield* runtime.inspect(runId)).status).toBe("cancelled")
+        expect(lifecycle).toEqual(["service:cancelling", "sandbox-active:cancelling"])
+      }),
+    )
   })
 })

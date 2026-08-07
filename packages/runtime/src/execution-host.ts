@@ -67,15 +67,14 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               .pipe(Effect.catch((error) => store.fail({ ...claim, error }).pipe(Effect.as(undefined))))
             if (resolution === undefined) return
             const resolved = resolution
-            let identityMatches = false
-            try {
-              identityMatches = equals(
-                decodePinned({ ref: claimed.executableRef, manifest: claimed.executableManifest }),
-                makeAttestation(resolved.attestation),
-              )
-            } catch {
-              identityMatches = false
-            }
+            const identityMatches = yield* Effect.try({
+              try: () =>
+                equals(
+                  decodePinned({ ref: claimed.executableRef, manifest: claimed.executableManifest }),
+                  makeAttestation(resolved.attestation),
+                ),
+              catch: () => false,
+            })
             if (!identityMatches) {
               yield* store.fail({
                 ...claim,
@@ -110,11 +109,9 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                 // for its session identity. Without one the Run stays process-bound.
                 const baseContext = Context.merge(
                   yield* hostContext({ agent, environment, store, codeMode }),
-                  yield* sessionContext(store, claimed.message.sessionId),
+                  yield* sessionContext({ store, sessionId: claimed.message.sessionId }),
                 )
-                const runHosted = <HostedTools extends Record<string, Tool.Any>>(
-                  hostedAgent: Agent.Agent<HostedTools, R>,
-                ): Effect.Effect<void> => {
+                const runHosted = (hostedAgent: Agent.Agent<Tools, R>): Effect.Effect<void> => {
                   const runAgent = (
                     prompt: Prompt.RawInput,
                     history: Prompt.Prompt | undefined,

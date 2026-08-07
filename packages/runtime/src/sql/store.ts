@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Option } from "effect"
 import type { Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { CursorExpired, RunNotFound } from "../errors.js"
@@ -81,7 +81,7 @@ export const makeSqliteRunStore = (
     }
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     yield* migrate(options.filename)
-    const hub = yield* makeEventHub()
+    const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
@@ -105,7 +105,8 @@ export const makeSqliteRunStore = (
 
     return RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
-      sessionStore: (sessionId: string) => withSql(sql, makeSqliteSessionStore({ sessionId })).pipe(Effect.orDie),
+      sessionStore: (sessionId: string) =>
+        withSql(sql, makeSqliteSessionStore({ sessionId })).pipe(Effect.orDie, Effect.map(Option.some)),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => run(admitSend(hub, addressBindings, input)),
       admitStart: (input) => runBuffered((transactionHub) => admitStart(transactionHub, input)),

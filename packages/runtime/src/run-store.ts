@@ -1,4 +1,4 @@
-import { Context, Effect, Schema, Stream } from "effect"
+import { Context, Effect, Schema, Stream, Option } from "effect"
 import type { ProgramCapabilities, Session } from "@batonfx/core"
 import type { Address } from "./address.js"
 import type { Cursor } from "./cursor.js"
@@ -181,7 +181,7 @@ export interface Interface {
    * Session is the authority for model-facing history, so the store that owns durability owns it too.
    * A store without durable Session returns undefined and its Runs fall back to process-bound history.
    */
-  readonly sessionStore: (sessionId: string) => Effect.Effect<typeof Session.SessionStore.Service | undefined>
+  readonly sessionStore: (sessionId: string) => Effect.Effect<Option.Option<typeof Session.SessionStore.Service>>
   readonly hasAdmission: (input: {
     readonly address: Address
     readonly sessionId: string

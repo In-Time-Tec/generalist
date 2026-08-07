@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Layer, Redacted, Schema, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Redacted, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -39,6 +39,15 @@ import {
 } from "./helpers.js"
 import { testExecutable } from "../identity.js"
 
+const scopedWith =
+  <A, E>(layerValue: Layer.Layer<A, E, never>) =>
+  <B, E2, R2 extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R2>) =>
+    Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
+
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+const decodeJson = (text: string): Record<string, any> =>
+  Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Any)))(text)
+
 const describePostgres = postgresAvailable ? describe.sequential : describe.skip
 
 const url = postgresUrl!
@@ -76,7 +85,7 @@ const admitWaitForCancellation = (waitId: string) =>
         SET status = 'running', owner_worker_id = ${parentClaim.workerId}
         WHERE run_id = ${receipt.runId}
       `
-    }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+    }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
     return {
       runtime,
       store,
@@ -110,19 +119,19 @@ const expireLease = (runId: string) =>
       SET lease_expires_at = NOW() - INTERVAL '1 second'
       WHERE run_id = ${runId}
     `
-  }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+  }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
 
 const bumpSchemaVersion = (version: number) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`UPDATE ${sql(SCHEMA_META_TABLE)} SET version = ${version} WHERE id = 1`
-  }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+  }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
 
 const corruptChecksum = () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`UPDATE ${sql(SCHEMA_META_TABLE)} SET checksum = 'deadbeef' WHERE id = 1`
-  }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+  }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
 
 const corruptEventExecutableRef = (runId: string, executableRef: unknown) =>
   Effect.gen(function* () {
@@ -130,16 +139,16 @@ const corruptEventExecutableRef = (runId: string, executableRef: unknown) =>
     const row = (yield* sql<{ event_json: string }>`
       SELECT event_json FROM baton_run_events WHERE run_id = ${runId} ORDER BY sequence LIMIT 1
     `)[0]!
-    const event = JSON.parse(row.event_json) as Record<string, unknown>
+    const event = decodeJson(row.event_json)
     event.executableRef = executableRef
     yield* sql`
-      UPDATE baton_run_events SET event_json = ${JSON.stringify(event)}
+      UPDATE baton_run_events SET event_json = ${encodeJson(event)}
       WHERE run_id = ${runId} AND sequence = 0
     `
-  }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+  }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
 
 const markDirty = () =>
-  RunSchema.markDirty("postgres-test").pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+  RunSchema.markDirty("postgres-test").pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -206,7 +215,7 @@ describePostgres("postgres run store", () => {
           })
           .pipe(Effect.flip)
         expect(conflict).toBeInstanceOf(Errors.ExecutableRegistrationConflict)
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -217,7 +226,7 @@ describePostgres("postgres run store", () => {
         const info = yield* store.info
         expect(info).toEqual({ durability: "durable", backend: "postgres", multiWorker: true })
         expect(schemaChecksum().length).toBe(64)
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -248,7 +257,7 @@ describePostgres("postgres run store", () => {
           (event) => event._tag === "RunResumed",
         )
         expect(resumed).toEqual(expect.objectContaining({ resolution }))
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -258,8 +267,8 @@ describePostgres("postgres run store", () => {
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`UPDATE ${sql(SCHEMA_META_TABLE)} SET version = 0 WHERE id = 1`
-        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
-        const failed = yield* Effect.exit(Effect.void.pipe(Effect.provide(postgresLayer(url)), Effect.scoped))
+        }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
+        const failed = yield* Effect.exit(scopedWith(postgresLayer(url))(Effect.void))
         expect(Exit.isFailure(failed)).toBe(true)
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
@@ -268,7 +277,7 @@ describePostgres("postgres run store", () => {
             SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = FALSE
             WHERE id = 1
           `
-        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
       }),
     ),
   )
@@ -298,7 +307,7 @@ describePostgres("postgres run store", () => {
         expect(yield* store.complete({ ...executionClaim, result: completedResult("early") })).toMatchObject({
           _tag: "SteeringPending",
         })
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -329,11 +338,11 @@ describePostgres("postgres run store", () => {
           const sql = yield* SqlClient.SqlClient
           yield* sql`
             UPDATE baton_runs SET
-              executable_ref_json = ${JSON.stringify(alternateAssistantRef.ref)},
-              executable_manifest_json = ${JSON.stringify(alternateAssistantRef.manifest)}
+              executable_ref_json = ${encodeJson(alternateAssistantRef.ref)},
+              executable_manifest_json = ${encodeJson(alternateAssistantRef.manifest)}
             WHERE run_id = ${runId}
           `
-        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
         const authorityConflict = yield* runtime
           .send({ runId, to: assistantAddress, sessionId, idempotencyKey: "same", prompt: textPrompt("one") })
           .pipe(Effect.flip)
@@ -357,7 +366,7 @@ describePostgres("postgres run store", () => {
           })
           .pipe(Effect.flip)
         expect(conflict).toBeInstanceOf(Errors.IdempotencyConflict)
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -389,7 +398,7 @@ describePostgres("postgres run store", () => {
           })
           .pipe(Effect.flip)
         expect(failure).toBeInstanceOf(Errors.RunTerminal)
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -427,7 +436,7 @@ describePostgres("postgres run store", () => {
         const claimedNext = yield* claims.claimReadyRuns({ workerId: "w1", limit: 2, lease: "10 seconds" })
         expect(claimedNext.map((item) => item.run.runId)).toEqual([blocked.runId])
         expect((yield* runtime.inspect(blocked.runId)).status).toBe("running")
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -453,7 +462,7 @@ describePostgres("postgres run store", () => {
         const claimedIds = [...w1, ...w2, ...w3].map((item) => item.run.runId)
         expect(new Set(claimedIds).size).toBe(6)
         expect(claimedIds.toSorted()).toEqual(receipts.map((receipt) => receipt.runId).toSorted())
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -494,7 +503,7 @@ describePostgres("postgres run store", () => {
           result: completedResult("ok"),
         })
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -540,13 +549,13 @@ describePostgres("postgres run store", () => {
               yield* sql`
                 UPDATE baton_runs
                 SET owner_worker_id = 'owner-b', attempt_fence = attempt_fence + 1,
-                  transcript_json = ${JSON.stringify(newerTranscript)},
+                  transcript_json = ${encodeJson(newerTranscript)},
                   lease_expires_at = NOW() + INTERVAL '10 seconds', updated_at = NOW()
                 WHERE run_id = ${receipt.runId}
               `
             }),
           )
-        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
 
         const takeoverFiber = yield* Effect.forkScoped(takeover)
         yield* Deferred.await(locked)
@@ -583,14 +592,14 @@ describePostgres("postgres run store", () => {
             WHERE run_id = ${receipt.runId} AND event_json LIKE '%"TurnCompleted"%'
           `
           return { run, eventCount: Number(events!.count) }
-        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
         expect(state.run).toEqual({
           owner_worker_id: "owner-b",
           attempt_fence: claim.attemptFence + 1,
-          transcript_json: JSON.stringify(newerTranscript),
+          transcript_json: encodeJson(newerTranscript),
         })
         expect(state.eventCount).toBe(0)
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -621,7 +630,7 @@ describePostgres("postgres run store", () => {
             lease: "10 seconds",
           }),
         ).toBe(false)
-      }).pipe(Effect.provide(postgresWithWorker(url, "tick-worker", 2)), Effect.scoped),
+      }).pipe(scopedWith(postgresWithWorker(url, "tick-worker", 2))),
     ),
   )
 
@@ -672,7 +681,7 @@ describePostgres("postgres run store", () => {
         expect((yield* driver.getOperation({ runId: receipt.runId, operationId: recorded.operationId })).result).toBe(
           "recovered",
         )
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -738,7 +747,7 @@ describePostgres("postgres run store", () => {
               `
             }),
           )
-        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
 
         const takeoverFiber = yield* Effect.forkScoped(takeover)
         yield* Deferred.await(locked)
@@ -772,7 +781,7 @@ describePostgres("postgres run store", () => {
           checkpoint,
         })
         expect(completed.status).toBe("succeeded")
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -866,7 +875,7 @@ describePostgres("postgres run store", () => {
         })
         yield* runtime.cancel({ runId: successor.runId, reason: "stop" })
         expect((yield* runtime.inspect(successor.runId)).status).toBe("cancelled")
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -903,7 +912,7 @@ describePostgres("postgres run store", () => {
             lease: "5 seconds",
           }),
         ).toBe(false)
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -961,12 +970,12 @@ describePostgres("postgres run store", () => {
           })
           const execution = yield* worker.execute.pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(started)
-          yield* Runtime.Runtime.pipe(
-            Effect.flatMap((otherRuntime) =>
-              otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),
+          yield* scopedWith(Runtime.layerPostgres(options))(
+            Runtime.Runtime.pipe(
+              Effect.flatMap((otherRuntime) =>
+                otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),
+              ),
             ),
-            Effect.provide(Runtime.layerPostgres(options)),
-            Effect.scoped,
           )
           yield* Fiber.join(execution)
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
@@ -979,7 +988,7 @@ describePostgres("postgres run store", () => {
             "model finalized",
             "execution resolver finalized",
           ])
-        }).pipe(Effect.provide(workerLayer), Effect.scoped)
+        }).pipe(scopedWith(workerLayer))
       }),
     ),
   )
@@ -1049,12 +1058,12 @@ describePostgres("postgres run store", () => {
           })
           const execution = yield* worker.execute.pipe(Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(started)
-          yield* Runtime.Runtime.pipe(
-            Effect.flatMap((otherRuntime) =>
-              otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),
+          yield* scopedWith(Runtime.layerPostgres(options))(
+            Runtime.Runtime.pipe(
+              Effect.flatMap((otherRuntime) =>
+                otherRuntime.cancel({ runId: receipt.runId, reason: "other node cancelled" }),
+              ),
             ),
-            Effect.provide(Runtime.layerPostgres(options)),
-            Effect.scoped,
           )
           yield* Fiber.join(execution)
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
@@ -1074,7 +1083,7 @@ describePostgres("postgres run store", () => {
           })
           yield* runtime.cancel({ runId: receipt.runId, reason: "settle cancellation" })
           expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-        }).pipe(Effect.provide(workerLayer), Effect.scoped)
+        }).pipe(scopedWith(workerLayer))
       }),
     ),
   )
@@ -1119,7 +1128,7 @@ describePostgres("postgres run store", () => {
           }
           expect(status).toBe("cancelled")
         }
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -1136,7 +1145,7 @@ describePostgres("postgres run store", () => {
           .pipe(Effect.flip)
         expect(conflict).toBeInstanceOf(Errors.ResponseConflict)
         expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -1154,11 +1163,15 @@ describePostgres("postgres run store", () => {
           .resume({ runId, waitId: "approval", resolution: { _tag: "Approved" } })
           .pipe(Effect.flip)
         expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
-        yield* store.suspend({ ...claim, wait: openWait("approval"), suspension: suspension("approval") })
+        yield* store.suspend({
+          ...claim,
+          wait: openWait("approval", undefined),
+          suspension: suspension("approval", undefined),
+        })
         const inspection = yield* runtime.inspect(runId)
         expect(inspection.status).toBe("cancelling")
         expect(inspection.wait).toMatchObject({ status: "cancelled" })
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -1205,7 +1218,7 @@ describePostgres("postgres run store", () => {
         yield* runtime.cancel({ runId: parent.runId, reason: "parent-stop" })
         expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
         expect((yield* runtime.inspect(child.runId)).status).toBe("succeeded")
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -1273,7 +1286,7 @@ describePostgres("postgres run store", () => {
         })
         const second = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
         expect(second.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[1]])
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -1324,7 +1337,7 @@ describePostgres("postgres run store", () => {
           _tag: "RunCompleted",
           result: { _tag: "Program", value: "program-output" },
         })
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -1358,7 +1371,7 @@ describePostgres("postgres run store", () => {
           })
           .pipe(Effect.flip)
         expect(failure).toBeInstanceOf(Errors.RunTerminal)
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -1384,7 +1397,7 @@ describePostgres("postgres run store", () => {
             result: completedResult("ok"),
           })
           return receipt.runId
-        }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped)
+        }).pipe(scopedWith(postgresLayer(url)))
 
         const tagsA = yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -1393,7 +1406,7 @@ describePostgres("postgres run store", () => {
             Stream.runCollect,
             Effect.map((chunk) => [...chunk].map((event) => `${event.sequence}:${event._tag}`)),
           )
-        }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped)
+        }).pipe(scopedWith(postgresLayer(url)))
 
         const tagsB = yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
@@ -1402,7 +1415,7 @@ describePostgres("postgres run store", () => {
             Stream.runCollect,
             Effect.map((chunk) => [...chunk].map((event) => `${event.sequence}:${event._tag}`)),
           )
-        }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped)
+        }).pipe(scopedWith(postgresLayer(url)))
 
         expect(tagsA).toEqual(tagsB)
         expect(tagsA[0]).toBe("0:RunAccepted")
@@ -1436,7 +1449,7 @@ describePostgres("postgres run store", () => {
           .events({ runId: crossClosure.runId, cursor: -1 })
           .pipe(Stream.runCollect, Effect.flip)
         expect(replayError).toBeInstanceOf(Errors.RuntimeUnavailable)
-      }).pipe(Effect.provide(postgresLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(postgresLayer(url))),
     ),
   )
 
@@ -1450,28 +1463,24 @@ describePostgres("postgres run store", () => {
             SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = FALSE
             WHERE id = 1
           `
-        }).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        }).pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
 
         const planned = yield* RunSchema.plan("postgres-test").pipe(
-          Effect.provide(PgClient.layer({ url: Redacted.make(url) })),
-          Effect.scoped,
+          scopedWith(PgClient.layer({ url: Redacted.make(url) })),
         )
         expect(planned.required).toBe(SCHEMA_VERSION)
         expect(planned.upgradeRequired).toBe(false)
-        yield* RunSchema.check("postgres-test").pipe(
-          Effect.provide(PgClient.layer({ url: Redacted.make(url) })),
-          Effect.scoped,
-        )
+        yield* RunSchema.check("postgres-test").pipe(scopedWith(PgClient.layer({ url: Redacted.make(url) })))
         yield* markDirty()
-        const dirty = yield* Effect.exit(Effect.void.pipe(Effect.provide(postgresLayer(url)), Effect.scoped))
+        const dirty = yield* Effect.exit(scopedWith(postgresLayer(url))(Effect.void))
         expect(Exit.isFailure(dirty)).toBe(true)
         yield* restoreMeta
         yield* corruptChecksum()
-        const mismatch = yield* Effect.exit(Effect.void.pipe(Effect.provide(postgresLayer(url)), Effect.scoped))
+        const mismatch = yield* Effect.exit(scopedWith(postgresLayer(url))(Effect.void))
         expect(Exit.isFailure(mismatch)).toBe(true)
         yield* restoreMeta
         yield* bumpSchemaVersion(SCHEMA_VERSION + 9)
-        const future = yield* Effect.exit(Effect.void.pipe(Effect.provide(postgresLayer(url)), Effect.scoped))
+        const future = yield* Effect.exit(scopedWith(postgresLayer(url))(Effect.void))
         expect(Exit.isFailure(future)).toBe(true)
         yield* restoreMeta
       }),

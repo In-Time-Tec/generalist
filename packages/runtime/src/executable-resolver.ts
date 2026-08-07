@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema, Scope } from "effect"
+import { Context, Effect, Function, Layer, Schema, Scope } from "effect"
 import {
   AgentManifest,
   type Agent,
@@ -83,14 +83,16 @@ const matchesRunOptions = (manifest: AgentManifest.AgentManifest, options: Stati
 }
 
 /** @experimental Verify resolver-owned static options against the persisted active Agent. */
-export const matchesActiveRunOptions = (
-  ref: ExecutableRef,
-  manifest: ExecutableManifest,
-  options: StaticRunOptions | undefined,
-): boolean => {
-  const active = manifest.entries.find((entry) => entry._tag === "Agent" && entry.pin === ref.active)
-  return active?._tag === "Agent" && matchesRunOptions(active.manifest, options)
-}
+export const matchesActiveRunOptions: {
+  (manifest: ExecutableManifest, options: StaticRunOptions | undefined): (ref: ExecutableRef) => boolean
+  (ref: ExecutableRef, manifest: ExecutableManifest, options: StaticRunOptions | undefined): boolean
+} = Function.dual(
+  3,
+  (ref: ExecutableRef, manifest: ExecutableManifest, options: StaticRunOptions | undefined): boolean => {
+    const active = manifest.entries.find((entry) => entry._tag === "Agent" && entry.pin === ref.active)
+    return active?._tag === "Agent" && matchesRunOptions(active.manifest, options)
+  },
+)
 
 /** @experimental Live Agent Program resources owned by the caller's scope. */
 export interface ProgramResolution {
@@ -349,7 +351,12 @@ const resolveProgram = (
       }),
     )
     const bindings = yield* Effect.try({
-      try: () => ProgramBindings.make({ tools, steps, agents }),
+      try: () =>
+        ProgramBindings.make({
+          tools: tools as ReadonlyArray<ProgramBindings.TypedTool>,
+          steps: steps as ReadonlyArray<ProgramBindings.TypedStep>,
+          agents,
+        }),
       catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
     })
     yield* ProgramHost.validateBindings(program, bindings).pipe(

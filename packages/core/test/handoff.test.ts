@@ -3,6 +3,7 @@ import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, AgentEvent, Approvals, Handoff, ModelMiddleware, ToolExecutor } from "../src/index"
 import { ItLayer } from "./it-layer"
+import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -103,6 +104,7 @@ layer(Layer.empty)("Handoff", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [mathTarget] })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer((options) => {
           const content = promptText(options.prompt)
           if (content.includes("math child task")) {
@@ -143,6 +145,7 @@ layer(Layer.empty)("Handoff", (it) => {
     const supervisorSetup = Handoff.supervisor({ name: "supervisor", specialists: [first, second] })
     return [
       Layer.mergeAll(
+        unusedToolHandlerLayer,
         modelLayer(() => {
           modelCalls += 1
           return Stream.make(textDelta("unexpected"))

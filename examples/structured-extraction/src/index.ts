@@ -1,9 +1,9 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
-const invoiceSchema = Schema.Struct({ total: Schema.Number, currency: Schema.String })
+const invoiceSchema = Schema.Struct({ total: Schema.Finite, currency: Schema.String })
 
 const modelLayer = (
   streamText: ModelParams["streamText"],
@@ -19,18 +19,17 @@ const program = Effect.gen(function* () {
     output: { schema: invoiceSchema },
   })
   yield* Console.log(`${result.value.total} ${result.value.currency}`)
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer(
-        () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." })),
-        () => Effect.succeed([{ type: "text", text: '{"total":42,"currency":"USD"}' }]),
-      ),
-      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  modelLayer(
+    () => Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Extracting invoice." })),
+    () => Effect.succeed([{ type: "text", text: '{"total":42,"currency":"USD"}' }]),
   ),
+  ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

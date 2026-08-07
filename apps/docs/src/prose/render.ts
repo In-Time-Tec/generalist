@@ -1,4 +1,5 @@
 import { Option } from "effect"
+import { dual } from "effect/Function"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -138,12 +139,18 @@ const renderNode = (node: Node, context: RenderContext): Html => {
   }
 }
 
-export const render = (title: string, description: string, nodes: ReadonlyArray<Node>, context: RenderContext): Html =>
-  h.div(
-    [],
-    [
-      h.h1([h.Id("overview"), h.Class("scroll-mt-20 text-3xl font-semibold tracking-tight md:text-4xl")], [title]),
-      h.p([h.Class("mt-4 max-w-3xl text-lg text-muted-foreground")], [description]),
-      ...nodes.map((node) => renderNode(node, context)),
-    ],
-  )
+export const render: {
+  (title: string, description: string, nodes: ReadonlyArray<Node>, context: RenderContext): Html
+  (description: string, nodes: ReadonlyArray<Node>, context: RenderContext): (title: string) => Html
+} = dual(
+  4,
+  (title: string, description: string, nodes: ReadonlyArray<Node>, context: RenderContext): Html =>
+    h.div(
+      [],
+      [
+        h.h1([h.Id("overview"), h.Class("scroll-mt-20 text-3xl font-semibold tracking-tight md:text-4xl")], [title]),
+        h.p([h.Class("mt-4 max-w-3xl text-lg text-muted-foreground")], [description]),
+        ...nodes.map((node) => renderNode(node, context)),
+      ],
+    ),
+)

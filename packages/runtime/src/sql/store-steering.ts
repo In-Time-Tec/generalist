@@ -1,12 +1,14 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { SqlClient } from "effect/unstable/sql"
-import { RunNotFound, RunTerminal, SteeringConflict } from "../errors.js"
+import { RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { AdmitSteeringInput, ExecutionClaim } from "../run-store.js"
 import { encodeContinuation, type ExecutionContinuation, type SteeringEntry } from "../steering.js"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { ExecutionResult } from "../execution-state.js"
 import { loadRun } from "./store-helpers.js"
+import { decodeJson, encodeJson } from "./codecs.js"
 
 interface SteeringRow {
   readonly entry_id: string
@@ -23,7 +25,7 @@ const decode = (row: SteeringRow): SteeringEntry => ({
   sequence: Number(row.sequence),
   idempotencyKey: row.idempotency_key,
   digest: row.digest,
-  prompt: Schema.decodeUnknownSync(Prompt.Prompt)(JSON.parse(row.prompt_json) as unknown),
+  prompt: decodeJson(Prompt.Prompt, row.prompt_json),
 })
 
 export const admitSteering = (input: AdmitSteeringInput) =>
@@ -53,7 +55,7 @@ export const admitSteering = (input: AdmitSteeringInput) =>
       FROM baton_run_steering WHERE run_id = ${input.runId}
     `
     const sequence = Number(rows[0]?.next_sequence ?? 0)
-    const encoded = JSON.stringify(Schema.encodeSync(Prompt.Prompt)(input.prompt))
+    const encoded = encodeJson(Prompt.Prompt, input.prompt)
     yield* sql`
       INSERT INTO baton_run_steering (
         entry_id, run_id, sequence, idempotency_key, digest, prompt_json, consumed_operation_id
@@ -77,7 +79,16 @@ const readPendingSteering = (runId: string) =>
 
 export const readSteering = (input: ExecutionClaim) => readPendingSteering(input.runId)
 
-export const saveCompletionContinuation = (runId: string, result: ExecutionResult) =>
+type ContinuationEffect = Effect.Effect<
+  ExecutionContinuation | undefined,
+  RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+
+export const saveCompletionContinuation: {
+  (runId: string, result: ExecutionResult): ContinuationEffect
+  (result: ExecutionResult): (runId: string) => ContinuationEffect
+} = Function.dual(2, (runId: string, result: ExecutionResult) =>
   Effect.gen(function* () {
     if (!("transcript" in result)) return undefined
     const run = yield* loadRun(runId)
@@ -96,9 +107,10 @@ export const saveCompletionContinuation = (runId: string, result: ExecutionResul
           }
     yield* sql`
       UPDATE baton_runs SET
-        transcript_json = ${JSON.stringify(result.transcript)},
+        transcript_json = ${encodeJson(Prompt.Prompt, result.transcript)},
         continuation_json = ${continuation === undefined ? null : encodeContinuation(continuation)}
       WHERE run_id = ${runId}
     `
     return continuation
-  })
+  }),
+)

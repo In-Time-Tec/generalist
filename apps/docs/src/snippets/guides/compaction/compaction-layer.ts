@@ -13,17 +13,21 @@ const compactionLayer = Compaction.layer({
   ]),
 })
 
-export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.LanguageModel> = Agent.generate(agent, {
-  prompt: "Continue the migration plan.",
-  compaction: { contextWindow: 128_000 },
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      ToolExecutor.layerTest({ execute: () => Effect.die("no tools in this example") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      compactionLayer,
-      ToolOutput.layerMemory,
+export const run: Effect.Effect<Agent.Result, Agent.RunError, LanguageModel.LanguageModel> = Effect.scoped(
+  Effect.flatMap(
+    Layer.build(
+      Layer.mergeAll(
+        ToolExecutor.layerTest({ execute: () => Effect.die("no tools in this example") }),
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        compactionLayer,
+        ToolOutput.layerMemory,
+      ),
     ),
+    (services) =>
+      Agent.generate(agent, {
+        prompt: "Continue the migration plan.",
+        compaction: { contextWindow: 128_000 },
+      }).pipe(Effect.provideContext(services)),
   ),
 )

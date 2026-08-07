@@ -1,4 +1,5 @@
 import type { DocsPage, PageGroup } from "../prose/page"
+import { dual } from "effect/Function"
 import { approvals } from "../pages/guides/approvals"
 import { compaction } from "../pages/guides/compaction"
 import { defineTools } from "../pages/guides/define-tools"
@@ -163,42 +164,48 @@ const excerptFor = (entry: IndexedPage, token: string): string => {
   return `${prefix}${entry.page.searchBody.slice(start, end).replace(/\n+/g, " ").trim()}${suffix}`
 }
 
-export const searchDocs = (query: string, limit = 8): ReadonlyArray<SearchResult> => {
-  const tokens = query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((token) => token.length > 0)
-  if (tokens.length === 0) {
-    return allPages.slice(0, limit).map((page) => ({
-      path: page.path,
-      title: page.title,
-      group: page.group,
-      excerpt: page.description,
-    }))
-  }
-  const scored = searchIndex.flatMap((entry) => {
-    let score = 0
-    for (const token of tokens) {
-      const inTitle = entry.titleLower.includes(token)
-      const inHeadings = entry.headingsLower.includes(token)
-      const inBody = entry.bodyLower.includes(token)
-      if (!inTitle && !inHeadings && !inBody) {
-        return []
-      }
-      score += (inTitle ? 8 : 0) + (inHeadings ? 4 : 0) + (inBody ? 1 : 0)
+export const searchDocs: {
+  (query: string, limit?: number): ReadonlyArray<SearchResult>
+  (limit?: number): (query: string) => ReadonlyArray<SearchResult>
+} = dual(
+  (args) => args.length > 0 && typeof args[0] === "string",
+  (query: string, limit: number = 8): ReadonlyArray<SearchResult> => {
+    const tokens = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((token) => token.length > 0)
+    if (tokens.length === 0) {
+      return allPages.slice(0, limit).map((page) => ({
+        path: page.path,
+        title: page.title,
+        group: page.group,
+        excerpt: page.description,
+      }))
     }
-    return [{ entry, score }]
-  })
-  return scored
-    .toSorted((left, right) => right.score - left.score)
-    .slice(0, limit)
-    .map(({ entry }) => ({
-      path: entry.page.path,
-      title: entry.page.title,
-      group: entry.page.group,
-      excerpt: excerptFor(entry, tokens[0] ?? ""),
-    }))
-}
+    const scored = searchIndex.flatMap((entry) => {
+      let score = 0
+      for (const token of tokens) {
+        const inTitle = entry.titleLower.includes(token)
+        const inHeadings = entry.headingsLower.includes(token)
+        const inBody = entry.bodyLower.includes(token)
+        if (!inTitle && !inHeadings && !inBody) {
+          return []
+        }
+        score += (inTitle ? 8 : 0) + (inHeadings ? 4 : 0) + (inBody ? 1 : 0)
+      }
+      return [{ entry, score }]
+    })
+    return scored
+      .toSorted((left, right) => right.score - left.score)
+      .slice(0, limit)
+      .map(({ entry }) => ({
+        path: entry.page.path,
+        title: entry.page.title,
+        group: entry.page.group,
+        excerpt: excerptFor(entry, tokens[0] ?? ""),
+      }))
+  },
+)
 
 const siteTagline =
   "Batonfx: an Effect-native TypeScript agent framework with plain-value agents, typed event streams, deterministic service seams, and an optional native durable Runtime."

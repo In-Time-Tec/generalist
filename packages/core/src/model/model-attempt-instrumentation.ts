@@ -161,20 +161,35 @@ const attemptFailed = (
   return Effect.void
 }
 
-export const settleFailure = (
-  context: CallContext,
-  disposition: FailureDisposition,
-): Effect.Effect<void, InvocationCoordinationFailed> =>
-  Effect.suspend(() => {
-    const pending = context.state.pendingFailure
-    if (pending === undefined) return Effect.void
-    context.state.pendingFailure = undefined
-    const { attempt, category, classification, usage } = pending
-    return Effect.gen(function* () {
-      const failedAt = yield* Clock.currentTimeMillis
-      if (context.options.coordinator !== undefined && context.logicalOperationId !== undefined) {
-        yield* context.options.coordinator.failAttempt({
-          logicalOperationId: context.logicalOperationId,
+export const settleFailure: {
+  (disposition: FailureDisposition): (context: CallContext) => Effect.Effect<void, InvocationCoordinationFailed>
+  (context: CallContext, disposition: FailureDisposition): Effect.Effect<void, InvocationCoordinationFailed>
+} = Function.dual(
+  2,
+  (context: CallContext, disposition: FailureDisposition): Effect.Effect<void, InvocationCoordinationFailed> =>
+    Effect.suspend(() => {
+      const pending = context.state.pendingFailure
+      if (pending === undefined) return Effect.void
+      context.state.pendingFailure = undefined
+      const { attempt, category, classification, usage } = pending
+      return Effect.gen(function* () {
+        const failedAt = yield* Clock.currentTimeMillis
+        if (context.options.coordinator !== undefined && context.logicalOperationId !== undefined) {
+          yield* context.options.coordinator.failAttempt({
+            logicalOperationId: context.logicalOperationId,
+            modelCallId: context.modelCallId,
+            modelAttemptId: attempt.modelAttemptId,
+            attempt: attempt.attempt,
+            failedAt,
+            category,
+            classification,
+            disposition,
+            ...identityFields(attempt.identity),
+          })
+        }
+        yield* context.options.emit({
+          _tag: "ModelAttemptFailed",
+          turn: context.options.turn,
           modelCallId: context.modelCallId,
           modelAttemptId: attempt.modelAttemptId,
           attempt: attempt.attempt,
@@ -183,23 +198,11 @@ export const settleFailure = (
           classification,
           disposition,
           ...identityFields(attempt.identity),
+          ...(usage === undefined ? {} : { providerUsage: usage }),
         })
-      }
-      yield* context.options.emit({
-        _tag: "ModelAttemptFailed",
-        turn: context.options.turn,
-        modelCallId: context.modelCallId,
-        modelAttemptId: attempt.modelAttemptId,
-        attempt: attempt.attempt,
-        failedAt,
-        category,
-        classification,
-        disposition,
-        ...identityFields(attempt.identity),
-        ...(usage === undefined ? {} : { providerUsage: usage }),
       })
-    })
-  })
+    }),
+)
 
 const attemptExit = (
   context: CallContext,
@@ -376,34 +379,36 @@ const attemptStream = <A extends Response.AnyPart, E, R>(
     ),
   )
 
-export const attemptModel = (
-  model: LanguageModel.Service,
-  context: CallContext,
-  identity?: CandidateIdentity,
-): LanguageModel.Service =>
-  adapt<
-    AiError.AiError | InvocationCoordinationFailed,
-    AiError.AiError | InvocationCoordinationFailed,
-    AiError.AiError | InvocationCoordinationFailed | TerminationFailure
-  >(model, {
-    generateText: (_options, invoke) =>
-      attemptEffect(
-        context,
-        "generateText",
-        () => invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-        identity,
-      ),
-    generateObject: (_options, invoke) =>
-      attemptEffect(
-        context,
-        "generateObject",
-        () => invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-        identity,
-      ),
-    streamText: (_options, invoke) =>
-      attemptStream(
-        context,
-        () => invoke().pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
-        identity,
-      ),
-  })
+export const attemptModel: {
+  (context: CallContext, identity?: CandidateIdentity): (model: LanguageModel.Service) => LanguageModel.Service
+  (model: LanguageModel.Service, context: CallContext, identity?: CandidateIdentity): LanguageModel.Service
+} = Function.dual(
+  (args) => args.length === 3 || !("modelCallId" in args[0]),
+  (model: LanguageModel.Service, context: CallContext, identity?: CandidateIdentity): LanguageModel.Service =>
+    adapt<
+      AiError.AiError | InvocationCoordinationFailed,
+      AiError.AiError | InvocationCoordinationFailed,
+      AiError.AiError | InvocationCoordinationFailed | TerminationFailure
+    >(model, {
+      generateText: (_options, invoke) =>
+        attemptEffect(
+          context,
+          "generateText",
+          () => invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+          identity,
+        ),
+      generateObject: (_options, invoke) =>
+        attemptEffect(
+          context,
+          "generateObject",
+          () => invoke().pipe(Effect.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+          identity,
+        ),
+      streamText: (_options, invoke) =>
+        attemptStream(
+          context,
+          () => invoke().pipe(Stream.provideService(ResponseIdTracker.ResponseIdTracker, disabledResponseIdTracker)),
+          identity,
+        ),
+    }),
+)

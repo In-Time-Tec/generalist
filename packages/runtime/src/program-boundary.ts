@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { Pins, ProgramCapabilities } from "@batonfx/core"
 
 const Operation = ProgramCapabilities.ProgramOperationName
@@ -40,26 +40,46 @@ export type ProgramBoundary =
   | "agent-input"
   | "agent-output"
 
-export const schemaFailure =
-  (
-    boundary: ProgramBoundary,
-    capability?: string,
-  ): ((error: Schema.SchemaError) => InstanceType<typeof ProgramCapabilities.ProgramSchemaFailure>) =>
-  (error) =>
-    ProgramCapabilities.ProgramSchemaFailure.make({
-      boundary,
-      ...(capability === undefined ? {} : { capability }),
-      message: String(error),
-    })
+type SchemaFailureMapper = (error: Schema.SchemaError) => InstanceType<typeof ProgramCapabilities.ProgramSchemaFailure>
 
-export const strictDecode =
-  <S extends Schema.Constraint>(schema: S, boundary: ProgramBoundary, capability?: string) =>
-  (
-    value: unknown,
-  ): Effect.Effect<S["Type"], InstanceType<typeof ProgramCapabilities.ProgramSchemaFailure>, S["DecodingServices"]> =>
-    Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value).pipe(
-      Effect.mapError(schemaFailure(boundary, capability)),
-    )
+const isBoundary = (value: unknown): value is ProgramBoundary =>
+  value === "program-output" ||
+  value === "tool-input" ||
+  value === "tool-output" ||
+  value === "step-input" ||
+  value === "step-output" ||
+  value === "agent-input" ||
+  value === "agent-output"
+
+export const schemaFailure: {
+  (boundary: ProgramBoundary, capability?: string): SchemaFailureMapper
+  (capability?: string): (boundary: ProgramBoundary) => SchemaFailureMapper
+} = Function.dual(
+  (args) => args.length >= 2 || isBoundary(args[0]),
+  (boundary: ProgramBoundary, capability?: string): SchemaFailureMapper =>
+    (error) =>
+      ProgramCapabilities.ProgramSchemaFailure.make({
+        boundary,
+        ...(capability === undefined ? {} : { capability }),
+        message: String(error),
+      }),
+)
+
+type StrictDecodeResult<S extends Schema.Constraint> = (
+  value: unknown,
+) => Effect.Effect<S["Type"], InstanceType<typeof ProgramCapabilities.ProgramSchemaFailure>, S["DecodingServices"]>
+
+export const strictDecode: {
+  <S extends Schema.Constraint>(schema: S, boundary: ProgramBoundary, capability?: string): StrictDecodeResult<S>
+  <S extends Schema.Constraint>(boundary: ProgramBoundary, capability?: string): (schema: S) => StrictDecodeResult<S>
+} = Function.dual(
+  (args) => args.length >= 3 || (args.length === 2 && isBoundary(args[1])),
+  <S extends Schema.Constraint>(schema: S, boundary: ProgramBoundary, capability?: string): StrictDecodeResult<S> =>
+    (value: unknown) =>
+      Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value).pipe(
+        Effect.mapError(schemaFailure(boundary, capability)),
+      ),
+)
 
 export const encodedBytes = (
   value: unknown,
@@ -68,20 +88,29 @@ export const encodedBytes = (
     Effect.mapError(schemaFailure("program-output", "program")),
     Effect.map((json) => new TextEncoder().encode(JSON.stringify(json)).byteLength),
   )
-export const digest = (
-  value: unknown,
-  boundary: "tool-input" | "step-input" | "agent-input" | "program-output",
-  capability?: string,
-): Effect.Effect<string, InstanceType<typeof ProgramCapabilities.ProgramSchemaFailure>> =>
-  Effect.try({
-    try: () => Pins.digest(value),
-    catch: (error) =>
-      ProgramCapabilities.ProgramSchemaFailure.make({
-        boundary,
-        ...(capability === undefined ? {} : { capability }),
-        message: String(error),
-      }),
-  })
+export const digest: {
+  (
+    boundary: "tool-input" | "step-input" | "agent-input" | "program-output",
+    capability?: string,
+  ): (value: unknown) => Effect.Effect<string, InstanceType<typeof ProgramCapabilities.ProgramSchemaFailure>>
+  (
+    value: unknown,
+    boundary: "tool-input" | "step-input" | "agent-input" | "program-output",
+    capability?: string,
+  ): Effect.Effect<string, InstanceType<typeof ProgramCapabilities.ProgramSchemaFailure>>
+} = Function.dual(
+  (args) => args.length >= 3 || (args.length === 2 && isBoundary(args[1])),
+  (value: unknown, boundary: "tool-input" | "step-input" | "agent-input" | "program-output", capability?: string) =>
+    Effect.try({
+      try: () => Pins.digest(value),
+      catch: (error) =>
+        ProgramCapabilities.ProgramSchemaFailure.make({
+          boundary,
+          ...(capability === undefined ? {} : { capability }),
+          message: String(error),
+        }),
+    }),
+)
 export const storeFailure = (error: unknown): ProgramCapabilities.CapabilityFailure =>
   Schema.is(ProgramCapabilities.CapabilityFailure)(error)
     ? error

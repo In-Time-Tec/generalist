@@ -98,7 +98,7 @@ export const make = (
           resolution: { _tag: "ToolResult", result, encodedResult: result },
         })
         return "done"
-      }).pipe(Effect.catch(() => Effect.succeed("retry" as const)))
+      }).pipe(Effect.orElseSucceed(() => "retry" as const))
 
     const processCandidate = (store: RunStoreInterface, runId: string) =>
       Effect.gen(function* () {

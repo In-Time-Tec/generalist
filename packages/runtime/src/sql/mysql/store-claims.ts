@@ -1,4 +1,4 @@
-import { Duration, Effect } from "effect"
+import { DateTime, Duration, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { isSqlError } from "effect/unstable/sql/SqlError"
@@ -9,10 +9,11 @@ import { appendEvent, loadRun } from "../store-helpers.js"
 import type { EventHub } from "../subscribers.js"
 import { StaleClaim } from "../errors.js"
 import { cancel, complete, fail } from "../store-control.js"
+import type { WithoutSqlError } from "../sql-effect.js"
 
-type RunFn = <A, E>(
-  effect: Effect.Effect<A, E, SqlClient.SqlClient>,
-) => Effect.Effect<A, Exclude<E, { readonly _tag: "SqlError" }> | RuntimeUnavailable>
+export type RunFn = <A, E>(
+  effect: Effect.Effect<A, E | SqlError, SqlClient.SqlClient>,
+) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
 
 /** @experimental MySQL reports lock contention as a retryable deadlock rather than a durable failure. */
 export const isDeadlock = (error: unknown): boolean => {
@@ -22,11 +23,11 @@ export const isDeadlock = (error: unknown): boolean => {
 }
 
 /** @experimental Pin every pooled connection to READ COMMITTED before the store serves traffic. */
-export const initializeReadCommitted = (sql: SqlClient.SqlClient, connections: number) =>
+export const initializeReadCommitted = (input: { readonly sql: SqlClient.SqlClient; readonly connections: number }) =>
   Effect.scoped(
     Effect.gen(function* () {
       const reserved = yield* Effect.all(
-        Array.from({ length: connections }, () => sql.reserve),
+        Array.from({ length: input.connections }, () => input.sql.reserve),
         { concurrency: "unbounded" },
       )
       yield* Effect.forEach(
@@ -104,7 +105,7 @@ export const makeMysqlClaims = (input: {
               run: fresh,
               workerId: claimInput.workerId,
               attemptFence: fresh.attemptFence,
-              leaseExpiresAt: new Date(fresh.leaseExpiresAt!),
+              leaseExpiresAt: DateTime.toDate(DateTime.makeUnsafe(fresh.leaseExpiresAt!)),
             })
           }
           return claimed

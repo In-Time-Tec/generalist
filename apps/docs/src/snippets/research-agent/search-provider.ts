@@ -12,7 +12,9 @@ export interface Interface {
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<SearchResult>>
 }
 
-export class Service extends Context.Service<Service, Interface>()("research-agent/SearchProvider") {}
+export class Service extends Context.Service<Service, Interface>()(
+  "@batonfx/docs/snippets/research-agent/search-provider/Service",
+) {}
 
 const cannedResults: ReadonlyArray<SearchResult> = [
   {

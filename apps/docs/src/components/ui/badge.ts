@@ -1,6 +1,7 @@
 import { type VariantProps, cva } from "class-variance-authority"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
@@ -33,10 +34,10 @@ export type BadgeConfig<ParentMessage> = SlotConfig<ParentMessage> &
     dataSlot?: string
   }>
 
-export const badge = <ParentMessage>(
-  config: BadgeConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const badge: {
+  <ParentMessage>(config: BadgeConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: BadgeConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: BadgeConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   const { dataSlot = "badge" } = config
   return h.span(
@@ -47,4 +48,4 @@ export const badge = <ParentMessage>(
     ],
     [...children],
   )
-}
+})

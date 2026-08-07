@@ -1,5 +1,5 @@
 import { Pins } from "@batonfx/core"
-import { Schema } from "effect"
+import { Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { ExecutableRef } from "./executable-manifest.js"
 import { RunId } from "./run.js"
@@ -102,10 +102,19 @@ export interface AdmitFanOutInput {
   readonly remainder: FanOutRemainder
 }
 
-export const fanOutIdFor = (parentRunId: string, idempotencyKey: string): string =>
-  `fanout_${Pins.digest([parentRunId, idempotencyKey]).slice(0, 48)}`
+export const fanOutIdFor: {
+  (idempotencyKey: string): (parentRunId: string) => string
+  (parentRunId: string, idempotencyKey: string): string
+} = Function.dual(
+  2,
+  (parentRunId: string, idempotencyKey: string): string =>
+    `fanout_${Pins.digest([parentRunId, idempotencyKey]).slice(0, 48)}`,
+)
 
-export const childRunIdFor = (fanOutId: string, ordinal: number): string => `${fanOutId}_${ordinal}`
+export const childRunIdFor: {
+  (ordinal: number): (fanOutId: string) => string
+  (fanOutId: string, ordinal: number): string
+} = Function.dual(2, (fanOutId: string, ordinal: number): string => `${fanOutId}_${ordinal}`)
 
 export const digestFanOut = (input: {
   readonly parentRunId: string

@@ -1,4 +1,4 @@
-import { Effect, Equal, Schema, Stream } from "effect"
+import { Effect, Equal, Option, Random, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import {
@@ -22,16 +22,16 @@ import { makeEventHub } from "../subscribers.js"
 import { check as checkSchema } from "./run-schema.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
 import { makePostgresClaims } from "./store-claims.js"
-import { postgresOperations } from "./store-ops.js"
+import { postgresOperations, type RunFn } from "./store-ops.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "../store-execution.js"
 import { decodeRunEffect, hasAdmission, loadRunWait } from "../store-helpers.js"
-import type { WaitResolution } from "../../run-wait.js"
+import { WaitResolution } from "../../run-wait.js"
 import { fanOutStoreMethods } from "./store-fan-out.js"
 import { deferCancelledFanOutParent, makeCancelRun } from "./store-cancel.js"
 import { loadTreeHistory } from "../tree-history.js"
 import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
 import { withConsistentSnapshot } from "../inspection-transaction.js"
-import { decodePinnedEffect, decodeStoredPinnedEffect } from "../codecs.js"
+import { StringArray, decodePinnedEffect, decodeStoredPinnedEffect, encodeJson } from "../codecs.js"
 import { suspend } from "./store-suspend.js"
 import {
   afterTerminal,
@@ -54,24 +54,27 @@ import { associateRegistrations, loadRegistrations } from "../executable-registr
 import { narrow } from "../../executable-registration.js"
 import { PendingRunOutcome } from "../../run-store.js"
 import { approvalResponse } from "../respond-approval.js"
-const nextId = (prefix: string) => Effect.sync(() => `${prefix}_${Math.random().toString(36).slice(2)}`)
+const nextId = (prefix: string): Effect.Effect<string> =>
+  Effect.gen(function* () {
+    const random = yield* Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER)
+    return `${prefix}_${random.toString(36)}`
+  })
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     yield* checkSchema(source)
-    const hub = yield* makeEventHub()
+    const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
     const transactionHub: typeof hub = { ...hub, publish: () => Effect.void }
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
     const pg = yield* PgClient.PgClient
-    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient | PgClient.PgClient>) =>
+    const run: RunFn = (effect) =>
       withSql(sql, sql.withTransaction(effect.pipe(Effect.provideService(PgClient.PgClient, pg))))
-    const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient | PgClient.PgClient>) =>
-      withSql(sql, effect.pipe(Effect.provideService(PgClient.PgClient, pg)))
-    const runInspection = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      withSql(sql, withConsistentSnapshot(sql, "postgres", effect))
+    const runNoTxn: RunFn = (effect) => withSql(sql, effect.pipe(Effect.provideService(PgClient.PgClient, pg)))
+    const runInspection: RunFn = (effect) =>
+      withSql(sql, withConsistentSnapshot(sql, "postgres", effect.pipe(Effect.provideService(PgClient.PgClient, pg))))
     const cancelRun = makeCancelRun({ sql, hub: transactionHub })
     const operations = postgresOperations({
       sql,
@@ -84,7 +87,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
     })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "postgres", multiWorker: true }),
-      sessionStore: () => Effect.succeed(undefined),
+      sessionStore: () => Effect.succeed(Option.none()),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => run(admitSend(transactionHub, addressBindings, nextId, input)),
       admitStart: (input) =>
@@ -226,7 +229,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             const responded = [...loaded.respondedWaitIds, input.waitId]
             const resolution: WaitResolution = input.resolution
             const closed = yield* sql<{ wait_id: string }>`
-              UPDATE baton_run_waits SET status = 'responded', response_json = ${JSON.stringify(resolution)}, closed_at = NOW()
+              UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'open'
               RETURNING wait_id
             `
@@ -237,7 +240,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             }
             yield* sql`
               UPDATE baton_runs
-              SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = NOW()
+              SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = NOW()
               WHERE run_id = ${loaded.runId}
             `
             yield* sql`
@@ -258,7 +261,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             const responded = [...loaded.respondedWaitIds, response.waitId]
             const resolution: WaitResolution = input.decision
             const closed = yield* sql<{ wait_id: string }>`
-              UPDATE baton_run_waits SET status = 'responded', response_json = ${JSON.stringify(resolution)}, closed_at = NOW()
+              UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
               WHERE run_id = ${loaded.runId} AND wait_id = ${response.waitId} AND status = 'open'
               RETURNING wait_id
             `
@@ -267,7 +270,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             }
             yield* sql`
               UPDATE baton_runs
-              SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = NOW()
+              SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = NOW()
               WHERE run_id = ${loaded.runId}
             `
             yield* sql`
@@ -294,7 +297,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               ...(input.payload === undefined ? {} : { payload: input.payload }),
             }
             yield* sql`
-              UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = NOW()
+              UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
               WHERE run_id = ${loaded.runId} AND wait_id = ${loaded.activeWaitId} AND status = 'open'
             `
             yield* appendEvent(hub, loaded, { _tag: "RunResumed", waitId: loaded.activeWaitId, resolution }, "running")
@@ -414,7 +417,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             if (runningFanOut.length > 0) {
               yield* sql`
                 UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
-                  pending_outcome_json = ${JSON.stringify(Schema.encodeSync(PendingRunOutcome)({ _tag: "Failed", error: input.error }))}
+                  pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Failed", error: input.error })}
                 WHERE run_id = ${loaded.runId}
               `
               return
@@ -453,7 +456,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             const responded = [...loaded.respondedWaitIds, input.waitId]
             const resolution: WaitResolution = input.resolution
             const closed = yield* sql<{ wait_id: string }>`
-              UPDATE baton_run_waits SET status = 'responded', response_json = ${JSON.stringify(resolution)}, closed_at = NOW()
+              UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'open'
               RETURNING wait_id
             `
@@ -464,7 +467,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             }
             yield* sql`
               UPDATE baton_runs
-              SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = NOW()
+              SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = NOW()
               WHERE run_id = ${loaded.runId}
             `
             yield* sql`

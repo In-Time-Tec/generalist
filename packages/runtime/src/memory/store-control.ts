@@ -1,5 +1,5 @@
 /* oxlint-disable no-accumulating-spread */
-import { DateTime, Effect, Equal, Option } from "effect"
+import { DateTime, Effect, Equal, Function, Option } from "effect"
 import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { CancelInput, RespondInput, SignalInput } from "../runtime.js"
@@ -26,6 +26,22 @@ import type { MemoryState, StoredRun } from "./state.js"
 import { reconcileFanOut } from "./store-fan-out.js"
 import { ProgramCapabilities } from "@batonfx/core"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
+
+type RespondResult = Effect.Effect<
+  MemoryState,
+  RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable
+>
+type SignalResult = Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable>
+type CancelResult = Effect.Effect<MemoryState, RunNotFound | RuntimeUnavailable>
+type SuspendInput = import("../run-store.js").ExecutionClaim & {
+  readonly wait: RunWait
+  readonly suspension: import("../execution-state.js").ExecutionSuspension
+  readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
+  readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
+  readonly continuation?: import("../steering.js").ExecutionContinuation | null
+}
+type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }
+type ResumeResult = Effect.Effect<MemoryState, RunNotFound | WaitNotOpen | RunTerminal | RuntimeUnavailable>
 
 const getRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -126,10 +142,10 @@ const settlePendingOutcome = (state: MemoryState, run: StoredRun): Effect.Effect
     return yield* afterTerminal(next, settled)
   })
 
-export const respond = (
-  state: MemoryState,
-  input: RespondInput,
-): Effect.Effect<MemoryState, RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable> =>
+export const respond: {
+  (input: RespondInput): (state: MemoryState) => RespondResult
+  (state: MemoryState, input: RespondInput): RespondResult
+} = Function.dual(2, (state: MemoryState, input: RespondInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
@@ -168,12 +184,13 @@ export const respond = (
       "running",
     )
     return resumed
-  })
+  }),
+)
 
-export const signal = (
-  state: MemoryState,
-  input: SignalInput,
-): Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable> =>
+export const signal: {
+  (input: SignalInput): (state: MemoryState) => SignalResult
+  (state: MemoryState, input: SignalInput): SignalResult
+} = Function.dual(2, (state: MemoryState, input: SignalInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
@@ -199,12 +216,13 @@ export const signal = (
       "running",
     )
     return resumed
-  })
+  }),
+)
 
-export const cancel = (
-  state: MemoryState,
-  input: CancelInput,
-): Effect.Effect<MemoryState, RunNotFound | RuntimeUnavailable> =>
+export const cancel: {
+  (input: CancelInput): (state: MemoryState) => CancelResult
+  (state: MemoryState, input: CancelInput): CancelResult
+} = Function.dual(2, (state: MemoryState, input: CancelInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     if (isTerminal(run.status)) return state
@@ -268,12 +286,13 @@ export const cancel = (
       next = yield* afterTerminal(next, settled)
     }
     return next
-  })
+  }),
+)
 
-export const complete = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly result: ExecutionResult },
-): Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable> =>
+export const complete: {
+  (input: { readonly runId: string; readonly result: ExecutionResult }): (state: MemoryState) => SignalResult
+  (state: MemoryState, input: { readonly runId: string; readonly result: ExecutionResult }): SignalResult
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly result: ExecutionResult }) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
@@ -319,12 +338,13 @@ export const complete = (
       next = yield* afterTerminal(next, settled)
     }
     return next
-  })
+  }),
+)
 
-export const fail = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly error: RunFailure },
-): Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable> =>
+export const fail: {
+  (input: { readonly runId: string; readonly error: RunFailure }): (state: MemoryState) => SignalResult
+  (state: MemoryState, input: { readonly runId: string; readonly error: RunFailure }): SignalResult
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly error: RunFailure }) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
@@ -366,18 +386,13 @@ export const fail = (
       next = yield* afterTerminal(next, settled)
     }
     return next
-  })
+  }),
+)
 
-export const suspend = (
-  state: MemoryState,
-  input: import("../run-store.js").ExecutionClaim & {
-    readonly wait: RunWait
-    readonly suspension: import("../execution-state.js").ExecutionSuspension
-    readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
-    readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
-    readonly continuation?: import("../steering.js").ExecutionContinuation | null
-  },
-): Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable> =>
+export const suspend: {
+  (input: SuspendInput): (state: MemoryState) => SignalResult
+  (state: MemoryState, input: SuspendInput): SignalResult
+} = Function.dual(2, (state: MemoryState, input: SuspendInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
@@ -426,12 +441,13 @@ export const suspend = (
       "running",
     )
     return resumed
-  })
+  }),
+)
 
-export const resume = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution },
-): Effect.Effect<MemoryState, RunNotFound | WaitNotOpen | RunTerminal | RuntimeUnavailable> =>
+export const resume: {
+  (input: ResumeInput): (state: MemoryState) => ResumeResult
+  (state: MemoryState, input: ResumeInput): ResumeResult
+} = Function.dual(2, (state: MemoryState, input: ResumeInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
@@ -455,12 +471,13 @@ export const resume = (
       "running",
     )
     return next
-  })
+  }),
+)
 
-export const emitAgentEvent = (
-  state: MemoryState,
-  input: { readonly runId: string; readonly event: AgentLoopEvent },
-): Effect.Effect<MemoryState, RunNotFound | RunTerminal | RuntimeUnavailable> =>
+export const emitAgentEvent: {
+  (input: { readonly runId: string; readonly event: AgentLoopEvent }): (state: MemoryState) => SignalResult
+  (state: MemoryState, input: { readonly runId: string; readonly event: AgentLoopEvent }): SignalResult
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly event: AgentLoopEvent }) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
@@ -471,4 +488,5 @@ export const emitAgentEvent = (
     const { continuation: _, ...withoutContinuation } = next.runs.get(run.runId)!
     runs.set(run.runId, { ...withoutContinuation, transcript: input.event.transcript })
     return { ...next, runs }
-  })
+  }),
+)

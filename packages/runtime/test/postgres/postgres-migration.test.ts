@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, layer } from "@effect/vitest"
 import { Effect, Redacted } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
@@ -48,26 +48,32 @@ const inspectSchema = Effect.gen(function* () {
 })
 
 describePostgres("postgres schema baseline", () => {
-  it.live("creates the current v1 baseline and applies idempotently", () =>
-    Effect.gen(function* () {
-      yield* resetSchema
-      yield* RunSchema.apply("postgres-migration-test")
-      yield* RunSchema.apply("postgres-migration-test")
-      yield* inspectSchema
-    }).pipe(Effect.provide(client), Effect.scoped),
-  )
+  layer(client, { excludeTestServices: true })("creates the current v1 baseline and applies idempotently", (suite) => {
+    suite.effect("creates the current v1 baseline and applies idempotently", () =>
+      Effect.gen(function* () {
+        yield* resetSchema
+        yield* RunSchema.apply("postgres-migration-test")
+        yield* RunSchema.apply("postgres-migration-test")
+        yield* inspectSchema
+      }),
+    )
+  })
 
-  it.live.each([
+  for (const [label, update, expected] of [
     ["dirty", "UPDATE baton_schema_meta SET dirty = TRUE WHERE id = 1", SchemaDirty],
     ["checksum", "UPDATE baton_schema_meta SET checksum = 'wrong' WHERE id = 1", SchemaChecksumMismatch],
     ["future", `UPDATE baton_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`, SchemaVersionUnsupported],
-  ] as const)("rejects a %s schema", ([, update, expected]) =>
-    Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient
-      yield* resetSchema
-      yield* RunSchema.apply("postgres-migration-test")
-      yield* sql.unsafe(update)
-      expect(yield* RunSchema.apply("postgres-migration-test").pipe(Effect.flip)).toBeInstanceOf(expected)
-    }).pipe(Effect.ensuring(resetSchema.pipe(Effect.orDie)), Effect.provide(client), Effect.scoped),
-  )
+  ] as const) {
+    layer(client, { excludeTestServices: true })(`rejects a ${label} schema`, (suite) => {
+      suite.effect(`rejects a ${label} schema`, () =>
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* resetSchema
+          yield* RunSchema.apply("postgres-migration-test")
+          yield* sql.unsafe(update)
+          expect(yield* RunSchema.apply("postgres-migration-test").pipe(Effect.flip)).toBeInstanceOf(expected)
+        }).pipe(Effect.ensuring(resetSchema.pipe(Effect.orDie))),
+      )
+    })
+  }
 })

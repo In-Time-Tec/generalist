@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema, Scope } from "effect"
+import { Context, Effect, Function, Layer, Schema, Scope } from "effect"
 import { CapabilityFailure, type ProgramCapabilities } from "./program-capabilities.js"
 
 /** @experimental */
@@ -67,9 +67,21 @@ export const testIdentity: Identity = Object.freeze({
 })
 
 /** @experimental Trusted fixture executor for tests only. */
-export const makeTest = (execute: Interface["execute"], identity: Identity = testIdentity): Interface =>
-  SandboxExecutor.of({ identity: Object.freeze({ ...identity }), execute })
+export const makeTest: {
+  (identity?: Identity): (execute: Interface["execute"]) => Interface
+  (execute: Interface["execute"], identity?: Identity): Interface
+} = Function.dual(
+  (args) => args.length > 1 || typeof args[0] === "function",
+  (execute: Interface["execute"], identity: Identity = testIdentity): Interface =>
+    SandboxExecutor.of({ identity: Object.freeze({ ...identity }), execute }),
+)
 
 /** @experimental Trusted fixture Layer for tests only. It provides no source isolation. */
-export const layerTest = (execute: Interface["execute"], identity?: Identity): Layer.Layer<SandboxExecutor> =>
-  Layer.succeed(SandboxExecutor, makeTest(execute, identity))
+export const layerTest: {
+  (identity?: Identity): (execute: Interface["execute"]) => Layer.Layer<SandboxExecutor>
+  (execute: Interface["execute"], identity?: Identity): Layer.Layer<SandboxExecutor>
+} = Function.dual(
+  (args) => args.length > 1 || typeof args[0] === "function",
+  (execute: Interface["execute"], identity?: Identity): Layer.Layer<SandboxExecutor> =>
+    Layer.succeed(SandboxExecutor, makeTest(execute, identity)),
+)

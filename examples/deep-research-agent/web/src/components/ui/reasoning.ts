@@ -1,3 +1,4 @@
+import { Function } from "effect"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -72,10 +73,10 @@ export type ReasoningConfig<ParentMessage> = SlotConfig<ParentMessage> &
  * duration timing are consumer concerns here (gap): track the elapsed
  * seconds in the Model and pass them as `durationSeconds`.
  */
-export const reasoning = <ParentMessage>(
-  config: ReasoningConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const reasoning: {
+  <ParentMessage>(config: ReasoningConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: ReasoningConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: ReasoningConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -86,7 +87,7 @@ export const reasoning = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 export type ReasoningTriggerConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -113,51 +114,57 @@ const thinkingMessage = <ParentMessage>(isStreaming: boolean, durationSeconds: n
  * utility; afterwards it reads "Thought for N seconds" from
  * `durationSeconds`. Children replace the default row.
  */
-export const reasoningTrigger = <ParentMessage>(
-  config: ReasoningTriggerConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string> = [],
-): Html => {
-  const h = html<ParentMessage>()
-  const defaultChildren: ReadonlyArray<Html> = [
-    brainIcon<ParentMessage>(),
-    thinkingMessage<ParentMessage>(config.isStreaming ?? false, config.durationSeconds),
-    chevronDownIcon<ParentMessage>(config.isOpen),
-  ]
-  return h.button(
-    [
-      h.Type("button"),
-      h.OnClick(config.onToggled),
-      h.AriaExpanded(config.isOpen),
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "reasoning-trigger"),
-      h.DataAttribute("state", config.isOpen ? "open" : "closed"),
-      h.Class(
-        cn(
-          "flex w-full items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground",
-          config.class,
+export const reasoningTrigger: {
+  <ParentMessage>(config: ReasoningTriggerConfig<ParentMessage>, children?: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children?: ReadonlyArray<Html | string>): (config: ReasoningTriggerConfig<ParentMessage>) => Html
+} = Function.dual(
+  (args) => args.length > 0 && !Array.isArray(args[0]),
+  <ParentMessage>(config: ReasoningTriggerConfig<ParentMessage>, children: ReadonlyArray<Html | string> = []): Html => {
+    const h = html<ParentMessage>()
+    const defaultChildren: ReadonlyArray<Html> = [
+      brainIcon<ParentMessage>(),
+      thinkingMessage<ParentMessage>(config.isStreaming ?? false, config.durationSeconds),
+      chevronDownIcon<ParentMessage>(config.isOpen),
+    ]
+    return h.button(
+      [
+        h.Type("button"),
+        h.OnClick(config.onToggled),
+        h.AriaExpanded(config.isOpen),
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "reasoning-trigger"),
+        h.DataAttribute("state", config.isOpen ? "open" : "closed"),
+        h.Class(
+          cn(
+            "flex w-full items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground",
+            config.class,
+          ),
         ),
-      ),
-    ],
-    children.length > 0 ? [...children] : defaultChildren,
-  )
-}
+      ],
+      children.length > 0 ? [...children] : defaultChildren,
+    )
+  },
+)
 
 /**
  * Reasoning body. Render it conditionally on the consumer's `isOpen` state.
  * AI Elements renders markdown through Streamdown here; FoldKit has no
  * markdown renderer (gap), so pass already-rendered children or plain text.
  */
-export const reasoningContent = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  return h.div(
-    [
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "reasoning-content"),
-      h.Class(cn("mt-4 text-sm text-muted-foreground outline-none", config.class)),
-    ],
-    [...children],
-  )
-}
+export const reasoningContent: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(
+  2,
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    return h.div(
+      [
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "reasoning-content"),
+        h.Class(cn("mt-4 text-sm text-muted-foreground outline-none", config.class)),
+      ],
+      [...children],
+    )
+  },
+)

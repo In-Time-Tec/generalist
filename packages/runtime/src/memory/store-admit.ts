@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Function, Schema } from "effect"
 import {
   IdempotencyConflict,
   RunIdConflict,
@@ -35,107 +35,107 @@ const newRunId = (state: MemoryState): readonly [string, MemoryState] => {
   return [runId, { ...state, nextRunCounter: state.nextRunCounter + 1 }]
 }
 
-export const admitSend = (
-  state: MemoryState,
-  input: AdmitSendInput,
-  digestOverride?: string,
-  promote = true,
-): Effect.Effect<
+type AdmitSendResult = Effect.Effect<
   readonly [RunReceipt, MemoryState],
   IdempotencyConflict | RunIdConflict | ExecutableRegistrationConflict | RuntimeUnavailable
-> =>
-  Effect.gen(function* () {
-    if (state.closed) {
-      return yield* RuntimeUnavailable.make({ message: "runtime store released" })
-    }
-    const digest = digestOverride ?? messageDigest(input.message)
-    const executable = yield* Effect.try({
-      try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    const key = idempotencyKey(input.message.to, input.message.sessionId, input.message.idempotencyKey)
-    const existing = state.idempotency.get(key)
-    if (existing !== undefined) {
-      if (input.runId !== undefined && input.runId !== existing.receipt.runId) {
-        return yield* RunIdConflict.make({ runId: input.runId, existingRunId: existing.receipt.runId })
-      }
-      if (existing.digest !== digest || !equals(existing.executable, executable)) {
-        return yield* IdempotencyConflict.make({
-          address: input.message.to,
-          sessionId: input.message.sessionId,
-          idempotencyKey: input.message.idempotencyKey,
-          existingRunId: existing.receipt.runId,
-        })
-      }
-      return [{ ...existing.receipt, duplicate: true }, state] as const
-    }
+>
 
-    const requestedRun = input.runId === undefined ? undefined : state.runs.get(input.runId)
-    if (requestedRun !== undefined) {
-      return yield* RunIdConflict.make({ runId: input.runId!, existingRunId: requestedRun.runId })
-    }
-    const registrationCatalog = new Map(state.registrationCatalog)
-    for (const registration of input.registrations) {
-      const registrationValueDigest = registrationDigest(registration)
-      const existingRegistration = registrationCatalog.get(registration.pin)
-      if (existingRegistration !== undefined && existingRegistration.digest !== registrationValueDigest) {
-        return yield* ExecutableRegistrationConflict.make({ pin: registration.pin })
+export const admitSend: {
+  (input: AdmitSendInput, digestOverride?: string, promote?: boolean): (state: MemoryState) => AdmitSendResult
+  (state: MemoryState, input: AdmitSendInput, digestOverride?: string, promote?: boolean): AdmitSendResult
+} = Function.dual(
+  (args) => typeof args[0] === "object" && args[0] !== null && "closed" in args[0] && "runs" in args[0],
+  (state: MemoryState, input: AdmitSendInput, digestOverride?: string, promote: boolean = true) =>
+    Effect.gen(function* () {
+      if (state.closed) {
+        return yield* RuntimeUnavailable.make({ message: "runtime store released" })
       }
-      registrationCatalog.set(registration.pin, { digest: registrationValueDigest, value: registration })
-    }
-    const [generatedRunId, withId] = input.runId === undefined ? newRunId(state) : ([input.runId, state] as const)
-    const runId = generatedRunId
-    const run: StoredRun = {
-      runId,
-      status: "queued",
-      executableRef: input.executableRef,
-      executableManifest: input.executableManifest,
-      address: input.message.to,
-      message: input.message,
-      rootRunId: runId,
-      respondedWaitIds: new Set(),
-      lastSequence: -1,
-      attempt: 0,
-      attemptFence: 0,
-      cancellationRequested: false,
-      children: [],
-      events: [],
-      subscribers: new Map(),
-      steering: [],
-      registrations: input.registrations,
-    }
-    const runs = new Map(withId.runs)
-    runs.set(runId, run)
-    const treeRoots = new Map(withId.treeRoots)
-    treeRoots.set(runId, { earliestPosition: 0, lastPosition: -1, events: [], subscribers: new Map() })
-    let next: MemoryState = { ...withId, runs, treeRoots }
-    const enqueued = enqueueLane(next, input.message.to, input.message.sessionId, runId)
-    next = enqueued.state
-    const [, acceptedState] = yield* appendLifecycle(
-      next,
-      runId,
-      makeAccepted(input.message.to, input.message.id),
-      "queued",
-    )
-    next = acceptedState
-    if (enqueued.isHead && promote) {
-      next = yield* promoteHead(next, input.message.to, input.message.sessionId)
-    }
-    const receipt: RunReceipt = {
-      runId,
-      messageId: input.message.id,
-      acceptedSequence: enqueued.acceptedSequence,
-      duplicate: false,
-    }
-    const idempotency = new Map(next.idempotency)
-    idempotency.set(key, { digest, executable, receipt })
-    return [receipt, { ...next, idempotency, registrationCatalog }] as const
-  })
+      const digest = digestOverride ?? messageDigest(input.message)
+      const executable = yield* Effect.try({
+        try: () => decodePinned({ ref: input.executableRef, manifest: input.executableManifest }),
+        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+      })
+      const key = idempotencyKey(input.message.to, input.message.sessionId, input.message.idempotencyKey)
+      const existing = state.idempotency.get(key)
+      if (existing !== undefined) {
+        if (input.runId !== undefined && input.runId !== existing.receipt.runId) {
+          return yield* RunIdConflict.make({ runId: input.runId, existingRunId: existing.receipt.runId })
+        }
+        if (existing.digest !== digest || !equals(existing.executable, executable)) {
+          return yield* IdempotencyConflict.make({
+            address: input.message.to,
+            sessionId: input.message.sessionId,
+            idempotencyKey: input.message.idempotencyKey,
+            existingRunId: existing.receipt.runId,
+          })
+        }
+        return [{ ...existing.receipt, duplicate: true }, state] as const
+      }
 
-export const admitStart = (
-  state: MemoryState,
-  input: AdmitStartInput,
-): Effect.Effect<
+      const requestedRun = input.runId === undefined ? undefined : state.runs.get(input.runId)
+      if (requestedRun !== undefined) {
+        return yield* RunIdConflict.make({ runId: input.runId!, existingRunId: requestedRun.runId })
+      }
+      const registrationCatalog = new Map(state.registrationCatalog)
+      for (const registration of input.registrations) {
+        const registrationValueDigest = registrationDigest(registration)
+        const existingRegistration = registrationCatalog.get(registration.pin)
+        if (existingRegistration !== undefined && existingRegistration.digest !== registrationValueDigest) {
+          return yield* ExecutableRegistrationConflict.make({ pin: registration.pin })
+        }
+        registrationCatalog.set(registration.pin, { digest: registrationValueDigest, value: registration })
+      }
+      const [generatedRunId, withId] = input.runId === undefined ? newRunId(state) : ([input.runId, state] as const)
+      const runId = generatedRunId
+      const run: StoredRun = {
+        runId,
+        status: "queued",
+        executableRef: input.executableRef,
+        executableManifest: input.executableManifest,
+        address: input.message.to,
+        message: input.message,
+        rootRunId: runId,
+        respondedWaitIds: new Set(),
+        lastSequence: -1,
+        attempt: 0,
+        attemptFence: 0,
+        cancellationRequested: false,
+        children: [],
+        events: [],
+        subscribers: new Map(),
+        steering: [],
+        registrations: input.registrations,
+      }
+      const runs = new Map(withId.runs)
+      runs.set(runId, run)
+      const treeRoots = new Map(withId.treeRoots)
+      treeRoots.set(runId, { earliestPosition: 0, lastPosition: -1, events: [], subscribers: new Map() })
+      let next: MemoryState = { ...withId, runs, treeRoots }
+      const enqueued = enqueueLane(next, input.message.to, input.message.sessionId, runId)
+      next = enqueued.state
+      const [, acceptedState] = yield* appendLifecycle(
+        next,
+        runId,
+        makeAccepted(input.message.to, input.message.id),
+        "queued",
+      )
+      next = acceptedState
+      if (enqueued.isHead && promote) {
+        next = yield* promoteHead(next, input.message.to, input.message.sessionId)
+      }
+      const receipt: RunReceipt = {
+        runId,
+        messageId: input.message.id,
+        acceptedSequence: enqueued.acceptedSequence,
+        duplicate: false,
+      }
+      const idempotency = new Map(next.idempotency)
+      idempotency.set(key, { digest, executable, receipt })
+      return [receipt, { ...next, idempotency, registrationCatalog }] as const
+    }),
+)
+
+type AdmitStartResult = Effect.Effect<
   readonly [StartReceipt, MemoryState],
   | IdempotencyConflict
   | RunIdConflict
@@ -146,7 +146,12 @@ export const admitStart = (
   | FanOutInvalid
   | FanOutRemainderUnsupported
   | RuntimeUnavailable
-> =>
+>
+
+export const admitStart: {
+  (input: AdmitStartInput): (state: MemoryState) => AdmitStartResult
+  (state: MemoryState, input: AdmitStartInput): AdmitStartResult
+} = Function.dual(2, (state: MemoryState, input: AdmitStartInput) =>
   Effect.gen(function* () {
     if (input.initialChildren.length > 64) {
       return yield* StartInvalid.make({ message: "initialChildren cannot contain more than 64 requests" })
@@ -252,7 +257,7 @@ export const admitStart = (
         message,
       }).pipe(
         Effect.mapError((error) =>
-          error instanceof RunNotFound || error instanceof RunTerminal
+          Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
             ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial child admission" })
             : error,
         ),
@@ -274,12 +279,12 @@ export const admitStart = (
           childRunId: childRunIdFor(fanOutId, ordinal),
           selection: member.selection,
           prompt: member.prompt,
-          sessionId: member.sessionId ?? fanOutMemberSessionId(fanOutId, member.key),
+          sessionId: member.sessionId ?? fanOutMemberSessionId({ fanOutId, key: member.key }),
           metadata: member.metadata ?? {},
         })),
       }).pipe(
         Effect.mapError((error) =>
-          error instanceof RunNotFound || error instanceof RunTerminal
+          Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
             ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial fan-out admission" })
             : error,
         ),
@@ -288,110 +293,128 @@ export const admitStart = (
       next = fanOutState
     }
     return [{ ...receipt, childRunIds, fanOuts }, next] as const
-  })
+  }),
+)
 
-export const admitSpawn = (
-  state: MemoryState,
-  input: SpawnInput & { readonly message: Message; readonly parentRunId: string },
-): Effect.Effect<
+type AdmitSpawnResult = Effect.Effect<
   readonly [RunReceipt, MemoryState],
   RunNotFound | RunTerminal | ChildSelectionMissing | IdempotencyConflict | RuntimeUnavailable
-> =>
-  Effect.gen(function* () {
-    if (state.closed) {
-      return yield* RuntimeUnavailable.make({ message: "runtime store released" })
-    }
-    const parent = state.runs.get(input.parentRunId)
-    if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
-    if (parent.status === "succeeded" || parent.status === "failed" || parent.status === "cancelled") {
-      return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
-    }
-    const executableRef = resolveChild(parent.executableRef, parent.executableManifest, input.selection)
-    if (executableRef === undefined) {
-      return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: input.selection })
-    }
+>
 
-    const sessionId = input.message.sessionId
-    const digest = childDigest(input.message, executableRef)
-    const executable = yield* Effect.try({
-      try: () => decodePinned({ ref: executableRef, manifest: parent.executableManifest }),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    const registrations = yield* narrow(executable, parent.registrations).pipe(
-      Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
-    )
-    const key = idempotencyKey(input.message.to, sessionId, input.message.idempotencyKey)
-    const existing = state.idempotency.get(key)
-    if (existing !== undefined) {
-      if (existing.digest !== digest || !equals(existing.executable, executable)) {
-        return yield* IdempotencyConflict.make({
-          address: input.message.to,
-          sessionId,
-          idempotencyKey: input.message.idempotencyKey,
-          existingRunId: existing.receipt.runId,
-        })
+export const admitSpawn: {
+  (
+    input: SpawnInput & { readonly message: Message; readonly parentRunId: string },
+  ): (state: MemoryState) => AdmitSpawnResult
+  (
+    state: MemoryState,
+    input: SpawnInput & { readonly message: Message; readonly parentRunId: string },
+  ): AdmitSpawnResult
+} = Function.dual(
+  2,
+  (state: MemoryState, input: SpawnInput & { readonly message: Message; readonly parentRunId: string }) =>
+    Effect.gen(function* () {
+      if (state.closed) {
+        return yield* RuntimeUnavailable.make({ message: "runtime store released" })
       }
-      return [{ ...existing.receipt, duplicate: true }, state] as const
-    }
+      const parent = state.runs.get(input.parentRunId)
+      if (parent === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
+      if (parent.status === "succeeded" || parent.status === "failed" || parent.status === "cancelled") {
+        return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
+      }
+      const executableRef = resolveChild(parent.executableRef, parent.executableManifest, input.selection)
+      if (executableRef === undefined) {
+        return yield* ChildSelectionMissing.make({ parentRunId: parent.runId, selection: input.selection })
+      }
 
-    const [runId, withId] = newRunId(state)
-    const child: StoredRun = {
-      runId,
-      status: "queued",
-      executableRef,
-      executableManifest: parent.executableManifest,
-      address: input.message.to,
-      message: input.message,
-      rootRunId: parent.rootRunId,
-      parentRunId: parent.runId,
-      invocationId: input.invocationId,
-      respondedWaitIds: new Set(),
-      lastSequence: -1,
-      attempt: 0,
-      attemptFence: 0,
-      cancellationRequested: false,
-      children: [],
-      events: [],
-      subscribers: new Map(),
-      steering: [],
-      registrations,
-    }
-    const runs = new Map(withId.runs)
-    const parentUpdated: StoredRun = { ...parent, children: [...parent.children, runId] }
-    runs.set(parent.runId, parentUpdated)
-    runs.set(runId, child)
-    let next: MemoryState = { ...withId, runs }
+      const sessionId = input.message.sessionId
+      const digest = childDigest(input.message, executableRef)
+      const executable = yield* Effect.try({
+        try: () => decodePinned({ ref: executableRef, manifest: parent.executableManifest }),
+        catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+      })
+      const registrations = yield* narrow(executable, parent.registrations).pipe(
+        Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
+      )
+      const key = idempotencyKey(input.message.to, sessionId, input.message.idempotencyKey)
+      const existing = state.idempotency.get(key)
+      if (existing !== undefined) {
+        if (existing.digest !== digest || !equals(existing.executable, executable)) {
+          return yield* IdempotencyConflict.make({
+            address: input.message.to,
+            sessionId,
+            idempotencyKey: input.message.idempotencyKey,
+            existingRunId: existing.receipt.runId,
+          })
+        }
+        return [{ ...existing.receipt, duplicate: true }, state] as const
+      }
 
-    const [, linked] = yield* appendLifecycle(
-      next,
-      parent.runId,
-      makeChildLinked(runId, input.invocationId, input.selection, input.message.prompt),
-    )
-    next = linked
+      const [runId, withId] = newRunId(state)
+      const child: StoredRun = {
+        runId,
+        status: "queued",
+        executableRef,
+        executableManifest: parent.executableManifest,
+        address: input.message.to,
+        message: input.message,
+        rootRunId: parent.rootRunId,
+        parentRunId: parent.runId,
+        invocationId: input.invocationId,
+        respondedWaitIds: new Set(),
+        lastSequence: -1,
+        attempt: 0,
+        attemptFence: 0,
+        cancellationRequested: false,
+        children: [],
+        events: [],
+        subscribers: new Map(),
+        steering: [],
+        registrations,
+      }
+      const runs = new Map(withId.runs)
+      const parentUpdated: StoredRun = { ...parent, children: [...parent.children, runId] }
+      runs.set(parent.runId, parentUpdated)
+      runs.set(runId, child)
+      let next: MemoryState = { ...withId, runs }
 
-    const [, accepted] = yield* appendLifecycle(next, runId, makeAccepted(input.message.to, input.message.id), "queued")
-    next = accepted
-    const [, started] = yield* appendLifecycle(next, runId, makeAttemptStarted(1), "running")
-    next = started
+      const [, linked] = yield* appendLifecycle(
+        next,
+        parent.runId,
+        makeChildLinked(runId, input.invocationId, input.selection, input.message.prompt),
+      )
+      next = linked
 
-    const receipt: RunReceipt = {
-      runId,
-      messageId: input.message.id,
-      acceptedSequence: 0,
-      duplicate: false,
-    }
-    const idempotency = new Map(next.idempotency)
-    idempotency.set(key, { digest, executable, receipt })
-    return [receipt, { ...next, idempotency }] as const
-  })
+      const [, accepted] = yield* appendLifecycle(
+        next,
+        runId,
+        makeAccepted(input.message.to, input.message.id),
+        "queued",
+      )
+      next = accepted
+      const [, started] = yield* appendLifecycle(next, runId, makeAttemptStarted(1), "running")
+      next = started
 
-export const admitProgramChild = (
-  state: MemoryState,
-  input: AdmitProgramChildInput,
-): Effect.Effect<
+      const receipt: RunReceipt = {
+        runId,
+        messageId: input.message.id,
+        acceptedSequence: 0,
+        duplicate: false,
+      }
+      const idempotency = new Map(next.idempotency)
+      idempotency.set(key, { digest, executable, receipt })
+      return [receipt, { ...next, idempotency }] as const
+    }),
+)
+
+type AdmitProgramChildResult = Effect.Effect<
   readonly [RunReceipt, MemoryState],
   RunNotFound | RunTerminal | IdempotencyConflict | RunIdConflict | RuntimeUnavailable
-> =>
+>
+
+export const admitProgramChild: {
+  (input: AdmitProgramChildInput): (state: MemoryState) => AdmitProgramChildResult
+  (state: MemoryState, input: AdmitProgramChildInput): AdmitProgramChildResult
+} = Function.dual(2, (state: MemoryState, input: AdmitProgramChildInput) =>
   Effect.gen(function* () {
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
     const parent = state.runs.get(input.runId)
@@ -470,4 +493,5 @@ export const admitProgramChild = (
     const idempotency = new Map(next.idempotency)
     idempotency.set(key, { digest, executable, receipt })
     return [receipt, { ...next, idempotency }] as const
-  })
+  }),
+)

@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite"
 import { expect, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { SchemaChecksumMismatch, SchemaDirty, SchemaVersionUnsupported } from "../src/sql/errors.js"
 import { layer as sqliteClientLayer } from "../src/sql/bun-client.js"
 import { migrate } from "../src/sql/migrate.js"
@@ -8,7 +8,11 @@ import { SCHEMA_VERSION, schemaChecksum } from "../src/sql/schema.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
 const apply = (filename: string) =>
-  migrate(filename).pipe(Effect.provide(sqliteClientLayer({ filename })), Effect.scoped)
+  Effect.scoped(
+    Effect.flatMap(Layer.build(sqliteClientLayer({ filename })), (context) =>
+      migrate(filename).pipe(Effect.provideContext(context)),
+    ),
+  )
 
 const inspect = (filename: string) => {
   const db = new Database(filename)

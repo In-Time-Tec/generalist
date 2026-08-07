@@ -1,6 +1,5 @@
 import { OpenAiClient, OpenAiLanguageModel, OpenAiSchema } from "@effect/ai-openai"
 import { ContextOverflow, ModelRegistry } from "@batonfx/core"
-import type { ModelRegistryFacade } from "@batonfx/core"
 import { Config, Effect, Function, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { AiError, OpenAiStructuredOutput, Tool } from "effect/unstable/ai"
 import type { Credential, ServiceInterface } from "./openai-account-auth.js"
@@ -209,7 +208,9 @@ export const layer = (
   ]).pipe(Layer.provide(layerConfig({ ...input.clientConfig, apiKey: input.apiKey })))
 
 /** @experimental Bare registration effect; the consumer provides the OpenAi client (see layerConfig). */
-export const registration = (input: OpenAiInput): ReturnType<ModelRegistryFacade["registration"]> =>
+export const registration = (
+  input: OpenAiInput,
+): Effect.Effect<ModelRegistry.Registration, never, OpenAiClient.OpenAiClient> =>
   ModelRegistry.registration({
     provider: "openai",
     model: input.model,
@@ -473,9 +474,10 @@ const openAiAccountClientLayer = (credentials: OpenAiAccountCredentials) =>
     ),
   )
 
-/** @experimental */
 /** @experimental Bare registration effect with the account-credential client bundled into the model layer. */
-export const registrationAccount = (input: OpenAiAccountInput): ReturnType<ModelRegistryFacade["registration"]> =>
+export const registrationAccount = (
+  input: OpenAiAccountInput,
+): Effect.Effect<ModelRegistry.Registration, never, HttpClient.HttpClient> =>
   ModelRegistry.registration({
     provider: "openai",
     model: input.model,
@@ -489,9 +491,5 @@ export const registrationAccount = (input: OpenAiAccountInput): ReturnType<Model
 
 export const layerAccount = (
   input: OpenAiAccountInput,
-): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([registrationAccount(input)]) as Layer.Layer<
-    ModelRegistry.ModelRegistry,
-    Config.ConfigError,
-    HttpClient.HttpClient
-  >
+): Layer.Layer<ModelRegistry.ModelRegistry, never, HttpClient.HttpClient> =>
+  ModelRegistry.layer([registrationAccount(input)])

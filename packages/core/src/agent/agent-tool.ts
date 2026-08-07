@@ -1,6 +1,6 @@
 import { Cause, Effect, Function, Option, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
-import { type Agent, type Result, type RunOptions, generate } from "./agent.js"
+import { type Agent, type Result, type RunError, type RunRequirements, generate } from "./agent.js"
 import {
   AgentError,
   AgentSuspended,
@@ -13,16 +13,17 @@ import {
   TurnPolicyStopped,
 } from "./agent-event.js"
 import { TurnPolicyError } from "../turn/turn-policy.js"
-import { reserveChildBudget, refundChildBudget } from "../durable/driver-run.js"
+import {} from "../durable/driver-run.js"
 import { DriverInterpreter } from "../durable/driver-interpreter.js"
-import { RunBudgetExhausted, RunBudgetGrantWidened } from "../durable/run-budget.js"
-import type { Registration } from "../policy/handoff.js"
+import { RunBudgetExhausted, RunBudgetGrantWidened, type RunBudget } from "../durable/run-budget.js"
+import { RegistrationError, type Registration } from "../policy/handoff.js"
+
+type AgentToolRunOptions = { readonly prompt: Prompt.RawInput; readonly inheritedBudget?: RunBudget }
 
 const defaultParameters = Schema.Struct({ prompt: Schema.String })
 
 type DefaultParameters = typeof defaultParameters
 type DefaultSuccess = typeof Schema.String
-type ToolMap = { readonly [name: string]: Tool.Any }
 
 /** @experimental */
 export interface AsToolOptions<
@@ -39,18 +40,25 @@ export interface AsToolOptions<
 }
 
 /** @experimental A schema-backed tool with a stable name and closed invocation. */
-export interface AgentToolToolkit<
-  _Name extends string,
-  _Parameters extends Schema.Top,
-  _Success extends Schema.Top,
-  R,
-> {
+export type AgentToolTool<Parameters extends Schema.Top, Success extends Schema.Top> = Tool.Tool<
+  string,
+  {
+    readonly parameters: Parameters | DefaultParameters
+    readonly success: Success | DefaultSuccess
+    readonly failure: typeof Schema.String
+    readonly failureMode: "return"
+  },
+  never
+>
+
+/** @experimental */
+export interface AgentToolToolkit<_Name extends string, Parameters extends Schema.Top, Success extends Schema.Top, R> {
   readonly name: string
-  readonly tool: Tool.Any
-  readonly tools: ToolMap
+  readonly tool: AgentToolTool<Parameters, Success>
+  readonly tools: { readonly [name: string]: AgentToolTool<Parameters, Success> }
   readonly parametersSchema: Schema.Top
   readonly successSchema: Schema.Top
-  readonly invoke: (params: unknown) => Effect.Effect<unknown, string, R>
+  readonly invoke: (params: unknown) => Effect.Effect<Success["Type"], string, R>
   readonly requirements: (value: R) => R
 }
 
@@ -141,9 +149,9 @@ const resultFor = <Success extends Schema.Top>(
   })
 
 const lazyHandled = <Name extends string, Parameters extends Schema.Top, Success extends Schema.Top, R>(
-  tool: Tool.Any,
+  tool: AgentToolTool<Parameters, Success>,
   name: string,
-  parameters: Parameters,
+  parameters: Parameters | DefaultParameters,
   invoke: (params: unknown) => Effect.Effect<unknown, string, R>,
 ): AgentToolToolkit<Name, Parameters, Success, R> => ({
   name,
@@ -164,8 +172,8 @@ export const asTool: {
   >(
     options?: AsToolOptions<Name, Parameters, Success>,
   ): <Tools extends Record<string, Tool.Any>, R>(
-    agent: Agent<Tools, R> | Registration,
-  ) => AgentToolToolkit<Name, Parameters, Success, R>
+    agent: Agent<Tools, R> | Registration<Tools, R>,
+  ) => AgentToolToolkit<Name, Parameters, Success, RunRequirements<Tools, R, AgentToolRunOptions>>
   <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -173,9 +181,9 @@ export const asTool: {
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
   >(
-    agent: Agent<Tools, R> | Registration,
+    agent: Agent<Tools, R> | Registration<Tools, R>,
     options?: AsToolOptions<Name, Parameters, Success>,
-  ): AgentToolToolkit<Name, Parameters, Success, R>
+  ): AgentToolToolkit<Name, Parameters, Success, RunRequirements<Tools, R, AgentToolRunOptions>>
 } = Function.dual(
   (args) => args.length !== 1 || "name" in args[0],
   <
@@ -185,23 +193,28 @@ export const asTool: {
     Parameters extends Schema.Top = DefaultParameters,
     Success extends Schema.Top = DefaultSuccess,
   >(
-    agent: Agent<Tools, R> | Registration,
+    agent: Agent<Tools, R> | Registration<Tools, R>,
     options: AsToolOptions<Name, Parameters, Success> = {},
-  ): AgentToolToolkit<Name, Parameters, Success, R> => {
+  ): AgentToolToolkit<Name, Parameters, Success, RunRequirements<Tools, R, AgentToolRunOptions>> => {
     const name = options.name ?? agent.name
     const parameters = options.parameters ?? defaultParameters
     const success = options.success ?? Schema.String
-    const handler = (params: unknown): Effect.Effect<unknown, string, R> =>
+    const handler = (params: unknown): Effect.Effect<unknown, string, RunRequirements<Tools, R, AgentToolRunOptions>> =>
       Effect.gen(function* () {
         const prompt = yield* promptFor(options.parameters, options.toPrompt, params)
-        const runChild = (runOptions: RunOptions) => {
-          const execution = "run" in agent ? agent.run(runOptions) : generate(agent, runOptions)
-          return execution.pipe(
+        const runChild = (runOptions: AgentToolRunOptions) => {
+          const execution: Effect.Effect<
+            Result,
+            RunError | RegistrationError,
+            RunRequirements<Tools, R, AgentToolRunOptions>
+          > = "run" in agent ? agent.run(runOptions) : generate(agent, runOptions)
+          const handled: Effect.Effect<Result, string, RunRequirements<Tools, R, AgentToolRunOptions>> = execution.pipe(
             Effect.catchCause((cause) => {
               if (Cause.hasInterrupts(cause)) return Effect.interrupt
               return Effect.fail(causeMessage(agent.name, cause))
             }),
           )
+          return handled
         }
         const interpreter = yield* Effect.serviceOption(DriverInterpreter)
         if (Option.isNone(interpreter)) {
@@ -209,25 +222,32 @@ export const asTool: {
           return yield* resultFor(options.success, options.fromResult, result)
         }
         const grant = "budget" in agent && agent.budget !== undefined ? agent.budget : {}
-        const childBudget = yield* reserveChildBudget(grant).pipe(
-          Effect.mapError((error) =>
-            Schema.is(RunBudgetExhausted)(error) || Schema.is(RunBudgetGrantWidened)(error)
-              ? errorMessage(error)
-              : errorMessage(error),
-          ),
-        )
+        const childBudget = yield* interpreter.value
+          .reserveChild(grant)
+          .pipe(
+            Effect.mapError((error) =>
+              Schema.is(RunBudgetExhausted)(error) || Schema.is(RunBudgetGrantWidened)(error)
+                ? errorMessage(error)
+                : errorMessage(error),
+            ),
+          )
         const result = yield* runChild({ prompt, inheritedBudget: childBudget }).pipe(
-          Effect.ensuring(refundChildBudget(childBudget)),
+          Effect.ensuring(interpreter.value.refundChild(childBudget)),
         )
         return yield* resultFor(options.success, options.fromResult, result)
-      }) as Effect.Effect<unknown, string, R>
-    const tool: Tool.Any = Tool.make(name, {
+      })
+    const tool = Tool.make(name, {
       ...(options.description === undefined ? {} : { description: options.description }),
       parameters,
       success,
       failure: Schema.String,
       failureMode: "return",
     })
-    return lazyHandled(tool, name, parameters, handler)
+    return lazyHandled<Name, Parameters, Success, RunRequirements<Tools, R, AgentToolRunOptions>>(
+      tool,
+      name,
+      parameters,
+      handler,
+    )
   },
 )

@@ -67,24 +67,31 @@ const prompt = "Deploy the api service."
 
 const program = Effect.gen(function* () {
   let transcript = Prompt.empty
-  const failure = yield* Agent.stream(agent, { prompt }).pipe(
-    Stream.runForEach((event) =>
-      Effect.sync(() => {
-        if (event._tag === "TurnCompleted") transcript = event.transcript
-      }),
+  const failure = yield* Effect.scoped(
+    Effect.flatMap(Layer.build(pendingLayers), (services) =>
+      Agent.stream(agent, { prompt }).pipe(
+        Stream.runForEach((event) =>
+          Effect.sync(() => {
+            if (event._tag === "TurnCompleted") transcript = event.transcript
+          }),
+        ),
+        Effect.provideContext(services),
+      ),
     ),
-    Effect.provide(pendingLayers),
-    Effect.flip,
-  )
-  if (!(failure instanceof AgentEvent.AgentSuspended)) {
+  ).pipe(Effect.flip)
+  if (!Schema.is(AgentEvent.AgentSuspended)(failure)) {
     return yield* Effect.die("expected the run to suspend")
   }
   yield* Console.log(`suspended reason=${failure.reason} tool=${failure.tool_name} token=${failure.token}`)
-  const resumed = yield* Agent.generate(agent, {
-    prompt,
-    history: transcript,
-    resume: { suspension: failure },
-  }).pipe(Effect.provide(approvedLayers))
+  const resumed = yield* Effect.scoped(
+    Effect.flatMap(Layer.build(approvedLayers), (services) =>
+      Agent.generate(agent, {
+        prompt,
+        history: transcript,
+        resume: { suspension: failure },
+      }).pipe(Effect.provideContext(services)),
+    ),
+  )
   yield* Console.log(resumed.text)
 })
 

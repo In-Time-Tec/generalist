@@ -46,7 +46,9 @@ export const make = (options: SqliteOptions): Effect.Effect<SqliteClient, never,
           try {
             return Effect.succeed((prepare(sql, useSafeIntegers).all(...(params as Array<any>)) ?? []) as Array<object>)
           } catch (cause) {
-            return Effect.fail(new SqlError({ reason: classifyError(cause, "Failed to execute statement", "execute") }))
+            return Effect.fail(
+              SqlError.make({ reason: classifyError(cause, "Failed to execute statement", "execute") }),
+            )
           }
         })
       const runValues = (sql: string, params: ReadonlyArray<unknown> = []) =>
@@ -56,7 +58,7 @@ export const make = (options: SqliteOptions): Effect.Effect<SqliteClient, never,
             return Effect.succeed(prepare(sql, useSafeIntegers).values(...(params as Array<any>)) ?? [])
           } catch (cause) {
             return Effect.fail(
-              new SqlError({ reason: classifyError(cause, "Failed to execute statement", "executeValues") }),
+              SqlError.make({ reason: classifyError(cause, "Failed to execute statement", "executeValues") }),
             )
           }
         })
@@ -66,7 +68,7 @@ export const make = (options: SqliteOptions): Effect.Effect<SqliteClient, never,
           params: ReadonlyArray<unknown>,
           transformRows: ((rows: ReadonlyArray<object>) => ReadonlyArray<object>) | undefined,
         ) {
-          return transformRows ? Effect.map(run(sql, params), transformRows) : run(sql, params)
+          return transformRows !== undefined ? Effect.map(run(sql, params), transformRows) : run(sql, params)
         },
         executeRaw(sql: string, params: ReadonlyArray<unknown>) {
           return run(sql, params)
@@ -89,7 +91,7 @@ export const make = (options: SqliteOptions): Effect.Effect<SqliteClient, never,
         },
         export: Effect.try({
           try: () => db.serialize(),
-          catch: (cause) => new SqlError({ reason: classifyError(cause, "Failed to export database", "export") }),
+          catch: (cause) => SqlError.make({ reason: classifyError(cause, "Failed to export database", "export") }),
         }),
         loadExtension: (path: string) =>
           Effect.try({
@@ -97,7 +99,7 @@ export const make = (options: SqliteOptions): Effect.Effect<SqliteClient, never,
               db.loadExtension(path)
             },
             catch: (cause) =>
-              new SqlError({ reason: classifyError(cause, "Failed to load extension", "loadExtension") }),
+              SqlError.make({ reason: classifyError(cause, "Failed to load extension", "loadExtension") }),
           }),
       })
     })

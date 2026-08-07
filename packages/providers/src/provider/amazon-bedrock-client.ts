@@ -40,7 +40,7 @@ export interface Recovery {
 }
 
 /** @experimental */
-export class Client extends Context.Service<Client, Interface>()("@batonfx/providers/AmazonBedrockClient") {}
+export class Client extends Context.Service<Client, Interface>()("@batonfx/providers/Client") {}
 
 /** @experimental */
 export interface Options {

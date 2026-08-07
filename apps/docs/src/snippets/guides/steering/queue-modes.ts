@@ -1,4 +1,4 @@
-import { Console, Effect } from "effect"
+import { Console, Effect, ManagedRuntime } from "effect"
 import { Steering } from "@batonfx/core"
 
 const program = Effect.gen(function* () {
@@ -8,6 +8,7 @@ const program = Effect.gen(function* () {
   const firstDrain = yield* steering.takeSteering
   const secondDrain = yield* steering.takeSteering
   yield* Console.log(`first drain: ${firstDrain.length}, second drain: ${secondDrain.length}`)
-}).pipe(Effect.provide(Steering.layer({ steering: { mode: "one-at-a-time" }, followUp: { mode: "all" } })))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(Steering.layer({ steering: { mode: "one-at-a-time" }, followUp: { mode: "all" } }))
+await runtime.runPromise(program)

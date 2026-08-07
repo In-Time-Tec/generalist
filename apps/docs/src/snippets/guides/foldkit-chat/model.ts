@@ -1,5 +1,6 @@
 import { Chat, Connection } from "@batonfx/foldkit"
-import { Cause, Effect, Schema } from "effect"
+import { Cause, Effect, Layer, Schema } from "effect"
+import { dual } from "effect/Function"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 import type { Command } from "foldkit/command"
 import { define, mapMessages } from "foldkit/command"
@@ -40,11 +41,14 @@ const OpenSession = define(
   FailedOpenSession,
 )(
   Effect.gen(function* () {
-    const response = yield* HttpClient.post(`${SERVER_URL}/sessions`, { body: HttpBody.jsonUnsafe({}) })
+    const httpClient = yield* Layer.build(FetchHttpClient.layer)
+    const response = yield* HttpClient.post(`${SERVER_URL}/sessions`, {
+      body: HttpBody.jsonUnsafe({}),
+    }).pipe(Effect.provideContext(httpClient))
     const body = (yield* response.json) as { readonly sessionId: string }
     return GotChatAction({ action: Chat.OpenedSession({ sessionId: body.sessionId }) })
   }).pipe(
-    Effect.provide(FetchHttpClient.layer),
+    Effect.scoped,
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
   ),
 )
@@ -60,7 +64,10 @@ const asProgramCommands = (
   commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
 ): ReadonlyArray<ProgramCommand> => commands as ReadonlyArray<ProgramCommand>
 
-export const update = (model: Model, message: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
+export const update: {
+  (model: Model, message: Message): readonly [Model, ReadonlyArray<ProgramCommand>]
+  (message: Message): (model: Model) => readonly [Model, ReadonlyArray<ProgramCommand>]
+} = dual(2, (model: Model, message: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
   switch (message._tag) {
     case "GotChatAction": {
       const [chat, chatCommands] = Chat.update(model.chat, message.action)
@@ -72,7 +79,7 @@ export const update = (model: Model, message: Message): readonly [Model, Readonl
     case "FailedOpenSession":
       return [{ chat: { ...model.chat, run: Chat.Failed({ message: message.reason }) } }, []]
   }
-}
+})
 
 export const subscriptions: Subscriptions<Model, Message, Connection.AgentConnection> = lift(Chat.subscriptions)({
   toChildModel: (model: Model) => model.chat,

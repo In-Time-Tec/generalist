@@ -26,13 +26,13 @@ export type Input = typeof Parameters.Type & {
 }
 
 /** @experimental Input for one non-blocking bounded child-group admission. */
-export type StartGroupInput = typeof StartGroupParameters.Type & {
+export type StartGroupInput = StartGroupParameters & {
   readonly parentRunId: string
   readonly toolCallId: string
 }
 
 /** @experimental Input for one durable child-group join. */
-export type AwaitGroupInput = typeof AwaitGroupParameters.Type & {
+export type AwaitGroupInput = AwaitGroupParameters & {
   readonly parentRunId: string
   readonly toolCallId: string
 }
@@ -127,7 +127,7 @@ export const make = (store: RunStoreInterface): Interface => {
           childRunId: childRunIdFor(groupId, ordinal),
           selection: member.selection,
           prompt: normalizePrompt(member.prompt),
-          sessionId: fanOutMemberSessionId(groupId, member.key),
+          sessionId: fanOutMemberSessionId({ fanOutId: groupId, key: member.key }),
           metadata: {
             runtimeChildGroup: true,
             parentRunId: input.parentRunId,

@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, Memory, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 import { WorkingMemory } from "@batonfx/memory"
 
@@ -20,20 +20,19 @@ const program = Effect.gen(function* () {
   yield* Agent.generate(agent, { prompt: "Ada likes Effect.", memory: { key } })
   const second = yield* Agent.generate(agent, { prompt: "What should you remember?", memory: { key } })
   yield* Console.log(second.text)
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer((options) => {
-        const content = JSON.stringify(options.prompt.content)
-        const text = content.includes("Ada likes Effect") ? "I remember that Ada likes Effect." : "Stored that fact."
-        return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: text }))
-      }),
-      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      WorkingMemory.layer({ maxMessages: 4 }),
-    ),
-  ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  modelLayer((options) => {
+    const content = JSON.stringify(options.prompt.content)
+    const text = content.includes("Ada likes Effect") ? "I remember that Ada likes Effect." : "Stored that fact."
+    return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: text }))
+  }),
+  ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+  WorkingMemory.layer({ maxMessages: 4 }),
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

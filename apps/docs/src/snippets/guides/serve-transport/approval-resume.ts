@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
 import {
   Agent,
@@ -77,7 +77,8 @@ const modelLayer = Layer.effect(
 const toolkitLayer = toolkit.toLayer({ deploy: () => Effect.succeed("deployed") })
 const toolExecutorLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitLayer))
+    const handlers = yield* Layer.build(toolkitLayer)
+    const handledToolkit = yield* toolkit.pipe(Effect.provideContext(handlers))
     return ToolExecutor.layerToolkit(handledToolkit)
   }),
 )
@@ -130,6 +131,7 @@ const program = Effect.gen(function* () {
     return yield* Effect.die("expected an Agent RunCompleted event")
   }
   yield* Console.log(completed.result.text)
-}).pipe(Effect.provide(runtimeLayer))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

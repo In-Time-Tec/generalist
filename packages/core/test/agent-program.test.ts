@@ -9,11 +9,11 @@ import {
   ProgramHost,
   SandboxExecutor,
 } from "../src/index.js"
-import { Deferred, Effect, Fiber, Schema } from "effect"
+import { Deferred, Effect, Fiber, Function, Layer, Schema, Scope } from "effect"
 import { expect } from "vitest"
 
-const Input = Schema.Struct({ value: Schema.Number })
-const Output = Schema.Struct({ value: Schema.Number })
+const Input = Schema.Struct({ value: Schema.Finite })
+const Output = Schema.Struct({ value: Schema.Finite })
 const inputPin = Pins.makeCapability({ schema: "program-input", version: 2 })
 const outputPin = Pins.makeCapability({ schema: "program-output", version: 2 })
 const toolPin = Pins.makeCapability({ tool: "increment", version: 2 })
@@ -73,8 +73,8 @@ const incrementTool = (
   ProgramBindings.tool({
     name: "increment",
     pin: toolPin,
-    input: Schema.Number,
-    output: Schema.Number,
+    input: Schema.Finite,
+    output: Schema.Finite,
     replay: "idempotent",
     authorize: overrides.authorize ?? allow,
     execute: overrides.execute ?? ((value: number): Effect.Effect<number, unknown> => Effect.succeed(value + 1)),
@@ -111,8 +111,8 @@ const bindings = (options?: { readonly toolOutput?: number; readonly agentDelay?
       ProgramBindings.step({
         name: "double",
         pin: stepPin,
-        input: Schema.Number,
-        output: Schema.Number,
+        input: Schema.Finite,
+        output: Schema.Finite,
         replay: "recorded",
         authorize: allow,
         execute: (value) => Effect.succeed(value * 2),
@@ -132,18 +132,38 @@ const bindings = (options?: { readonly toolOutput?: number; readonly agentDelay?
     ],
   })
 
-const runWith = <E>(
-  fixture: SandboxExecutor.Interface["execute"],
-  live = bindings(),
-): ((
-  effect: Effect.Effect<{ readonly value: number }, E, ProgramHost.ProgramHost | import("effect").Scope.Scope>,
-) => Effect.Effect<{ readonly value: number }, E, import("effect").Scope.Scope>) =>
-  Effect.provide(
-    ProgramHost.layerDirect({
-      sandbox: SandboxExecutor.makeTest(fixture, { ...SandboxExecutor.testIdentity, fixture: "agent-program" }),
-      bindings: live,
-    }),
-  )
+const provideScoped = Function.dual<
+  <A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+  ) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>>,
+  <A, E, R, A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>>
+>(
+  2,
+  <A, E, R, A2, E2, R2>(
+    provided: Layer.Layer<A2, E2, R2>,
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | E2, Scope.Scope | R2 | Exclude<R, A2>> =>
+    Effect.scoped(Effect.flatMap(Layer.build(provided), (context) => effect.pipe(Effect.provideContext(context)))),
+)
+
+const runWith =
+  <E>(
+    fixture: SandboxExecutor.Interface["execute"],
+    live = bindings(),
+  ): ((
+    effect: Effect.Effect<{ readonly value: number }, E, ProgramHost.ProgramHost | import("effect").Scope.Scope>,
+  ) => Effect.Effect<{ readonly value: number }, E, import("effect").Scope.Scope>) =>
+  (effect) =>
+    provideScoped(
+      ProgramHost.layerDirect({
+        sandbox: SandboxExecutor.makeTest(fixture, { ...SandboxExecutor.testIdentity, fixture: "agent-program" }),
+        bindings: live,
+      }),
+      effect,
+    )
 
 it.effect("runs sequential typed tools and steps while filtering a large intermediate", () =>
   Effect.scoped(
@@ -153,7 +173,7 @@ it.effect("runs sequential typed tools and steps while filtering a large interme
           Effect.gen(function* () {
             const capabilities = yield* ProgramCapabilities.ProgramCapabilities
             const input = request.input as { readonly value: number }
-            expect(yield* capabilities.discoverTools()).toEqual([{ name: "increment" }])
+            expect(yield* capabilities.discoverTools).toEqual([{ name: "increment" }])
             expect(yield* capabilities.describeTool("increment")).toMatchObject({ name: "increment" })
             const large = yield* capabilities.callTool({ operation: "load", tool: "increment", input: input.value })
             expect(large).toBe(10_000)
@@ -176,10 +196,10 @@ it.effect("denies bindings outside the exact manifest closure and rejects pin mi
         ...SandboxExecutor.testIdentity,
         fixture: "closed-program",
       })
-      const extra = yield* AgentProgram.run(closed, { value: 1 }).pipe(
-        Effect.provide(ProgramHost.layerDirect({ sandbox: fixture, bindings: bindings() })),
-        Effect.flip,
-      )
+      const extra = yield* provideScoped(
+        ProgramHost.layerDirect({ sandbox: fixture, bindings: bindings() }),
+        AgentProgram.run(closed, { value: 1 }),
+      ).pipe(Effect.flip)
       expect(extra).toBeInstanceOf(ProgramHost.ProgramBindingMismatch)
 
       const wrong = ProgramBindings.make({
@@ -187,10 +207,10 @@ it.effect("denies bindings outside the exact manifest closure and rejects pin mi
         steps: [],
         agents: [],
       })
-      const mismatch = yield* AgentProgram.run(closed, { value: 1 }).pipe(
-        Effect.provide(ProgramHost.layerDirect({ sandbox: fixture, bindings: wrong })),
-        Effect.flip,
-      )
+      const mismatch = yield* provideScoped(
+        ProgramHost.layerDirect({ sandbox: fixture, bindings: wrong }),
+        AgentProgram.run(closed, { value: 1 }),
+      ).pipe(Effect.flip)
       expect(mismatch).toBeInstanceOf(ProgramHost.ProgramBindingMismatch)
     }),
   ),
@@ -381,7 +401,10 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         ),
         Effect.flip,
       )
-      expect((toolFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("toolCalls")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(toolFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(toolFailure)) {
+        expect(toolFailure.dimension).toBe("toolCalls")
+      }
 
       const agentRunFailure = yield* AgentProgram.run(program("Agent run budget"), { value: 1 }).pipe(
         runWith(() =>
@@ -397,7 +420,10 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         ),
         Effect.flip,
       )
-      expect((agentRunFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("agentRuns")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(agentRunFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(agentRunFailure)) {
+        expect(agentRunFailure.dimension).toBe("agentRuns")
+      }
 
       const live = bindings()
       const expensiveAgent = ProgramBindings.make({
@@ -421,7 +447,10 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         ),
         Effect.flip,
       )
-      expect((tokenFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("tokens")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(tokenFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(tokenFailure)) {
+        expect(tokenFailure.dimension).toBe("tokens")
+      }
 
       const logFailure = yield* AgentProgram.run(program("log budget"), { value: 1 }).pipe(
         runWith(() =>
@@ -433,7 +462,10 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         ),
         Effect.flip,
       )
-      expect((logFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("logBytes")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(logFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(logFailure)) {
+        expect(logFailure.dimension).toBe("logBytes")
+      }
 
       const wallFailure = yield* AgentProgram.run(
         program("wall budget", { budget: { ...budget, wallClockMillis: 0 } }),
@@ -442,13 +474,19 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         runWith(() => Effect.never),
         Effect.flip,
       )
-      expect((wallFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("wallClockMillis")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(wallFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(wallFailure)) {
+        expect(wallFailure.dimension).toBe("wallClockMillis")
+      }
 
       const outputFailure = yield* AgentProgram.run(program("output budget"), { value: 1 }).pipe(
         runWith(() => Effect.succeed({ value: 1, ignored: "x".repeat(2_000) })),
         Effect.flip,
       )
-      expect((outputFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("outputBytes")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(outputFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(outputFailure)) {
+        expect(outputFailure.dimension).toBe("outputBytes")
+      }
     }),
   ),
 )

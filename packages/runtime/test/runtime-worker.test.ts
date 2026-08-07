@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Ref } from "effect"
+import { DateTime, Deferred, Effect, Fiber, Ref } from "effect"
 import { TestClock } from "effect/testing"
 import { ExecutionHost } from "../src/execution-host.js"
 import { makeWorker } from "../src/sql/postgres/worker.js"
@@ -11,7 +11,7 @@ const claimed = {
   run: { runId: "run:worker" },
   workerId: "worker-a",
   attemptFence: 1,
-  leaseExpiresAt: new Date(0),
+  leaseExpiresAt: DateTime.toDate(DateTime.makeUnsafe(0)),
 } as ClaimedRun
 
 const claimsService = (refreshLease: ClaimsInterface["refreshLease"]): ClaimsInterface =>

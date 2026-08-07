@@ -1,4 +1,4 @@
-import { Console, Effect, Stream } from "effect"
+import { Console, Effect, ManagedRuntime, Stream } from "effect"
 import { Connection } from "@batonfx/foldkit"
 
 const connectionLayer = Connection.layerTest({
@@ -14,6 +14,7 @@ const program = Connection.AgentConnection.use((connection) =>
       yield* Console.log(`received ${frames.length} connection event`)
     }),
   ),
-).pipe(Effect.provide(connectionLayer))
+)
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(connectionLayer)
+await runtime.runPromise(program)

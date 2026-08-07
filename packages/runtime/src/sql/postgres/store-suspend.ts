@@ -1,19 +1,32 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import { RuntimeUnavailable, RunTerminal } from "../../errors.js"
+import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
+import { StaleClaim } from "../errors.js"
+import type { SqlError } from "effect/unstable/sql/SqlError"
 import { checkpointRef } from "../../executable-manifest.js"
 import { isTerminal } from "../../run.js"
 import type { Interface as RunStoreInterface } from "../../run-store.js"
 import { encodeContinuation } from "../../steering.js"
-import { encodeExecutableRef } from "../codecs.js"
+import { encodeExecutableRef, encodeJson } from "../codecs.js"
 import type { EventHub } from "../subscribers.js"
-import { encodeReason } from "../../run-wait.js"
+import { encodeReason, WaitResolution } from "../../run-wait.js"
 import { appendEvent, lockRun, requireRun } from "./pg-helpers.js"
 import { requireExecutionClaim } from "../store-execution.js"
 import { groupIdFromSuspension, resultFromInspection } from "../../child-group.js"
 import { inspectFanOut } from "../store-fan-out.js"
+import { Prompt } from "effect/unstable/ai"
+import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
 
-export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]) =>
+type SuspendEffect = Effect.Effect<
+  undefined,
+  RunNotFound | RunTerminal | RuntimeUnavailable | SqlError | StaleClaim,
+  SqlClient.SqlClient
+>
+
+export const suspend: {
+  (input: Parameters<RunStoreInterface["suspend"]>[0]): (hub: EventHub) => SuspendEffect
+  (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]): SuspendEffect
+} = Function.dual(2, (hub: EventHub, input: Parameters<RunStoreInterface["suspend"]>[0]) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* lockRun(input.runId)
@@ -29,10 +42,10 @@ export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["susp
     })
     yield* sql`
       UPDATE baton_runs SET
-        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
-        suspension_json = ${JSON.stringify(input.suspension)},
-        transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+        suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
+        transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
         continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
           THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
           ELSE continuation_json END,
@@ -66,7 +79,7 @@ export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["susp
           ),
         }
         yield* sql`
-          UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = NOW()
+          UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
           WHERE run_id = ${loaded.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
         `
         yield* appendEvent(
@@ -78,4 +91,5 @@ export const suspend = (hub: EventHub, input: Parameters<RunStoreInterface["susp
       }
     }
     yield* sql`UPDATE baton_runs SET owner_worker_id = NULL, lease_expires_at = NULL WHERE run_id = ${loaded.runId}`
-  })
+  }),
+)

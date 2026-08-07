@@ -1,4 +1,4 @@
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Function, Schema, Stream } from "effect"
 import { DriverInterpreter, type OperationSpec } from "./driver-interpreter.js"
 import type { BudgetLimits, RunBudget } from "./run-budget.js"
 import { LoopDriverState } from "./loop-driver-state.js"
@@ -21,26 +21,76 @@ export const logicalOperationId = checkpoint.pipe(
 )
 
 /** @experimental */
-export const intercept = <A, E, R>(
-  spec: OperationSpec,
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R> =>
-  Effect.gen(function* () {
-    const interpreter = yield* DriverInterpreter
-    return yield* interpreter.run(spec, effect)
-  }) as Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>
-
-/** @experimental */
-export const interceptStream = <A, E, R>(
-  spec: OperationSpec,
-  stream: Stream.Stream<A, E, R>,
-): Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R> =>
-  Stream.unwrap(
+export const intercept: {
+  (
+    spec: OperationSpec,
+  ): <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
+    R | DriverInterpreter
+  >
+  <A, E, R>(
+    spec: OperationSpec,
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
+    R | DriverInterpreter
+  >
+} = Function.dual(
+  2,
+  <A, E, R>(
+    spec: OperationSpec,
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
+    R | DriverInterpreter
+  > =>
     Effect.gen(function* () {
       const interpreter = yield* DriverInterpreter
-      return interpreter.runStream(spec, stream)
+      return yield* interpreter.run(spec, effect)
     }),
-  ) as Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>
+)
+
+/** @experimental */
+export const interceptStream: {
+  (
+    spec: OperationSpec,
+  ): <A, E, R>(
+    stream: Stream.Stream<A, E, R>,
+  ) => Stream.Stream<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
+    R | DriverInterpreter
+  >
+  <A, E, R>(
+    spec: OperationSpec,
+    stream: Stream.Stream<A, E, R>,
+  ): Stream.Stream<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
+    R | DriverInterpreter
+  >
+} = Function.dual(
+  2,
+  <A, E, R>(
+    spec: OperationSpec,
+    stream: Stream.Stream<A, E, R>,
+  ): Stream.Stream<
+    A,
+    E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted,
+    R | DriverInterpreter
+  > =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        const interpreter = yield* DriverInterpreter
+        return interpreter.runStream(spec, stream)
+      }),
+    ),
+)
 
 /** @experimental */
 export const recordSuspension = (input: { readonly waitId: string; readonly reason: string; readonly token: string }) =>

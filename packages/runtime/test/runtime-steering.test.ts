@@ -1,4 +1,5 @@
 import { expect, it, layer } from "@effect/vitest"
+import { provideScoped } from "./scoped-provide.js"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, DurableDriver, ToolExecutor } from "@batonfx/core"
@@ -6,6 +7,7 @@ import { closedTestAgent, testExecutable } from "./identity.js"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
 import { assistant, assistantAddress, assistantRef, completedResult, memoryLayer, registrationsFor } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const admitRun = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
@@ -144,58 +146,68 @@ layer(memoryLayer)("Runtime durable steering memory contract", (test) => {
 })
 
 for (const backend of ["memory", "sqlite"] as const) {
-  it.live(`${backend} completion cannot resurrect cancellation through pending steering`, () => {
-    const options = {
-      resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-      addresses: [
-        { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
-      ],
-      scheduler: { pollInterval: "1 day" as const },
-    }
-    const runtimeLayer =
-      backend === "memory"
-        ? Runtime.layerMemory(options)
-        : Runtime.layerSqlite({ ...options, filename: tempDbPath("steering-cancel-completion") })
+  const options = {
+    resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+    addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+    scheduler: { pollInterval: "1 day" as const },
+  }
+  const runtimeLayer =
+    backend === "memory"
+      ? Runtime.layerMemory(options)
+      : Runtime.layerSqlite({ ...options, filename: tempDbPath("steering-cancel-completion") })
+  layer(runtimeLayer, { excludeTestServices: true })(
+    `${backend} completion cannot resurrect cancellation through pending steering`,
+    (test) => {
+      test.effect(`${backend} completion cannot resurrect cancellation through pending steering`, () =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: assistantAddress,
+            sessionId: `steering-cancel-completion:${backend}`,
+            idempotencyKey: "run",
+            prompt: "start",
+          })
+          yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "pending", prompt: "do not resume" })
+          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "completion-race" })
+          yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
 
-    return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const receipt = yield* runtime.send({
-        to: assistantAddress,
-        sessionId: `steering-cancel-completion:${backend}`,
-        idempotencyKey: "run",
-        prompt: "start",
-      })
-      yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "pending", prompt: "do not resume" })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "completion-race" })
-      yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-
-      expect(yield* store.complete({ ...claim, result: completedResult("late") })).toEqual({ _tag: "Completed" })
-      expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-      expect((yield* store.loadExecution(receipt.runId)).continuation).toBeUndefined()
-      const tags = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag)
-      expect(tags.filter((tag) => tag === "RunCancelled")).toHaveLength(1)
-      expect(tags).not.toContain("RunCompleted")
-    }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
-  })
+          expect(yield* store.complete({ ...claim, result: completedResult("late") })).toEqual({ _tag: "Completed" })
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+          expect((yield* store.loadExecution(receipt.runId)).continuation).toBeUndefined()
+          const tags = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map(
+            (event) => event._tag,
+          )
+          expect(tags.filter((tag) => tag === "RunCancelled")).toHaveLength(1)
+          expect(tags).not.toContain("RunCompleted")
+        }),
+      )
+    },
+  )
 }
 
 it.live("persists accepted steering across a SQLite close and reopen", () => {
   const filename = tempDbPath("runtime-steering-reopen")
   let runId = ""
-  const admit = Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
-    const receipt = yield* admitRun
-    runId = receipt.runId
-    yield* runtime.steer({ runId, idempotencyKey: "steer:reopen", prompt: "survive restart" })
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  const reopen = Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
-    const claim = yield* store.claimExecution({ runId, ownerId: "reopened" })
-    const entries = yield* store.readSteering(claim)
-    expect(entries).toHaveLength(1)
-    expect(JSON.stringify(entries[0]?.prompt)).toContain("survive restart")
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  const admit = provideScoped(
+    sqliteLayer(filename),
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const receipt = yield* admitRun
+      runId = receipt.runId
+      yield* runtime.steer({ runId, idempotencyKey: "steer:reopen", prompt: "survive restart" })
+    }),
+  )
+  const reopen = provideScoped(
+    sqliteLayer(filename),
+    Effect.gen(function* () {
+      const store = yield* RunStore.RunStore
+      const claim = yield* store.claimExecution({ runId, ownerId: "reopened" })
+      const entries = yield* store.readSteering(claim)
+      expect(entries).toHaveLength(1)
+      expect(encodeJson(entries[0]?.prompt)).toContain("survive restart")
+    }),
+  )
   return admit.pipe(Effect.andThen(reopen))
 })
 
@@ -215,41 +227,47 @@ it.live("atomically persists steering consumption and model scheduling before SQ
   } satisfies DurableDriver.DriverCheckpoint
   let runId = ""
 
-  const schedule = Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
-    const receipt = yield* admitRun
-    runId = receipt.runId
-    yield* runtime.steer({ runId, idempotencyKey: "steer:scheduled", prompt: "consume atomically" })
-    const claim = yield* store.claimExecution({ runId, ownerId: "before-crash" })
-    const entries = yield* store.readSteering(claim)
-    yield* store.recordOperation({
-      ...claim,
-      operationKey: "model:scheduled-before-dispatch",
-      kind: "model",
-      inputDigest: "model:scheduled-before-dispatch",
-      input: { prompt: "next model request" },
-      replayPolicy: "provider-idempotent",
-      attempt: claim.attempt,
-      checkpoint,
-      steeringEntryIds: entries.map((entry) => entry.entryId),
-    })
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  const schedule = provideScoped(
+    sqliteLayer(filename),
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* admitRun
+      runId = receipt.runId
+      yield* runtime.steer({ runId, idempotencyKey: "steer:scheduled", prompt: "consume atomically" })
+      const claim = yield* store.claimExecution({ runId, ownerId: "before-crash" })
+      const entries = yield* store.readSteering(claim)
+      yield* store.recordOperation({
+        ...claim,
+        operationKey: "model:scheduled-before-dispatch",
+        kind: "model",
+        inputDigest: "model:scheduled-before-dispatch",
+        input: { prompt: "next model request" },
+        replayPolicy: "provider-idempotent",
+        attempt: claim.attempt,
+        checkpoint,
+        steeringEntryIds: entries.map((entry) => entry.entryId),
+      })
+    }),
+  )
 
-  const reopen = Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
-    const claim = yield* store.claimExecution({ runId, ownerId: "after-crash" })
-    const operation = yield* store.getOperationByKey({ runId, operationKey: "model:scheduled-before-dispatch" })
+  const reopen = provideScoped(
+    sqliteLayer(filename),
+    Effect.gen(function* () {
+      const store = yield* RunStore.RunStore
+      const claim = yield* store.claimExecution({ runId, ownerId: "after-crash" })
+      const operation = yield* store.getOperationByKey({ runId, operationKey: "model:scheduled-before-dispatch" })
 
-    expect(yield* store.readSteering(claim)).toEqual([])
-    expect(operation).toMatchObject({ kind: "model", status: "requested" })
-    expect((yield* store.loadExecution(runId)).checkpoint).toEqual(checkpoint)
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+      expect(yield* store.readSteering(claim)).toEqual([])
+      expect(operation).toMatchObject({ kind: "model", status: "requested" })
+      expect((yield* store.loadExecution(runId)).checkpoint).toEqual(checkpoint)
+    }),
+  )
 
   return schedule.pipe(Effect.andThen(reopen))
 })
 
-it.effect("ExecutionHost delivers durable steering in the next model operation", () => {
+{
   const requests: Array<string> = []
   let serviceAcquisitions = 0
   const agent = Agent.make({ name: "steered-host" })
@@ -278,39 +296,43 @@ it.effect("ExecutionHost delivers durable steering in the next model operation",
     resolver: ExecutableResolver.makeStatic([{ executable: ref, agent: Agent.close(agent, model) }]),
     addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
   })
-  return Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
-    const host = yield* ExecutionHost.ExecutionHost
-    const receipt = yield* runtime.send({
-      to: address,
-      sessionId: "session:host-steering",
-      idempotencyKey: "run:host-steering",
-      prompt: "initial",
-    })
-    yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:host", prompt: "new direction" })
-    const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
-    yield* host.execute(claim)
-    const inspection = yield* runtime.inspect(receipt.runId)
-    if (inspection.status === "failed") {
-      const history = yield* store.history({ runId: receipt.runId, cursor: -1, limit: 100 })
-      const failure = history.find((event) => event._tag === "RunFailed")
-      throw new Error(failure?._tag === "RunFailed" ? failure.error.message : "host failed")
-    }
-    expect(requests).toHaveLength(2)
-    expect(serviceAcquisitions).toBe(1)
-    expect(requests[1]).toContain("new direction")
-    expect(inspection.status).toBe("succeeded")
-    expect(yield* store.readSteering(claim)).toEqual([])
-    const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
-    const drained = history.filter((event) => event._tag === "SteeringDrained")
-    const modelAttempts = history
-      .map((event, index) => ({ event, index }))
-      .filter(({ event }) => event._tag === "ModelAttemptStarted")
-    expect(drained).toHaveLength(1)
-    expect(history.findIndex((event) => event._tag === "SteeringDrained")).toBeLessThan(modelAttempts[1]!.index)
-  }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
-})
+  layer(runtimeLayer)("ExecutionHost delivers durable steering in the next model operation", (test) => {
+    test.effect("ExecutionHost delivers durable steering in the next model operation", () =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const host = yield* ExecutionHost.ExecutionHost
+        const receipt = yield* runtime.send({
+          to: address,
+          sessionId: "session:host-steering",
+          idempotencyKey: "run:host-steering",
+          prompt: "initial",
+        })
+        yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:host", prompt: "new direction" })
+        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
+        yield* host.execute(claim)
+        const inspection = yield* runtime.inspect(receipt.runId)
+        if (inspection.status === "failed") {
+          const history = yield* store.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+          const failure = history.find((event) => event._tag === "RunFailed")
+          throw new Error(failure?._tag === "RunFailed" ? failure.error.message : "host failed")
+        }
+        expect(requests).toHaveLength(2)
+        expect(serviceAcquisitions).toBe(1)
+        expect(requests[1]).toContain("new direction")
+        expect(inspection.status).toBe("succeeded")
+        expect(yield* store.readSteering(claim)).toEqual([])
+        const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+        const drained = history.filter((event) => event._tag === "SteeringDrained")
+        const modelAttempts = history
+          .map((event, index) => ({ event, index }))
+          .filter(({ event }) => event._tag === "ModelAttemptStarted")
+        expect(drained).toHaveLength(1)
+        expect(history.findIndex((event) => event._tag === "SteeringDrained")).toBeLessThan(modelAttempts[1]!.index)
+      }),
+    )
+  })
+}
 
 it.effect("steering admitted during model streaming does not interrupt it and reaches the next turn", () =>
   Effect.gen(function* () {
@@ -352,31 +374,34 @@ it.effect("steering admitted during model streaming does not interrupt it and re
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
     })
 
-    yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const host = yield* ExecutionHost.ExecutionHost
-      const store = yield* RunStore.RunStore
-      const receipt = yield* runtime.send({
-        to: address,
-        sessionId: "session:streaming-steering",
-        idempotencyKey: "run:streaming-steering",
-        prompt: "initial",
-      })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
-      const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
-      yield* Deferred.await(started)
+    yield* provideScoped(
+      runtimeLayer,
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* ExecutionHost.ExecutionHost
+        const store = yield* RunStore.RunStore
+        const receipt = yield* runtime.send({
+          to: address,
+          sessionId: "session:streaming-steering",
+          idempotencyKey: "run:streaming-steering",
+          prompt: "initial",
+        })
+        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
+        const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
+        yield* Deferred.await(started)
 
-      yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:while-streaming", prompt: "redirect" })
-      expect(requests).toHaveLength(1)
-      expect(passedStreamingGate).toBe(false)
+        yield* runtime.steer({ runId: receipt.runId, idempotencyKey: "steer:while-streaming", prompt: "redirect" })
+        expect(requests).toHaveLength(1)
+        expect(passedStreamingGate).toBe(false)
 
-      yield* Deferred.succeed(release, undefined)
-      expect((yield* Fiber.await(fiber))._tag).toBe("Success")
-      expect(passedStreamingGate).toBe(true)
-      expect(requests).toHaveLength(2)
-      expect(requests[1]).toContain("redirect")
-      expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
-    }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
+        yield* Deferred.succeed(release, undefined)
+        expect((yield* Fiber.await(fiber))._tag).toBe("Success")
+        expect(passedStreamingGate).toBe(true)
+        expect(requests).toHaveLength(2)
+        expect(requests[1]).toContain("redirect")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+      }),
+    )
   }),
 )
 
@@ -444,55 +469,58 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
     })
 
-    yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const host = yield* ExecutionHost.ExecutionHost
-      const store = yield* RunStore.RunStore
-      const receipt = yield* runtime.send({
-        to: address,
-        sessionId: `session:tool-steering-${concurrency}`,
-        idempotencyKey: `run:tool-steering-${concurrency}`,
-        prompt: "run the batch",
-      })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
-      const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
-      yield* Deferred.await(started[0])
-      if (concurrency === 2) yield* Deferred.await(started[1])
+    yield* provideScoped(
+      runtimeLayer,
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* ExecutionHost.ExecutionHost
+        const store = yield* RunStore.RunStore
+        const receipt = yield* runtime.send({
+          to: address,
+          sessionId: `session:tool-steering-${concurrency}`,
+          idempotencyKey: `run:tool-steering-${concurrency}`,
+          prompt: "run the batch",
+        })
+        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
+        const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
+        yield* Deferred.await(started[0])
+        if (concurrency === 2) yield* Deferred.await(started[1])
 
-      yield* runtime.steer({
-        runId: receipt.runId,
-        idempotencyKey: `steer:during-tools-${concurrency}`,
-        prompt: "after every tool",
-      })
-      yield* Deferred.succeed(releases[0], undefined)
-      yield* Deferred.await(settled[0])
-      if (concurrency === 1) yield* Deferred.await(started[1])
+        yield* runtime.steer({
+          runId: receipt.runId,
+          idempotencyKey: `steer:during-tools-${concurrency}`,
+          prompt: "after every tool",
+        })
+        yield* Deferred.succeed(releases[0], undefined)
+        yield* Deferred.await(settled[0])
+        if (concurrency === 1) yield* Deferred.await(started[1])
 
-      expect(requests).toHaveLength(1)
-      expect(yield* store.readSteering(claim)).toHaveLength(1)
-      expect(
-        (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).some(
-          (event) => event._tag === "SteeringDrained",
-        ),
-      ).toBe(false)
+        expect(requests).toHaveLength(1)
+        expect(yield* store.readSteering(claim)).toHaveLength(1)
+        expect(
+          (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).some(
+            (event) => event._tag === "SteeringDrained",
+          ),
+        ).toBe(false)
 
-      yield* Deferred.succeed(releases[1], undefined)
-      expect((yield* Fiber.await(fiber))._tag).toBe("Success")
-      expect(requests).toHaveLength(2)
-      expect(requests[1]).toContain("after every tool")
-      expect(requests[1]).toContain("result-0")
-      expect(requests[1]).toContain("result-1")
+        yield* Deferred.succeed(releases[1], undefined)
+        expect((yield* Fiber.await(fiber))._tag).toBe("Success")
+        expect(requests).toHaveLength(2)
+        expect(requests[1]).toContain("after every tool")
+        expect(requests[1]).toContain("result-0")
+        expect(requests[1]).toContain("result-1")
 
-      const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
-      const drainedIndex = history.findIndex((event) => event._tag === "SteeringDrained")
-      const toolResultIndexes = history
-        .map((event, index) => ({ event, index }))
-        .filter(({ event }) => event._tag === "ToolExecutionCompleted")
-        .map(({ index }) => index)
-      expect(toolResultIndexes).toHaveLength(2)
-      expect(toolResultIndexes.every((index) => index < drainedIndex)).toBe(true)
-      expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
-    }).pipe(Effect.provide(runtimeLayer), Effect.scoped)
+        const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
+        const drainedIndex = history.findIndex((event) => event._tag === "SteeringDrained")
+        const toolResultIndexes = history
+          .map((event, index) => ({ event, index }))
+          .filter(({ event }) => event._tag === "ToolExecutionCompleted")
+          .map(({ index }) => index)
+        expect(toolResultIndexes).toHaveLength(2)
+        expect(toolResultIndexes.every((index) => index < drainedIndex)).toBe(true)
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+      }),
+    )
   })
 
 it.effect("steering admitted during sequential and concurrent tools drains after the whole batch", () =>

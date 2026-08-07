@@ -1,9 +1,14 @@
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { ProgramCapabilities } from "@batonfx/core"
-import { RuntimeUnavailable } from "../errors.js"
-import { OperationResolutionConflict } from "../errors.js"
+import {
+  ChildSelectionMissing,
+  FanOutConflict,
+  FanOutInvalid,
+  OperationResolutionConflict,
+  RuntimeUnavailable,
+} from "../errors.js"
 import {
   ProgramOperationRecord,
   ProgramRunState,
@@ -16,11 +21,11 @@ import {
   type CommitProgramLogInput,
 } from "../program-store.js"
 import { StaleClaim } from "./errors.js"
-import { encodeJson } from "./codecs.js"
+import { StringArray, decodeJson, decodeJsonValue, encodeJsonValue } from "./codecs.js"
 import { admitFanOut } from "./store-fan-out.js"
 import { appendEvent, loadRun } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
-import { type ResolveOperationInput, digest as resolutionDigest } from "../operation-resolution.js"
+import { OperationResolution, type ResolveOperationInput, digest as resolutionDigest } from "../operation-resolution.js"
 import type { WorkerMutationError } from "../run-store.js"
 
 interface StateRow {
@@ -57,7 +62,7 @@ const decodeState = (row: StateRow) =>
   Schema.decodeUnknownEffect(ProgramRunState)({
     runId: row.run_id,
     programPin: row.program_pin,
-    budget: JSON.parse(row.budget_json),
+    budget: decodeJsonValue(row.budget_json),
     deadlineMillis: Number(row.deadline_millis),
     toolCalls: Number(row.tool_calls),
     agentRuns: Number(row.agent_runs),
@@ -73,16 +78,16 @@ const decodeOperation = (row: OperationRow) =>
     kind: row.kind,
     capability: row.capability,
     inputDigest: row.input_digest,
-    input: JSON.parse(row.input_json),
+    input: decodeJsonValue(row.input_json),
     replay: row.replay_policy,
     status: row.status,
-    ...(row.result_json === null ? {} : { result: JSON.parse(row.result_json) }),
-    ...(row.error_json === null ? {} : { error: JSON.parse(row.error_json) }),
+    ...(row.result_json === null ? {} : { result: decodeJsonValue(row.result_json) }),
+    ...(row.error_json === null ? {} : { error: decodeJsonValue(row.error_json) }),
     ...(row.wait_id === null ? {} : { waitId: row.wait_id }),
     ...(row.fan_out_id === null ? {} : { fanOutId: row.fan_out_id }),
-    childRunIds: JSON.parse(row.child_run_ids_json),
+    childRunIds: decodeJson(StringArray, row.child_run_ids_json),
     ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
-    ...(row.resolution_json === null ? {} : { resolution: JSON.parse(row.resolution_json) }),
+    ...(row.resolution_json === null ? {} : { resolution: decodeJsonValue(row.resolution_json) }),
   }).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })))
 
 const operationRows = (runId: string, operation: string) =>
@@ -94,7 +99,7 @@ const operationRows = (runId: string, operation: string) =>
   })
 
 const sameJson = (left: unknown, right: unknown) =>
-  (JSON.stringify(left) ?? "null") === (JSON.stringify(right) ?? "null")
+  Schema.encodeSync(Schema.UnknownFromJsonString)(left) === Schema.encodeSync(Schema.UnknownFromJsonString)(right)
 
 /**
  * A settle whose outcome equals the recorded terminal outcome is an idempotent replay.
@@ -150,7 +155,7 @@ export const reserveProgramOperation = (
         INSERT INTO baton_program_runs (
           run_id, program_pin, budget_json, deadline_millis, tool_calls, agent_runs, tokens, log_bytes, active_slots
         ) VALUES (
-          ${input.runId}, ${input.programPin}, ${encodeJson(input.budget)},
+          ${input.runId}, ${input.programPin}, ${encodeJsonValue(input.budget)},
           ${input.nowMillis + input.budget.wallClockMillis}, 0, 0, 0, 0, 0
         )
       `
@@ -194,13 +199,40 @@ export const reserveProgramOperation = (
         status, result_json, error_json, wait_id, fan_out_id, child_run_ids_json
       ) VALUES (
         ${input.runId}, ${input.operation}, ${input.kind}, ${input.capability}, ${input.inputDigest},
-        ${encodeJson(input.input)}, ${input.replay}, 'reserved', NULL, NULL, NULL, NULL, '[]'
+        ${encodeJsonValue(input.input)}, ${input.replay}, 'reserved', NULL, NULL, NULL, NULL, '[]'
       )
     `
     return yield* decodeOperation((yield* operationRows(input.runId, input.operation))[0]!)
   })
 
-export const settleProgramOperation = (hub: EventHub, input: SettleProgramOperationInput) =>
+type ProgramOperation = ProgramOperationRecord
+type SettleEffect = Effect.Effect<ProgramOperation, RuntimeUnavailable | SqlError | StaleClaim, SqlClient.SqlClient>
+type SuspendProgramEffect = Effect.Effect<
+  ProgramOperation,
+  ProgramStoreFailure | WorkerMutationError,
+  SqlClient.SqlClient
+>
+type AdmitAgentsEffect = Effect.Effect<
+  ProgramOperation,
+  ChildSelectionMissing | FanOutConflict | FanOutInvalid | ProgramStoreFailure | WorkerMutationError,
+  SqlClient.SqlClient
+>
+type CommitLogEffect = Effect.Effect<
+  ProgramOperation,
+  RuntimeUnavailable | SqlError | StaleClaim | ProgramStoreFailure,
+  SqlClient.SqlClient
+>
+type ResolveProgramEffect = Effect.Effect<
+  undefined,
+  OperationResolutionConflict | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+type CancelProgramEffect = Effect.Effect<void, SqlError, SqlClient.SqlClient>
+
+export const settleProgramOperation: {
+  (input: SettleProgramOperationInput): (hub: EventHub) => SettleEffect
+  (hub: EventHub, input: SettleProgramOperationInput): SettleEffect
+} = Function.dual(2, (hub: EventHub, input: SettleProgramOperationInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const row = (yield* operationRows(input.runId, input.operation))[0]
@@ -224,8 +256,8 @@ export const settleProgramOperation = (hub: EventHub, input: SettleProgramOperat
     yield* sql`
       UPDATE baton_program_operations SET
         status = ${outcome._tag === "Succeeded" ? "succeeded" : outcome._tag === "Failed" ? "failed" : "unknown"},
-        result_json = ${outcome._tag === "Succeeded" ? encodeJson(outcome.value) : null},
-        error_json = ${outcome._tag === "Failed" ? encodeJson(outcome.error) : null}
+        result_json = ${outcome._tag === "Succeeded" ? encodeJsonValue(outcome.value) : null},
+        error_json = ${outcome._tag === "Failed" ? encodeJsonValue(outcome.error) : null}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operation}
         AND status IN ('reserved', 'running', 'waiting')
     `
@@ -240,14 +272,26 @@ export const settleProgramOperation = (hub: EventHub, input: SettleProgramOperat
     if (run === undefined) return yield* RuntimeUnavailable.make({ message: `Run ${input.runId} is missing` })
     yield* appendEvent(hub, run, { _tag: "OperationUnknown", operationId: input.operation }, "needs-resolution")
     return record
-  })
+  }),
+)
 
-export const resolveProgramOperation = (
-  input: ResolveOperationInput,
-  claimableStatus: "running" | "queued",
-  clearLease = false,
-) =>
-  Effect.gen(function* () {
+export const resolveProgramOperation: {
+  (input: ResolveOperationInput, claimableStatus: "running" | "queued", clearLease?: boolean): ResolveProgramEffect
+  (claimableStatus: "running" | "queued", clearLease?: boolean): (input: ResolveOperationInput) => ResolveProgramEffect
+} = (
+  inputOrClaimable: ResolveOperationInput | string,
+  maybeClaimable?: "running" | "queued" | boolean,
+  maybeClearLease?: boolean,
+): any => {
+  if (typeof inputOrClaimable === "string") {
+    const claimableStatus = inputOrClaimable as "running" | "queued"
+    const clearLease = maybeClaimable as boolean
+    return (input: ResolveOperationInput) => resolveProgramOperation(input, claimableStatus, clearLease)
+  }
+  const input = inputOrClaimable
+  const claimableStatus = maybeClaimable
+  const clearLease = maybeClearLease ?? false
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* loadRun(input.runId)
     const row = (yield* operationRows(input.runId, input.operationId))[0]
@@ -259,7 +303,7 @@ export const resolveProgramOperation = (
       })
     if (run === undefined || row === undefined) return yield* conflict()
     if (row.resolution_idempotency_key !== null) {
-      const prior = row.resolution_json === null ? undefined : JSON.parse(row.resolution_json)
+      const prior = row.resolution_json === null ? undefined : decodeJson(OperationResolution, row.resolution_json)
       if (
         row.resolution_idempotency_key === input.idempotencyKey &&
         prior !== undefined &&
@@ -269,13 +313,13 @@ export const resolveProgramOperation = (
       return yield* conflict()
     }
     if (run.status !== "needs-resolution" || row.status !== "unknown") return yield* conflict()
-    const resolutionJson = encodeJson(input.resolution)
+    const resolutionJson = encodeJsonValue(input.resolution)
     const status =
       input.resolution._tag === "Succeeded" ? "succeeded" : input.resolution._tag === "Failed" ? "failed" : "reserved"
     yield* sql`
       UPDATE baton_program_operations SET status = ${status},
-        result_json = ${input.resolution._tag === "Succeeded" ? encodeJson(input.resolution.value) : null},
-        error_json = ${input.resolution._tag === "Failed" ? encodeJson(input.resolution.error) : null},
+        result_json = ${input.resolution._tag === "Succeeded" ? encodeJsonValue(input.resolution.value) : null},
+        error_json = ${input.resolution._tag === "Failed" ? encodeJsonValue(input.resolution.error) : null},
         resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operationId} AND status = 'unknown'
     `
@@ -291,6 +335,7 @@ export const resolveProgramOperation = (
       `
     }
   })
+}
 
 export const startProgramOperation = (input: { readonly runId: string; readonly operation: string }) =>
   Effect.gen(function* () {
@@ -305,27 +350,33 @@ export const startProgramOperation = (input: { readonly runId: string; readonly 
     return yield* decodeOperation(row)
   })
 
-export const reconcileProgramCancellation = (runId: string, reason?: string) =>
-  Effect.gen(function* () {
+export const reconcileProgramCancellation: {
+  (runId: string, reason?: string): CancelProgramEffect
+  (reason?: string): (runId: string) => CancelProgramEffect
+} = (...args: [string?, string?]): any => {
+  const [runIdOrReason, reason] = args
+  if (args.length < 2) return (runId: string) => reconcileProgramCancellation(runId, runIdOrReason)
+  const runId = runIdOrReason as string
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const failure = ProgramCapabilities.ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
     yield* sql`
-      UPDATE baton_program_operations SET status = 'failed', error_json = ${encodeJson(failure)}
+      UPDATE baton_program_operations SET status = 'failed', error_json = ${encodeJsonValue(failure)}
       WHERE run_id = ${runId} AND status IN ('reserved', 'running', 'waiting')
     `
     yield* sql`UPDATE baton_program_runs SET active_slots = 0 WHERE run_id = ${runId}`
   })
+}
 
 type SuspendParent = (
   hub: EventHub,
   input: Parameters<import("../run-store.js").Interface["suspend"]>[0],
 ) => Effect.Effect<void, WorkerMutationError, SqlClient.SqlClient>
 
-export const suspendProgramOperation = (
-  hub: EventHub,
-  input: SuspendProgramOperationInput,
-  suspendParent: SuspendParent,
-) =>
+export const suspendProgramOperation: {
+  (input: SuspendProgramOperationInput, suspendParent: SuspendParent): (hub: EventHub) => SuspendProgramEffect
+  (hub: EventHub, input: SuspendProgramOperationInput, suspendParent: SuspendParent): SuspendProgramEffect
+} = Function.dual(3, (hub: EventHub, input: SuspendProgramOperationInput, suspendParent: SuspendParent) =>
   Effect.gen(function* () {
     const reserved = yield* reserveProgramOperation(input)
     if (reserved.status === "waiting") return reserved
@@ -336,9 +387,13 @@ export const suspendProgramOperation = (
     `
     yield* suspendParent(hub, input)
     return yield* decodeOperation((yield* operationRows(input.runId, input.operation))[0]!)
-  })
+  }),
+)
 
-export const admitProgramAgents = (hub: EventHub, input: AdmitProgramAgentsInput, suspendParent: SuspendParent) =>
+export const admitProgramAgents: {
+  (input: AdmitProgramAgentsInput, suspendParent: SuspendParent): (hub: EventHub) => AdmitAgentsEffect
+  (hub: EventHub, input: AdmitProgramAgentsInput, suspendParent: SuspendParent): AdmitAgentsEffect
+} = Function.dual(3, (hub: EventHub, input: AdmitProgramAgentsInput, suspendParent: SuspendParent) =>
   Effect.gen(function* () {
     const reserved = yield* reserveProgramOperation(input)
     if (reserved.childRunIds.length > 0) return reserved
@@ -346,14 +401,18 @@ export const admitProgramAgents = (hub: EventHub, input: AdmitProgramAgentsInput
     const sql = yield* SqlClient.SqlClient
     yield* sql`
       UPDATE baton_program_operations SET status = 'waiting', wait_id = ${input.wait.waitId},
-        fan_out_id = ${receipt.fanOutId}, child_run_ids_json = ${encodeJson(receipt.childRunIds)}
+        fan_out_id = ${receipt.fanOutId}, child_run_ids_json = ${encodeJsonValue(receipt.childRunIds)}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operation} AND status = 'reserved'
     `
     yield* suspendParent(hub, { ...input, checkpoint: { _tag: "Program", version: "1" } })
     return yield* decodeOperation((yield* operationRows(input.runId, input.operation))[0]!)
-  })
+  }),
+)
 
-export const commitProgramLog = (hub: EventHub, input: CommitProgramLogInput) =>
+export const commitProgramLog: {
+  (input: CommitProgramLogInput): (hub: EventHub) => CommitLogEffect
+  (hub: EventHub, input: CommitProgramLogInput): CommitLogEffect
+} = Function.dual(2, (hub: EventHub, input: CommitProgramLogInput) =>
   Effect.gen(function* () {
     const prior = yield* reserveProgramOperation(input)
     if (prior.status === "succeeded") return prior
@@ -371,4 +430,5 @@ export const commitProgramLog = (hub: EventHub, input: CommitProgramLogInput) =>
       outcome: { _tag: "Succeeded", value: undefined },
       releaseSlots: 0,
     })
-  })
+  }),
+)

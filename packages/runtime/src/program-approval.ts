@@ -1,3 +1,5 @@
+import { Function } from "effect"
+
 /** @experimental Derive one stable typed wait from a suspended Program operation. */
 export const programWait = (input: {
   readonly runId: string
@@ -27,16 +29,26 @@ export const programWait = (input: {
   }
 }
 
-export const approvedFor = (claimed: import("./run-store.js").ExecutionRecord, operation: string): boolean =>
-  claimed.suspension?._tag === "@batonfx/core/ProgramSuspended" &&
-  claimed.suspension.operation === operation &&
-  claimed.suspension.reason === "approval" &&
-  claimed.resolution?._tag === "Approved"
+export const approvedFor: {
+  (operation: string): (claimed: import("./run-store.js").ExecutionRecord) => boolean
+  (claimed: import("./run-store.js").ExecutionRecord, operation: string): boolean
+} = Function.dual(
+  2,
+  (claimed: import("./run-store.js").ExecutionRecord, operation: string): boolean =>
+    claimed.suspension?._tag === "@batonfx/core/ProgramSuspended" &&
+    claimed.suspension.operation === operation &&
+    claimed.suspension.reason === "approval" &&
+    claimed.resolution?._tag === "Approved",
+)
 
-export const deniedFor = (claimed: import("./run-store.js").ExecutionRecord, operation: string): string | undefined =>
+export const deniedFor: {
+  (operation: string): (claimed: import("./run-store.js").ExecutionRecord) => string | undefined
+  (claimed: import("./run-store.js").ExecutionRecord, operation: string): string | undefined
+} = Function.dual(2, (claimed: import("./run-store.js").ExecutionRecord, operation: string): string | undefined =>
   claimed.suspension?._tag === "@batonfx/core/ProgramSuspended" &&
   claimed.suspension.operation === operation &&
   claimed.suspension.reason === "approval" &&
   claimed.resolution?._tag === "Denied"
     ? (claimed.resolution.reason ?? "approval denied")
-    : undefined
+    : undefined,
+)

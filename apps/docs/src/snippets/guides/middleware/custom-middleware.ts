@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Option, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Option, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 const dropReasoning: ModelMiddleware.Middleware = {
@@ -23,15 +23,14 @@ const program = Effect.gen(function* () {
   const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "Favorite color?" }))
   const partTypes = events.filter((event) => event._tag === "ModelPart").map((event) => event.part.type)
   yield* Console.log(`model parts seen by the loop: ${partTypes.join(", ")}`)
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layer([dropReasoning]),
-    ),
-  ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layer([dropReasoning]),
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

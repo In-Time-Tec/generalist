@@ -12,8 +12,7 @@ export const AgentExecutionResult = Schema.Struct({
 export type AgentExecutionResult = typeof AgentExecutionResult.Type
 
 /** @experimental Terminal value produced by an Agent Program execution. */
-export const ProgramExecutionResult = Schema.Struct({
-  _tag: Schema.Literal("Program"),
+export const ProgramExecutionResult = Schema.TaggedStruct("Program", {
   value: Schema.Unknown,
 })
 /** @experimental */
@@ -25,8 +24,7 @@ export const ExecutionResult = Schema.Union([AgentExecutionResult, ProgramExecut
 export type ExecutionResult = typeof ExecutionResult.Type
 
 /** @experimental Fresh-sandbox replay frontier for an Agent Program. */
-export const ProgramCheckpoint = Schema.Struct({
-  _tag: Schema.Literal("Program"),
+export const ProgramCheckpoint = Schema.TaggedStruct("Program", {
   version: Schema.Literal("1"),
 })
 /** @experimental */
@@ -39,9 +37,7 @@ export type ExecutionCheckpoint = typeof ExecutionCheckpoint.Type
 
 /** @experimental Executable-neutral persisted suspension state. */
 /** @experimental */
-export type ExecutionSuspension =
-  | typeof AgentEvent.AgentSuspended.Type
-  | typeof ProgramCapabilities.ProgramSuspended.Type
+export type ExecutionSuspension = AgentEvent.AgentSuspended | ProgramCapabilities.ProgramSuspended
 /** @experimental */
 export const ExecutionSuspension: Schema.Codec<ExecutionSuspension, unknown> = Schema.Union([
   AgentEvent.AgentSuspended,

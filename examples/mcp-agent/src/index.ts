@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool } from "@batonfx/core"
 import { McpToolSource } from "@batonfx/mcp"
 import { layerToolkit, toolkit } from "@batonfx/mcp/baton"
@@ -38,32 +38,31 @@ const modelLayer = (streamText: ModelParams["streamText"]): Layer.Layer<Language
 
 let calls = 0
 
+const runtimeLayer = Layer.mergeAll(
+  modelLayer(() => {
+    calls += 1
+    return calls === 1
+      ? Stream.make(
+          Response.makePart("tool-call", {
+            id: "search-1",
+            name: "local_search",
+            params: { query: "setup" },
+            providerExecuted: false,
+          }),
+        )
+      : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Found local setup docs." }))
+  }),
+  layerToolkit(source),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+)
+
 const program = Effect.gen(function* () {
   const mcpToolkit = yield* toolkit(source)
   const agent = Agent.make({ name: "mcp-agent", toolkit: mcpToolkit })
-  const result = yield* Agent.generate(agent, { prompt: "Find the setup docs" }).pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        modelLayer(() => {
-          calls += 1
-          return calls === 1
-            ? Stream.make(
-                Response.makePart("tool-call", {
-                  id: "search-1",
-                  name: "local_search",
-                  params: { query: "setup" },
-                  providerExecuted: false,
-                }),
-              )
-            : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "Found local setup docs." }))
-        }),
-        layerToolkit(source),
-        Approvals.layerAutoApprove,
-        ModelMiddleware.layerIdentity,
-      ),
-    ),
-  )
+  const result = yield* Agent.generate(agent, { prompt: "Find the setup docs" })
   yield* Console.log(result.text)
 })
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

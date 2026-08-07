@@ -1,5 +1,5 @@
 import { Chat, Connection } from "@batonfx/foldkit"
-import { Cause, Effect, Schema } from "effect"
+import { Cause, Effect, Function, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 import { define, mapMessage, mapMessages, type Command } from "foldkit/command"
 import type { Document, Html } from "foldkit/html"
@@ -90,11 +90,14 @@ export const OpenSession = define(
   FailedOpenSession,
 )(
   Effect.gen(function* () {
-    const httpResponse = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, { body: HttpBody.jsonUnsafe({}) })
+    const httpClient = yield* Layer.build(FetchHttpClient.layer)
+    const httpResponse = yield* HttpClient.post(`${SERVER_HTTP_URL}/sessions`, {
+      body: HttpBody.jsonUnsafe({}),
+    }).pipe(Effect.provideContext(httpClient))
     const body = (yield* httpResponse.json) as { readonly sessionId: string }
     return OpenedSession({ sessionId: body.sessionId })
   }).pipe(
-    Effect.provide(FetchHttpClient.layer),
+    Effect.scoped,
     Effect.catchCause((cause) => Effect.succeed(FailedOpenSession({ reason: Cause.pretty(cause) }))),
   ),
 )
@@ -110,7 +113,7 @@ const asProgramCommands = (
   commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
 ): ReadonlyArray<ProgramCommand> => commands as ReadonlyArray<ProgramCommand>
 
-export const update = (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
+const updateModel = (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
   switch (currentMessage._tag) {
     case "OpenedSession":
       return [{ ...model, chat: { ...model.chat, sessionId: currentMessage.sessionId }, session: SessionReady() }, []]
@@ -136,6 +139,12 @@ export const update = (model: Model, currentMessage: Message): readonly [Model, 
       return [{ ...model, expandedToolCallIds: toggle(model.expandedToolCallIds, currentMessage.key) }, []]
   }
 }
+
+/** The TEA reducer, with a data-last form for pipelines. */
+export const update: {
+  (currentMessage: Message): (model: Model) => readonly [Model, ReadonlyArray<ProgramCommand>]
+  (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>]
+} = Function.dual(2, updateModel)
 
 // SUBSCRIPTION
 
@@ -423,22 +432,16 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
 
 const sessionBannerView = (session: SessionState): Html => {
   const h = html<Message>()
-  return h.keyed("div")(session._tag, [], [sessionBannerContentView(session)])
-}
-
-const sessionBannerContentView = (session: SessionState): Html => {
-  const h = html<Message>()
-  switch (session._tag) {
-    case "SessionOpening":
-      return h.p([h.Class("px-6 py-2 text-xs text-muted-foreground")], ["Opening a session…"])
-    case "SessionFailed":
-      return h.p(
-        [h.Class("bg-destructive/10 px-6 py-2 text-xs text-destructive")],
-        [`Could not open a session: ${session.message}`],
-      )
-    case "SessionReady":
-      return h.div([], [])
-  }
+  const content =
+    session._tag === "SessionOpening"
+      ? h.p([h.Class("px-6 py-2 text-xs text-muted-foreground")], ["Opening a session…"])
+      : session._tag === "SessionFailed"
+        ? h.p(
+            [h.Class("bg-destructive/10 px-6 py-2 text-xs text-destructive")],
+            [`Could not open a session: ${session.message}`],
+          )
+        : h.div([], [])
+  return h.keyed("div")(session._tag, [], [content])
 }
 
 const footerView = (model: Model): Html => {

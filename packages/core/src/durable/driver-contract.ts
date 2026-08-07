@@ -1,7 +1,17 @@
-import { Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
+import type { ParseOptions } from "effect/SchemaAST"
 import { ExecutableRef } from "./executable-manifest.js"
 import { RunBudget } from "./run-budget.js"
 import { digest as canonicalDigest } from "./canonical-json.js"
+
+const isParseOptions = (value: unknown): value is ParseOptions =>
+  typeof value === "object" &&
+  value !== null &&
+  ("errors" in value ||
+    "onExcessProperty" in value ||
+    "propertyOrder" in value ||
+    "disableChecks" in value ||
+    "concurrency" in value)
 
 /** @experimental Version string for a durable driver implementation. */
 export const DriverVersion = Schema.String
@@ -118,23 +128,111 @@ export const makeOperation = (input: {
 })
 
 /** @experimental */
-export const encodeCheckpoint = Schema.encodeEffect(DriverCheckpoint)
+export const encodeCheckpoint: {
+  (
+    input: DriverCheckpoint,
+    options?: ParseOptions,
+  ): Effect.Effect<typeof DriverCheckpoint.Encoded, Schema.SchemaError, never>
+  (
+    options?: ParseOptions,
+  ): (input: DriverCheckpoint) => Effect.Effect<typeof DriverCheckpoint.Encoded, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (
+    input: DriverCheckpoint,
+    options?: ParseOptions,
+  ): Effect.Effect<typeof DriverCheckpoint.Encoded, Schema.SchemaError, never> =>
+    Schema.encodeEffect(DriverCheckpoint)(input, options),
+)
 
 /** @experimental */
-export const decodeCheckpoint = Schema.decodeEffect(DriverCheckpoint)
+export const decodeCheckpoint: {
+  (
+    input: typeof DriverCheckpoint.Encoded,
+    options?: ParseOptions,
+  ): Effect.Effect<DriverCheckpoint, Schema.SchemaError, never>
+  (
+    options?: ParseOptions,
+  ): (input: typeof DriverCheckpoint.Encoded) => Effect.Effect<DriverCheckpoint, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (
+    input: typeof DriverCheckpoint.Encoded,
+    options?: ParseOptions,
+  ): Effect.Effect<DriverCheckpoint, Schema.SchemaError, never> =>
+    Schema.decodeEffect(DriverCheckpoint)(input, options),
+)
 
 /** @experimental */
-export const encodeDecision = Schema.encodeEffect(DriverDecision)
+export const encodeDecision: {
+  (
+    input: DriverDecision,
+    options?: ParseOptions,
+  ): Effect.Effect<typeof DriverDecision.Encoded, Schema.SchemaError, never>
+  (
+    options?: ParseOptions,
+  ): (input: DriverDecision) => Effect.Effect<typeof DriverDecision.Encoded, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (
+    input: DriverDecision,
+    options?: ParseOptions,
+  ): Effect.Effect<typeof DriverDecision.Encoded, Schema.SchemaError, never> =>
+    Schema.encodeEffect(DriverDecision)(input, options),
+)
 
 /** @experimental */
-export const decodeDecision = Schema.decodeEffect(DriverDecision)
+export const decodeDecision: {
+  (
+    input: typeof DriverDecision.Encoded,
+    options?: ParseOptions,
+  ): Effect.Effect<DriverDecision, Schema.SchemaError, never>
+  (
+    options?: ParseOptions,
+  ): (input: typeof DriverDecision.Encoded) => Effect.Effect<DriverDecision, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (
+    input: typeof DriverDecision.Encoded,
+    options?: ParseOptions,
+  ): Effect.Effect<DriverDecision, Schema.SchemaError, never> => Schema.decodeEffect(DriverDecision)(input, options),
+)
 
 /** @experimental */
-export const encodeOutcome = Schema.encodeEffect(OperationOutcome)
+export const encodeOutcome: {
+  (
+    input: OperationOutcome,
+    options?: ParseOptions,
+  ): Effect.Effect<typeof OperationOutcome.Encoded, Schema.SchemaError, never>
+  (
+    options?: ParseOptions,
+  ): (input: OperationOutcome) => Effect.Effect<typeof OperationOutcome.Encoded, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (
+    input: OperationOutcome,
+    options?: ParseOptions,
+  ): Effect.Effect<typeof OperationOutcome.Encoded, Schema.SchemaError, never> =>
+    Schema.encodeEffect(OperationOutcome)(input, options),
+)
 
 /** @experimental */
-export const decodeOutcome = Schema.decodeEffect(OperationOutcome)
-
+export const decodeOutcome: {
+  (
+    input: typeof OperationOutcome.Encoded,
+    options?: ParseOptions,
+  ): Effect.Effect<OperationOutcome, Schema.SchemaError, never>
+  (
+    options?: ParseOptions,
+  ): (input: typeof OperationOutcome.Encoded) => Effect.Effect<OperationOutcome, Schema.SchemaError, never>
+} = Function.dual(
+  (args) => args.length > 1 || (args.length === 1 && !isParseOptions(args[0])),
+  (
+    input: typeof OperationOutcome.Encoded,
+    options?: ParseOptions,
+  ): Effect.Effect<OperationOutcome, Schema.SchemaError, never> =>
+    Schema.decodeEffect(OperationOutcome)(input, options),
+)
 /** @experimental */
 export const isUnknownOutcome = (
   outcome: OperationOutcome,

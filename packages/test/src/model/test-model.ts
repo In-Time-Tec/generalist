@@ -389,12 +389,15 @@ export const truncated: {
   }),
 )
 
+const isStepOptionsLike = (value: unknown): value is StepOptions =>
+  typeof value === "object" && value !== null && ("finishReason" in value || "usage" in value || "delay" in value)
+
 /** @experimental */
 export const object: {
-  (): (value: unknown) => ObjectStep
+  (options?: StepOptions): (value: unknown) => ObjectStep
   (value: unknown, options?: StepOptions): ObjectStep
 } = Function.dual(
-  (args) => args.length > 0,
+  (args) => args.length > 0 && !isStepOptionsLike(args[0]),
   (value: unknown, options: StepOptions = {}) => ({
     _tag: "Object",
     value,
@@ -404,10 +407,10 @@ export const object: {
 
 /** @experimental */
 export const failure: {
-  (): (error: AiError.AiError) => FailureStep
+  (options?: { readonly delay?: Duration.Input }): (error: AiError.AiError) => FailureStep
   (error: AiError.AiError, options?: { readonly delay?: Duration.Input }): FailureStep
 } = Function.dual(
-  (args) => args.length > 0,
+  (args) => AiError.isAiError(args[0]),
   (error: AiError.AiError, options: { readonly delay?: Duration.Input } = {}) => ({
     _tag: "Failure",
     error,

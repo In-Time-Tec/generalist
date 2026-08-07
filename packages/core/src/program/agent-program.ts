@@ -1,4 +1,4 @@
-import { Effect, Schema, Scope } from "effect"
+import { Effect, Function, Schema, Scope } from "effect"
 import type { NamedCapability } from "../durable/agent-manifest.js"
 import {
   make as makeManifest,
@@ -45,17 +45,30 @@ export const make = <I, IE, O, OE>(input: {
 })
 
 /** @experimental Execute a trusted, caller-supplied Agent Program through the configured sandbox boundary. */
-export const run = <I, IE, O, OE>(
-  program: Program<I, IE, O, OE>,
-  input: I,
-): Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramHost | Scope.Scope> =>
-  Effect.gen(function* () {
-    const encoded = yield* Schema.encodeEffect(program.input)(input).pipe(
-      Effect.mapError((error) => ProgramSchemaFailure.make({ boundary: "program-input", message: String(error) })),
-    )
-    const host = yield* ProgramHost
-    const output = yield* host.execute({ program: program.pinned, input: encoded })
-    return yield* Schema.decodeUnknownEffect(program.output)(output).pipe(
-      Effect.mapError((error) => ProgramSchemaFailure.make({ boundary: "program-output", message: String(error) })),
-    )
-  })
+export const run: {
+  <I, IE, O, OE>(
+    input: I,
+  ): (
+    program: Program<I, IE, O, OE>,
+  ) => Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramHost | Scope.Scope>
+  <I, IE, O, OE>(
+    program: Program<I, IE, O, OE>,
+    input: I,
+  ): Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramHost | Scope.Scope>
+} = Function.dual(
+  2,
+  <I, IE, O, OE>(
+    program: Program<I, IE, O, OE>,
+    input: I,
+  ): Effect.Effect<O, ProgramSchemaFailure | ExecutionFailure, ProgramHost | Scope.Scope> =>
+    Effect.gen(function* () {
+      const encoded = yield* Schema.encodeEffect(program.input)(input).pipe(
+        Effect.mapError((error) => ProgramSchemaFailure.make({ boundary: "program-input", message: String(error) })),
+      )
+      const host = yield* ProgramHost
+      const output = yield* host.execute({ program: program.pinned, input: encoded })
+      return yield* Schema.decodeUnknownEffect(program.output)(output).pipe(
+        Effect.mapError((error) => ProgramSchemaFailure.make({ boundary: "program-output", message: String(error) })),
+      )
+    }),
+)

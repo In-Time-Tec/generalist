@@ -1,4 +1,4 @@
-import { Effect, Option, Ref, Schema } from "effect"
+import { Effect, Function, Option, Ref, Schema } from "effect"
 import { Chat, LanguageModel, Prompt, Tokenizer, Tool } from "effect/unstable/ai"
 import { AgentError, type Event as AgentEvent, ResumeMismatch } from "./agent-event.js"
 import { Approvals } from "../policy/approvals.js"
@@ -50,7 +50,7 @@ const progressOverflowPolicySchema = Schema.Union([
   Schema.TaggedStruct("Fail", { capacity: progressCapacitySchema }),
 ])
 
-export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
+const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
   Effect.gen(function* () {
     const persistenceOptions = options.persistence
     const resume = options.resume
@@ -111,7 +111,6 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
                     )
               }),
           })
-
     let recoveredHistory: Prompt.Prompt | undefined
     if (
       resume !== undefined &&
@@ -129,7 +128,6 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
         recoveredHistory = buildContext(path)
       }).pipe(Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })))
     }
-
     let resumeChat: Chat.Service | undefined
     let validatedResume: SuspensionCheckpoint | undefined
     if (resume !== undefined) {
@@ -158,7 +156,6 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
         )
       }
     }
-
     const staticDeclarations: ReadonlyArray<StaticDeclaration> =
       agent.toolDeclarations ??
       Object.values(agent.toolkit.tools).map((tool) => ({
@@ -303,7 +300,7 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       undeliveredTelemetry.push(event)
     }
     if (options.driverCheckpoint !== undefined && Option.isSome(sessionService)) {
-      yield* restoreCheckpointTelemetry(sessionService.value, undeliveredTelemetry).pipe(
+      yield* restoreCheckpointTelemetry({ session: sessionService.value, undelivered: undeliveredTelemetry }).pipe(
         Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
       )
     }
@@ -312,22 +309,24 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
         publishTelemetry(prepareTelemetry(payload))
       })
     const flushTelemetry = (): ReadonlyArray<AgentEvent> => pendingTelemetry.splice(0, pendingTelemetry.length)
-    const deliverPending = (): Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed> => {
-      if (Option.isNone(deliveryService) || undeliveredTelemetry.length === 0) return Effect.void
-      const snapshot = Object.freeze([...undeliveredTelemetry])
-      return deliveryService.value.deliver({ sessionId, events: snapshot }).pipe(
-        Effect.onError(() =>
-          Effect.sync(() => {
-            pendingTelemetry.splice(0, pendingTelemetry.length)
-          }),
-        ),
-        Effect.tap(() =>
-          Effect.sync(() => {
-            undeliveredTelemetry.splice(0, snapshot.length)
-          }),
-        ),
-      )
-    }
+    const deliverPending: Effect.Effect<void, import("../model/model-telemetry.js").DeliveryFailed> = Effect.suspend(
+      () => {
+        if (Option.isNone(deliveryService) || undeliveredTelemetry.length === 0) return Effect.void
+        const snapshot = Object.freeze([...undeliveredTelemetry])
+        return deliveryService.value.deliver({ sessionId, events: snapshot }).pipe(
+          Effect.onError(() =>
+            Effect.sync(() => {
+              pendingTelemetry.splice(0, pendingTelemetry.length)
+            }),
+          ),
+          Effect.tap(() =>
+            Effect.sync(() => {
+              undeliveredTelemetry.splice(0, snapshot.length)
+            }),
+          ),
+        )
+      },
+    )
     const telemetryIdentity = makeIdentityCell()
     const restoredModelCallOrdinal =
       options.driverCheckpoint === undefined
@@ -491,3 +490,8 @@ export const setupRun = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, 
       chat,
     }
   })
+type SetupEffect<T extends Record<string, Tool.Any>, R> = ReturnType<typeof setupRunImpl<T, R>>
+export const setupRun: {
+  <T extends Record<string, Tool.Any>, R>(options: RunOptions): (agent: Agent<T, R>) => SetupEffect<T, R>
+  <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions): SetupEffect<T, R>
+} = Function.dual(2, setupRunImpl)

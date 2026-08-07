@@ -1,8 +1,10 @@
 import { RunAgentInputSchema, type AGUIEvent, type RunAgentInput } from "@ag-ui/core"
-import { Context, Effect, Layer, Stream } from "effect"
+import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { Cursor, type Address, Errors, Runtime } from "@batonfx/runtime"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
 import { makeState, project, stateSnapshot } from "./projection.js"
+
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 /** @experimental */
 export interface LayerOptions {
@@ -35,16 +37,16 @@ const validate = (value: RunAgentInput): Effect.Effect<RunAgentInput, InputMalfo
   const parsed = RunAgentInputSchema.safeParse(value)
   return parsed.success
     ? Effect.succeed(parsed.data)
-    : Effect.fail(new InputMalformed({ detail: parsed.error.message }))
+    : Effect.fail(InputMalformed.make({ detail: parsed.error.message }))
 }
 
 const rejectAuthority = (input: RunAgentInput): Effect.Effect<void, InputRejected> => {
-  if (input.tools.length > 0) return Effect.fail(new InputRejected({ reason: "client-tools" }))
+  if (input.tools.length > 0) return Effect.fail(InputRejected.make({ reason: "client-tools" }))
   if (input.messages.some((message: RunAgentInput["messages"][number]) => message.role === "system")) {
-    return Effect.fail(new InputRejected({ reason: "system-message" }))
+    return Effect.fail(InputRejected.make({ reason: "system-message" }))
   }
   if (input.messages.some((message: RunAgentInput["messages"][number]) => message.role === "developer")) {
-    return Effect.fail(new InputRejected({ reason: "developer-message" }))
+    return Effect.fail(InputRejected.make({ reason: "developer-message" }))
   }
   return Effect.void
 }
@@ -53,9 +55,9 @@ const finalPrompt = (
   input: RunAgentInput,
 ): Effect.Effect<{ readonly prompt: string; readonly messageId: string }, InputRejected> => {
   const message = input.messages.at(-1)
-  if (message?.role !== "user") return Effect.fail(new InputRejected({ reason: "final-message-not-user" }))
+  if (message?.role !== "user") return Effect.fail(InputRejected.make({ reason: "final-message-not-user" }))
   if (typeof message.content !== "string") {
-    return Effect.fail(new InputRejected({ reason: "unsupported-user-content" }))
+    return Effect.fail(InputRejected.make({ reason: "unsupported-user-content" }))
   }
   return Effect.succeed({ prompt: message.content, messageId: message.id })
 }
@@ -63,10 +65,10 @@ const finalPrompt = (
 const serializablePayload = (payload: unknown): Effect.Effect<unknown, InputRejected> =>
   Effect.try({
     try: () => {
-      if (JSON.stringify(payload) === undefined) throw new TypeError("Resume payload is not serializable")
+      encodeJsonValue(payload)
       return payload
     },
-    catch: () => new InputRejected({ reason: "invalid-resume" }),
+    catch: () => InputRejected.make({ reason: "invalid-resume" }),
   })
 
 const recover = (
@@ -81,7 +83,7 @@ const recover = (
     Stream.flattenIterable,
     Stream.catchIf(
       (error): error is Errors.SubscriberLagged | Errors.CursorExpired =>
-        error instanceof Errors.SubscriberLagged || error instanceof Errors.CursorExpired,
+        Schema.is(Errors.SubscriberLagged)(error) || Schema.is(Errors.CursorExpired)(error),
       () =>
         Stream.unwrap(
           runtime.snapshot(runId).pipe(
@@ -122,7 +124,7 @@ export const layer = (options: LayerOptions): Layer.Layer<AgUi, never, Runtime.R
                 entry.status !== "resolved" ||
                 entry.interruptId !== current.run.wait.waitId
               ) {
-                return yield* new ResumeMismatch({
+                return yield* ResumeMismatch.make({
                   runId: input.runId,
                   ...(current.run.wait?.status === "open" ? { expectedWaitId: current.run.wait.waitId } : {}),
                   receivedWaitIds,

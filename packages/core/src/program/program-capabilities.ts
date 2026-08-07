@@ -87,7 +87,7 @@ export class ProgramBudgetExhausted extends Schema.TaggedErrorClass<ProgramBudge
       "logBytes",
       "outputBytes",
     ]),
-    limit: Schema.Number,
+    limit: Schema.Finite,
   },
 ) {}
 
@@ -101,6 +101,12 @@ export class ProgramReplayDivergence extends Schema.TaggedErrorClass<ProgramRepl
 export class ProgramOperationUnknown extends Schema.TaggedErrorClass<ProgramOperationUnknown>()(
   "@batonfx/core/ProgramOperationUnknown",
   { operation: ProgramOperationName },
+) {}
+
+/** @experimental One decoded invocation failed with an implementation-specific error. */
+export class ProgramInvocationFailure extends Schema.TaggedErrorClass<ProgramInvocationFailure>()(
+  "@batonfx/core/ProgramInvocationFailure",
+  { cause: Schema.Unknown },
 ) {}
 
 /** @experimental */
@@ -218,7 +224,7 @@ export type CapabilityFailure = typeof CapabilityFailure.Type
 
 /** @experimental Encoded operations visible to sandboxed source. */
 export interface Interface {
-  readonly discoverTools: () => Effect.Effect<ReadonlyArray<ToolSummary>>
+  readonly discoverTools: Effect.Effect<ReadonlyArray<ToolSummary>>
   readonly describeTool: (name: string) => Effect.Effect<ToolDescription, ProgramCapabilityMissing>
   readonly callTool: (input: ToolCallInput) => Effect.Effect<unknown, CapabilityFailure>
   readonly callStep: (input: StepCallInput) => Effect.Effect<unknown, CapabilityFailure>

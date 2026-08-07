@@ -1,6 +1,6 @@
 import { Cause, Context, Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool } from "effect/unstable/ai"
-import { ModelMiddleware, ModelRegistry } from "@batonfx/core"
+import { ModelMiddleware, ModelRegistry, ToolContext } from "@batonfx/core"
 
 /** @experimental */
 export interface Input {
@@ -32,10 +32,8 @@ const singleFailure = (cause: Cause.Cause<unknown>): unknown | undefined => {
 
 type BroadTools = Record<string, Tool.Any>
 type GenerateTextOptions = LanguageModel.GenerateTextOptions<BroadTools>
-type GenerateObjectOptions = LanguageModel.GenerateObjectOptions<
-  BroadTools,
-  Schema.Encoder<Record<string, Tool.Any>, unknown>
->
+const objectSchema = Schema.Struct({ value: Schema.String })
+type GenerateObjectOptions = LanguageModel.GenerateObjectOptions<BroadTools, typeof objectSchema>
 
 const noToolkitOptions = (options: GenerateTextOptions): LanguageModel.GenerateTextOptions<{}> => ({
   prompt: options.prompt,
@@ -49,13 +47,26 @@ const noToolkitOptions = (options: GenerateTextOptions): LanguageModel.GenerateT
   toolkit: undefined,
 })
 
-const invokeGenerateText = (model: LanguageModel.Service, options: GenerateTextOptions) =>
-  options.toolkit === undefined
-    ? model.generateText({ ...noToolkitOptions(options), toolkit: undefined })
-    : model.generateText({ ...options, toolkit: options.toolkit })
+const invokeGenerateText = (model: LanguageModel.Service, options: GenerateTextOptions) => {
+  if (options.toolkit === undefined) {
+    return model.generateText({ ...noToolkitOptions(options), toolkit: undefined })
+  }
+  const invoked: Effect.Effect<
+    LanguageModel.GenerateTextResponse<BroadTools>,
+    LanguageModel.ExtractError<GenerateTextOptions>,
+    ToolContext.ToolContext
+  > = model.generateText({ ...options, toolkit: options.toolkit })
+  return invoked
+}
 
-const invokeGenerateObject = (model: LanguageModel.Service, options: GenerateObjectOptions) =>
-  model.generateObject(options)
+const invokeGenerateObject = (
+  model: LanguageModel.Service,
+  options: GenerateObjectOptions,
+): import("effect").Effect.Effect<
+  LanguageModel.GenerateObjectResponse<BroadTools, unknown>,
+  import("effect/unstable/ai").AiError.AiError,
+  ToolContext.ToolContext
+> => model.generateObject(options)
 
 const invokeStreamText = (model: LanguageModel.Service, options: GenerateTextOptions) =>
   options.toolkit === undefined

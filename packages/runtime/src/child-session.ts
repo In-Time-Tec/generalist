@@ -8,12 +8,12 @@
  * Derivation is deterministic rather than generated: a durable Runtime retries, and a replayed spawn
  * must reattach to the same child Session instead of stranding the first attempt's work in an orphan.
  */
-export const childSessionId = (parentRunId: string, invocationId: string): string =>
-  `child:${encodeURIComponent(parentRunId)}:${encodeURIComponent(invocationId)}`
+export const childSessionId = (input: { readonly parentRunId: string; readonly invocationId: string }): string =>
+  `child:${encodeURIComponent(input.parentRunId)}:${encodeURIComponent(input.invocationId)}`
 
 /** @experimental Session identity for one member of a fan-out. */
-export const fanOutMemberSessionId = (fanOutId: string, key: string): string =>
-  `fanout:${encodeURIComponent(fanOutId)}:${encodeURIComponent(key)}`
+export const fanOutMemberSessionId = (input: { readonly fanOutId: string; readonly key: string }): string =>
+  `fanout:${encodeURIComponent(input.fanOutId)}:${encodeURIComponent(input.key)}`
 
 /** @experimental Shape one fan-out member into its admitted child form. */
 export const fanOutMember = <
@@ -25,16 +25,17 @@ export const fanOutMember = <
     readonly metadata?: Readonly<Record<string, unknown>>
   },
   P,
->(
-  input: { readonly fanOutId: string; readonly childRunIdFor: (fanOutId: string, ordinal: number) => string },
-  member: M,
-  ordinal: number,
-) => ({
-  ordinal,
-  key: member.key,
-  childRunId: input.childRunIdFor(input.fanOutId, ordinal),
-  selection: member.selection,
-  prompt: member.prompt,
-  sessionId: member.sessionId ?? fanOutMemberSessionId(input.fanOutId, member.key),
-  metadata: member.metadata ?? {},
+>(input: {
+  readonly fanOutId: string
+  readonly childRunIdFor: (fanOutId: string, ordinal: number) => string
+  readonly member: M
+  readonly ordinal: number
+}) => ({
+  ordinal: input.ordinal,
+  key: input.member.key,
+  childRunId: input.childRunIdFor(input.fanOutId, input.ordinal),
+  selection: input.member.selection,
+  prompt: input.member.prompt,
+  sessionId: input.member.sessionId ?? fanOutMemberSessionId({ fanOutId: input.fanOutId, key: input.member.key }),
+  metadata: input.member.metadata ?? {},
 })

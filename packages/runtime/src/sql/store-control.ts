@@ -1,6 +1,8 @@
-import { Effect, Equal, Schema } from "effect"
+import { Effect, Equal } from "effect"
 import { SqlClient } from "effect/unstable/sql"
+import { Prompt } from "effect/unstable/ai"
 import {
+  ApprovalMismatch,
   ApprovalStale,
   ResponseConflict,
   RunNotFound,
@@ -10,14 +12,14 @@ import {
 } from "../errors.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { AgentLoopEvent } from "../agent-event.js"
-import type { ExecutionResult } from "../execution-state.js"
+import { ExecutionCheckpoint, ExecutionSuspension, type ExecutionResult } from "../execution-state.js"
 import type { CancelInput, RespondInput, SignalInput } from "../runtime.js"
 import type { RespondInput as RespondApprovalInput } from "../approval.js"
 import { isTerminal } from "../run.js"
 import type { RunFailure } from "../run-event.js"
-import { encodeReason, type WaitResolution } from "../run-wait.js"
+import { encodeReason, WaitResolution } from "../run-wait.js"
 import { checkpointRef } from "../executable-manifest.js"
-import { encodeExecutableRef } from "./codecs.js"
+import { StringArray, encodeExecutableRef, encodeJson } from "./codecs.js"
 import { encodeContinuation } from "../steering.js"
 import {
   afterTerminal,
@@ -40,6 +42,33 @@ const requireRun = (runId: string) =>
   loadRun(runId).pipe(
     Effect.flatMap((run) => (run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run))),
   )
+
+type UndefinedEffect = Effect.Effect<
+  undefined,
+  RunNotFound | RunTerminal | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+type ConflictEffect = Effect.Effect<
+  undefined,
+  ResponseConflict | RunNotFound | RunTerminal | RuntimeUnavailable | SqlError | WaitNotOpen,
+  SqlClient.SqlClient
+>
+type VoidEffect = Effect.Effect<void, RunNotFound | RuntimeUnavailable | SqlError, SqlClient.SqlClient>
+type ApprovalEffect = Effect.Effect<
+  void | undefined,
+  ApprovalMismatch | ApprovalStale | RunNotFound | RuntimeUnavailable | SqlError,
+  SqlClient.SqlClient
+>
+type ResumeEffect = Effect.Effect<
+  undefined,
+  ResponseConflict | RunNotFound | RunTerminal | RuntimeUnavailable | SqlError | WaitNotOpen,
+  SqlClient.SqlClient
+>
+type CompleteInput = { readonly runId: string; readonly result: ExecutionResult }
+type FailInput = { readonly runId: string; readonly error: RunFailure }
+type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }
+type AgentEventInput = { readonly runId: string; readonly event: AgentLoopEvent }
+type SuspendInput = Parameters<import("../run-store.js").Interface["suspend"]>[0]
 
 const cancelRun = (
   hub: EventHub,
@@ -108,8 +137,14 @@ const cancelRun = (
     yield* afterTerminal(hub, settled)
   })
 
-export const respond = (hub: EventHub, input: RespondInput) =>
-  Effect.gen(function* () {
+export const respond: {
+  (hub: EventHub, input: RespondInput): ConflictEffect
+  (input: RespondInput): (hub: EventHub) => ConflictEffect
+} = (hubOrInput: EventHub | RespondInput, maybeInput?: RespondInput): any => {
+  if (maybeInput === undefined) return (hub: EventHub) => respond(hub, hubOrInput as RespondInput)
+  const hub = hubOrInput as EventHub
+  const input = maybeInput
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
@@ -128,11 +163,11 @@ export const respond = (hub: EventHub, input: RespondInput) =>
     const updated = yield* nowIso
     const resolution: WaitResolution = input.resolution
     yield* sql`
-      UPDATE baton_run_waits SET status = 'responded', response_json = ${JSON.stringify(resolution)}, closed_at = ${updated}
+      UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${updated}
       WHERE run_id = ${run.runId} AND wait_id = ${input.waitId} AND status = 'open'
     `
     yield* sql`
-      UPDATE baton_runs SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = ${updated}
+      UPDATE baton_runs SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = ${updated}
       WHERE run_id = ${run.runId}
     `
     yield* sql`
@@ -142,9 +177,16 @@ export const respond = (hub: EventHub, input: RespondInput) =>
     const current = (yield* loadRun(run.runId))!
     yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
   })
+}
 
-export const respondApproval = (hub: EventHub, input: RespondApprovalInput) =>
-  approvalResponse(input).pipe(
+export const respondApproval: {
+  (hub: EventHub, input: RespondApprovalInput): ApprovalEffect
+  (input: RespondApprovalInput): (hub: EventHub) => ApprovalEffect
+} = (hubOrInput: EventHub | RespondApprovalInput, maybeInput?: RespondApprovalInput): any => {
+  if (maybeInput === undefined) return (hub: EventHub) => respondApproval(hub, hubOrInput as RespondApprovalInput)
+  const hub = hubOrInput as EventHub
+  const input = maybeInput
+  return approvalResponse(input).pipe(
     Effect.flatMap((response) =>
       response._tag === "Duplicate"
         ? Effect.void
@@ -158,9 +200,15 @@ export const respondApproval = (hub: EventHub, input: RespondApprovalInput) =>
         : error,
     ),
   )
-
-export const signal = (hub: EventHub, input: SignalInput) =>
-  Effect.gen(function* () {
+}
+export const signal: {
+  (hub: EventHub, input: SignalInput): UndefinedEffect
+  (input: SignalInput): (hub: EventHub) => UndefinedEffect
+} = (hubOrInput: EventHub | SignalInput, maybeInput?: SignalInput): any => {
+  if (maybeInput === undefined) return (hub: EventHub) => signal(hub, hubOrInput as SignalInput)
+  const hub = hubOrInput as EventHub
+  const input = maybeInput
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
@@ -174,29 +222,47 @@ export const signal = (hub: EventHub, input: SignalInput) =>
       ...(input.payload === undefined ? {} : { payload: input.payload }),
     }
     yield* sql`
-      UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${updated}
+      UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${updated}
       WHERE run_id = ${run.runId} AND wait_id = ${run.activeWaitId} AND status = 'open'
     `
     yield* appendEvent(hub, run, { _tag: "RunResumed", waitId: run.activeWaitId, resolution }, "running")
   })
-
-export const cancel = (hub: EventHub, input: CancelInput) =>
-  Effect.gen(function* () {
+}
+export const cancel: {
+  (hub: EventHub, input: CancelInput): VoidEffect
+  (input: CancelInput): (hub: EventHub) => VoidEffect
+} = (hubOrInput: EventHub | CancelInput, maybeInput?: CancelInput): any => {
+  if (maybeInput === undefined) return (hub: EventHub) => cancel(hub, hubOrInput as CancelInput)
+  const hub = hubOrInput as EventHub
+  const input = maybeInput
+  return Effect.gen(function* () {
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return
     yield* cancelRun(hub, run, input.reason)
   })
-
+}
 /** Settle a cancellation that was admitted while an unknown operation still needed resolution. */
-export const settleAdmittedCancellation = (hub: EventHub, runId: string) =>
-  Effect.gen(function* () {
+export const settleAdmittedCancellation: {
+  (hub: EventHub, runId: string): VoidEffect
+  (runId: string): (hub: EventHub) => VoidEffect
+} = (hubOrRunId: EventHub | string, maybeRunId?: string): any => {
+  if (maybeRunId === undefined) return (hub: EventHub) => settleAdmittedCancellation(hub, hubOrRunId as string)
+  const hub = hubOrRunId as EventHub
+  const runId = maybeRunId as string
+  return Effect.gen(function* () {
     const run = yield* loadRun(runId)
     if (run === undefined || !run.cancellationRequested || isTerminal(run.status)) return
     yield* cancelRun(hub, run, run.cancelReason)
   })
-
-export const complete = (hub: EventHub, input: { readonly runId: string; readonly result: ExecutionResult }) =>
-  Effect.gen(function* () {
+}
+export const complete: {
+  (hub: EventHub, input: CompleteInput): UndefinedEffect
+  (input: CompleteInput): (hub: EventHub) => UndefinedEffect
+} = (hubOrInput: EventHub | CompleteInput, maybeInput?: CompleteInput): any => {
+  if (maybeInput === undefined) return (hub: EventHub) => complete(hub, hubOrInput as CompleteInput)
+  const hub = hubOrInput as EventHub
+  const input = maybeInput
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
@@ -225,7 +291,7 @@ export const complete = (hub: EventHub, input: { readonly runId: string; readonl
     if (running.length > 0) {
       yield* sql`
         UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL,
-          pending_outcome_json = ${JSON.stringify(Schema.encodeSync(PendingRunOutcome)({ _tag: "Completed", result: input.result }))}
+          pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Completed", result: input.result })}
         WHERE run_id = ${run.runId}
       `
       return
@@ -235,9 +301,15 @@ export const complete = (hub: EventHub, input: { readonly runId: string; readonl
     yield* settleParent(hub, settled, event.eventId)
     yield* afterTerminal(hub, settled)
   })
-
-export const fail = (hub: EventHub, input: { readonly runId: string; readonly error: RunFailure }) =>
-  Effect.gen(function* () {
+}
+export const fail: {
+  (hub: EventHub, input: FailInput): UndefinedEffect
+  (input: FailInput): (hub: EventHub) => UndefinedEffect
+} = (hubOrInput: EventHub | FailInput, maybeInput?: FailInput): any => {
+  if (maybeInput === undefined) return (hub: EventHub) => fail(hub, hubOrInput as FailInput)
+  const hub = hubOrInput as EventHub
+  const input = maybeInput
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
@@ -266,7 +338,7 @@ export const fail = (hub: EventHub, input: { readonly runId: string; readonly er
     if (running.length > 0) {
       yield* sql`
         UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL,
-          pending_outcome_json = ${JSON.stringify(Schema.encodeSync(PendingRunOutcome)({ _tag: "Failed", error: input.error }))}
+          pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Failed", error: input.error })}
         WHERE run_id = ${run.runId}
       `
       return
@@ -276,9 +348,15 @@ export const fail = (hub: EventHub, input: { readonly runId: string; readonly er
     yield* settleParent(hub, settled, event.eventId)
     yield* afterTerminal(hub, settled)
   })
-
-export const suspend = (hub: EventHub, input: Parameters<import("../run-store.js").Interface["suspend"]>[0]) =>
-  Effect.gen(function* () {
+}
+export const suspend: {
+  (hub: EventHub, input: SuspendInput): UndefinedEffect
+  (input: SuspendInput): (hub: EventHub) => UndefinedEffect
+} = (hubOrInput: EventHub | SuspendInput, maybeInput?: SuspendInput): any => {
+  if (maybeInput === undefined) return (hub: EventHub) => suspend(hub, hubOrInput as SuspendInput)
+  const hub = hubOrInput as EventHub
+  const input = maybeInput
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
@@ -289,10 +367,10 @@ export const suspend = (hub: EventHub, input: Parameters<import("../run-store.js
     const opened = yield* nowIso
     yield* sql`
       UPDATE baton_runs SET
-        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
-        suspension_json = ${JSON.stringify(input.suspension)},
-        transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+        suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
+        transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
         continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
           THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
           ELSE continuation_json END,
@@ -327,7 +405,7 @@ export const suspend = (hub: EventHub, input: Parameters<import("../run-store.js
         }
         const closed = yield* nowIso
         yield* sql`
-          UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${closed}
+          UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closed}
           WHERE run_id = ${run.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
         `
         yield* appendEvent(
@@ -340,12 +418,15 @@ export const suspend = (hub: EventHub, input: Parameters<import("../run-store.js
     }
     yield* sql`UPDATE baton_runs SET owner_worker_id = NULL WHERE run_id = ${run.runId}`
   })
-
-export const resume = (
-  hub: EventHub,
-  input: { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution },
-) =>
-  Effect.gen(function* () {
+}
+export const resume: {
+  (hub: EventHub, input: ResumeInput): ResumeEffect
+  (input: ResumeInput): (hub: EventHub) => ResumeEffect
+} = (hubOrInput: EventHub | ResumeInput, maybeInput?: ResumeInput): any => {
+  if (maybeInput === undefined) return (hub: EventHub) => resume(hub, hubOrInput as ResumeInput)
+  const hub = hubOrInput as EventHub
+  const input = maybeInput
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
@@ -364,27 +445,34 @@ export const resume = (
     const resolution: WaitResolution = input.resolution
     const updated = yield* nowIso
     yield* sql`
-      UPDATE baton_run_waits SET status = 'responded', response_json = ${JSON.stringify(resolution)}, closed_at = ${updated}
+      UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${updated}
       WHERE run_id = ${run.runId} AND wait_id = ${input.waitId} AND status = 'open'
     `
     yield* sql`
-      UPDATE baton_runs SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = ${updated}
+      UPDATE baton_runs SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = ${updated}
       WHERE run_id = ${run.runId}
     `
     const current = (yield* loadRun(run.runId))!
     yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
   })
-
-export const emitAgentEvent = (hub: EventHub, input: { readonly runId: string; readonly event: AgentLoopEvent }) =>
-  Effect.gen(function* () {
+}
+export const emitAgentEvent: {
+  (hub: EventHub, input: AgentEventInput): UndefinedEffect
+  (input: AgentEventInput): (hub: EventHub) => UndefinedEffect
+} = (hubOrInput: EventHub | AgentEventInput, maybeInput?: AgentEventInput): any => {
+  if (maybeInput === undefined) return (hub: EventHub) => emitAgentEvent(hub, hubOrInput as AgentEventInput)
+  const hub = hubOrInput as EventHub
+  const input = maybeInput
+  return Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
     yield* appendEvent(hub, run, input.event as { readonly _tag: string } & Record<string, unknown>)
     if (input.event._tag === "TurnCompleted") {
       yield* sql`
-        UPDATE baton_runs SET transcript_json = ${JSON.stringify(input.event.transcript)}, continuation_json = NULL
+        UPDATE baton_runs SET transcript_json = ${encodeJson(Prompt.Prompt, input.event.transcript)}, continuation_json = NULL
         WHERE run_id = ${run.runId}
       `
     }
   })
+}

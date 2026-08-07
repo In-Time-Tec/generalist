@@ -1,6 +1,7 @@
 import { cva } from "class-variance-authority"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import type { SlotConfig } from "@/lib/utils"
 import { cn } from "@/lib/utils"
@@ -52,10 +53,10 @@ const chevronDownIcon = <ParentMessage>(): Html => {
  * animation is not ported (gap); each item's panel positions itself below its
  * own trigger like shadcn's `viewport={false}` mode.
  */
-export const navigationMenu = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const navigationMenu: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.nav(
     [
@@ -65,9 +66,11 @@ export const navigationMenu = <ParentMessage>(
     ],
     [...children],
   )
-}
-
-export const list = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+})
+export const list: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.ul(
     [
@@ -77,9 +80,11 @@ export const list = <ParentMessage>(config: SlotConfig<ParentMessage>, children:
     ],
     [...children],
   )
-}
-
-export const item = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+})
+export const item: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.li(
     [
@@ -89,8 +94,7 @@ export const item = <ParentMessage>(config: SlotConfig<ParentMessage>, children:
     ],
     [...children],
   )
-}
-
+})
 export type TriggerConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
     isOpen: boolean
@@ -102,10 +106,10 @@ export type TriggerConfig<ParentMessage> = SlotConfig<ParentMessage> &
  * `isOpen` reflects the consumer's Model; `onClick` is the consumer's toggle
  * Message.
  */
-export const trigger = <ParentMessage>(
-  config: TriggerConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const trigger: {
+  <ParentMessage>(config: TriggerConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: TriggerConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: TriggerConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.button(
     [
@@ -119,14 +123,16 @@ export const trigger = <ParentMessage>(
     ],
     [...children, chevronDownIcon<ParentMessage>()],
   )
-}
-
+})
 /**
  * Navigation menu panel, positioned absolutely below its item. Mount it
  * conditionally on the consumer's open state, following the keyed-view rules
  * for stateful children.
  */
-export const content = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const content: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -136,27 +142,26 @@ export const content = <ParentMessage>(config: SlotConfig<ParentMessage>, childr
     ],
     [...children],
   )
-}
-
+})
 export type LinkConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
     href?: string
     isActive?: boolean
   }>
 
-export const link = <ParentMessage>(
-  config: LinkConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const link: {
+  <ParentMessage>(config: LinkConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: LinkConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: LinkConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.a(
     [
       ...(config.href === undefined ? [] : [h.Href(config.href)]),
-      ...(config.isActive ? [h.DataAttribute("active", "")] : []),
+      ...(config.isActive === true ? [h.DataAttribute("active", "")] : []),
       ...(config.attributes ?? []),
       h.DataAttribute("slot", "navigation-menu-link"),
       h.Class(cn(linkClass, config.class)),
     ],
     [...children],
   )
-}
+})

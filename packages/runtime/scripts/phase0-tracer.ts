@@ -1,12 +1,14 @@
-import { Effect } from "effect"
+import { Console, Effect, ManagedRuntime, Schema } from "effect"
 import { Runtime, RunStore } from "../src/index.js"
 import { assistantAddress, textPrompt } from "../test/helpers.js"
 import { sqliteLayer, tempDbPath } from "../test/sqlite-helpers.js"
 
-const program = Effect.gen(function* () {
-  const filename = tempDbPath("phase0-cli")
-  let externalCounter = 0
-  const boundary = yield* Effect.gen(function* () {
+const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+
+const filename = tempDbPath("phase0-cli")
+
+const runBoundary = (externalCounter: { value: number }) =>
+  Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const driver = yield* RunStore.RunStore
     const receipt = yield* runtime.send({
@@ -26,29 +28,32 @@ const program = Effect.gen(function* () {
       attempt: 1,
     })
     yield* driver.startOperation({ ...claim, operationId: op.operationId })
-    externalCounter += 1
+    externalCounter.value += 1
     return { runId: receipt.runId, operationId: op.operationId }
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  })
 
-  const unknown = yield* Effect.gen(function* () {
+const runUnknown = (boundary: { readonly runId: string; readonly operationId: string }) =>
+  Effect.gen(function* () {
     const driver = yield* RunStore.RunStore
     const claim = yield* driver.claimExecution({ runId: boundary.runId, ownerId: "tracer-recovery" })
     return yield* driver.expireRunningOperation({ ...claim, operationId: boundary.operationId })
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  })
+const program = Effect.gen(function* () {
+  const externalCounter: { value: number } = { value: 0 }
+  const boundary = yield* runBoundary(externalCounter)
 
-  console.log(
-    JSON.stringify(
-      {
-        filename,
-        externalCounter,
-        outcome: unknown.outcome,
-        status: unknown.record.status,
-        blindRepeat: false,
-      },
-      null,
-      2,
-    ),
+  const unknown = yield* runUnknown(boundary)
+
+  yield* Console.log(
+    encodeJson({
+      filename,
+      externalCounter: externalCounter.value,
+      outcome: unknown.outcome,
+      status: unknown.record.status,
+      blindRepeat: false,
+    }),
   )
 })
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(sqliteLayer(filename))
+await runtime.runPromise(program)

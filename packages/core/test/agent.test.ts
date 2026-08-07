@@ -316,6 +316,8 @@ const modelLayer = (
     }),
   )
 
+const unusedModelLayer = modelLayer(() => Stream.make(textDelta("unused")))
+
 class Budget extends Context.Service<Budget, { readonly remaining: (turn: number) => number }>()(
   "@batonfx/core/test/agent.test/Budget",
 ) {}
@@ -1049,7 +1051,11 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             provider: "test",
             model: "agent-default",
             layer: modelLayer(() => Stream.make(textDelta("registry done"))),
-          }).pipe(Effect.map((registration) => ModelRegistry.layer([Effect.succeed(registration)]))),
+          }).pipe(
+            Effect.map((registration) =>
+              Layer.mergeAll(ModelRegistry.layer([Effect.succeed(registration)]), unusedModelLayer),
+            ),
+          ),
         ),
         Effect.gen(function* () {
           const agent = Agent.make({
@@ -1108,6 +1114,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
               unusedExecutor,
               Approvals.layerAutoApprove,
               ModelMiddleware.layerIdentity,
+              unusedModelLayer,
             ),
           ),
         ),
@@ -4145,6 +4152,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const session = yield* Session.SessionStore
@@ -4201,6 +4209,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "fallback-overflow-agent", model: overflowSelection })
@@ -4252,6 +4261,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "error-part-overflow-agent", model: overflowSelection })
@@ -4286,6 +4296,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "reactive-compaction-fail-agent", model: overflowSelection })
@@ -4316,6 +4327,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "partial-overflow-agent", model: overflowSelection })
@@ -4353,6 +4365,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         }),
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -4385,6 +4398,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "unchanged-overflow-agent", model: overflowSelection })
@@ -4413,6 +4427,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         unusedExecutor,
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "terminal-overflow-agent", model: overflowSelection })
@@ -6078,6 +6093,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         Approvals.layerAutoApprove,
         ModelResilience.layer({ retrySchedule: Schedule.recurs(3), classify: () => "transient" }),
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "terminal-structured-overflow-agent", model: overflowSelection })
@@ -6368,6 +6384,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           classify: (error) => (error === overrideFailure ? "transient" : "terminal"),
         }),
         ModelMiddleware.layerIdentity,
+        unusedModelLayer,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({
@@ -7869,7 +7886,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ),
     Effect.gen(function* () {
       const agent = Agent.make({ name: "checkpoint-identity-agent" })
-      const executable = ExecutableManifest.makeTest("checkpoint-identity-agent")
+      const executable = ExecutableManifest.makeTest("checkpoint-identity-agent", undefined)
       const budget = RunBudget.allocate({})
       const checkpoint: DurableDriver.DriverCheckpoint = {
         driverVersion: DurableDriver.currentDriverVersion,
@@ -7909,12 +7926,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ),
     Effect.gen(function* () {
       const agent = Agent.make({ name: "journal-restart-agent" })
-      const executable = ExecutableManifest.makeTest("journal-restart-agent")
+      const executable = ExecutableManifest.makeTest("journal-restart-agent", undefined)
       let pending: DurableDriver.DriverCheckpoint | undefined
       const crashingJournal: DurableDriver.DriverJournal = {
         onScheduled: (operation, checkpoint) =>
           operation.kind !== "model"
-            ? Effect.succeed(undefined)
+            ? Effect.void
             : Effect.sync(() => {
                 pending = checkpoint
               }).pipe(Effect.andThen(Effect.interrupt)),
@@ -7925,11 +7942,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         prompt: "continue",
         logicalOperationId: "journal-restart",
         executableRef: executable.ref,
-      }).pipe(
-        Stream.runDrain,
-        Effect.provide(Layer.succeed(DurableDriver.DriverJournalService, crashingJournal)),
-        Effect.exit,
-      )
+      }).pipe(Stream.runDrain, Effect.provideService(DurableDriver.DriverJournalService, crashingJournal), Effect.exit)
       expect(pending).toBeDefined()
 
       const scheduled: Array<string> = []
@@ -7946,7 +7959,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         logicalOperationId: "journal-restart",
         executableRef: executable.ref,
         driverCheckpoint: pending!,
-      }).pipe(Stream.runCollect, Effect.provide(Layer.succeed(DurableDriver.DriverJournalService, resumedJournal)))
+      }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournalService, resumedJournal))
       expect(scheduled.find((key) => key.includes(":model:"))).toContain(":model:0:0:conversation")
       const call = events.find((event) => event._tag === "ModelCallStarted")
       const attempt = events.find((event) => event._tag === "ModelAttemptStarted")

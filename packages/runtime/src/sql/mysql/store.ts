@@ -1,6 +1,5 @@
-import { Duration, Effect, Ref, Schedule, Stream, type Scope } from "effect"
+import { Duration, Effect, Option, Ref, Schedule, Stream, type Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
-import type { SqlError } from "effect/unstable/sql/SqlError"
 import { CursorExpired, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { checkpointRef } from "../../executable-manifest.js"
 import type { LayerOptions } from "../../runtime.js"
@@ -37,7 +36,6 @@ import {
   nowIso,
 } from "../store-helpers.js"
 import type { RunRow } from "../rows.js"
-import { withSql } from "../sql-effect.js"
 import { makeEventHub } from "../subscribers.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
 import {
@@ -48,13 +46,12 @@ import {
   SchemaVersionUnsupported,
 } from "../errors.js"
 import { check as checkSchema } from "./run-schema.js"
-import { initializeReadCommitted, isDeadlock, makeMysqlClaims } from "./store-claims.js"
+import { initializeReadCommitted, makeMysqlClaims } from "./store-claims.js"
 import { admitFanOut, inspectFanOut } from "../store-fan-out.js"
 import { loadTreeHistory } from "../tree-history.js"
 import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
-import { encodeExecutableRef } from "../codecs.js"
+import { encodeExecutableRef, encodeJson } from "../codecs.js"
 import { encodeContinuation } from "../../steering.js"
-import { withConsistentSnapshot } from "../inspection-transaction.js"
 import {
   admitProgramAgents,
   commitProgramLog,
@@ -68,7 +65,10 @@ import {
 } from "../store-program.js"
 import { ProgramCapabilities } from "@batonfx/core"
 import { groupIdFromSuspension, resultFromInspection } from "../../child-group.js"
-import { encodeReason } from "../../run-wait.js"
+import { encodeReason, WaitResolution } from "../../run-wait.js"
+import { Prompt } from "effect/unstable/ai"
+import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
+import { makeSqlRunner } from "./transaction.js"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
@@ -92,7 +92,7 @@ export const makeMysqlServices = (
     const source = options.source ?? "mysql"
     const addressBindings = new Map(options.addresses.map((entry) => [entry.address, entry.executable] as const))
     yield* checkSchema(source)
-    const hub = yield* makeEventHub()
+    const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
     const transactionHub: typeof hub = { ...hub, publish: () => Effect.void }
     const capacity = options.subscriberQueueCapacity ?? 64
@@ -108,7 +108,7 @@ export const makeMysqlServices = (
     if (!Number.isSafeInteger(majorVersion) || majorVersion < 8) {
       return yield* SchemaMigrationFailed.make({ source, message: "MySQL runtime requires MySQL 8 or newer" })
     }
-    yield* initializeReadCommitted(sql, connections).pipe(
+    yield* initializeReadCommitted({ sql, connections }).pipe(
       Effect.mapError((error) => SchemaMigrationFailed.make({ source, message: String(error) })),
     )
     const isolation = yield* sql<{ isolation: string }>`SELECT @@transaction_isolation AS isolation`.pipe(
@@ -117,22 +117,7 @@ export const makeMysqlServices = (
     if (isolation[0]?.isolation !== "READ-COMMITTED") {
       return yield* SchemaMigrationFailed.make({ source, message: "MySQL runtime requires READ COMMITTED" })
     }
-    const transaction = <A, E>(
-      effect: Effect.Effect<A, E, SqlClient.SqlClient>,
-      retries = 4,
-    ): Effect.Effect<A, E | SqlError, SqlClient.SqlClient> =>
-      Effect.suspend(() =>
-        sql.withTransaction(effect).pipe(
-          Effect.catchIf(
-            (error): error is E | SqlError => retries > 0 && isDeadlock(error),
-            () => Effect.sleep("10 millis").pipe(Effect.andThen(transaction(effect, retries - 1))),
-          ),
-        ),
-      )
-    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, transaction(effect))
-    const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
-    const runInspection = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      withSql(sql, withConsistentSnapshot(sql, "mysql", effect))
+    const { run, runNoTxn, runInspection } = makeSqlRunner(sql)
     const lockRun = (runId: string) => sql`SELECT run_id FROM baton_runs WHERE run_id = ${runId} FOR UPDATE`
     const lockParent = (runId: string) =>
       sql<{ parent_run_id: string | null }>`SELECT parent_run_id FROM baton_runs WHERE run_id = ${runId}`.pipe(
@@ -167,10 +152,10 @@ export const makeMysqlServices = (
         })
         yield* sql`
           UPDATE baton_runs SET
-            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
             executable_ref_json = ${encodeExecutableRef(executableRef)},
-            suspension_json = ${JSON.stringify(input.suspension)},
-            transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+            suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
+            transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
             continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
               THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
               ELSE continuation_json END,
@@ -207,7 +192,7 @@ export const makeMysqlServices = (
             }
             const closed = yield* nowIso
             yield* sql`
-              UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${closed}
+              UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closed}
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
             `
             yield* appendEvent(
@@ -233,17 +218,17 @@ export const makeMysqlServices = (
         })
         yield* sql`
           UPDATE baton_runs SET
-            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
             executable_ref_json = ${encodeExecutableRef(executableRef)},
-            suspension_json = COALESCE(${input.suspension === undefined ? null : JSON.stringify(input.suspension)}, suspension_json),
-            transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+            suspension_json = COALESCE(${input.suspension === undefined ? null : encodeJson(ExecutionSuspension, input.suspension)}, suspension_json),
+            transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
             updated_at = ${yield* nowIso}
           WHERE run_id = ${input.runId} AND owner_worker_id = ${input.ownerId} AND attempt_fence = ${input.attemptFence}
         `
       })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "mysql", multiWorker: true }),
-      sessionStore: () => Effect.succeed(undefined),
+      sessionStore: () => Effect.succeed(Option.none()),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) =>
         run(

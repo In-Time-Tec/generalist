@@ -1,7 +1,9 @@
 import { EventSchemas, EventType, type AGUIEvent } from "@ag-ui/core"
-import { Effect, Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { RunEvent } from "@batonfx/runtime"
 import { EventInvalid, ValueNotSerializable } from "./errors.js"
+
+const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 /** @experimental */
 export interface ProjectionState {
@@ -21,7 +23,7 @@ const emit = (event: unknown): Effect.Effect<AGUIEvent, EventInvalid> => {
   const parsed = EventSchemas.safeParse(event)
   return parsed.success
     ? Effect.succeed(parsed.data)
-    : Effect.fail(new EventInvalid({ source: "ag-ui", detail: parsed.error.message }))
+    : Effect.fail(EventInvalid.make({ source: "ag-ui", detail: parsed.error.message }))
 }
 
 const emitAll = (events: ReadonlyArray<unknown>): Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid> =>
@@ -31,11 +33,9 @@ const stringify = (value: unknown, field: string): Effect.Effect<string, ValueNo
   Effect.try({
     try: () => {
       if (typeof value === "string") return value
-      const encoded = JSON.stringify(value)
-      if (encoded === undefined) throw new TypeError("Value has no JSON representation")
-      return encoded
+      return encodeJsonValue(value)
     },
-    catch: () => new ValueNotSerializable({ field }),
+    catch: () => ValueNotSerializable.make({ field }),
   })
 
 const closeOpen = (state: ProjectionState): ReadonlyArray<unknown> => {
@@ -130,125 +130,138 @@ const projectModelPart = (
 }
 
 /** @experimental */
-export const project = (
-  state: ProjectionState,
-  value: unknown,
-  threadId: string,
-): Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid | ValueNotSerializable> => {
-  if (!Schema.is(RunEvent.RunEvent)(value)) {
-    return Effect.fail(new EventInvalid({ source: "runtime", detail: "RunEvent schema rejected the value" }))
-  }
-  const event = value
-  return Effect.suspend(() => {
-    if (event._tag === "ModelPart") return projectModelPart(state, event)
-    switch (event._tag) {
-      case "RunAccepted":
-        return emitAll([
-          {
-            type: EventType.RUN_STARTED,
-            threadId,
-            runId: event.runId,
-            ...(event.parentRunId === undefined ? {} : { parentRunId: event.parentRunId }),
-          },
-        ])
-      case "RunResumed":
-        return emitAll([
-          {
-            type: EventType.RUN_STARTED,
-            threadId,
-            runId: event.runId,
-            ...(event.parentRunId === undefined ? {} : { parentRunId: event.parentRunId }),
-          },
-        ])
-      case "TurnStarted":
-        return emitAll([{ type: EventType.STEP_STARTED, stepName: `turn:${event.turn}` }])
-      case "TurnCompleted":
-        return emitAll([...closeOpen(state), { type: EventType.STEP_FINISHED, stepName: `turn:${event.turn}` }])
-      case "ToolExecutionCompleted":
-        return stringify(event.result.encodedResult, "tool result").pipe(
-          Effect.flatMap((content) =>
-            emitAll([
-              {
-                type: EventType.TOOL_CALL_RESULT,
-                messageId: `${event.eventId}:result`,
-                toolCallId: event.call.id,
-                content,
-              },
-            ]),
-          ),
-        )
-      case "ToolProgress":
-        return emitAll([
-          {
-            type: EventType.CUSTOM,
-            name: "baton.tool.progress",
-            value: {
-              toolCallId: event.toolCallId,
-              ...(event.message === undefined ? {} : { message: event.message }),
-              ...(event.data === undefined ? {} : { data: event.data }),
-            },
-          },
-        ])
-      case "RunWaiting": {
-        const wait = event.wait
-        return emitAll([
-          ...closeOpen(state),
-          {
-            type: EventType.RUN_FINISHED,
-            threadId,
-            runId: event.runId,
-            outcome: {
-              type: "interrupt",
-              interrupts: [
-                {
-                  id: wait.waitId,
-                  reason: wait.reason._tag,
-                  metadata: {
-                    status: wait.status,
-                    ...(wait.reason._tag === "Approval" ? { approval: wait.reason.request } : {}),
-                  },
-                },
-              ],
-            },
-          },
-        ])
-      }
-      case "RunCompleted":
-        return emitAll([
-          ...closeOpen(state),
-          {
-            type: EventType.RUN_FINISHED,
-            threadId,
-            runId: event.runId,
-            result: event.result,
-            outcome: { type: "success" },
-          },
-        ])
-      case "RunFailed":
-        return emitAll([
-          ...closeOpen(state),
-          { type: EventType.RUN_ERROR, message: event.error.message, code: "RUN_FAILED" },
-        ])
-      case "RunCancelled":
-        return emitAll([
-          ...closeOpen(state),
-          { type: EventType.RUN_ERROR, message: event.reason ?? "Run cancelled", code: "RUN_CANCELLED" },
-        ])
-      case "OperationUnknown":
-        return emitAll([
-          {
-            type: EventType.RUN_ERROR,
-            message: `Operation ${event.operationId} requires resolution`,
-            code: "OPERATION_UNKNOWN",
-          },
-        ])
-      case "StructuredOutput":
-        return emitAll([{ type: EventType.CUSTOM, name: "baton.structured-output", value: event.value }])
-      default:
-        return Effect.succeed([])
+export const project: {
+  (
+    state: ProjectionState,
+    value: unknown,
+    threadId: string,
+  ): Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid | ValueNotSerializable>
+  (
+    value: unknown,
+    threadId: string,
+  ): (state: ProjectionState) => Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid | ValueNotSerializable>
+} = Function.dual(
+  3,
+  (
+    state: ProjectionState,
+    value: unknown,
+    threadId: string,
+  ): Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid | ValueNotSerializable> => {
+    if (!Schema.is(RunEvent.RunEvent)(value)) {
+      return Effect.fail(EventInvalid.make({ source: "runtime", detail: "RunEvent schema rejected the value" }))
     }
-  })
-}
+    const event = value
+    return Effect.suspend(() => {
+      if (event._tag === "ModelPart") return projectModelPart(state, event)
+      switch (event._tag) {
+        case "RunAccepted":
+          return emitAll([
+            {
+              type: EventType.RUN_STARTED,
+              threadId,
+              runId: event.runId,
+              ...(event.parentRunId === undefined ? {} : { parentRunId: event.parentRunId }),
+            },
+          ])
+        case "RunResumed":
+          return emitAll([
+            {
+              type: EventType.RUN_STARTED,
+              threadId,
+              runId: event.runId,
+              ...(event.parentRunId === undefined ? {} : { parentRunId: event.parentRunId }),
+            },
+          ])
+        case "TurnStarted":
+          return emitAll([{ type: EventType.STEP_STARTED, stepName: `turn:${event.turn}` }])
+        case "TurnCompleted":
+          return emitAll([...closeOpen(state), { type: EventType.STEP_FINISHED, stepName: `turn:${event.turn}` }])
+        case "ToolExecutionCompleted":
+          return stringify(event.result.encodedResult, "tool result").pipe(
+            Effect.flatMap((content) =>
+              emitAll([
+                {
+                  type: EventType.TOOL_CALL_RESULT,
+                  messageId: `${event.eventId}:result`,
+                  toolCallId: event.call.id,
+                  content,
+                },
+              ]),
+            ),
+          )
+        case "ToolProgress":
+          return emitAll([
+            {
+              type: EventType.CUSTOM,
+              name: "baton.tool.progress",
+              value: {
+                toolCallId: event.toolCallId,
+                ...(event.message === undefined ? {} : { message: event.message }),
+                ...(event.data === undefined ? {} : { data: event.data }),
+              },
+            },
+          ])
+        case "RunWaiting": {
+          const wait = event.wait
+          return emitAll([
+            ...closeOpen(state),
+            {
+              type: EventType.RUN_FINISHED,
+              threadId,
+              runId: event.runId,
+              outcome: {
+                type: "interrupt",
+                interrupts: [
+                  {
+                    id: wait.waitId,
+                    reason: wait.reason._tag,
+                    metadata: {
+                      status: wait.status,
+                      ...(wait.reason._tag === "Approval" ? { approval: wait.reason.request } : {}),
+                    },
+                  },
+                ],
+              },
+            },
+          ])
+        }
+        case "RunCompleted":
+          return emitAll([
+            ...closeOpen(state),
+            {
+              type: EventType.RUN_FINISHED,
+              threadId,
+              runId: event.runId,
+              result: event.result,
+              outcome: { type: "success" },
+            },
+          ])
+        case "RunFailed":
+          return emitAll([
+            ...closeOpen(state),
+            { type: EventType.RUN_ERROR, message: event.error.message, code: "RUN_FAILED" },
+          ])
+        case "RunCancelled":
+          return emitAll([
+            ...closeOpen(state),
+            { type: EventType.RUN_ERROR, message: event.reason ?? "Run cancelled", code: "RUN_CANCELLED" },
+          ])
+        case "OperationUnknown":
+          return emitAll([
+            {
+              type: EventType.RUN_ERROR,
+              message: `Operation ${event.operationId} requires resolution`,
+              code: "OPERATION_UNKNOWN",
+            },
+          ])
+        case "StructuredOutput":
+          return emitAll([{ type: EventType.CUSTOM, name: "baton.structured-output", value: event.value }])
+        default:
+          return Effect.succeed([])
+      }
+    })
+  },
+)
 
 /** @experimental */
 export const stateSnapshot = (snapshot: unknown): Effect.Effect<AGUIEvent, EventInvalid> =>

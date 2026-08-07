@@ -2,6 +2,7 @@ import { Message, Model, OutMessage, Selected, create, init } from "@foldkit/ui/
 import type { AnchorConfig, GroupHeading, InitConfig, ViewInputs } from "@foldkit/ui/combobox"
 import type { Html } from "foldkit/html"
 import { childAttributes, html } from "foldkit/html"
+import { dual } from "effect/Function"
 
 import type { ContentConfig } from "@/components/ui/dialog"
 import type { SlotConfig } from "@/lib/utils"
@@ -12,13 +13,13 @@ import { cn } from "@/lib/utils"
 export { Model, init }
 export type { AnchorConfig, InitConfig }
 export const CommandModel = Model
-export type CommandModel = typeof Model.Type
+export type CommandModel = Model
 export const commandInit = init
 
 // MESSAGE
 
 export { Message, OutMessage, Selected }
-export type CommandMessage = typeof Message.Type
+export type CommandMessage = Message
 export type CommandSelected<Value extends string = string> = Readonly<{
   readonly _tag: "Selected"
   readonly value: Value
@@ -159,32 +160,36 @@ export type ItemConfig = Readonly<{
  * `ItemConfig` with shadcn command-item classes, highlighting the active
  * option via the primitive's `data-active` attribute.
  */
-export const item = (config: ItemConfig, children: ReadonlyArray<Html | string>): PrimitiveItemConfig => {
+export const item: {
+  (config: ItemConfig, children: ReadonlyArray<Html | string>): PrimitiveItemConfig
+  (children: ReadonlyArray<Html | string>): (config: ItemConfig) => PrimitiveItemConfig
+} = dual(2, (config: ItemConfig, children: ReadonlyArray<Html | string>): PrimitiveItemConfig => {
   const h = html<CommandMessage>()
   return {
     className: cn(itemClass, config.class),
     content: h.div([h.DataAttribute("slot", "command-item"), h.Class("flex w-full items-center gap-2")], [...children]),
   }
-}
-
+})
 export type LabelConfig = Readonly<{
   class?: string
 }>
 
 /** Styled group heading for `groupToHeading`: returns the primitive's `GroupHeading`. */
-export const label = (config: LabelConfig, children: ReadonlyArray<Html | string>): GroupHeading => {
+export const label: {
+  (config: LabelConfig, children: ReadonlyArray<Html | string>): GroupHeading
+  (children: ReadonlyArray<Html | string>): (config: LabelConfig) => GroupHeading
+} = dual(2, (config: LabelConfig, children: ReadonlyArray<Html | string>): GroupHeading => {
   const h = html<CommandMessage>()
   return {
     className: cn(labelClass, config.class),
     content: h.span([h.DataAttribute("slot", "command-group-heading")], [...children]),
   }
-}
-
+})
 /** Styled keyboard-shortcut hint, right-aligned inside an item's content. */
-export const shortcut = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
+export const shortcut: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
   return h.span(
     [
@@ -194,8 +199,7 @@ export const shortcut = <ParentMessage>(
     ],
     [...children],
   )
-}
-
+})
 export type CommandDialogConfig = Readonly<{
   class?: string
   showCloseButton?: boolean
