@@ -24,19 +24,23 @@ interface SessionRow {
 
 const storeError = (message: string) => Session.SessionStoreError.make({ message })
 
-const decodePayload = Schema.decodeUnknownSync(Session.EntryPayload)
-const encodePayload = Schema.encodeSync(Session.EntryPayload)
+// JSON.stringify drops keys whose value is undefined, but Effect AI usage fields are
+// UndefinedOr and require the key to be present. Encoding through the schema's own JSON
+// string codec keeps a persisted entry decodable.
+const PayloadJson = Schema.fromJsonString(Session.EntryPayload)
+const decodePayload = Schema.decodeUnknownSync(PayloadJson)
+const encodePayload = Schema.encodeSync(PayloadJson)
 
 const toEntry = (row: EntryRow): Entry =>
   ({
-    ...decodePayload(JSON.parse(row.payload_json) as unknown),
+    ...decodePayload(row.payload_json),
     id: row.entry_id,
     parentId: row.parent_id,
   }) as Entry
 
 const fromEntry = (entry: { readonly _tag: string } & Record<string, unknown>): string => {
   const { id: _id, parentId: _parentId, ...payload } = entry as Record<string, unknown>
-  return JSON.stringify(encodePayload(payload as Session.EntryPayload)) ?? "null"
+  return encodePayload(payload as Session.EntryPayload)
 }
 
 /**
