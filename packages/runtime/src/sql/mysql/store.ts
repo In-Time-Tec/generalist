@@ -1,4 +1,4 @@
-import { Duration, Effect, Ref, Schedule, Stream, type Scope } from "effect"
+import { Duration, Effect, Option, Ref, Schedule, Stream, type Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { CursorExpired, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { checkpointRef } from "../../executable-manifest.js"
@@ -46,7 +46,7 @@ import {
   SchemaVersionUnsupported,
 } from "../errors.js"
 import { check as checkSchema } from "./run-schema.js"
-import { makeMysqlClaims } from "./store-claims.js"
+import { initializeReadCommitted, makeMysqlClaims } from "./store-claims.js"
 import { admitFanOut, inspectFanOut } from "../store-fan-out.js"
 import { loadTreeHistory } from "../tree-history.js"
 import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
@@ -81,21 +81,6 @@ export type MysqlStoreError =
   | SchemaVersionUnsupported
   | SchemaUpgradeRequired
   | SchemaMigrationFailed
-const initializeReadCommitted = (sql: SqlClient.SqlClient, connections: number) =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const reserved = yield* Effect.all(
-        Array.from({ length: connections }, () => sql.reserve),
-        { concurrency: "unbounded" },
-      )
-      yield* Effect.forEach(
-        reserved,
-        (connection) =>
-          connection.executeUnprepared("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED", [], undefined),
-        { concurrency: "unbounded", discard: true },
-      )
-    }),
-  )
 export const makeMysqlServices = (
   options: MysqlStoreOptions,
 ): Effect.Effect<
@@ -123,7 +108,7 @@ export const makeMysqlServices = (
     if (!Number.isSafeInteger(majorVersion) || majorVersion < 8) {
       return yield* SchemaMigrationFailed.make({ source, message: "MySQL runtime requires MySQL 8 or newer" })
     }
-    yield* initializeReadCommitted(sql, connections).pipe(
+    yield* initializeReadCommitted({ sql, connections }).pipe(
       Effect.mapError((error) => SchemaMigrationFailed.make({ source, message: String(error) })),
     )
     const isolation = yield* sql<{ isolation: string }>`SELECT @@transaction_isolation AS isolation`.pipe(
@@ -243,6 +228,7 @@ export const makeMysqlServices = (
       })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "mysql", multiWorker: true }),
+      sessionStore: () => Effect.succeed(Option.none()),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) =>
         run(

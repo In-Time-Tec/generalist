@@ -28,6 +28,7 @@ import { make as makeAddress } from "../address.js"
 import { make as makeMessage } from "../message.js"
 import { childRunIdFor, fanOutIdFor } from "../fan-out.js"
 import { admitFanOut } from "./store-fan-out.js"
+import { fanOutMemberSessionId } from "../child-session.js"
 
 const newRunId = (state: MemoryState): readonly [string, MemoryState] => {
   const runId = `run_${state.nextRunCounter}`
@@ -278,7 +279,7 @@ export const admitStart: {
           childRunId: childRunIdFor(fanOutId, ordinal),
           selection: member.selection,
           prompt: member.prompt,
-          sessionId: member.sessionId ?? `fanout:${fanOutId}`,
+          sessionId: member.sessionId ?? fanOutMemberSessionId({ fanOutId, key: member.key }),
           metadata: member.metadata ?? {},
         })),
       }).pipe(

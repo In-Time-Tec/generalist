@@ -40,6 +40,7 @@ import { narrow } from "../executable-registration.js"
 import type { AdmitStartInput } from "../run-store.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 import { WaitResolution } from "../run-wait.js"
+import { fanOutMember } from "../child-session.js"
 export const inspectFanOut = (fanOutId: string) =>
   Effect.gen(function* () {
     const loaded = yield* loadFanOut(fanOutId)
@@ -225,15 +226,7 @@ export const admitInitialFanOuts: {
       concurrency: Math.min(fanOut.concurrency, fanOut.members.length),
       join: fanOut.join,
       remainder: fanOut.remainder,
-      members: fanOut.members.map((member, ordinal) => ({
-        ordinal,
-        key: member.key,
-        childRunId: childRunIdFor(fanOutId, ordinal),
-        selection: member.selection,
-        prompt: member.prompt,
-        sessionId: member.sessionId ?? `fanout:${fanOutId}`,
-        metadata: member.metadata ?? {},
-      })),
+      members: fanOut.members.map((member, ordinal) => fanOutMember({ fanOutId, childRunIdFor, member, ordinal })),
     }).pipe(
       Effect.mapError((error) =>
         Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)

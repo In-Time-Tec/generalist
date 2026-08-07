@@ -1,5 +1,5 @@
-import { Context, Effect, Schema, Stream } from "effect"
-import type { ProgramCapabilities } from "@batonfx/core"
+import { Context, Effect, Schema, Stream, Option } from "effect"
+import type { ProgramCapabilities, Session } from "@batonfx/core"
 import type { Address } from "./address.js"
 import type { Cursor } from "./cursor.js"
 import type {
@@ -175,6 +175,13 @@ export type WorkerMutationError =
 
 export interface Interface {
   readonly info: Effect.Effect<StoreInfo>
+  /**
+   * @experimental Durable conversation history for one session identity.
+   *
+   * Session is the authority for model-facing history, so the store that owns durability owns it too.
+   * A store without durable Session returns undefined and its Runs fall back to process-bound history.
+   */
+  readonly sessionStore: (sessionId: string) => Effect.Effect<Option.Option<typeof Session.SessionStore.Service>>
   readonly hasAdmission: (input: {
     readonly address: Address
     readonly sessionId: string

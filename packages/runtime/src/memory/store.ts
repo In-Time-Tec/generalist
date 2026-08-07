@@ -1,4 +1,4 @@
-import { Effect, Layer, SynchronizedRef } from "effect"
+import { Effect, Layer, Option, SynchronizedRef } from "effect"
 import {
   AddressNotFound,
   CursorExpired,
@@ -72,6 +72,7 @@ export const makeRunStore = (options: LayerOptions) =>
 
     return RunStore.of({
       info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
+      sessionStore: () => Effect.succeed(Option.none()),
       hasAdmission: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>

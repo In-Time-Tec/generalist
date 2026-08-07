@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -24,6 +25,7 @@ import {
   RunStore,
 } from "../src/index.js"
 import { assistant, assistantRef, registrationsFor, researcherRef } from "./helpers.js"
+import { provideScoped } from "./scoped-provide.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 
 const waitTool = Tool.make("wait_for_human", {
@@ -149,6 +151,248 @@ describe("ExecutionHost", () => {
 
       expect(observed).toMatchObject({ contextWindow: 32_768, reserveTokens: 2_048 })
       expect(observedKeepRecent).toBe(777)
+    }),
+  )
+
+  it.effect("keeps a valid conversation after every execution record is dropped", () =>
+    Effect.gen(function* () {
+      const filename = tempDbPath("session-record-independence")
+      const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
+      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
+
+      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* RunStore.RunStore
+            const session = yield* store.sessionStore("thread:independence")
+            if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
+            return yield* body(session.value)
+          }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
+        )
+
+      yield* withSession((session) => session.append({ _tag: "Message", message: user("m1") }).pipe(Effect.orDie))
+      yield* withSession((session) => session.append({ _tag: "Message", message: user("m2") }).pipe(Effect.orDie))
+
+      // Conversation and execution are separate logs. Dropping the execution journal must leave the
+      // conversation whole; if this fails, orchestration state leaked into conversation state.
+      const database = new Database(filename)
+      for (const table of [
+        "baton_run_events",
+        "baton_run_operations",
+        "baton_run_steering",
+        "baton_run_waits",
+        "baton_run_links",
+        "baton_tree_event_index",
+        "baton_run_registrations",
+        "baton_runs",
+        "baton_lanes",
+      ]) {
+        database.run(`DELETE FROM ${table}`)
+      }
+      database.close()
+
+      const path = yield* withSession((session) => session.path().pipe(Effect.orDie))
+      expect(path).toHaveLength(2)
+      expect(Session.buildContext(path).content).toHaveLength(2)
+    }),
+  )
+
+  it.effect("round-trips a checkpoint whose telemetry carries absent usage fields", () =>
+    Effect.gen(function* () {
+      const filename = tempDbPath("session-usage-roundtrip")
+      const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
+      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
+
+      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* RunStore.RunStore
+            const session = yield* store.sessionStore("thread:usage")
+            if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
+            return yield* body(session.value)
+          }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
+        )
+
+      // A real provider reports partial usage. These fields are UndefinedOr, so the key must survive
+      // persistence even when its value is undefined.
+      const telemetry = [
+        {
+          _tag: "ModelAttemptCompleted" as const,
+          deliveryId: "delivery-1",
+          turn: 0,
+          modelCallId: "call-1",
+          modelAttemptId: "attempt-1",
+          attempt: 0,
+          modelId: "test",
+          providerId: "test",
+          usage: Response.Usage.make({
+            inputTokens: { uncached: undefined, total: 5, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+          }),
+          usageAt: 1,
+          finishReason: "stop" as const,
+          completedAt: 2,
+        },
+      ]
+
+      const id = yield* withSession((session) => session.reserveEntryId.pipe(Effect.orDie))
+      yield* withSession((session) =>
+        session
+          .appendCheckpoint({ id, parentId: null, projectedHistory: Prompt.fromMessages([user("kept")]), telemetry })
+          .pipe(Effect.orDie),
+      )
+      const path = yield* withSession((session) => session.path().pipe(Effect.orDie))
+      const checkpoint = path.at(-1)
+
+      expect(checkpoint?._tag).toBe("Compaction")
+      if (checkpoint?._tag === "Compaction") {
+        expect(checkpoint.telemetry).toHaveLength(1)
+        expect(Session.buildContext(path).content).toHaveLength(1)
+      }
+    }),
+  )
+
+  it.effect("appends and reads one durable Session across store reopens", () =>
+    Effect.gen(function* () {
+      const filename = tempDbPath("durable-session-store")
+      const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
+      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
+
+      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* RunStore.RunStore
+            const session = yield* store.sessionStore("thread:direct")
+            if (Option.isNone(session)) return yield* Effect.die("expected a durable Session")
+            return yield* body(session.value)
+          }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
+        )
+
+      const first = yield* withSession((session) =>
+        session.append({ _tag: "Message", message: user("m1") }).pipe(Effect.orDie),
+      )
+      const second = yield* withSession((session) =>
+        session.append({ _tag: "Message", message: user("m2") }).pipe(Effect.orDie),
+      )
+      const path = yield* withSession((session) => session.path().pipe(Effect.orDie))
+
+      expect(first.parentId).toBeNull()
+      expect(second.parentId).toBe(first.id)
+      expect(path).toHaveLength(2)
+      expect(path.map((entry) => entry.id)).toEqual([first.id, second.id])
+    }),
+  )
+
+  it.effect("continues one durable Session across separate Runs and a store reopen", () =>
+    Effect.gen(function* () {
+      const filename = tempDbPath("durable-session-continuity")
+      const prompts: Array<string> = []
+      const agent = Agent.make({ name: "durable-session-agent", instructions: "Stay consistent." })
+      const model = Pins.makeModel({ model: "conversation", route: "conversation-route:v1" })
+      const compaction = {
+        service: Pins.makeCapability({ service: "compaction", revision: 1 }),
+        summaryModel: Pins.makeModel({ model: "summary", route: "summary-route:v1" }),
+        contextWindow: 1_000_000,
+        reserveTokens: 0,
+        keepRecentTokens: 1,
+        strategyIdentity: "default:v1",
+        summaryPromptIdentity: "summary:v1",
+      }
+      const pinned = AgentManifest.fromLiveAgent(agent, {
+        model,
+        tools: [],
+        skills: [],
+        services: [],
+        policy: { _tag: "Portable", policy: { _tag: "Forever" } },
+        compaction,
+        budget: {},
+        children: [],
+      })
+      const executable = ExecutableManifest.make({ root: pinned.pin, entries: [{ _tag: "Agent", ...pinned }] })
+      const registrations = [
+        { pin: model, codec: "test-model", version: "1", payload: { route: "conversation-route:v1" } },
+        {
+          pin: compaction.service,
+          codec: "compaction-policy",
+          version: "1",
+          payload: { keepRecentTokens: 1, strategyIdentity: "default:v1", summaryPromptIdentity: "summary:v1" },
+        },
+        { pin: compaction.summaryModel, codec: "test-model", version: "1", payload: { route: "summary-route:v1" } },
+      ]
+      const resolver = ExecutableResolver.ExecutableResolver.of({
+        resolve: () =>
+          Effect.succeed({
+            _tag: "Agent" as const,
+            agent: Agent.close(
+              agent,
+              Layer.mergeAll(
+                Layer.effect(
+                  LanguageModel.LanguageModel,
+                  LanguageModel.make({
+                    generateText: () => Effect.succeed([]),
+                    streamText: (options) => {
+                      prompts.push(JSON.stringify(options.prompt.content))
+                      return Stream.fromIterable<Response.StreamPartEncoded>([
+                        Response.makePart("text-start", { id: "text" }),
+                        Response.makePart("text-delta", { id: "text", delta: `reply ${prompts.length}` }),
+                        Response.makePart("text-end", { id: "text" }),
+                        finish,
+                      ])
+                    },
+                  }),
+                ),
+                Compaction.layer({
+                  contextWindow: 1_000_000,
+                  reserveTokens: 0,
+                  keepRecentTokens: 1_000_000,
+                  summaryModel: Layer.effect(
+                    LanguageModel.LanguageModel,
+                    LanguageModel.make({
+                      generateText: () => Effect.succeed([]),
+                      streamText: () => Stream.empty,
+                    }),
+                  ),
+                }),
+              ),
+            ),
+            runOptions: { compaction: { contextWindow: 1_000_000, reserveTokens: 0 } },
+            attestation: executable,
+          }),
+      })
+      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const turn = (idempotencyKey: string, prompt: string) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const receipt = yield* runtime.start({
+              executable,
+              registrations,
+              sessionId: "thread:durable-continuity",
+              idempotencyKey,
+              prompt,
+            })
+            const host = yield* ExecutionHost.ExecutionHost
+            const store = yield* RunStore.RunStore
+            yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: idempotencyKey }))
+          }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
+        )
+
+      // Each turn opens its own Runtime scope, so the second and third cross a store reopen.
+      yield* turn("turn-1", "first question")
+      yield* turn("turn-2", "second question")
+      yield* turn("turn-3", "third question")
+      expect(prompts).toHaveLength(3)
+      expect(prompts[0]).toContain("first question")
+      expect(prompts[0]).not.toContain("second question")
+      expect(prompts[1]).toContain("first question")
+      expect(prompts[1]).toContain("reply 1")
+      expect(prompts[1]).toContain("second question")
+      expect(prompts[2]).toContain("first question")
+      expect(prompts[2]).toContain("second question")
+      expect(prompts[2]).toContain("third question")
     }),
   )
 

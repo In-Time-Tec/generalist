@@ -10,6 +10,9 @@ import { withProviderFinish } from "./provider-finish"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
+const conversation = (prompt: Prompt.Prompt): ReadonlyArray<Prompt.Message> =>
+  prompt.content.filter((message) => message.role !== "system")
+
 const modelLayer = (
   streamText: ModelParams["streamText"],
   generateText: ModelParams["generateText"] = () => Effect.succeed([{ type: "text", text: "unused" }]),
@@ -196,7 +199,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           const chat = yield* persistence.get("structured")
           const history = yield* Ref.get(chat.history)
           const session = yield* Session.SessionStore
-          expect(Session.buildContext(yield* session.path()).content).toEqual(history.content)
+          expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(history))
         }),
       ] as const,
   )
@@ -238,7 +241,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           const chat = yield* persistence.get("multipart")
           const history = yield* Ref.get(chat.history)
           const session = yield* Session.SessionStore
-          expect(Session.buildContext(yield* session.path()).content).toEqual(history.content)
+          expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(history))
 
           // A second turn must not fail the session prefix invariant.
           yield* Stream.runDrain(Agent.stream(agent, { prompt: "follow up", persistence: { chatId: "multipart" } }))
@@ -444,7 +447,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           "tool-call-ordinary-2",
           "tool-call-ordinary-3",
         ])
-        expect(Session.buildContext(yield* session.path()).content).toEqual(suspendedHistory.content)
+        expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(suspendedHistory))
 
         const events = yield* Stream.runCollect(
           Agent.stream(agent, {
@@ -460,7 +463,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const completedChat = yield* persistence.get("s1")
         const completedHistory = yield* Ref.get(completedChat.history)
         expect(toolResultIds(completedHistory)).toEqual(resultOrder)
-        expect(Session.buildContext(yield* session.path()).content).toEqual(completedHistory.content)
+        expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(completedHistory))
         expect(modelCalls).toBe(2)
       }),
     ] as const
@@ -511,7 +514,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const history = yield* Ref.get(chat.history)
         const session = yield* Session.SessionStore
         expect(second.token).toBe("wait-2")
-        expect(Session.buildContext(yield* session.path()).content).toEqual(history.content)
+        expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(history))
 
         yield* Agent.stream(agent, {
           prompt: "ignored",
@@ -647,7 +650,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
                 history: Prompt.make("committed too early"),
                 prompt: Prompt.make("retry prompt"),
                 summary: "summary",
-                firstKeptEntryId: "0",
               }),
             ).pipe(Compaction.withLifecycle(request)),
         }),
@@ -708,7 +710,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           const session = yield* Session.SessionStore
 
           expect(failure._tag).toBe("@batonfx/core/DuplicateToolCallId")
-          expect(Session.buildContext(yield* session.path()).content).toEqual(history.content)
+          expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(history))
         }),
       ] as const,
   )
@@ -887,7 +889,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
     let pathEntered: Deferred.Deferred<void> | undefined
     let blockCheckpointPath = true
     let compactionCalls = 0
-    let committedCheckpoint: Session.CheckpointEntry | undefined
+    let committedCheckpoint: Session.CompactionEntry | undefined
     const sessionLayer = Layer.effect(
       Session.SessionStore,
       Ref.make<ReadonlyArray<Session.Entry>>([]).pipe(
@@ -906,15 +908,14 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
             appendCheckpoint: (prepared) =>
               Ref.modify(entries, (path) => {
                 const existing = path.find((entry) => entry.id === prepared.id)
-                if (existing?._tag === "Compaction" && existing.version === 2) {
+                if (existing?._tag === "Compaction") {
                   return [
                     { _tag: "AlreadyPresent", checkpoint: existing, leafId: path.at(-1)?.id ?? existing.id } as const,
                     path,
                   ] as readonly [Session.CheckpointAppend, ReadonlyArray<Session.Entry>]
                 }
-                const checkpoint: Session.CheckpointEntry = {
+                const checkpoint: Session.CompactionEntry = {
                   _tag: "Compaction",
-                  version: 2,
                   ...prepared,
                 }
                 committedCheckpoint = checkpoint
@@ -984,9 +985,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         const history = yield* Ref.get(chat.history)
         const session = yield* Session.SessionStore
         const path = yield* session.path()
-        const checkpoints = path.filter(
-          (entry): entry is Session.CheckpointEntry => entry._tag === "Compaction" && entry.version === 2,
-        )
+        const checkpoints = path.filter((entry): entry is Session.CompactionEntry => entry._tag === "Compaction")
         expect(checkpoints).toHaveLength(1)
         expect(committedCheckpoint).toBeDefined()
         expect(checkpoints[0]?.telemetry.map((event) => event.deliveryId)).toEqual(

@@ -1,6 +1,7 @@
 import { DateTime, Duration, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
+import { isSqlError } from "effect/unstable/sql/SqlError"
 import { AgentExecutionFailure, RuntimeUnavailable } from "../../errors.js"
 import { RunClaims, type ClaimedRun, type Interface as ClaimsInterface } from "../run-claims.js"
 import type { RunRow } from "../rows.js"
@@ -13,6 +14,30 @@ import type { WithoutSqlError } from "../sql-effect.js"
 export type RunFn = <A, E>(
   effect: Effect.Effect<A, E | SqlError, SqlClient.SqlClient>,
 ) => Effect.Effect<A, WithoutSqlError<E | SqlError> | RuntimeUnavailable>
+
+/** @experimental MySQL reports lock contention as a retryable deadlock rather than a durable failure. */
+export const isDeadlock = (error: unknown): boolean => {
+  if (!isSqlError(error)) return false
+  const text = `${error.message} ${String(error.reason)}`.toLowerCase()
+  return text.includes("deadlock") || text.includes("1213") || text.includes("40001")
+}
+
+/** @experimental Pin every pooled connection to READ COMMITTED before the store serves traffic. */
+export const initializeReadCommitted = (input: { readonly sql: SqlClient.SqlClient; readonly connections: number }) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const reserved = yield* Effect.all(
+        Array.from({ length: input.connections }, () => input.sql.reserve),
+        { concurrency: "unbounded" },
+      )
+      yield* Effect.forEach(
+        reserved,
+        (connection) =>
+          connection.executeUnprepared("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED", [], undefined),
+        { concurrency: "unbounded", discard: true },
+      )
+    }),
+  )
 
 export const makeMysqlClaims = (input: {
   readonly sql: SqlClient.SqlClient

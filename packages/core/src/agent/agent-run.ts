@@ -2,13 +2,7 @@ import { Effect, Equal, Function, Layer, Option, Ref, Schema, Stream } from "eff
 import { LanguageModel, Prompt, Tool } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, type Event } from "./agent-event.js"
 import { type Item, type MemoryError, messageFromRecall, projectTranscript } from "../context/memory.js"
-import {
-  type Entry,
-  SessionConflict,
-  SessionStore,
-  type SessionStoreError,
-  buildMemoryContext,
-} from "../context/session.js"
+import { type Entry, SessionConflict, type SessionStoreError, buildMemoryContext } from "../context/session.js"
 import { type Candidate, assemble, get, type Registry } from "../tools/tool-registry.js"
 import type { CompactionError } from "../turn/compaction.js"
 import type { SkillSourceError } from "../context/skill-source.js"
@@ -71,6 +65,8 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
       const {
         compactionService,
         sessionService,
+        activeSession,
+        system,
         persisted,
         validatedResume,
         executor,
@@ -274,9 +270,6 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
           ),
         )
       if (validatedResume !== undefined) yield* Ref.get(chat.history).pipe(Effect.flatMap(restoreActivatedSkills))
-      const activeSession = Option.isSome(compactionService)
-        ? sessionService
-        : Option.none<typeof SessionStore.Service>()
       const sessionError = (turn: number, error: SessionStoreError | SessionConflict): AgentError =>
         AgentError.make({ message: error.message, turn, cause: error })
       const compactionError = (turn: number, error: CompactionError): AgentError =>
@@ -347,6 +340,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         })
       const compactionRuntime = makeCompactionRuntime({
         activeSession,
+        system,
         sessionService,
         sessionId,
         sessionOwnerToken,

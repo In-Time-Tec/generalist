@@ -1,5 +1,3 @@
-import { Function } from "effect"
-
 export const packages = [
   "a2a",
   "ag-ui",
@@ -16,13 +14,13 @@ export const packages = [
 export const compressedSizeLimits: Record<(typeof packages)[number], number> = {
   a2a: 50_000,
   "ag-ui": 30_000,
-  core: 169_000,
+  core: 171_000,
   test: 8_000,
   skills: 13_000,
   memory: 10_000,
   providers: 35_000,
   mcp: 12_000,
-  runtime: 159_000,
+  runtime: 164_000,
   transport: 30_000,
   foldkit: 16_000,
 }
@@ -49,41 +47,20 @@ export const packedProviderDependencies = {
 export const sortRecord = (value: Record<string, string> | undefined): Record<string, string> =>
   Object.fromEntries(Object.entries(value ?? {}).toSorted(([left], [right]) => left.localeCompare(right)))
 
-export const catalogVersion: {
-  (
-    rootManifest: {
-      readonly workspaces: {
-        readonly catalog: Readonly<Record<string, string>>
-        readonly catalogs?: Readonly<Record<string, Readonly<Record<string, string>>>>
-      }
-    },
-    dependency: string,
-    reference: string,
-  ): string | undefined
-  (
-    dependency: string,
-    reference: string,
-  ): (rootManifest: {
+export const catalogVersion = (input: {
+  readonly rootManifest: {
     readonly workspaces: {
       readonly catalog: Readonly<Record<string, string>>
       readonly catalogs?: Readonly<Record<string, Readonly<Record<string, string>>>>
     }
-  }) => string | undefined
-} = Function.dual(
-  3,
-  (
-    rootManifest: {
-      readonly workspaces: {
-        readonly catalog: Readonly<Record<string, string>>
-        readonly catalogs?: Readonly<Record<string, Readonly<Record<string, string>>>>
-      }
-    },
-    dependency: string,
-    reference: string,
-  ): string | undefined => {
-    const catalogName = reference.slice("catalog:".length)
-    const catalog =
-      catalogName.length === 0 ? rootManifest.workspaces.catalog : rootManifest.workspaces.catalogs?.[catalogName]
-    return catalog?.[dependency]
-  },
-)
+  }
+  readonly dependency: string
+  readonly reference: string
+}): string | undefined => {
+  const catalogName = input.reference.slice("catalog:".length)
+  const catalog =
+    catalogName.length === 0
+      ? input.rootManifest.workspaces.catalog
+      : input.rootManifest.workspaces.catalogs?.[catalogName]
+  return catalog?.[input.dependency]
+}

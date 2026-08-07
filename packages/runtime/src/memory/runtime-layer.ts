@@ -37,6 +37,7 @@ import type { ExecutableRegistration } from "../executable-registration.js"
 type Registrations = ReadonlyArray<ExecutableRegistration>
 import { validate as validateRegistrations } from "../executable-registration.js"
 import { LocalScheduler, layer as localSchedulerLayer } from "../local-scheduler.js"
+import { childSessionId, fanOutMemberSessionId } from "../child-session.js"
 
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 
@@ -166,7 +167,7 @@ export const makeRuntime = (
           childRunId: childRunIdFor(fanOutId, ordinal),
           selection: member.selection,
           prompt: normalizePrompt(member.prompt),
-          sessionId: member.sessionId ?? `fanout:${fanOutId}`,
+          sessionId: member.sessionId ?? fanOutMemberSessionId({ fanOutId, key: member.key }),
           metadata: member.metadata ?? {},
         }))
         return {
@@ -303,7 +304,8 @@ export const makeRuntime = (
         }),
       spawn: (input: SpawnInput) =>
         Effect.gen(function* () {
-          const sessionId = input.sessionId ?? `child:${input.parentRunId}`
+          const sessionId =
+            input.sessionId ?? childSessionId({ parentRunId: input.parentRunId, invocationId: input.invocationId })
           const idempotencyKey = input.idempotencyKey ?? `spawn:${input.parentRunId}:${input.invocationId}`
           const address = makeAddress(`spawn:${input.parentRunId}`)
           const prompt = normalizePrompt(input.prompt)

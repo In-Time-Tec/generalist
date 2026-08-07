@@ -84,7 +84,7 @@ const program = Effect.gen(function* () {
   const root = path.resolve(".")
   const rootManifest = parseJson(yield* fileSystem.readFileString(path.join(root, "package.json")))
   const version = rootManifest.version as string
-  const effectVersion = catalogVersion(rootManifest, "effect", "catalog:")
+  const effectVersion = catalogVersion({ rootManifest, dependency: "effect", reference: "catalog:" })
   if (effectVersion === undefined) {
     return yield* smokeError("root catalog must define effect")
   }
@@ -206,7 +206,7 @@ const program = Effect.gen(function* () {
           if (typeof dependencyVersion !== "string") return [dependency, dependencyVersion]
           if (dependencyVersion.startsWith("workspace:")) return [dependency, version]
           if (dependencyVersion.startsWith("catalog:")) {
-            const resolvedVersion = catalogVersion(rootManifest, dependency, dependencyVersion)
+            const resolvedVersion = catalogVersion({ rootManifest, dependency, reference: dependencyVersion })
             if (resolvedVersion === undefined) {
               throw new Error(`${sourceManifest.name} references missing catalog dependency ${dependency}`)
             }

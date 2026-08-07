@@ -88,15 +88,17 @@ const inspect = (filename: string) => {
     "baton_run_waits",
     "baton_runs",
     "baton_schema_meta",
+    "baton_session_entries",
+    "baton_sessions",
     "baton_sql_migrations",
     "baton_tree_event_index",
     "baton_tree_roots",
   ])
 }
 
-it.live("creates the current SQLite v1 baseline and applies idempotently", () =>
+it.live("creates the current SQLite baseline and applies idempotently", () =>
   Effect.gen(function* () {
-    const filename = tempDbPath("sqlite-baseline-v1")
+    const filename = tempDbPath("sqlite-baseline")
     yield* apply(filename)
     yield* apply(filename)
     inspect(filename)

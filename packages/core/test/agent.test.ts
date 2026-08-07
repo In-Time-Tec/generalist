@@ -301,6 +301,9 @@ const agentRequirementProofs: ReadonlyArray<true> = [
   >,
 ]
 
+const conversation = (prompt: Prompt.Prompt): ReadonlyArray<Prompt.Message> =>
+  prompt.content.filter((message) => message.role !== "system")
+
 const modelLayer = (
   streamText: ModelParams["streamText"],
   generateText: ModelParams["generateText"] = () => Effect.succeed([{ type: "text", text: "unused" }]),
@@ -3144,6 +3147,118 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
+  ItLayer.make(it, "re-derives Instructions on every Run of a continued Session", () => {
+    const prompts: Array<string> = []
+    let guidance = "GUIDANCE ONE"
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          prompts.push(Json.stringify(options.prompt.content))
+          return Stream.make(
+            Response.makePart("text-start", { id: "text" }),
+            textDelta("ok"),
+            Response.makePart("text-end", { id: "text" }),
+          )
+        }),
+        Instructions.layer([{ id: "workspace", render: () => Effect.succeedSome(guidance) }]),
+        Session.layerMemory,
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        Compaction.layer({ contextWindow: 1_000_000, reserveTokens: 1, keepRecentTokens: 1 }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "session-epoch-agent", instructions: "fallback" })
+
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "one" }))
+        guidance = "GUIDANCE TWO"
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "two" }))
+
+        expect(prompts[0]).toContain("GUIDANCE ONE")
+        // A continued Session renders current guidance instead of the epoch captured on run one.
+        expect(prompts[1]).toContain("GUIDANCE TWO")
+        expect(prompts[1]).not.toContain("GUIDANCE ONE")
+        expect(prompts[1]).toContain("one")
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "continues an active Session across separate Runs", () => {
+    const prompts: Array<string> = []
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          prompts.push(Json.stringify(options.prompt.content))
+          return Stream.make(
+            Response.makePart("text-start", { id: "text" }),
+            textDelta(`reply ${prompts.length}`),
+            Response.makePart("text-end", { id: "text" }),
+          )
+        }),
+        Session.layerMemory,
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        Compaction.layer({ contextWindow: 1_000_000, reserveTokens: 1, keepRecentTokens: 1 }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "session-continuity-agent" })
+
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "first question", system: "stable instructions" }))
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "second question", system: "stable instructions" }))
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "third question", system: "stable instructions" }))
+
+        expect(prompts).toHaveLength(3)
+        // Run 1 sees only its own prompt.
+        expect(prompts[0]).toContain("first question")
+        expect(prompts[0]).not.toContain("second question")
+        // Run 2 sees run 1's exchange. This is the regression: it used to start empty.
+        expect(prompts[1]).toContain("first question")
+        expect(prompts[1]).toContain("reply 1")
+        expect(prompts[1]).toContain("second question")
+        // Run 3 sees both prior turns.
+        expect(prompts[2]).toContain("first question")
+        expect(prompts[2]).toContain("second question")
+        expect(prompts[2]).toContain("reply 2")
+        expect(prompts[2]).toContain("third question")
+        // The system message is derived per Run and never becomes a Session entry.
+        const path = yield* (yield* Session.SessionStore).path()
+        expect(path.every((entry) => entry._tag !== "Message" || entry.message.role !== "system")).toBe(true)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "renders current instructions on a Session resumed with different instructions", () => {
+    const prompts: Array<string> = []
+    return [
+      Layer.mergeAll(
+        modelLayer((options) => {
+          prompts.push(Json.stringify(options.prompt.content))
+          return Stream.make(
+            Response.makePart("text-start", { id: "text" }),
+            textDelta("ok"),
+            Response.makePart("text-end", { id: "text" }),
+          )
+        }),
+        Session.layerMemory,
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        Compaction.layer({ contextWindow: 1_000_000, reserveTokens: 1, keepRecentTokens: 1 }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "session-instructions-agent" })
+
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "one", system: "ORIGINAL GUIDANCE" }))
+        yield* Stream.runCollect(Agent.stream(agent, { prompt: "two", system: "EDITED GUIDANCE" }))
+
+        expect(prompts[1]).toContain("EDITED GUIDANCE")
+        expect(prompts[1]).not.toContain("ORIGINAL GUIDANCE")
+        expect(prompts[1]).toContain("one")
+      }),
+    ] as const
+  })
+
   ItLayer.make(it, "leaves Session untouched when Compaction is absent", () => {
     let calls = 0
     return [
@@ -3650,7 +3765,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
           expect(Json.stringify(Session.buildContext(yield* session.path()).content)).toBe(
-            Json.stringify(completed.transcript.content),
+            Json.stringify(conversation(completed.transcript)),
           )
         }
       }),
@@ -3688,7 +3803,6 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
                       history,
                       prompt: Prompt.empty,
                       summary: `summary-${compactions}`,
-                      firstKeptEntryId: "legacy-field-is-not-projection-authority",
                     },
               )
             }).pipe(Compaction.withLifecycle(request)),
@@ -3709,10 +3823,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         expect(compactions).toBe(5)
         expect(checkpoints).toHaveLength(5)
         expect(new Set(checkpoints.map((entry) => entry.id)).size).toBe(5)
-        expect(checkpoints.every((entry) => entry._tag === "Compaction" && entry.version === 2)).toBe(true)
+        expect(checkpoints.every((entry) => entry._tag === "Compaction")).toBe(true)
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
-          expect(Json.stringify(Session.buildContext(path).content)).toBe(Json.stringify(completed.transcript.content))
+          expect(Json.stringify(Session.buildContext(path).content)).toBe(
+            Json.stringify(conversation(completed.transcript)),
+          )
           expect(Json.stringify(completed.transcript.content)).toContain("projection-5")
         }
       }),
@@ -3751,10 +3867,12 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const path = yield* session.path()
         const completed = events.at(-1)
 
-        expect(path.some((entry) => entry._tag === "Compaction" && entry.version === 2)).toBe(true)
+        expect(path.some((entry) => entry._tag === "Compaction")).toBe(true)
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
-          expect(Json.stringify(Session.buildContext(path).content)).toBe(Json.stringify(completed.transcript.content))
+          expect(Json.stringify(Session.buildContext(path).content)).toBe(
+            Json.stringify(conversation(completed.transcript)),
+          )
           expect(Json.stringify(completed.transcript.content)).toContain("newest prompt")
           expect(Json.stringify(completed.transcript.content)).not.toContain("old prompt")
         }
@@ -3911,10 +4029,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const path = yield* session.path()
         const completed = events.at(-1)
 
-        expect(path.some((entry) => entry._tag === "Compaction" && entry.version === 2)).toBe(true)
+        expect(path.some((entry) => entry._tag === "Compaction")).toBe(true)
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
-          expect(Session.buildContext(path).content).toEqual(completed.transcript.content)
+          expect(Session.buildContext(path).content).toEqual(conversation(completed.transcript))
         }
       }),
     ] as const

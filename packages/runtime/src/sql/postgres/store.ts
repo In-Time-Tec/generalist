@@ -1,4 +1,4 @@
-import { Effect, Equal, Random, Stream } from "effect"
+import { Effect, Equal, Option, Random, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import {
@@ -87,6 +87,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
     })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "postgres", multiWorker: true }),
+      sessionStore: () => Effect.succeed(Option.none()),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => run(admitSend(transactionHub, addressBindings, nextId, input)),
       admitStart: (input) =>

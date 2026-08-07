@@ -5,6 +5,7 @@ import { make as makeAddress } from "./address.js"
 import { make as makeMessage } from "./message.js"
 import { normalizePrompt } from "./memory/prompt.js"
 import { childRunIdFor, fanOutIdFor } from "./fan-out.js"
+import { fanOutMemberSessionId } from "./child-session.js"
 import {
   AwaitGroupParameters,
   GroupReceipt,
@@ -126,7 +127,7 @@ export const make = (store: RunStoreInterface): Interface => {
           childRunId: childRunIdFor(groupId, ordinal),
           selection: member.selection,
           prompt: normalizePrompt(member.prompt),
-          sessionId: `child-group:${groupId}`,
+          sessionId: fanOutMemberSessionId({ fanOutId: groupId, key: member.key }),
           metadata: {
             runtimeChildGroup: true,
             parentRunId: input.parentRunId,

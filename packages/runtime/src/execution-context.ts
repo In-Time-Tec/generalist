@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Option, type Scope } from "effect"
 import type { Tool } from "effect/unstable/ai"
-import { Agent, ToolExecutor } from "@batonfx/core"
+import { Agent, Session, ToolExecutor } from "@batonfx/core"
 import { ChildRuns, make as makeChildRuns } from "./child-runs.js"
 import { makeExecutor as makeCodeModeExecutor, type Interface as CodeMode } from "./code-mode.js"
 import type { Interface as RunStoreInterface } from "./run-store.js"
@@ -39,3 +39,23 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
       ),
     )
   })
+
+/**
+ * @experimental Bind one Run to the durable conversation for its session identity.
+ *
+ * Session owns model-facing history, so a durable store hands each Run its session and a Run
+ * continues the conversation instead of starting empty. A store without durable Session returns
+ * undefined and the Run falls back to whatever Session its environment provides.
+ */
+export const sessionContext = (input: {
+  readonly store: RunStoreInterface
+  readonly sessionId: string
+}): Effect.Effect<Context.Context<never> | Context.Context<Session.SessionStore>> =>
+  input.store.sessionStore(input.sessionId).pipe(
+    Effect.map(
+      Option.match({
+        onNone: () => Context.empty(),
+        onSome: (session) => Context.make(Session.SessionStore, session),
+      }),
+    ),
+  )
