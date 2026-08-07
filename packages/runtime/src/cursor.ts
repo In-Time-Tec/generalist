@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Effect, Function, Schema } from "effect"
 
 export const Cursor = Schema.Int.check(
   Schema.isGreaterThanOrEqualTo(-1),
@@ -10,5 +10,18 @@ export const origin: Cursor = -1
 
 export const make = (value: number): Cursor => Schema.decodeSync(Cursor)(value)
 
-export const encode = Schema.encodeEffect(Cursor)
-export const decode = Schema.decodeEffect(Cursor)
+export const encode: {
+  (input: Cursor, options?: import("effect/SchemaAST").ParseOptions): Effect.Effect<number, Schema.SchemaError>
+  (options?: import("effect/SchemaAST").ParseOptions): (input: Cursor) => Effect.Effect<number, Schema.SchemaError>
+} = Function.dual(
+  (args) => typeof args[0] === "number",
+  (input: Cursor, options?: import("effect/SchemaAST").ParseOptions) => Schema.encodeEffect(Cursor)(input, options),
+)
+
+export const decode: {
+  (input: Cursor, options?: import("effect/SchemaAST").ParseOptions): Effect.Effect<number, Schema.SchemaError>
+  (options?: import("effect/SchemaAST").ParseOptions): (input: Cursor) => Effect.Effect<number, Schema.SchemaError>
+} = Function.dual(
+  (args) => typeof args[0] === "number",
+  (input: Cursor, options?: import("effect/SchemaAST").ParseOptions) => Schema.decodeEffect(Cursor)(input, options),
+)

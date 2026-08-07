@@ -1,3 +1,4 @@
+import { Function } from "effect"
 import type { Queue } from "effect"
 import type { Address } from "../address.js"
 import type { ExecutableManifest, ExecutableRef, PinnedExecutable } from "../executable-manifest.js"
@@ -101,10 +102,15 @@ export interface StoredFanOut {
   readonly members: ReadonlyArray<FanOutMemberResult>
 }
 
-export const laneKey = (address: Address, sessionId: string): string => `${address}\0${sessionId}`
+export const laneKey: {
+  (sessionId: string): (address: Address) => string
+  (address: Address, sessionId: string): string
+} = Function.dual(2, (address: Address, sessionId: string): string => `${address}\0${sessionId}`)
 
-export const idempotencyKey = (address: Address, sessionId: string, key: string): string =>
-  `${address}\0${sessionId}\0${key}`
+export const idempotencyKey: {
+  (sessionId: string, key: string): (address: Address) => string
+  (address: Address, sessionId: string, key: string): string
+} = Function.dual(3, (address: Address, sessionId: string, key: string): string => `${address}\0${sessionId}\0${key}`)
 
 export const emptyState = (input: {
   readonly addressBindings: MemoryState["addressBindings"]
@@ -128,6 +134,12 @@ export const emptyState = (input: {
   subscriberQueueCapacity: input.subscriberQueueCapacity,
 })
 
-export const operationMapKey = (runId: string, operationId: string): string => `${runId}\0${operationId}`
+export const operationMapKey: {
+  (operationId: string): (runId: string) => string
+  (runId: string, operationId: string): string
+} = Function.dual(2, (runId: string, operationId: string): string => `${runId}\0${operationId}`)
 
-export const operationKeyMapKey = (runId: string, operationKey: string): string => `key:${runId}\0${operationKey}`
+export const operationKeyMapKey: {
+  (operationKey: string): (runId: string) => string
+  (runId: string, operationKey: string): string
+} = Function.dual(2, (runId: string, operationKey: string): string => `key:${runId}\0${operationKey}`)

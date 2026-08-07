@@ -1,14 +1,21 @@
-import { Effect, Equal } from "effect"
+import { Effect, Equal, Function } from "effect"
 import type { RespondInput as RespondApprovalInput } from "../approval.js"
 import { ApprovalMismatch, ApprovalStale, RunNotFound, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { MemoryState } from "./state.js"
 import { respond } from "./store-control.js"
 
-export const respondApproval = (
-  state: MemoryState,
-  input: RespondApprovalInput,
-): Effect.Effect<MemoryState, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable> =>
+export const respondApproval: {
+  (
+    input: RespondApprovalInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<MemoryState, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable>
+  (
+    state: MemoryState,
+    input: RespondApprovalInput,
+  ): Effect.Effect<MemoryState, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable>
+} = Function.dual(2, (state: MemoryState, input: RespondApprovalInput) =>
   Effect.gen(function* () {
     if (state.closed) return yield* RuntimeUnavailable.make({ message: "runtime store released" })
     const run = state.runs.get(input.runId)
@@ -63,4 +70,5 @@ export const respondApproval = (
           : ApprovalStale.make({ runId: run.runId, approvalId: input.approvalId }),
       ),
     )
-  })
+  }),
+)

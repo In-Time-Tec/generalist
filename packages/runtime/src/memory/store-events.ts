@@ -1,4 +1,4 @@
-import { Effect, Queue, Stream, SynchronizedRef } from "effect"
+import { Effect, Function, Queue, Stream, SynchronizedRef } from "effect"
 import { CursorExpired, RunNotFound, RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import type { Cursor } from "../cursor.js"
 import type { RunInspection } from "../run.js"
@@ -18,72 +18,94 @@ export const toInspection = (
   ...(run.wait === undefined ? {} : { wait: run.wait }),
 })
 
-export const inspectRun = (
-  state: MemoryState,
-  runId: string,
-): Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable> => {
-  if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
-  const run = state.runs.get(runId)
-  if (run === undefined) return Effect.fail(RunNotFound.make({ runId }))
-  return Effect.succeed(toInspection(run))
-}
+export const inspectRun: {
+  (runId: string): (state: MemoryState) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
+  (state: MemoryState, runId: string): Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
+} = Function.dual(
+  2,
+  (state: MemoryState, runId: string): Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable> => {
+    if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
+    const run = state.runs.get(runId)
+    if (run === undefined) return Effect.fail(RunNotFound.make({ runId }))
+    return Effect.succeed(toInspection(run))
+  },
+)
 
-export const followEvents = (
-  stateRef: SynchronizedRef.SynchronizedRef<MemoryState>,
-  input: { readonly runId: string; readonly cursor: Cursor },
-): Stream.Stream<RunEvent, RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable> =>
-  Stream.unwrap(
-    Effect.gen(function* () {
-      const capacity = (yield* SynchronizedRef.get(stateRef)).subscriberQueueCapacity
-      const liveQueue: SubscriberQueue = yield* Queue.dropping<RunEvent, SubscriberError>(capacity)
+export const followEvents: {
+  (input: {
+    readonly runId: string
+    readonly cursor: Cursor
+  }): (
+    stateRef: SynchronizedRef.SynchronizedRef<MemoryState>,
+  ) => Stream.Stream<RunEvent, RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable>
+  (
+    stateRef: SynchronizedRef.SynchronizedRef<MemoryState>,
+    input: { readonly runId: string; readonly cursor: Cursor },
+  ): Stream.Stream<RunEvent, RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable>
+} = Function.dual(
+  2,
+  (
+    stateRef: SynchronizedRef.SynchronizedRef<MemoryState>,
+    input: { readonly runId: string; readonly cursor: Cursor },
+  ) =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        const capacity = (yield* SynchronizedRef.get(stateRef)).subscriberQueueCapacity
+        const liveQueue: SubscriberQueue = yield* Queue.dropping<RunEvent, SubscriberError>(capacity)
 
-      const plan = yield* SynchronizedRef.modifyEffect(stateRef, (state) =>
-        Effect.gen(function* () {
-          if (state.closed) {
-            return yield* RuntimeUnavailable.make({ message: "runtime store released" })
-          }
-          const run = state.runs.get(input.runId)
-          if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
-          if (input.cursor < -1 || input.cursor > run.lastSequence) {
-            return yield* CursorExpired.make({
-              runId: input.runId,
-              cursor: input.cursor,
-              earliestSequence: run.events[0]?.sequence ?? 0,
-            })
-          }
-          const replay = run.events.filter((event) => event.sequence > input.cursor)
-          const subscriberId = state.nextSubscriberId
-          const subscribers = new Map(run.subscribers)
-          subscribers.set(subscriberId, liveQueue)
-          const runs = new Map(state.runs)
-          runs.set(input.runId, { ...run, subscribers })
-          return [
-            { replay, subscriberId },
-            { ...state, runs, nextSubscriberId: subscriberId + 1 },
-          ] as const
-        }),
-      )
+        const plan = yield* SynchronizedRef.modifyEffect(stateRef, (state) =>
+          Effect.gen(function* () {
+            if (state.closed) {
+              return yield* RuntimeUnavailable.make({ message: "runtime store released" })
+            }
+            const run = state.runs.get(input.runId)
+            if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
+            if (input.cursor < -1 || input.cursor > run.lastSequence) {
+              return yield* CursorExpired.make({
+                runId: input.runId,
+                cursor: input.cursor,
+                earliestSequence: run.events[0]?.sequence ?? 0,
+              })
+            }
+            const replay = run.events.filter((event) => event.sequence > input.cursor)
+            const subscriberId = state.nextSubscriberId
+            const subscribers = new Map(run.subscribers)
+            subscribers.set(subscriberId, liveQueue)
+            const runs = new Map(state.runs)
+            runs.set(input.runId, { ...run, subscribers })
+            return [
+              { replay, subscriberId },
+              { ...state, runs, nextSubscriberId: subscriberId + 1 },
+            ] as const
+          }),
+        )
 
-      yield* Effect.addFinalizer(() =>
-        SynchronizedRef.update(stateRef, (state) => {
-          const run = state.runs.get(input.runId)
-          if (run === undefined) return state
-          const subscribers = new Map(run.subscribers)
-          subscribers.delete(plan.subscriberId)
-          const runs = new Map(state.runs)
-          runs.set(input.runId, { ...run, subscribers })
-          return { ...state, runs }
-        }).pipe(Effect.andThen(Queue.shutdown(liveQueue)), Effect.asVoid),
-      )
+        yield* Effect.addFinalizer(() =>
+          SynchronizedRef.update(stateRef, (state) => {
+            const run = state.runs.get(input.runId)
+            if (run === undefined) return state
+            const subscribers = new Map(run.subscribers)
+            subscribers.delete(plan.subscriberId)
+            const runs = new Map(state.runs)
+            runs.set(input.runId, { ...run, subscribers })
+            return { ...state, runs }
+          }).pipe(Effect.andThen(Queue.shutdown(liveQueue)), Effect.asVoid),
+        )
 
-      return Stream.concat(Stream.fromIterable(plan.replay), Stream.fromQueue(liveQueue))
-    }),
-  )
+        return Stream.concat(Stream.fromIterable(plan.replay), Stream.fromQueue(liveQueue))
+      }),
+    ),
+)
 
-export const followTreeChanges = (
-  stateRef: SynchronizedRef.SynchronizedRef<MemoryState>,
-  rootRunId: string,
-): Stream.Stream<void, RunNotFound | RuntimeUnavailable> =>
+export const followTreeChanges: {
+  (
+    rootRunId: string,
+  ): (stateRef: SynchronizedRef.SynchronizedRef<MemoryState>) => Stream.Stream<void, RunNotFound | RuntimeUnavailable>
+  (
+    stateRef: SynchronizedRef.SynchronizedRef<MemoryState>,
+    rootRunId: string,
+  ): Stream.Stream<void, RunNotFound | RuntimeUnavailable>
+} = Function.dual(2, (stateRef: SynchronizedRef.SynchronizedRef<MemoryState>, rootRunId: string) =>
   Stream.unwrap(
     Effect.gen(function* () {
       const liveQueue: TreeSubscriberQueue = yield* Queue.sliding<void, RuntimeUnavailable>(1)
@@ -113,7 +135,8 @@ export const followTreeChanges = (
       )
       return Stream.concat(Stream.succeed(undefined), Stream.fromQueue(liveQueue))
     }),
-  )
+  ),
+)
 
 export const shutdownStore = (stateRef: SynchronizedRef.SynchronizedRef<MemoryState>): Effect.Effect<void> =>
   SynchronizedRef.modifyEffect(stateRef, (state) =>

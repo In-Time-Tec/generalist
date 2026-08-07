@@ -1,5 +1,5 @@
 import { Pins } from "@batonfx/core"
-import { Schema } from "effect"
+import { Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import type { Message } from "../message.js"
 import type { ExecutableRef } from "../executable-manifest.js"
@@ -19,8 +19,12 @@ export const messageDigest = (message: Message): string => {
   })
 }
 
-export const childDigest = (message: Message, executableRef: ExecutableRef): string =>
-  Pins.digest([messageDigest(message), executableRef])
+export const childDigest: {
+  (executableRef: ExecutableRef): (message: Message) => string
+  (message: Message, executableRef: ExecutableRef): string
+} = Function.dual(2, (message: Message, executableRef: ExecutableRef): string =>
+  Pins.digest([messageDigest(message), executableRef]),
+)
 
 export const startDigest = (input: AdmitStartInput): string =>
   Pins.digest([
