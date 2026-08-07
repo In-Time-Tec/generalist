@@ -154,3 +154,28 @@ feasible with the separate D conditional) plus the makeRunLoop/RunStream full tr
 `LanguageModel`/`HandoffCatalog` members require the runtime `execution-host` to provision them explicitly
 (the closed-environment's generic `R` cannot be proven to cover them) — the documented runtime-model
 provisioning investigation.
+
+## Wave 25.5 (2026-08-07) — truthful channels + ambient HandoffCatalog: probe-verified, checkpointed
+
+Major wave-25.5 findings (implemented, tsc-verified, then reverted to the cleaner 1-error checkpoint):
+
+1. **Ambient HandoffCatalog works**: `Effect.serviceOption(HandoffCatalog)` in handoff-tool-execution +
+   the catalog passed as a parameter to `executeSameRunHandoff` — the HandoffCatalog is fully removed from
+   the run-channel chain (tool-execution → modelTurn → makeRunLoop → RunStream → RunRequirements) — tsc 0.
+   A missing catalog becomes a typed `FrameworkFailure` instead of "Service not found" — sound.
+2. **Truthful run channels with the separate D/E conditionals clear agent.ts:466**: RunStream =
+   `R | LanguageModel | StaticToolServices<Tools> | SchemaServicesD<S>` (no HC), the run-loop annotations
+   truthful, `RunRequirements<Tools, R, O>` — the 466 flag clears (the wave-25 SchemaServicesD insight made
+   the structuredFinalEvents threading feasible).
+3. **Runtime provisioning**: `Context.getOption` has no ⊆ constraint — the execution-host can source the
+   LanguageModel from the built closed-environment services and re-provide it in the run context.
+
+Remaining blockers (the same library-erasure class, now precisely bounded):
+- The delegate/fanOut `RunRequirements<Record<string, Tool.Any>, ...>` produce `StaticToolServices<Record>`
+  = `Handler<any> | unknown` — ~24 `any` lint flags in the delegate/fanOut tests/docs.
+- The execution-host's code_mode tool (`HostedTools = Record<string, Tool.Any>`) — the HandlersFor Exclude.
+
+**Checkpoint**: reverted to the wave-25 state (tsc 0, 1,168 tests pass, all scripts PASS, lint = agent.ts:466
+only, 65 commits). The wave-25.5 design is documented for the next session; the remaining work is the
+StaticToolServices conditional for broad tool types (the tool-execution RHS wall) and the code_mode handler
+provisioning.
