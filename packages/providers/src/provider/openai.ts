@@ -490,8 +490,4 @@ export const registrationAccount = (input: OpenAiAccountInput): ReturnType<Model
 export const layerAccount = (
   input: OpenAiAccountInput,
 ): Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient> =>
-  ModelRegistry.layer([registrationAccount(input)]) as Layer.Layer<
-    ModelRegistry.ModelRegistry,
-    Config.ConfigError,
-    HttpClient.HttpClient
-  >
+  ModelRegistry.layer([registrationAccount(input)])

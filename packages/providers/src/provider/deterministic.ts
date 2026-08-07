@@ -52,7 +52,7 @@ export const registration = (input: DeterministicInput = {}): ReturnType<ModelRe
 
 /** @experimental */
 export const layer = (input: DeterministicInput = {}): Layer.Layer<ModelRegistry.ModelRegistry> =>
-  ModelRegistry.layer([registration(input)]) as Layer.Layer<ModelRegistry.ModelRegistry>
+  ModelRegistry.layer([registration(input)])
 
 /** @experimental */
 export interface OpenAiFallbackOptions extends LayerOptions {
@@ -61,7 +61,11 @@ export interface OpenAiFallbackOptions extends LayerOptions {
 }
 
 /** @experimental */
-export const layerOpenAi = (options: OpenAiFallbackOptions) =>
+export const layerOpenAi = (options: OpenAiFallbackOptions): Layer.Layer<
+  ModelRegistry.ModelRegistry,
+  Config.ConfigError,
+  HttpClient.HttpClient
+> =>
   Layer.unwrap(
     Effect.gen(function* () {
       const deterministic = yield* registration({
@@ -94,4 +98,4 @@ export const layerOpenAi = (options: OpenAiFallbackOptions) =>
         ...(Option.isSome(openAiRegistration) ? [Effect.succeed(openAiRegistration.value)] : []),
       ])
     }),
-  ) as Layer.Layer<ModelRegistry.ModelRegistry, Config.ConfigError, HttpClient.HttpClient>
+  )
