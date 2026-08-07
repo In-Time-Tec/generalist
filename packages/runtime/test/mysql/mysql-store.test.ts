@@ -1,11 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Layer, Redacted, Schema, Stream } from "effect"
+import { Effect, Exit, Layer, Redacted, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { MysqlClient } from "@effect/sql-mysql2"
 import { Errors, MysqlRunSchema, RunClaims, Runtime, RuntimeWorker, RunStore } from "../../src/index.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../src/sql/mysql/schema.js"
 import {
-
   alternateAssistantRef,
   assistantAddress,
   assistantRef,
@@ -16,6 +15,12 @@ import {
   textPrompt,
 } from "../helpers.js"
 import { mysqlAvailable, mysqlClient, mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "./helpers.js"
+
+const scopedWith =
+  <A, E>(layerValue: Layer.Layer<A, E, never>) =>
+  <B, E2, R2 extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R2>) =>
+    Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
+
 const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
@@ -100,7 +105,7 @@ describeMysql("mysql run store", () => {
           })
           .pipe(Effect.flip)
         expect(conflict).toBeInstanceOf(Errors.ExecutableRegistrationConflict)
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -113,7 +118,7 @@ describeMysql("mysql run store", () => {
           multiWorker: true,
         })
         expect(schemaChecksum()).toHaveLength(64)
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -144,7 +149,7 @@ describeMysql("mysql run store", () => {
           (event) => event._tag === "RunResumed",
         )
         expect(resumed).toEqual(expect.objectContaining({ resolution }))
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -167,12 +172,12 @@ describeMysql("mysql run store", () => {
               executable_manifest_json = ${encodeJson(alternateAssistantRef.manifest)}
             WHERE run_id = ${runId}
           `
-        }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
+        }).pipe(scopedWith(mysqlClient(url)))
         const authorityConflict = yield* runtime.send(input).pipe(Effect.flip)
         expect(authorityConflict).toBeInstanceOf(Errors.IdempotencyConflict)
         const conflict = yield* runtime.send({ ...input, prompt: textPrompt("changed") }).pipe(Effect.flip)
         expect(conflict).toBeInstanceOf(Errors.IdempotencyConflict)
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -204,7 +209,7 @@ describeMysql("mysql run store", () => {
           })
           .pipe(Effect.flip)
         expect(failure).toBeInstanceOf(Errors.RunTerminal)
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -233,7 +238,7 @@ describeMysql("mysql run store", () => {
         expect(yield* store.complete({ ...executionClaim, result: completedResult("early") })).toMatchObject({
           _tag: "SteeringPending",
         })
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -262,7 +267,7 @@ describeMysql("mysql run store", () => {
         const ids = groups.flat().map((item) => item.run.runId)
         expect(new Set(ids).size).toBe(6)
         expect(ids.toSorted()).toEqual(receipts.map((receipt) => receipt.runId).toSorted())
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -282,7 +287,7 @@ describeMysql("mysql run store", () => {
         )
         expect(new Set(receipts.map((receipt) => receipt.runId)).size).toBe(1)
         expect(receipts.filter((receipt) => !receipt.duplicate)).toHaveLength(1)
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -300,7 +305,7 @@ describeMysql("mysql run store", () => {
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`UPDATE baton_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${head.runId}`
-        }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
+        }).pipe(scopedWith(mysqlClient(url)))
         const second = yield* claims.claimReadyRuns({ workerId: "owner-b", limit: 1, lease: "10 seconds" })
         expect(second[0]!.attemptFence).toBeGreaterThan(first[0]!.attemptFence)
         const stale = yield* claims
@@ -325,10 +330,10 @@ describeMysql("mysql run store", () => {
           return yield* sql<{ owner_worker_id: string | null; lease_expires_at: string | null }>`
             SELECT owner_worker_id, lease_expires_at FROM baton_runs WHERE run_id = ${head.runId}
           `
-        }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
+        }).pipe(scopedWith(mysqlClient(url)))
         expect(ownership[0]).toEqual({ owner_worker_id: null, lease_expires_at: null })
         expect((yield* claims.claimReadyRuns({ workerId: "owner-c", limit: 1 }))[0]?.run.runId).toBe(next.runId)
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -364,7 +369,7 @@ describeMysql("mysql run store", () => {
           }),
         ).toBe(false)
       }).pipe(
-        Effect.provide(
+        scopedWith(
           RuntimeWorker.layerWorker({
             workerId: "mysql-worker",
             concurrency: 2,
@@ -372,7 +377,6 @@ describeMysql("mysql run store", () => {
             pollInterval: "50 millis",
           }).pipe(Layer.provideMerge(mysqlLayer(url))),
         ),
-        Effect.scoped,
       ),
     ),
   )
@@ -415,7 +419,7 @@ describeMysql("mysql run store", () => {
         expect(history.filter((event) => event._tag === "ChildLinked")).toHaveLength(4)
         expect(history.filter((event) => event._tag === "ChildSettled")).toHaveLength(4)
         expect(history.map((event) => event.sequence)).toEqual(history.map((_, index) => index))
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -442,7 +446,7 @@ describeMysql("mysql run store", () => {
         expect(claim.run.runId).toBe(fresh.runId)
         expect(claim.leaseExpiresAt).toBeInstanceOf(Date)
         expect(Number.isNaN(claim.leaseExpiresAt.getTime())).toBe(false)
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -525,7 +529,7 @@ describeMysql("mysql run store", () => {
         expect((yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })).result).toBe(
           "recovered",
         )
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -559,7 +563,7 @@ describeMysql("mysql run store", () => {
         const tags = (yield* runtime.history({ runId: parent.runId, cursor: -1, limit: 20 })).map((event) => event._tag)
         expect(tags).toContain("ChildLinked")
         expect(tags).toContain("ChildSettled")
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -627,7 +631,7 @@ describeMysql("mysql run store", () => {
         })
         const second = yield* claims.claimReadyRuns({ workerId: "fan-out", limit: 3 })
         expect(second.map((claim) => claim.run.runId)).toEqual([receipt.childRunIds[1]])
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -682,7 +686,7 @@ describeMysql("mysql run store", () => {
           _tag: "RunCompleted",
           result: { _tag: "Program", value: "preserved" },
         })
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -716,7 +720,7 @@ describeMysql("mysql run store", () => {
           })
           .pipe(Effect.flip)
         expect(failure).toBeInstanceOf(Errors.RunTerminal)
-      }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped),
+      }).pipe(scopedWith(mysqlLayer(url))),
     ),
   )
 
@@ -731,7 +735,7 @@ describeMysql("mysql run store", () => {
             idempotencyKey: "poll",
             prompt: "poll",
           })).runId
-        }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped)
+        }).pipe(scopedWith(mysqlLayer(url)))
         const observed = yield* Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const claims = yield* RunClaims.RunClaims
@@ -750,7 +754,7 @@ describeMysql("mysql run store", () => {
             ),
           )
           return yield* runtime.events({ runId, cursor: 0 }).pipe(Stream.take(2), Stream.runCollect)
-        }).pipe(Effect.provide(mysqlLayer(url)), Effect.scoped)
+        }).pipe(scopedWith(mysqlLayer(url)))
         expect([...observed].map((event) => event._tag)).toEqual(["RunAttemptStarted", "RunCompleted"])
       }),
     ),
@@ -759,36 +763,32 @@ describeMysql("mysql run store", () => {
   it.live("exposes plan, check, apply, markDirty, and verify-only startup", () =>
     withSchema(
       Effect.gen(function* () {
-        const plan = yield* MysqlRunSchema.plan("mysql-test").pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
+        const plan = yield* MysqlRunSchema.plan("mysql-test").pipe(scopedWith(mysqlClient(url)))
         expect(plan.required).toBe(SCHEMA_VERSION)
         expect(plan.upgradeRequired).toBe(false)
         expect(plan.statements).toEqual([])
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`UPDATE baton_schema_meta SET version = 0 WHERE id = 1`
-        }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
-        const upgrade = yield* Effect.exit(Effect.void.pipe(Effect.provide(mysqlLayer(url)), Effect.scoped))
+        }).pipe(scopedWith(mysqlClient(url)))
+        const upgrade = yield* Effect.exit(scopedWith(mysqlLayer(url))(Effect.void))
         expect(Exit.isFailure(upgrade)).toBe(true)
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`UPDATE baton_schema_meta SET version = ${SCHEMA_VERSION} WHERE id = 1`
-        }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
-        yield* MysqlRunSchema.markDirty("mysql-test").pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
-        const dirty = yield* Effect.exit(Effect.void.pipe(Effect.provide(mysqlLayer(url)), Effect.scoped))
+        }).pipe(scopedWith(mysqlClient(url)))
+        yield* MysqlRunSchema.markDirty("mysql-test").pipe(scopedWith(mysqlClient(url)))
+        const dirty = yield* Effect.exit(scopedWith(mysqlLayer(url))(Effect.void))
         expect(Exit.isFailure(dirty)).toBe(true)
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`UPDATE baton_schema_meta SET dirty = 0, checksum = ${schemaChecksum()} WHERE id = 1`
-        }).pipe(Effect.provide(MysqlClient.layer({ url: Redacted.make(url) })), Effect.scoped)
+        }).pipe(scopedWith(MysqlClient.layer({ url: Redacted.make(url) })))
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
           yield* sql`UPDATE baton_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`
-        }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
-        const future = yield* MysqlRunSchema.apply("mysql-test").pipe(
-          Effect.provide(mysqlClient(url)),
-          Effect.scoped,
-          Effect.flip,
-        )
+        }).pipe(scopedWith(mysqlClient(url)))
+        const future = yield* MysqlRunSchema.apply("mysql-test").pipe(scopedWith(mysqlClient(url)), Effect.flip)
         expect(future).toBeInstanceOf(Errors.SchemaVersionUnsupported)
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
@@ -799,7 +799,7 @@ describeMysql("mysql run store", () => {
             SET version = ${SCHEMA_VERSION}, checksum = ${schemaChecksum()}, dirty = 0
             WHERE id = 1
           `
-        }).pipe(Effect.provide(mysqlClient(url)), Effect.scoped)
+        }).pipe(scopedWith(mysqlClient(url)))
       }),
     ),
   )

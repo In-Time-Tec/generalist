@@ -1,5 +1,5 @@
 import { expect, it, layer } from "@effect/vitest"
-import { Effect, Option, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { AgentEvent } from "@batonfx/core"
 import { ChildRuns, Errors, Runtime, RunStore } from "../src/index.js"
 import { assistantAddress, completedResult, parentRelativeOptions } from "./helpers.js"
@@ -180,78 +180,94 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
 it.live("persists one ordered child-group suspension and result across SQLite reopen", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("child-group")
-    const admitted = yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const children = ChildRuns.make(store)
-      const parent = yield* runtime.send({
-        to: assistantAddress,
-        sessionId: "child-group:sqlite",
-        idempotencyKey: "parent",
-        prompt: "parent",
-      })
-      const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
-      const receipt = yield* startGroup(parent.runId)
-      expect(
-        yield* children.awaitGroup({
-          parentRunId: parent.runId,
-          toolCallId: "sqlite-await",
-          groupId: receipt.groupId,
-        }),
-      ).toEqual({ _tag: "Suspend", token: receipt.groupId })
-      yield* store.suspend({
-        ...parentClaim,
-        wait: openGroupWait("sqlite-await"),
-        suspension: groupSuspension("sqlite-await", receipt.groupId),
-      })
-      return { parentRunId: parent.runId, receipt }
-    }).pipe(Effect.provide(sqliteGroupLayer(filename)), Effect.scoped)
+    const admitted = yield* Effect.scoped(
+      Effect.flatMap(Layer.build(sqliteGroupLayer(filename)), (context) =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const children = ChildRuns.make(store)
+          const parent = yield* runtime.send({
+            to: assistantAddress,
+            sessionId: "child-group:sqlite",
+            idempotencyKey: "parent",
+            prompt: "parent",
+          })
+          const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })
+          const receipt = yield* startGroup(parent.runId)
+          expect(
+            yield* children.awaitGroup({
+              parentRunId: parent.runId,
+              toolCallId: "sqlite-await",
+              groupId: receipt.groupId,
+            }),
+          ).toEqual({ _tag: "Suspend", token: receipt.groupId })
+          yield* store.suspend({
+            ...parentClaim,
+            wait: openGroupWait("sqlite-await"),
+            suspension: groupSuspension("sqlite-await", receipt.groupId),
+          })
+          return { parentRunId: parent.runId, receipt }
+        }).pipe(Effect.provideContext(context)),
+      ),
+    )
 
-    yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      expect(yield* runtime.inspect(admitted.parentRunId)).toMatchObject({
-        status: "waiting",
-        wait: { waitId: "sqlite-await", status: "open" },
-      })
-      yield* store.complete({
-        ...(yield* store.claimExecution({ runId: admitted.receipt.children[2]!.childRunId, ownerId: "third" })),
-        result: completedResult("third persisted"),
-      })
-      yield* store.complete({
-        ...(yield* store.claimExecution({ runId: admitted.receipt.children[0]!.childRunId, ownerId: "first" })),
-        result: completedResult("first persisted"),
-      })
-      yield* store.fail({
-        ...(yield* store.claimExecution({ runId: admitted.receipt.children[1]!.childRunId, ownerId: "second" })),
-        error: Errors.AgentExecutionFailure.make({ message: "persisted failure" }),
-      })
-      const parent = yield* runtime.inspect(admitted.parentRunId)
-      expect(parent.status).toBe("running")
-      expect(parent.wait).toMatchObject({ status: "signaled" })
-    }).pipe(Effect.provide(sqliteGroupLayer(filename)), Effect.scoped)
+    yield* Effect.scoped(
+      Effect.flatMap(Layer.build(sqliteGroupLayer(filename)), (context) =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          expect(yield* runtime.inspect(admitted.parentRunId)).toMatchObject({
+            status: "waiting",
+            wait: { waitId: "sqlite-await", status: "open" },
+          })
+          yield* store.complete({
+            ...(yield* store.claimExecution({ runId: admitted.receipt.children[2]!.childRunId, ownerId: "third" })),
+            result: completedResult("third persisted"),
+          })
+          yield* store.complete({
+            ...(yield* store.claimExecution({ runId: admitted.receipt.children[0]!.childRunId, ownerId: "first" })),
+            result: completedResult("first persisted"),
+          })
+          yield* store.fail({
+            ...(yield* store.claimExecution({ runId: admitted.receipt.children[1]!.childRunId, ownerId: "second" })),
+            error: Errors.AgentExecutionFailure.make({ message: "persisted failure" }),
+          })
+          const parent = yield* runtime.inspect(admitted.parentRunId)
+          expect(parent.status).toBe("running")
+          expect(parent.wait).toMatchObject({ status: "signaled" })
+        }).pipe(Effect.provideContext(context)),
+      ),
+    )
 
-    yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const children = ChildRuns.make(store)
-      const parent = yield* runtime.inspect(admitted.parentRunId)
-      const resolution = parent.wait?.resolution
-      const result = yield* Schema.decodeUnknownEffect(ChildRuns.GroupResult)(
-        resolution?._tag === "Signal" ? resolution.payload : undefined,
-      )
-      expect(result.children.map((child) => child.key)).toEqual(["first", "second", "third"])
-      expect(result.children.map((child) => child.status)).toEqual(["succeeded", "failed", "succeeded"])
-      expect(result.children.map((child) => child.text)).toEqual(["first persisted", undefined, "third persisted"])
-      const replay = yield* children.awaitGroup({
-        parentRunId: admitted.parentRunId,
-        toolCallId: "sqlite-await",
-        groupId: admitted.receipt.groupId,
-      })
-      expect(replay._tag).toBe("Success")
-      const history = yield* runtime.history({ runId: admitted.parentRunId, limit: 100 })
-      expect(history.filter((event) => event._tag === "RunWaiting")).toHaveLength(1)
-      expect(history.filter((event) => event._tag === "RunResumed")).toHaveLength(1)
-    }).pipe(Effect.provide(sqliteGroupLayer(filename)), Effect.scoped)
+    yield* Effect.scoped(
+      Effect.flatMap(Layer.build(sqliteGroupLayer(filename)), (context) =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const children = ChildRuns.make(store)
+          const parent = yield* runtime.inspect(admitted.parentRunId)
+          const resolution = parent.wait?.resolution
+          const result = yield* Schema.decodeUnknownEffect(ChildRuns.GroupResult)(
+            resolution?._tag === "Signal" ? resolution.payload : undefined,
+          )
+          expect(result.children.map((child) => child.key)).toEqual(["first", "second", "third"])
+          expect(result.children.map((child) => child.status)).toEqual(["succeeded", "failed", "succeeded"])
+          expect(result.children.map((child) => child.text)).toEqual([
+            "first persisted",
+            undefined,
+            "third persisted",
+          ])
+          const replay = yield* children.awaitGroup({
+            parentRunId: admitted.parentRunId,
+            toolCallId: "sqlite-await",
+            groupId: admitted.receipt.groupId,
+          })
+          expect(replay._tag).toBe("Success")
+          const history = yield* runtime.history({ runId: admitted.parentRunId, limit: 100 })
+          expect(history.filter((event) => event._tag === "RunWaiting")).toHaveLength(1)
+          expect(history.filter((event) => event._tag === "RunResumed")).toHaveLength(1)
+        }).pipe(Effect.provideContext(context)),
+      ),
+    )
   }),
 )

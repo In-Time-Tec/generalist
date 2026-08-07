@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import {
   Agent,
@@ -42,6 +42,11 @@ const finish = Response.makePart("finish", {
   response: undefined,
 })
 
+const scopedWith =
+  <A, E>(layerValue: Layer.Layer<A, E, never>) =>
+  <B, E2, R2 extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R2>) =>
+    Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
+
 describe("ExecutionHost", () => {
   it.effect("passes the exact pinned context window and reserve to compaction", () =>
     Effect.gen(function* () {
@@ -82,9 +87,9 @@ describe("ExecutionHost", () => {
         resolve: (input) =>
           Effect.sync(() => {
             const registration = input.registrations?.find((item) => item.pin === compaction.service)
-            const policy = Schema.decodeUnknownOption(ExecutableRegistration.CompactionPolicy)(registration?.payload).pipe(
-              Option.getOrUndefined,
-            )
+            const policy = Schema.decodeUnknownOption(ExecutableRegistration.CompactionPolicy)(
+              registration?.payload,
+            ).pipe(Option.getOrUndefined)
             const strategy: Compaction.Strategy = {
               ...Compaction.defaultStrategy(),
               shouldCompact: (usage) => {
@@ -126,19 +131,21 @@ describe("ExecutionHost", () => {
         addresses: [],
       })
 
-      yield* Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
-        const store = yield* RunStore.RunStore
-        const receipt = yield* runtime.start({
-          executable,
-          registrations,
-          sessionId: "session:pinned-compaction",
-          idempotencyKey: "pinned-compaction",
-          prompt: "run",
-        })
-        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "pinned-compaction" }))
-      }).pipe(Effect.provide(runtimeLayer))
+      yield* scopedWith(runtimeLayer)(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.start({
+            executable,
+            registrations,
+            sessionId: "session:pinned-compaction",
+            idempotencyKey: "pinned-compaction",
+            prompt: "run",
+          })
+          yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "pinned-compaction" }))
+        }),
+      )
 
       expect(observed).toMatchObject({ contextWindow: 32_768, reserveTokens: 2_048 })
       expect(observedKeepRecent).toBe(777)
@@ -271,7 +278,7 @@ describe("ExecutionHost", () => {
           }),
       })
       const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
-      const receipt = yield* Effect.scoped(
+      const receipt = yield* scopedWith(layerSqlite())(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           return yield* runtime.start({
@@ -281,20 +288,20 @@ describe("ExecutionHost", () => {
             idempotencyKey: "sqlite-pinned-compaction",
             prompt: "old context that must be summarized",
           })
-        }).pipe(Effect.provide(layerSqlite())),
+        }),
       )
-      yield* Effect.scoped(
+      yield* scopedWith(layerSqlite())(
         Effect.gen(function* () {
           const host = yield* ExecutionHost.ExecutionHost
           const store = yield* RunStore.RunStore
           yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "reopened-compaction" }))
-        }).pipe(Effect.provide(layerSqlite())),
+        }),
       )
-      const snapshot = yield* Effect.scoped(
+      const snapshot = yield* scopedWith(layerSqlite())(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           return yield* runtime.snapshot(receipt.runId)
-        }).pipe(Effect.provide(layerSqlite())),
+        }),
       )
       expect(summaryCalls).toBe(1)
       expect(snapshot.compactions).toHaveLength(1)
@@ -344,35 +351,37 @@ describe("ExecutionHost", () => {
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
       })
 
-      yield* Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
-        const store = yield* RunStore.RunStore
-        const receipt = yield* runtime.send({
-          to: address,
-          sessionId: "session:lazy",
-          idempotencyKey: "lazy:1",
-          prompt: "run",
-        })
-        expect(yield* Ref.get(admissions)).toBe(1)
-        expect(yield* Ref.get(resolved)).toBe(0)
-        expect(yield* Ref.get(lifecycle)).toEqual(["admission resolver acquired", "admission resolver finalized"])
-        const persisted = yield* store.loadExecution(receipt.runId)
-        expect(persisted.executableRef).toEqual(executable.ref)
-        expect(persisted.executableManifest).toEqual(executable.manifest)
+      yield* scopedWith(runtimeLayer)(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: "session:lazy",
+            idempotencyKey: "lazy:1",
+            prompt: "run",
+          })
+          expect(yield* Ref.get(admissions)).toBe(1)
+          expect(yield* Ref.get(resolved)).toBe(0)
+          expect(yield* Ref.get(lifecycle)).toEqual(["admission resolver acquired", "admission resolver finalized"])
+          const persisted = yield* store.loadExecution(receipt.runId)
+          expect(persisted.executableRef).toEqual(executable.ref)
+          expect(persisted.executableManifest).toEqual(executable.manifest)
 
-        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "lazy" }))
-        expect(yield* Ref.get(admissions)).toBe(1)
-        expect(yield* Ref.get(resolved)).toBe(1)
-        expect(yield* Ref.get(lifecycle)).toEqual([
-          "admission resolver acquired",
-          "admission resolver finalized",
-          "execution resolver acquired",
-          "service acquired",
-          "service finalized",
-          "execution resolver finalized",
-        ])
-      }).pipe(Effect.provide(runtimeLayer))
+          yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "lazy" }))
+          expect(yield* Ref.get(admissions)).toBe(1)
+          expect(yield* Ref.get(resolved)).toBe(1)
+          expect(yield* Ref.get(lifecycle)).toEqual([
+            "admission resolver acquired",
+            "admission resolver finalized",
+            "execution resolver acquired",
+            "service acquired",
+            "service finalized",
+            "execution resolver finalized",
+          ])
+        }),
+      )
     }),
   )
 
@@ -410,26 +419,28 @@ describe("ExecutionHost", () => {
         addresses: [{ address, executable, registrations: registrationsFor(executable) }],
       })
 
-      yield* Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
-        const store = yield* RunStore.RunStore
-        const receipt = yield* runtime.send({
-          to: address,
-          sessionId: "session:blocked-resolver",
-          idempotencyKey: "blocked-resolver:1",
-          prompt: "never resolve",
-        })
-        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "blocked-resolver" })
-        const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
-        yield* Deferred.await(resolving)
-        yield* runtime.cancel({ runId: receipt.runId, reason: "stop resolving" })
+      yield* scopedWith(runtimeLayer)(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: "session:blocked-resolver",
+            idempotencyKey: "blocked-resolver:1",
+            prompt: "never resolve",
+          })
+          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "blocked-resolver" })
+          const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(resolving)
+          yield* runtime.cancel({ runId: receipt.runId, reason: "stop resolving" })
 
-        expect((yield* Fiber.await(execution))._tag).toBe("Success")
-        yield* Deferred.await(finalized)
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-        expect(yield* Ref.get(modelCalls)).toBe(0)
-      }).pipe(Effect.provide(runtimeLayer))
+          expect((yield* Fiber.await(execution))._tag).toBe("Success")
+          yield* Deferred.await(finalized)
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+          expect(yield* Ref.get(modelCalls)).toBe(0)
+        }),
+      )
     }),
   )
 
@@ -463,35 +474,35 @@ describe("ExecutionHost", () => {
           }),
       })
 
-      yield* Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
-        const store = yield* RunStore.RunStore
-        const receipt = yield* runtime.send({
-          to: address,
-          sessionId: "session:failing-model",
-          idempotencyKey: "failing-model:1",
-          prompt: "fail",
-        })
-        expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
-        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "failing-model" }))
+      yield* scopedWith(
+        Runtime.layerMemory({
+          resolver,
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        }),
+      )(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: "session:failing-model",
+            idempotencyKey: "failing-model:1",
+            prompt: "fail",
+          })
+          expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
+          yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "failing-model" }))
 
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
-        expect(lifecycle).toEqual([
-          "admission resolver acquired",
-          "admission resolver finalized",
-          "execution resolver acquired",
-          "service acquired",
-          "service finalized",
-          "execution resolver finalized",
-        ])
-      }).pipe(
-        Effect.provide(
-          Runtime.layerMemory({
-            resolver,
-            addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-          }),
-        ),
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
+          expect(lifecycle).toEqual([
+            "admission resolver acquired",
+            "admission resolver finalized",
+            "execution resolver acquired",
+            "service acquired",
+            "service finalized",
+            "execution resolver finalized",
+          ])
+        }),
       )
     }),
   )
@@ -528,14 +539,7 @@ describe("ExecutionHost", () => {
         expect(failed?._tag).toBe("RunFailed")
         if (failed?._tag === "RunFailed") expect(failed.error._tag).toBe(expectedTag)
         expect(yield* Ref.get(finalized)).toBe(true)
-      }).pipe(
-        Effect.provide(
-          Runtime.layerMemory({
-            resolver,
-            addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-          }),
-        ),
-      )
+      })
 
     return Effect.gen(function* () {
       const missingFinalized = yield* Ref.make(false)
@@ -559,19 +563,33 @@ describe("ExecutionHost", () => {
                 Effect.as({ _tag: "Agent" as const, agent: closedTestAgent(agent), attestation: other }),
               ),
       })
-      yield* verify(
-        missing,
-        "@batonfx/runtime/ExecutablePinMissing",
-        "missing",
-        missingFinalized,
-        missingAdmissionFinalized,
+      yield* scopedWith(
+        Runtime.layerMemory({
+          resolver: missing,
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        }),
+      )(
+        verify(
+          missing,
+          "@batonfx/runtime/ExecutablePinMissing",
+          "missing",
+          missingFinalized,
+          missingAdmissionFinalized,
+        ),
       )
-      yield* verify(
-        mismatched,
-        "@batonfx/runtime/ExecutableIdentityMismatch",
-        "mismatch",
-        mismatchFinalized,
-        mismatchAdmissionFinalized,
+      yield* scopedWith(
+        Runtime.layerMemory({
+          resolver: mismatched,
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+        }),
+      )(
+        verify(
+          mismatched,
+          "@batonfx/runtime/ExecutableIdentityMismatch",
+          "mismatch",
+          mismatchFinalized,
+          mismatchAdmissionFinalized,
+        ),
       )
     })
   })
@@ -638,95 +656,97 @@ describe("ExecutionHost", () => {
       addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
     })
 
-    return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const host = yield* ExecutionHost.ExecutionHost
-      const store = yield* RunStore.RunStore
-      const receipt = yield* runtime.send({
-        to: address,
-        sessionId: "session:durable",
-        idempotencyKey: "message:1",
-        prompt: "Wait and then continue.",
-      })
-      expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
+    return scopedWith(runtimeLayer)(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* ExecutionHost.ExecutionHost
+        const store = yield* RunStore.RunStore
+        const receipt = yield* runtime.send({
+          to: address,
+          sessionId: "session:durable",
+          idempotencyKey: "message:1",
+          prompt: "Wait and then continue.",
+        })
+        expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
 
-      const firstClaim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
-      yield* host.execute(firstClaim)
-      const waiting = yield* runtime.inspect(receipt.runId)
-      if (waiting.status === "failed") {
-        const failedEvents = yield* runtime.events({ runId: receipt.runId }).pipe(
-          Stream.takeUntil((event) => event._tag === "RunFailed"),
+        const firstClaim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
+        yield* host.execute(firstClaim)
+        const waiting = yield* runtime.inspect(receipt.runId)
+        if (waiting.status === "failed") {
+          const failedEvents = yield* runtime.events({ runId: receipt.runId }).pipe(
+            Stream.takeUntil((event) => event._tag === "RunFailed"),
+            Stream.runCollect,
+          )
+          const failed = [...failedEvents].find((event) => event._tag === "RunFailed")
+          throw new Error(failed?._tag === "RunFailed" ? failed.error.message : "run failed")
+        }
+        expect(waiting.status).toBe("waiting")
+        expect(waiting.wait?.waitId).toBe("wait-call-1")
+        const persisted = yield* store.loadExecution(receipt.runId)
+        expect(persisted.checkpoint !== undefined && "driverVersion" in persisted.checkpoint).toBe(true)
+        if (persisted.checkpoint === undefined || !("driverVersion" in persisted.checkpoint)) return
+        expect(persisted.checkpoint.driverVersion).toBe("1")
+        expect(persisted.checkpoint.executable).toEqual(ref.ref)
+        expect(persisted.transcript).toBeDefined()
+        expect(persisted.suspension?.token).toBe("approval-token")
+        expect(lifecycle).toEqual([
+          "admission resolver acquired",
+          "admission resolver finalized",
+          "execution resolver acquired",
+          "service acquired",
+          "service finalized",
+          "execution resolver finalized",
+        ])
+
+        phase = "resume"
+        lifecycle.length = 0
+        yield* runtime.respond({
+          runId: receipt.runId,
+          waitId: "wait-call-1",
+          idempotencyKey: "response:1",
+          resolution: { _tag: "ToolResult", result: "approved", encodedResult: "approved" },
+        })
+        const resumeClaim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
+        yield* host.execute(resumeClaim)
+
+        const completed = yield* runtime.inspect(receipt.runId)
+        if (completed.status === "failed") {
+          const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
+          const failure = history.find((event) => event._tag === "RunFailed")
+          throw new Error(failure?._tag === "RunFailed" ? failure.error.message : "run failed")
+        }
+        expect(completed.runId).toBe(receipt.runId)
+        expect(completed.status).toBe("succeeded")
+        const events = yield* runtime.events({ runId: receipt.runId, cursor: Cursor.origin }).pipe(
+          Stream.takeUntil((event) => event._tag === "RunCompleted"),
           Stream.runCollect,
         )
-        const failed = [...failedEvents].find((event) => event._tag === "RunFailed")
-        throw new Error(failed?._tag === "RunFailed" ? failed.error.message : "run failed")
-      }
-      expect(waiting.status).toBe("waiting")
-      expect(waiting.wait?.waitId).toBe("wait-call-1")
-      const persisted = yield* store.loadExecution(receipt.runId)
-      expect(persisted.checkpoint !== undefined && "driverVersion" in persisted.checkpoint).toBe(true)
-      if (persisted.checkpoint === undefined || !("driverVersion" in persisted.checkpoint)) return
-      expect(persisted.checkpoint.driverVersion).toBe("1")
-      expect(persisted.checkpoint.executable).toEqual(ref.ref)
-      expect(persisted.transcript).toBeDefined()
-      expect(persisted.suspension?.token).toBe("approval-token")
-      expect(lifecycle).toEqual([
-        "admission resolver acquired",
-        "admission resolver finalized",
-        "execution resolver acquired",
-        "service acquired",
-        "service finalized",
-        "execution resolver finalized",
-      ])
+        const replay = [...events]
+        expect(replay.filter((event) => event._tag === "RunCompleted")).toHaveLength(1)
+        expect(replay.map((event) => event.sequence)).toEqual(replay.map((_, index) => index))
+        expect(new Set(replay.map((event) => event.runId))).toEqual(new Set([receipt.runId]))
+        expect(modelCalls).toBe(2)
+        expect(lifecycle).toEqual([
+          "execution resolver acquired",
+          "service acquired",
+          "service finalized",
+          "execution resolver finalized",
+        ])
 
-      phase = "resume"
-      lifecycle.length = 0
-      yield* runtime.respond({
-        runId: receipt.runId,
-        waitId: "wait-call-1",
-        idempotencyKey: "response:1",
-        resolution: { _tag: "ToolResult", result: "approved", encodedResult: "approved" },
-      })
-      const resumeClaim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
-      yield* host.execute(resumeClaim)
-
-      const completed = yield* runtime.inspect(receipt.runId)
-      if (completed.status === "failed") {
-        const history = yield* store.history({ runId: receipt.runId, cursor: Cursor.origin, limit: 100 })
-        const failure = history.find((event) => event._tag === "RunFailed")
-        throw new Error(failure?._tag === "RunFailed" ? failure.error.message : "run failed")
-      }
-      expect(completed.runId).toBe(receipt.runId)
-      expect(completed.status).toBe("succeeded")
-      const events = yield* runtime.events({ runId: receipt.runId, cursor: Cursor.origin }).pipe(
-        Stream.takeUntil((event) => event._tag === "RunCompleted"),
-        Stream.runCollect,
-      )
-      const replay = [...events]
-      expect(replay.filter((event) => event._tag === "RunCompleted")).toHaveLength(1)
-      expect(replay.map((event) => event.sequence)).toEqual(replay.map((_, index) => index))
-      expect(new Set(replay.map((event) => event.runId))).toEqual(new Set([receipt.runId]))
-      expect(modelCalls).toBe(2)
-      expect(lifecycle).toEqual([
-        "execution resolver acquired",
-        "service acquired",
-        "service finalized",
-        "execution resolver finalized",
-      ])
-
-      modelCalls = 0
-      phase = "suspend"
-      const cancelled = yield* runtime.send({
-        to: address,
-        sessionId: "session:durable-cancel",
-        idempotencyKey: "message:cancel",
-        prompt: "Wait until cancelled.",
-      })
-      yield* host.execute(yield* store.claimExecution({ runId: cancelled.runId, ownerId: "memory" }))
-      expect((yield* runtime.inspect(cancelled.runId)).status).toBe("waiting")
-      yield* runtime.cancel({ runId: cancelled.runId, reason: "stop while suspended" })
-      expect((yield* runtime.inspect(cancelled.runId)).status).toBe("cancelled")
-    }).pipe(Effect.provide(runtimeLayer))
+        modelCalls = 0
+        phase = "suspend"
+        const cancelled = yield* runtime.send({
+          to: address,
+          sessionId: "session:durable-cancel",
+          idempotencyKey: "message:cancel",
+          prompt: "Wait until cancelled.",
+        })
+        yield* host.execute(yield* store.claimExecution({ runId: cancelled.runId, ownerId: "memory" }))
+        expect((yield* runtime.inspect(cancelled.runId)).status).toBe("waiting")
+        yield* runtime.cancel({ runId: cancelled.runId, reason: "stop while suspended" })
+        expect((yield* runtime.inspect(cancelled.runId)).status).toBe("cancelled")
+      }),
+    )
   })
 
   it.effect("interrupts an active model when Runtime.cancel commits cancellation", () =>
@@ -775,45 +795,47 @@ describe("ExecutionHost", () => {
         resolver,
         addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
       })
-      yield* Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
-        const store = yield* RunStore.RunStore
-        const receipt = yield* runtime.send({
-          to: address,
-          sessionId: "session:cancel",
-          idempotencyKey: "cancel:1",
-          prompt: "wait",
-        })
-        expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
-        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
-        const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
-        yield* Deferred.await(started)
-        yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
-        expect(lifecycle).toEqual([
-          "admission resolver acquired",
-          "admission resolver finalized",
-          "execution resolver acquired",
-          "service acquired",
-        ])
-        yield* Deferred.succeed(releaseFinalizer, undefined)
-        const exit = yield* Fiber.await(fiber)
-        expect(exit._tag).toBe("Success")
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-        expect(yield* Ref.get(interrupted)).toBe(true)
-        expect(lifecycle).toEqual([
-          "admission resolver acquired",
-          "admission resolver finalized",
-          "execution resolver acquired",
-          "service acquired",
-          "service finalized",
-          "execution resolver finalized",
-        ])
-        expect(
-          (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
-        ).not.toContain("RunFailed")
-      }).pipe(Effect.provide(runtimeLayer))
+      yield* scopedWith(runtimeLayer)(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: "session:cancel",
+            idempotencyKey: "cancel:1",
+            prompt: "wait",
+          })
+          expect(lifecycle).toEqual(["admission resolver acquired", "admission resolver finalized"])
+          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
+          const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(started)
+          yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
+          expect(lifecycle).toEqual([
+            "admission resolver acquired",
+            "admission resolver finalized",
+            "execution resolver acquired",
+            "service acquired",
+          ])
+          yield* Deferred.succeed(releaseFinalizer, undefined)
+          const exit = yield* Fiber.await(fiber)
+          expect(exit._tag).toBe("Success")
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+          expect(yield* Ref.get(interrupted)).toBe(true)
+          expect(lifecycle).toEqual([
+            "admission resolver acquired",
+            "admission resolver finalized",
+            "execution resolver acquired",
+            "service acquired",
+            "service finalized",
+            "execution resolver finalized",
+          ])
+          expect(
+            (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
+          ).not.toContain("RunFailed")
+        }),
+      )
     }),
   )
 
@@ -833,7 +855,14 @@ describe("ExecutionHost", () => {
         }),
       )
       const firstResolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, blockingModel) }])
-      const runId = yield* Effect.scoped(
+      const runId = yield* scopedWith(
+        Runtime.layerSqlite({
+          filename,
+          resolver: firstResolver,
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+          scheduler: { pollInterval: "1 hour" },
+        }),
+      )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const host = yield* ExecutionHost.ExecutionHost
@@ -848,16 +877,7 @@ describe("ExecutionHost", () => {
           yield* host.execute(claim).pipe(Effect.forkScoped)
           yield* Deferred.await(started)
           return receipt.runId
-        }).pipe(
-          Effect.provide(
-            Runtime.layerSqlite({
-              filename,
-              resolver: firstResolver,
-              addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-              scheduler: { pollInterval: "1 hour" },
-            }),
-          ),
-        ),
+        }),
       )
 
       const recoveredStarted = yield* Deferred.make<void>()
@@ -870,7 +890,14 @@ describe("ExecutionHost", () => {
         }),
       )
       const secondResolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, recoveredModel) }])
-      yield* Effect.scoped(
+      yield* scopedWith(
+        Runtime.layerSqlite({
+          filename,
+          resolver: secondResolver,
+          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+          scheduler: { pollInterval: "1 hour" },
+        }),
+      )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const host = yield* ExecutionHost.ExecutionHost
@@ -881,16 +908,7 @@ describe("ExecutionHost", () => {
           yield* host.execute(yield* store.claimExecution({ runId, ownerId: "after-reopen" })).pipe(Effect.forkScoped)
           yield* Deferred.await(recoveredStarted)
           expect((yield* runtime.inspect(runId)).status).toBe("running")
-        }).pipe(
-          Effect.provide(
-            Runtime.layerSqlite({
-              filename,
-              resolver: secondResolver,
-              addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-              scheduler: { pollInterval: "1 hour" },
-            }),
-          ),
-        ),
+        }),
       )
     }),
   )
@@ -935,50 +953,52 @@ describe("ExecutionHost", () => {
         ]),
         addresses: [{ address, executable: ref, registrations: registrationsFor(ref) }],
       })
-      yield* Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const host = yield* ExecutionHost.ExecutionHost
-        const store = yield* RunStore.RunStore
-        const receipt = yield* runtime.send({
-          to: address,
-          sessionId: "session:cancel-tool",
-          idempotencyKey: "cancel-tool:1",
-          prompt: "block",
-        })
-        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
-        const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
-        yield* Deferred.await(started)
-        expect(invocation).toMatchObject({
-          runId: receipt.runId,
-          rootRunId: receipt.runId,
-          toolCallId: "block-1",
-          operationKey: `${receipt.runId}:tool:0:0:block-1:block`,
-          idempotencyKey: `${receipt.runId}:tool:0:0:block-1:block`,
-          attempt: 1,
-          admittedAt: expect.any(String),
-          sessionId: "session:cancel-tool",
-        })
-        yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-        const exit = yield* Fiber.await(fiber)
-        expect(exit._tag).toBe("Success")
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
-        expect(yield* Ref.get(interrupted)).toBe(true)
-        const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
-          (event) => event._tag === "OperationUnknown",
-        )
-        if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
-        yield* runtime.resolveOperation({
-          runId: receipt.runId,
-          operationId: unknown.operationId,
-          idempotencyKey: "cancel-tool:resolved",
-          resolution: { _tag: "Failed", error: { message: "cancelled before result was observed" } },
-        })
-        yield* runtime.cancel({ runId: receipt.runId, reason: "settle after resolution" })
-        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-        expect(
-          (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
-        ).not.toContain("RunFailed")
-      }).pipe(Effect.provide(runtimeLayer))
+      yield* scopedWith(runtimeLayer)(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: "session:cancel-tool",
+            idempotencyKey: "cancel-tool:1",
+            prompt: "block",
+          })
+          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "memory" })
+          const fiber = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
+          yield* Deferred.await(started)
+          expect(invocation).toMatchObject({
+            runId: receipt.runId,
+            rootRunId: receipt.runId,
+            toolCallId: "block-1",
+            operationKey: `${receipt.runId}:tool:0:0:block-1:block`,
+            idempotencyKey: `${receipt.runId}:tool:0:0:block-1:block`,
+            attempt: 1,
+            admittedAt: expect.any(String),
+            sessionId: "session:cancel-tool",
+          })
+          yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+          const exit = yield* Fiber.await(fiber)
+          expect(exit._tag).toBe("Success")
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+          expect(yield* Ref.get(interrupted)).toBe(true)
+          const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
+            (event) => event._tag === "OperationUnknown",
+          )
+          if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
+          yield* runtime.resolveOperation({
+            runId: receipt.runId,
+            operationId: unknown.operationId,
+            idempotencyKey: "cancel-tool:resolved",
+            resolution: { _tag: "Failed", error: { message: "cancelled before result was observed" } },
+          })
+          yield* runtime.cancel({ runId: receipt.runId, reason: "settle after resolution" })
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+          expect(
+            (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
+          ).not.toContain("RunFailed")
+        }),
+      )
     }),
   )
 
@@ -1061,75 +1081,79 @@ describe("ExecutionHost", () => {
                 addresses: [{ address, executable, registrations: registrationsFor(executable) }],
               })
 
-        const first = yield* Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
-          const store = yield* RunStore.RunStore
-          const receipt = yield* runtime.send({
-            to: address,
-            sessionId: `session:uncertain-${backend}`,
-            idempotencyKey: `uncertain-${backend}:1`,
-            prompt: "increment once",
-          })
-          expect(lifecycle).toEqual(["admission resolver finalized"])
-          const fiber = yield* host
-            .execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: `uncertain-${backend}` }))
-            .pipe(Effect.forkChild({ startImmediately: true }))
-          yield* Deferred.await(started)
-          yield* runtime.cancel({ runId: receipt.runId, reason: "stop after commit" })
-          expect((yield* Fiber.await(fiber))._tag).toBe("Success")
-          yield* Deferred.await(toolFinalized)
-          expect(externalCounter).toBe(1)
-          expect(lifecycle[0]).toBe("admission resolver finalized")
-          expect(lifecycle[1]).toBe("external effect committed")
-          expect(new Set(lifecycle.slice(2))).toEqual(
-            new Set(["tool finalized", "service finalized", "execution resolver finalized"]),
-          )
-          const persistedTool = yield* store.getOperationByKey({
-            runId: receipt.runId,
-            operationKey: `${receipt.runId}:tool:0:0:external-counter-1:external_counter`,
-          })
-          expect(persistedTool?.status).toBe("unknown")
-          const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
-            (event) => event._tag === "OperationUnknown",
-          )
-          expect(unknown?._tag).toBe("OperationUnknown")
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
-          if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
-          const operation = yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })
-          expect(operation.status).toBe("unknown")
-          expect(operation.replayPolicy).toBe("never")
-          if (backend === "memory") {
-            yield* runtime.resolveOperation({
-              runId: receipt.runId,
-              operationId: operation.operationId,
-              idempotencyKey: "operator:committed",
-              resolution: { _tag: "Succeeded", value: 1 },
+        const first = yield* scopedWith(layer())(
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const host = yield* ExecutionHost.ExecutionHost
+            const store = yield* RunStore.RunStore
+            const receipt = yield* runtime.send({
+              to: address,
+              sessionId: `session:uncertain-${backend}`,
+              idempotencyKey: `uncertain-${backend}:1`,
+              prompt: "increment once",
             })
-            yield* runtime.cancel({ runId: receipt.runId, reason: "settle after resolution" })
-            expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-          }
-          return { runId: receipt.runId, operationId: operation.operationId }
-        }).pipe(Effect.provide(layer()), Effect.scoped)
+            expect(lifecycle).toEqual(["admission resolver finalized"])
+            const fiber = yield* host
+              .execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: `uncertain-${backend}` }))
+              .pipe(Effect.forkChild({ startImmediately: true }))
+            yield* Deferred.await(started)
+            yield* runtime.cancel({ runId: receipt.runId, reason: "stop after commit" })
+            expect((yield* Fiber.await(fiber))._tag).toBe("Success")
+            yield* Deferred.await(toolFinalized)
+            expect(externalCounter).toBe(1)
+            expect(lifecycle[0]).toBe("admission resolver finalized")
+            expect(lifecycle[1]).toBe("external effect committed")
+            expect(new Set(lifecycle.slice(2))).toEqual(
+              new Set(["tool finalized", "service finalized", "execution resolver finalized"]),
+            )
+            const persistedTool = yield* store.getOperationByKey({
+              runId: receipt.runId,
+              operationKey: `${receipt.runId}:tool:0:0:external-counter-1:external_counter`,
+            })
+            expect(persistedTool?.status).toBe("unknown")
+            const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
+              (event) => event._tag === "OperationUnknown",
+            )
+            expect(unknown?._tag).toBe("OperationUnknown")
+            expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+            if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
+            const operation = yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })
+            expect(operation.status).toBe("unknown")
+            expect(operation.replayPolicy).toBe("never")
+            if (backend === "memory") {
+              yield* runtime.resolveOperation({
+                runId: receipt.runId,
+                operationId: operation.operationId,
+                idempotencyKey: "operator:committed",
+                resolution: { _tag: "Succeeded", value: 1 },
+              })
+              yield* runtime.cancel({ runId: receipt.runId, reason: "settle after resolution" })
+              expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+            }
+            return { runId: receipt.runId, operationId: operation.operationId }
+          }),
+        )
 
         if (backend === "sqlite") {
-          yield* Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
-            const store = yield* RunStore.RunStore
-            expect((yield* runtime.inspect(first.runId)).status).toBe("needs-resolution")
-            expect((yield* store.getOperation({ runId: first.runId, operationId: first.operationId })).status).toBe(
-              "unknown",
-            )
-            expect(externalCounter).toBe(1)
-            yield* runtime.resolveOperation({
-              runId: first.runId,
-              operationId: first.operationId,
-              idempotencyKey: "operator:committed",
-              resolution: { _tag: "Succeeded", value: 1 },
-            })
-            yield* runtime.cancel({ runId: first.runId, reason: "settle after resolution" })
-            expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
-          }).pipe(Effect.provide(layer()), Effect.scoped)
+          yield* scopedWith(layer())(
+            Effect.gen(function* () {
+              const runtime = yield* Runtime.Runtime
+              const store = yield* RunStore.RunStore
+              expect((yield* runtime.inspect(first.runId)).status).toBe("needs-resolution")
+              expect((yield* store.getOperation({ runId: first.runId, operationId: first.operationId })).status).toBe(
+                "unknown",
+              )
+              expect(externalCounter).toBe(1)
+              yield* runtime.resolveOperation({
+                runId: first.runId,
+                operationId: first.operationId,
+                idempotencyKey: "operator:committed",
+                resolution: { _tag: "Succeeded", value: 1 },
+              })
+              yield* runtime.cancel({ runId: first.runId, reason: "settle after resolution" })
+              expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
+            }),
+          )
         }
       }),
     )
@@ -1176,7 +1200,7 @@ describe("ExecutionHost", () => {
         "running",
       )
     }).pipe(
-      Effect.provide(
+      scopedWith(
         Runtime.layerMemory({
           resolver: (() => {
             const agent = Agent.make({ name: "fence" })
@@ -1247,7 +1271,7 @@ describe("ExecutionHost", () => {
       expect(committed.checkpoint).toEqual(checkpoint)
       expect(committed.executableRef).toEqual(researcherRef.ref)
     }).pipe(
-      Effect.provide(
+      scopedWith(
         Runtime.layerMemory({
           resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
           addresses: [
@@ -1342,7 +1366,7 @@ describe("ExecutionHost", () => {
       expect(inspection.status).toBe("waiting")
       expect(inspection.wait?.waitId).toBe("approval")
     }).pipe(
-      Effect.provide(
+      scopedWith(
         Runtime.layerMemory({
           resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
           addresses: [
@@ -1400,7 +1424,7 @@ describe("ExecutionHost", () => {
       expect(admitted).toBe(assistantRef.ref.active)
       expect(seen).toBe(researcherRef.ref.active)
     }).pipe(
-      Effect.provide(
+      scopedWith(
         Runtime.layerMemory({
           resolver,
           addresses: [

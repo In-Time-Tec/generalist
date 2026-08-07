@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
 import {
@@ -132,9 +132,16 @@ const fixture = () => {
   return { resolver, counts }
 }
 
+const withLayer =
+  <A2, E2, R2>(layerValue: Layer.Layer<A2, E2, R2>) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.scoped(
+      Layer.build(layerValue).pipe(Effect.flatMap((context) => effect.pipe(Effect.provideContext(context)))),
+    )
+
 describe("Runtime code_mode Program children", () => {
   for (const backend of ["memory", "sqlite"] as const) {
-    it.live(`${backend} admits one exact Program child and resumes the same root Run`, () => {
+    standalone.live(`${backend} admits one exact Program child and resumes the same root Run`, () => {
       const filename = tempDbPath("code-mode")
       const { resolver } = fixture()
       const options = { resolver, addresses: [], scheduler: { pollInterval: "1 day" as const } }
@@ -174,51 +181,54 @@ describe("Runtime code_mode Program children", () => {
         expect((yield* runtime.inspectTree(rootRunId)).runs).toHaveLength(2)
       })
       if (backend === "memory") {
-        return admit.pipe(Effect.andThen(finishRun), Effect.provide(Runtime.layerMemory(options)), Effect.scoped)
+        return withLayer(Runtime.layerMemory(options))(admit.pipe(Effect.andThen(finishRun)))
       }
-      return admit.pipe(
-        Effect.provide(Runtime.layerSqlite({ ...options, filename })),
-        Effect.scoped,
-        Effect.andThen(finishRun.pipe(Effect.provide(Runtime.layerSqlite({ ...options, filename })), Effect.scoped)),
+      return withLayer(Runtime.layerSqlite({ ...options, filename }))(admit).pipe(
+        Effect.andThen(withLayer(Runtime.layerSqlite({ ...options, filename }))(finishRun)),
       )
     })
 
-    it.live(`${backend} propagates root cancellation to an admitted code_mode Program child`, () => {
+    {
       const { resolver } = fixture()
       const options = { resolver, addresses: [], scheduler: { pollInterval: "1 day" as const } }
-      const layer =
+      const runtimeLayer =
         backend === "memory"
           ? Runtime.layerMemory(options)
           : Runtime.layerSqlite({ ...options, filename: tempDbPath("code-mode-cancel") })
-      return Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
-        const rootRunId = (yield* runtime.start({
-          executable,
-          registrations,
-          sessionId: `code-mode-cancel:${backend}`,
-          idempotencyKey: "root",
-          prompt: "use code mode",
-        })).runId
-        yield* scheduler.tick
-        yield* scheduler.idle
-        const childRunId = (yield* runtime.inspectTree(rootRunId)).runs.find((run) => run.parentRunId === rootRunId)!
-          .run.runId
-        yield* runtime.cancel({ runId: rootRunId, reason: "operator cancelled" })
-        expect((yield* runtime.inspect(rootRunId)).status).toBe("cancelled")
-        expect((yield* runtime.inspect(childRunId)).status).toBe("cancelled")
-      }).pipe(Effect.provide(layer), Effect.scoped)
-    })
+      layer(runtimeLayer)(`${backend} propagates root cancellation to an admitted code_mode Program child`, (it) => {
+        it.effect("propagates root cancellation to the child", () =>
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const scheduler = yield* LocalScheduler.LocalScheduler
+            const rootRunId = (yield* runtime.start({
+              executable,
+              registrations,
+              sessionId: `code-mode-cancel:${backend}`,
+              idempotencyKey: "root",
+              prompt: "use code mode",
+            })).runId
+            yield* scheduler.tick
+            yield* scheduler.idle
+            const childRunId = (yield* runtime.inspectTree(rootRunId)).runs.find(
+              (run) => run.parentRunId === rootRunId,
+            )!.run.runId
+            yield* runtime.cancel({ runId: rootRunId, reason: "operator cancelled" })
+            expect((yield* runtime.inspect(rootRunId)).status).toBe("cancelled")
+            expect((yield* runtime.inspect(childRunId)).status).toBe("cancelled")
+          }),
+        )
+      })
+    }
   }
 
   for (const crashPoint of ["before-admission", "after-atomic-admission"] as const) {
-    it.live(`sqlite preserves the Code Mode boundary after a crash ${crashPoint}`, () => {
+    standalone.live(`sqlite preserves the Code Mode boundary after a crash ${crashPoint}`, () => {
       const filename = tempDbPath(`code-mode-${crashPoint}`)
       const { resolver, counts } = fixture()
       const options = { resolver, addresses: [], scheduler: { pollInterval: "1 day" as const } }
       let rootRunId = ""
       let childRunId = ""
-      const crash = Effect.scoped(
+      const crash = withLayer(Runtime.layerSqlite({ ...options, filename }))(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const store = yield* RunStore.RunStore
@@ -242,7 +252,7 @@ describe("Runtime code_mode Program children", () => {
           })
           const host = yield* makeExecutionHost({ workerId: `crash:${crashPoint}`, resolver }).pipe(
             Effect.provideService(RunStore.RunStore, crashStore),
-            Effect.provide(activeExecutionsLayer),
+            Effect.provideContext(yield* Layer.build(activeExecutionsLayer)),
           )
           const claim = yield* store.claimExecution({ runId: rootRunId, ownerId: `crash:${crashPoint}` })
           const scope = yield* Scope.make()
@@ -258,90 +268,104 @@ describe("Runtime code_mode Program children", () => {
           }
           yield* Fiber.interrupt(fiber)
           yield* Scope.close(scope, Effect.void as never)
-        }).pipe(Effect.provide(Runtime.layerSqlite({ ...options, filename }))),
+        }),
       )
-      const reopen = Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        if (crashPoint === "before-admission") {
-          expect((yield* runtime.inspectTree(rootRunId)).runs).toHaveLength(1)
-          expect(counts.model).toBe(1)
-          expect(counts.capability).toBe(0)
-          return
-        }
-        const scheduler = yield* LocalScheduler.LocalScheduler
-        yield* Effect.forEach([0, 1, 2, 3, 4, 5, 6, 7], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), {
-          discard: true,
-        })
-        expect(counts.model).toBe(2)
-        expect(counts.capability).toBe(1)
-        expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
-        const tree = yield* runtime.inspectTree(rootRunId)
-        expect(tree.runs).toHaveLength(2)
-        const recoveredChild = tree.runs.find((run) => run.parentRunId === rootRunId)!.run.runId
-        const expectedChild = `run_code_${Pins.digest({ parentRunId: rootRunId, toolCallId: "code-1" }).slice(0, 32)}`
-        expect(recoveredChild).toBe(expectedChild)
-        if (childRunId !== "") expect(recoveredChild).toBe(childRunId)
-      }).pipe(Effect.provide(Runtime.layerSqlite({ ...options, filename })), Effect.scoped)
+      const reopen = withLayer(Runtime.layerSqlite({ ...options, filename }))(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          if (crashPoint === "before-admission") {
+            expect((yield* runtime.inspectTree(rootRunId)).runs).toHaveLength(1)
+            expect(counts.model).toBe(1)
+            expect(counts.capability).toBe(0)
+            return
+          }
+          const scheduler = yield* LocalScheduler.LocalScheduler
+          yield* Effect.forEach([0, 1, 2, 3, 4, 5, 6, 7], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), {
+            discard: true,
+          })
+          expect(counts.model).toBe(2)
+          expect(counts.capability).toBe(1)
+          expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
+          const tree = yield* runtime.inspectTree(rootRunId)
+          expect(tree.runs).toHaveLength(2)
+          const recoveredChild = tree.runs.find((run) => run.parentRunId === rootRunId)!.run.runId
+          const expectedChild = `run_code_${Pins.digest({ parentRunId: rootRunId, toolCallId: "code-1" }).slice(0, 32)}`
+          expect(recoveredChild).toBe(expectedChild)
+          if (childRunId !== "") expect(recoveredChild).toBe(childRunId)
+        }),
+      )
       return crash.pipe(Effect.andThen(reopen))
     })
   }
 
-  it.live("sqlite resumes once after a crash with a completed Code Mode child", () => {
+  standalone.live("sqlite resumes once after a crash with a completed Code Mode child", () => {
     const filename = tempDbPath("code-mode-child-complete")
     const { resolver, counts } = fixture()
     const options = { resolver, addresses: [], scheduler: { pollInterval: "1 day" as const } }
     let rootRunId = ""
     let childRunId = ""
-    const completeChild = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const scheduler = yield* LocalScheduler.LocalScheduler
-      rootRunId = (yield* runtime.start({
-        executable,
-        registrations,
-        sessionId: "code-mode-child-complete",
-        idempotencyKey: "root",
-        prompt: "use code mode",
-      })).runId
-      yield* scheduler.tick
-      yield* scheduler.idle
-      childRunId = (yield* runtime.inspectTree(rootRunId)).runs.find((run) => run.parentRunId === rootRunId)!.run.runId
-      yield* scheduler.tick
-      yield* scheduler.idle
-      expect((yield* runtime.inspect(rootRunId)).status).toBe("waiting")
-      expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
-      expect(counts.model).toBe(1)
-      expect(counts.capability).toBe(1)
-    }).pipe(Effect.provide(Runtime.layerSqlite({ ...options, filename })), Effect.scoped)
-    const reopen = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const scheduler = yield* LocalScheduler.LocalScheduler
-      yield* Effect.forEach([0, 1, 2], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), { discard: true })
-      expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
-      expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
-      expect(counts.model).toBe(2)
-      expect(counts.capability).toBe(1)
-    }).pipe(Effect.provide(Runtime.layerSqlite({ ...options, filename })), Effect.scoped)
+    const completeChild = withLayer(Runtime.layerSqlite({ ...options, filename }))(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const scheduler = yield* LocalScheduler.LocalScheduler
+        rootRunId = (yield* runtime.start({
+          executable,
+          registrations,
+          sessionId: "code-mode-child-complete",
+          idempotencyKey: "root",
+          prompt: "use code mode",
+        })).runId
+        yield* scheduler.tick
+        yield* scheduler.idle
+        childRunId = (yield* runtime.inspectTree(rootRunId)).runs.find((run) => run.parentRunId === rootRunId)!.run
+          .runId
+        yield* scheduler.tick
+        yield* scheduler.idle
+        expect((yield* runtime.inspect(rootRunId)).status).toBe("waiting")
+        expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
+        expect(counts.model).toBe(1)
+        expect(counts.capability).toBe(1)
+      }),
+    )
+    const reopen = withLayer(Runtime.layerSqlite({ ...options, filename }))(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const scheduler = yield* LocalScheduler.LocalScheduler
+        yield* Effect.forEach([0, 1, 2], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), { discard: true })
+        expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
+        expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
+        expect(counts.model).toBe(2)
+        expect(counts.capability).toBe(1)
+      }),
+    )
     return completeChild.pipe(Effect.andThen(reopen))
   })
 
-  it.effect("requires the sandbox and every bounded authority registration at exact root admission", () => {
+  {
     const { resolver } = fixture()
-    return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const failure = yield* Effect.flip(
-        runtime.start({
-          executable,
-          registrations: registrations.filter((registration) => registration.pin !== sandboxPin),
-          sessionId: "code-mode-missing-sandbox",
-          idempotencyKey: "root",
-          prompt: "use code mode",
-        }),
-      )
-      expect(failure).toMatchObject({ _tag: "@batonfx/runtime/ExecutableRegistrationMissing", pin: sandboxPin })
-    }).pipe(Effect.provide(Runtime.layerMemory({ resolver, addresses: [] })), Effect.scoped)
-  })
+    layer(Runtime.layerMemory({ resolver, addresses: [] }))(
+      "requires the sandbox and every bounded authority registration at exact root admission",
+      (it) => {
+        it.effect("requires the sandbox and bounded authority registrations", () =>
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const failure = yield* Effect.flip(
+              runtime.start({
+                executable,
+                registrations: registrations.filter((registration) => registration.pin !== sandboxPin),
+                sessionId: "code-mode-missing-sandbox",
+                idempotencyKey: "root",
+                prompt: "use code mode",
+              }),
+            )
+            expect(failure).toMatchObject({ _tag: "@batonfx/runtime/ExecutableRegistrationMissing", pin: sandboxPin })
+          }),
+        )
+      },
+    )
+  }
 
-  it.effect("advertises only exact ProgramAuthority selections and maxima in the model tool schema", () => {
+  standalone.effect("advertises only exact ProgramAuthority selections and maxima in the model tool schema", () => {
     const authority = {
       ...root.manifest.programAuthority!,
       tools: [{ name: "shell.run", pin: Pins.makeCapability({ tool: "shell.run" }) }],
@@ -390,52 +414,55 @@ describe("Runtime code_mode Program children", () => {
     })
   })
 
-  it.effect("emits a provider-valid typed schema when a ProgramAuthority grants an empty selection catalog", () => {
-    const authority = root.manifest.programAuthority!
-    expect(authority.tools).toEqual([])
-    expect(authority.agents).toEqual([])
-    expect(authority.steps).toEqual([])
-    const declaration = CodeMode.makeTool(authority)
-    const modelSchema = Tool.getJsonSchema(declaration) as Record<string, unknown>
-    const invalid: Array<string> = []
-    const walk = (node: unknown, path: string): void => {
-      if (typeof node !== "object" || node === null) return
-      if (Array.isArray(node)) {
-        node.forEach((child, index) => walk(child, `${path}[${index}]`))
-        return
+  standalone.effect(
+    "emits a provider-valid typed schema when a ProgramAuthority grants an empty selection catalog",
+    () => {
+      const authority = root.manifest.programAuthority!
+      expect(authority.tools).toEqual([])
+      expect(authority.agents).toEqual([])
+      expect(authority.steps).toEqual([])
+      const declaration = CodeMode.makeTool(authority)
+      const modelSchema = Tool.getJsonSchema(declaration) as Record<string, unknown>
+      const invalid: Array<string> = []
+      const walk = (node: unknown, path: string): void => {
+        if (typeof node !== "object" || node === null) return
+        if (Array.isArray(node)) {
+          node.forEach((child, index) => walk(child, `${path}[${index}]`))
+          return
+        }
+        const schema = node as Record<string, unknown>
+        if ("not" in schema) invalid.push(`${path}.not`)
+        if (schema["type"] === "array") {
+          const items = schema["items"]
+          const typed =
+            typeof items === "object" && items !== null && ("type" in items || "anyOf" in items || "$ref" in items)
+          if (!typed) invalid.push(`${path}.items`)
+        }
+        for (const [key, value] of Object.entries(schema)) walk(value, `${path}.${key}`)
       }
-      const schema = node as Record<string, unknown>
-      if ("not" in schema) invalid.push(`${path}.not`)
-      if (schema["type"] === "array") {
-        const items = schema["items"]
-        const typed =
-          typeof items === "object" && items !== null && ("type" in items || "anyOf" in items || "$ref" in items)
-        if (!typed) invalid.push(`${path}.items`)
-      }
-      for (const [key, value] of Object.entries(schema)) walk(value, `${path}.${key}`)
-    }
-    walk(modelSchema, "$")
-    expect(invalid).toEqual([])
-    for (const dimension of ["tools", "agents", "steps"] as const) {
-      expect((modelSchema["properties"] as Record<string, unknown>)[dimension]).toMatchObject({
-        type: "array",
-        items: { type: "string" },
-        allOf: [{ maxItems: 0 }],
-      })
-    }
-    const exact = { source: "return input", input: "input", tools: [], agents: [], steps: [], budget }
-    return Effect.gen(function* () {
-      expect(yield* Schema.decodeUnknownEffect(declaration.parametersSchema)(exact)).toEqual(exact)
+      walk(modelSchema, "$")
+      expect(invalid).toEqual([])
       for (const dimension of ["tools", "agents", "steps"] as const) {
-        const rejected = yield* Effect.flip(
-          Schema.decodeUnknownEffect(declaration.parametersSchema)({ ...exact, [dimension]: ["anything"] }),
-        )
-        expect(String(rejected)).toContain("Expected a value with a length of at most 0")
+        expect((modelSchema["properties"] as Record<string, unknown>)[dimension]).toMatchObject({
+          type: "array",
+          items: { type: "string" },
+          allOf: [{ maxItems: 0 }],
+        })
       }
-    })
-  })
+      const exact = { source: "return input", input: "input", tools: [], agents: [], steps: [], budget }
+      return Effect.gen(function* () {
+        expect(yield* Schema.decodeUnknownEffect(declaration.parametersSchema)(exact)).toEqual(exact)
+        for (const dimension of ["tools", "agents", "steps"] as const) {
+          const rejected = yield* Effect.flip(
+            Schema.decodeUnknownEffect(declaration.parametersSchema)({ ...exact, [dimension]: ["anything"] }),
+          )
+          expect(String(rejected)).toContain("Expected a value with a length of at most 0")
+        }
+      })
+    },
+  )
 
-  it.effect("bounds ProgramAuthority catalogs and reports exact allowed selection IDs", () => {
+  standalone.effect("bounds ProgramAuthority catalogs and reports exact allowed selection IDs", () => {
     const tools = Array.from({ length: 64 }, (_, index) => ({
       name: `tool-${index}`,
       pin: Pins.makeCapability({ tool: index }),
@@ -490,7 +517,7 @@ describe("Runtime code_mode Program children", () => {
     })
   })
 
-  it.effect("returns typed failures when source, capabilities, or budgets exceed ProgramAuthority", () => {
+  standalone.effect("returns typed failures when source, capabilities, or budgets exceed ProgramAuthority", () => {
     const implementation = CodeMode.make({
       claim: { runId: "root", ownerId: "worker", attemptFence: 1 },
       claimed: {} as ExecutionRecord,

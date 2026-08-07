@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite"
-import { expect, it } from "@effect/vitest"
+import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Handoff, ToolExecutor } from "@batonfx/core"
@@ -10,7 +10,6 @@ import { SCHEMA_META_TABLE, SCHEMA_VERSION, schemaChecksum } from "../src/sql/sc
 import { markDirty } from "../src/sql/migrate.js"
 import { layer as sqliteClientLayer } from "../src/sql/bun-client.js"
 import {
-
   alternateAssistantAddress,
   alternateAssistantRef,
   alternateResearcherRef,
@@ -28,6 +27,11 @@ import {
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 import { closedTestAgent, pinnedTestAgent } from "./identity.js"
 const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
+
+const scopedWith =
+  <A, E>(layerValue: Layer.Layer<A, E, never>) =>
+  <B, E2, R2 extends A>(effect: Effect.Effect<B, E2, R2>): Effect.Effect<B, E | E2> =>
+    Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
 
 const admitWaitWithClaimedChild = (waitId: string) =>
   Effect.gen(function* () {
@@ -57,7 +61,7 @@ const admitWaitWithClaimedChild = (waitId: string) =>
 it.live("migrates and reopens a durable sqlite store", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("migrate")
-    const first = yield* Effect.gen(function* () {
+    const admit = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
@@ -137,9 +141,9 @@ it.live("migrates and reopens a durable sqlite store", () =>
       })
       yield* store.complete({ ...rootClaim, result: completedResult("root") })
       return receipt.runId
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-
-    const second = yield* Effect.gen(function* () {
+    })
+    const first = yield* scopedWith(sqliteLayer(filename))(admit)
+    const second = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const inspection = yield* runtime.inspect(first)
       expect(inspection.status).toBe("succeeded")
@@ -158,90 +162,94 @@ it.live("migrates and reopens a durable sqlite store", () =>
         Effect.map((chunk) => [...chunk].map((event) => event._tag)),
       )
       expect(tags).toEqual(["RunAccepted", "RunAttemptStarted"])
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-    void second
-  }).pipe(Effect.asVoid),
+    })
+    yield* scopedWith(sqliteLayer(filename))(second)
+  }),
 )
 
-it.live("resolves SQLite child selections relative to each persisted parent closure", () =>
-  Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
-    const first = yield* runtime.send({
-      to: assistantAddress,
-      sessionId: "sqlite:relative:first",
-      idempotencyKey: "parent",
-      prompt: "first",
-    })
-    const second = yield* runtime.send({
-      to: alternateAssistantAddress,
-      sessionId: "sqlite:relative:second",
-      idempotencyKey: "parent",
-      prompt: "second",
-    })
-    const firstChild = yield* runtime.spawn({
-      parentRunId: first.runId,
-      invocationId: "child",
-      selection: "researcher",
-      prompt: "child",
-    })
-    const secondChild = yield* runtime.spawn({
-      parentRunId: second.runId,
-      invocationId: "child",
-      selection: "researcher",
-      prompt: "child",
-    })
-    expect((yield* runtime.inspect(firstChild.runId)).executableRef).toEqual(researcherRef.ref)
-    expect((yield* runtime.inspect(secondChild.runId)).executableRef).toEqual(alternateResearcherRef.ref)
+layer(Runtime.layerSqlite({ filename: tempDbPath("relative-selection"), ...parentRelativeOptions }))(
+  "resolves SQLite child selections relative to each persisted parent closure",
+  (suite) => {
+    suite.effect("resolves selections per persisted parent closure", () =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const first = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: "sqlite:relative:first",
+          idempotencyKey: "parent",
+          prompt: "first",
+        })
+        const second = yield* runtime.send({
+          to: alternateAssistantAddress,
+          sessionId: "sqlite:relative:second",
+          idempotencyKey: "parent",
+          prompt: "second",
+        })
+        const firstChild = yield* runtime.spawn({
+          parentRunId: first.runId,
+          invocationId: "child",
+          selection: "researcher",
+          prompt: "child",
+        })
+        const secondChild = yield* runtime.spawn({
+          parentRunId: second.runId,
+          invocationId: "child",
+          selection: "researcher",
+          prompt: "child",
+        })
+        expect((yield* runtime.inspect(firstChild.runId)).executableRef).toEqual(researcherRef.ref)
+        expect((yield* runtime.inspect(secondChild.runId)).executableRef).toEqual(alternateResearcherRef.ref)
 
-    const before = yield* RunTree.inspect(first.runId)
-    const failure = yield* runtime
-      .spawn({ parentRunId: first.runId, invocationId: "missing", selection: "undeclared", prompt: "missing" })
-      .pipe(Effect.flip)
-    expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
-    expect(yield* RunTree.inspect(first.runId)).toEqual(before)
-  }).pipe(
-    Effect.provide(Runtime.layerSqlite({ filename: tempDbPath("relative-selection"), ...parentRelativeOptions })),
-    Effect.scoped,
-  ),
+        const before = yield* RunTree.inspect(first.runId)
+        const failure = yield* runtime
+          .spawn({
+            parentRunId: first.runId,
+            invocationId: "missing",
+            selection: "undeclared",
+            prompt: "missing",
+          })
+          .pipe(Effect.flip)
+        expect(failure).toBeInstanceOf(Errors.ChildSelectionMissing)
+        expect(yield* RunTree.inspect(first.runId)).toEqual(before)
+      }),
+    )
+  },
 )
 
 it.live("resumes tree history from an opaque cursor after close and reopen", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("tree-cursor-reopen")
-    const initial = yield* Effect.scoped(
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const receipt = yield* runtime.send({
-          to: assistantAddress,
-          sessionId: "session:tree-reopen",
-          idempotencyKey: "tree-reopen",
-          prompt: textPrompt("tree-reopen"),
-        })
-        const page = yield* RunTree.history({ rootRunId: receipt.runId, limit: 100 })
-        return { receipt, cursor: page.cursor }
-      }).pipe(Effect.provide(sqliteLayer(filename))),
-    )
-
-    yield* Effect.scoped(
-      Effect.gen(function* () {
-        const store = yield* RunStore.RunStore
-        const claim = yield* store.claimExecution({ runId: initial.receipt.runId, ownerId: "tree-reopen" })
-        yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
-        const resumed = yield* RunTree.history({
-          rootRunId: initial.receipt.runId,
-          cursor: initial.cursor,
-          limit: 100,
-        })
-        expect(resumed.events.map((entry) => entry.event._tag)).toEqual(["TurnStarted"])
-      }).pipe(Effect.provide(sqliteLayer(filename))),
-    )
+    const admit = Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:tree-reopen",
+        idempotencyKey: "tree-reopen",
+        prompt: textPrompt("tree-reopen"),
+      })
+      const page = yield* RunTree.history({ rootRunId: receipt.runId, limit: 100 })
+      return { receipt, cursor: page.cursor }
+    })
+    const initial = yield* scopedWith(sqliteLayer(filename))(admit)
+    const resume = Effect.gen(function* () {
+      const store = yield* RunStore.RunStore
+      const claim = yield* store.claimExecution({ runId: initial.receipt.runId, ownerId: "tree-reopen" })
+      yield* store.emitAgentEvent({ ...claim, event: { _tag: "TurnStarted", turn: 1 } })
+      return yield* RunTree.history({
+        rootRunId: initial.receipt.runId,
+        cursor: initial.cursor,
+        limit: 100,
+      })
+    })
+    const resumed = yield* scopedWith(sqliteLayer(filename))(resume)
+    expect(resumed.events.map((entry) => entry.event._tag)).toEqual(["TurnStarted"])
   }),
 )
 
 it.live("persists decoded finish parts that omit an undefined response", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("finish-part")
-    const runId = yield* Effect.gen(function* () {
+    const admit = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
@@ -306,80 +314,93 @@ it.live("persists decoded finish parts that omit an undefined response", () =>
         },
       })
       return receipt.runId
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-
-    const history = yield* Effect.gen(function* () {
+    })
+    const runId = yield* scopedWith(sqliteLayer(filename))(admit)
+    const history = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       return yield* runtime.history({ runId, cursor: -1, limit: 10 })
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-    const modelPart = history.find((event) => event._tag === "ModelPart")
+    })
+    const historyResult = yield* scopedWith(sqliteLayer(filename))(history)
+    const modelPart = historyResult.find((event) => event._tag === "ModelPart")
     expect(modelPart?._tag === "ModelPart" && modelPart.part.type).toBe("finish")
-    expect(history.map((event) => event._tag)).toContain("ModelAttemptCompleted")
-    expect(history.map((event) => event._tag)).toContain("ModelCallCompleted")
-  }).pipe(Effect.asVoid),
+    expect(historyResult.map((event) => event._tag)).toContain("ModelAttemptCompleted")
+    expect(historyResult.map((event) => event._tag)).toContain("ModelCallCompleted")
+  }),
 )
 
 it.live("rejects dirty schema and checksum mismatch", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("dirty")
-    yield* Effect.void.pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-    yield* markDirty(filename).pipe(Effect.provide(sqliteClientLayer({ filename })), Effect.scoped)
-    const dirty = yield* Effect.exit(Effect.void.pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped))
+    yield* scopedWith(sqliteLayer(filename))(Effect.void)
+    yield* scopedWith(sqliteClientLayer({ filename }))(markDirty(filename))
+    const dirty = yield* Effect.exit(scopedWith(sqliteLayer(filename))(Effect.void))
     expect(Exit.isFailure(dirty)).toBe(true)
 
     const checksumFile = tempDbPath("checksum")
-    yield* Effect.void.pipe(Effect.provide(sqliteLayer(checksumFile)), Effect.scoped)
+    yield* scopedWith(sqliteLayer(checksumFile))(Effect.void)
     const db = new Database(checksumFile)
     db.run(`UPDATE ${SCHEMA_META_TABLE} SET checksum = 'deadbeef' WHERE id = 1`)
     db.close()
-    const mismatch = yield* Effect.exit(Effect.void.pipe(Effect.provide(sqliteLayer(checksumFile)), Effect.scoped))
+    const mismatch = yield* Effect.exit(scopedWith(sqliteLayer(checksumFile))(Effect.void))
     expect(Exit.isFailure(mismatch)).toBe(true)
-  }).pipe(Effect.asVoid),
+  }),
 )
 
 it.live("rejects unsupported forward schema versions", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("forward")
-    yield* Effect.void.pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+    yield* scopedWith(sqliteLayer(filename))(Effect.void)
     const db = new Database(filename)
     db.run(`UPDATE ${SCHEMA_META_TABLE} SET version = ${SCHEMA_VERSION + 5} WHERE id = 1`)
     db.close()
-    const failed = yield* Effect.exit(Effect.void.pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped))
+    const failed = yield* Effect.exit(scopedWith(sqliteLayer(filename))(Effect.void))
     expect(Exit.isFailure(failed)).toBe(true)
-  }).pipe(Effect.asVoid),
+  }),
 )
 
 it.live("rejects multi-worker configuration", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("workers")
     const failed = yield* Effect.exit(
-      Effect.void.pipe(
-        Effect.provide(
-          Runtime.layerSqlite({
-            filename,
-            multiWorker: true,
-            resolver: ExecutableResolver.makeStatic([]),
-            addresses: [],
-          }),
-        ),
-        Effect.scoped,
-      ),
+      scopedWith(
+        Runtime.layerSqlite({
+          filename,
+          multiWorker: true,
+          resolver: ExecutableResolver.makeStatic([]),
+          addresses: [],
+        }),
+      )(Effect.void),
     )
     expect(Exit.isFailure(failed)).toBe(true)
-  }).pipe(Effect.asVoid),
+  }),
 )
 
-it.live("attests once and reuses the admitted Run for a duplicate", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("idem-attestation")
-    let attestations = 0
-    const send = {
-      to: assistantAddress,
-      sessionId: "session:idem-attestation",
-      idempotencyKey: "same",
-      prompt: textPrompt("one"),
-    } as const
-    yield* Effect.gen(function* () {
+let attestations = 0
+layer(
+  Runtime.layerSqlite({
+    filename: tempDbPath("idem-attestation"),
+    addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+    resolver: ExecutableResolver.ExecutableResolver.of({
+      resolve: (input) =>
+        Effect.sync(() => {
+          if (input.runId === "pending") attestations += 1
+          return {
+            _tag: "Agent" as const,
+            agent: closedTestAgent(assistant),
+            attestation: { ref: assistantRef.ref, manifest: assistantRef.manifest },
+          }
+        }),
+    }),
+  }),
+)("attests once and reuses the admitted Run for a duplicate", (suite) => {
+  suite.effect("attests once and reuses the admitted Run", () =>
+    Effect.gen(function* () {
+      const send = {
+        to: assistantAddress,
+        sessionId: "session:idem-attestation",
+        idempotencyKey: "same",
+        prompt: textPrompt("one"),
+      } as const
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       const first = yield* runtime.send(send)
@@ -389,35 +410,13 @@ it.live("attests once and reuses the admitted Run for a duplicate", () =>
       expect(duplicate.runId).toBe(first.runId)
       expect(attestations).toBe(1)
       expect(yield* store.list({ limit: 10 })).toHaveLength(1)
-    }).pipe(
-      Effect.provide(
-        Runtime.layerSqlite({
-          filename,
-          addresses: [
-            { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
-          ],
-          resolver: ExecutableResolver.ExecutableResolver.of({
-            resolve: (input) =>
-              Effect.sync(() => {
-                if (input.runId === "pending") attestations += 1
-                return {
-                  _tag: "Agent" as const,
-                  agent: closedTestAgent(assistant),
-                  attestation: { ref: assistantRef.ref, manifest: assistantRef.manifest },
-                }
-              }),
-          }),
-        }),
-      ),
-      Effect.scoped,
-    )
-  }).pipe(Effect.asVoid),
-)
+    }),
+  )
+})
 
-it.live("exact duplicate admission and changed-payload conflict", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("idem")
-    yield* Effect.gen(function* () {
+layer(sqliteLayer(tempDbPath("idem")))("exact duplicate admission and changed-payload conflict", (suite) => {
+  suite.effect("exact duplicate admission and changed-payload conflict", () =>
+    Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const first = yield* runtime.send({
         to: assistantAddress,
@@ -442,9 +441,9 @@ it.live("exact duplicate admission and changed-payload conflict", () =>
         })
         .pipe(Effect.flip)
       expect(conflict).toBeInstanceOf(Errors.IdempotencyConflict)
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
-)
+    }),
+  )
+})
 
 it.live("rejects an exact duplicate after the address binding changes", () => {
   const filename = tempDbPath("idem-authority")
@@ -457,7 +456,7 @@ it.live("rejects an exact duplicate after the address binding changes", () => {
   const admit = Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     yield* runtime.send(send)
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  })
   const reopen = Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
@@ -468,8 +467,10 @@ it.live("rejects an exact duplicate after the address binding changes", () => {
       .pipe(Effect.flip)
     expect(fresh).toBeInstanceOf(Errors.ExecutablePinMissing)
     expect(yield* store.list({ limit: 10 })).toHaveLength(1)
-  }).pipe(
-    Effect.provide(
+  })
+  return Effect.gen(function* () {
+    yield* scopedWith(sqliteLayer(filename))(admit)
+    yield* scopedWith(
       Runtime.layerSqlite({
         filename,
         resolver: ExecutableResolver.makeStatic([]),
@@ -481,10 +482,8 @@ it.live("rejects an exact duplicate after the address binding changes", () => {
           },
         ],
       }),
-    ),
-    Effect.scoped,
-  )
-  return admit.pipe(Effect.andThen(reopen))
+    )(reopen)
+  })
 })
 
 it.live("persists a handoff checkpoint and active pin atomically across reopen", () => {
@@ -531,7 +530,7 @@ it.live("persists a handoff checkpoint and active pin atomically across reopen",
     const saved = yield* store.loadExecution(runId)
     expect(saved.executableRef).toEqual(researcherRef.ref)
     expect(saved.executableManifest).toEqual(assistantRef.manifest)
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  })
   const reopen = Effect.gen(function* () {
     const store = yield* RunStore.RunStore
     const saved = yield* store.loadExecution(runId)
@@ -539,8 +538,11 @@ it.live("persists a handoff checkpoint and active pin atomically across reopen",
     expect(saved.checkpoint).toEqual(checkpoint)
     expect(saved.executableRef).toEqual(researcherRef.ref)
     expect(saved.executableManifest).toEqual(assistantRef.manifest)
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  return admit.pipe(Effect.andThen(reopen))
+  })
+  return Effect.gen(function* () {
+    yield* scopedWith(sqliteLayer(filename))(admit)
+    yield* scopedWith(sqliteLayer(filename))(reopen)
+  })
 })
 
 it.live("recovers a committed ExecutionHost handoff through the active Agent after reopen", () =>
@@ -608,64 +610,62 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
         }),
     })
     const crashScope = yield* Scope.make()
-    const committed = yield* Effect.scoped(
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const handoffCommitted = yield* Deferred.make<void>()
-        const crashStore = RunStore.RunStore.of({
-          ...store,
-          completeOperation: (input) =>
-            store
-              .completeOperation(input)
-              .pipe(
-                Effect.flatMap((record) =>
-                  record.kind === "handoff"
-                    ? Deferred.succeed(handoffCommitted, undefined).pipe(Effect.andThen(Effect.never))
-                    : Effect.succeed(record),
-                ),
+    const committed = Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const handoffCommitted = yield* Deferred.make<void>()
+      const crashStore = RunStore.RunStore.of({
+        ...store,
+        completeOperation: (input) =>
+          store
+            .completeOperation(input)
+            .pipe(
+              Effect.flatMap((record) =>
+                record.kind === "handoff"
+                  ? Deferred.succeed(handoffCommitted, undefined).pipe(Effect.andThen(Effect.never))
+                  : Effect.succeed(record),
               ),
-        })
-        const crashHost = yield* makeExecutionHost({ workerId: "before-reopen", resolver: firstResolver }).pipe(
+            ),
+      })
+      const crashHost = yield* scopedWith(activeExecutionsLayer)(
+        makeExecutionHost({ workerId: "before-reopen", resolver: firstResolver }).pipe(
           Effect.provideService(RunStore.RunStore, crashStore),
-          Effect.provide(activeExecutionsLayer),
-        )
-        const receipt = yield* runtime.send({
-          to: address,
-          sessionId: "session:durable-handoff",
-          idempotencyKey: "durable-handoff",
-          prompt: "start with the supervisor",
-        })
-        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-reopen" })
-        const fiber = yield* crashHost.execute(claim).pipe(Effect.forkIn(crashScope))
-        yield* Deferred.await(handoffCommitted)
-        const execution = yield* store.loadExecution(receipt.runId)
-        const checkpointState = (
-          execution.checkpoint !== undefined && "state" in execution.checkpoint ? execution.checkpoint.state : undefined
-        ) as { readonly handoff?: { readonly path: ReadonlyArray<{ readonly handoffId: string }> } } | undefined
-        const operation = yield* store.getOperationByKey({
-          runId: receipt.runId,
-          operationKey: checkpointState?.handoff?.path[0]?.handoffId ?? "missing",
-        })
-        return { runId: receipt.runId, fiber, execution, operation }
-      }).pipe(
-        Effect.provide(
-          Runtime.layerSqlite({
-            filename,
-            resolver: firstResolver,
-            addresses: [{ address, executable: admittedRef, registrations: registrationsFor(admittedRef) }],
-          }),
         ),
-      ),
-    )
+      )
+      const receipt = yield* runtime.send({
+        to: address,
+        sessionId: "session:durable-handoff",
+        idempotencyKey: "durable-handoff",
+        prompt: "start with the supervisor",
+      })
+      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "before-reopen" })
+      const fiber = yield* crashHost.execute(claim).pipe(Effect.forkIn(crashScope))
+      yield* Deferred.await(handoffCommitted)
+      const execution = yield* store.loadExecution(receipt.runId)
+      const checkpointState = (
+        execution.checkpoint !== undefined && "state" in execution.checkpoint ? execution.checkpoint.state : undefined
+      ) as { readonly handoff?: { readonly path: ReadonlyArray<{ readonly handoffId: string }> } } | undefined
+      const operation = yield* store.getOperationByKey({
+        runId: receipt.runId,
+        operationKey: checkpointState?.handoff?.path[0]?.handoffId ?? "missing",
+      })
+      return { runId: receipt.runId, fiber, execution, operation }
+    })
+    const committedResult = yield* scopedWith(
+      Runtime.layerSqlite({
+        filename,
+        resolver: firstResolver,
+        addresses: [{ address, executable: admittedRef, registrations: registrationsFor(admittedRef) }],
+      }),
+    )(committed)
 
-    yield* Fiber.interrupt(committed.fiber)
-    expect(committed.operation?.status).toBe("succeeded")
-    expect(committed.execution.executableRef).toEqual(activeRef.ref)
-    expect(committed.execution.transcript).toBeDefined()
+    yield* Fiber.interrupt(committedResult.fiber)
+    expect(committedResult.operation?.status).toBe("succeeded")
+    expect(committedResult.execution.executableRef).toEqual(activeRef.ref)
+    expect(committedResult.execution.transcript).toBeDefined()
     const committedState = (
-      committed.execution.checkpoint !== undefined && "state" in committed.execution.checkpoint
-        ? committed.execution.checkpoint.state
+      committedResult.execution.checkpoint !== undefined && "state" in committedResult.execution.checkpoint
+        ? committedResult.execution.checkpoint.state
         : undefined
     ) as {
       readonly handoff?: {
@@ -705,37 +705,34 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
           return { _tag: "Agent" as const, agent: Agent.close(childAgent, childModel), attestation: activeRef }
         }),
     })
-    yield* Effect.scoped(
-      Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* ExecutionHost.ExecutionHost
-        const claim = yield* store.claimExecution({ runId: committed.runId, ownerId: "after-reopen" })
-        yield* host.execute(claim)
-        expect(resolvedActive).toBe(child.pin)
-        expect((yield* runtime.inspect(committed.runId)).status).toBe("succeeded")
-        const completed = yield* store.loadExecution(committed.runId)
-        const completedState = (
-          completed.checkpoint !== undefined && "state" in completed.checkpoint ? completed.checkpoint.state : undefined
-        ) as typeof committedState
-        expect(completedState.handoff).toMatchObject({
-          active: childAgent.name,
-          path: [{ source: supervisor.agent.name, target: childAgent.name }],
-          edgeCounts: [{ source: supervisor.agent.name, target: childAgent.name, count: 1 }],
-          handoffCount: 1,
-        })
-        expect(completedState.handoff?.pendingContinuation).toBeUndefined()
-        expect(receivedByChild).toEqual(Prompt.concat(committed.execution.transcript!, continuation))
-      }).pipe(
-        Effect.provide(
-          Runtime.layerSqlite({
-            filename,
-            resolver: reopenResolver,
-            addresses: [{ address, executable: admittedRef, registrations: registrationsFor(admittedRef) }],
-          }),
-        ),
-      ),
-    )
+    const reopen = Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const host = yield* ExecutionHost.ExecutionHost
+      const claim = yield* store.claimExecution({ runId: committedResult.runId, ownerId: "after-reopen" })
+      yield* host.execute(claim)
+      expect(resolvedActive).toBe(child.pin)
+      expect((yield* runtime.inspect(committedResult.runId)).status).toBe("succeeded")
+      const completed = yield* store.loadExecution(committedResult.runId)
+      const completedState = (
+        completed.checkpoint !== undefined && "state" in completed.checkpoint ? completed.checkpoint.state : undefined
+      ) as typeof committedState
+      expect(completedState.handoff).toMatchObject({
+        active: childAgent.name,
+        path: [{ source: supervisor.agent.name, target: childAgent.name }],
+        edgeCounts: [{ source: supervisor.agent.name, target: childAgent.name, count: 1 }],
+        handoffCount: 1,
+      })
+      expect(completedState.handoff?.pendingContinuation).toBeUndefined()
+      expect(receivedByChild).toEqual(Prompt.concat(committedResult.execution.transcript!, continuation))
+    })
+    yield* scopedWith(
+      Runtime.layerSqlite({
+        filename,
+        resolver: reopenResolver,
+        addresses: [{ address, executable: admittedRef, registrations: registrationsFor(admittedRef) }],
+      }),
+    )(reopen)
   }),
 )
 
@@ -750,7 +747,7 @@ it.live("rejects corrupted persisted executable authority with RuntimeUnavailabl
       idempotencyKey: "corrupt",
       prompt: textPrompt("corrupt"),
     })).runId
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  })
   const corrupt = Effect.sync(() => {
     const db = new Database(filename)
     db.run("UPDATE baton_runs SET executable_ref_json = ? WHERE run_id = ?", [
@@ -763,8 +760,12 @@ it.live("rejects corrupted persisted executable authority with RuntimeUnavailabl
     const store = yield* RunStore.RunStore
     const error = yield* store.loadExecution(runId).pipe(Effect.flip)
     expect(error).toBeInstanceOf(Errors.RuntimeUnavailable)
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  return admit.pipe(Effect.andThen(corrupt), Effect.andThen(reopen))
+  })
+  return Effect.gen(function* () {
+    yield* scopedWith(sqliteLayer(filename))(admit)
+    yield* corrupt
+    yield* scopedWith(sqliteLayer(filename))(reopen)
+  })
 })
 
 it.live("persists only complete atomic failure, unknown, and suspension states across reopen", () => {
@@ -816,7 +817,7 @@ it.live("persists only complete atomic failure, unknown, and suspension states a
       suspension: suspension("approval", "approval"),
       wait: openWait("approval", "approval"),
     })
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+  })
   const reopen = Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
     const store = yield* RunStore.RunStore
@@ -839,14 +840,17 @@ it.live("persists only complete atomic failure, unknown, and suspension states a
     })
     expect((yield* runtime.inspect(runIds.Suspended!)).wait?.waitId).toBe("approval")
     expect((yield* runtime.inspect(runIds.Suspended!)).status).toBe("waiting")
-  }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  return write.pipe(Effect.andThen(reopen))
+  })
+  return Effect.gen(function* () {
+    yield* scopedWith(sqliteLayer(filename))(write)
+    yield* scopedWith(sqliteLayer(filename))(reopen)
+  })
 })
 
 it.live("persists caller RunId, wait resolution, and finite inspection reads across reopen", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("protocol-foundation")
-    yield* Effect.gen(function* () {
+    const admit = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
@@ -868,9 +872,8 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
         waitId: "wait:sqlite",
         resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
       })
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-
-    yield* Effect.gen(function* () {
+    })
+    const reopen = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const inspection = yield* runtime.inspect("run:sqlite:caller")
       expect(inspection.wait?.resolution).toEqual({ _tag: "ToolResult", result: "yes", encodedResult: "yes" })
@@ -887,92 +890,110 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
         })
         .pipe(Effect.flip)
       expect(conflict).toBeInstanceOf(Errors.RunIdConflict)
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
+    })
+    yield* scopedWith(sqliteLayer(filename))(admit)
+    yield* scopedWith(sqliteLayer(filename))(reopen)
+  }),
 )
 
-it.live("persists and strictly replays the exact resolution supplied to RunStore.resume", () =>
-  Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
-    const receipt = yield* runtime.send({
-      to: assistantAddress,
-      sessionId: "session:sqlite:direct-resume",
-      idempotencyKey: "direct-resume",
-      prompt: textPrompt("wait"),
-    })
-    const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "direct-resume" })
-    yield* store.suspend({
-      ...claim,
-      wait: openWait("wait:direct-resume"),
-      suspension: suspension("wait:direct-resume"),
-    })
-    const resolution = {
-      _tag: "ToolResult" as const,
-      result: { approved: true, values: [1, 2, 3] },
-      encodedResult: { format: "json", value: "approved" },
-    }
-    const resumeInput = { runId: receipt.runId, waitId: "wait:direct-resume", resolution }
-    yield* store.resume(resumeInput)
+layer(sqliteLayer(tempDbPath("direct-resume")))(
+  "persists and strictly replays the exact resolution supplied to RunStore.resume",
+  (suite) => {
+    suite.effect("persists and replays the exact resolution", () =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: "session:sqlite:direct-resume",
+          idempotencyKey: "direct-resume",
+          prompt: textPrompt("wait"),
+        })
+        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "direct-resume" })
+        yield* store.suspend({
+          ...claim,
+          wait: openWait("wait:direct-resume"),
+          suspension: suspension("wait:direct-resume"),
+        })
+        const resolution = {
+          _tag: "ToolResult" as const,
+          result: { approved: true, values: [1, 2, 3] },
+          encodedResult: { format: "json", value: "approved" },
+        }
+        const resumeInput = { runId: receipt.runId, waitId: "wait:direct-resume", resolution }
+        yield* store.resume(resumeInput)
 
-    const resumed = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 10 })).find(
-      (event) => event._tag === "RunResumed",
+        const resumed = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 10 })).find(
+          (event) => event._tag === "RunResumed",
+        )
+        expect(resumed).toEqual(
+          expect.objectContaining({ _tag: "RunResumed", waitId: "wait:direct-resume", resolution }),
+        )
+      }),
     )
-    expect(resumed).toEqual(expect.objectContaining({ _tag: "RunResumed", waitId: "wait:direct-resume", resolution }))
-  }).pipe(Effect.provide(sqliteLayer(tempDbPath("direct-resume"))), Effect.scoped),
+  },
 )
 
-it.live("does not resume a SQLite Run after cancellation admission", () =>
-  Effect.gen(function* () {
-    const { runtime, store, runId } = yield* admitWaitWithClaimedChild("wait:sqlite-cancelled")
-    yield* runtime.cancel({ runId, reason: "stop" })
-    expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
+layer(sqliteLayer(tempDbPath("cancelled-wait")))(
+  "does not resume a SQLite Run after cancellation admission",
+  (suite) => {
+    suite.effect("does not resume after cancellation admission", () =>
+      Effect.gen(function* () {
+        const { runtime, store, runId } = yield* admitWaitWithClaimedChild("wait:sqlite-cancelled")
+        yield* runtime.cancel({ runId, reason: "stop" })
+        expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
 
-    const response = yield* runtime
-      .respond({
-        runId,
-        waitId: "wait:sqlite-cancelled",
-        resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
-      })
-      .pipe(Effect.flip)
-    expect(response).toBeInstanceOf(Errors.WaitNotOpen)
-    yield* runtime.signal({ runId, name: "wait:sqlite-cancelled" })
-    const resume = yield* store
-      .resume({
-        runId,
-        waitId: "wait:sqlite-cancelled",
-        resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
-      })
-      .pipe(Effect.flip)
-    expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
-    expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
-  }).pipe(Effect.provide(sqliteLayer(tempDbPath("cancelled-wait"))), Effect.scoped),
-)
-
-it.live("keeps a concurrent SQLite response and cancellation from leaving a Run running", () =>
-  Effect.gen(function* () {
-    const { runtime, runId } = yield* admitWaitWithClaimedChild("wait:sqlite-race")
-    yield* Effect.all(
-      [
-        runtime
+        const response = yield* runtime
           .respond({
             runId,
-            waitId: "wait:sqlite-race",
+            waitId: "wait:sqlite-cancelled",
             resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
           })
-          .pipe(Effect.exit),
-        runtime.cancel({ runId, reason: "stop" }).pipe(Effect.exit),
-      ],
-      { concurrency: "unbounded" },
+          .pipe(Effect.flip)
+        expect(response).toBeInstanceOf(Errors.WaitNotOpen)
+        yield* runtime.signal({ runId, name: "wait:sqlite-cancelled" })
+        const resume = yield* store
+          .resume({
+            runId,
+            waitId: "wait:sqlite-cancelled",
+            resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
+          })
+          .pipe(Effect.flip)
+        expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
+        expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
+      }),
     )
-    expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
-  }).pipe(Effect.provide(sqliteLayer(tempDbPath("cancelled-wait-race"))), Effect.scoped),
+  },
 )
 
-it.live("fifo blocks successors until head terminals", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("fifo")
-    yield* Effect.gen(function* () {
+layer(sqliteLayer(tempDbPath("cancelled-wait-race")))(
+  "keeps a concurrent SQLite response and cancellation from leaving a Run running",
+  (suite) => {
+    suite.effect("keeps response and cancellation concurrent", () =>
+      Effect.gen(function* () {
+        const { runtime, runId } = yield* admitWaitWithClaimedChild("wait:sqlite-race")
+        yield* Effect.all(
+          [
+            runtime
+              .respond({
+                runId,
+                waitId: "wait:sqlite-race",
+                resolution: { _tag: "ToolResult", result: "yes", encodedResult: "yes" },
+              })
+              .pipe(Effect.exit),
+            runtime.cancel({ runId, reason: "stop" }).pipe(Effect.exit),
+          ],
+          { concurrency: "unbounded" },
+        )
+        expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
+      }),
+    )
+  },
+)
+
+layer(sqliteLayer(tempDbPath("fifo")))("fifo blocks successors until head terminals", (suite) => {
+  suite.effect("fifo blocks successors until head terminals", () =>
+    Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const driver = yield* RunStore.RunStore
       const head = yield* runtime.send({
@@ -995,14 +1016,13 @@ it.live("fifo blocks successors until head terminals", () =>
         result: completedResult("done"),
       })
       expect((yield* runtime.inspect(blocked.runId)).status).toBe("running")
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
-)
+    }),
+  )
+})
 
-it.live("response signal and cancel bypass the lane", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("control")
-    yield* Effect.gen(function* () {
+layer(sqliteLayer(tempDbPath("control")))("response signal and cancel bypass the lane", (suite) => {
+  suite.effect("response signal and cancel bypass the lane", () =>
+    Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const driver = yield* RunStore.RunStore
       const waiting = yield* runtime.send({
@@ -1037,14 +1057,13 @@ it.live("response signal and cancel bypass the lane", () =>
       yield* runtime.cancel({ runId: waiting.runId, reason: "stop" })
       expect((yield* runtime.inspect(waiting.runId)).status).toBe("cancelled")
       expect((yield* runtime.inspect(successor.runId)).status).toBe("running")
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
-)
+    }),
+  )
+})
 
-it.live("attempt fencing is monotonic across promote", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("fence")
-    yield* Effect.gen(function* () {
+layer(sqliteLayer(tempDbPath("fence")))("attempt fencing is monotonic across promote", (suite) => {
+  suite.effect("attempt fencing is monotonic across promote", () =>
+    Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const driver = yield* RunStore.RunStore
       const first = yield* runtime.send({
@@ -1077,15 +1096,16 @@ it.live("attempt fencing is monotonic across promote", () =>
         Effect.map((chunk) => [...chunk]),
       )
       const secondStarted = secondEvents.find((event) => event._tag === "RunAttemptStarted")
-      expect(secondStarted !== undefined && secondStarted._tag === "RunAttemptStarted" ? secondStarted.attempt : 0).toBe(1)
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
-)
+      expect(
+        secondStarted !== undefined && secondStarted._tag === "RunAttemptStarted" ? secondStarted.attempt : 0,
+      ).toBe(1)
+    }),
+  )
+})
 
-it.live("expired non-idempotent running operations become unknown", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("ops")
-    yield* Effect.gen(function* () {
+layer(sqliteLayer(tempDbPath("ops")))("expired non-idempotent running operations become unknown", (suite) => {
+  suite.effect("expired non-idempotent running operations become unknown", () =>
+    Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const driver = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
@@ -1180,14 +1200,13 @@ it.live("expired non-idempotent running operations become unknown", () =>
       })
       expect(retried.outcome).toBe("retried")
       expect(retried.record.status).toBe("requested")
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
-)
+    }),
+  )
+})
 
-it.live("first terminal wins", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("terminal")
-    yield* Effect.gen(function* () {
+layer(sqliteLayer(tempDbPath("terminal")))("first terminal wins", (suite) => {
+  suite.effect("first terminal wins", () =>
+    Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const driver = yield* RunStore.RunStore
       const receipt = yield* runtime.send({
@@ -1203,14 +1222,13 @@ it.live("first terminal wins", () =>
         .pipe(Effect.flip)
       expect(again).toBeInstanceOf(Errors.RunTerminal)
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
-)
+    }),
+  )
+})
 
-it.live("rejects child admission after a terminal parent", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("terminal-parent-spawn")
-    yield* Effect.gen(function* () {
+layer(sqliteLayer(tempDbPath("terminal-parent-spawn")))("rejects child admission after a terminal parent", (suite) => {
+  suite.effect("rejects child admission after a terminal parent", () =>
+    Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       const parent = yield* runtime.send({
@@ -1231,92 +1249,96 @@ it.live("rejects child admission after a terminal parent", () =>
         .pipe(Effect.flip)
       expect(failure).toBeInstanceOf(Errors.RunTerminal)
       expect((yield* RunTree.inspect(parent.runId)).runs).toHaveLength(1)
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
+    }),
+  )
+})
+
+layer(sqliteLayer(tempDbPath("cancel-unknown-resolution")))(
+  "settles an admitted cancellation only after an unknown operation is resolved",
+  (suite) => {
+    suite.effect("settles cancellation after unknown resolution", () =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: "session:cancel-unknown",
+          idempotencyKey: "cancel-unknown",
+          prompt: textPrompt("hello"),
+        })
+        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "worker:one" })
+        const operation = yield* store.recordOperation({
+          ...claim,
+          operationKey: "tool:non-replayable",
+          kind: "tool",
+          inputDigest: "digest",
+          input: { call: "once" },
+          replayPolicy: "never",
+          attempt: claim.attempt,
+        })
+        yield* store.startOperation({ ...claim, operationId: operation.operationId })
+        yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+
+        yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+
+        yield* runtime.resolveOperation({
+          runId: receipt.runId,
+          operationId: operation.operationId,
+          idempotencyKey: "resolution:cancelled",
+          resolution: { _tag: "Succeeded", value: { answer: 1 } },
+        })
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+      }),
+    )
+  },
 )
 
-it.live("settles an admitted cancellation only after an unknown operation is resolved", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("cancel-unknown-resolution")
-    yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const receipt = yield* runtime.send({
-        to: assistantAddress,
-        sessionId: "session:cancel-unknown",
-        idempotencyKey: "cancel-unknown",
-        prompt: textPrompt("hello"),
-      })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "worker:one" })
-      const operation = yield* store.recordOperation({
-        ...claim,
-        operationKey: "tool:non-replayable",
-        kind: "tool",
-        inputDigest: "digest",
-        input: { call: "once" },
-        replayPolicy: "never",
-        attempt: claim.attempt,
-      })
-      yield* store.startOperation({ ...claim, operationId: operation.operationId })
-      yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
-      expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+layer(sqliteLayer(tempDbPath("cancel-tree-quiescence")))(
+  "settles every owned child before a cancelled root reports terminal",
+  (suite) => {
+    suite.effect("settles children before cancelled root", () =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const parent = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: "session:cancel-quiescence",
+          idempotencyKey: "parent",
+          prompt: textPrompt("parent"),
+        })
+        const first = yield* runtime.spawn({
+          parentRunId: parent.runId,
+          invocationId: "child-one",
+          selection: "researcher",
+          prompt: textPrompt("one"),
+        })
+        const second = yield* runtime.spawn({
+          parentRunId: parent.runId,
+          invocationId: "child-two",
+          selection: "researcher",
+          prompt: textPrompt("two"),
+        })
 
-      yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-      expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+        yield* runtime.cancel({ runId: parent.runId, reason: "stop" })
 
-      yield* runtime.resolveOperation({
-        runId: receipt.runId,
-        operationId: operation.operationId,
-        idempotencyKey: "resolution:cancelled",
-        resolution: { _tag: "Succeeded", value: { answer: 1 } },
-      })
-      expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
-)
+        expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
+        expect((yield* runtime.inspect(second.runId)).status).toBe("cancelled")
+        expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
 
-it.live("settles every owned child before a cancelled root reports terminal", () =>
-  Effect.gen(function* () {
-    const filename = tempDbPath("cancel-tree-quiescence")
-    yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const parent = yield* runtime.send({
-        to: assistantAddress,
-        sessionId: "session:cancel-quiescence",
-        idempotencyKey: "parent",
-        prompt: textPrompt("parent"),
-      })
-      const first = yield* runtime.spawn({
-        parentRunId: parent.runId,
-        invocationId: "child-one",
-        selection: "researcher",
-        prompt: textPrompt("one"),
-      })
-      const second = yield* runtime.spawn({
-        parentRunId: parent.runId,
-        invocationId: "child-two",
-        selection: "researcher",
-        prompt: textPrompt("two"),
-      })
-
-      yield* runtime.cancel({ runId: parent.runId, reason: "stop" })
-
-      expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
-      expect((yield* runtime.inspect(second.runId)).status).toBe("cancelled")
-      expect((yield* runtime.inspect(parent.runId)).status).toBe("cancelled")
-
-      const tree = yield* RunTree.history({ rootRunId: parent.runId, limit: 500 })
-      const cancelled = tree.events.filter((item) => item.event._tag === "RunCancelled").map((item) => item.runId)
-      expect(new Set(cancelled)).toEqual(new Set([parent.runId, first.runId, second.runId]))
-      expect(cancelled[cancelled.length - 1]).toBe(parent.runId)
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
+        const tree = yield* RunTree.history({ rootRunId: parent.runId, limit: 500 })
+        const cancelled = tree.events.filter((item) => item.event._tag === "RunCancelled").map((item) => item.runId)
+        expect(new Set(cancelled)).toEqual(new Set([parent.runId, first.runId, second.runId]))
+        expect(cancelled[cancelled.length - 1]).toBe(parent.runId)
+      }),
+    )
+  },
 )
 
 it.live("child link reconciliation and cursor replay after reopen", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("child")
-    const parentRunId = yield* Effect.gen(function* () {
+    const admit = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const driver = yield* RunStore.RunStore
       const parent = yield* runtime.send({
@@ -1344,9 +1366,9 @@ it.live("child link reconciliation and cursor replay after reopen", () =>
       expect(parentTags).toContain("ChildLinked")
       expect(parentTags).toContain("ChildSettled")
       return parent.runId
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-
-    yield* Effect.gen(function* () {
+    })
+    const parentRunId = yield* scopedWith(sqliteLayer(filename))(admit)
+    const replay = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const tags = yield* runtime.events({ runId: parentRunId, cursor: 0 }).pipe(
         Stream.take(3),
@@ -1355,14 +1377,15 @@ it.live("child link reconciliation and cursor replay after reopen", () =>
       )
       expect(tags.length).toBeGreaterThan(0)
       expect(schemaChecksum().length).toBe(64)
-    }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
-  }).pipe(Effect.asVoid),
+    })
+    yield* scopedWith(sqliteLayer(filename))(replay)
+  }),
 )
 
 it.live("serializes concurrent sqlite writers on one file", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("concurrent")
-    yield* Effect.void.pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+    yield* scopedWith(sqliteLayer(filename))(Effect.void)
     const send = (key: string) =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -1372,15 +1395,15 @@ it.live("serializes concurrent sqlite writers on one file", () =>
           idempotencyKey: key,
           prompt: textPrompt(key),
         })
-      }).pipe(Effect.provide(sqliteLayer(filename)), Effect.scoped)
+      })
 
     const results = yield* Effect.all(
-      Array.from({ length: 8 }, (_, index) => send(`k${index}`)),
+      Array.from({ length: 8 }, (_, index) => scopedWith(sqliteLayer(filename))(send(`k${index}`))),
       { concurrency: 8 },
     )
     expect(new Set(results.map((receipt) => receipt.runId)).size).toBe(8)
     expect(results.map((receipt) => receipt.acceptedSequence).toSorted((a, b) => a - b)).toEqual([
       0, 1, 2, 3, 4, 5, 6, 7,
     ])
-  }).pipe(Effect.asVoid),
+  }),
 )

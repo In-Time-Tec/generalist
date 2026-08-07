@@ -1,5 +1,5 @@
-import { describe, expect, it } from "@effect/vitest"
-import { Clock, Effect } from "effect"
+import { describe, expect, it, layer } from "@effect/vitest"
+import { Clock, Effect, Layer } from "effect"
 import { Pins } from "@batonfx/core"
 import { Approval, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
 import { registrationsFor } from "./helpers.js"
@@ -15,6 +15,11 @@ import {
 } from "./program-fixture.js"
 import { programReplayDivergenceContract } from "./program-store-contract.js"
 
+const scopedWith =
+  <A, E>(layerValue: Layer.Layer<A, E, never>) =>
+  <B, E2, R2 extends A>(effect: Effect.Effect<B, E2, R2>): Effect.Effect<B, E | E2> =>
+    Effect.scoped(Effect.flatMap(Layer.build(layerValue), (context) => effect.pipe(Effect.provideContext(context))))
+
 describe("durable Agent Programs", () => {
   it.effect("rejects Program replay divergence in memory and SQLite without changing the journal", () => {
     const memory = programFixture()
@@ -29,20 +34,15 @@ describe("durable Agent Programs", () => {
         },
       ],
     })
-    return programReplayDivergenceContract.pipe(
-      Effect.provide(Runtime.layerMemory(options(memory.resolver))),
-      Effect.andThen(
-        programReplayDivergenceContract.pipe(
-          Effect.provide(
-            Runtime.layerSqlite({
-              ...options(sqlite.resolver),
-              filename: tempDbPath("program-replay-divergence"),
-            }),
-          ),
-          Effect.scoped,
-        ),
-      ),
-    )
+    return Effect.gen(function* () {
+      yield* scopedWith(Runtime.layerMemory(options(memory.resolver)))(programReplayDivergenceContract)
+      yield* scopedWith(
+        Runtime.layerSqlite({
+          ...options(sqlite.resolver),
+          filename: tempDbPath("program-replay-divergence"),
+        }),
+      )(programReplayDivergenceContract)
+    })
   })
 
   it("rejects a live Program whose manifest differs from its claimed pin", () => {
@@ -68,104 +68,104 @@ describe("durable Agent Programs", () => {
     ).toThrow(/does not match/)
   })
 
-  it.effect("dispatches Programs and replays named tool and log operations in memory", () => {
-    const { resolver, counts } = programFixture()
-    return Effect.gen(function* () {
-      const runId = yield* executeProgramFixture
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
-      expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({
-        kind: "tool",
-        status: "succeeded",
-      })
-      expect(yield* store.getProgramOperation({ runId, operation: "summary" })).toMatchObject({
-        kind: "log",
-        status: "succeeded",
-      })
-      expect((yield* runtime.history({ runId, limit: 100 })).filter((event) => event._tag === "ProgramLog")).toEqual([
-        expect.objectContaining({ operation: "summary", level: "info", message: "finished" }),
-      ])
-      expect(counts()).toEqual({ toolCalls: 1, logs: 1 })
-    }).pipe(
-      Effect.provide(
-        Runtime.layerMemory({
-          resolver,
-          addresses: [
-            {
-              address: programAddress,
-              executable: programExecutable,
-              registrations: registrationsFor(programExecutable),
-            },
-          ],
-        }),
-      ),
+  const dispatchFixture = programFixture()
+  layer(
+    Runtime.layerMemory({
+      resolver: dispatchFixture.resolver,
+      addresses: [
+        {
+          address: programAddress,
+          executable: programExecutable,
+          registrations: registrationsFor(programExecutable),
+        },
+      ],
+    }),
+  )("dispatches Programs and replays named tool and log operations in memory", (suite) => {
+    suite.effect("dispatches and replays named operations", () =>
+      Effect.gen(function* () {
+        const runId = yield* executeProgramFixture
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
+        expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({
+          kind: "tool",
+          status: "succeeded",
+        })
+        expect(yield* store.getProgramOperation({ runId, operation: "summary" })).toMatchObject({
+          kind: "log",
+          status: "succeeded",
+        })
+        expect((yield* runtime.history({ runId, limit: 100 })).filter((event) => event._tag === "ProgramLog")).toEqual([
+          expect.objectContaining({ operation: "summary", level: "info", message: "finished" }),
+        ])
+        expect(dispatchFixture.counts()).toEqual({ toolCalls: 1, logs: 1 })
+      }),
     )
   })
 
-  it.effect("authorizes before dispatch and resumes the exact approved operation once", () => {
-    const fixture = approvalProgramFixture()
-    return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const host = yield* ExecutionHost.ExecutionHost
-      const receipt = yield* runtime.send({
-        to: programAddress,
-        sessionId: "approval-session",
-        idempotencyKey: "approval-run",
-        prompt: "run",
-      })
-      yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-worker" }))
-      const waiting = (yield* runtime.inspect(receipt.runId)).wait
-      expect(waiting).toMatchObject({
-        waitId: "approval:echo",
-        reason: {
-          _tag: "Approval",
-          request: { approvalId: "approval:echo", operation: "echo", capability: "echo" },
+  const approvalFixture = approvalProgramFixture()
+  layer(
+    Runtime.layerMemory({
+      resolver: approvalFixture.resolver,
+      addresses: [
+        {
+          address: programAddress,
+          executable: programExecutable,
+          registrations: registrationsFor(programExecutable),
         },
-      })
-      expect(fixture.counts()).toEqual({ authorizations: 1, executions: 0, sandboxes: 1 })
-      const wrong = yield* runtime
-        .respondApproval({ runId: receipt.runId, approvalId: "approval:other", decision: { _tag: "Approved" } })
-        .pipe(Effect.flip)
-      expect(wrong._tag).toBe("@batonfx/runtime/ApprovalMismatch")
-      yield* Approval.approve({ runId: receipt.runId, approvalId: "approval:echo" })
-      yield* runtime.respondApproval({
-        runId: receipt.runId,
-        approvalId: "approval:echo",
-        decision: { _tag: "Approved" },
-      })
-      const conflict = yield* runtime
-        .respondApproval({ runId: receipt.runId, approvalId: "approval:echo", decision: { _tag: "Denied" } })
-        .pipe(Effect.flip)
-      expect(conflict._tag).toBe("@batonfx/runtime/ApprovalMismatch")
-      expect(yield* runtime.history({ runId: receipt.runId, limit: 100 })).toContainEqual(
-        expect.objectContaining({
-          _tag: "RunResumed",
+      ],
+    }),
+  )("authorizes before dispatch and resumes the exact approved operation once", (suite) => {
+    suite.effect("authorizes once and resumes exactly", () =>
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const host = yield* ExecutionHost.ExecutionHost
+        const receipt = yield* runtime.send({
+          to: programAddress,
+          sessionId: "approval-session",
+          idempotencyKey: "approval-run",
+          prompt: "run",
+        })
+        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-worker" }))
+        const waiting = (yield* runtime.inspect(receipt.runId)).wait
+        expect(waiting).toMatchObject({
           waitId: "approval:echo",
-          resolution: { _tag: "Approved" },
-        }),
-      )
-      yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-worker" }))
-      expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
-      const stale = yield* runtime
-        .respondApproval({ runId: receipt.runId, approvalId: "approval:stale", decision: { _tag: "Approved" } })
-        .pipe(Effect.flip)
-      expect(stale._tag).toBe("@batonfx/runtime/ApprovalStale")
-      expect(fixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
-    }).pipe(
-      Effect.provide(
-        Runtime.layerMemory({
-          resolver: fixture.resolver,
-          addresses: [
-            {
-              address: programAddress,
-              executable: programExecutable,
-              registrations: registrationsFor(programExecutable),
-            },
-          ],
-        }),
-      ),
+          reason: {
+            _tag: "Approval",
+            request: { approvalId: "approval:echo", operation: "echo", capability: "echo" },
+          },
+        })
+        expect(approvalFixture.counts()).toEqual({ authorizations: 1, executions: 0, sandboxes: 1 })
+        const wrong = yield* runtime
+          .respondApproval({ runId: receipt.runId, approvalId: "approval:other", decision: { _tag: "Approved" } })
+          .pipe(Effect.flip)
+        expect(wrong._tag).toBe("@batonfx/runtime/ApprovalMismatch")
+        yield* Approval.approve({ runId: receipt.runId, approvalId: "approval:echo" })
+        yield* runtime.respondApproval({
+          runId: receipt.runId,
+          approvalId: "approval:echo",
+          decision: { _tag: "Approved" },
+        })
+        const conflict = yield* runtime
+          .respondApproval({ runId: receipt.runId, approvalId: "approval:echo", decision: { _tag: "Denied" } })
+          .pipe(Effect.flip)
+        expect(conflict._tag).toBe("@batonfx/runtime/ApprovalMismatch")
+        expect(yield* runtime.history({ runId: receipt.runId, limit: 100 })).toContainEqual(
+          expect.objectContaining({
+            _tag: "RunResumed",
+            waitId: "approval:echo",
+            resolution: { _tag: "Approved" },
+          }),
+        )
+        yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "approval-worker" }))
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+        const stale = yield* runtime
+          .respondApproval({ runId: receipt.runId, approvalId: "approval:stale", decision: { _tag: "Approved" } })
+          .pipe(Effect.flip)
+        expect(stale._tag).toBe("@batonfx/runtime/ApprovalStale")
+        expect(approvalFixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
+      }),
     )
   })
 
@@ -199,7 +199,7 @@ describe("durable Agent Programs", () => {
         },
       })
       expect(fixture.counts()).toEqual({ authorizations: 1, executions: 0, sandboxes: 1 })
-    }).pipe(Effect.provide(Runtime.layerSqlite(options)), Effect.scoped)
+    })
     const resume = Effect.suspend(() =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -220,19 +220,18 @@ describe("durable Agent Programs", () => {
         yield* host.execute(yield* store.claimExecution({ runId, ownerId: "approval-after-reopen" }))
         expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
         expect(fixture.counts()).toEqual({ authorizations: 1, executions: 1, sandboxes: 2 })
-      }).pipe(Effect.provide(Runtime.layerSqlite(options)), Effect.scoped),
+      }),
     )
-    return suspend.pipe(Effect.andThen(resume))
+    return Effect.gen(function* () {
+      yield* scopedWith(Runtime.layerSqlite(options))(suspend)
+      yield* scopedWith(Runtime.layerSqlite(options))(resume)
+    })
   })
 
   it.effect("settles denied approval without dispatch and cancels a waiting Program without stranded slots", () => {
     const denied = approvalProgramFixture()
     const cancelled = approvalProgramFixture()
-    const run = (
-      fixture: ReturnType<typeof approvalProgramFixture>,
-      resolution: "Denied" | "Cancel",
-      sqliteName?: string,
-    ) =>
+    const run = (fixture: ReturnType<typeof approvalProgramFixture>, resolution: "Denied" | "Cancel") =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
@@ -262,38 +261,38 @@ describe("durable Agent Programs", () => {
         })
         expect((yield* store.loadProgramState(receipt.runId))?.activeSlots).toBe(0)
         expect(fixture.counts().executions).toBe(0)
-      }).pipe(
-        Effect.provide(
-          sqliteName === undefined
-            ? Runtime.layerMemory({
-                resolver: fixture.resolver,
-                addresses: [
-                  {
-                    address: programAddress,
-                    executable: programExecutable,
-                    registrations: registrationsFor(programExecutable),
-                  },
-                ],
-              })
-            : Runtime.layerSqlite({
-                filename: tempDbPath(sqliteName),
-                resolver: fixture.resolver,
-                addresses: [
-                  {
-                    address: programAddress,
-                    executable: programExecutable,
-                    registrations: registrationsFor(programExecutable),
-                  },
-                ],
-              }),
-        ),
-        Effect.scoped,
+      })
+    const layerFor = (fixture: ReturnType<typeof approvalProgramFixture>, sqliteName?: string) =>
+      sqliteName === undefined
+        ? Runtime.layerMemory({
+            resolver: fixture.resolver,
+            addresses: [
+              {
+                address: programAddress,
+                executable: programExecutable,
+                registrations: registrationsFor(programExecutable),
+              },
+            ],
+          })
+        : Runtime.layerSqlite({
+            filename: tempDbPath(sqliteName),
+            resolver: fixture.resolver,
+            addresses: [
+              {
+                address: programAddress,
+                executable: programExecutable,
+                registrations: registrationsFor(programExecutable),
+              },
+            ],
+          })
+    return Effect.gen(function* () {
+      yield* scopedWith(layerFor(denied))(run(denied, "Denied"))
+      yield* scopedWith(layerFor(cancelled))(run(cancelled, "Cancel"))
+      yield* scopedWith(layerFor(approvalProgramFixture(), "program-denied"))(run(approvalProgramFixture(), "Denied"))
+      yield* scopedWith(layerFor(approvalProgramFixture(), "program-cancelled"))(
+        run(approvalProgramFixture(), "Cancel"),
       )
-    return run(denied, "Denied").pipe(
-      Effect.andThen(run(cancelled, "Cancel")),
-      Effect.andThen(run(approvalProgramFixture(), "Denied", "program-denied")),
-      Effect.andThen(run(approvalProgramFixture(), "Cancel", "program-cancelled")),
-    )
+    })
   })
 
   it.live("reopens SQLite with the Program result and operation journal intact", () => {
@@ -302,22 +301,7 @@ describe("durable Agent Programs", () => {
     let runId = ""
     const write = Effect.gen(function* () {
       runId = yield* executeProgramFixture
-    }).pipe(
-      Effect.provide(
-        Runtime.layerSqlite({
-          filename,
-          resolver: first.resolver,
-          addresses: [
-            {
-              address: programAddress,
-              executable: programExecutable,
-              registrations: registrationsFor(programExecutable),
-            },
-          ],
-        }),
-      ),
-      Effect.scoped,
-    )
+    })
     const reopen = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
@@ -329,8 +313,22 @@ describe("durable Agent Programs", () => {
         status: "succeeded",
         result: "value:1",
       })
-    }).pipe(
-      Effect.provide(
+    })
+    return Effect.gen(function* () {
+      yield* scopedWith(
+        Runtime.layerSqlite({
+          filename,
+          resolver: first.resolver,
+          addresses: [
+            {
+              address: programAddress,
+              executable: programExecutable,
+              registrations: registrationsFor(programExecutable),
+            },
+          ],
+        }),
+      )(write)
+      yield* scopedWith(
         Runtime.layerSqlite({
           filename,
           resolver: programFixture().resolver,
@@ -342,10 +340,8 @@ describe("durable Agent Programs", () => {
             },
           ],
         }),
-      ),
-      Effect.scoped,
-    )
-    return write.pipe(Effect.andThen(reopen))
+      )(reopen)
+    })
   })
 
   it.live("resolves a crashed non-idempotent Program operation without redispatch", () => {
@@ -410,8 +406,8 @@ describe("durable Agent Programs", () => {
     })
     const memory = programFixture()
     const sqlite = programFixture()
-    return verify.pipe(
-      Effect.provide(
+    return Effect.gen(function* () {
+      yield* scopedWith(
         Runtime.layerMemory({
           resolver: memory.resolver,
           addresses: [
@@ -422,26 +418,21 @@ describe("durable Agent Programs", () => {
             },
           ],
         }),
-      ),
-      Effect.andThen(
-        verify.pipe(
-          Effect.provide(
-            Runtime.layerSqlite({
-              filename: tempDbPath("program-unknown"),
-              resolver: sqlite.resolver,
-              addresses: [
-                {
-                  address: programAddress,
-                  executable: programExecutable,
-                  registrations: registrationsFor(programExecutable),
-                },
-              ],
-            }),
-          ),
-          Effect.scoped,
-        ),
-      ),
-    )
+      )(verify)
+      yield* scopedWith(
+        Runtime.layerSqlite({
+          filename: tempDbPath("program-unknown"),
+          resolver: sqlite.resolver,
+          addresses: [
+            {
+              address: programAddress,
+              executable: programExecutable,
+              registrations: registrationsFor(programExecutable),
+            },
+          ],
+        }),
+      )(verify)
+    })
   })
 
   it.live(
@@ -510,20 +501,15 @@ describe("durable Agent Programs", () => {
       const memory = Effect.gen(function* () {
         const finalizersBefore = fixture.counts().childFinalizers
         yield* finishRun(yield* admit, finalizersBefore)
-      }).pipe(Effect.provide(Runtime.layerMemory(options)))
+      })
       const filename = tempDbPath("program-agent-map")
       let sqliteRunId = ""
       let sqliteFinalizersBefore = 0
       const sqliteAdmit = Effect.gen(function* () {
         sqliteFinalizersBefore = fixture.counts().childFinalizers
         sqliteRunId = yield* admit
-      }).pipe(Effect.provide(Runtime.layerSqlite({ ...options, filename })), Effect.scoped)
-      const sqliteReopen = Effect.suspend(() =>
-        finishRun(sqliteRunId, sqliteFinalizersBefore).pipe(
-          Effect.provide(Runtime.layerSqlite({ ...options, filename })),
-          Effect.scoped,
-        ),
-      )
+      })
+      const sqliteReopen = Effect.suspend(() => finishRun(sqliteRunId, sqliteFinalizersBefore))
       const cancelAdmitted = Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const store = yield* RunStore.RunStore
@@ -546,22 +532,18 @@ describe("durable Agent Programs", () => {
         })
         expect((yield* store.loadProgramState(receipt.runId))?.activeSlots).toBe(0)
       })
-      return memory.pipe(
-        Effect.andThen(sqliteAdmit),
-        Effect.andThen(sqliteReopen),
-        Effect.andThen(cancelAdmitted.pipe(Effect.provide(Runtime.layerMemory(options)))),
-        Effect.andThen(
-          cancelAdmitted.pipe(
-            Effect.provide(
-              Runtime.layerSqlite({
-                ...options,
-                filename: tempDbPath("program-agent-map-cancel"),
-              }),
-            ),
-            Effect.scoped,
-          ),
-        ),
-      )
+      return Effect.gen(function* () {
+        yield* scopedWith(Runtime.layerMemory(options))(memory)
+        yield* scopedWith(Runtime.layerSqlite({ ...options, filename }))(sqliteAdmit)
+        yield* scopedWith(Runtime.layerSqlite({ ...options, filename }))(sqliteReopen)
+        yield* scopedWith(Runtime.layerMemory(options))(cancelAdmitted)
+        yield* scopedWith(
+          Runtime.layerSqlite({
+            ...options,
+            filename: tempDbPath("program-agent-map-cancel"),
+          }),
+        )(cancelAdmitted)
+      })
     },
     15_000,
   )
