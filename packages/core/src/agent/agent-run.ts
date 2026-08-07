@@ -113,7 +113,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
         suspension: AgentSuspended,
-      ): Effect.Effect<Prompt.Prompt, RunError, DriverInterpreter> =>
+      ) =>
         Effect.gen(function* () {
           const withPending = yield* appendPending(turn, pending)
           const unresolved = unresolvedToolCall(withPending.content, suspension.tool_call_id)
@@ -167,7 +167,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
           )
           if (Option.isNone(activeSession)) yield* savePersisted(turn)
           return yield* Ref.get(chat.history)
-        }) as Effect.Effect<Prompt.Prompt, RunError>
+        })
       const checkpointPending = (
         turn: number,
         pending: ReadonlyArray<PendingToolResult>,
@@ -267,9 +267,9 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
                   cause: error,
                 }),
           ),
-        ) as Effect.Effect<void, AgentError | ToolNameCollision>
+        )
       if (validatedResume !== undefined)
-        yield* (Ref.get(chat.history) as Effect.Effect<Prompt.Prompt>).pipe(Effect.flatMap(restoreActivatedSkills))
+        yield* Ref.get(chat.history).pipe(Effect.flatMap(restoreActivatedSkills))
       const activeSession = Option.isSome(compactionService)
         ? sessionService
         : Option.none<typeof SessionStore.Service>()

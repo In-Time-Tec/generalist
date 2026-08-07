@@ -379,11 +379,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     turn: number,
     prompt: Prompt.Prompt,
     overflow: boolean,
-  ): Effect.Effect<
-    { readonly prompt: Prompt.Prompt; readonly changed: boolean },
-    RunError,
-    LanguageModel.LanguageModel | DriverInterpreter
-  > =>
+  ) =>
     Option.match(compactionService, {
       onNone: () => Effect.succeed({ prompt, changed: false }),
       onSome: (compaction) =>
