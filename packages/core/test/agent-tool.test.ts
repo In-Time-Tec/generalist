@@ -1,3 +1,5 @@
+import { HandoffCatalog } from "../src/policy/handoff-target.js"
+import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
 import { Context, Deferred, Effect, Exit, Fiber, Layer, Schedule, Schema, SchemaTransformation, Stream } from "effect"
@@ -30,7 +32,7 @@ const requirementChild = Agent.make({
 })
 const requirementChildTool = AgentTool.asTool(requirementChild)
 const agentToolRequirementProof: Assert<
-  Equal<AgentToolRequirements<typeof requirementChildTool>, LanguageModel.LanguageModel | Memory.Memory>
+  Equal<AgentToolRequirements<typeof requirementChildTool>, LanguageModel.LanguageModel | Memory.Memory | HandoffCatalog>
 > = true
 
 const modelLayer = (streamText: ModelParams["streamText"]) =>
@@ -90,7 +92,7 @@ const placementPrefixSchema = Schema.String.pipe(
   ),
 )
 
-layer(unusedToolHandlerLayer)("AgentTool", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, layerHandoffCatalogTest))("AgentTool", (it) => {
   expect(agentToolRequirementProof).toBe(true)
 
   it("exposes a stable schema-backed closed tool contract", () => {

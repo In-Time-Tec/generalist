@@ -1,3 +1,4 @@
+import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Ref, Schema, Stream } from "effect"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -49,7 +50,7 @@ const messageText = (message: Prompt.Message): string => {
 
 const unusedExecutor = ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool execution") })
 
-layer(unusedToolHandlerLayer)("Memory", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, layerHandoffCatalogTest))("Memory", (it) => {
   it("accepts only user-message parts as recalled item content", () => {
     expectTypeOf<Memory.ItemPart>().toEqualTypeOf<Prompt.UserMessagePart>()
     expectTypeOf<Prompt.ReasoningPart>().not.toExtend<Memory.ItemPart>()

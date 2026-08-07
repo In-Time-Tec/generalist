@@ -1,3 +1,4 @@
+import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Cause, Effect, Function, Layer, Schema, Scope, Stream } from "effect"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -650,7 +651,7 @@ const captureJournal = () => {
 }
 
 describe("DurableDriver Agent.stream integration", () => {
-  layer(makeToolCallModelLayer())(
+  layer(Layer.mergeAll(makeToolCallModelLayer(), layerHandoffCatalogTest))(
     "rejects a checkpoint with no executable identity for another standalone Agent",
     (suite) => {
       suite.effect("rejects a checkpoint with no executable identity for another standalone Agent", () =>
@@ -779,6 +780,7 @@ describe("DurableDriver Agent.stream integration", () => {
         }),
         journalLayer,
         unusedToolHandlerLayer,
+        layerHandoffCatalogTest,
       ),
     )("records model and tool operations through the driver journal seam", (suite) => {
       suite.effect("records model and tool operations through the driver journal seam", () =>
@@ -806,6 +808,7 @@ describe("DurableDriver Agent.stream integration", () => {
               }),
               journalLayer,
               unusedToolHandlerLayer,
+              layerHandoffCatalogTest,
             ),
             Agent.stream(agent, {
               prompt: "use echo",
@@ -1000,6 +1003,7 @@ describe("DurableDriver Agent.stream integration", () => {
       persistenceLayer,
       Agent.layerRuntime,
       unusedToolHandlerLayer,
+      layerHandoffCatalogTest,
     )
     layer(services)("binds suspension checkpoints to resume tokens", (suite) => {
       suite.effect("binds suspension checkpoints to resume tokens", () =>

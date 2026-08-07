@@ -24,7 +24,10 @@ import { resolvedToolResult, type SuspensionCheckpoint } from "./agent-suspensio
 import type { ResumeResolution, RunError } from "./agent.js"
 import type { Input } from "../turn/steering.js"
 import { applyPromptChain, errorMessage, providerOutputState } from "./agent-message.js"
-import type { ObjectSchema, RunLoopContext, StructuredRunConfig } from "./run-loop-context.js"
+type SchemaServices<S extends ObjectSchema> = [unknown] extends [S["DecodingServices"]] ? never : S["DecodingServices"]
+
+import type { ObjectSchema, RunLoopContext, StaticToolServices, StructuredRunConfig } from "./run-loop-context.js"
+import type { HandoffCatalog } from "../policy/handoff-target.js"
 import type { Request } from "../tools/tool-executor.js"
 import { select } from "../tools/tool-registry.js"
 import {
@@ -47,7 +50,11 @@ export const makeRunLoop = <
   StructuredOutputSchema extends ObjectSchema = ObjectSchema,
 >(
   context: RunLoopContext<Tools, R, StructuredOutputSchema>,
-): Stream.Stream<Event, RunError, R | StructuredOutputSchema["DecodingServices"]> => {
+): Stream.Stream<
+    Event,
+    RunError,
+    LanguageModel.LanguageModel | R | StaticToolServices<Tools> | SchemaServices<StructuredOutputSchema> | DriverInterpreter | HandoffCatalog
+  > => {
   const {
     agent,
     options,
@@ -84,7 +91,7 @@ export const makeRunLoop = <
   const structuredFinalEvents = (
     structuredTurn: number,
     config: StructuredRunConfig<StructuredOutputSchema>,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> =>
+  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | SchemaServices<StructuredOutputSchema> | DriverInterpreter> =>
     Stream.fromEffect(
       Effect.gen(function* () {
         const transformedPrompt = yield* applyPromptChain(chain, Prompt.make(config.objectPrompt), {
@@ -175,11 +182,7 @@ export const makeRunLoop = <
     turn: number,
   ): Effect.Effect<
     {
-      readonly events: Stream.Stream<
-        Event,
-        RunError,
-        LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]
-      >
+      readonly events: Stream.Stream<Event, RunError, LanguageModel.LanguageModel | SchemaServices<StructuredOutputSchema>>
       readonly next?: {
         readonly prompt: Prompt.RawInput
         readonly overrides?: TurnOverrides
@@ -314,7 +317,7 @@ export const makeRunLoop = <
     turn: number,
     prompt: Prompt.RawInput,
     overrides?: TurnOverrides,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> => {
+  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<Tools> | SchemaServices<StructuredOutputSchema> | DriverInterpreter | HandoffCatalog> => {
     let next:
       | {
           readonly prompt: Prompt.RawInput
@@ -356,7 +359,7 @@ export const makeRunLoop = <
   }
   const resumeStream = (
     checkpoint: SuspensionCheckpoint,
-  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | StructuredOutputSchema["DecodingServices"]> => {
+  ): Stream.Stream<Event, RunError, LanguageModel.LanguageModel | R | StaticToolServices<Tools> | SchemaServices<StructuredOutputSchema> | DriverInterpreter | HandoffCatalog> => {
     let next:
       | {
           readonly prompt: Prompt.RawInput
