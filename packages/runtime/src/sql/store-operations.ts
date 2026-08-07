@@ -1,9 +1,9 @@
-import { Clock, Effect, Random } from "effect"
+import { Clock, Effect, Random, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { RecordOperationInput } from "../run-store.js"
-import { decodeJson, encodeJson } from "./codecs.js"
+import { decodeJson, encodeJson, encodeJsonValue } from "./codecs.js"
 import { canBlindRetry } from "./operations.js"
 import type { OperationRow } from "./rows.js"
 import { appendEvent, loadRun, nowIso, toOperationRecord } from "./store-helpers.js"
@@ -72,7 +72,7 @@ export const recordOperation = (hub: EventHub, input: RecordOperationInput) =>
         result_json, error_json, replay_policy, attempt, started_at, finished_at
       ) VALUES (
         ${input.runId}, ${operationId}, ${input.operationKey}, ${input.kind}, 'requested',
-        ${input.inputDigest}, ${encodeJson(input.input)}, NULL, NULL, ${input.replayPolicy},
+        ${input.inputDigest}, ${encodeJsonValue(input.input)}, NULL, NULL, ${input.replayPolicy},
         ${input.attempt}, NULL, NULL
       )
     `
@@ -162,14 +162,14 @@ export const completeOperation = (
     if (input.outcome._tag === "Succeeded") {
       yield* sql`
         UPDATE baton_run_operations
-        SET status = 'succeeded', result_json = ${encodeJson(input.outcome.value)}, finished_at = ${finished}
+        SET status = 'succeeded', result_json = ${encodeJsonValue(input.outcome.value)}, finished_at = ${finished}
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
           AND status IN ('requested', 'running')
       `
     } else if (input.outcome._tag === "Failed") {
       yield* sql`
         UPDATE baton_run_operations
-        SET status = 'failed', error_json = ${encodeJson(input.outcome.error)}, finished_at = ${finished}
+        SET status = 'failed', error_json = ${encodeJsonValue(input.outcome.error)}, finished_at = ${finished}
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
           AND status IN ('requested', 'running')
       `
@@ -279,7 +279,7 @@ export const resolveOperation = (
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
     const row = rows[0]
-    const resolutionJson = encodeJson(input.resolution)
+    const resolutionJson = encodeJsonValue(input.resolution)
     const conflict = () =>
       OperationResolutionConflict.make({
         runId: input.runId,
@@ -302,13 +302,13 @@ export const resolveOperation = (
     const finished = yield* nowIso
     if (input.resolution._tag === "Succeeded") {
       yield* sql`
-        UPDATE baton_run_operations SET status = 'succeeded', result_json = ${encodeJson(input.resolution.value)},
+        UPDATE baton_run_operations SET status = 'succeeded', result_json = ${encodeJsonValue(input.resolution.value)},
           resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}, finished_at = ${finished}
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'unknown'
       `
     } else if (input.resolution._tag === "Failed") {
       yield* sql`
-        UPDATE baton_run_operations SET status = 'failed', error_json = ${encodeJson(input.resolution.error)},
+        UPDATE baton_run_operations SET status = 'failed', error_json = ${encodeJsonValue(input.resolution.error)},
           resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}, finished_at = ${finished}
         WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'unknown'
       `

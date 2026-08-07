@@ -16,7 +16,7 @@ import {
   type CommitProgramLogInput,
 } from "../program-store.js"
 import { StaleClaim } from "./errors.js"
-import { encodeJson } from "./codecs.js"
+import { encodeJson, encodeJsonValue } from "./codecs.js"
 import { admitFanOut } from "./store-fan-out.js"
 import { appendEvent, loadRun } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
@@ -150,7 +150,7 @@ export const reserveProgramOperation = (
         INSERT INTO baton_program_runs (
           run_id, program_pin, budget_json, deadline_millis, tool_calls, agent_runs, tokens, log_bytes, active_slots
         ) VALUES (
-          ${input.runId}, ${input.programPin}, ${encodeJson(input.budget)},
+          ${input.runId}, ${input.programPin}, ${encodeJsonValue(input.budget)},
           ${input.nowMillis + input.budget.wallClockMillis}, 0, 0, 0, 0, 0
         )
       `
@@ -194,7 +194,7 @@ export const reserveProgramOperation = (
         status, result_json, error_json, wait_id, fan_out_id, child_run_ids_json
       ) VALUES (
         ${input.runId}, ${input.operation}, ${input.kind}, ${input.capability}, ${input.inputDigest},
-        ${encodeJson(input.input)}, ${input.replay}, 'reserved', NULL, NULL, NULL, NULL, '[]'
+        ${encodeJsonValue(input.input)}, ${input.replay}, 'reserved', NULL, NULL, NULL, NULL, '[]'
       )
     `
     return yield* decodeOperation((yield* operationRows(input.runId, input.operation))[0]!)
@@ -224,8 +224,8 @@ export const settleProgramOperation = (hub: EventHub, input: SettleProgramOperat
     yield* sql`
       UPDATE baton_program_operations SET
         status = ${outcome._tag === "Succeeded" ? "succeeded" : outcome._tag === "Failed" ? "failed" : "unknown"},
-        result_json = ${outcome._tag === "Succeeded" ? encodeJson(outcome.value) : null},
-        error_json = ${outcome._tag === "Failed" ? encodeJson(outcome.error) : null}
+        result_json = ${outcome._tag === "Succeeded" ? encodeJsonValue(outcome.value) : null},
+        error_json = ${outcome._tag === "Failed" ? encodeJsonValue(outcome.error) : null}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operation}
         AND status IN ('reserved', 'running', 'waiting')
     `
@@ -269,13 +269,13 @@ export const resolveProgramOperation = (
       return yield* conflict()
     }
     if (run.status !== "needs-resolution" || row.status !== "unknown") return yield* conflict()
-    const resolutionJson = encodeJson(input.resolution)
+    const resolutionJson = encodeJsonValue(input.resolution)
     const status =
       input.resolution._tag === "Succeeded" ? "succeeded" : input.resolution._tag === "Failed" ? "failed" : "reserved"
     yield* sql`
       UPDATE baton_program_operations SET status = ${status},
-        result_json = ${input.resolution._tag === "Succeeded" ? encodeJson(input.resolution.value) : null},
-        error_json = ${input.resolution._tag === "Failed" ? encodeJson(input.resolution.error) : null},
+        result_json = ${input.resolution._tag === "Succeeded" ? encodeJsonValue(input.resolution.value) : null},
+        error_json = ${input.resolution._tag === "Failed" ? encodeJsonValue(input.resolution.error) : null},
         resolution_idempotency_key = ${input.idempotencyKey}, resolution_json = ${resolutionJson}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operationId} AND status = 'unknown'
     `
@@ -310,7 +310,7 @@ export const reconcileProgramCancellation = (runId: string, reason?: string) =>
     const sql = yield* SqlClient.SqlClient
     const failure = ProgramCapabilities.ProgramCancelled.make({ reason: reason ?? "Program Run cancelled" })
     yield* sql`
-      UPDATE baton_program_operations SET status = 'failed', error_json = ${encodeJson(failure)}
+      UPDATE baton_program_operations SET status = 'failed', error_json = ${encodeJsonValue(failure)}
       WHERE run_id = ${runId} AND status IN ('reserved', 'running', 'waiting')
     `
     yield* sql`UPDATE baton_program_runs SET active_slots = 0 WHERE run_id = ${runId}`
@@ -346,7 +346,7 @@ export const admitProgramAgents = (hub: EventHub, input: AdmitProgramAgentsInput
     const sql = yield* SqlClient.SqlClient
     yield* sql`
       UPDATE baton_program_operations SET status = 'waiting', wait_id = ${input.wait.waitId},
-        fan_out_id = ${receipt.fanOutId}, child_run_ids_json = ${encodeJson(receipt.childRunIds)}
+        fan_out_id = ${receipt.fanOutId}, child_run_ids_json = ${encodeJsonValue(receipt.childRunIds)}
       WHERE run_id = ${input.runId} AND operation_name = ${input.operation} AND status = 'reserved'
     `
     yield* suspendParent(hub, { ...input, checkpoint: { _tag: "Program", version: "1" } })

@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import { ProgramCapabilities, ProgramHost, SandboxExecutor } from "@batonfx/core"
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Schema, Stream, pipe } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Errors, ExecutableResolver, LocalScheduler, RunEvent, Runtime, RunStore } from "../src/index.js"
 import type { RunFailure as RunFailureType } from "../src/run-event.js"
@@ -71,7 +71,7 @@ const failedEvent = (error: RunFailureType) => ({
 
 it("round-trips every RunFailure variant through the durable RunEvent codec", () => {
   for (const failure of failures) {
-    const decoded = decodeEvent(encodeEvent(failedEvent(failure)))
+    const decoded = pipe(failedEvent(failure), encodeEvent, decodeEvent)
     expect(decoded._tag).toBe("RunFailed")
     if (decoded._tag !== "RunFailed") throw new Error("expected RunFailed")
     expect(decoded.error.constructor).toBe(failure.constructor)
@@ -100,7 +100,7 @@ it("round-trips the canonical ApprovalRequested identity and payload", () => {
       input: call.params,
     },
   }
-  const decoded = decodeEvent(encodeEvent(event))
+  const decoded = pipe(event, encodeEvent, decodeEvent)
   expect(decoded).toMatchObject({
     _tag: "ApprovalRequested",
     turn: 2,
@@ -114,12 +114,15 @@ it("round-trips the canonical ApprovalRequested identity and payload", () => {
 })
 
 it("rejects corrupted event payloads without fallback parsing", () => {
-  const encoded = JSON.parse(encodeEvent(failedEvent(failures[0]!))) as Record<string, unknown>
-  expect(() => decodeEvent(JSON.stringify({ ...encoded, sequence: -1 }))).toThrow()
+  const EventRecord = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
+  const encoded = Schema.decodeUnknownSync(EventRecord)(encodeEvent(failedEvent(failures[0]!)))
+  expect(() => decodeEvent(Schema.encodeSync(EventRecord)({ ...encoded, sequence: -1 }))).toThrow()
   expect(() =>
-    decodeEvent(JSON.stringify({ ...encoded, error: { _tag: "@batonfx/runtime/AgentExecutionFailure" } })),
+    decodeEvent(
+      Schema.encodeSync(EventRecord)({ ...encoded, error: { _tag: "@batonfx/runtime/AgentExecutionFailure" } }),
+    ),
   ).toThrow()
-  expect(() => decodeEvent(JSON.stringify({ ...encoded, _tag: "UnknownEvent" }))).toThrow()
+  expect(() => decodeEvent(Schema.encodeSync(EventRecord)({ ...encoded, _tag: "UnknownEvent" }))).toThrow()
 })
 
 it.live("keeps memory and SQLite failure history and inspection in parity", () => {

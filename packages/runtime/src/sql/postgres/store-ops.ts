@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import type { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
@@ -6,7 +6,7 @@ import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailab
 import { OperationResolution, digest as resolutionDigest } from "../../operation-resolution.js"
 import { isTerminal } from "../../run.js"
 import type { Interface as RunStoreInterface } from "../../run-store.js"
-import { decodeJson, encodeExecutableRef, encodeJson } from "../codecs.js"
+import { decodeJson, encodeExecutableRef, encodeJson, encodeJsonValue } from "../codecs.js"
 import { canBlindRetry } from "../operations.js"
 import type { DecodedRun, OperationRow } from "../rows.js"
 import type { EventHub } from "../subscribers.js"
@@ -97,7 +97,7 @@ export const postgresOperations = (input: {
               result_json, error_json, replay_policy, attempt, owner_worker_id, lease_expires_at, started_at, finished_at
             ) VALUES (
               ${op.runId}, ${operationId}, ${op.operationKey}, ${op.kind}, 'requested',
-              ${op.inputDigest}, ${encodeJson(op.input)}, NULL, NULL, ${op.replayPolicy},
+              ${op.inputDigest}, ${encodeJsonValue(op.input)}, NULL, NULL, ${op.replayPolicy},
               ${op.attempt}, NULL, NULL, NULL, NULL
             )
           `
@@ -185,14 +185,14 @@ export const postgresOperations = (input: {
           if (op.outcome._tag === "Succeeded") {
             yield* sql`
               UPDATE baton_run_operations
-              SET status = 'succeeded', result_json = ${encodeJson(op.outcome.value)}, finished_at = NOW()
+              SET status = 'succeeded', result_json = ${encodeJsonValue(op.outcome.value)}, finished_at = NOW()
               WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
                 AND status IN ('requested', 'running')
             `
           } else if (op.outcome._tag === "Failed") {
             yield* sql`
               UPDATE baton_run_operations
-              SET status = 'failed', error_json = ${encodeJson(op.outcome.error)}, finished_at = NOW()
+              SET status = 'failed', error_json = ${encodeJsonValue(op.outcome.error)}, finished_at = NOW()
               WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
                 AND status IN ('requested', 'running')
             `
@@ -298,7 +298,7 @@ export const postgresOperations = (input: {
             FOR UPDATE
           `
           const row = rows[0]
-          const resolutionJson = encodeJson(op.resolution)
+          const resolutionJson = encodeJsonValue(op.resolution)
           const conflict = () =>
             OperationResolutionConflict.make({
               runId: op.runId,
@@ -320,14 +320,14 @@ export const postgresOperations = (input: {
           if (loaded.status !== "needs-resolution" || row.status !== "unknown") return yield* conflict()
           if (op.resolution._tag === "Succeeded") {
             yield* sql`
-              UPDATE baton_run_operations SET status = 'succeeded', result_json = ${encodeJson(op.resolution.value)},
+              UPDATE baton_run_operations SET status = 'succeeded', result_json = ${encodeJsonValue(op.resolution.value)},
                 resolution_idempotency_key = ${op.idempotencyKey}, resolution_json = ${resolutionJson},
                 owner_worker_id = NULL, lease_expires_at = NULL, finished_at = NOW()
               WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'unknown'
             `
           } else if (op.resolution._tag === "Failed") {
             yield* sql`
-              UPDATE baton_run_operations SET status = 'failed', error_json = ${encodeJson(op.resolution.error)},
+              UPDATE baton_run_operations SET status = 'failed', error_json = ${encodeJsonValue(op.resolution.error)},
                 resolution_idempotency_key = ${op.idempotencyKey}, resolution_json = ${resolutionJson},
                 owner_worker_id = NULL, lease_expires_at = NULL, finished_at = NOW()
               WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'unknown'

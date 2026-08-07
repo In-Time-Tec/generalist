@@ -38,18 +38,17 @@ const admitRun = (
     ),
   )
 
-const freePort = Effect.tryPromise({
-  try: () =>
-    new Promise<number>((resolve, reject) => {
-      const server = createServer()
-      server.once("error", reject)
-      server.listen(0, "127.0.0.1", () => {
-        const address = server.address()
-        const port = typeof address === "object" && address !== null ? address.port : 0
-        server.close(() => resolve(port))
-      })
-    }),
-  catch: (error) => TransportTestError.make({ message: `could not allocate a test port: ${String(error)}` }),
+const freePort = Effect.callback<number, TransportTestError>((resume) => {
+  const server = createServer()
+  server.once("error", (error) => {
+    server.close()
+    resume(Effect.fail(TransportTestError.make({ message: `could not allocate a test port: ${String(error)}` })))
+  })
+  server.listen(0, "127.0.0.1", () => {
+    const address = server.address()
+    const port = typeof address === "object" && address !== null ? address.port : 0
+    server.close(() => resume(Effect.succeed(port)))
+  })
 })
 
 const startServer = (port: number) =>
@@ -65,22 +64,21 @@ const startServer = (port: number) =>
     stderr: "inherit",
   })
 
-const probePort = (port: number) =>
-  Effect.tryPromise({
-    try: () =>
-      new Promise<void>((resolve, reject) => {
-        const socket = connect({ port, host: "127.0.0.1" })
-        socket.once("connect", () => {
-          socket.destroy()
-          resolve()
-        })
-        socket.once("error", (error) => {
-          socket.destroy()
-          reject(error)
-        })
-      }),
-    catch: (error) =>
-      TransportTestError.make({ message: `server on port ${port} did not accept a connection: ${String(error)}` }),
+const probePort = (port: number): Effect.Effect<void, TransportTestError> =>
+  Effect.callback<void, TransportTestError>((resume) => {
+    const socket = connect({ port, host: "127.0.0.1" })
+    socket.once("connect", () => {
+      socket.destroy()
+      resume(Effect.void)
+    })
+    socket.once("error", (error) => {
+      socket.destroy()
+      resume(
+        Effect.fail(
+          TransportTestError.make({ message: `server on port ${port} did not accept a connection: ${String(error)}` }),
+        ),
+      )
+    })
   })
 
 const waitForServerReady = (port: number, attempts: number): Effect.Effect<void, TransportTestError> =>

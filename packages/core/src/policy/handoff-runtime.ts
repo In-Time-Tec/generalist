@@ -138,13 +138,10 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
           reason: "Pinned handoff requires an executable closure and exact target Agent pin",
         })
       }
-      const validationFailure = yield* Effect.try({
+      yield* Effect.try({
         try: () => validateRef(pinnedRef, pinnedManifest),
-        catch: (error) => error,
-      }).pipe(Effect.flip, Effect.option)
-      if (Option.isSome(validationFailure)) {
-        return yield* HandoffRejected.make({ handoffId, turn: input.turn, reason: String(validationFailure.value) })
-      }
+        catch: (error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: String(error) }),
+      })
       if (!pinnedManifest.entries.some((entry) => entry._tag === "Agent" && entry.pin === resolved.pin)) {
         return yield* HandoffRejected.make({
           handoffId,
