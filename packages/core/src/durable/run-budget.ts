@@ -238,7 +238,7 @@ export const reserveChild: {
     RunBudgetExhausted | RunBudgetGrantWidened
   > =>
     Effect.gen(function* () {
-      grant = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(grant).pipe(
+      const validatedGrant = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(grant).pipe(
         Effect.mapError((error) =>
           RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message }),
         ),
@@ -259,7 +259,7 @@ export const reserveChild: {
           remaining: parent.remaining.childRuns,
         })
       }
-      const reserved = yield* subtractLimits(parent.remaining, grant)
+      const reserved = yield* subtractLimits(parent.remaining, validatedGrant)
       const childRunsRemaining =
         parent.remaining.childRuns === undefined
           ? undefined
@@ -273,8 +273,8 @@ export const reserveChild: {
           },
         },
         child: {
-          allocation: grant,
-          remaining: { ...grant },
+          allocation: validatedGrant,
+          remaining: { ...validatedGrant },
           depth: childDepth,
         },
       }
@@ -325,13 +325,15 @@ export const narrowChild: {
     narrower: BudgetLimits,
   ): Effect.Effect<{ readonly parent: RunBudget; readonly child: RunBudget }, RunBudgetGrantWidened> =>
     Effect.gen(function* () {
-      narrower = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(narrower).pipe(
+      const validatedNarrower = yield* Schema.decodeUnknownEffect(BudgetLimits, { onExcessProperty: "error" })(
+        narrower,
+      ).pipe(
         Effect.mapError((error) =>
           RunBudgetGrantWidened.make({ dimension: "modelCalls", grant: 0, remaining: 0, message: error.message }),
         ),
       )
       for (const dimension of [...chargeDimensions, "childRuns", "depth"] as const) {
-        const next = narrower[dimension]
+        const next = validatedNarrower[dimension]
         if (next === undefined) continue
         const current = child.allocation[dimension]
         if (current !== undefined && next > current) {
@@ -342,7 +344,7 @@ export const narrowChild: {
           })
         }
       }
-      const refunded = allocationRefund(child.allocation, narrower)
+      const refunded = allocationRefund(child.allocation, validatedNarrower)
       return {
         parent: { ...parent, remaining: mergeRemaining(parent.remaining, refunded) },
         child: {

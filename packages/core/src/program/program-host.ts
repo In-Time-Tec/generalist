@@ -426,14 +426,14 @@ export const layerDirect = (options: {
             return yield* ProgramIdentityMismatch.make({ expected: request.program.pin, actual: actualPin })
           yield* validateBindings(request.program, options.bindings)
           const capabilities = yield* makeCapabilities(options.bindings, request.program.manifest.budget)
-          const controller = new AbortController()
+          const signal = yield* Effect.abortSignal
           const execution = options.sandbox
             .execute({
               language: "javascript",
               source: request.program.manifest.source.text,
               sourceDigest: digest(request.program.manifest.source.text),
               input: request.input,
-              signal: controller.signal,
+              signal,
               limits: {
                 wallTimeMillis: request.program.manifest.budget.wallClockMillis,
                 outputBytes: request.program.manifest.budget.outputBytes,
@@ -451,7 +451,6 @@ export const layerDirect = (options: {
                   }),
                 ),
             }),
-            Effect.onInterrupt(() => Effect.sync(() => controller.abort())),
           )
           const bytes = yield* encodedBytes(output)
           if (bytes > request.program.manifest.budget.outputBytes)

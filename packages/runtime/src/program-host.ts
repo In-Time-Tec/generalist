@@ -459,14 +459,14 @@ export const make = (input: {
           return yield* ProgramHost.ProgramIdentityMismatch.make({ expected: request.program.pin, actual: actual.pin })
         yield* ProgramHost.validateBindings(request.program, input.bindings)
         const capabilities = makeCapabilities(request.program)
-        const controller = new AbortController()
+        const signal = yield* Effect.abortSignal
         const execution = input.sandbox
           .execute({
             language: "javascript",
             source: request.program.manifest.source.text,
             sourceDigest: yield* digest(request.program.manifest.source.text, "program-output", "source"),
             input: request.input,
-            signal: controller.signal,
+            signal,
             limits: {
               wallTimeMillis: request.program.manifest.budget.wallClockMillis,
               outputBytes: request.program.manifest.budget.outputBytes,
@@ -474,7 +474,6 @@ export const make = (input: {
           })
           .pipe(Effect.provideService(ProgramCapabilities.ProgramCapabilities, capabilities))
         const output = yield* execution.pipe(
-          Effect.ensuring(Effect.sync(() => controller.abort())),
           Effect.timeoutOrElse({
             duration: request.program.manifest.budget.wallClockMillis,
             orElse: () =>
