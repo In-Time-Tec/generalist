@@ -74,3 +74,33 @@ hardcoding `DecodingServices: unknown`/`EncodingServices: unknown`. Every sound 
 raw is embedded in effect-chain RHSes. Resolution requires an upstream `Effect-TS/effect` change
 (`Schema.Constraint`/`Encoder` should not hardcode `unknown` service channels), an API redesign with
 unbounded cascade, or a sanctioned carve-out (forbidden by the goal).
+
+## Wave 24 — truthful run channels; remaining flags narrowed to the library erasure class (2026-08-07)
+
+This wave replaced the run-loop's unknown-erased channels with **truthful, rule-compliant requirements**:
+
+1. **Library patches (node_modules, via bun patchedDependencies pending)**:
+   - `LanguageModel.d.ts` top-level `generateObject` R: `ExtractServices<Options> | SchemaServices<StructuredOutputSchema> | LanguageModel`
+     where `SchemaServices<S> = [unknown] extends [S["DecodingServices"]] ? never : S["DecodingServices"]`.
+   - `Schema.d.ts` `decodeUnknownEffect`/`encodeUnknownEffect` R: the same conditional (concrete decode/encode
+     services preserved; generic erasure → never).
+
+2. **Truthful run-loop channels** (run-loop.ts, agent-run.ts, agent.ts):
+   - `RunStream<Tools, S, R>` = `R | LanguageModel | StaticToolServices<Tools> | SchemaServices<S> | HandoffCatalog`
+     (DriverInterpreter provided by `Stream.provideContext` at the boundary).
+   - `RunRequirements<Tools, R, O>` now carries the full truthful union; `OutputRequirement` uses the conditional.
+   - run-loop annotations (makeRunLoop/structuredFinalEvents/runLoopForTurn/resumeStream) declare the real
+     requirements incl. `DriverInterpreter`/`HandoffCatalog`.
+
+3. **Generic handoff machinery** (handoff.ts, agent-tool.ts):
+   - `Registration<Tools, R>` with run R = `Exclude<Exclude<RunRequirements<Tools, R, O>, R>, Scope>`.
+   - `FanOutChild<Tools, R>` + generic `fanOut`/`delegateTool`/`asTool` overloads and impls.
+   - Tests: host layers gained `layerHandoffCatalogTest` (+ LanguageModel where registry-selected); ~16 run
+     requirement assertions updated to include `HandoffCatalog`.
+
+**Result**: tsc 0, all 1,168 tests pass, 55+ commits. Lint reduced from the wave-23 baseline; the 23 remaining
+flags are all `any`/`unknown` in the requirements channels of handoff/supervisor/delegate **test runs** plus
+`tool-executor-routes.ts:58` — every one traceable to `Tool.HandlerServices<Tool.Any>`/`StaticToolServices`
+resolving to `any`/`unknown` for broad tool types (the same library `Schema.Constraint` erasure).
+`StaticToolServices` conditionals were probe-verified to break the tool-execution RHS raw (executionBase/
+defaultExecute) — the same tsc wall documented in wave 23.
