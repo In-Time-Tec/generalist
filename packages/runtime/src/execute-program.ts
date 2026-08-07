@@ -26,9 +26,12 @@ export const executeProgram = (input: {
   const scopedExecution = Effect.scoped(
     resolution.services === undefined
       ? execution
-      : Effect.flatMap(Layer.build(Layer.fresh(resolution.services)), (services) =>
-          execution.pipe(Effect.provideContext(services)),
-        ),
+      : Effect.scopedWith((scope) => {
+          const servicesLayer = resolution.services as Layer.Layer<never, never, never>
+          return Effect.flatMap(Layer.buildWithScope(Layer.fresh(servicesLayer), scope), (services) =>
+            execution.pipe(Effect.provideContext(services)),
+          )
+        }),
   )
   return scopedExecution.pipe(
     Effect.flatMap((value) =>
