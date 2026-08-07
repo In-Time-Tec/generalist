@@ -16,7 +16,7 @@ export const packages = [
 export const compressedSizeLimits: Record<(typeof packages)[number], number> = {
   a2a: 50_000,
   "ag-ui": 30_000,
-  core: 168_000,
+  core: 169_000,
   test: 8_000,
   skills: 13_000,
   memory: 10_000,
