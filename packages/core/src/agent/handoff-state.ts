@@ -38,8 +38,7 @@ export const HandoffControlState = Schema.Struct({
 
 export type HandoffControlState = typeof HandoffControlState.Type
 
-export const HandoffCommit = Schema.Struct({
-  _tag: Schema.Literal("HandoffCommit"),
+export const HandoffCommit = Schema.TaggedStruct("HandoffCommit", {
   state: HandoffControlState,
   transcript: Prompt.Prompt,
   targetAgentPin: Schema.optionalKey(AgentPin),
@@ -166,8 +165,7 @@ export class HandoffRequirementsMissing extends Schema.TaggedErrorClass<HandoffR
   { target: Schema.String, message: Schema.String, turn: Schema.Finite },
 ) {}
 
-export const HandoffAccepted = Schema.Struct({
-  _tag: Schema.Literal("HandoffAccepted"),
+export const HandoffAccepted = Schema.TaggedStruct("HandoffAccepted", {
   handoffId: Schema.String,
   source: Schema.String,
   target: Schema.String,

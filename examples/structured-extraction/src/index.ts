@@ -3,7 +3,7 @@ import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecuto
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
-const invoiceSchema = Schema.Struct({ total: Schema.Number, currency: Schema.String })
+const invoiceSchema = Schema.Struct({ total: Schema.Finite, currency: Schema.String })
 
 const modelLayer = (
   streamText: ModelParams["streamText"],

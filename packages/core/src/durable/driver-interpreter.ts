@@ -55,7 +55,7 @@ export interface DriverJournal {
   readonly onScheduled: (
     operation: DriverOperation,
     checkpoint: DriverCheckpoint,
-  ) => Effect.Effect<OperationOutcome | undefined>
+  ) => Effect.Effect<OperationOutcome | void>
   readonly onCompleted: (
     operation: DriverOperation,
     outcome: OperationOutcome,
@@ -112,7 +112,7 @@ export class DriverInterpreter extends Context.Service<DriverInterpreter, Interf
 ) {}
 
 const noopJournal: DriverJournal = {
-  onScheduled: () => Effect.succeed(undefined),
+  onScheduled: () => Effect.void,
   onCompleted: () => Effect.void,
   onCheckpoint: () => Effect.void,
 }

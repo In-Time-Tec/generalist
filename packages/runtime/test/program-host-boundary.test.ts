@@ -52,8 +52,8 @@ const makeFixture = (
       ProgramBindings.tool({
         name: "echo",
         pin: program.pinned.manifest.capabilities.tools[0]!.pin,
-        input: Schema.Struct({ value: Schema.Number }),
-        output: Schema.Struct({ value: Schema.Number }),
+        input: Schema.Struct({ value: Schema.Finite }),
+        output: Schema.Struct({ value: Schema.Finite }),
         replay: "recorded",
         authorize: () => Effect.succeed(true),
         execute: () => Effect.succeed((options?.toolOutput ?? { value: 1 }) as { value: number }),

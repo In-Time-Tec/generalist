@@ -87,7 +87,7 @@ export class ProgramBudgetExhausted extends Schema.TaggedErrorClass<ProgramBudge
       "logBytes",
       "outputBytes",
     ]),
-    limit: Schema.Number,
+    limit: Schema.Finite,
   },
 ) {}
 

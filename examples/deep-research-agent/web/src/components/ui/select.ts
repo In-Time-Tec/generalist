@@ -8,14 +8,14 @@ import { cn } from "@/lib/utils"
 // MODEL
 
 export { Model, Orientation, init }
-export type SelectModel = typeof Model.Type
-export type SelectOrientation = typeof Orientation.Type
+export type SelectModel = Model
+export type SelectOrientation = Orientation
 export type { AnchorConfig, InitConfig }
 
 // MESSAGE
 
 export { Message, OutMessage, Selected }
-export type SelectMessage = typeof Message.Type
+export type SelectMessage = Message
 export type SelectSelected<Value extends string = string> = Readonly<{
   readonly _tag: "Selected"
   readonly value: Value

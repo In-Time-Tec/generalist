@@ -68,8 +68,7 @@ const subtractFinite = (
   amount: number,
   dimension: RunBudgetExhausted["dimension"],
 ): Effect.Effect<number | undefined, RunBudgetExhausted> => {
-  if (amount === 0) return Effect.succeed(remaining)
-  if (remaining === undefined) return Effect.succeed(undefined)
+  if (amount === 0 || remaining === undefined) return Effect.succeed(remaining)
   if (amount > remaining) {
     return Effect.fail(
       RunBudgetExhausted.make({

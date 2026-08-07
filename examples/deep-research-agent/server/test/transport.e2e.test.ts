@@ -49,7 +49,7 @@ const freePort = Effect.tryPromise({
         server.close(() => resolve(port))
       })
     }),
-  catch: (error) => new TransportTestError({ message: `could not allocate a test port: ${String(error)}` }),
+  catch: (error) => TransportTestError.make({ message: `could not allocate a test port: ${String(error)}` }),
 })
 
 const startServer = (port: number) =>
@@ -80,7 +80,7 @@ const probePort = (port: number) =>
         })
       }),
     catch: (error) =>
-      new TransportTestError({ message: `server on port ${port} did not accept a connection: ${String(error)}` }),
+      TransportTestError.make({ message: `server on port ${port} did not accept a connection: ${String(error)}` }),
   })
 
 const waitForServerReady = (port: number, attempts: number): Effect.Effect<void, TransportTestError> =>

@@ -227,7 +227,7 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
           .pipe(
             Effect.catch(
               (cause): Effect.Effect<never, ProgramSuspended | ProgramCancelled | ProgramAgentFailure> =>
-                cause instanceof ProgramSuspended || cause instanceof ProgramCancelled
+                Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
                   ? Effect.fail(cause)
                   : Effect.fail(ProgramAgentFailure.make({ selection, operation, cause })),
             ),
@@ -257,7 +257,7 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
           .pipe(
             Effect.catch(
               (cause): Effect.Effect<never, ProgramSuspended | ProgramCancelled | ProgramToolFailure> =>
-                cause instanceof ProgramSuspended || cause instanceof ProgramCancelled
+                Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
                   ? Effect.fail(cause)
                   : Effect.fail(ProgramToolFailure.make({ tool: input.tool, operation: input.operation, cause })),
             ),
@@ -284,7 +284,7 @@ const makeCapabilities = (bindings: Bindings, budget: ProgramBudget) =>
           .pipe(
             Effect.catch(
               (cause): Effect.Effect<never, ProgramSuspended | ProgramCancelled | ProgramStepFailure> =>
-                cause instanceof ProgramSuspended || cause instanceof ProgramCancelled
+                Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
                   ? Effect.fail(cause)
                   : Effect.fail(ProgramStepFailure.make({ step: input.step, operation: input.operation, cause })),
             ),

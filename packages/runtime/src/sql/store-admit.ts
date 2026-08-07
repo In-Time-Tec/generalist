@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import {
   AddressNotFound,
@@ -293,7 +293,7 @@ export const admitStart = (hub: EventHub, input: AdmitStartInput) =>
       })
       const receipt = yield* admitSpawn(hub, { ...child, parentRunId: runId, message }).pipe(
         Effect.mapError((error) =>
-          error instanceof RunNotFound || error instanceof RunTerminal
+          Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
             ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial child admission" })
             : error,
         ),

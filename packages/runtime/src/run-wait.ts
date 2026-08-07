@@ -33,7 +33,7 @@ export const RunWait = Schema.Struct({
 export type RunWait = typeof RunWait.Type
 
 /** @experimental Construct the approval reason shared by Runtime producers and controls. */
-export const approvalReason = (request: typeof ApprovalRequest.Type): WaitReason => ({
+export const approvalReason = (request: ApprovalRequest): WaitReason => ({
   _tag: "Approval",
   request,
 })

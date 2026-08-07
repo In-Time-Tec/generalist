@@ -243,8 +243,7 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
                     ? store.inspect(runId)
                     : store
                         .complete({ ...claim, result: completedResult("race") })
-                        .pipe(Effect.orDie)
-                        .pipe(Effect.andThen(store.inspect(runId))),
+                        .pipe(Effect.orDie, Effect.andThen(store.inspect(runId))),
                 ),
               ),
       })

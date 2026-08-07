@@ -332,7 +332,7 @@ describe("Compaction", () => {
             ? Option.some({ head: [path[0]!], recent: [path[1]!], firstKeptEntryId: "1" })
             : Option.none()
         },
-        summarize: () => Effect.fail(new Compaction.CompactionError({ message: "summary failed" })),
+        summarize: () => Effect.fail(Compaction.CompactionError.make({ message: "summary failed" })),
       })
       const request = {
         compactionId: "failed-overflow",

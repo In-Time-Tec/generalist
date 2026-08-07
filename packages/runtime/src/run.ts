@@ -53,10 +53,10 @@ export const RunReceipt: Schema.Codec<RunReceipt, RunReceiptEncoded> = Schema.St
 export interface RunInspection {
   readonly runId: RunId
   readonly status: RunStatus
-  readonly executableRef: typeof ExecutableRef.Type
-  readonly executableManifest: typeof ExecutableManifest.Type
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly parentRunId?: RunId
-  readonly wait?: typeof RunWait.Type
+  readonly wait?: RunWait
   readonly lastSequence: number
   readonly durability: "ephemeral" | "durable"
 }
@@ -96,11 +96,11 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
 )
 
 export type RunFailure =
-  | typeof AgentExecutionFailure.Type
-  | typeof ExecutablePinMissing.Type
-  | typeof ExecutableIdentityMismatch.Type
-  | typeof ExecutableRegistrationInvalid.Type
-  | typeof ExecutableRegistrationMissing.Type
+  | AgentExecutionFailure
+  | ExecutablePinMissing
+  | ExecutableIdentityMismatch
+  | ExecutableRegistrationInvalid
+  | ExecutableRegistrationMissing
   | ProgramHost.ExecutionFailure
 
 export const RunFailure: Schema.Codec<RunFailure, unknown> = Schema.Union([
@@ -261,7 +261,7 @@ export const CompactionInspection: Schema.Codec<CompactionInspection, Compaction
 
 export interface RunSnapshot {
   readonly run: RunInspection
-  readonly cursor: typeof Cursor.Type
+  readonly cursor: Cursor
   readonly outcome?: RunOutcome
   readonly usage: ReadonlyArray<RawUsageFact>
   readonly compactions: ReadonlyArray<CompactionInspection>
@@ -286,13 +286,13 @@ export const RunSnapshot: Schema.Codec<RunSnapshot, RunSnapshotEncoded> = Schema
 export interface Run {
   readonly runId: RunId
   readonly status: RunStatus
-  readonly executableRef: typeof ExecutableRef.Type
-  readonly executableManifest: typeof ExecutableManifest.Type
+  readonly executableRef: ExecutableRef
+  readonly executableManifest: ExecutableManifest
   readonly messageId: string
   readonly sessionId: string
   readonly rootRunId: RunId
   readonly parentRunId?: RunId
-  readonly wait?: typeof RunWait.Type
+  readonly wait?: RunWait
   readonly lastSequence: number
   readonly attempt: number
 }

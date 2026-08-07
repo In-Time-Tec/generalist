@@ -133,14 +133,14 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
           const invocationPath =
             handoffState === undefined ? undefined : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
           const activatedSkills = [...(yield* Ref.get(toolState)).activatedSkillBodies.keys()]
-          return yield* Effect.fail(
-            suspended(call, toolCallBatch, toolCallIndex, outcome.token, "tool-wait", {
+          return yield* suspended(
+            call, toolCallBatch, toolCallIndex, outcome.token, "tool-wait", {
               active_tools: registry.entries.map((entry) => entry.tool.name),
               activated_skills: activatedSkills,
               ...(invocationPath === undefined || invocationPath.length === 0
                 ? {}
                 : { invocation_path: invocationPath }),
-            }),
+            },
           )
         })
     }
@@ -404,22 +404,20 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
                         handoffState === undefined
                           ? undefined
                           : (yield* Ref.get(handoffState)).path.map((frame) => frame.handoffId)
-                      return yield* Effect.fail(
-                        AgentSuspended.make({
-                          token: decision.suspension.token,
-                          reason: "approval",
-                          tool_call_index: toolCallIndex,
-                          tool_call_id: call.id,
-                          tool_name: call.name,
-                          tool_params: call.params,
-                          tool_call_batch: toolCallBatch.calls.map(canonicalSuspensionCall),
-                          active_tools: activeTools,
-                          activated_skills: activatedSkills,
-                          ...(invocationPath === undefined || invocationPath.length === 0
-                            ? {}
-                            : { invocation_path: invocationPath }),
-                        }),
-                      )
+                      return yield* AgentSuspended.make({
+                        token: decision.suspension.token,
+                        reason: "approval",
+                        tool_call_index: toolCallIndex,
+                        tool_call_id: call.id,
+                        tool_name: call.name,
+                        tool_params: call.params,
+                        tool_call_batch: toolCallBatch.calls.map(canonicalSuspensionCall),
+                        active_tools: activeTools,
+                        activated_skills: activatedSkills,
+                        ...(invocationPath === undefined || invocationPath.length === 0
+                          ? {}
+                          : { invocation_path: invocationPath }),
+                      })
                     }),
                   )
               }

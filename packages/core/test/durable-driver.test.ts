@@ -827,7 +827,7 @@ describe("DurableDriver Agent.stream integration", () => {
         driver,
         initial,
         journal: {
-          onScheduled: () => Effect.succeed(undefined),
+          onScheduled: () => Effect.void,
           onCompleted: (_operation, outcome) =>
             Effect.sync(() => lifecycle.push(outcome._tag === "Unknown" ? "unknown persisted" : outcome._tag)),
           onCheckpoint: () => Effect.void,
@@ -863,7 +863,7 @@ describe("DurableDriver Agent.stream integration", () => {
         driver,
         initial,
         journal: {
-          onScheduled: () => Effect.succeed(undefined),
+          onScheduled: () => Effect.void,
           onCompleted: (_operation, outcome) => Effect.sync(() => outcomes.push(outcome)),
           onCheckpoint: () => Effect.void,
         },
@@ -928,7 +928,7 @@ describe("DurableDriver Agent.stream integration", () => {
         driver,
         initial,
         journal: {
-          onScheduled: () => Effect.succeed(undefined),
+          onScheduled: () => Effect.void,
           onCompleted: (_operation, outcome) => Effect.sync(() => lifecycle.push(outcome._tag)),
           onCheckpoint: () => Effect.void,
         },

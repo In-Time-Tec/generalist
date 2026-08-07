@@ -137,7 +137,7 @@ export const TrackViewportScroll = defineStream(
 )(
   (element) =>
     /* v8 ignore start -- Mount stream body (scroll addEventListener closure) only runs against a live element in a browser runtime; the scene harness intercepts Mounts via Scene.Mount.resolve */
-    Stream.callback<typeof ScrolledViewport.Type>((queue) =>
+    Stream.callback<ScrolledViewport>((queue) =>
       Effect.gen(function* () {
         yield* Effect.acquireRelease(
           Effect.sync(() => {
@@ -173,7 +173,7 @@ export const ObserveContentGrowth = defineStream(
 )(
   (element) =>
     /* v8 ignore start -- Mount stream body (ResizeObserver closure) only runs against a live element in a browser runtime; the scene harness intercepts Mounts via Scene.Mount.resolve */
-    Stream.callback<typeof GrewContent.Type>((queue) =>
+    Stream.callback<GrewContent>((queue) =>
       Effect.gen(function* () {
         yield* Effect.acquireRelease(
           Effect.sync(() => {

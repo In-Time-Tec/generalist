@@ -12,8 +12,8 @@ import {
 import { Deferred, Effect, Fiber, Schema } from "effect"
 import { expect } from "vitest"
 
-const Input = Schema.Struct({ value: Schema.Number })
-const Output = Schema.Struct({ value: Schema.Number })
+const Input = Schema.Struct({ value: Schema.Finite })
+const Output = Schema.Struct({ value: Schema.Finite })
 const inputPin = Pins.makeCapability({ schema: "program-input", version: 2 })
 const outputPin = Pins.makeCapability({ schema: "program-output", version: 2 })
 const toolPin = Pins.makeCapability({ tool: "increment", version: 2 })
@@ -73,8 +73,8 @@ const incrementTool = (
   ProgramBindings.tool({
     name: "increment",
     pin: toolPin,
-    input: Schema.Number,
-    output: Schema.Number,
+    input: Schema.Finite,
+    output: Schema.Finite,
     replay: "idempotent",
     authorize: overrides.authorize ?? allow,
     execute: overrides.execute ?? ((value: number): Effect.Effect<number, unknown> => Effect.succeed(value + 1)),
@@ -111,8 +111,8 @@ const bindings = (options?: { readonly toolOutput?: number; readonly agentDelay?
       ProgramBindings.step({
         name: "double",
         pin: stepPin,
-        input: Schema.Number,
-        output: Schema.Number,
+        input: Schema.Finite,
+        output: Schema.Finite,
         replay: "recorded",
         authorize: allow,
         execute: (value) => Effect.succeed(value * 2),

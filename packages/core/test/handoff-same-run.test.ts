@@ -66,7 +66,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
     let handoffCommit: Handoff.HandoffCommit | undefined
     let calls = 0
     const journal = Layer.succeed(DurableDriver.DriverJournalService, {
-      onScheduled: () => Effect.succeed(undefined),
+      onScheduled: () => Effect.void,
       onCompleted: (
         operation: DurableDriver.DriverOperation,
         outcome: DurableDriver.OperationOutcome,
@@ -166,7 +166,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         Approvals.layerAutoApprove,
         ModelMiddleware.layerIdentity,
         Layer.succeed(DurableDriver.DriverJournalService, {
-          onScheduled: () => Effect.succeed(undefined),
+          onScheduled: () => Effect.void,
           onCompleted: (operation: DurableDriver.DriverOperation) =>
             Effect.sync(() => {
               if (operation.kind === "handoff") {

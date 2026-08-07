@@ -13,13 +13,13 @@ const program = Effect.gen(function* () {
   const server = yield* Effect.acquireRelease(
     Effect.tryPromise({
       try: () => createServer({ configFile: false, server: { middlewareMode: true }, appType: "custom" }),
-      catch: (error) => new LlmsGenerationError({ message: String(error) }),
+      catch: (error) => LlmsGenerationError.make({ message: String(error) }),
     }),
     (acquiredServer) => Effect.tryPromise(() => acquiredServer.close()).pipe(Effect.ignore),
   )
   const registry = yield* Effect.tryPromise({
     try: () => server.ssrLoadModule("/src/content/registry.ts"),
-    catch: (error) => new LlmsGenerationError({ message: String(error) }),
+    catch: (error) => LlmsGenerationError.make({ message: String(error) }),
   })
   if (typeof registry.llmsIndex !== "function" || typeof registry.llmsFull !== "function") {
     return yield* LlmsGenerationError.make({ message: "docs registry does not export llmsIndex and llmsFull" })
@@ -27,11 +27,11 @@ const program = Effect.gen(function* () {
   const [index, full] = yield* Effect.all([
     Effect.try({
       try: () => String(registry.llmsIndex()),
-      catch: (error) => new LlmsGenerationError({ message: String(error) }),
+      catch: (error) => LlmsGenerationError.make({ message: String(error) }),
     }),
     Effect.try({
       try: () => String(registry.llmsFull()),
-      catch: (error) => new LlmsGenerationError({ message: String(error) }),
+      catch: (error) => LlmsGenerationError.make({ message: String(error) }),
     }),
   ])
   const scriptPath = yield* path.fromFileUrl(new URL(import.meta.url))

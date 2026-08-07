@@ -28,7 +28,7 @@ export const ProgramRunState = Schema.Struct({
   runId: Schema.String,
   programPin: Schema.String,
   budget: ProgramManifest.ProgramBudget,
-  deadlineMillis: Schema.Number,
+  deadlineMillis: Schema.Finite,
   toolCalls: Schema.Int,
   agentRuns: Schema.Int,
   tokens: Schema.Int,

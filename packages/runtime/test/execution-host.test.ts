@@ -400,8 +400,7 @@ describe("ExecutionHost", () => {
             if (isAdmission(input)) return resolution
             yield* Effect.addFinalizer(() => Deferred.succeed(finalized, undefined))
             yield* Deferred.succeed(resolving, undefined)
-            yield* Effect.never
-            return resolution
+            return yield* Effect.never
           }),
       })
       const runtimeLayer = Runtime.layerMemory({
@@ -987,7 +986,7 @@ describe("ExecutionHost", () => {
         const toolFinalized = yield* Deferred.make<void>()
         const lifecycle: Array<string> = []
         let externalCounter = 0
-        const tool = Tool.make("external_counter", { parameters: Schema.Struct({}), success: Schema.Number })
+        const tool = Tool.make("external_counter", { parameters: Schema.Struct({}), success: Schema.Finite })
         const agent = Agent.make({ name: `uncertain-${backend}`, toolkit: Toolkit.make(tool) })
         const executable = testExecutable(agent, `uncertain-${backend}-v1`)
         const address = Address.make(`agent:uncertain-${backend}`)

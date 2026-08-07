@@ -114,7 +114,7 @@ export const fromRuntime = (runtime: Runtime.Interface, taskId: string): Effect.
   }).pipe(
     Effect.mapError(
       (cause) =>
-        new TaskProjectionFailed({
+        TaskProjectionFailed.make({
           taskId,
           message: "Runtime task projection failed",
           cause,

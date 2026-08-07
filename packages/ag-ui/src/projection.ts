@@ -21,7 +21,7 @@ const emit = (event: unknown): Effect.Effect<AGUIEvent, EventInvalid> => {
   const parsed = EventSchemas.safeParse(event)
   return parsed.success
     ? Effect.succeed(parsed.data)
-    : Effect.fail(new EventInvalid({ source: "ag-ui", detail: parsed.error.message }))
+    : Effect.fail(EventInvalid.make({ source: "ag-ui", detail: parsed.error.message }))
 }
 
 const emitAll = (events: ReadonlyArray<unknown>): Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid> =>
@@ -35,7 +35,7 @@ const stringify = (value: unknown, field: string): Effect.Effect<string, ValueNo
       if (encoded === undefined) throw new TypeError("Value has no JSON representation")
       return encoded
     },
-    catch: () => new ValueNotSerializable({ field }),
+    catch: () => ValueNotSerializable.make({ field }),
   })
 
 const closeOpen = (state: ProjectionState): ReadonlyArray<unknown> => {
@@ -136,7 +136,7 @@ export const project = (
   threadId: string,
 ): Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid | ValueNotSerializable> => {
   if (!Schema.is(RunEvent.RunEvent)(value)) {
-    return Effect.fail(new EventInvalid({ source: "runtime", detail: "RunEvent schema rejected the value" }))
+    return Effect.fail(EventInvalid.make({ source: "runtime", detail: "RunEvent schema rejected the value" }))
   }
   const event = value
   return Effect.suspend(() => {

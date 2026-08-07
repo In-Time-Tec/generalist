@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import {
   IdempotencyConflict,
   RunIdConflict,
@@ -251,7 +251,7 @@ export const admitStart = (
         message,
       }).pipe(
         Effect.mapError((error) =>
-          error instanceof RunNotFound || error instanceof RunTerminal
+          Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
             ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial child admission" })
             : error,
         ),
@@ -278,7 +278,7 @@ export const admitStart = (
         })),
       }).pipe(
         Effect.mapError((error) =>
-          error instanceof RunNotFound || error instanceof RunTerminal
+          Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
             ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial fan-out admission" })
             : error,
         ),

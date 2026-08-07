@@ -7796,7 +7796,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
       const crashingJournal: DurableDriver.DriverJournal = {
         onScheduled: (operation, checkpoint) =>
           operation.kind !== "model"
-            ? Effect.succeed(undefined)
+            ? Effect.void
             : Effect.sync(() => {
                 pending = checkpoint
               }).pipe(Effect.andThen(Effect.interrupt)),

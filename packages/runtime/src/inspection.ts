@@ -16,13 +16,13 @@ export interface InspectionRun {
 
 const corruption = (message: string) => RuntimeUnavailable.make({ message })
 
-const outcomeFor = (run: InspectionRun): Effect.Effect<RunOutcome | undefined, RuntimeUnavailable> => {
+const outcomeFor = (run: InspectionRun): Effect.Effect<RunOutcome | void, RuntimeUnavailable> => {
   const terminalEvents = run.events.filter(
     (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
   )
   if (!isTerminal(run.inspection.status)) {
     return terminalEvents.length === 0
-      ? Effect.succeed(undefined)
+      ? Effect.void
       : Effect.fail(corruption(`Non-terminal Run ${run.inspection.runId} has a terminal event`))
   }
   const event = terminalEvents.find((candidate) => candidate.eventId === run.terminalEventId)

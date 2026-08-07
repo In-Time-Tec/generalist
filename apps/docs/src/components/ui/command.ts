@@ -12,13 +12,13 @@ import { cn } from "@/lib/utils"
 export { Model, init }
 export type { AnchorConfig, InitConfig }
 export const CommandModel = Model
-export type CommandModel = typeof Model.Type
+export type CommandModel = Model
 export const commandInit = init
 
 // MESSAGE
 
 export { Message, OutMessage, Selected }
-export type CommandMessage = typeof Message.Type
+export type CommandMessage = Message
 export type CommandSelected<Value extends string = string> = Readonly<{
   readonly _tag: "Selected"
   readonly value: Value

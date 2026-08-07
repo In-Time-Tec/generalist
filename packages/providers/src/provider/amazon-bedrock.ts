@@ -70,7 +70,7 @@ export interface Config {
 }
 
 const ConfigSchema = Schema.Struct({
-  maxTokens: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1))),
+  maxTokens: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
   temperature: Schema.optionalKey(Schema.Finite),
   topP: Schema.optionalKey(Schema.Finite),
   stopSequences: Schema.optionalKey(Schema.Array(Schema.String)),

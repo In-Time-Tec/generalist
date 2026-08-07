@@ -175,15 +175,15 @@ const ToolResult = Schema.Struct({
 })
 const Usage = Schema.Struct({
   inputTokens: Schema.Struct({
-    uncached: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-    cacheRead: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-    cacheWrite: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+    uncached: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    cacheRead: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    cacheWrite: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
   }),
   outputTokens: Schema.Struct({
-    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-    text: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
-    reasoning: Schema.optionalKey(Schema.UndefinedOr(Schema.Number)),
+    total: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    text: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
+    reasoning: Schema.optionalKey(Schema.UndefinedOr(Schema.Finite)),
   }),
 })
 const FinishPart = Schema.Struct({

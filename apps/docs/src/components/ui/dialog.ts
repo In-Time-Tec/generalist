@@ -11,14 +11,14 @@ import { cn } from "@/lib/utils"
 export { Model, init }
 export type { InitConfig }
 export const DialogModel = Model
-export type DialogModel = typeof Model.Type
+export type DialogModel = Model
 export const dialogInit = init
 
 // MESSAGE
 
 export { Message, OutMessage }
-export type DialogMessage = typeof Message.Type
-export type DialogOutMessage = typeof OutMessage.Type
+export type DialogMessage = Message
+export type DialogOutMessage = OutMessage
 export const DialogMessage = Message
 export const DialogOutMessage = OutMessage
 

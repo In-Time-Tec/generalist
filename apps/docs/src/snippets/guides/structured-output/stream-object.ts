@@ -1,7 +1,7 @@
 import { Console, Effect, Layer, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
-const invoiceSchema = Schema.Struct({ total: Schema.Number, currency: Schema.String })
+const invoiceSchema = Schema.Struct({ total: Schema.Finite, currency: Schema.String })
 
 const agent = Agent.make({ name: "extractor", instructions: "Extract invoice data." })
 

@@ -130,7 +130,7 @@ const messageOf = (error: unknown): string => {
   return "unknown"
 }
 
-const toExaError = (error: unknown) => new ExaSearchProviderError({ message: `Exa search failed: ${messageOf(error)}` })
+const toExaError = (error: unknown) => ExaSearchProviderError.make({ message: `Exa search failed: ${messageOf(error)}` })
 
 const snippetFor = (result: ExaResult): string => {
   if (result.text !== undefined && result.text !== null) return result.text
@@ -181,7 +181,7 @@ export const exaLayerFromApiKey = (
       return Service.of({
         search: Effect.fn("SearchProvider.Exa.search")(function* (query: string) {
           return yield* searchExa(client, apiKey, query).pipe(
-            Effect.catch(() => Effect.succeed(cannedResultsFor(query))),
+            Effect.orElseSucceed(() => cannedResultsFor(query)),
           )
         }),
       })

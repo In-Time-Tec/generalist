@@ -21,7 +21,7 @@ import {
   type TaskStore,
 } from "@a2a-js/sdk/server"
 import { type Address, Cursor, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
-import { Effect, Stream } from "effect"
+import { Effect, Option, Stream } from "effect"
 import { decode } from "./content.js"
 import { artifactFromEvent, fromRuntime, stateFromRun, statusFromEvent } from "./projection.js"
 
@@ -66,15 +66,17 @@ const makeTaskStore = (runtime: Runtime.Interface): TaskStore => ({
   load: (taskId: string, _context: ServerCallContext) =>
     Effect.runPromise(
       fromRuntime(runtime, taskId).pipe(
+        Effect.map(Option.some),
         Effect.catchTag("@batonfx/a2a/TaskProjectionFailed", (failure) =>
           failure.cause !== undefined &&
           typeof failure.cause === "object" &&
           failure.cause !== null &&
           "_tag" in failure.cause &&
           failure.cause._tag === "@batonfx/runtime/RunNotFound"
-            ? Effect.succeed(undefined)
+            ? Effect.succeed(Option.none<Task>())
             : Effect.fail(failure),
         ),
+        Effect.map(Option.getOrUndefined),
       ),
     ),
   list: (params: ListTasksRequest, _context: ServerCallContext): Promise<ListTasksResponse> => {

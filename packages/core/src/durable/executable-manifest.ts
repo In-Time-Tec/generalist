@@ -68,15 +68,13 @@ export interface PinnedExecutableEncoded extends Omit<PinnedExecutable, "ref" | 
 }
 
 /** @experimental One complete pinned Agent entry in an executable closure. */
-export const AgentEntry: Schema.Codec<AgentEntry, AgentEntryEncoded> = Schema.Struct({
-  _tag: Schema.Literal("Agent"),
+export const AgentEntry: Schema.Codec<AgentEntry, AgentEntryEncoded> = Schema.TaggedStruct("Agent", {
   pin: AgentPin,
   manifest: AgentManifest,
 })
 
 /** @experimental One complete pinned Agent Program entry in an executable closure. */
-export const ProgramEntry: Schema.Codec<ProgramEntry, ProgramEntryEncoded> = Schema.Struct({
-  _tag: Schema.Literal("Program"),
+export const ProgramEntry: Schema.Codec<ProgramEntry, ProgramEntryEncoded> = Schema.TaggedStruct("Program", {
   pin: ProgramPin,
   manifest: ProgramManifest,
 })

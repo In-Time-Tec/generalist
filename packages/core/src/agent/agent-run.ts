@@ -431,7 +431,7 @@ export const streamInternal = <Tools extends Record<string, Tool.Any>, R, Struct
       }
       const initialPrompt =
         options.resume === undefined
-          ? yield* withInterpreter(recallInitialPrompt(baseInitialPrompt))
+          ? yield* recallInitialPrompt(baseInitialPrompt).pipe(withInterpreter)
           : baseInitialPrompt
       const runPrompt =
         options.resume === undefined && options.driverCheckpoint !== undefined && handoffStateRef !== undefined

@@ -35,7 +35,7 @@ const json = (value: unknown): Schema.Json | undefined =>
   Option.getOrUndefined(Schema.decodeUnknownOption(Schema.Json)(value))
 
 const bedrockMetadata = Schema.Struct({
-  metrics: Schema.optionalKey(Schema.Struct({ latencyMs: Schema.optionalKey(Schema.Number) })),
+  metrics: Schema.optionalKey(Schema.Struct({ latencyMs: Schema.optionalKey(Schema.Finite) })),
   trace: Schema.optionalKey(Schema.Json),
   additionalModelResponseFields: Schema.optionalKey(Schema.Json),
   performanceConfig: Schema.optionalKey(Schema.Json),

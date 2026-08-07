@@ -54,7 +54,7 @@ export interface ProgramAuthority {
   readonly tools: ReadonlyArray<NamedCapability>
   readonly agents: ReadonlyArray<ProgramAgentCapability>
   readonly steps: ReadonlyArray<NamedCapability>
-  readonly budget: typeof ProgramBudget.Type
+  readonly budget: ProgramBudget
 }
 
 /** @experimental Closed, reconstructable identity contract for one Agent. */
@@ -70,7 +70,7 @@ export interface AgentManifest {
   readonly toolScheduling: ToolSchedulingPolicy
   readonly compaction?: CompactionIdentity
   readonly programAuthority?: ProgramAuthority
-  readonly budget: typeof BudgetLimits.Type
+  readonly budget: BudgetLimits
   readonly children: ReadonlyArray<ChildBinding>
 }
 
@@ -131,16 +131,16 @@ export const ChildBinding: Schema.Codec<ChildBinding, ChildBindingEncoded> = Sch
 export const PortablePolicy: Schema.Codec<PortablePolicy, PortablePolicy> = Schema.suspend(() =>
   Schema.Union([
     Schema.Struct({ _tag: Schema.Literal("Forever") }),
-    Schema.Struct({ _tag: Schema.Literal("Recurs"), count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
-    Schema.Struct({ _tag: Schema.Literal("UntilToolCall"), name: Schema.String }),
-    Schema.Struct({ _tag: Schema.Literal("Both"), first: PortablePolicy, second: PortablePolicy }),
+    Schema.TaggedStruct("Recurs", { count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
+    Schema.TaggedStruct("UntilToolCall", { name: Schema.String }),
+    Schema.TaggedStruct("Both", { first: PortablePolicy, second: PortablePolicy }),
   ]),
 )
 
 /** @experimental Exact identity of either a portable policy or an opaque policy capability. */
 export const PolicyIdentity: Schema.Codec<PolicyIdentity, PolicyIdentityEncoded> = Schema.Union([
-  Schema.Struct({ _tag: Schema.Literal("Portable"), policy: PortablePolicy }),
-  Schema.Struct({ _tag: Schema.Literal("Pinned"), pin: CapabilityPin }),
+  Schema.TaggedStruct("Portable", { policy: PortablePolicy }),
+  Schema.TaggedStruct("Pinned", { pin: CapabilityPin }),
 ])
 const ToolSchedulingPolicySchema = Schema.Struct({
   maxConcurrency: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -276,7 +276,7 @@ export const fromLiveAgent = <Tools extends Record<string, Tool.Any>, R, PolicyS
     readonly policy: PolicyIdentity
     readonly compaction?: CompactionIdentity
     readonly programAuthority?: ProgramAuthority
-    readonly budget: typeof BudgetLimits.Type
+    readonly budget: BudgetLimits
     readonly children: ReadonlyArray<ChildBinding>
   },
 ): PinnedAgent => {

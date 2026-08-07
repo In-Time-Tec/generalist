@@ -149,18 +149,14 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
 
     const reopen = yield* Effect.gen(function* () {
       const driver = yield* RunStore.RunStore
-      const ops = yield* Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const receipt = yield* runtime.send({
-          to: assistantAddress,
-          sessionId: "session:tracer:commit",
-          idempotencyKey: "commit",
-          prompt: textPrompt("counter-3"),
-        })
-        expect(receipt.duplicate).toBe(true)
-        return receipt.runId
+      const runtime = yield* Runtime.Runtime
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:tracer:commit",
+        idempotencyKey: "commit",
+        prompt: textPrompt("counter-3"),
       })
-      void ops
+      expect(receipt.duplicate).toBe(true)
       const recorded = yield* driver.recordOperation({
         ...(yield* driver.claimExecution({ runId: committed.runId, ownerId: "test" })),
         runId: committed.runId,
