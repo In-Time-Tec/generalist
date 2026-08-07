@@ -45,5 +45,5 @@ export const wrapDriverAttempt: {
             attemptBody(activePrompt, retryOverflow, compactOverflow, overflowCause),
           )
         }),
-      ) as Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel>,
+      ),
 )
