@@ -429,21 +429,19 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
 
 const sessionBannerView = (session: SessionState): Html => {
   const h = html<Message>()
-  return h.keyed("div")(session._tag, [], [sessionBannerContentView(session)])
-}
-
-const sessionBannerContentView = (session: SessionState): Html => {
-  const h = html<Message>()
+  const banner = (content: Html): Html => h.keyed("div")(session._tag, [], [content])
   switch (session._tag) {
     case "SessionOpening":
-      return h.p([h.Class("px-6 py-2 text-xs text-muted-foreground")], ["Opening a session…"])
+      return banner(h.p([h.Class("px-6 py-2 text-xs text-muted-foreground")], ["Opening a session…"]))
     case "SessionFailed":
-      return h.p(
-        [h.Class("bg-destructive/10 px-6 py-2 text-xs text-destructive")],
-        [`Could not open a session: ${session.message}`],
+      return banner(
+        h.p(
+          [h.Class("bg-destructive/10 px-6 py-2 text-xs text-destructive")],
+          [`Could not open a session: ${session.message}`],
+        ),
       )
     case "SessionReady":
-      return h.div([], [])
+      return banner(h.div([], []))
   }
 }
 

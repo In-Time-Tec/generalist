@@ -2,7 +2,6 @@ import { Match, Schema } from "effect"
 import { dual } from "effect/Function"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
-import { m } from "foldkit/message"
 import { evo } from "foldkit/struct"
 
 import { button } from "@/components/ui/button"
@@ -351,15 +350,13 @@ export const sidebarHeader: {
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
 } = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
-  return h.div(
-    [
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "sidebar-header"),
-      h.DataAttribute("sidebar", "header"),
-      h.Class(cn("flex flex-col gap-2 p-2", config.class)),
-    ],
-    [...children],
-  )
+  const attrs = [
+    ...(config.attributes ?? []),
+    h.DataAttribute("slot", "sidebar-header"),
+    h.DataAttribute("sidebar", "header"),
+    h.Class(cn("flex flex-col gap-2 p-2", config.class)),
+  ]
+  return h.div(attrs, [...children])
 })
 
 export const sidebarFooter: {
@@ -392,20 +389,18 @@ export const sidebarContent: {
   <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
 } = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
-  return h.div(
-    [
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "sidebar-content"),
-      h.DataAttribute("sidebar", "content"),
-      h.Class(
-        cn(
-          "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
-          config.class,
-        ),
+  const attrs = [
+    ...(config.attributes ?? []),
+    h.DataAttribute("slot", "sidebar-content"),
+    h.DataAttribute("sidebar", "content"),
+    h.Class(
+      cn(
+        "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+        config.class,
       ),
-    ],
-    [...children],
-  )
+    ),
+  ]
+  return h.div(attrs, [...children])
 })
 
 export const sidebarGroup: {
@@ -424,26 +419,29 @@ export const sidebarGroup: {
   )
 })
 
+const sidebarGroupActionClass = cn(
+  "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+  "after:absolute after:-inset-2 md:after:hidden",
+  "group-data-[collapsible=icon]:hidden",
+)
+
+const sidebarGroupLabelClass = cn(
+  "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+  "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
+)
+
 export const sidebarGroupLabel: {
   <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
   <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
 } = dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
   const h = html<ParentMessage>()
-  return h.div(
-    [
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "sidebar-group-label"),
-      h.DataAttribute("sidebar", "group-label"),
-      h.Class(
-        cn(
-          "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-          "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
-          config.class,
-        ),
-      ),
-    ],
-    [...children],
-  )
+  const attrs = [
+    ...(config.attributes ?? []),
+    h.DataAttribute("slot", "sidebar-group-label"),
+    h.DataAttribute("sidebar", "group-label"),
+    h.Class(cn(sidebarGroupLabelClass, config.class)),
+  ]
+  return h.div(attrs, [...children])
 })
 
 export type SidebarGroupActionConfig<ParentMessage> = SlotConfig<ParentMessage> &
@@ -465,14 +463,7 @@ export const sidebarGroupAction: {
         ...(config.attributes ?? []),
         h.DataAttribute("slot", "sidebar-group-action"),
         h.DataAttribute("sidebar", "group-action"),
-        h.Class(
-          cn(
-            "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-            "after:absolute after:-inset-2 md:after:hidden",
-            "group-data-[collapsible=icon]:hidden",
-            config.class,
-          ),
-        ),
+        h.Class(cn(sidebarGroupActionClass, config.class)),
       ],
       [...children],
     )

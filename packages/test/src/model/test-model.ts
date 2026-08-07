@@ -410,7 +410,7 @@ export const failure: {
   (options?: { readonly delay?: Duration.Input }): (error: AiError.AiError) => FailureStep
   (error: AiError.AiError, options?: { readonly delay?: Duration.Input }): FailureStep
 } = Function.dual(
-  (args) => !AiError.isAiError(args[0]),
+  (args) => AiError.isAiError(args[0]),
   (error: AiError.AiError, options: { readonly delay?: Duration.Input } = {}) => ({
     _tag: "Failure",
     error,
