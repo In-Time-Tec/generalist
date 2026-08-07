@@ -195,3 +195,18 @@ The complete wave-25.5 design was re-applied and verified end-to-end:
 `Toolkit.handle` boundary — the final wall) plus 2 runtime tsc errors (the code_mode handler Scope/cast).
 **Reverted to the 1-error checkpoint** — the cleanest achievable state within the constraints:
 tsc 0, 1,168 tests pass, all scripts PASS, lint = agent.ts:466 only, 66 commits. NOT pushed to main.
+
+## Wave 27 (2026-08-07) — Exclude-only StaticToolServices conditional probe + final state
+
+The last targeted probe: applying the conditional to ONLY the `Exclude<Tool.HandlerServices<...>, ToolContext>`
+member of `StaticToolServices` (leaving `HandlersFor<T>` raw) — verified:
+- tsc: 1 error — the `supervisor` helper's `Agent.make` requirements (`OptionRequirements<Record<string, Tool.Any>, ...>`)
+  — the conditional changes the supervisor agent's inferred R, breaking the `HandoffAgent` variance.
+- The agent.ts:466 flag is unaffected (it is the OutputRequirement channel, not StaticToolServices).
+
+**Final verified state (67 commits, tree clean, NOT pushed): tsc 0 (root + runtime), 1 lint error (agent.ts:466),
+1,168 tests pass, all scripts PASS.** The last flag is the OutputRequirement's generic `S["DecodingServices"]`
+erasure — every sound fix path (verified waves 22–27) either hits the tool-executor `Toolkit.handle` library
+raw (`StaticToolServices` conditional), the supervisor's `HandlersFor` variance, or the runtime code_mode
+`Scope`/`HandlersFor` threading — all the same `Effect` `Schema.Constraint`/`Encoder` hardcoded-`unknown`
+service-channel erasure. Upstream `Effect-TS/effect` change required for completion.
