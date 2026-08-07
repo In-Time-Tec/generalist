@@ -51,11 +51,11 @@ export interface AgentBinding<I extends Prompt.RawInput, IE, E = never> {
  * @experimental One decoded invocation of a bound tool or step. The decoded input stays inside the binding, so
  * authorization and execution keep the exact type the binding declared.
  */
-export interface Invocation {
+export interface Invocation<O = unknown, E = unknown> {
   readonly authorize: (
     operation: ProgramOperationName,
   ) => Effect.Effect<boolean, ProgramAuthorizationFailure | ProgramCapabilityDenied | ProgramSuspended>
-  readonly execute: Effect.Effect<unknown, unknown>
+  readonly execute: Effect.Effect<O, E>
 }
 
 /** @experimental One decoded Agent invocation, exposing only the prompt every Agent input must produce. */
@@ -77,7 +77,7 @@ export interface AnyTool {
   readonly input: Schema.Codec<unknown, unknown>
   readonly output: Schema.Codec<unknown, unknown>
   readonly replay: ProgramReplayPolicy
-  readonly decode: (encoded: unknown) => Effect.Effect<Invocation, Schema.SchemaError>
+  readonly decode: (encoded: unknown) => Effect.Effect<Invocation<unknown, unknown>, Schema.SchemaError>
 }
 
 /** @experimental Host-facing view of one bound named step, with the same hidden input as {@link AnyTool}. */
@@ -115,7 +115,11 @@ const decodeInput = <I, IE>(codec: Schema.Codec<I, IE>, encoded: unknown): Effec
   Schema.decodeUnknownEffect(codec, { onExcessProperty: "error" })(encoded)
 
 /** @experimental Construct a typed tool binding. */
-export const tool = <I, IE, O, OE, E>(binding: ToolBinding<I, IE, O, OE, E>): AnyTool => ({
+export const tool = <I, IE, O, OE, E>(
+  binding: ToolBinding<I, IE, O, OE, E>,
+): AnyTool & {
+  readonly decode: (encoded: unknown) => Effect.Effect<Invocation<O, E>, Schema.SchemaError>
+} => ({
   name: binding.name,
   pin: binding.pin,
   input: binding.input,
@@ -124,7 +128,7 @@ export const tool = <I, IE, O, OE, E>(binding: ToolBinding<I, IE, O, OE, E>): An
   decode: (encoded) =>
     Effect.map(decodeInput(binding.input, encoded), (input) => ({
       authorize: (operation) => binding.authorize({ operation, input }),
-      execute: Effect.suspend(() => binding.execute(input)),
+      execute: Effect.suspend(() => binding.execute(input)) as Effect.Effect<O, E>,
     })),
 })
 
