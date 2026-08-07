@@ -251,10 +251,11 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     context: ServerCallContext,
   ): AsyncGenerator<StreamResponse, void, undefined> {
     const stream = () => super.sendMessageStream(params, context)
-    return (async function* () {
-      await validateRequest(params)
-      yield* stream()
-    })()
+    return Stream.toAsyncIterable(
+      Stream.fromEffect(Effect.promise(() => validateRequest(params))).pipe(
+        Stream.flatMap(() => Stream.fromAsyncIterable(stream(), (error): never => { throw error })),
+      ),
+    ) as AsyncGenerator<StreamResponse, void, undefined>
   }
 
   override cancelTask(params: CancelTaskRequest, _context: ServerCallContext): Promise<Task> {
@@ -276,47 +277,68 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     _context: ServerCallContext,
   ): AsyncGenerator<StreamResponse, void, undefined> {
     const runtime = this.runtime
-    return (async function* () {
-      const snapshot = await Effect.runPromise(runtime.snapshot(params.id))
-      const task = await Effect.runPromise(fromRuntime(runtime, params.id))
-      yield { payload: { $case: "task", value: task } }
-      if (
-        snapshot.run.status === "succeeded" ||
-        snapshot.run.status === "failed" ||
-        snapshot.run.status === "cancelled"
-      ) {
-        return
-      }
+    const resubscribeResponses = (
+      task: Task,
+      events: Stream.Stream<RunEvent.RunEvent, Runtime.EventsError>,
+    ): Stream.Stream<StreamResponse, Runtime.EventsError> => {
       const preceding: Array<RunEvent.RunEvent> = []
-      for await (const event of Stream.toAsyncIterable(runtime.events({ runId: params.id, cursor: snapshot.cursor }))) {
-        if (event._tag === "RunCompleted") {
-          yield {
-            payload: {
-              $case: "artifactUpdate",
-              value: {
-                taskId: task.id,
-                contextId: task.contextId,
-                artifact: artifactFromEvent(event, preceding),
-                append: false,
-                lastChunk: true,
-                metadata: {},
+      return events.pipe(
+        Stream.takeUntil(isBoundary),
+        Stream.map((event) => {
+          const responses: Array<StreamResponse> = []
+          if (event._tag === "RunCompleted") {
+            responses.push({
+              payload: {
+                $case: "artifactUpdate",
+                value: {
+                  taskId: task.id,
+                  contextId: task.contextId,
+                  artifact: artifactFromEvent(event, preceding),
+                  append: false,
+                  lastChunk: true,
+                  metadata: {},
+                },
               },
-            },
+            })
           }
-        }
-        const status = statusFromEvent(task, event)
-        if (status !== undefined) {
-          yield {
-            payload: {
-              $case: "statusUpdate",
-              value: { taskId: task.id, contextId: task.contextId, status, metadata: {} },
-            },
+          const status = statusFromEvent(task, event)
+          if (status !== undefined) {
+            responses.push({
+              payload: {
+                $case: "statusUpdate",
+                value: { taskId: task.id, contextId: task.contextId, status, metadata: {} },
+              },
+            })
           }
-        }
-        preceding.push(event)
-        if (isBoundary(event)) return
-      }
-    })()
+          preceding.push(event)
+          return responses
+        }),
+        Stream.flatMap((responses) => Stream.fromIterable(responses)),
+      )
+    }
+    return Stream.toAsyncIterable(
+      Stream.fromEffect(
+        Effect.gen(function* () {
+          const snapshot = yield* runtime.snapshot(params.id)
+          const task = yield* fromRuntime(runtime, params.id)
+          return { snapshot, task }
+        }),
+      ).pipe(
+        Stream.flatMap(({ snapshot, task }) => {
+          const head = Stream.make({ payload: { $case: "task", value: task } })
+          if (
+            snapshot.run.status === "succeeded" ||
+            snapshot.run.status === "failed" ||
+            snapshot.run.status === "cancelled"
+          ) {
+            return head
+          }
+          return head.pipe(
+            Stream.concat(resubscribeResponses(task, runtime.events({ runId: params.id, cursor: snapshot.cursor }))),
+          )
+        }),
+      ),
+    ) as AsyncGenerator<StreamResponse, void, undefined>
   }
 }
 

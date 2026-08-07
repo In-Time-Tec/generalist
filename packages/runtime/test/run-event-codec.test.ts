@@ -115,7 +115,8 @@ it("round-trips the canonical ApprovalRequested identity and payload", () => {
 
 it("rejects corrupted event payloads without fallback parsing", () => {
   const EventRecord = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
-  const encoded = Schema.decodeUnknownSync(EventRecord)(encodeEvent(failedEvent(failures[0]!)))
+  const encodedEvent = encodeEvent(failedEvent(failures[0]!))
+  const encoded = pipe(encodedEvent, Schema.decodeUnknownSync(EventRecord))
   expect(() => decodeEvent(Schema.encodeSync(EventRecord)({ ...encoded, sequence: -1 }))).toThrow()
   expect(() =>
     decodeEvent(

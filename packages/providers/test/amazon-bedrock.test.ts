@@ -130,8 +130,9 @@ describe("AmazonBedrock", () => {
     expect(() => decodeConfig({ guardrailConfig: { guardrailIdentifier: "guardrail" } })).toThrow()
   })
 
-  it("keeps the explicit public runtime surface", async () => {
-    const module = await import("@batonfx/providers/amazon-bedrock")
+  it.effect("keeps the explicit public runtime surface", () =>
+    Effect.gen(function* () {
+      const module = yield* Effect.promise(() => import("@batonfx/providers/amazon-bedrock"))
     expect(Object.keys(module).toSorted()).toEqual([
       "Client",
       "ClientFailure",
@@ -148,7 +149,8 @@ describe("AmazonBedrock", () => {
       "makeRequest",
       "toolJsonSchemaCompiler",
     ])
-  })
+    }),
+  )
   it.effect("maps complete text, tools, reasoning, usage, and provider metadata", () =>
     Effect.gen(function* () {
       const model = yield* make({ model: "profile/us.test" }).pipe(Effect.provideService(Client, fakeClient()))

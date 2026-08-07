@@ -1,9 +1,9 @@
-import type { AgentCard, Message, SendMessageRequest } from "@a2a-js/sdk"
+import type { AgentCard, Message, SendMessageRequest, StreamResponse } from "@a2a-js/sdk"
 import { Role, TaskState } from "@a2a-js/sdk"
 import { ServerCallContext } from "@a2a-js/sdk/server"
 import { Address, ExecutableManifest, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Stream } from "effect"
+import { Effect, Option, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { makeHandler } from "../src/adapter.js"
 
@@ -212,118 +212,138 @@ const request = (value: Message): SendMessageRequest => ({
   metadata: {},
 })
 
+type HandlerStream = AsyncGenerator<StreamResponse, void, undefined>
+
+const collectResponses = (
+  stream: HandlerStream,
+): Effect.Effect<ReadonlyArray<StreamResponse>, { readonly reason: string }> =>
+  Stream.fromAsyncIterable(stream, (error) => ({
+    reason: typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string"
+      ? error.reason
+      : String(error),
+  })).pipe(Stream.runCollect)
+
 describe("DefaultRequestHandler projection", () => {
-  it("streams a full Task first and keeps Task.id equal to Runtime runId", async () => {
-    const fixture = makeRuntime()
-    const handler = makeHandler(fixture.runtime, { address, card })
-    const stream = handler.sendMessageStream(request(message("complete")), new ServerCallContext())
-    const responses = []
-    for await (const response of stream) responses.push(response)
+  it.effect("streams a full Task first and keeps Task.id equal to Runtime runId", () =>
+    Effect.gen(function* () {
+      const fixture = makeRuntime()
+      const handler = makeHandler(fixture.runtime, { address, card })
+      const responses = yield* collectResponses(
+        handler.sendMessageStream(request(message("complete")), new ServerCallContext()),
+      )
 
-    expect(responses[0]?.payload?.$case).toBe("task")
-    const taskId = responses[0]?.payload?.$case === "task" ? responses[0].payload.value.id : ""
-    expect(fixture.sentRunIds).toEqual([taskId])
-    expect(responses.map((item) => item.payload?.$case)).toEqual([
-      "task",
-      "statusUpdate",
-      "artifactUpdate",
-      "statusUpdate",
-    ])
+      expect(responses[0]?.payload?.$case).toBe("task")
+      const taskId = responses[0]?.payload?.$case === "task" ? responses[0].payload.value.id : ""
+      expect(fixture.sentRunIds).toEqual([taskId])
+      expect(responses.map((item) => item.payload?.$case)).toEqual([
+        "task",
+        "statusUpdate",
+        "artifactUpdate",
+        "statusUpdate",
+      ])
 
-    const task = await handler.getTask({ tenant: "", id: taskId }, new ServerCallContext())
-    expect(task.status?.state).toBe(TaskState.TASK_STATE_COMPLETED)
-    expect(task.artifacts[0]?.parts[0]?.content).toEqual({ $case: "text", value: "complete" })
+      const task = yield* Effect.promise(() => handler.getTask({ tenant: "", id: taskId }, new ServerCallContext()))
+      expect(task.status?.state).toBe(TaskState.TASK_STATE_COMPLETED)
+      expect(task.artifacts[0]?.parts[0]?.content).toEqual({ $case: "text", value: "complete" })
 
-    const listed = await handler.listTasks(
-      {
-        tenant: "",
-        contextId: "",
-        status: TaskState.TASK_STATE_UNSPECIFIED,
-        pageToken: "",
-        statusTimestampAfter: undefined,
-      },
-      new ServerCallContext(),
-    )
-    expect(listed.tasks.map((item) => item.id)).toEqual([taskId])
-  })
+      const listed = yield* Effect.promise(() =>
+        handler.listTasks(
+          {
+            tenant: "",
+            contextId: "",
+            status: TaskState.TASK_STATE_UNSPECIFIED,
+            pageToken: "",
+            statusTimestampAfter: undefined,
+          },
+          new ServerCallContext(),
+        ),
+      )
+      expect(listed.tasks.map((item) => item.id)).toEqual([taskId])
+    }),
+  )
 
-  it("projects Program completion values as structured artifacts", async () => {
-    const fixture = makeRuntime()
-    const handler = makeHandler(fixture.runtime, { address, card })
-    const responses = []
-    for await (const response of handler.sendMessageStream(request(message("program")), new ServerCallContext())) {
-      responses.push(response)
-    }
+  it.effect("projects Program completion values as structured artifacts", () =>
+    Effect.gen(function* () {
+      const fixture = makeRuntime()
+      const handler = makeHandler(fixture.runtime, { address, card })
+      const responses = yield* collectResponses(
+        handler.sendMessageStream(request(message("program")), new ServerCallContext()),
+      )
 
-    const taskId = responses[0]?.payload?.$case === "task" ? responses[0].payload.value.id : ""
-    const task = await handler.getTask({ tenant: "", id: taskId }, new ServerCallContext())
-    expect(task.artifacts[0]?.parts[0]?.content).toEqual({ $case: "data", value: { answer: 42 } })
-  })
+      const taskId = responses[0]?.payload?.$case === "task" ? responses[0].payload.value.id : ""
+      const task = yield* Effect.promise(() => handler.getTask({ tenant: "", id: taskId }, new ServerCallContext()))
+      expect(task.artifacts[0]?.parts[0]?.content).toEqual({ $case: "data", value: { answer: 42 } })
+    }),
+  )
 
-  it("starts a newly admitted run at the run-event origin, not its lane sequence", async () => {
-    const fixture = makeRuntime(7)
-    const handler = makeHandler(fixture.runtime, { address, card })
-    const responses = []
-    for await (const response of handler.sendMessageStream(request(message("later-lane")), new ServerCallContext())) {
-      responses.push(response)
-    }
+  it.effect("starts a newly admitted run at the run-event origin, not its lane sequence", () =>
+    Effect.gen(function* () {
+      const fixture = makeRuntime(7)
+      const handler = makeHandler(fixture.runtime, { address, card })
+      const responses = yield* collectResponses(
+        handler.sendMessageStream(request(message("later-lane")), new ServerCallContext()),
+      )
 
-    expect(fixture.observedCursors).toEqual([-1])
-    expect(responses.map((item) => item.payload?.$case)).toEqual([
-      "task",
-      "statusUpdate",
-      "artifactUpdate",
-      "statusUpdate",
-    ])
-  })
+      expect(fixture.observedCursors).toEqual([-1])
+      expect(responses.map((item) => item.payload?.$case)).toEqual([
+        "task",
+        "statusUpdate",
+        "artifactUpdate",
+        "statusUpdate",
+      ])
+    }),
+  )
 
-  it("resubscribes, responds to the authoritative wait, and cancels through Runtime", async () => {
-    const fixture = makeRuntime()
-    const handler = makeHandler(fixture.runtime, { address, card })
-    const initial = []
-    for await (const response of handler.sendMessageStream(request(message("wait")), new ServerCallContext())) {
-      initial.push(response)
-    }
-    const taskId = initial[0]?.payload?.$case === "task" ? initial[0].payload.value.id : ""
-    expect(initial.at(-1)?.payload?.$case).toBe("statusUpdate")
+  it.effect("resubscribes, responds to the authoritative wait, and cancels through Runtime", () =>
+    Effect.gen(function* () {
+      const fixture = makeRuntime()
+      const handler = makeHandler(fixture.runtime, { address, card })
+      const initial = yield* collectResponses(
+        handler.sendMessageStream(request(message("wait")), new ServerCallContext()),
+      )
+      const taskId = initial[0]?.payload?.$case === "task" ? initial[0].payload.value.id : ""
+      expect(initial.at(-1)?.payload?.$case).toBe("statusUpdate")
 
-    const subscription = handler.resubscribe({ tenant: "", id: taskId }, new ServerCallContext())
-    const snapshot = await subscription.next()
-    expect(snapshot.value?.payload?.$case).toBe("task")
-    await subscription.return()
+      const subscription = handler.resubscribe({ tenant: "", id: taskId }, new ServerCallContext())
+      const snapshot = yield* Effect.promise(() => subscription.next())
+      expect(snapshot.value?.payload?.$case).toBe("task")
+      yield* Effect.promise(() => subscription.return())
 
-    const resumed = []
-    for await (const response of handler.sendMessageStream(
-      request(message("follow-up", taskId)),
-      new ServerCallContext(),
-    )) {
-      resumed.push(response)
-    }
-    expect(resumed[0]?.payload?.$case).toBe("task")
-    expect((await handler.getTask({ tenant: "", id: taskId }, new ServerCallContext())).status?.state).toBe(
-      TaskState.TASK_STATE_COMPLETED,
-    )
+      const resumed = yield* collectResponses(
+        handler.sendMessageStream(request(message("follow-up", taskId)), new ServerCallContext()),
+      )
+      expect(resumed[0]?.payload?.$case).toBe("task")
+      const resumedTask = yield* Effect.promise(() =>
+        handler.getTask({ tenant: "", id: taskId }, new ServerCallContext()),
+      )
+      expect(resumedTask.status?.state).toBe(TaskState.TASK_STATE_COMPLETED)
 
-    const second = makeRuntime()
-    const cancelHandler = makeHandler(second.runtime, { address, card })
-    const waitingResponses = []
-    for await (const response of cancelHandler.sendMessageStream(request(message("wait")), new ServerCallContext())) {
-      waitingResponses.push(response)
-    }
-    const cancelId = waitingResponses[0]?.payload?.$case === "task" ? waitingResponses[0].payload.value.id : ""
-    const canceled = await cancelHandler.cancelTask({ tenant: "", id: cancelId, metadata: {} }, new ServerCallContext())
-    expect(canceled.status?.state).toBe(TaskState.TASK_STATE_CANCELED)
-  })
+      const second = makeRuntime()
+      const cancelHandler = makeHandler(second.runtime, { address, card })
+      const waitingResponses = yield* collectResponses(
+        cancelHandler.sendMessageStream(request(message("wait")), new ServerCallContext()),
+      )
+      const cancelId = waitingResponses[0]?.payload?.$case === "task" ? waitingResponses[0].payload.value.id : ""
+      const canceled = yield* Effect.promise(() =>
+        cancelHandler.cancelTask({ tenant: "", id: cancelId, metadata: {} }, new ServerCallContext()),
+      )
+      expect(canceled.status?.state).toBe(TaskState.TASK_STATE_CANCELED)
+    }),
+  )
 
-  it("rejects agent-role and unsupported content before Runtime admission", async () => {
-    const fixture = makeRuntime()
-    const handler = makeHandler(fixture.runtime, { address, card })
-    const injected = { ...message("bad"), role: Role.ROLE_AGENT }
-    await expect(async () => {
-      for await (const _response of handler.sendMessageStream(request(injected), new ServerCallContext())) {
-        void _response // The request must fail before an SDK Task or Runtime Run exists.
+  it.effect("rejects agent-role and unsupported content before Runtime admission", () =>
+    Effect.gen(function* () {
+      const fixture = makeRuntime()
+      const handler = makeHandler(fixture.runtime, { address, card })
+      const injected = { ...message("bad"), role: Role.ROLE_AGENT }
+      const outcome = yield* collectResponses(
+        handler.sendMessageStream(request(injected), new ServerCallContext()),
+      ).pipe(Effect.flip, Effect.option)
+      expect(Option.isSome(outcome)).toBe(true)
+      if (Option.isSome(outcome)) {
+        expect(outcome.value.reason).toBe("CONTENT_TYPE_NOT_SUPPORTED")
       }
-    }).rejects.toMatchObject({ reason: "CONTENT_TYPE_NOT_SUPPORTED" })
-    expect(fixture.sentRunIds).toEqual([])
-  })
+      expect(fixture.sentRunIds).toEqual([])
+    }),
+  )
 })

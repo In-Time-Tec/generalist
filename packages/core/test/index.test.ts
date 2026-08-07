@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
+import { Effect } from "effect"
 import {
   AiError as EffectAiError,
   Chat as EffectChat,
@@ -30,8 +31,9 @@ import {
 } from "../src/index"
 
 describe("@batonfx/core public surface", () => {
-  it("keeps the frozen root namespace and Effect AI keys", async () => {
-    const module = await import("../src/index.js")
+  it.effect("keeps the frozen root namespace and Effect AI keys", () =>
+    Effect.gen(function* () {
+      const module = yield* Effect.promise(() => import("../src/index.js"))
     expect(Object.keys(module).toSorted()).toEqual([
       "Agent",
       "AgentEvent",
@@ -84,7 +86,8 @@ describe("@batonfx/core public surface", () => {
       "Toolkit",
       "TurnPolicy",
     ])
-  })
+    }),
+  )
   it("re-exports Effect AI primitives by identity", () => {
     expect(Tool).toBe(EffectTool)
     expect(Toolkit).toBe(EffectToolkit)

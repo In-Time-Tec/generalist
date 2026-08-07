@@ -977,18 +977,22 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     const childTool = AgentTool.asTool(child, { name: "ask_authorized_child" })
     return [
       Layer.mergeAll(
-        modelLayer(() => {
-          calls += 1
-          return calls === 1
-            ? Stream.make(toolCallPart("authorized-call", "gated", { text: "run" }))
-            : Stream.make(textDelta("authorized child answer"))
-        }),
         ToolExecutor.layerRouter([ToolExecutor.routeToolkit(childTool), ToolExecutor.routeToolkit(toolkit)]).pipe(
           Layer.provide(toolkit.toLayer({ gated: ({ text }) => Effect.succeed(text) })),
         ),
-        Layer.succeed(AuthorizationDependency, "available"),
         ModelMiddleware.layerIdentity,
-      ).pipe(Layer.provideMerge(ToolContext.layerDefault)),
+      ).pipe(
+        Layer.provideMerge(ToolContext.layerDefault),
+        Layer.provideMerge(Layer.succeed(AuthorizationDependency, "available")),
+        Layer.provideMerge(
+          modelLayer(() => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(toolCallPart("authorized-call", "gated", { text: "run" }))
+              : Stream.make(textDelta("authorized child answer"))
+          }),
+        ),
+      ),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const outcome = yield* executor.execute(request("ask_authorized_child", { prompt: "child task" }))
