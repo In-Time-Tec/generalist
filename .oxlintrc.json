@@ -22,7 +22,7 @@
     "effecttsgo/class-self-mismatch": "error",
     "effecttsgo/crypto-random-uuid": "error",
     "effecttsgo/crypto-random-uuid-in-effect": "error",
-    "effecttsgo/deterministic-keys": "error",
+    "effecttsgo/deterministic-keys": "off",
     "effecttsgo/duplicate-package": "error",
     "effecttsgo/effect-do-notation": "error",
     "effecttsgo/effect-fn-iife": "error",

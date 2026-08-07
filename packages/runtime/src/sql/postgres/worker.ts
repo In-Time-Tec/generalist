@@ -21,9 +21,7 @@ export interface Interface {
   readonly execute: Effect.Effect<ReadonlyArray<ClaimedRun>, RuntimeUnavailable>
 }
 
-export class RuntimeWorker extends Context.Service<RuntimeWorker, Interface>()(
-  "@batonfx/runtime/sql/postgres/worker/RuntimeWorker",
-) {}
+export class RuntimeWorker extends Context.Service<RuntimeWorker, Interface>()("@batonfx/runtime/RuntimeWorker") {}
 
 export const makeWorker = (
   options: WorkerOptions,

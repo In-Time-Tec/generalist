@@ -120,7 +120,7 @@ export interface Interface {
 
 /** @experimental */
 export class ExecutableResolver extends Context.Service<ExecutableResolver, Interface>()(
-  "@batonfx/runtime/executable-resolver/ExecutableResolver",
+  "@batonfx/runtime/ExecutableResolver",
 ) {}
 
 /** @experimental One exact static Agent executable bound to its persisted Agent pin. */

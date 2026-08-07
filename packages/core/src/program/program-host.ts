@@ -90,9 +90,7 @@ export interface Interface {
 }
 
 /** @experimental Owner of Agent Program execution and its host policy. */
-export class ProgramHost extends Context.Service<ProgramHost, Interface>()(
-  "@batonfx/core/program/program-host/ProgramHost",
-) {}
+export class ProgramHost extends Context.Service<ProgramHost, Interface>()("@batonfx/core/ProgramHost") {}
 
 const encodedBytes = (value: unknown): Effect.Effect<number, ProgramSchemaFailure> =>
   Schema.encodeEffect(Schema.UnknownFromJsonString)(value).pipe(

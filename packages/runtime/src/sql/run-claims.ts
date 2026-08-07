@@ -38,4 +38,4 @@ export interface Interface {
   }) => Effect.Effect<void, RunNotFound | RunTerminal | StaleClaim | RuntimeUnavailable>
 }
 
-export class RunClaims extends Context.Service<RunClaims, Interface>()("@batonfx/runtime/sql/run-claims/RunClaims") {}
+export class RunClaims extends Context.Service<RunClaims, Interface>()("@batonfx/runtime/RunClaims") {}

@@ -2,6 +2,7 @@ import { Match, Schema } from "effect"
 import { dual } from "effect/Function"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
+import { m } from "foldkit/message"
 import { evo } from "foldkit/struct"
 
 import { button } from "@/components/ui/button"
@@ -55,8 +56,7 @@ export type ClosedMobile = typeof ClosedMobile.Type
 export type Message = typeof Message.Type
 
 // UPDATE
-
-/** Processes a sidebar message and returns the next model. Produces no commands and no OutMessages. */
+/** Processes a sidebar message and returns the next model. */
 export const update: {
   (model: Model, message: Message): Model
   (message: Message): (model: Model) => Model

@@ -31,7 +31,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class AgUi extends Context.Service<AgUi, Interface>()("@batonfx/ag-ui/ag-ui/AgUi") {}
+export class AgUi extends Context.Service<AgUi, Interface>()("@batonfx/ag-ui/AgUi") {}
 
 const validate = (value: RunAgentInput): Effect.Effect<RunAgentInput, InputMalformed> => {
   const parsed = RunAgentInputSchema.safeParse(value)

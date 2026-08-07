@@ -125,7 +125,7 @@ export class CompactionError extends Schema.TaggedErrorClass<CompactionError>()(
 }) {}
 
 /** @experimental */
-export class Compaction extends Context.Service<Compaction, Interface>()("@batonfx/core/turn/compaction") {}
+export class Compaction extends Context.Service<Compaction, Interface>()("@batonfx/core/Compaction") {}
 
 /** @experimental Options for the default compaction implementation. */
 export interface DefaultOptions {

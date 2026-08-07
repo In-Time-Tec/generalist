@@ -113,10 +113,7 @@ const asProgramCommands = (
   commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
 ): ReadonlyArray<ProgramCommand> => commands as ReadonlyArray<ProgramCommand>
 
-export const update: {
-  (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>]
-  (currentMessage: Message): (model: Model) => readonly [Model, ReadonlyArray<ProgramCommand>]
-} = Function.dual(2, (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
+const updateModel = (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
   switch (currentMessage._tag) {
     case "OpenedSession":
       return [{ ...model, chat: { ...model.chat, sessionId: currentMessage.sessionId }, session: SessionReady() }, []]
@@ -141,7 +138,13 @@ export const update: {
     case "ToggledExpanded":
       return [{ ...model, expandedToolCallIds: toggle(model.expandedToolCallIds, currentMessage.key) }, []]
   }
-})
+}
+
+/** The TEA reducer, with a data-last form for pipelines. */
+export const update: {
+  (currentMessage: Message): (model: Model) => readonly [Model, ReadonlyArray<ProgramCommand>]
+  (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>]
+} = Function.dual(2, updateModel)
 
 // SUBSCRIPTION
 
@@ -429,20 +432,16 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
 
 const sessionBannerView = (session: SessionState): Html => {
   const h = html<Message>()
-  const banner = (content: Html): Html => h.keyed("div")(session._tag, [], [content])
-  switch (session._tag) {
-    case "SessionOpening":
-      return banner(h.p([h.Class("px-6 py-2 text-xs text-muted-foreground")], ["Opening a session…"]))
-    case "SessionFailed":
-      return banner(
-        h.p(
-          [h.Class("bg-destructive/10 px-6 py-2 text-xs text-destructive")],
-          [`Could not open a session: ${session.message}`],
-        ),
-      )
-    case "SessionReady":
-      return banner(h.div([], []))
-  }
+  const content =
+    session._tag === "SessionOpening"
+      ? h.p([h.Class("px-6 py-2 text-xs text-muted-foreground")], ["Opening a session…"])
+      : session._tag === "SessionFailed"
+        ? h.p(
+            [h.Class("bg-destructive/10 px-6 py-2 text-xs text-destructive")],
+            [`Could not open a session: ${session.message}`],
+          )
+        : h.div([], [])
+  return h.keyed("div")(session._tag, [], [content])
 }
 
 const footerView = (model: Model): Html => {

@@ -11,7 +11,7 @@ export interface Interface {
 }
 
 /** @experimental A2A adapter service. */
-export class A2A extends Context.Service<A2A, Interface>()("@batonfx/a2a/service/A2A") {}
+export class A2A extends Context.Service<A2A, Interface>()("@batonfx/a2a/A2A") {}
 
 /** @experimental Provide one explicit A2A deployment over the caller's Runtime. */
 export const layer = (deployment: Deployment): Layer.Layer<A2A, never, Runtime.Runtime> =>

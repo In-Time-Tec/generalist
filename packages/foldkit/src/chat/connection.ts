@@ -85,7 +85,7 @@ export interface Interface {
 }
 /** @experimental */
 export class AgentConnection extends Context.Service<AgentConnection, Interface>()(
-  "@batonfx/foldkit/chat/connection/AgentConnection",
+  "@batonfx/foldkit/AgentConnection",
 ) {}
 
 interface ActiveConnection {

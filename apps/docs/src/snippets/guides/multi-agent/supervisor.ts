@@ -1,4 +1,5 @@
 import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
+import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 let supervisorCalls = 0
@@ -40,9 +41,19 @@ const program = Agent.generate(supervisor.agent, { prompt: "I want a refund for 
   Effect.flatMap((result) => Console.log(result.text)),
 )
 
+const handlerLayer = supervisor.agent.toolkit.toLayer(
+  Object.fromEntries(
+    Object.keys(supervisor.agent.toolkit.tools).map((name) => [
+      name,
+      () => Effect.die("ToolExecutor owns handoff tool execution"),
+    ]),
+  ) as Toolkit.HandlersFrom<typeof supervisor.agent.toolkit.tools>,
+)
+
 const runtimeLayer = Layer.mergeAll(
   modelLayer,
   ToolExecutor.layerToolkit(supervisor.toolkit),
+  handlerLayer,
   supervisor.catalog,
   Approvals.layerAutoApprove,
   ModelMiddleware.layerIdentity,

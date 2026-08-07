@@ -28,9 +28,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class ModelResilience extends Context.Service<ModelResilience, Interface>()(
-  "@batonfx/core/model/model-resilience/ModelResilience",
-) {}
+export class ModelResilience extends Context.Service<ModelResilience, Interface>()("@batonfx/core/ModelResilience") {}
 
 /** @experimental A model resilience policy contains an unsafe correction bound. */
 export class ModelResilienceMisconfigured extends Schema.TaggedErrorClass<ModelResilienceMisconfigured>()(

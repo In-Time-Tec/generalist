@@ -236,5 +236,5 @@ export interface Interface {
 
 /** @experimental Host-owned encoded operations exposed only inside a sandbox execution. */
 export class ProgramCapabilities extends Context.Service<ProgramCapabilities, Interface>()(
-  "@batonfx/core/program/program-capabilities/ProgramCapabilities",
+  "@batonfx/core/ProgramCapabilities",
 ) {}

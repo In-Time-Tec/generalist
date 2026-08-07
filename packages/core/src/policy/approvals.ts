@@ -24,7 +24,7 @@ export interface Interface {
   readonly resolve: (pending: Pending) => Effect.Effect<Resolution>
 }
 /** @experimental Enforcement point for policy asks and `Ai.Tool.needsApproval`. */
-export class Approvals extends Context.Service<Approvals, Interface>()("@batonfx/core/policy/approvals") {}
+export class Approvals extends Context.Service<Approvals, Interface>()("@batonfx/core/Approvals") {}
 /** @experimental Default: every request resolves Approved. */
 export const layerAutoApprove: Layer.Layer<Approvals> = Layer.succeed(
   Approvals,

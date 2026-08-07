@@ -46,9 +46,7 @@ export interface Interface {
 export type Source<R = never> = Effect.Effect<Interface, SkillSourceError, R>
 
 /** @experimental */
-export class SkillSource extends Context.Service<SkillSource, Interface>()(
-  "@batonfx/core/context/skill-source/SkillSource",
-) {}
+export class SkillSource extends Context.Service<SkillSource, Interface>()("@batonfx/core/SkillSource") {}
 
 /** @experimental Build a startup listing line from skill frontmatter. */
 export const makeListing: {

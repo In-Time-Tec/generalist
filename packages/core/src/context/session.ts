@@ -148,9 +148,7 @@ export interface Interface {
   readonly leaf: Effect.Effect<EntryId | null>
 }
 /** @experimental */
-export class SessionStore extends Context.Service<SessionStore, Interface>()(
-  "@batonfx/core/context/session/SessionStore",
-) {}
+export class SessionStore extends Context.Service<SessionStore, Interface>()("@batonfx/core/SessionStore") {}
 interface State {
   readonly entries: HashMap.HashMap<EntryId, Entry>
   readonly order: ReadonlyArray<EntryId>

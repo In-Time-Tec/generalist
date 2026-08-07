@@ -33,9 +33,7 @@ export interface Options {
 export interface Interface {
   readonly execute: (claim: ExecutionClaim) => Effect.Effect<void>
 }
-export class ExecutionHost extends Context.Service<ExecutionHost, Interface>()(
-  "@batonfx/runtime/execution-host/ExecutionHost",
-) {}
+export class ExecutionHost extends Context.Service<ExecutionHost, Interface>()("@batonfx/runtime/ExecutionHost") {}
 const failureMessage = (cause: Cause.Cause<unknown>): string => {
   const error = Cause.squash(cause)
   return error instanceof Error ? error.message : String(error)

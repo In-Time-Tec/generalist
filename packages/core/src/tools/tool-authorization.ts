@@ -60,7 +60,7 @@ export interface ToolAuthorizer<R = never> {
 
 /** @experimental Optional exact tool authorizer service for run-layer composition. */
 export class ToolAuthorizerService extends Context.Service<ToolAuthorizerService, ToolAuthorizer<never>>()(
-  "@batonfx/core/tools/tool-authorization/ToolAuthorizerService",
+  "@batonfx/core/ToolAuthorizerService",
 ) {}
 
 /** @experimental Required services used by the linear authorization pass. */
