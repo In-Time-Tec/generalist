@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 const invoiceSchema = Schema.Struct({ total: Schema.Finite, currency: Schema.String })
@@ -26,14 +26,14 @@ const program = Agent.stream(agent, {
       ? Console.log(`${event._tag}: ${JSON.stringify(event.value)}`)
       : Console.log(event._tag),
   ),
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
 )
 
-await Effect.runPromise(program)
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+)
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

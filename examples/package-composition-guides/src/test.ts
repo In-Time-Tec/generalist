@@ -1,4 +1,4 @@
-import { Console, Effect } from "effect"
+import { Console, Effect, ManagedRuntime } from "effect"
 import { Agent } from "@batonfx/core"
 import { TestModel } from "@batonfx/test"
 
@@ -7,7 +7,7 @@ const agent = Agent.make({ name: "tested-agent" })
 
 const program = Agent.generate(agent, { prompt: "Answer deterministically." }).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(modelLayer),
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(modelLayer)
+await runtime.runPromise(program)

@@ -1,4 +1,4 @@
-import { Config, Console, Effect, Layer } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { Presets } from "@batonfx/providers"
 import { FetchHttpClient } from "effect/unstable/http"
@@ -13,16 +13,14 @@ const providerLayer = Presets.layerGoogleAiStudio({
 const program = ModelRegistry.operate(
   { provider: "google", model: "gemini-2.0-flash" },
   Agent.generate(agent, { prompt: "Summarize the Effect Layer type in one sentence." }),
-).pipe(
-  Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(
-    Layer.mergeAll(
-      providerLayer,
-      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
-)
+).pipe(Effect.flatMap((result) => Console.log(result.text)))
 
-await Effect.runPromise(program.pipe(Effect.provide(FetchHttpClient.layer)))
+const runtimeLayer = Layer.mergeAll(
+  providerLayer,
+  ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+).pipe(Layer.provideMerge(FetchHttpClient.layer))
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 const modelLayer = Layer.effect(
@@ -19,13 +19,13 @@ const children = [
 
 const program = Handoff.fanOut(children, { concurrency: 2 }).pipe(
   Effect.flatMap((results) => Console.log(results.map((result) => result.text).join("\n"))),
-  Effect.provide(
-    Layer.mergeAll(
-      ToolExecutor.layerTest({ execute: () => Effect.die("fanOut children have no tools") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
 )
 
-await Effect.runPromise(program)
+const runtimeLayer = Layer.mergeAll(
+  ToolExecutor.layerTest({ execute: () => Effect.die("fanOut children have no tools") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+)
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

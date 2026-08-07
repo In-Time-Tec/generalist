@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import {
   Agent,
   Approvals,
@@ -43,14 +43,14 @@ const middlewareLayer = ModelMiddleware.layer([
 
 const program = Agent.generate(agent, { prompt: "My SSN is 123-45-6789, please update my record." }).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.layerAutoApprove,
-      middlewareLayer,
-    ),
-  ),
 )
 
-await Effect.runPromise(program)
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Approvals.layerAutoApprove,
+  middlewareLayer,
+)
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

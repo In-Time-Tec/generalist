@@ -1,4 +1,4 @@
-import { Config, Console, Effect, Layer } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { OpenRouter } from "@batonfx/providers"
 import { FetchHttpClient } from "effect/unstable/http"
@@ -16,16 +16,14 @@ const registryLayer = OpenRouter.layer({
 const program = ModelRegistry.operate(
   { provider: "openrouter", model: "openai/gpt-4o-mini" },
   Agent.generate(agent, { prompt: "Name one Effect data type." }),
-).pipe(
-  Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(
-    Layer.mergeAll(
-      registryLayer,
-      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
-)
+).pipe(Effect.flatMap((result) => Console.log(result.text)))
 
-await Effect.runPromise(program.pipe(Effect.provide(FetchHttpClient.layer)))
+const runtimeLayer = Layer.mergeAll(
+  registryLayer,
+  ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+).pipe(Layer.provideMerge(FetchHttpClient.layer))
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

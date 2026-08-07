@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, Memory, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 import { WorkingMemory } from "@batonfx/memory"
 
@@ -22,16 +22,15 @@ const program = Effect.gen(function* () {
   yield* Agent.generate(agent, { prompt: "Ada prefers dark mode.", memory: { key } })
   const second = yield* Agent.generate(agent, { prompt: "What do you remember about Ada?", memory: { key } })
   yield* Console.log(second.text)
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      WorkingMemory.layer({ maxMessages: 8 }),
-    ),
-  ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  ToolExecutor.layerTest({ execute: () => Effect.die("unexpected tool call") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+  WorkingMemory.layer({ maxMessages: 8 }),
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

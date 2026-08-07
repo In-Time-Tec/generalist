@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import {
   Agent,
   AgentTool,
@@ -75,15 +75,15 @@ const modelLayer = Layer.effect(
 
 const program = Agent.generate(parent, { prompt: "Summarize the intro document." }).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      parentToolkit.toLayer({ summarize: () => Effect.die("agent tool bridge handles summarize") }),
-      ToolExecutor.layerToolkit(summarizeToolkit).pipe(Layer.provide(modelLayer)),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
 )
 
-await Effect.runPromise(program)
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  parentToolkit.toLayer({ summarize: () => Effect.die("agent tool bridge handles summarize") }),
+  ToolExecutor.layerToolkit(summarizeToolkit).pipe(Layer.provide(modelLayer)),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+)
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

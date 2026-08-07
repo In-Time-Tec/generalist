@@ -25,19 +25,22 @@ const program = Effect.gen(function* () {
     TestModel.toolCall("lookup_order", { orderId: "42" }, { id: "lookup-1" }),
     TestModel.text("Order 42 shipped yesterday."),
   ])
-  const result = yield* Agent.generate(agent, { prompt: "Where is order 42?" }).pipe(
-    Effect.provide(
-      fixture.layer.pipe(
-        Layer.provideMerge(
-          toolkit.toLayer({
-            lookup_order: (params) =>
-              Effect.sync(() => {
-                executedCalls.push(params)
-                return "shipped yesterday"
-              }),
-          }),
+  const result = yield* Effect.scoped(
+    Effect.flatMap(
+      Layer.build(
+        fixture.layer.pipe(
+          Layer.provideMerge(
+            toolkit.toLayer({
+              lookup_order: (params) =>
+                Effect.sync(() => {
+                  executedCalls.push(params)
+                  return "shipped yesterday"
+                }),
+            }),
+          ),
         ),
       ),
+      (services) => Agent.generate(agent, { prompt: "Where is order 42?" }).pipe(Effect.provideContext(services)),
     ),
   )
   if (result.text !== "Order 42 shipped yesterday.") {

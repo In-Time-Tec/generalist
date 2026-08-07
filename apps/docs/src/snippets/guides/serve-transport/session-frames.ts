@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
 import {
   Agent,
@@ -96,6 +96,7 @@ const program = Effect.gen(function* () {
   yield* Console.log(`live:   ${tags(live)}`)
   const replayed = yield* collectRun(receipt.runId, 2)
   yield* Console.log(`replay: ${tags(replayed)}`)
-}).pipe(Effect.provide(runtimeLayer))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

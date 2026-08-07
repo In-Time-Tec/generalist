@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, Handoff, LanguageModel, ModelMiddleware, Response, ToolExecutor } from "@batonfx/core"
 
 let supervisorCalls = 0
@@ -38,15 +38,15 @@ const supervisor = Handoff.supervisor({
 
 const program = Agent.generate(supervisor.agent, { prompt: "I want a refund for order 42." }).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      ToolExecutor.layerToolkit(supervisor.toolkit),
-      supervisor.catalog,
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
 )
 
-await Effect.runPromise(program)
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  ToolExecutor.layerToolkit(supervisor.toolkit),
+  supervisor.catalog,
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+)
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

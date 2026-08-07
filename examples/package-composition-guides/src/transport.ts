@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Persistence } from "effect/unstable/persistence"
 import { Agent, AgentManifest, Chat, Pins } from "@batonfx/core"
 import { ExecutionHost, ExecutableManifest, ExecutableResolver, RunStore, Runtime } from "@batonfx/runtime"
@@ -52,6 +52,7 @@ const program = Effect.gen(function* () {
   yield* Console.log(
     `admitted ${receipt.runId}; first event: ${Array.from(first)[0]?._tag}; SSE schema: ${Sse.streamSuccess._tag}`,
   )
-}).pipe(Effect.provide(runtimeLayer))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

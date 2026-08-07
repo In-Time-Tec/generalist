@@ -125,7 +125,8 @@ export const approvalsLayer = Approvals.layerTest({
 
 export const toolExecutorLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const handledToolkit = yield* toolkit.pipe(Effect.provide(toolkitLayer))
+    const handlers = yield* Layer.build(toolkitLayer)
+    const handledToolkit = yield* toolkit.pipe(Effect.provideContext(handlers))
     return ToolExecutor.layerToolkit(handledToolkit)
   }),
 ).pipe(Layer.provide(cannedLayer)) as Layer.Layer<ToolExecutor.ToolExecutor>

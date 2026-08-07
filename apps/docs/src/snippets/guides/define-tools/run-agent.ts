@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, LanguageModel, Response } from "@batonfx/core"
 import { docsToolLayer } from "./executor"
 import { toolkit } from "./search-tool"
@@ -39,6 +39,7 @@ const modelLayer = Layer.effect(
 const program = Effect.gen(function* () {
   const result = yield* Agent.generate(agent, { prompt: "Where are toolkits documented?" })
   yield* Console.log(result.text)
-}).pipe(Effect.provide(Layer.mergeAll(modelLayer, docsToolLayer)))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(Layer.mergeAll(modelLayer, docsToolLayer))
+await runtime.runPromise(program)

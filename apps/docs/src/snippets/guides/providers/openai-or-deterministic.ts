@@ -1,4 +1,4 @@
-import { Config, Console, Effect, Layer } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime } from "effect"
 import { Agent, Approvals, ModelMiddleware, ModelRegistry, ToolExecutor } from "@batonfx/core"
 import { Deterministic } from "@batonfx/providers"
 import { FetchHttpClient } from "effect/unstable/http"
@@ -15,14 +15,14 @@ const selection: ModelRegistry.ModelSelection = { provider: "deterministic", mod
 
 const program = ModelRegistry.operate(selection, Agent.generate(agent, { prompt: "Draft the release note." })).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
 )
 
-await Effect.runPromise(program.pipe(Effect.provide(FetchHttpClient.layer)))
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  ToolExecutor.layerTest({ execute: () => Effect.die("this agent has no tools") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+).pipe(Layer.provideMerge(FetchHttpClient.layer))
+
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

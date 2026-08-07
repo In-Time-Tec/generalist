@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Steering, Tool, Toolkit } from "@batonfx/core"
 
 const statusTool = Tool.make("check_status", {
@@ -57,6 +57,7 @@ const program = Effect.gen(function* () {
   const result = yield* Agent.generate(agent, { prompt: "Is the api deploy healthy?" })
   yield* Console.log(`turns: ${result.turns}`)
   yield* Console.log(result.text)
-}).pipe(Effect.provide(layers))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(layers)
+await runtime.runPromise(program)

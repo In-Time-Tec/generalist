@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
 import { McpToolSource } from "@batonfx/mcp"
 
@@ -29,6 +29,7 @@ const sourceLayer = Layer.succeed(McpToolSource.McpToolSource, source)
 
 const program = McpToolSource.McpToolSource.use((mcp) =>
   mcp.tools.pipe(Effect.flatMap((tools) => Console.log(`discovered ${tools.length} MCP tool`))),
-).pipe(Effect.provide(sourceLayer))
+)
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(sourceLayer)
+await runtime.runPromise(program)

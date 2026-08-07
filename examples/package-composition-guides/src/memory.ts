@@ -1,4 +1,4 @@
-import { Console, Effect } from "effect"
+import { Console, Effect, ManagedRuntime } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Memory } from "@batonfx/core"
 import { WorkingMemory } from "@batonfx/memory"
@@ -22,6 +22,7 @@ const program = Memory.Memory.use((memory) =>
     })
     yield* Console.log(`recalled ${recalled.length} messages`)
   }),
-).pipe(Effect.provide(WorkingMemory.layer({ maxMessages: 4 })))
+)
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(WorkingMemory.layer({ maxMessages: 4 }))
+await runtime.runPromise(program)

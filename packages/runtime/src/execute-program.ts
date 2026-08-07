@@ -24,11 +24,18 @@ export const executeProgram = (input: {
     Effect.provideService(ProgramHost.ProgramHost, programHost),
   )
   const scopedExecution = Effect.scoped(
-    resolution.services === undefined ? execution : execution.pipe(Effect.provide(Layer.fresh(resolution.services))),
+    resolution.services === undefined
+      ? execution
+      : Effect.flatMap(Layer.build(Layer.fresh(resolution.services)), (services) =>
+          execution.pipe(Effect.provideContext(services)),
+        ),
   )
   return scopedExecution.pipe(
     Effect.flatMap((value) =>
-      (value === undefined ? Effect.succeed("undefined") : Schema.encodeEffect(Schema.UnknownFromJsonString)(value)).pipe(
+      (value === undefined
+        ? Effect.succeed("undefined")
+        : Schema.encodeEffect(Schema.UnknownFromJsonString)(value)
+      ).pipe(
         Effect.map((encoded) => new TextEncoder().encode(encoded).byteLength),
         Effect.mapError((error) => AgentExecutionFailure.make({ message: error.message })),
         Effect.flatMap((outputBytes) =>

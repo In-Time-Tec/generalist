@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, Tool, Toolkit } from "@batonfx/core"
 
 const weatherTool = Tool.make("get_weather", {
@@ -45,15 +45,14 @@ const scriptedModel = Layer.effect(
 const program = Effect.gen(function* () {
   const result = yield* Agent.generate(agent, { prompt: "Should I bring a jacket in Boise?" })
   yield* Console.log(result.text)
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      scriptedModel,
-      toolkit.toLayer({ get_weather: ({ city }) => Effect.succeed(`sunny and 72°F in ${city}`) }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  scriptedModel,
+  toolkit.toLayer({ get_weather: ({ city }) => Effect.succeed(`sunny and 72°F in ${city}`) }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

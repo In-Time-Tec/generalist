@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, Approvals, LanguageModel, ModelMiddleware, Response, SkillSource, ToolExecutor } from "@batonfx/core"
 
 const frontmatter: SkillSource.Frontmatter = {
@@ -48,16 +48,15 @@ const modelLayer = Layer.effect(
 const program = Effect.gen(function* () {
   const result = yield* Agent.generate(agent, { prompt: "Draft release notes for 0.2.0." })
   yield* Console.log(result.text)
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      ToolExecutor.layerTest({ execute: () => Effect.die("activate_skill is handled by the loop, not the executor") }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-      SkillSource.layerSkills([releaseNotesSkill]),
-    ),
-  ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  ToolExecutor.layerTest({ execute: () => Effect.die("activate_skill is handled by the loop, not the executor") }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
+  SkillSource.layerSkills([releaseNotesSkill]),
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

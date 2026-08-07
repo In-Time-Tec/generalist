@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { Agent, LanguageModel, Response } from "@batonfx/core"
 
 const agent = Agent.make({
@@ -19,7 +19,7 @@ const layers = Layer.mergeAll(modelLayer)
 
 const program = Agent.generate(agent, { prompt: "Are you fully configured?" }).pipe(
   Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(layers),
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(layers)
+await runtime.runPromise(program)

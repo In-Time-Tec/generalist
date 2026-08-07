@@ -1,4 +1,4 @@
-import { Console, Effect } from "effect"
+import { Console, Effect, ManagedRuntime } from "effect"
 import { Prompt, Session } from "@batonfx/core"
 
 const message = (entry: Prompt.Message): Session.AppendInput => ({ _tag: "Message", message: entry })
@@ -29,6 +29,7 @@ const program = Effect.gen(function* () {
   const after = Session.buildContext(path)
   yield* Console.log(`after: ${after.content.map((entry) => entry.role).join(" ")}`)
   yield* Console.log(`log entries: ${path.length}`)
-}).pipe(Effect.provide(Session.layerMemory))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(Session.layerMemory)
+await runtime.runPromise(program)

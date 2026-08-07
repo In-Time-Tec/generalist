@@ -1,4 +1,4 @@
-import { Console, Effect } from "effect"
+import { Console, Effect, ManagedRuntime } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 
 const program = Effect.gen(function* () {
@@ -6,6 +6,7 @@ const program = Effect.gen(function* () {
     body: HttpBody.jsonUnsafe({ waitId: "search-1", resolution: { _tag: "Approved" } }),
   })
   yield* Console.log(`approval response: ${response.status}`)
-}).pipe(Effect.provide(FetchHttpClient.layer))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(FetchHttpClient.layer)
+await runtime.runPromise(program)

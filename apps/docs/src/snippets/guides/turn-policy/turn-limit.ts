@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import {
   Agent,
   AgentEvent,
@@ -52,15 +52,14 @@ const program = Effect.gen(function* () {
   }
   const pending = failure.pending.map((call) => call.tool_name).join(", ")
   yield* Console.log(`stopped before turn ${failure.turn} with pending results from: ${pending}`)
-}).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      modelLayer,
-      toolkit.toLayer({ lookup: ({ topic }) => Effect.succeed(`found ${topic}`) }),
-      Approvals.layerAutoApprove,
-      ModelMiddleware.layerIdentity,
-    ),
-  ),
+})
+
+const runtimeLayer = Layer.mergeAll(
+  modelLayer,
+  toolkit.toLayer({ lookup: ({ topic }) => Effect.succeed(`found ${topic}`) }),
+  Approvals.layerAutoApprove,
+  ModelMiddleware.layerIdentity,
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(runtimeLayer)
+await runtime.runPromise(program)

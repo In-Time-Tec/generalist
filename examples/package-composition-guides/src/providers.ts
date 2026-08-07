@@ -1,4 +1,4 @@
-import { Console, Effect } from "effect"
+import { Console, Effect, ManagedRuntime } from "effect"
 import { Agent, ModelRegistry } from "@batonfx/core"
 import { Deterministic } from "@batonfx/providers"
 
@@ -8,9 +8,7 @@ const selection = { provider: "deterministic", model: "local" }
 const program = ModelRegistry.operate(
   selection,
   Agent.generate(agent, { prompt: "Give me the deterministic response." }),
-).pipe(
-  Effect.flatMap((result) => Console.log(result.text)),
-  Effect.provide(Deterministic.layer(selection)),
-)
+).pipe(Effect.flatMap((result) => Console.log(result.text)))
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(Deterministic.layer(selection))
+await runtime.runPromise(program)

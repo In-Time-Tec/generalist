@@ -1,4 +1,4 @@
-import { Console, Effect, Layer, Schema, Stream } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Schema, Stream } from "effect"
 import {
   Agent,
   Approvals,
@@ -58,7 +58,7 @@ const describe = (event: AgentEvent.Event): string =>
 
 const program = Agent.stream(agent, { prompt: "What does TurnPolicy do?" }).pipe(
   Stream.runForEach((event) => Console.log(describe(event))),
-  Effect.provide(layers),
 )
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(layers)
+await runtime.runPromise(program)

@@ -1,4 +1,4 @@
-import { Console, Effect } from "effect"
+import { Console, Effect, ManagedRuntime } from "effect"
 import { Agent, ModelRegistry } from "@batonfx/core"
 import { Deterministic } from "@batonfx/providers"
 
@@ -13,6 +13,7 @@ const program = Effect.gen(function* () {
     return yield* Effect.die(`Unexpected eval output: ${result.text}`)
   }
   yield* Console.log("eval passed")
-}).pipe(Effect.provide(Deterministic.layer({ model: "local" })))
+})
 
-await Effect.runPromise(program)
+const runtime = ManagedRuntime.make(Deterministic.layer({ model: "local" }))
+await runtime.runPromise(program)
