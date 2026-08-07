@@ -18,7 +18,9 @@ export interface Interface {
   readonly idle: Effect.Effect<void>
 }
 
-export class LocalScheduler extends Context.Service<LocalScheduler, Interface>()("@batonfx/runtime/LocalScheduler") {}
+export class LocalScheduler extends Context.Service<LocalScheduler, Interface>()(
+  "@batonfx/runtime/local-scheduler/LocalScheduler",
+) {}
 
 const terminalStatuses = ["succeeded", "failed", "cancelled"] as const
 type TerminalStatus = (typeof terminalStatuses)[number]

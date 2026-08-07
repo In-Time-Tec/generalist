@@ -11,6 +11,7 @@
   },
   "ignorePatterns": ["dist", "node_modules", ".turbo"],
   "rules": {
+    "effecttsgo/abort-controller-in-effect": "error",
     "effecttsgo/any-unknown-in-error-context": "error",
     "effecttsgo/async-function": "error",
     "effecttsgo/catch-all-to-map-error": "error",
@@ -22,7 +23,7 @@
     "effecttsgo/class-self-mismatch": "error",
     "effecttsgo/crypto-random-uuid": "error",
     "effecttsgo/crypto-random-uuid-in-effect": "error",
-    "effecttsgo/deterministic-keys": "off",
+    "effecttsgo/deterministic-keys": "error",
     "effecttsgo/duplicate-package": "error",
     "effecttsgo/effect-do-notation": "error",
     "effecttsgo/effect-fn-iife": "error",
@@ -75,8 +76,10 @@
     "effecttsgo/overridden-schema-constructor": "error",
     "effecttsgo/prefer-schema-over-json": "error",
     "effecttsgo/prefer-schema-type-property": "error",
+    "effecttsgo/prefer-unsafe-constructor": "error",
     "effecttsgo/process-env": "error",
     "effecttsgo/process-env-in-effect": "error",
+    "effecttsgo/promise-in-effect-success": "error",
     "effecttsgo/redundant-map-error": "error",
     "effecttsgo/redundant-or-die": "error",
     "effecttsgo/redundant-schema-tag-identifier": "error",
@@ -102,6 +105,8 @@
     "effecttsgo/unnecessary-pipe-chain": "error",
     "effecttsgo/unnecessary-typeof-type": "error",
     "effecttsgo/unsafe-effect-type-assertion": "error",
+    "no-var": "error",
+    "no-param-reassign": "error",
     "eslint/no-underscore-dangle": [
       "error",
       {

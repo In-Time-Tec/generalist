@@ -226,4 +226,4 @@ export interface Interface {
   readonly awaitFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, AwaitFanOutError>
 }
 
-export class Runtime extends Context.Service<Runtime, Interface>()("@batonfx/runtime/Runtime") {}
+export class Runtime extends Context.Service<Runtime, Interface>()("@batonfx/runtime/runtime") {}

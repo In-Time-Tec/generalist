@@ -27,7 +27,7 @@ export interface Middleware {
 
 /** @experimental Service holding the middleware chain, applied in array order. */
 export class ModelMiddleware extends Context.Service<ModelMiddleware, ReadonlyArray<Middleware>>()(
-  "@batonfx/core/ModelMiddleware",
+  "@batonfx/core/model/model-middleware/ModelMiddleware",
 ) {}
 
 /** @experimental Identity chain — the default. */

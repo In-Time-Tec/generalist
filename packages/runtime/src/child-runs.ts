@@ -45,7 +45,7 @@ export interface Interface {
 }
 
 /** @experimental Runtime-owned child execution service. */
-export class ChildRuns extends Context.Service<ChildRuns, Interface>()("@batonfx/runtime/ChildRuns") {}
+export class ChildRuns extends Context.Service<ChildRuns, Interface>()("@batonfx/runtime/child-runs/ChildRuns") {}
 
 const success = (result: unknown): ToolExecutor.Outcome => ({ _tag: "Success", result, encodedResult: result })
 

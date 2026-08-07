@@ -28,6 +28,7 @@ BatonFX is an Effect-native agent framework over `effect/unstable/ai` with an op
 - Follow the construction-verb canon: `make` constructs an in-memory value, `register` records it for later lookup, and `start` begins a hosted Runtime `Execution`. Do not use `create` as a synonym for `make` or `register`.
 - Name Layer constructors `layer` or with a noun after `layer` (`layerMemory`, `layerNoop`, `layerIdentity`, `layerConfig`). Put parameters in `layer(options)`; do not add Layer aliases or flag-in-a-name variants.
 - Model boundary failures with `Schema.TaggedErrorClass`, tag them `@<scope>/<package>/<Name>`, and name the class for the failure condition without forcing an `Error` suffix.
+- Tag `Context.Service` classes `@<scope>/<package>/<module-path>/<ServiceClass>`; `effecttsgo/deterministic-keys` derives the key from the file path and enforces it. Boundary error tags stay `@<scope>/<package>/<Name>` because they are wire identities that must survive a file move.
 - Every exported symbol carries `@experimental` while Effect AI is unstable.
 - Public modules use intentional package-root namespaces. Services expose `Interface`, `Context.Service`, explicit Layers, schema-backed boundary errors, and a `layerTest` or `layerMemory` for behavior-bearing seams.
 - Prefer direct imports. Do not add wrapper files, catch-all `utils`/`helpers`/`common`/`lib` directories, or namespace imports.

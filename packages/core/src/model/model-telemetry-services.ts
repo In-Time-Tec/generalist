@@ -22,7 +22,7 @@ export interface InvocationCoordinatorInterface {
 
 /** @experimental */
 export class InvocationCoordinator extends Context.Service<InvocationCoordinator, InvocationCoordinatorInterface>()(
-  "@batonfx/core/InvocationCoordinator",
+  "@batonfx/core/model/model-telemetry-services/InvocationCoordinator",
 ) {}
 
 /** @experimental */
@@ -50,7 +50,9 @@ export interface DeliveryInterface {
 }
 
 /** @experimental */
-export class Delivery extends Context.Service<Delivery, DeliveryInterface>()("@batonfx/core/Delivery") {}
+export class Delivery extends Context.Service<Delivery, DeliveryInterface>()(
+  "@batonfx/core/model/model-telemetry-services/Delivery",
+) {}
 
 /** @experimental No-op host delivery sink. */
 export const layerNoop: Layer.Layer<Delivery> = Layer.succeed(Delivery, Delivery.of({ deliver: () => Effect.void }))

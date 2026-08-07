@@ -90,7 +90,9 @@ export interface Interface {
 }
 
 /** @experimental Owner of Agent Program execution and its host policy. */
-export class ProgramHost extends Context.Service<ProgramHost, Interface>()("@batonfx/core/ProgramHost") {}
+export class ProgramHost extends Context.Service<ProgramHost, Interface>()(
+  "@batonfx/core/program/program-host/ProgramHost",
+) {}
 
 const encodedBytes = (value: unknown): Effect.Effect<number, ProgramSchemaFailure> =>
   Schema.encodeEffect(Schema.UnknownFromJsonString)(value).pipe(
@@ -424,14 +426,14 @@ export const layerDirect = (options: {
             return yield* ProgramIdentityMismatch.make({ expected: request.program.pin, actual: actualPin })
           yield* validateBindings(request.program, options.bindings)
           const capabilities = yield* makeCapabilities(options.bindings, request.program.manifest.budget)
-          const controller = new AbortController()
+          const signal = yield* Effect.abortSignal
           const execution = options.sandbox
             .execute({
               language: "javascript",
               source: request.program.manifest.source.text,
               sourceDigest: digest(request.program.manifest.source.text),
               input: request.input,
-              signal: controller.signal,
+              signal,
               limits: {
                 wallTimeMillis: request.program.manifest.budget.wallClockMillis,
                 outputBytes: request.program.manifest.budget.outputBytes,
@@ -449,7 +451,6 @@ export const layerDirect = (options: {
                   }),
                 ),
             }),
-            Effect.onInterrupt(() => Effect.sync(() => controller.abort())),
           )
           const bytes = yield* encodedBytes(output)
           if (bytes > request.program.manifest.budget.outputBytes)

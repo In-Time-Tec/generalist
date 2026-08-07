@@ -15,7 +15,7 @@ export interface Options {
 
 /** @experimental */
 export class SummaryModel extends Context.Service<SummaryModel, LanguageModel.Service>()(
-  "@batonfx/memory/SummaryModel",
+  "@batonfx/memory/memory/working-memory/SummaryModel",
 ) {}
 
 /** @experimental */

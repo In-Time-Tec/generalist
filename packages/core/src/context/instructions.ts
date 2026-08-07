@@ -19,7 +19,7 @@ export interface Interface {
 }
 
 /** @experimental */
-export class Instructions extends Context.Service<Instructions, Interface>()("@batonfx/core/Instructions") {}
+export class Instructions extends Context.Service<Instructions, Interface>()("@batonfx/core/context/instructions") {}
 
 /** @experimental A static baseline source. */
 export const staticSource: {
