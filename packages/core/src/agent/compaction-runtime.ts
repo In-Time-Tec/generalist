@@ -1,5 +1,5 @@
 import { Clock, Effect, Equal, Exit, Option, Ref, Schema } from "effect"
-import { Chat, LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
+import { Chat, Prompt, Tokenizer } from "effect/unstable/ai"
 import { AgentError, MiddlewareViolation } from "./agent-event.js"
 import {
   Compaction,
