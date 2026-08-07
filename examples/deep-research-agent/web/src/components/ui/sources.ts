@@ -1,3 +1,4 @@
+import { Function } from "effect"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -52,7 +53,10 @@ const chevronDownIcon = <ParentMessage>(isOpen: boolean): Html => {
  * pattern: the consumer keeps an `isOpen` boolean in its Model, flips it on
  * the trigger's `onToggled`, and renders `sourcesContent` conditionally.
  */
-export const sources = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const sources: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -62,7 +66,7 @@ export const sources = <ParentMessage>(config: SlotConfig<ParentMessage>, childr
     ],
     [...children],
   )
-}
+})
 
 export type SourcesTriggerConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -72,34 +76,37 @@ export type SourcesTriggerConfig<ParentMessage> = SlotConfig<ParentMessage> &
   }>
 
 /** Trigger row reading "Used N sources" with a chevron that flips with `isOpen`. Children replace the default row. */
-export const sourcesTrigger = <ParentMessage>(
-  config: SourcesTriggerConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string> = [],
-): Html => {
-  const h = html<ParentMessage>()
-  const defaultChildren: ReadonlyArray<Html> = [
-    h.span([h.Class("font-medium")], [`Used ${config.count} sources`]),
-    chevronDownIcon<ParentMessage>(config.isOpen),
-  ]
-  return h.button(
-    [
-      h.Type("button"),
-      h.OnClick(config.onToggled),
-      h.AriaExpanded(config.isOpen),
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "sources-trigger"),
-      h.DataAttribute("state", config.isOpen ? "open" : "closed"),
-      h.Class(cn("flex items-center gap-2", config.class)),
-    ],
-    children.length > 0 ? [...children] : defaultChildren,
-  )
-}
+export const sourcesTrigger: {
+  <ParentMessage>(config: SourcesTriggerConfig<ParentMessage>, children?: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children?: ReadonlyArray<Html | string>): (config: SourcesTriggerConfig<ParentMessage>) => Html
+} = Function.dual(
+  (args) => args.length > 0 && !Array.isArray(args[0]),
+  <ParentMessage>(config: SourcesTriggerConfig<ParentMessage>, children: ReadonlyArray<Html | string> = []): Html => {
+    const h = html<ParentMessage>()
+    const defaultChildren: ReadonlyArray<Html> = [
+      h.span([h.Class("font-medium")], [`Used ${config.count} sources`]),
+      chevronDownIcon<ParentMessage>(config.isOpen),
+    ]
+    return h.button(
+      [
+        h.Type("button"),
+        h.OnClick(config.onToggled),
+        h.AriaExpanded(config.isOpen),
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "sources-trigger"),
+        h.DataAttribute("state", config.isOpen ? "open" : "closed"),
+        h.Class(cn("flex items-center gap-2", config.class)),
+      ],
+      children.length > 0 ? [...children] : defaultChildren,
+    )
+  },
+)
 
 /** Column of source links. Render it conditionally on the consumer's `isOpen` state. */
-export const sourcesContent = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const sourcesContent: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -109,7 +116,7 @@ export const sourcesContent = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 export type SourceConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -118,24 +125,27 @@ export type SourceConfig<ParentMessage> = SlotConfig<ParentMessage> &
   }>
 
 /** One source link row: a book icon and the source title, opening in a new tab. Children replace the default row. */
-export const source = <ParentMessage>(
-  config: SourceConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string> = [],
-): Html => {
-  const h = html<ParentMessage>()
-  const defaultChildren: ReadonlyArray<Html> = [
-    bookIcon<ParentMessage>(),
-    h.span([h.Class("block font-medium")], [config.title ?? config.href]),
-  ]
-  return h.a(
-    [
-      h.Href(config.href),
-      h.Target("_blank"),
-      h.Rel("noreferrer"),
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "source"),
-      h.Class(cn("flex items-center gap-2", config.class)),
-    ],
-    children.length > 0 ? [...children] : defaultChildren,
-  )
-}
+export const source: {
+  <ParentMessage>(config: SourceConfig<ParentMessage>, children?: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children?: ReadonlyArray<Html | string>): (config: SourceConfig<ParentMessage>) => Html
+} = Function.dual(
+  (args) => args.length > 0 && !Array.isArray(args[0]),
+  <ParentMessage>(config: SourceConfig<ParentMessage>, children: ReadonlyArray<Html | string> = []): Html => {
+    const h = html<ParentMessage>()
+    const defaultChildren: ReadonlyArray<Html> = [
+      bookIcon<ParentMessage>(),
+      h.span([h.Class("block font-medium")], [config.title ?? config.href]),
+    ]
+    return h.a(
+      [
+        h.Href(config.href),
+        h.Target("_blank"),
+        h.Rel("noreferrer"),
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "source"),
+        h.Class(cn("flex items-center gap-2", config.class)),
+      ],
+      children.length > 0 ? [...children] : defaultChildren,
+    )
+  },
+)

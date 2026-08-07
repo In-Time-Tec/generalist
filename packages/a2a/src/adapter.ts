@@ -21,7 +21,7 @@ import {
   type TaskStore,
 } from "@a2a-js/sdk/server"
 import { type Address, Cursor, type Run, type RunEvent, type Runtime } from "@batonfx/runtime"
-import { Effect, Option, Stream } from "effect"
+import { Effect, Function, Option, Stream } from "effect"
 import { decode } from "./content.js"
 import { artifactFromEvent, fromRuntime, stateFromRun, statusFromEvent } from "./projection.js"
 import { TaskNotWaiting } from "./errors.js"
@@ -110,7 +110,8 @@ const toAsyncGenerator = <A>(iterable: AsyncIterable<A>): AsyncGenerator<A, void
       return this
     },
     next: () => iterator.next(),
-    return: (value) => (iterator.return === undefined ? Promise.resolve({ done: true, value }) : iterator.return(value)),
+    return: (value) =>
+      iterator.return === undefined ? Promise.resolve({ done: true, value }) : iterator.return(value),
     throw: (error) => (iterator.throw === undefined ? Promise.reject(error) : iterator.throw(error)),
     [Symbol.asyncDispose]: () =>
       iterator.return === undefined ? Promise.resolve() : iterator.return(undefined).then(() => undefined),
@@ -187,7 +188,10 @@ const makeExecutor = (runtime: Runtime.Interface, deployment: Deployment): Agent
       bus.publish(AgentEvent.task(task))
       const wait = snapshot.run.wait
       if (snapshot.run.status !== "waiting" || wait === undefined || wait.status !== "open") {
-        return yield* TaskNotWaiting.make({ taskId: context.taskId, message: `Task ${context.taskId} is not waiting for input` })
+        return yield* TaskNotWaiting.make({
+          taskId: context.taskId,
+          message: `Task ${context.taskId} is not waiting for input`,
+        })
       }
       if (wait.reason._tag === "Approval") {
         yield* runtime.respondApproval({
@@ -269,7 +273,11 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
     return toAsyncGenerator(
       Stream.toAsyncIterable(
         Stream.fromEffect(Effect.promise(() => validateRequest(params))).pipe(
-          Stream.flatMap(() => Stream.fromAsyncIterable(stream(), (error): never => { throw error })),
+          Stream.flatMap(() =>
+            Stream.fromAsyncIterable(stream(), (error): never => {
+              throw error
+            }),
+          ),
         ),
       ),
     )
@@ -342,25 +350,31 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
             return { snapshot, task }
           }),
         ).pipe(
-        Stream.flatMap(({ snapshot, task }) => {
-          const head = Stream.make({ payload: { $case: "task", value: task } })
-          if (
-            snapshot.run.status === "succeeded" ||
-            snapshot.run.status === "failed" ||
-            snapshot.run.status === "cancelled"
-          ) {
-            return head
-          }
-          return head.pipe(
-            Stream.concat(resubscribeResponses(task, runtime.events({ runId: params.id, cursor: snapshot.cursor }))),
-          )
-        }),
+          Stream.flatMap(({ snapshot, task }) => {
+            const head = Stream.make({ payload: { $case: "task", value: task } })
+            if (
+              snapshot.run.status === "succeeded" ||
+              snapshot.run.status === "failed" ||
+              snapshot.run.status === "cancelled"
+            ) {
+              return head
+            }
+            return head.pipe(
+              Stream.concat(resubscribeResponses(task, runtime.events({ runId: params.id, cursor: snapshot.cursor }))),
+            )
+          }),
+        ),
       ),
-    ),
-  )
-}
+    )
+  }
 }
 
 /** @experimental Construct the SDK handler while keeping Runtime as task authority. */
-export const makeHandler = (runtime: Runtime.Interface, deployment: Deployment): DefaultRequestHandler =>
-  new RuntimeRequestHandler(deployment.card, makeTaskStore(runtime), makeExecutor(runtime, deployment), runtime)
+export const makeHandler: {
+  (runtime: Runtime.Interface, deployment: Deployment): DefaultRequestHandler
+  (deployment: Deployment): (runtime: Runtime.Interface) => DefaultRequestHandler
+} = Function.dual(
+  2,
+  (runtime: Runtime.Interface, deployment: Deployment): DefaultRequestHandler =>
+    new RuntimeRequestHandler(deployment.card, makeTaskStore(runtime), makeExecutor(runtime, deployment), runtime),
+)

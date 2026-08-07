@@ -1,4 +1,5 @@
 import { type VariantProps, cva } from "class-variance-authority"
+import { Function } from "effect"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -33,18 +34,21 @@ export type BadgeConfig<ParentMessage> = SlotConfig<ParentMessage> &
     dataSlot?: string
   }>
 
-export const badge = <ParentMessage>(
-  config: BadgeConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  const { dataSlot = "badge" } = config
-  return h.span(
-    [
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", dataSlot),
-      h.Class(cn(badgeVariants({ variant: config.variant }), config.class)),
-    ],
-    [...children],
-  )
-}
+export const badge: {
+  <ParentMessage>(config: BadgeConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: BadgeConfig<ParentMessage>) => Html
+} = Function.dual(
+  2,
+  <ParentMessage>(config: BadgeConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    const { dataSlot = "badge" } = config
+    return h.span(
+      [
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", dataSlot),
+        h.Class(cn(badgeVariants({ variant: config.variant }), config.class)),
+      ],
+      [...children],
+    )
+  },
+)

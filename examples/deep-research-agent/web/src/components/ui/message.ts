@@ -1,3 +1,4 @@
+import { Function } from "effect"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -9,7 +10,10 @@ import { cn } from "@/lib/utils"
 export type MessageAlign = "start" | "end"
 
 /** Stack of related messages, spacing them tighter than the surrounding conversation. */
-export const messageGroup = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const messageGroup: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -19,7 +23,7 @@ export const messageGroup = <ParentMessage>(config: SlotConfig<ParentMessage>, c
     ],
     [...children],
   )
-}
+})
 
 export type MessageConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -31,7 +35,10 @@ export type MessageConfig<ParentMessage> = SlotConfig<ParentMessage> &
  * user's messages (avatar on the right, content flowing from the end edge);
  * the default `'start'` alignment suits assistant or other-party messages.
  */
-export const message = <ParentMessage>(config: MessageConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const message: {
+  <ParentMessage>(config: MessageConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: MessageConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: MessageConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -44,13 +51,13 @@ export const message = <ParentMessage>(config: MessageConfig<ParentMessage>, chi
     ],
     [...children],
   )
-}
+})
 
 /** Avatar well pinned to the bottom of the row. Compose the avatar component (or a plain img) inside it. */
-export const messageAvatar = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const messageAvatar: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -65,13 +72,13 @@ export const messageAvatar = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 /** Column holding the bubbles, header, and footer of a turn. */
-export const messageContent = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const messageContent: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -86,46 +93,52 @@ export const messageContent = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 /** Sender name or timestamp line above the bubbles. */
-export const messageHeader = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  return h.div(
-    [
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "message-header"),
-      h.Class(
-        cn(
-          "flex max-w-full min-w-0 items-center px-3 text-xs font-medium text-muted-foreground group-has-data-[variant=ghost]/message:px-0",
-          config.class,
+export const messageHeader: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(
+  2,
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    return h.div(
+      [
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "message-header"),
+        h.Class(
+          cn(
+            "flex max-w-full min-w-0 items-center px-3 text-xs font-medium text-muted-foreground group-has-data-[variant=ghost]/message:px-0",
+            config.class,
+          ),
         ),
-      ),
-    ],
-    [...children],
-  )
-}
+      ],
+      [...children],
+    )
+  },
+)
 
 /** Delivery status or timestamp line below the bubbles, end-aligned for `align: 'end'` messages. */
-export const messageFooter = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  return h.div(
-    [
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "message-footer"),
-      h.Class(
-        cn(
-          "flex max-w-full min-w-0 items-center px-3 text-xs font-medium text-muted-foreground group-has-data-[variant=ghost]/message:px-0 group-data-[align=end]/message:justify-end",
-          config.class,
+export const messageFooter: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(
+  2,
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    return h.div(
+      [
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "message-footer"),
+        h.Class(
+          cn(
+            "flex max-w-full min-w-0 items-center px-3 text-xs font-medium text-muted-foreground group-has-data-[variant=ghost]/message:px-0 group-data-[align=end]/message:justify-end",
+            config.class,
+          ),
         ),
-      ),
-    ],
-    [...children],
-  )
-}
+      ],
+      [...children],
+    )
+  },
+)

@@ -1,3 +1,4 @@
+import { Function } from "effect"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -25,7 +26,10 @@ import { cn } from "@/lib/utils"
  * ])
  * ```
  */
-export const conversation = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const conversation: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return root(
     {
@@ -34,7 +38,7 @@ export const conversation = <ParentMessage>(config: SlotConfig<ParentMessage>, c
     },
     children,
   )
-}
+})
 
 export type ConversationContentConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -43,23 +47,26 @@ export type ConversationContentConfig<ParentMessage> = SlotConfig<ParentMessage>
   }>
 
 /** Scrolling column of turns: the scroller viewport wrapping the growth-observed content element. */
-export const conversationContent = <ParentMessage>(
-  config: ConversationContentConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html =>
-  viewport(
-    {
-      model: config.model,
-      toParentMessage: config.toParentMessage,
-      attributes: config.attributes ?? [],
-    },
-    [
-      content(
-        { toParentMessage: config.toParentMessage, class: cn("flex flex-col gap-8 p-4", config.class) },
-        children,
-      ),
-    ],
-  )
+export const conversationContent: {
+  <ParentMessage>(config: ConversationContentConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: ConversationContentConfig<ParentMessage>) => Html
+} = Function.dual(
+  2,
+  <ParentMessage>(config: ConversationContentConfig<ParentMessage>, children: ReadonlyArray<Html>): Html =>
+    viewport(
+      {
+        model: config.model,
+        toParentMessage: config.toParentMessage,
+        attributes: config.attributes ?? [],
+      },
+      [
+        content(
+          { toParentMessage: config.toParentMessage, class: cn("flex flex-col gap-8 p-4", config.class) },
+          children,
+        ),
+      ],
+    ),
+)
 
 export type ConversationEmptyStateConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -69,29 +76,40 @@ export type ConversationEmptyStateConfig<ParentMessage> = SlotConfig<ParentMessa
   }>
 
 /** Placeholder shown before the first message. Children replace the default icon, title, and description stack. */
-export const conversationEmptyState = <ParentMessage>(
-  config: ConversationEmptyStateConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string> = [],
-): Html => {
-  const h = html<ParentMessage>()
-  const title = config.title ?? "No messages yet"
-  const description = config.description ?? "Start a conversation to see messages here"
-  const defaultChildren: ReadonlyArray<Html> = [
-    ...(config.icon === undefined ? [] : [h.div([h.Class("text-muted-foreground")], [config.icon])]),
-    h.div(
-      [h.Class("space-y-1")],
-      [h.h3([h.Class("text-sm font-medium")], [title]), h.p([h.Class("text-sm text-muted-foreground")], [description])],
-    ),
-  ]
-  return h.div(
-    [
-      ...(config.attributes ?? []),
-      h.DataAttribute("slot", "conversation-empty-state"),
-      h.Class(cn("flex size-full flex-col items-center justify-center gap-3 p-8 text-center", config.class)),
-    ],
-    children.length > 0 ? [...children] : defaultChildren,
-  )
-}
+export const conversationEmptyState: {
+  <ParentMessage>(config: ConversationEmptyStateConfig<ParentMessage>, children?: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(
+    children?: ReadonlyArray<Html | string>,
+  ): (config: ConversationEmptyStateConfig<ParentMessage>) => Html
+} = Function.dual(
+  (args) => args.length > 0 && !Array.isArray(args[0]),
+  <ParentMessage>(
+    config: ConversationEmptyStateConfig<ParentMessage>,
+    children: ReadonlyArray<Html | string> = [],
+  ): Html => {
+    const h = html<ParentMessage>()
+    const title = config.title ?? "No messages yet"
+    const description = config.description ?? "Start a conversation to see messages here"
+    const defaultChildren: ReadonlyArray<Html> = [
+      ...(config.icon === undefined ? [] : [h.div([h.Class("text-muted-foreground")], [config.icon])]),
+      h.div(
+        [h.Class("space-y-1")],
+        [
+          h.h3([h.Class("text-sm font-medium")], [title]),
+          h.p([h.Class("text-sm text-muted-foreground")], [description]),
+        ],
+      ),
+    ]
+    return h.div(
+      [
+        ...(config.attributes ?? []),
+        h.DataAttribute("slot", "conversation-empty-state"),
+        h.Class(cn("flex size-full flex-col items-center justify-center gap-3 p-8 text-center", config.class)),
+      ],
+      children.length > 0 ? [...children] : defaultChildren,
+    )
+  },
+)
 
 export type ConversationScrollButtonConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{

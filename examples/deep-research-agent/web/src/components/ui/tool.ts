@@ -1,3 +1,4 @@
+import { Function } from "effect"
 import { cva } from "class-variance-authority"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
@@ -125,7 +126,10 @@ export const toolStatusBadge = <ParentMessage>(status: ToolStatus): Html =>
  * consumer keeps an `isOpen` boolean in its Model, flips it on the header's
  * `onToggled`, and renders `toolContent` conditionally.
  */
-export const tool = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const tool: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -135,7 +139,7 @@ export const tool = <ParentMessage>(config: SlotConfig<ParentMessage>, children:
     ],
     [...children],
   )
-}
+})
 
 export type ToolHeaderConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -173,7 +177,10 @@ export const toolHeader = <ParentMessage>(config: ToolHeaderConfig<ParentMessage
 }
 
 /** Tool body holding the input and output sections. Render it conditionally on the consumer's `isOpen` state. */
-export const toolContent = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const toolContent: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -183,14 +190,17 @@ export const toolContent = <ParentMessage>(config: SlotConfig<ParentMessage>, ch
     ],
     [...children],
   )
-}
+})
 
 /**
  * Parameters section: renders `code` (typically pretty-printed JSON) in a
  * pre-formatted block. AI Elements uses a syntax-highlighted CodeBlock here;
  * foldcn has no code-block component (gap), so this is a plain `pre`.
  */
-export const toolInput = <ParentMessage>(config: SlotConfig<ParentMessage>, code: string): Html => {
+export const toolInput: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, code: string): Html
+  <ParentMessage>(code: string): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, code: string): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -206,7 +216,7 @@ export const toolInput = <ParentMessage>(config: SlotConfig<ParentMessage>, code
       ),
     ],
   )
-}
+})
 
 export type ToolOutputConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -217,30 +227,33 @@ export type ToolOutputConfig<ParentMessage> = SlotConfig<ParentMessage> &
  * Result section. Pass the rendered output (or the error text) as children;
  * `isError: true` switches the heading to "Error" and the destructive tint.
  */
-export const toolOutput = <ParentMessage>(
-  config: ToolOutputConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const h = html<ParentMessage>()
-  const isError = config.isError ?? false
-  return h.div(
-    [...(config.attributes ?? []), h.DataAttribute("slot", "tool-output"), h.Class(cn("space-y-2", config.class))],
-    [
-      h.h4(
-        [h.Class("text-xs font-medium tracking-wide text-muted-foreground uppercase")],
-        [isError ? "Error" : "Result"],
-      ),
-      h.div(
-        [
-          h.Class(
-            cn(
-              "overflow-x-auto rounded-md text-xs [&_table]:w-full",
-              isError ? "bg-destructive/10 text-destructive" : "bg-muted/50 text-foreground",
+export const toolOutput: {
+  <ParentMessage>(config: ToolOutputConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: ToolOutputConfig<ParentMessage>) => Html
+} = Function.dual(
+  2,
+  <ParentMessage>(config: ToolOutputConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const h = html<ParentMessage>()
+    const isError = config.isError ?? false
+    return h.div(
+      [...(config.attributes ?? []), h.DataAttribute("slot", "tool-output"), h.Class(cn("space-y-2", config.class))],
+      [
+        h.h4(
+          [h.Class("text-xs font-medium tracking-wide text-muted-foreground uppercase")],
+          [isError ? "Error" : "Result"],
+        ),
+        h.div(
+          [
+            h.Class(
+              cn(
+                "overflow-x-auto rounded-md text-xs [&_table]:w-full",
+                isError ? "bg-destructive/10 text-destructive" : "bg-muted/50 text-foreground",
+              ),
             ),
-          ),
-        ],
-        [...children],
-      ),
-    ],
-  )
-}
+          ],
+          [...children],
+        ),
+      ],
+    )
+  },
+)

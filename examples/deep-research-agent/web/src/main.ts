@@ -1,5 +1,5 @@
 import { Chat, Connection } from "@batonfx/foldkit"
-import { Cause, Effect, Schema } from "effect"
+import { Cause, Effect, Function, Schema } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/unstable/http"
 import { define, mapMessage, mapMessages, type Command } from "foldkit/command"
 import type { Document, Html } from "foldkit/html"
@@ -110,7 +110,10 @@ const asProgramCommands = (
   commands: ReadonlyArray<Command<Message, unknown, Connection.AgentConnection>>,
 ): ReadonlyArray<ProgramCommand> => commands as ReadonlyArray<ProgramCommand>
 
-export const update = (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
+export const update: {
+  (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>]
+  (currentMessage: Message): (model: Model) => readonly [Model, ReadonlyArray<ProgramCommand>]
+} = Function.dual(2, (model: Model, currentMessage: Message): readonly [Model, ReadonlyArray<ProgramCommand>] => {
   switch (currentMessage._tag) {
     case "OpenedSession":
       return [{ ...model, chat: { ...model.chat, sessionId: currentMessage.sessionId }, session: SessionReady() }, []]
@@ -135,7 +138,7 @@ export const update = (model: Model, currentMessage: Message): readonly [Model, 
     case "ToggledExpanded":
       return [{ ...model, expandedToolCallIds: toggle(model.expandedToolCallIds, currentMessage.key) }, []]
   }
-}
+})
 
 // SUBSCRIPTION
 

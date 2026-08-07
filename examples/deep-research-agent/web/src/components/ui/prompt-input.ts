@@ -1,4 +1,4 @@
-import { Option } from "effect"
+import { Option, Function } from "effect"
 import type { Html } from "foldkit/html"
 import { html } from "foldkit/html"
 
@@ -101,10 +101,10 @@ export type PromptInputConfig<ParentMessage> = SlotConfig<ParentMessage> &
  * attachment state and submission in the consumer's Model instead.
  * `onSubmitted` fires on native form submission with the default prevented.
  */
-export const promptInput = <ParentMessage>(
-  config: PromptInputConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const promptInput: {
+  <ParentMessage>(config: PromptInputConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: PromptInputConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: PromptInputConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.form(
     [
@@ -115,7 +115,7 @@ export const promptInput = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 export type PromptInputTextareaConfig<ParentMessage> = TextareaConfig<ParentMessage> &
   Readonly<{
@@ -152,10 +152,10 @@ export const promptInputTextarea = <ParentMessage>(config: PromptInputTextareaCo
 }
 
 /** Bottom row of the prompt form, holding the tools on one side and the submit button on the other. */
-export const promptInputToolbar = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const promptInputToolbar: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -165,13 +165,13 @@ export const promptInputToolbar = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 /** Cluster of prompt tool buttons and selects. */
-export const promptInputTools = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const promptInputTools: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -181,7 +181,7 @@ export const promptInputTools = <ParentMessage>(
     ],
     [...children],
   )
-}
+})
 
 export type PromptInputButtonConfig<ParentMessage> = ButtonConfig<ParentMessage>
 
@@ -190,23 +190,26 @@ export type PromptInputButtonConfig<ParentMessage> = ButtonConfig<ParentMessage>
  * variant; icon-only children get the icon size, wider children the small
  * size, adapting AI Elements' child-count sizing.
  */
-export const promptInputButton = <ParentMessage>(
-  config: PromptInputButtonConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string>,
-): Html => {
-  const size = config.size ?? (children.length > 1 ? "sm" : "icon")
-  return button(
-    {
-      ...config,
-      variant: config.variant ?? "ghost",
-      size,
-      class: cn("shrink-0 gap-1.5 rounded-lg text-muted-foreground", config.class),
-      dataSlot: "prompt-input-button",
-      attributes: [...(config.attributes ?? [])],
-    },
-    children,
-  )
-}
+export const promptInputButton: {
+  <ParentMessage>(config: PromptInputButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children: ReadonlyArray<Html | string>): (config: PromptInputButtonConfig<ParentMessage>) => Html
+} = Function.dual(
+  2,
+  <ParentMessage>(config: PromptInputButtonConfig<ParentMessage>, children: ReadonlyArray<Html | string>): Html => {
+    const size = config.size ?? (children.length > 1 ? "sm" : "icon")
+    return button(
+      {
+        ...config,
+        variant: config.variant ?? "ghost",
+        size,
+        class: cn("shrink-0 gap-1.5 rounded-lg text-muted-foreground", config.class),
+        dataSlot: "prompt-input-button",
+        attributes: [...(config.attributes ?? [])],
+      },
+      children,
+    )
+  },
+)
 
 export type PromptInputStatus = "idle" | "submitted" | "streaming" | "error"
 
@@ -233,29 +236,35 @@ const statusIcon = <ParentMessage>(status: PromptInputStatus): Html => {
  * spinner after submission, a stop square while streaming, and an x on
  * error. Pass `onClick` to turn the streaming state into a stop action.
  */
-export const promptInputSubmit = <ParentMessage>(
-  config: PromptInputSubmitConfig<ParentMessage>,
-  children: ReadonlyArray<Html | string> = [],
-): Html => {
-  const h = html<ParentMessage>()
-  const { status = "idle", ...buttonConfig } = config
-  return button(
-    {
-      ...buttonConfig,
-      variant: config.variant ?? "default",
-      size: config.size ?? "icon",
-      type: config.type ?? "submit",
-      class: cn("gap-1.5 rounded-lg", config.class),
-      dataSlot: "prompt-input-submit",
-      attributes: [
-        ...(config.attributes ?? []),
-        h.DataAttribute("status", status),
-        h.AriaLabel(status === "streaming" || status === "submitted" ? "Stop" : "Submit"),
-      ],
-    },
-    children.length > 0 ? children : [statusIcon<ParentMessage>(status)],
-  )
-}
+export const promptInputSubmit: {
+  <ParentMessage>(config: PromptInputSubmitConfig<ParentMessage>, children?: ReadonlyArray<Html | string>): Html
+  <ParentMessage>(children?: ReadonlyArray<Html | string>): (config: PromptInputSubmitConfig<ParentMessage>) => Html
+} = Function.dual(
+  (args) => args.length > 0 && !Array.isArray(args[0]),
+  <ParentMessage>(
+    config: PromptInputSubmitConfig<ParentMessage>,
+    children: ReadonlyArray<Html | string> = [],
+  ): Html => {
+    const h = html<ParentMessage>()
+    const { status = "idle", ...buttonConfig } = config
+    return button(
+      {
+        ...buttonConfig,
+        variant: config.variant ?? "default",
+        size: config.size ?? "icon",
+        type: config.type ?? "submit",
+        class: cn("gap-1.5 rounded-lg", config.class),
+        dataSlot: "prompt-input-submit",
+        attributes: [
+          ...(config.attributes ?? []),
+          h.DataAttribute("status", status),
+          h.AriaLabel(status === "streaming" || status === "submitted" ? "Stop" : "Submit"),
+        ],
+      },
+      children.length > 0 ? children : [statusIcon<ParentMessage>(status)],
+    )
+  },
+)
 
 export type PromptInputModelSelectConfig<Item extends string = string> = RootConfig<Item>
 
@@ -280,10 +289,10 @@ export const promptInputModelSelect = <Item extends string = string>(
 export const promptInputModelSelectItem = item
 
 /** Strip above the textarea for queued attachments. Compose attachment components (or any chips) inside it. */
-export const promptInputAttachments = <ParentMessage>(
-  config: SlotConfig<ParentMessage>,
-  children: ReadonlyArray<Html>,
-): Html => {
+export const promptInputAttachments: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -293,4 +302,4 @@ export const promptInputAttachments = <ParentMessage>(
     ],
     [...children],
   )
-}
+})

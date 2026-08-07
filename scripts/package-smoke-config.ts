@@ -1,3 +1,5 @@
+import { Function } from "effect"
+
 export const packages = [
   "a2a",
   "ag-ui",
@@ -47,18 +49,41 @@ export const packedProviderDependencies = {
 export const sortRecord = (value: Record<string, string> | undefined): Record<string, string> =>
   Object.fromEntries(Object.entries(value ?? {}).toSorted(([left], [right]) => left.localeCompare(right)))
 
-export const catalogVersion = (
-  rootManifest: {
+export const catalogVersion: {
+  (
+    rootManifest: {
+      readonly workspaces: {
+        readonly catalog: Readonly<Record<string, string>>
+        readonly catalogs?: Readonly<Record<string, Readonly<Record<string, string>>>>
+      }
+    },
+    dependency: string,
+    reference: string,
+  ): string | undefined
+  (
+    dependency: string,
+    reference: string,
+  ): (rootManifest: {
     readonly workspaces: {
       readonly catalog: Readonly<Record<string, string>>
       readonly catalogs?: Readonly<Record<string, Readonly<Record<string, string>>>>
     }
+  }) => string | undefined
+} = Function.dual(
+  3,
+  (
+    rootManifest: {
+      readonly workspaces: {
+        readonly catalog: Readonly<Record<string, string>>
+        readonly catalogs?: Readonly<Record<string, Readonly<Record<string, string>>>>
+      }
+    },
+    dependency: string,
+    reference: string,
+  ): string | undefined => {
+    const catalogName = reference.slice("catalog:".length)
+    const catalog =
+      catalogName.length === 0 ? rootManifest.workspaces.catalog : rootManifest.workspaces.catalogs?.[catalogName]
+    return catalog?.[dependency]
   },
-  dependency: string,
-  reference: string,
-): string | undefined => {
-  const catalogName = reference.slice("catalog:".length)
-  const catalog =
-    catalogName.length === 0 ? rootManifest.workspaces.catalog : rootManifest.workspaces.catalogs?.[catalogName]
-  return catalog?.[dependency]
-}
+)

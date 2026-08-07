@@ -1,22 +1,28 @@
-import { Effect, Layer, Stream } from "effect"
+import { Effect, Function, Layer, Stream } from "effect"
 import { ExecutableManifest, Runtime } from "@batonfx/runtime"
 import type { RunEvent } from "@batonfx/runtime"
 
 export const executable: ExecutableManifest.PinnedExecutable = ExecutableManifest.makeTest("assistant", "1")
 export const agent = executable.ref
 
-export const event = (sequence: number, tag = "RunAttemptStarted"): RunEvent.RunEvent =>
-  ({
-    _tag: tag,
-    specVersion: "1",
-    eventId: `run-1:${sequence}`,
-    runId: "run-1",
-    sequence,
-    executableRef: agent,
-    rootRunId: "run-1",
-    occurredAt: "2026-08-03T00:00:00.000Z",
-    attempt: 1,
-  }) as RunEvent.RunEvent
+export const event: {
+  (sequence: number, tag?: string): RunEvent.RunEvent
+  (tag?: string): (sequence: number) => RunEvent.RunEvent
+} = Function.dual(
+  (args) => typeof args[0] === "number",
+  (sequence: number, tag: string = "RunAttemptStarted"): RunEvent.RunEvent =>
+    ({
+      _tag: tag,
+      specVersion: "1",
+      eventId: `run-1:${sequence}`,
+      runId: "run-1",
+      sequence,
+      executableRef: agent,
+      rootRunId: "run-1",
+      occurredAt: "2026-08-03T00:00:00.000Z",
+      attempt: 1,
+    }) as RunEvent.RunEvent,
+)
 
 export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): Layer.Layer<Runtime.Runtime> =>
   Layer.succeed(

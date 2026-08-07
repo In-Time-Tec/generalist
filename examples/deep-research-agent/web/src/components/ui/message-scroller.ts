@@ -210,34 +210,40 @@ const withUpdateReturn = Match.withReturnType<UpdateReturn>()
  * (`isFollowing && isAtBottom`), so a click-initiated smooth scroll that the
  * user interrupts by scrolling up is never yanked back down.
  */
-export const update = (model: Model, message: Message): UpdateReturn =>
-  Match.value(message).pipe(
-    withUpdateReturn,
-    Match.tagsExhaustive({
-      ScrolledViewport: ({ isAtBottom }) => [
-        evo(model, { isAtBottom: () => isAtBottom, isFollowing: () => isAtBottom }),
-        [],
-      ],
-      // Re-pin only when actually at the bottom. `ClickedScrollToBottom` sets
-      // `isFollowing` before the smooth scroll arrives (so `isAtBottom` is
-      // still false); gating on `isAtBottom` keeps that transient state from
-      // force-scrolling a user who scrolled away mid-animation.
-      GrewContent: () =>
-        model.isFollowing && model.isAtBottom
-          ? [model, [ScrollToBottom({ behavior: "instant", viewportId: viewportId(model) })]]
-          : [model, []],
-      // No-op when already pinned (the button is inert at the bottom, but a
-      // programmatic dispatch would otherwise fire a redundant scroll).
-      ClickedScrollToBottom: () =>
-        model.isAtBottom
-          ? [model, []]
-          : [
-              evo(model, { isFollowing: () => true }),
-              [ScrollToBottom({ behavior: "smooth", viewportId: viewportId(model) })],
-            ],
-      CompletedScrollToBottom: () => [model, []],
-    }),
-  )
+export const update: {
+  (model: Model, message: Message): UpdateReturn
+  (message: Message): (model: Model) => UpdateReturn
+} = Function.dual(
+  2,
+  (model: Model, message: Message): UpdateReturn =>
+    Match.value(message).pipe(
+      withUpdateReturn,
+      Match.tagsExhaustive({
+        ScrolledViewport: ({ isAtBottom }) => [
+          evo(model, { isAtBottom: () => isAtBottom, isFollowing: () => isAtBottom }),
+          [],
+        ],
+        // Re-pin only when actually at the bottom. `ClickedScrollToBottom` sets
+        // `isFollowing` before the smooth scroll arrives (so `isAtBottom` is
+        // still false); gating on `isAtBottom` keeps that transient state from
+        // force-scrolling a user who scrolled away mid-animation.
+        GrewContent: () =>
+          model.isFollowing && model.isAtBottom
+            ? [model, [ScrollToBottom({ behavior: "instant", viewportId: viewportId(model) })]]
+            : [model, []],
+        // No-op when already pinned (the button is inert at the bottom, but a
+        // programmatic dispatch would otherwise fire a redundant scroll).
+        ClickedScrollToBottom: () =>
+          model.isAtBottom
+            ? [model, []]
+            : [
+                evo(model, { isFollowing: () => true }),
+                [ScrollToBottom({ behavior: "smooth", viewportId: viewportId(model) })],
+              ],
+        CompletedScrollToBottom: () => [model, []],
+      }),
+    ),
+)
 
 export const messageScrollerUpdate = update
 
@@ -261,7 +267,10 @@ const arrowDownIcon = <ParentMessage>(): Html => {
 }
 
 /** Positioning frame for the scroller: wrap the viewport and the scroll button in it. */
-export const root = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const root: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -271,7 +280,7 @@ export const root = <ParentMessage>(config: SlotConfig<ParentMessage>, children:
     ],
     [...children],
   )
-}
+})
 
 export type ViewportConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -285,7 +294,10 @@ export type ViewportConfig<ParentMessage> = SlotConfig<ParentMessage> &
  * hiding is not ported (gap): this version does not distinguish programmatic
  * scrolls from user scrolls.
  */
-export const viewport = <ParentMessage>(config: ViewportConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const viewport: {
+  <ParentMessage>(config: ViewportConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: ViewportConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: ViewportConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -302,7 +314,7 @@ export const viewport = <ParentMessage>(config: ViewportConfig<ParentMessage>, c
     ],
     [...children],
   )
-}
+})
 
 export type ContentConfig<ParentMessage> = SlotConfig<ParentMessage> &
   Readonly<{
@@ -310,7 +322,10 @@ export type ContentConfig<ParentMessage> = SlotConfig<ParentMessage> &
   }>
 
 /** Column wrapper for the messages. Carries the growth-observer Mount that keeps the viewport pinned while following. */
-export const content = <ParentMessage>(config: ContentConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const content: {
+  <ParentMessage>(config: ContentConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: ContentConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: ContentConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -321,10 +336,13 @@ export const content = <ParentMessage>(config: ContentConfig<ParentMessage>, chi
     ],
     [...children],
   )
-}
+})
 
 /** One conversation entry, content-visibility contained so long transcripts stay cheap to render. */
-export const item = <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
+export const item: {
+  <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html
+  <ParentMessage>(children: ReadonlyArray<Html>): (config: SlotConfig<ParentMessage>) => Html
+} = Function.dual(2, <ParentMessage>(config: SlotConfig<ParentMessage>, children: ReadonlyArray<Html>): Html => {
   const h = html<ParentMessage>()
   return h.div(
     [
@@ -334,7 +352,7 @@ export const item = <ParentMessage>(config: SlotConfig<ParentMessage>, children:
     ],
     [...children],
   )
-}
+})
 
 const scrollButtonClass =
   "absolute inset-s-1/2 bottom-4 size-8 -translate-x-1/2 rounded-full border border-border bg-background text-foreground shadow-md transition-[translate,scale,opacity] duration-200 hover:bg-muted hover:text-foreground data-[active=false]:pointer-events-none data-[active=false]:translate-y-full data-[active=false]:scale-95 data-[active=false]:opacity-0 data-[active=false]:duration-400 data-[active=false]:ease-[cubic-bezier(0.7,0,0.84,0)] data-[active=true]:translate-y-0 data-[active=true]:scale-100 data-[active=true]:opacity-100 data-[active=true]:ease-[cubic-bezier(0.23,1,0.32,1)] rtl:translate-x-1/2"
