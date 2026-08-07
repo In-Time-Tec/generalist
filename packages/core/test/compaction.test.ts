@@ -1,11 +1,14 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Json } from "./json"
-import { Deferred, Effect, Equal, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
 import { Compaction, Session, ToolOutput } from "../src/index"
 import { ItLayer } from "./it-layer"
 import { estimatePromptTokens } from "../src/turn/prompt-token-estimate"
 import { makeThresholdState } from "../src/turn/compaction-threshold-state"
+
+const encodeJsonValue = (value: unknown): string =>
+  Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -193,7 +196,7 @@ describe("Compaction", () => {
       Object.defineProperty(firstSubclass, "toJSON", { value: () => ["constant"] })
       Object.defineProperty(secondSubclass, "toJSON", { value: () => ["constant"] })
       expect(firstSubclass[0]).not.toBe(secondSubclass[0])
-      expect(Schema.encodeSync(Schema.UnknownFromJsonString)(firstSubclass)).toBe(Schema.encodeSync(Schema.UnknownFromJsonString)(secondSubclass))
+      expect(encodeJsonValue(firstSubclass)).toBe(encodeJsonValue(secondSubclass))
       const values = [
         [undefined, () => undefined],
         [Number.NaN, Number.POSITIVE_INFINITY],
