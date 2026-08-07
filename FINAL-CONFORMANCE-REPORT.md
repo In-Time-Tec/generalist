@@ -210,3 +210,20 @@ erasure — every sound fix path (verified waves 22–27) either hits the tool-e
 raw (`StaticToolServices` conditional), the supervisor's `HandlersFor` variance, or the runtime code_mode
 `Scope`/`HandlersFor` threading — all the same `Effect` `Schema.Constraint`/`Encoder` hardcoded-`unknown`
 service-channel erasure. Upstream `Effect-TS/effect` change required for completion.
+
+## Wave 28 (2026-08-07) — final hypothesis disproven; definitive conclusion
+
+The last hypothesis — that the ~18 `any`-class flags came from the *explicit* `StaticToolServices` member in
+`RunStream`/`RunRequirements` (while the implicit member in the generic `R` was never flagged) — was tested:
+the RunStream without the explicit `StaticToolServices` member fails tsc at the impl boundary (the makeRunLoop's
+RHS `HandlersFor`/`HandlerServices` is not assignable to `R | LanguageModel | SchemaServicesD`). The member is
+required by the run-loop's truthful channel. The 18 flags are inherent to the truthful-channel design, which is
+the only design that clears agent.ts:466.
+
+**Definitive conclusion (waves 22–28, probe-verified)**: the final lint error (agent.ts:466) is the run channel's
+generic `S["DecodingServices"]` erasure from Effect 4.0.0-beta.98's `Schema.Constraint`/`Encoder` hardcoded
+`unknown` service channels. Every sound fix path either (a) clears the flag while exposing ~18 identical-class
+flags (truthful channels — the only 466-clearing design), or (b) fails tsc at the tool-executor `Toolkit.handle`
+library raw / supervisor `HandlersFor` variance / runtime code_mode `Scope` threading. Completion requires the
+upstream `Effect-TS/effect` change. Final state: tsc 0, 1,168 tests pass, all scripts PASS, lint = 1 error
+(agent.ts:466), 68 commits, NOT pushed to main.
