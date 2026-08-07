@@ -1,4 +1,3 @@
-import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -123,7 +122,7 @@ const runAgent = (
 ) =>
   Stream.runCollect(
     Agent.stream(agent, { prompt: "no replay" }).pipe(
-      Stream.provide(Layer.mergeAll(model, policy.pipe(Layer.orDie), middleware, toolLayer, layerHandoffCatalogTest)),
+      Stream.provide(Layer.mergeAll(model, policy.pipe(Layer.orDie), middleware, toolLayer)),
     ),
   )
 
@@ -195,7 +194,6 @@ describe("agent model stream replay safety", () => {
               retrySchedule: Schedule.recurs(0),
               invalidToolCallCorrectionLimit: 2,
             }).pipe(Layer.orDie),
-            layerHandoffCatalogTest,
           ),
         ),
         Stream.runDrain,

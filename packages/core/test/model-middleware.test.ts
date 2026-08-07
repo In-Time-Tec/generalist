@@ -1,4 +1,3 @@
-import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { expect, layer } from "@effect/vitest"
 import { Json } from "./json"
 import { Effect, Exit, Layer, Option, Ref, Schema, Stream } from "effect"
@@ -90,7 +89,7 @@ const failingPrompt: ModelMiddleware.Middleware = {
   transformPrompt: () => Effect.fail(AgentEvent.AgentError.make({ message: "prompt middleware boom", turn: 0 })),
 }
 
-layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime, layerHandoffCatalogTest))("ModelMiddleware", (it) => {
+layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("ModelMiddleware", (it) => {
   ItLayer.make(
     it,
     "identity default: empty chain behaves like the pre-middleware loop",

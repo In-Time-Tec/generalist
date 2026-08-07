@@ -1,4 +1,3 @@
-import { layerHandoffCatalogTest } from "./handoff-test-layer.js"
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
@@ -11,8 +10,7 @@ type ModelParams = Parameters<typeof LanguageModel.make>[0]
 const fanOutWithUnionOptions = (children: ReadonlyArray<Handoff.FanOutChild>, options: Handoff.FanOutOptions) => {
   const result: Effect.Effect<
     ReadonlyArray<Agent.Result> | ReadonlyArray<Handoff.FanOutMemberResult>,
-    Agent.RunError | Handoff.RegistrationError | Handoff.FanOutUnsatisfied,
-    Agent.RunRequirements<Record<string, import("effect/unstable/ai").Tool.Any>, never, Agent.RunOptions>
+    Agent.RunError | Handoff.RegistrationError | Handoff.FanOutUnsatisfied
   > = Handoff.fanOut(children, options)
   return result
 }
@@ -193,8 +191,7 @@ layer(Layer.empty)("Handoff", (it) => {
       prompt: `task ${index}`,
     }))
     return [
-      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, layerHandoffCatalogTest,
-      modelLayer(() => Stream.make(textDelta("unused")))),
+      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
       Effect.gen(function* () {
         for (const concurrency of [1, 3, 6]) {
           active = 0
@@ -217,7 +214,7 @@ layer(Layer.empty)("Handoff", (it) => {
   ItLayer.make(it, "supports zero-argument currying", () => {
     const runFanOut = Handoff.fanOut()
     return [
-      Layer.mergeAll(layerHandoffCatalogTest, modelLayer(() => Stream.make(textDelta("unused")))),
+      Layer.empty,
       Effect.gen(function* () {
         const results = yield* runFanOut([])
         expect(results).toEqual([])
@@ -231,8 +228,7 @@ layer(Layer.empty)("Handoff", (it) => {
       modelLayer(() => Stream.fail(new Error("child failed") as never)),
     )
     return [
-      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, layerHandoffCatalogTest,
-      modelLayer(() => Stream.make(textDelta("unused")))),
+      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
       Effect.gen(function* () {
         const failure = yield* Effect.flip(Handoff.fanOut([{ registration: child, prompt: "fail" }]))
         expect(failure._tag).toBe("@batonfx/core/AgentError")
@@ -265,8 +261,7 @@ layer(Layer.empty)("Handoff", (it) => {
       },
     ]
     return [
-      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, layerHandoffCatalogTest,
-      modelLayer(() => Stream.make(textDelta("unused")))),
+      Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
       Effect.gen(function* () {
         for (const join of [{ _tag: "AllSettled" }, { _tag: "BestEffort" }] as const) {
           const outcomes = yield* Handoff.fanOut(children, { join })
@@ -278,8 +273,7 @@ layer(Layer.empty)("Handoff", (it) => {
   })
 
   ItLayer.make(it, "returns first success and interrupts unnecessary members", () => [
-    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, layerHandoffCatalogTest,
-      modelLayer(() => Stream.make(textDelta("unused")))),
+    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
     Effect.gen(function* () {
       for (const remainder of ["request-cancel", "terminate"] as const) {
         const firstStarted = yield* Deferred.make<void>()
@@ -315,8 +309,7 @@ layer(Layer.empty)("Handoff", (it) => {
   ])
 
   ItLayer.make(it, "awaits the remainder after first-success satisfaction", () => [
-    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, layerHandoffCatalogTest,
-      modelLayer(() => Stream.make(textDelta("unused")))),
+    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
     Effect.gen(function* () {
       const release = yield* Deferred.make<void>()
       const completed = yield* Deferred.make<void>()
@@ -352,7 +345,7 @@ layer(Layer.empty)("Handoff", (it) => {
   ])
 
   ItLayer.make(it, "interrupts every owned member when the parent is interrupted", () => [
-    Layer.mergeAll(layerHandoffCatalogTest, modelLayer(() => Stream.make(textDelta("unused")))),
+    Layer.empty,
     Effect.gen(function* () {
       const firstStarted = yield* Deferred.make<void>()
       const secondStarted = yield* Deferred.make<void>()
@@ -379,7 +372,7 @@ layer(Layer.empty)("Handoff", (it) => {
   ])
 
   ItLayer.make(it, "continues scheduling after a member interrupts itself", () => [
-    Layer.mergeAll(layerHandoffCatalogTest, modelLayer(() => Stream.make(textDelta("unused")))),
+    Layer.empty,
     Effect.gen(function* () {
       let secondStarted = false
       const outcomes = yield* Handoff.fanOut(
@@ -407,8 +400,7 @@ layer(Layer.empty)("Handoff", (it) => {
   ])
 
   ItLayer.make(it, "completes quorum and fails as soon as quorum is impossible", () => [
-    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity, layerHandoffCatalogTest,
-      modelLayer(() => Stream.make(textDelta("unused")))),
+    Layer.mergeAll(Approvals.layerAutoApprove, ModelMiddleware.layerIdentity),
     Effect.gen(function* () {
       const success = (name: string) => ({
         registration: directRegistration(name, Effect.succeed(directResult(name))),
