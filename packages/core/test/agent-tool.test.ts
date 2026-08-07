@@ -108,7 +108,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       success: Schema.String,
     })
     let seen: unknown
-    const toolkit: ToolExecutor.ClosedToolSet = {
+    const toolkit: ToolExecutor.ClosedToolSet<never, Tool.Any> = {
       tools: { numeric: numericTool },
       invoke: (_name, params) => {
         seen = params
@@ -116,7 +116,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
       },
     }
     return [
-      ToolExecutor.layerToolkit(toolkit),
+      Layer.mergeAll(ToolExecutor.layerToolkit(toolkit), ToolContext.layerDefault),
       Effect.gen(function* () {
         const executor = yield* ToolExecutor.ToolExecutor
         const result = yield* executor.execute(request("numeric", "42"))

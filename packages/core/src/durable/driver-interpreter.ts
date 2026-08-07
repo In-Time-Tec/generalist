@@ -401,7 +401,7 @@ export const layerForRun = <Tools extends Record<string, import("effect/unstable
   options: RunOptions,
   prompt: Prompt.Prompt,
   budget?: RunBudget,
-): Layer.Layer<DriverInterpreter> => {
+): Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid> => {
   const sessionId = options.sessionId ?? agent.name
   const logicalOperationId = options.logicalOperationId ?? sessionId
   const driver = makeLoopDriver({
@@ -441,7 +441,7 @@ export const layerForRun = <Tools extends Record<string, import("effect/unstable
         }),
       ),
     ),
-  ) as Layer.Layer<DriverInterpreter>
+  )
 }
 
 /** @experimental */

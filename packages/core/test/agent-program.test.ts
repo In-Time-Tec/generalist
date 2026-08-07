@@ -381,7 +381,10 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         ),
         Effect.flip,
       )
-      expect((toolFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("toolCalls")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(toolFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(toolFailure)) {
+        expect(toolFailure.dimension).toBe("toolCalls")
+      }
 
       const agentRunFailure = yield* AgentProgram.run(program("Agent run budget"), { value: 1 }).pipe(
         runWith(() =>
@@ -397,7 +400,10 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         ),
         Effect.flip,
       )
-      expect((agentRunFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("agentRuns")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(agentRunFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(agentRunFailure)) {
+        expect(agentRunFailure.dimension).toBe("agentRuns")
+      }
 
       const live = bindings()
       const expensiveAgent = ProgramBindings.make({
@@ -421,7 +427,10 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         ),
         Effect.flip,
       )
-      expect((tokenFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("tokens")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(tokenFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(tokenFailure)) {
+        expect(tokenFailure.dimension).toBe("tokens")
+      }
 
       const logFailure = yield* AgentProgram.run(program("log budget"), { value: 1 }).pipe(
         runWith(() =>
@@ -433,7 +442,10 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         ),
         Effect.flip,
       )
-      expect((logFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("logBytes")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(logFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(logFailure)) {
+        expect(logFailure.dimension).toBe("logBytes")
+      }
 
       const wallFailure = yield* AgentProgram.run(
         program("wall budget", { budget: { ...budget, wallClockMillis: 0 } }),
@@ -442,13 +454,19 @@ it.effect("enforces tool, Agent token, log, wall-clock, and output budgets", () 
         runWith(() => Effect.never),
         Effect.flip,
       )
-      expect((wallFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("wallClockMillis")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(wallFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(wallFailure)) {
+        expect(wallFailure.dimension).toBe("wallClockMillis")
+      }
 
       const outputFailure = yield* AgentProgram.run(program("output budget"), { value: 1 }).pipe(
         runWith(() => Effect.succeed({ value: 1, ignored: "x".repeat(2_000) })),
         Effect.flip,
       )
-      expect((outputFailure as ProgramCapabilities.ProgramBudgetExhausted).dimension).toBe("outputBytes")
+      expect(Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(outputFailure)).toBe(true)
+      if (Schema.is(ProgramCapabilities.ProgramBudgetExhausted)(outputFailure)) {
+        expect(outputFailure.dimension).toBe("outputBytes")
+      }
     }),
   ),
 )
