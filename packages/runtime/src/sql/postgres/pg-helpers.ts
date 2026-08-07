@@ -7,11 +7,15 @@ import type { ExecutableManifest, ExecutableRef } from "../../executable-manifes
 import type { Message } from "../../message.js"
 import { isTerminal, type RunStatus } from "../../run.js"
 import {
+  StringArray,
+  decodeJson,
+  decodeJsonValue,
   decodeMessage,
   decodeQueue,
   encodeExecutableManifest,
   encodeExecutableRef,
   encodeEvent,
+  encodeJson,
   encodeMessage,
   encodeQueue,
 } from "../codecs.js"
@@ -26,6 +30,8 @@ import { PendingRunOutcome, type ExecutionClaim } from "../../run-store.js"
 import type { ExecutionResult } from "../../execution-state.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
+import { OperationResolution } from "../../operation-resolution.js"
+import { Prompt } from "effect/unstable/ai"
 
 export type EventPartial = { readonly _tag: string } & Record<string, unknown>
 
@@ -83,7 +89,7 @@ export const emitAgentEvent = (hub: EventHub, input: ExecutionClaim & { readonly
     yield* appendEvent(hub, loaded, input.event as EventPartial)
     if (input.event._tag === "TurnCompleted") {
       yield* sql`
-        UPDATE baton_runs SET transcript_json = ${JSON.stringify(input.event.transcript)}, continuation_json = NULL
+        UPDATE baton_runs SET transcript_json = ${encodeJson(Prompt.Prompt, input.event.transcript)}, continuation_json = NULL
         WHERE run_id = ${loaded.runId}
       `
     }
@@ -289,7 +295,7 @@ export const completeRun = (hub: EventHub, run: DecodedRun, result: ExecutionRes
     if (runningFanOut.length > 0) {
       yield* sql`
         UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL, lease_expires_at = NULL,
-          pending_outcome_json = ${JSON.stringify(Schema.encodeSync(PendingRunOutcome)({ _tag: "Completed", result }))}
+          pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Completed", result })}
         WHERE run_id = ${run.runId}
       `
       return
@@ -392,7 +398,7 @@ export const insertRun = (input: {
         ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
         ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
         NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, FALSE, NULL, NULL, ${input.acceptedSequence},
-        ${JSON.stringify([])}, NULL, NULL, NOW(), NOW()
+        ${encodeJson(StringArray, [])}, NULL, NULL, NOW(), NOW()
       )
     `
     if (input.runId === input.rootRunId) {
@@ -434,13 +440,13 @@ export const toOperationRecord = (row: OperationRow): OperationRecord => ({
   kind: row.kind,
   status: row.status,
   inputDigest: row.input_digest,
-  input: JSON.parse(row.input_json) as unknown,
+  input: decodeJsonValue(row.input_json),
   replayPolicy: row.replay_policy,
   attempt: Number(row.attempt),
-  ...(row.result_json === null ? {} : { result: JSON.parse(row.result_json) as unknown }),
-  ...(row.error_json === null ? {} : { error: JSON.parse(row.error_json) as unknown }),
+  ...(row.result_json === null ? {} : { result: decodeJsonValue(row.result_json) }),
+  ...(row.error_json === null ? {} : { error: decodeJsonValue(row.error_json) }),
   ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
-  ...(row.resolution_json === null ? {} : { resolution: JSON.parse(row.resolution_json) }),
+  ...(row.resolution_json === null ? {} : { resolution: decodeJson(OperationResolution, row.resolution_json) }),
 })
 
 export { decodeMessage, encodeQueue, decodeQueue }

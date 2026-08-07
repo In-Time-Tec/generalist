@@ -1,10 +1,11 @@
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
 import type { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { OperationResolution, digest as resolutionDigest } from "../../operation-resolution.js"
 import { isTerminal } from "../../run.js"
+import { ExecutionCheckpoint } from "../../execution-state.js"
 import type { Interface as RunStoreInterface } from "../../run-store.js"
 import { decodeJson, encodeExecutableRef, encodeJson, encodeJsonValue } from "../codecs.js"
 import { canBlindRetry } from "../operations.js"
@@ -15,6 +16,7 @@ import { encodeContinuation } from "../../steering.js"
 import { checkpointRef } from "../../executable-manifest.js"
 import { getProgramOperation, resolveProgramOperation } from "../store-program.js"
 import { settleAdmittedCancellation } from "../store-control.js"
+import { Prompt } from "effect/unstable/ai"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
 type RunFn = <A, E>(
@@ -104,9 +106,9 @@ export const postgresOperations = (input: {
           if (op.checkpoint !== undefined || op.transcript !== undefined || op.continuation !== undefined) {
             yield* sql`
               UPDATE baton_runs SET
-                driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : JSON.stringify(op.checkpoint)}, driver_checkpoint_json),
+                driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, op.checkpoint)}, driver_checkpoint_json),
                 executable_ref_json = ${encodeExecutableRef(executableRef)},
-                transcript_json = COALESCE(${op.transcript === undefined ? null : JSON.stringify(op.transcript)}, transcript_json),
+                transcript_json = COALESCE(${op.transcript === undefined ? null : encodeJson(Prompt.Prompt, op.transcript)}, transcript_json),
                 continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
                   THEN ${op.continuation === null || op.continuation === undefined ? null : encodeContinuation(op.continuation)}
                   ELSE continuation_json END
@@ -205,9 +207,9 @@ export const postgresOperations = (input: {
           }
           yield* sql`
             UPDATE baton_runs SET
-              driver_checkpoint_json = ${JSON.stringify(op.checkpoint)},
+              driver_checkpoint_json = ${encodeJson(ExecutionCheckpoint, op.checkpoint)},
               executable_ref_json = ${encodeExecutableRef(executableRef)},
-              transcript_json = COALESCE(${op.transcript === undefined ? null : JSON.stringify(op.transcript)}, transcript_json),
+              transcript_json = COALESCE(${op.transcript === undefined ? null : encodeJson(Prompt.Prompt, op.transcript)}, transcript_json),
               continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
                 THEN ${op.continuation === null || op.continuation === undefined ? null : encodeContinuation(op.continuation)}
                 ELSE continuation_json END,

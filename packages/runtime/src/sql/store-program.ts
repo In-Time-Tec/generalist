@@ -16,11 +16,11 @@ import {
   type CommitProgramLogInput,
 } from "../program-store.js"
 import { StaleClaim } from "./errors.js"
-import { encodeJson, encodeJsonValue } from "./codecs.js"
+import { StringArray, decodeJson, decodeJsonValue, encodeJsonValue } from "./codecs.js"
 import { admitFanOut } from "./store-fan-out.js"
 import { appendEvent, loadRun } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
-import { type ResolveOperationInput, digest as resolutionDigest } from "../operation-resolution.js"
+import { OperationResolution, type ResolveOperationInput, digest as resolutionDigest } from "../operation-resolution.js"
 import type { WorkerMutationError } from "../run-store.js"
 
 interface StateRow {
@@ -57,7 +57,7 @@ const decodeState = (row: StateRow) =>
   Schema.decodeUnknownEffect(ProgramRunState)({
     runId: row.run_id,
     programPin: row.program_pin,
-    budget: JSON.parse(row.budget_json),
+    budget: decodeJsonValue(row.budget_json),
     deadlineMillis: Number(row.deadline_millis),
     toolCalls: Number(row.tool_calls),
     agentRuns: Number(row.agent_runs),
@@ -73,16 +73,16 @@ const decodeOperation = (row: OperationRow) =>
     kind: row.kind,
     capability: row.capability,
     inputDigest: row.input_digest,
-    input: JSON.parse(row.input_json),
+    input: decodeJsonValue(row.input_json),
     replay: row.replay_policy,
     status: row.status,
-    ...(row.result_json === null ? {} : { result: JSON.parse(row.result_json) }),
-    ...(row.error_json === null ? {} : { error: JSON.parse(row.error_json) }),
+    ...(row.result_json === null ? {} : { result: decodeJsonValue(row.result_json) }),
+    ...(row.error_json === null ? {} : { error: decodeJsonValue(row.error_json) }),
     ...(row.wait_id === null ? {} : { waitId: row.wait_id }),
     ...(row.fan_out_id === null ? {} : { fanOutId: row.fan_out_id }),
-    childRunIds: JSON.parse(row.child_run_ids_json),
+    childRunIds: decodeJson(StringArray, row.child_run_ids_json),
     ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
-    ...(row.resolution_json === null ? {} : { resolution: JSON.parse(row.resolution_json) }),
+    ...(row.resolution_json === null ? {} : { resolution: decodeJsonValue(row.resolution_json) }),
   }).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })))
 
 const operationRows = (runId: string, operation: string) =>
@@ -94,7 +94,7 @@ const operationRows = (runId: string, operation: string) =>
   })
 
 const sameJson = (left: unknown, right: unknown) =>
-  (JSON.stringify(left) ?? "null") === (JSON.stringify(right) ?? "null")
+  Schema.encodeSync(Schema.UnknownFromJsonString)(left) === Schema.encodeSync(Schema.UnknownFromJsonString)(right)
 
 /**
  * A settle whose outcome equals the recorded terminal outcome is an idempotent replay.
@@ -259,7 +259,7 @@ export const resolveProgramOperation = (
       })
     if (run === undefined || row === undefined) return yield* conflict()
     if (row.resolution_idempotency_key !== null) {
-      const prior = row.resolution_json === null ? undefined : JSON.parse(row.resolution_json)
+      const prior = row.resolution_json === null ? undefined : decodeJson(OperationResolution, row.resolution_json)
       if (
         row.resolution_idempotency_key === input.idempotencyKey &&
         prior !== undefined &&

@@ -2,11 +2,14 @@ import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { eventIdFor, type AgentLoopEvent, type ExecutionResult, type RunEvent, type RunFailure } from "../run-event.js"
-import { ExecutionCheckpoint } from "../execution-state.js"
+import { ExecutionCheckpoint, ExecutionSuspension } from "../execution-state.js"
 import type { ExecutableManifest, ExecutableRef } from "../executable-manifest.js"
 import type { Message } from "../message.js"
 import { isTerminal, type RunStatus } from "../run.js"
 import {
+  StringArray,
+  decodeJson,
+  decodeJsonValue,
   decodePinnedExecutable,
   decodeEvent,
   decodeMessage,
@@ -14,6 +17,7 @@ import {
   encodeExecutableManifest,
   encodeExecutableRef,
   encodeEvent,
+  encodeJson,
   encodeMessage,
   encodeQueue,
 } from "./codecs.js"
@@ -21,6 +25,7 @@ import type { EventHub } from "./subscribers.js"
 import type { DecodedRun, EventRow, OperationRow, RunRow } from "./rows.js"
 import type { WaitRow } from "./rows.js"
 import { decodeReason, WaitResolution, type RunWait } from "../run-wait.js"
+import { OperationResolution } from "../operation-resolution.js"
 import { Schema } from "effect"
 import type { OperationRecord } from "./operations.js"
 import { decodeContinuation } from "../steering.js"
@@ -28,6 +33,7 @@ import { reconcileFanOut } from "./store-fan-out.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { checkpointRef, decodePinned } from "../executable-manifest.js"
 import { PendingRunOutcome } from "../run-store.js"
+import { Prompt } from "effect/unstable/ai"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -43,7 +49,7 @@ export const decodeRun = (row: RunRow): DecodedRun => {
   const checkpoint =
     row.driver_checkpoint_json === null || row.driver_checkpoint_json === undefined
       ? undefined
-      : Schema.decodeUnknownSync(ExecutionCheckpoint)(JSON.parse(row.driver_checkpoint_json))
+      : decodeJson(ExecutionCheckpoint, row.driver_checkpoint_json)
   const checkpointExecutable = checkpointRef(executable.ref, executable.manifest, checkpoint)
   if (
     checkpointExecutable.executable !== executable.ref.executable ||
@@ -67,7 +73,7 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     lastSequence: Number(row.last_sequence),
     cancellationRequested: asBool(row.cancellation_requested),
     acceptedSequence: Number(row.accepted_sequence),
-    respondedWaitIds: new Set(JSON.parse(row.responded_wait_ids_json) as ReadonlyArray<string>),
+    respondedWaitIds: new Set(decodeJson(StringArray, row.responded_wait_ids_json)),
     ...(row.parent_run_id === null || row.parent_run_id === undefined ? {} : { parentRunId: row.parent_run_id }),
     ...(row.invocation_id === null || row.invocation_id === undefined ? {} : { invocationId: row.invocation_id }),
     ...(row.active_wait_id === null || row.active_wait_id === undefined ? {} : { activeWaitId: row.active_wait_id }),
@@ -81,16 +87,16 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     ...(checkpoint === undefined ? {} : { driverCheckpoint: checkpoint }),
     ...(row.suspension_json === null || row.suspension_json === undefined
       ? {}
-      : { suspension: JSON.parse(row.suspension_json) }),
+      : { suspension: decodeJson(ExecutionSuspension, row.suspension_json) }),
     ...(row.transcript_json === null || row.transcript_json === undefined
       ? {}
-      : { transcript: JSON.parse(row.transcript_json) }),
+      : { transcript: decodeJson(Prompt.Prompt, row.transcript_json) }),
     ...(row.continuation_json === null || row.continuation_json === undefined
       ? {}
       : { continuation: decodeContinuation(row.continuation_json) }),
     ...(row.pending_outcome_json === null || row.pending_outcome_json === undefined
       ? {}
-      : { pendingOutcome: Schema.decodeUnknownSync(PendingRunOutcome)(JSON.parse(row.pending_outcome_json)) }),
+      : { pendingOutcome: decodeJson(PendingRunOutcome, row.pending_outcome_json) }),
     ...(() => {
       const lease = asIso(row.lease_expires_at)
       return lease === undefined ? {} : { leaseExpiresAt: lease }
@@ -166,7 +172,7 @@ export const loadRunWait = (runId: string, waitId?: string) =>
     const openedAt = asIso(row.opened_at)!
     const closedAt = asIso(row.closed_at)
     const resolution =
-      row.response_json === null ? undefined : Schema.decodeUnknownSync(WaitResolution)(JSON.parse(row.response_json))
+      row.response_json === null ? undefined : decodeJson(WaitResolution, row.response_json)
     return {
       waitId: row.wait_id,
       reason: decodeReason(row.reason),
@@ -404,7 +410,7 @@ export const insertRun = (input: {
         ${encodeExecutableRef(input.executableRef)}, ${encodeExecutableManifest(input.executableManifest)},
         ${input.rootRunId}, ${input.parentRunId ?? null}, ${input.invocationId ?? null},
         NULL, ${input.attempt ?? 0}, ${input.attempt ?? 0}, -1, ${false}, NULL, NULL, ${input.acceptedSequence},
-        ${JSON.stringify([])}, ${created}, ${created}
+        ${encodeJson(StringArray, [])}, ${created}, ${created}
       )
     `
     if (input.runId === input.rootRunId) {
@@ -419,13 +425,13 @@ export const toOperationRecord = (row: OperationRow): OperationRecord => ({
   kind: row.kind,
   status: row.status,
   inputDigest: row.input_digest,
-  input: JSON.parse(row.input_json) as unknown,
+  input: decodeJsonValue(row.input_json),
   replayPolicy: row.replay_policy,
   attempt: Number(row.attempt),
-  ...(row.result_json === null ? {} : { result: JSON.parse(row.result_json) as unknown }),
-  ...(row.error_json === null ? {} : { error: JSON.parse(row.error_json) as unknown }),
+  ...(row.result_json === null ? {} : { result: decodeJsonValue(row.result_json) }),
+  ...(row.error_json === null ? {} : { error: decodeJsonValue(row.error_json) }),
   ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
-  ...(row.resolution_json === null ? {} : { resolution: JSON.parse(row.resolution_json) }),
+  ...(row.resolution_json === null ? {} : { resolution: decodeJson(OperationResolution, row.resolution_json) }),
 })
 
 export type { AgentLoopEvent, ExecutionResult, RunFailure }

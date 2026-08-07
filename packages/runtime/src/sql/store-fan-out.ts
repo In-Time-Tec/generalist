@@ -24,7 +24,7 @@ import { resolveChild } from "../executable-manifest.js"
 import { make as makeMessage } from "../message.js"
 import { isTerminal } from "../run.js"
 import type { RunEvent } from "../run-event.js"
-import { decodeEvent } from "./codecs.js"
+import { decodeEvent, decodeJson, encodeJson, encodeJsonValue } from "./codecs.js"
 import {
   afterTerminal as defaultAfterTerminal,
   appendEvent as defaultAppendEvent,
@@ -37,6 +37,7 @@ import { associateRegistrations, loadRegistrations } from "./executable-registra
 import { narrow } from "../executable-registration.js"
 import type { AdmitStartInput } from "../run-store.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
+import { WaitResolution } from "../run-wait.js"
 interface FanOutRow {
   readonly fan_out_id: string
   readonly parent_run_id: string
@@ -66,7 +67,7 @@ const loadFanOut = (fanOutId: string) =>
     return { fanOut, members }
   })
 const decodeMember = (row: MemberRow): FanOutMemberResult => {
-  const outcome = row.outcome_json === null ? {} : (JSON.parse(row.outcome_json) as Record<string, unknown>)
+  const outcome = row.outcome_json === null ? {} : decodeJson(Schema.Record(Schema.String, Schema.Unknown), row.outcome_json)
   return {
     ordinal: Number(row.ordinal),
     key: row.member_key,
@@ -86,7 +87,7 @@ export const inspectFanOut = (fanOutId: string) =>
       parentRunId: loaded.fanOut.parent_run_id,
       idempotencyKey: loaded.fanOut.idempotency_key,
       status: loaded.fanOut.status,
-      join: Schema.decodeUnknownSync(FanOutJoin)(JSON.parse(loaded.fanOut.join_json)),
+      join: decodeJson(FanOutJoin, loaded.fanOut.join_json),
       remainder: loaded.fanOut.remainder,
       concurrency: Number(loaded.fanOut.concurrency),
       members: loaded.members.map(decodeMember),
@@ -143,7 +144,7 @@ export const admitFanOut = (hub: EventHub, input: AdmitFanOutInput) =>
         concurrency, status, created_at, updated_at
       ) VALUES (
         ${input.fanOutId}, ${input.parentRunId}, ${input.idempotencyKey}, ${digest},
-        ${JSON.stringify(input.join)}, ${input.remainder}, ${input.concurrency}, 'running', ${created}, ${created}
+        ${encodeJson(FanOutJoin, input.join)}, ${input.remainder}, ${input.concurrency}, 'running', ${created}, ${created}
       )
     `
     for (const member of members) {
@@ -282,7 +283,7 @@ export const reconcileFanOutWith = <E, R>(
       event._tag === "RunCompleted" ? "succeeded" : event._tag === "RunFailed" ? "failed" : "cancelled"
     yield* sql`
       UPDATE baton_fan_out_members SET status = ${memberStatus}, terminal_event_id = ${event.eventId},
-        outcome_json = ${JSON.stringify(outcomeFor(event))}
+        outcome_json = ${encodeJsonValue(outcomeFor(event))}
       WHERE child_run_id = ${childRunId}
     `
     const loaded = (yield* loadFanOut(row.fan_out_id))!
@@ -303,7 +304,7 @@ export const reconcileFanOutWith = <E, R>(
       }
       return
     }
-    const join = Schema.decodeUnknownSync(FanOutJoin)(JSON.parse(loaded.fanOut.join_json))
+    const join = decodeJson(FanOutJoin, loaded.fanOut.join_json)
     let joined: "succeeded" | "failed" | undefined
     switch (join._tag) {
       case "AllSuccess":
@@ -444,7 +445,7 @@ export const reconcileFanOutWith = <E, R>(
       }
       const closedAt = yield* nowIso
       yield* sql`
-        UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${closedAt}
+        UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
         WHERE run_id = ${resumeParent.runId} AND wait_id = ${resumeParent.activeWaitId} AND status = 'open'
       `
       yield* sql`UPDATE baton_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`
@@ -475,7 +476,7 @@ export const reconcileFanOutWith = <E, R>(
         WHERE run_id = ${operation.run_id} AND operation_name = ${operation.operation_name} AND status = 'waiting'
       `
       yield* sql`
-        UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${closedAt}
+        UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closedAt}
         WHERE run_id = ${resumeParent.runId} AND wait_id = ${operation.wait_id} AND status = 'open'
       `
       yield* sql`UPDATE baton_runs SET owner_worker_id = NULL WHERE run_id = ${resumeParent.runId}`

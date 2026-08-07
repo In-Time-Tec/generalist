@@ -66,9 +66,9 @@ export const loadRegistrations = (runId: string) =>
     return yield* Effect.forEach(rows, (row) =>
       Effect.try({
         try: () => {
-          const registration = Schema.decodeUnknownSync(ExecutableRegistration, { onExcessProperty: "error" })(
-            JSON.parse(row.payload_json),
-          )
+          const registration = Schema.decodeUnknownSync(Schema.fromJsonString(ExecutableRegistration), {
+            onExcessProperty: "error",
+          })(row.payload_json)
           if (digest(registration) !== row.registration_digest)
             throw new TypeError(`registration digest mismatch: ${row.pin}`)
           return registration

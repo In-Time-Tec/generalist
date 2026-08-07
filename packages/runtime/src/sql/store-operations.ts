@@ -1,16 +1,18 @@
-import { Clock, Effect, Random, Schema } from "effect"
+import { Clock, Effect, Random } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
+import { ExecutionCheckpoint } from "../execution-state.js"
+import { Prompt } from "effect/unstable/ai"
 import type { RecordOperationInput } from "../run-store.js"
-import { decodeJson, encodeJson, encodeJsonValue } from "./codecs.js"
+import { decodeJson, encodeExecutableRef, encodeJson, encodeJsonValue } from "./codecs.js"
 import { canBlindRetry } from "./operations.js"
 import type { OperationRow } from "./rows.js"
 import { appendEvent, loadRun, nowIso, toOperationRecord } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
 import { encodeContinuation } from "../steering.js"
 import { checkpointRef } from "../executable-manifest.js"
-import { encodeExecutableRef } from "./codecs.js"
+
 import { OperationResolution, digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
 
 const nextId = (prefix: string): Effect.Effect<string> =>
@@ -79,9 +81,9 @@ export const recordOperation = (hub: EventHub, input: RecordOperationInput) =>
     if (input.checkpoint !== undefined || input.transcript !== undefined || input.continuation !== undefined) {
       yield* sql`
         UPDATE baton_runs SET
-          driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+          driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
           executable_ref_json = ${encodeExecutableRef(executableRef)},
-          transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+          transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
           continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
             THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
             ELSE continuation_json END
@@ -182,9 +184,9 @@ export const completeOperation = (
     }
     yield* sql`
       UPDATE baton_runs SET
-        driver_checkpoint_json = ${JSON.stringify(input.checkpoint)},
+        driver_checkpoint_json = ${encodeJson(ExecutionCheckpoint, input.checkpoint)},
         executable_ref_json = ${encodeExecutableRef(executableRef)},
-        transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+        transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
         continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
           THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
           ELSE continuation_json END,

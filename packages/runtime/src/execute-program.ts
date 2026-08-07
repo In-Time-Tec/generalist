@@ -29,7 +29,7 @@ export const executeProgram = (input: {
   return scopedExecution.pipe(
     Effect.flatMap((value) =>
       Effect.try({
-        try: () => new TextEncoder().encode(JSON.stringify(value)).byteLength,
+        try: () => new TextEncoder().encode(Schema.encodeSync(Schema.UnknownFromJsonString)(value)).byteLength,
         catch: (error) => AgentExecutionFailure.make({ message: String(error) }),
       }).pipe(
         Effect.flatMap((outputBytes) =>

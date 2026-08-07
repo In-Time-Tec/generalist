@@ -7,6 +7,7 @@ import type { AdmitSteeringInput, ExecutionClaim } from "../run-store.js"
 import { encodeContinuation, type ExecutionContinuation, type SteeringEntry } from "../steering.js"
 import type { ExecutionResult } from "../execution-state.js"
 import { loadRun } from "./store-helpers.js"
+import { decodeJson, encodeJson } from "./codecs.js"
 
 interface SteeringRow {
   readonly entry_id: string
@@ -23,7 +24,7 @@ const decode = (row: SteeringRow): SteeringEntry => ({
   sequence: Number(row.sequence),
   idempotencyKey: row.idempotency_key,
   digest: row.digest,
-  prompt: Schema.decodeUnknownSync(Prompt.Prompt)(JSON.parse(row.prompt_json) as unknown),
+  prompt: decodeJson(Prompt.Prompt, row.prompt_json),
 })
 
 export const admitSteering = (input: AdmitSteeringInput) =>
@@ -53,7 +54,7 @@ export const admitSteering = (input: AdmitSteeringInput) =>
       FROM baton_run_steering WHERE run_id = ${input.runId}
     `
     const sequence = Number(rows[0]?.next_sequence ?? 0)
-    const encoded = JSON.stringify(Schema.encodeSync(Prompt.Prompt)(input.prompt))
+    const encoded = encodeJson(Prompt.Prompt, input.prompt)
     yield* sql`
       INSERT INTO baton_run_steering (
         entry_id, run_id, sequence, idempotency_key, digest, prompt_json, consumed_operation_id
@@ -96,7 +97,7 @@ export const saveCompletionContinuation = (runId: string, result: ExecutionResul
           }
     yield* sql`
       UPDATE baton_runs SET
-        transcript_json = ${JSON.stringify(result.transcript)},
+        transcript_json = ${encodeJson(Prompt.Prompt, result.transcript)},
         continuation_json = ${continuation === undefined ? null : encodeContinuation(continuation)}
       WHERE run_id = ${runId}
     `

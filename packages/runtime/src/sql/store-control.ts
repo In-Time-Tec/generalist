@@ -1,5 +1,6 @@
 import { Effect, Equal, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
+import { Prompt } from "effect/unstable/ai"
 import {
   ApprovalStale,
   ResponseConflict,
@@ -10,14 +11,14 @@ import {
 } from "../errors.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { AgentLoopEvent } from "../agent-event.js"
-import type { ExecutionResult } from "../execution-state.js"
+import { ExecutionCheckpoint, ExecutionSuspension, type ExecutionResult } from "../execution-state.js"
 import type { CancelInput, RespondInput, SignalInput } from "../runtime.js"
 import type { RespondInput as RespondApprovalInput } from "../approval.js"
 import { isTerminal } from "../run.js"
 import type { RunFailure } from "../run-event.js"
-import { encodeReason, type WaitResolution } from "../run-wait.js"
+import { encodeReason, WaitResolution } from "../run-wait.js"
 import { checkpointRef } from "../executable-manifest.js"
-import { encodeExecutableRef } from "./codecs.js"
+import { StringArray, encodeExecutableRef, encodeJson } from "./codecs.js"
 import { encodeContinuation } from "../steering.js"
 import {
   afterTerminal,
@@ -128,11 +129,11 @@ export const respond = (hub: EventHub, input: RespondInput) =>
     const updated = yield* nowIso
     const resolution: WaitResolution = input.resolution
     yield* sql`
-      UPDATE baton_run_waits SET status = 'responded', response_json = ${JSON.stringify(resolution)}, closed_at = ${updated}
+      UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${updated}
       WHERE run_id = ${run.runId} AND wait_id = ${input.waitId} AND status = 'open'
     `
     yield* sql`
-      UPDATE baton_runs SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = ${updated}
+      UPDATE baton_runs SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = ${updated}
       WHERE run_id = ${run.runId}
     `
     yield* sql`
@@ -174,7 +175,7 @@ export const signal = (hub: EventHub, input: SignalInput) =>
       ...(input.payload === undefined ? {} : { payload: input.payload }),
     }
     yield* sql`
-      UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${updated}
+      UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${updated}
       WHERE run_id = ${run.runId} AND wait_id = ${run.activeWaitId} AND status = 'open'
     `
     yield* appendEvent(hub, run, { _tag: "RunResumed", waitId: run.activeWaitId, resolution }, "running")
@@ -225,7 +226,7 @@ export const complete = (hub: EventHub, input: { readonly runId: string; readonl
     if (running.length > 0) {
       yield* sql`
         UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL,
-          pending_outcome_json = ${JSON.stringify(Schema.encodeSync(PendingRunOutcome)({ _tag: "Completed", result: input.result }))}
+          pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Completed", result: input.result })}
         WHERE run_id = ${run.runId}
       `
       return
@@ -266,7 +267,7 @@ export const fail = (hub: EventHub, input: { readonly runId: string; readonly er
     if (running.length > 0) {
       yield* sql`
         UPDATE baton_runs SET status = 'waiting', owner_worker_id = NULL,
-          pending_outcome_json = ${JSON.stringify(Schema.encodeSync(PendingRunOutcome)({ _tag: "Failed", error: input.error }))}
+          pending_outcome_json = ${encodeJson(PendingRunOutcome, { _tag: "Failed", error: input.error })}
         WHERE run_id = ${run.runId}
       `
       return
@@ -289,10 +290,10 @@ export const suspend = (hub: EventHub, input: Parameters<import("../run-store.js
     const opened = yield* nowIso
     yield* sql`
       UPDATE baton_runs SET
-        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
-        suspension_json = ${JSON.stringify(input.suspension)},
-        transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+        suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
+        transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
         continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
           THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
           ELSE continuation_json END,
@@ -327,7 +328,7 @@ export const suspend = (hub: EventHub, input: Parameters<import("../run-store.js
         }
         const closed = yield* nowIso
         yield* sql`
-          UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${closed}
+          UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closed}
           WHERE run_id = ${run.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
         `
         yield* appendEvent(
@@ -364,11 +365,11 @@ export const resume = (
     const resolution: WaitResolution = input.resolution
     const updated = yield* nowIso
     yield* sql`
-      UPDATE baton_run_waits SET status = 'responded', response_json = ${JSON.stringify(resolution)}, closed_at = ${updated}
+      UPDATE baton_run_waits SET status = 'responded', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${updated}
       WHERE run_id = ${run.runId} AND wait_id = ${input.waitId} AND status = 'open'
     `
     yield* sql`
-      UPDATE baton_runs SET responded_wait_ids_json = ${JSON.stringify(responded)}, updated_at = ${updated}
+      UPDATE baton_runs SET responded_wait_ids_json = ${encodeJson(StringArray, responded)}, updated_at = ${updated}
       WHERE run_id = ${run.runId}
     `
     const current = (yield* loadRun(run.runId))!
@@ -383,7 +384,7 @@ export const emitAgentEvent = (hub: EventHub, input: { readonly runId: string; r
     yield* appendEvent(hub, run, input.event as { readonly _tag: string } & Record<string, unknown>)
     if (input.event._tag === "TurnCompleted") {
       yield* sql`
-        UPDATE baton_runs SET transcript_json = ${JSON.stringify(input.event.transcript)}, continuation_json = NULL
+        UPDATE baton_runs SET transcript_json = ${encodeJson(Prompt.Prompt, input.event.transcript)}, continuation_json = NULL
         WHERE run_id = ${run.runId}
       `
     }

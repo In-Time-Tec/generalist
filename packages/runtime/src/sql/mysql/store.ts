@@ -52,7 +52,7 @@ import { makeMysqlClaims } from "./store-claims.js"
 import { admitFanOut, inspectFanOut } from "../store-fan-out.js"
 import { loadTreeHistory } from "../tree-history.js"
 import { loadRunSnapshot, loadTreeInspection } from "../inspection.js"
-import { encodeExecutableRef } from "../codecs.js"
+import { StringArray, encodeExecutableRef, encodeJson } from "../codecs.js"
 import { encodeContinuation } from "../../steering.js"
 import { withConsistentSnapshot } from "../inspection-transaction.js"
 import {
@@ -68,7 +68,9 @@ import {
 } from "../store-program.js"
 import { ProgramCapabilities } from "@batonfx/core"
 import { groupIdFromSuspension, resultFromInspection } from "../../child-group.js"
-import { encodeReason } from "../../run-wait.js"
+import { encodeReason, WaitResolution } from "../../run-wait.js"
+import { Prompt } from "effect/unstable/ai"
+import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
@@ -187,10 +189,10 @@ export const makeMysqlServices = (
         })
         yield* sql`
           UPDATE baton_runs SET
-            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
             executable_ref_json = ${encodeExecutableRef(executableRef)},
-            suspension_json = ${JSON.stringify(input.suspension)},
-            transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+            suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
+            transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
             continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
               THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
               ELSE continuation_json END,
@@ -227,7 +229,7 @@ export const makeMysqlServices = (
             }
             const closed = yield* nowIso
             yield* sql`
-              UPDATE baton_run_waits SET status = 'signaled', response_json = ${JSON.stringify(resolution)}, closed_at = ${closed}
+              UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = ${closed}
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.wait.waitId} AND status = 'open'
             `
             yield* appendEvent(
@@ -253,10 +255,10 @@ export const makeMysqlServices = (
         })
         yield* sql`
           UPDATE baton_runs SET
-            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : JSON.stringify(input.checkpoint)}, driver_checkpoint_json),
+            driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
             executable_ref_json = ${encodeExecutableRef(executableRef)},
-            suspension_json = COALESCE(${input.suspension === undefined ? null : JSON.stringify(input.suspension)}, suspension_json),
-            transcript_json = COALESCE(${input.transcript === undefined ? null : JSON.stringify(input.transcript)}, transcript_json),
+            suspension_json = COALESCE(${input.suspension === undefined ? null : encodeJson(ExecutionSuspension, input.suspension)}, suspension_json),
+            transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
             updated_at = ${yield* nowIso}
           WHERE run_id = ${input.runId} AND owner_worker_id = ${input.ownerId} AND attempt_fence = ${input.attemptFence}
         `

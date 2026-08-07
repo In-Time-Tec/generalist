@@ -20,6 +20,8 @@ export const decodeJson = <S extends Schema.Codec<any, any, never, never>>(
 
 export const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
+export const decodeJsonValue = (text: string): unknown => Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(text)
+
 export const encodeJsonEffect = <S extends Schema.Codec<any, any, never, never>>(
   schema: S,
   value: Schema.Schema.Type<S>,
