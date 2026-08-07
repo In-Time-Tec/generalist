@@ -205,6 +205,8 @@ export const ProgramBindings = {
 }
 export namespace ProgramBindings {
   export type Bindings = import("./program/program-bindings.js").Bindings
+  export type TypedTool = import("./program/program-bindings.js").TypedTool
+  export type TypedStep = import("./program/program-bindings.js").TypedStep
   export type ToolBinding<I, IE, O, OE, E = never> = import("./program/program-bindings.js").ToolBinding<
     I,
     IE,

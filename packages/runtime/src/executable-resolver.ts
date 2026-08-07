@@ -351,7 +351,12 @@ const resolveProgram = (
       }),
     )
     const bindings = yield* Effect.try({
-      try: () => ProgramBindings.make({ tools, steps, agents }),
+      try: () =>
+        ProgramBindings.make({
+          tools: tools as ReadonlyArray<ProgramBindings.TypedTool>,
+          steps: steps as ReadonlyArray<ProgramBindings.TypedStep>,
+          agents,
+        }),
       catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
     })
     yield* ProgramHost.validateBindings(program, bindings).pipe(
