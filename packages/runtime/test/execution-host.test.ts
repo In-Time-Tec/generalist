@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -140,6 +141,50 @@ describe("ExecutionHost", () => {
 
       expect(observed).toMatchObject({ contextWindow: 32_768, reserveTokens: 2_048 })
       expect(observedKeepRecent).toBe(777)
+    }),
+  )
+
+  it.effect("keeps a valid conversation after every execution record is dropped", () =>
+    Effect.gen(function* () {
+      const filename = tempDbPath("session-record-independence")
+      const resolver = ExecutableResolver.ExecutableResolver.of({ resolve: () => Effect.die("unused") })
+      const layerSqlite = () => Runtime.layerSqlite({ filename, addresses: [], resolver })
+      const user = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
+
+      const withSession = <A>(body: (session: Session.Interface) => Effect.Effect<A>) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const store = yield* RunStore.RunStore
+            const session = yield* store.sessionStore("thread:independence")
+            if (session === undefined) return yield* Effect.die("expected a durable Session")
+            return yield* body(session)
+          }).pipe(Effect.provide(layerSqlite())),
+        )
+
+      yield* withSession((session) => session.append({ _tag: "Message", message: user("m1") }).pipe(Effect.orDie))
+      yield* withSession((session) => session.append({ _tag: "Message", message: user("m2") }).pipe(Effect.orDie))
+
+      // Conversation and execution are separate logs. Dropping the execution journal must leave the
+      // conversation whole; if this fails, orchestration state leaked into conversation state.
+      const database = new Database(filename)
+      for (const table of [
+        "baton_run_events",
+        "baton_run_operations",
+        "baton_run_steering",
+        "baton_run_waits",
+        "baton_run_links",
+        "baton_tree_event_index",
+        "baton_run_registrations",
+        "baton_runs",
+        "baton_lanes",
+      ]) {
+        database.run(`DELETE FROM ${table}`)
+      }
+      database.close()
+
+      const path = yield* withSession((session) => session.path().pipe(Effect.orDie))
+      expect(path).toHaveLength(2)
+      expect(Session.buildContext(path).content).toHaveLength(2)
     }),
   )
 

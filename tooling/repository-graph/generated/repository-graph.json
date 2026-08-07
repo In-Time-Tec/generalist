@@ -14125,6 +14125,10 @@
     },
     {
       "source": "packages/runtime/test/execution-host.test.ts",
+      "specifier": "bun:sqlite"
+    },
+    {
+      "source": "packages/runtime/test/execution-host.test.ts",
       "specifier": "effect"
     },
     {
