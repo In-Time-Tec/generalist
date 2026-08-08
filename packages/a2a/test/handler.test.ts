@@ -190,6 +190,8 @@ const makeRuntime = (acceptedSequence = 0) => {
       return Effect.void
     },
     inspect: (runId) => Effect.succeed(inspection(runId, runs.get(runId)!)),
+    acknowledge: () => Effect.void,
+    acknowledged: (runId) => Effect.succeed({ runId, sequence: -1 }),
   }
   return { runtime, runs, sentRunIds, observedCursors }
 }

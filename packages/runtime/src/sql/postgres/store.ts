@@ -16,6 +16,7 @@ import { equals, resolveChild } from "../../executable-manifest.js"
 import { isTerminal } from "../../run.js"
 import { RunStore } from "../../run-store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
+import { acknowledge, loadAcknowledged } from "../store-ack.js"
 import type { RunRow } from "../rows.js"
 import { withSql } from "../sql-effect.js"
 import { makeEventHub } from "../subscribers.js"
@@ -324,6 +325,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           }),
         ),
       snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
+      acknowledge: (input) => run(lockRun(input.runId).pipe(Effect.andThen(acknowledge(input)))),
+      acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),
       inspectTree: (rootRunId) => runInspection(loadTreeInspection(rootRunId)),
       history: (input) =>
         runNoTxn(

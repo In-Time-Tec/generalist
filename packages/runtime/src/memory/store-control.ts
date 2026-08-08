@@ -482,11 +482,15 @@ export const emitAgentEvent: {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
-    const [, next] = yield* appendAgentEvent(state, run.runId, input.event)
+    const [event, next] = yield* appendAgentEvent(state, run.runId, input.event)
     if (input.event._tag !== "TurnCompleted") return next
     const runs = new Map(next.runs)
     const { continuation: _, ...withoutContinuation } = next.runs.get(run.runId)!
-    runs.set(run.runId, { ...withoutContinuation, transcript: input.event.transcript })
+    runs.set(run.runId, {
+      ...withoutContinuation,
+      transcript: input.event.transcript,
+      lastCommittedSequence: event.sequence,
+    })
     return { ...next, runs }
   }),
 )

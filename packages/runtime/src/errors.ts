@@ -183,3 +183,20 @@ export class FanOutRemainderUnsupported extends Schema.TaggedErrorClass<FanOutRe
   "@batonfx/runtime/FanOutRemainderUnsupported",
   { remainder: Schema.Literal("terminate"), durability: Schema.Literals(["ephemeral", "durable"]) },
 ) {}
+
+/** @experimental The acknowledged sequence is not a valid processed-through point for the Run. */
+export class AckInvalid extends Schema.TaggedErrorClass<AckInvalid>()("@batonfx/runtime/AckInvalid", {
+  runId: Schema.String,
+  sequence: Schema.Int,
+  message: Schema.String,
+}) {}
+
+/** @experimental The acknowledged sequence is beyond the last committed cycle boundary. */
+export class AckBeyondCommitted extends Schema.TaggedErrorClass<AckBeyondCommitted>()(
+  "@batonfx/runtime/AckBeyondCommitted",
+  {
+    runId: Schema.String,
+    sequence: Schema.Int,
+    lastCommittedSequence: Schema.Int,
+  },
+) {}

@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines */
 import {
   Address as Address_Address,
   make as Address_make,
@@ -243,6 +244,8 @@ import {
   StartInvalid as Errors_StartInvalid,
   OperationResolutionConflict as Errors_OperationResolutionConflict,
   StructuredAgentFailure as Errors_StructuredAgentFailure,
+  AckInvalid as Errors_AckInvalid,
+  AckBeyondCommitted as Errors_AckBeyondCommitted,
 } from "./errors.js"
 import {
   SchemaDirty as Errors_SchemaDirty,
@@ -283,6 +286,8 @@ export const Errors = {
   StartInvalid: Errors_StartInvalid,
   OperationResolutionConflict: Errors_OperationResolutionConflict,
   StructuredAgentFailure: Errors_StructuredAgentFailure,
+  AckInvalid: Errors_AckInvalid,
+  AckBeyondCommitted: Errors_AckBeyondCommitted,
   SchemaDirty: Errors_SchemaDirty,
   SchemaChecksumMismatch: Errors_SchemaChecksumMismatch,
   SchemaVersionUnsupported: Errors_SchemaVersionUnsupported,
@@ -321,6 +326,8 @@ export namespace Errors {
   export type StartInvalid = import("./errors.js").StartInvalid
   export type OperationResolutionConflict = import("./errors.js").OperationResolutionConflict
   export type StructuredAgentFailure = import("./errors.js").StructuredAgentFailure
+  export type AckInvalid = import("./errors.js").AckInvalid
+  export type AckBeyondCommitted = import("./errors.js").AckBeyondCommitted
   export type SchemaDirty = import("./sql/errors.js").SchemaDirty
   export type SchemaChecksumMismatch = import("./sql/errors.js").SchemaChecksumMismatch
   export type SchemaVersionUnsupported = import("./sql/errors.js").SchemaVersionUnsupported
@@ -374,6 +381,8 @@ export namespace Runtime {
   export type CancelError = import("./runtime.js").CancelError
   export type SteerError = import("./runtime.js").SteerError
   export type InspectError = import("./runtime.js").InspectError
+  export type AckError = import("./runtime.js").AckError
+  export type AckPoint = import("./run-store.js").AckPoint
   export type FanOutInput = import("./fan-out.js").FanOutInput
   export type FanOutMemberInput = import("./fan-out.js").FanOutMemberInput
   export type FanOutError = import("./runtime.js").FanOutError

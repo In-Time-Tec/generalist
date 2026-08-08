@@ -354,6 +354,8 @@ export const makeRuntime = (
       },
       resolveOperation: (input) => store.resolveOperation(input),
       inspect: (runId) => store.inspect(runId),
+      acknowledge: (input) => store.acknowledge(input),
+      acknowledged: (runId) => store.acknowledged(runId),
       fanOut: (input) =>
         Effect.gen(function* () {
           return yield* store.admitFanOut(yield* normalizeFanOut(input.parentRunId, input))

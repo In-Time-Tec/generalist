@@ -39,6 +39,7 @@ import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } f
 import { withSql } from "./sql-effect.js"
 import { makeSqliteSessionStore } from "./session-store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "./store-steering.js"
+import { acknowledge, loadAcknowledged } from "./store-ack.js"
 import { makeEventHub } from "./subscribers.js"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { loadTreeHistory } from "./tree-history.js"
@@ -161,6 +162,8 @@ export const makeSqliteRunStore = (
           }),
         ),
       snapshot: (runId) => run(loadRunSnapshot(runId)),
+      acknowledge: (input) => run(acknowledge(input)),
+      acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),
       inspectTree: (rootRunId) => run(loadTreeInspection(rootRunId)),
       history: (input) =>
         runNoTxn(

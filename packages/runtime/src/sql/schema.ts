@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 
@@ -35,6 +35,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   attempt INTEGER NOT NULL DEFAULT 0,
   attempt_fence INTEGER NOT NULL DEFAULT 0,
   last_sequence INTEGER NOT NULL DEFAULT -1,
+  last_committed_sequence INTEGER NOT NULL DEFAULT -1,
   cancellation_requested INTEGER NOT NULL DEFAULT 0,
   cancel_reason TEXT,
   terminal_event_id TEXT,
@@ -111,6 +112,12 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   consumed_operation_id TEXT,
   UNIQUE (run_id, sequence),
   UNIQUE (run_id, idempotency_key),
+  FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+)`,
+  `CREATE TABLE IF NOT EXISTS baton_run_acks (
+  run_id TEXT PRIMARY KEY,
+  sequence INTEGER NOT NULL,
+  acknowledged_at TEXT NOT NULL,
   FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
 )`,
   `CREATE INDEX IF NOT EXISTS baton_run_steering_pending_idx ON baton_run_steering(run_id, consumed_operation_id, sequence)`,

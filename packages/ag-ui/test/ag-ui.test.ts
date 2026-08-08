@@ -61,6 +61,8 @@ const mockRuntime = (implementation: Partial<Runtime.Interface>): Runtime.Interf
     fanOut: () => unused(),
     inspectFanOut: () => unused(),
     awaitFanOut: () => unused(),
+    acknowledge: () => unused(),
+    acknowledged: () => unused(),
     ...implementation,
   })
 

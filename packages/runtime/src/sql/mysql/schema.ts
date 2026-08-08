@@ -45,6 +45,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   attempt INT NOT NULL DEFAULT 0,
   attempt_fence INT NOT NULL DEFAULT 0,
   last_sequence INT NOT NULL DEFAULT -1,
+  last_committed_sequence INT NOT NULL DEFAULT -1,
   cancellation_requested TINYINT(1) NOT NULL DEFAULT 0,
   cancel_reason TEXT,
   terminal_event_id VARCHAR(255),
@@ -133,6 +134,12 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   UNIQUE KEY baton_run_steering_idempotency_key (run_id, idempotency_key),
   KEY baton_run_steering_pending_idx (run_id, consumed_operation_id, sequence),
   CONSTRAINT baton_run_steering_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
+) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS baton_run_acks (
+  run_id VARCHAR(255) PRIMARY KEY,
+  sequence INT NOT NULL,
+  acknowledged_at VARCHAR(30) NOT NULL,
+  CONSTRAINT baton_run_acks_run_fk FOREIGN KEY (run_id) REFERENCES baton_runs(run_id)
 ) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS baton_fan_outs (
   fan_out_id VARCHAR(255) PRIMARY KEY,

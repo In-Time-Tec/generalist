@@ -140,6 +140,7 @@ export const admitFanOut: {
         invocationId: `${input.fanOutId}:${member.key}`,
         respondedWaitIds: new Set(),
         lastSequence: -1,
+        lastCommittedSequence: -1,
         attempt: active ? 1 : 0,
         attemptFence: active ? 1 : 0,
         cancellationRequested: false,

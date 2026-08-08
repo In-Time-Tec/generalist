@@ -41,6 +41,8 @@ export interface StoredRun {
   readonly wait?: RunWait
   readonly respondedWaitIds: ReadonlySet<string>
   readonly lastSequence: number
+  /** Sequence of the last committed `TurnCompleted` boundary (-1 when no cycle has completed). */
+  readonly lastCommittedSequence: number
   readonly attempt: number
   readonly attemptFence: number
   readonly ownerId?: string
@@ -76,6 +78,7 @@ export interface MemoryState {
   readonly idempotency: ReadonlyMap<string, IdempotencyEntry>
   readonly registrationCatalog: ReadonlyMap<string, { readonly digest: string; readonly value: ExecutableRegistration }>
   readonly fanOuts: ReadonlyMap<string, StoredFanOut>
+  readonly acks: ReadonlyMap<string, import("../run-store.js").AckPoint>
   readonly operations: ReadonlyMap<string, OperationRecord>
   readonly programStates: ReadonlyMap<string, ProgramRunState>
   readonly programOperations: ReadonlyMap<string, ProgramOperationRecord>
@@ -127,6 +130,7 @@ export const emptyState = (input: {
   idempotency: new Map(),
   registrationCatalog: new Map(),
   fanOuts: new Map(),
+  acks: new Map(),
   operations: new Map(),
   programStates: new Map(),
   programOperations: new Map(),

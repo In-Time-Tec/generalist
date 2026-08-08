@@ -71,6 +71,8 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
       fanOut: () => Effect.die("unused fanOut"),
       inspectFanOut: () => Effect.die("unused inspectFanOut"),
       awaitFanOut: () => Effect.die("unused awaitFanOut"),
+      acknowledge: () => Effect.die("unused acknowledge"),
+      acknowledged: (runId) => Effect.succeed({ runId, sequence: -1 }),
       ...implementation,
     }),
   )

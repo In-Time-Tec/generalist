@@ -3,6 +3,8 @@ import type { ProgramCapabilities, Session } from "@batonfx/core"
 import type { Address } from "./address.js"
 import type { Cursor } from "./cursor.js"
 import type {
+  AckBeyondCommitted,
+  AckInvalid,
   AddressNotFound,
   CursorExpired,
   IdempotencyConflict,
@@ -107,6 +109,19 @@ export interface StoreInfo {
   readonly durability: Durability
   readonly backend: StoreBackend
   readonly multiWorker: boolean
+}
+
+/** @experimental The durable host-acknowledged processed-through point for a Run. */
+export interface AckPoint {
+  readonly runId: string
+  /**
+   * Sequence of the acknowledged point. -1 is the origin: no event has been acknowledged.
+   * The commit boundary is the existing `TurnCompleted` agent event's sequence; an ack never
+   * exceeds the last committed boundary.
+   */
+  readonly sequence: number
+  /** When the acknowledged point was last durably recorded (ISO timestamp). */
+  readonly acknowledgedAt?: string
 }
 
 export interface RecordOperationInput extends ExecutionClaim {
@@ -256,6 +271,11 @@ export interface Interface {
   readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, RunNotFound | RuntimeUnavailable>
+  readonly acknowledge: (input: {
+    readonly runId: string
+    readonly sequence: number
+  }) => Effect.Effect<void, RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable>
+  readonly acknowledged: (runId: string) => Effect.Effect<AckPoint, RunNotFound | RuntimeUnavailable>
   readonly inspectTree: (
     rootRunId: string,
   ) => Effect.Effect<import("./tree.js").Inspection, RunNotFound | RuntimeUnavailable>

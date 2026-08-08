@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines */
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
@@ -70,6 +71,7 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     attempt: Number(row.attempt),
     attemptFence: Number(row.attempt_fence),
     lastSequence: Number(row.last_sequence),
+    lastCommittedSequence: Number(row.last_committed_sequence),
     cancellationRequested: asBool(row.cancellation_requested),
     acceptedSequence: Number(row.accepted_sequence),
     respondedWaitIds: new Set(decodeJson(StringArray, row.responded_wait_ids_json)),

@@ -98,10 +98,10 @@ export const emitAgentEvent: {
       })
     }
     if (isTerminal(loaded.status)) return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
-    yield* appendEvent(hub, loaded, input.event as EventPartial)
+    const event = yield* appendEvent(hub, loaded, input.event as EventPartial)
     if (input.event._tag === "TurnCompleted") {
       yield* sql`
-        UPDATE baton_runs SET transcript_json = ${encodeJson(Prompt.Prompt, input.event.transcript)}, continuation_json = NULL
+        UPDATE baton_runs SET transcript_json = ${encodeJson(Prompt.Prompt, input.event.transcript)}, continuation_json = NULL, last_committed_sequence = ${event.sequence}
         WHERE run_id = ${loaded.runId}
       `
     }

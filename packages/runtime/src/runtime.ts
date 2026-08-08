@@ -5,6 +5,8 @@ import type { PinnedExecutable } from "./executable-manifest.js"
 import type { Interface as ExecutableResolverInterface } from "./executable-resolver.js"
 import type { Cursor } from "./cursor.js"
 import type {
+  AckBeyondCommitted,
+  AckInvalid,
   AddressNotFound,
   CursorExpired,
   IdempotencyConflict,
@@ -35,6 +37,7 @@ import type {
 } from "./errors.js"
 import type { Metadata } from "./message.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
+import type { AckPoint } from "./run-store.js"
 import type { RunEvent } from "./run-event.js"
 import type { WaitResolution } from "./run-wait.js"
 import type { FanOutInput, FanOutInspection, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
@@ -190,6 +193,7 @@ export type CancelError = RunNotFound | RuntimeUnavailable
 export type SteerError = RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable
 export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable
 export type InspectError = RunNotFound | RuntimeUnavailable
+export type AckError = RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable
 export type FanOutError =
   | RunNotFound
   | RunTerminal
@@ -221,6 +225,10 @@ export interface Interface {
   readonly steer: (input: SteerInput) => Effect.Effect<void, SteerError>
   readonly resolveOperation: (input: ResolveOperationInput) => Effect.Effect<void, ResolveOperationError>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
+  /** Durably record the host's processed-through point for a Run (idempotent, monotonic). */
+  readonly acknowledge: (input: { readonly runId: string; readonly sequence: number }) => Effect.Effect<void, AckError>
+  /** Read the durable host-acknowledged processed-through point for a Run (-1 when never acknowledged). */
+  readonly acknowledged: (runId: string) => Effect.Effect<AckPoint, InspectError>
   readonly fanOut: (input: FanOutInput) => Effect.Effect<FanOutReceipt, FanOutError>
   readonly inspectFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, InspectFanOutError>
   readonly awaitFanOut: (fanOutId: string) => Effect.Effect<FanOutInspection, AwaitFanOutError>

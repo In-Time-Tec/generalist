@@ -27,6 +27,7 @@ import {
 } from "./store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
 import { admitSteering, readSteering } from "./store-steering.js"
+import { acknowledge, loadAcknowledged } from "./store-ack.js"
 import { Prompt } from "effect/unstable/ai"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { makeCursor } from "../tree-cursor.js"
@@ -126,6 +127,9 @@ export const makeRunStore = (options: LayerOptions) =>
           ),
         ),
       inspect: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectRun(state, runId))),
+      acknowledge: (input) => update((state) => acknowledge(state, input)),
+      acknowledged: (runId) =>
+        SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadAcknowledged(state, runId))),
       snapshot: (runId) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>

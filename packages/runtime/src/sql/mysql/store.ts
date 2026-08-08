@@ -38,6 +38,7 @@ import {
 import type { RunRow } from "../rows.js"
 import { makeEventHub } from "../subscribers.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
+import { acknowledge, loadAcknowledged } from "../store-ack.js"
 import {
   SchemaChecksumMismatch,
   SchemaDirty,
@@ -319,6 +320,8 @@ export const makeMysqlServices = (
           }),
         ),
       snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
+      acknowledge: (input) => run(lockRun(input.runId).pipe(Effect.andThen(acknowledge(input)))),
+      acknowledged: (runId) => runNoTxn(loadAcknowledged(runId)),
       inspectTree: (rootRunId) => runInspection(loadTreeInspection(rootRunId)),
       history: (input) =>
         runNoTxn(
