@@ -4,6 +4,7 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import { AckBeyondCommitted, AckInvalid, RunNotFound, RuntimeUnavailable } from "../errors.js"
 import type { AckPoint } from "../run-store.js"
 import { loadRun, nowIso } from "./store-helpers.js"
+import { validateBoundary, validateRange } from "../acknowledgement.js"
 
 export type AckError = RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable | SqlError
 
@@ -30,20 +31,23 @@ export const acknowledge = (input: { readonly runId: string; readonly sequence: 
     const sql = yield* SqlClient.SqlClient
     const run = yield* loadRun(input.runId)
     if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
-    if (input.sequence < -1) {
-      return yield* AckInvalid.make({
-        runId: input.runId,
-        sequence: input.sequence,
-        message: "acknowledged sequence must be -1 or a committed sequence",
-      })
-    }
-    if (input.sequence > run.lastCommittedSequence) {
-      return yield* AckBeyondCommitted.make({
-        runId: input.runId,
-        sequence: input.sequence,
-        lastCommittedSequence: run.lastCommittedSequence,
-      })
-    }
+    yield* validateRange({
+      runId: input.runId,
+      sequence: input.sequence,
+      lastCommittedSequence: run.lastCommittedSequence,
+    })
+    const boundaryRows =
+      input.sequence === -1
+        ? []
+        : yield* sql<{ event_tag: string }>`
+            SELECT event_tag FROM baton_run_events
+            WHERE run_id = ${input.runId} AND sequence = ${input.sequence}
+          `
+    yield* validateBoundary({
+      runId: input.runId,
+      sequence: input.sequence,
+      committed: boundaryRows[0]?.event_tag === "TurnCompleted",
+    })
     const rows = yield* sql<{ sequence: number | string }>`
       SELECT sequence FROM baton_run_acks WHERE run_id = ${input.runId}
     `

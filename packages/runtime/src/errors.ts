@@ -184,10 +184,12 @@ export class FanOutRemainderUnsupported extends Schema.TaggedErrorClass<FanOutRe
   { remainder: Schema.Literal("terminate"), durability: Schema.Literals(["ephemeral", "durable"]) },
 ) {}
 
+const ReportedNumber = Schema.declare((input): input is number => typeof input === "number")
+
 /** @experimental The acknowledged sequence is not a valid processed-through point for the Run. */
 export class AckInvalid extends Schema.TaggedErrorClass<AckInvalid>()("@batonfx/runtime/AckInvalid", {
   runId: Schema.String,
-  sequence: Schema.Int,
+  sequence: ReportedNumber,
   message: Schema.String,
 }) {}
 

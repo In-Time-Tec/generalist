@@ -42,6 +42,7 @@ export interface EventRow {
   readonly run_id: string
   readonly sequence: number
   readonly event_id: string
+  readonly event_tag: string
   readonly event_json: string
 }
 

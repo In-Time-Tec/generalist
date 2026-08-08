@@ -38,6 +38,7 @@ import {
   uniqueSession,
 } from "./helpers.js"
 import { testExecutable } from "../identity.js"
+import { acknowledgementBoundaryContract } from "../acknowledgement-store-contract.js"
 
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
@@ -160,6 +161,22 @@ const finish = Response.makePart("finish", {
 })
 
 describePostgres("postgres run store", () => {
+  it.live("persists the acknowledgement contract across a store reopen", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const recorded = yield* scopedWith(postgresLayer(url))(
+          acknowledgementBoundaryContract(uniqueSession("postgres-ack")),
+        )
+        yield* scopedWith(postgresLayer(url))(
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            expect((yield* runtime.acknowledged(recorded.runId)).sequence).toBe(recorded.sequence)
+          }),
+        )
+      }),
+    ),
+  )
+
   it.live("persists exact-start registrations and replays admission idempotently", () =>
     withSchema(
       Effect.gen(function* () {

@@ -56,7 +56,7 @@ const resetRuntimeSchema = (url: string) =>
       yield* sql.unsafe(`DROP TABLE IF EXISTS
       baton_run_registrations, baton_executable_registrations,
       baton_program_operations, baton_program_runs, baton_tree_event_index, baton_tree_roots, baton_fan_out_members, baton_fan_outs, baton_run_steering,
-      baton_run_links, baton_run_waits, baton_run_operations, baton_run_events, baton_runs, baton_lanes,
+      baton_run_links, baton_run_waits, baton_run_operations, baton_run_acks, baton_run_events, baton_runs, baton_lanes,
       baton_runtime_locks, baton_sql_migrations, baton_schema_meta CASCADE`)
     }),
   )

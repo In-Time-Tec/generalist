@@ -493,15 +493,6 @@ export namespace LocalScheduler {
   export type Options = import("./local-scheduler.js").Options
 }
 
-import { ExecutionHost as ExecutionHost_ExecutionHost, layer as ExecutionHost_layer } from "./execution-host.js"
-export const ExecutionHost = {
-  ExecutionHost: ExecutionHost_ExecutionHost,
-  layer: ExecutionHost_layer,
-} as typeof import("./execution-host.js")
-export namespace ExecutionHost {
-  export type ExecutionHost = import("./execution-host.js").ExecutionHost
-  export type Interface = import("./execution-host.js").Interface
-  export type Options = import("./execution-host.js").Options
-}
+export * as ExecutionHost from "./execution-host.js"
 
 export * as RunTree from "./tree.js"

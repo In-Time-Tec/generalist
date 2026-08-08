@@ -8,8 +8,6 @@ import type { Message } from "../../message.js"
 import { isTerminal, type RunStatus } from "../../run.js"
 import {
   StringArray,
-  decodeJson,
-  decodeJsonValue,
   decodeMessage,
   decodeQueue,
   encodeExecutableManifest,
@@ -21,8 +19,7 @@ import {
 } from "../codecs.js"
 import type { EventHub } from "../subscribers.js"
 import { reconcileFanOutWith } from "../store-fan-out.js"
-import type { DecodedRun, EventRow, OperationRow, RunRow } from "../rows.js"
-import type { OperationRecord } from "../operations.js"
+import type { DecodedRun, EventRow, RunRow } from "../rows.js"
 import { decodePersistedEvents, decodeRunEffect, nowIso } from "../store-helpers.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
 import type { AgentLoopEvent } from "../../agent-event.js"
@@ -30,7 +27,6 @@ import { PendingRunOutcome, type ExecutionClaim } from "../../run-store.js"
 import type { ExecutionResult } from "../../execution-state.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
-import { OperationResolution } from "../../operation-resolution.js"
 import { Prompt } from "effect/unstable/ai"
 
 type StoreError = RuntimeUnavailable | SqlError
@@ -163,8 +159,8 @@ export const appendEvent: {
         ...partial,
       } as RunEvent
       yield* sql`
-      INSERT INTO baton_run_events (run_id, sequence, event_id, event_json)
-      VALUES (${run.runId}, ${sequence}, ${event.eventId}, ${encodeEvent(event)})
+      INSERT INTO baton_run_events (run_id, sequence, event_id, event_tag, event_json)
+      VALUES (${run.runId}, ${sequence}, ${event.eventId}, ${event._tag}, ${encodeEvent(event)})
     `
       const treeRoot = (yield* sql<{ last_position: number }>`
       UPDATE baton_tree_roots SET last_position = last_position + 1
@@ -480,21 +476,5 @@ export const enqueueLane: {
     return { acceptedSequence, isHead: head === runId }
   }),
 )
-
-export const toOperationRecord = (row: OperationRow): OperationRecord => ({
-  runId: row.run_id,
-  operationId: row.operation_id,
-  operationKey: row.operation_key,
-  kind: row.kind,
-  status: row.status,
-  inputDigest: row.input_digest,
-  input: decodeJsonValue(row.input_json),
-  replayPolicy: row.replay_policy,
-  attempt: Number(row.attempt),
-  ...(row.result_json === null ? {} : { result: decodeJsonValue(row.result_json) }),
-  ...(row.error_json === null ? {} : { error: decodeJsonValue(row.error_json) }),
-  ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
-  ...(row.resolution_json === null ? {} : { resolution: decodeJson(OperationResolution, row.resolution_json) }),
-})
 
 export { decodeMessage, encodeQueue, decodeQueue }

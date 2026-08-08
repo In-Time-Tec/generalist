@@ -58,6 +58,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   run_id TEXT NOT NULL REFERENCES baton_runs(run_id),
   sequence INTEGER NOT NULL,
   event_id TEXT NOT NULL UNIQUE,
+  event_tag TEXT NOT NULL,
   event_json TEXT NOT NULL,
   PRIMARY KEY (run_id, sequence)
 )`,

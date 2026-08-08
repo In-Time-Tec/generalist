@@ -59,6 +59,7 @@ export const resetRuntimeTables = (url: string) =>
             "baton_run_links",
             "baton_run_waits",
             "baton_run_operations",
+            "baton_run_acks",
             "baton_run_events",
             "baton_runs",
             "baton_lanes",

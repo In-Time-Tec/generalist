@@ -2,6 +2,7 @@ import { DateTime, Effect, Function } from "effect"
 import { AckBeyondCommitted, AckInvalid, RunNotFound, RuntimeUnavailable } from "../errors.js"
 import type { AckPoint } from "../run-store.js"
 import type { MemoryState, StoredRun } from "./state.js"
+import { validateBoundary, validateRange } from "../acknowledgement.js"
 
 type AckResult = Effect.Effect<MemoryState, RunNotFound | AckInvalid | AckBeyondCommitted | RuntimeUnavailable>
 
@@ -24,20 +25,16 @@ export const acknowledge: {
 } = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly sequence: number }) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
-    if (input.sequence < -1) {
-      return yield* AckInvalid.make({
-        runId: input.runId,
-        sequence: input.sequence,
-        message: "acknowledged sequence must be -1 or a committed sequence",
-      })
-    }
-    if (input.sequence > run.lastCommittedSequence) {
-      return yield* AckBeyondCommitted.make({
-        runId: input.runId,
-        sequence: input.sequence,
-        lastCommittedSequence: run.lastCommittedSequence,
-      })
-    }
+    yield* validateRange({
+      runId: input.runId,
+      sequence: input.sequence,
+      lastCommittedSequence: run.lastCommittedSequence,
+    })
+    yield* validateBoundary({
+      runId: input.runId,
+      sequence: input.sequence,
+      committed: run.events.some((event) => event.sequence === input.sequence && event._tag === "TurnCompleted"),
+    })
     const acks = new Map(state.acks)
     const current = acks.get(input.runId)
     if (current === undefined || input.sequence > current.sequence) {

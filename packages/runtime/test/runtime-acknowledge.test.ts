@@ -3,10 +3,11 @@ import { Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "@batonfx/core"
 import { Address, Errors, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
-import { assistantAddress, emptyTranscript, memoryLayer, registrationsFor } from "./helpers.js"
+import { assistantAddress, memoryLayer, parentRelativeOptions, registrationsFor } from "./helpers.js"
 import { testExecutable } from "./identity.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 import { provideScoped } from "./scoped-provide.js"
+import { acknowledgementBoundaryContract } from "./acknowledgement-store-contract.js"
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -88,54 +89,7 @@ layer(memoryLayer)("Runtime host-acknowledged checkpoint memory contract", (test
     }),
   )
 
-  test.effect("is idempotent and monotonic, and a future ack fails typed", () =>
-    Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const receipt = yield* runtime.send({
-        to: assistantAddress,
-        sessionId: "session:ack-rules",
-        idempotencyKey: "run:ack-rules",
-        prompt: "start",
-      })
-      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "ack-rules" })
-      yield* store.emitAgentEvent({
-        ...claim,
-        event: { _tag: "TurnCompleted", turn: 1, transcript: emptyTranscript },
-      })
-      yield* store.emitAgentEvent({
-        ...claim,
-        event: { _tag: "TurnCompleted", turn: 2, transcript: emptyTranscript },
-      })
-      const committed = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).filter(
-        (event) => event._tag === "TurnCompleted",
-      )
-      expect(committed).toHaveLength(2)
-      const cycle1 = committed[0]!.sequence
-      const cycle2 = committed[1]!.sequence
-
-      yield* runtime.acknowledge({ runId: receipt.runId, sequence: cycle1 })
-      yield* runtime.acknowledge({ runId: receipt.runId, sequence: cycle1 })
-      yield* runtime.acknowledge({ runId: receipt.runId, sequence: cycle2 })
-      // An older ack is a no-op.
-      yield* runtime.acknowledge({ runId: receipt.runId, sequence: cycle1 })
-      expect((yield* runtime.acknowledged(receipt.runId)).sequence).toBe(cycle2)
-
-      // A future ack fails typed.
-      const future = yield* runtime.acknowledge({ runId: receipt.runId, sequence: cycle2 + 1 }).pipe(Effect.flip)
-      expect(future).toBeInstanceOf(Errors.AckBeyondCommitted)
-      if (Schema.is(Errors.AckBeyondCommitted)(future)) {
-        expect(future.lastCommittedSequence).toBe(cycle2)
-      }
-
-      // A sequence below the cursor origin is invalid.
-      const invalid = yield* runtime.acknowledge({ runId: receipt.runId, sequence: -2 }).pipe(Effect.flip)
-      expect(invalid).toBeInstanceOf(Errors.AckInvalid)
-
-      // The ack never moved past the last committed boundary.
-      expect((yield* runtime.acknowledged(receipt.runId)).sequence).toBe(cycle2)
-    }),
-  )
+  test.effect("accepts only safe committed TurnCompleted boundaries", () => acknowledgementBoundaryContract("memory"))
 
   test.effect("a run without a completed cycle rejects any ack beyond the origin", () =>
     Effect.gen(function* () {
@@ -167,6 +121,16 @@ layer(memoryLayer)("Runtime host-acknowledged checkpoint memory contract", (test
   )
 })
 
+it.live("applies the acknowledgement boundary contract through the shared SQL store", () =>
+  provideScoped(
+    Runtime.layerSqlite({
+      ...parentRelativeOptions,
+      filename: tempDbPath("runtime-ack-sql-contract"),
+    }),
+    acknowledgementBoundaryContract("sqlite"),
+  ),
+)
+
 it.live("host acks cycle N, disconnects, and resumes exactly after N across a SQLite restart", () => {
   const filename = tempDbPath("runtime-ack-restart")
   const ackSqliteLayer = twoTurnLayer().sqlite
@@ -192,7 +156,7 @@ it.live("host acks cycle N, disconnects, and resumes exactly after N across a SQ
       const observed = yield* runtime.events({ runId }).pipe(
         Stream.takeWhile((event) => !isTerminalTag(event._tag)),
         Stream.tap((event) =>
-          event._tag === "TurnCompleted"
+          event._tag === "TurnCompleted" && acked === -1
             ? Effect.sync(() => {
                 acked = event.sequence
               }).pipe(Effect.andThen(runtime.acknowledge({ runId, sequence: event.sequence })))
@@ -208,8 +172,9 @@ it.live("host acks cycle N, disconnects, and resumes exactly after N across a SQ
         sequence: event.sequence,
         _tag: event._tag,
       }))
-      expect(full.filter((event) => event._tag === "TurnCompleted")).toHaveLength(2)
-      expect(acked).toBeGreaterThanOrEqual(0)
+      const boundaries = full.filter((event) => event._tag === "TurnCompleted")
+      expect(boundaries).toHaveLength(2)
+      expect(acked).toBe(boundaries[0]!.sequence)
       expect((yield* runtime.acknowledged(runId)).sequence).toBe(acked)
     }),
   )
@@ -221,6 +186,7 @@ it.live("host acks cycle N, disconnects, and resumes exactly after N across a SQ
       const point = yield* runtime.acknowledged(runId)
       expect(point.sequence).toBe(acked)
       const expected = full.filter((event) => event.sequence > point.sequence)
+      expect(expected.filter((event) => event._tag === "TurnCompleted")).toHaveLength(1)
       const observed = yield* runtime.events({ runId, cursor: point.sequence }).pipe(
         Stream.take(expected.length),
         Stream.runCollect,

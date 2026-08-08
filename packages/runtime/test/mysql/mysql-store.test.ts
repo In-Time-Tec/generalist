@@ -15,6 +15,7 @@ import {
   textPrompt,
 } from "../helpers.js"
 import { mysqlAvailable, mysqlClient, mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "./helpers.js"
+import { acknowledgementBoundaryContract } from "../acknowledgement-store-contract.js"
 
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
@@ -50,6 +51,20 @@ const exactRegistrations = () => {
 }
 
 describeMysql("mysql run store", () => {
+  it.live("persists the acknowledgement contract across a store reopen", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const recorded = yield* scopedWith(mysqlLayer(url))(acknowledgementBoundaryContract(uniqueSession("mysql-ack")))
+        yield* scopedWith(mysqlLayer(url))(
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            expect((yield* runtime.acknowledged(recorded.runId)).sequence).toBe(recorded.sequence)
+          }),
+        )
+      }),
+    ),
+  )
+
   it.live("persists exact-start registrations and replays admission idempotently", () =>
     withSchema(
       Effect.gen(function* () {
