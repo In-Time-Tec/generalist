@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.19.0
+
+- Add `decodeConfig` to the OpenRouter provider so persisted provider options
+  (reasoning effort and summary verbosity, sampling parameters, provider
+  routing) decode into `OpenRouterLanguageModel` request configuration with the
+  same strict unknown-field rejection the OpenAI provider applies.
+
 ## 0.18.3
 
 - Persist distinct durable checkpoints when one logical Agent turn suspends more than once. Suspension checkpoints now derive their idempotent compaction-application identity from the encoded suspension itself, so a child-group join followed by a `run_child` retry in the same turn can no longer replay the first suspension's checkpoint and fail rehydration with a blank `ResumeMismatch`.
