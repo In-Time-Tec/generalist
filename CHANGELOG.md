@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.19.1
+
+- Fix the `decodeConfig` return type on the OpenRouter provider: the exported
+  `Config` alias no longer includes `undefined`, so persisted provider options
+  satisfy the layer options type exactly.
+
 ## 0.19.0
 
 - Add `decodeConfig` to the OpenRouter provider so persisted provider options

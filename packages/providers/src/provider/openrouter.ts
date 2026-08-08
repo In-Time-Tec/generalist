@@ -40,17 +40,18 @@ const ConfigSchema = Schema.Struct({
   strictJsonSchema: Schema.optionalKey(Schema.Boolean),
 })
 
-/** @experimental Decodes persisted provider options into OpenRouter request configuration. */
-export const decodeConfig = (options: unknown): OpenRouterInput["config"] =>
-  Schema.decodeUnknownSync(ConfigSchema, { onExcessProperty: "error" })(
-    options ?? {},
-  ) as unknown as OpenRouterInput["config"]
+/** @experimental */
+export type Config = Omit<typeof OpenRouterLanguageModel.Config.Service, "model">
 
 /** @experimental */
 export interface OpenRouterInput extends RegistrationOptions {
   readonly model: string
-  readonly config?: Omit<typeof OpenRouterLanguageModel.Config.Service, "model">
+  readonly config?: Config
 }
+
+/** @experimental Decodes persisted provider options into OpenRouter request configuration. */
+export const decodeConfig = (options: unknown): Config =>
+  Schema.decodeUnknownSync(ConfigSchema, { onExcessProperty: "error" })(options ?? {}) as unknown as Config
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
