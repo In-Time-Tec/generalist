@@ -1,4 +1,3 @@
-/* oxlint-disable max-lines */
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
