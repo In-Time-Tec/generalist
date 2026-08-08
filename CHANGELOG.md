@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.19.2
+
+- Export `decodeConfig` from the `OpenRouter` provider namespace so consumers
+  can decode persisted provider options through the package root.
+
 ## 0.19.1
 
 - Fix the `decodeConfig` return type on the OpenRouter provider: the exported
