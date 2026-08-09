@@ -177,7 +177,12 @@ const mount = (modules: ReadonlyArray<{ readonly module: string; readonly operat
   for (const descriptor of modules) {
     const operations: Record<string, unknown> = {}
     for (const operation of descriptor.operations) {
-      operations[operation] = (input: unknown) => hostRequest(descriptor.module, operation, input)
+      /**
+       * An operation whose input is empty reads better called with no argument, and JSON cannot
+       * carry the `undefined` that produces, so the empty object it stands for is sent instead.
+       */
+      operations[operation] = (input: unknown) =>
+        hostRequest(descriptor.module, operation, input === undefined ? {} : input)
     }
     host[descriptor.module] = operations
     reserved.add(descriptor.module)

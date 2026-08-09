@@ -77,7 +77,11 @@ export const HostRequest = Schema.TaggedStruct("HostRequest", {
   requestId: RequestId,
   module: Schema.String,
   operation: Schema.String,
-  input: Schema.Unknown,
+  /**
+   * A binding called with no argument sends nothing, because JSON has no way to carry `undefined`.
+   * A required field would fail to decode and the cell would wait for an answer that never comes.
+   */
+  input: Schema.optionalKey(Schema.Unknown),
 })
 
 /** @experimental The cell completed with a value. */

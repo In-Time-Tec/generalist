@@ -33,7 +33,7 @@ export interface HostAsk {
   readonly requestId: string
   readonly module: string
   readonly operation: string
-  readonly input: unknown
+  readonly input?: unknown
 }
 
 /** @experimental Answer one host request from an executing cell without blocking the frame reader. */
