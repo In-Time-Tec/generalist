@@ -133,7 +133,7 @@ export const addressedMessaging = definePage({
     callout(
       "warning",
       "There is no ack call",
-      "The contract is consumption-acked: at-least-once bind, exactly-once consume. Binding is not delivery. A Run that takes a message and then reaches succeeded, failed, or cancelled without consuming it returns that message to pending for the session's next Run. Consumption happens in the same commit as the model operation, so a Run that died before that commit never showed the message to a model and redelivery duplicates nothing. Adding a separate ack would introduce a second commit point whose own failure window could lose or duplicate a message.",
+      "The contract is consumption-acked: at-least-once bind, exactly-once consume. Binding is not delivery. A Run that takes a message and then reaches succeeded, failed, or cancelled without consuming it returns that message to pending for the session's next Run. Consumption happens in the same commit as the model operation, so exactly-once describes the journal rather than what a model observed: a turn folds its steering into the prompt before that operation commits, and a Run that dies in between leaves the entry pending for the next Run to deliver again. Adding a separate ack would introduce a second commit point whose own failure window could lose or duplicate a message.",
     ),
     p(
       code("deliveredRunId"),
