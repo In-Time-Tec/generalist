@@ -112,6 +112,25 @@ export interface Ingested {
   readonly truncated: boolean
 }
 
+/**
+ * The largest prefix of `text` that fits in `budget` bytes without splitting a character. Slicing by
+ * code unit would admit up to four bytes per unit against a byte bound and could cut a surrogate
+ * pair in half, so the prefix is measured in the encoding the bound is stated in.
+ */
+const keptWithinBytes = (text: string, budget: number): string => {
+  const encoder = new TextEncoder()
+  let low = 0
+  let high = text.length
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2)
+    if (encoder.encode(text.slice(0, middle)).byteLength <= budget) low = middle
+    else high = middle - 1
+  }
+  const candidate = text.slice(0, low)
+  const lastUnit = candidate.charCodeAt(candidate.length - 1)
+  return lastUnit >= 0xd800 && lastUnit <= 0xdbff ? candidate.slice(0, -1) : candidate
+}
+
 const metered = (previous: ChannelState, text: string, limit: number): { state: ChannelState; kept: string } => {
   const size = new TextEncoder().encode(text).byteLength
   const remaining = limit - previous.bytes
@@ -124,12 +143,12 @@ const metered = (previous: ChannelState, text: string, limit: number): { state: 
   if (size <= remaining) {
     return { state: { ...previous, text: previous.text + text, bytes: previous.bytes + size }, kept: text }
   }
-  const kept = text.slice(0, remaining)
+  const kept = keptWithinBytes(text, remaining)
   const keptBytes = new TextEncoder().encode(kept).byteLength
   return {
     state: {
       text: previous.text + kept,
-      bytes: limit,
+      bytes: previous.bytes + keptBytes,
       droppedBytes: previous.droppedBytes + (size - keptBytes),
       droppedEvents: previous.droppedEvents + 1,
     },

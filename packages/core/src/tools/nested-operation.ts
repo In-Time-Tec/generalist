@@ -1,4 +1,4 @@
-import { Cause, Context, Effect, Function, Layer, Ref, Schema } from "effect"
+import { Cause, Context, Effect, Function, Layer, Option, Ref, Schema } from "effect"
 import { digest as canonicalDigest } from "../durable/canonical-json.js"
 import { ReplayPolicy } from "../durable/driver-contract.js"
 import { ToolContext } from "./tool-context.js"
@@ -92,24 +92,25 @@ export const progressData = (input: {
   readonly render?: Render | undefined
 }): Effect.Effect<Record<string, unknown>> =>
   Effect.gen(function* () {
-    const serialized =
-      input.render === undefined
-        ? undefined
-        : yield* Schema.encodeUnknownEffect(Schema.fromJsonString(Render))(input.render)
-    const encoded = input.render === undefined ? undefined : yield* Schema.encodeUnknownEffect(Render)(input.render)
-    const byteSize = serialized === undefined ? 0 : new TextEncoder().encode(serialized).byteLength
+    const encodable = yield* Effect.option(
+      Effect.all({
+        serialized: Schema.encodeUnknownEffect(Schema.fromJsonString(Render))(input.render as Render),
+        encoded: Schema.encodeUnknownEffect(Render)(input.render as Render),
+      }),
+    )
+    const projection = input.render === undefined ? undefined : Option.getOrUndefined(encodable)
+    const byteSize = projection === undefined ? 0 : new TextEncoder().encode(projection.serialized).byteLength
     const withheld = byteSize > maxRenderBytes
     return {
       [progressKey]: {
         kind: input.kind,
         ordinal: input.ordinal,
         status: input.status,
-        ...(encoded === undefined || withheld ? {} : { render: encoded }),
+        ...(projection === undefined || withheld ? {} : { render: projection.encoded }),
         ...(withheld ? { renderWithheldBytes: byteSize } : {}),
       },
     }
-  }).pipe(Effect.orDie)
-
+  })
 export interface Request<A = unknown> {
   readonly kind: string
   readonly payload: unknown
