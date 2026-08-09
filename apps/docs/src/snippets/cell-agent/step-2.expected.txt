@@ -1,0 +1,4 @@
+tool: typescript
+parameters: code
+scheduling: maxConcurrency=1 parallelSafe=0
+epoch digest: 02d1994c96b99e5142dffabc351dc7d66e2d387df3361a60d7aaf3afc94748ed

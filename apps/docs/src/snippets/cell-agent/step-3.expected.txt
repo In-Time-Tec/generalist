@@ -1,0 +1,4 @@
+c1 events: 0:KernelReady 1:Stdout 2:Result
+c1 outcome: Success
+c2 events: 0:KernelReady 1:Stderr
+c2 outcome: Failure

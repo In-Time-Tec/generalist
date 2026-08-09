@@ -1,0 +1,4 @@
+mounted: workspace.read
+bindings digest: 54d2f7dd1bee8efcf49681349de679f40745c8dd5681d57414c5bcb75d499ba5
+outcome: Success
+value: "# cell-agent"

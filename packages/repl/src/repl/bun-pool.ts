@@ -210,9 +210,23 @@ export const make = (
               Effect.ignore,
               Effect.forkIn(cellScope),
             )
+            /**
+             * Interrupting the caller is itself a cancellation, and it is the only one that must
+             * stop the cell outright. The abort signal a host passes is watched by a fiber in
+             * `cellScope`, which closes as this result settles, so an interrupted caller would
+             * tear that watcher down before the signal fired and leave the cell running unstopped.
+             *
+             * Killing the kernel is the honest remedy rather than an in-place interrupt: an
+             * interrupt only rejects what the host awaits, while the cell's own continuations keep
+             * running, so a cell that awaited a timer before writing a file would still land that
+             * write after the caller was told it had been cancelled. The process is the only
+             * boundary that actually ends the work. The namespace dies with it, which is why
+             * `interrupt` keeps its in-place meaning for callers that want the session to survive.
+             */
             const execution: Execution = {
               events: Stream.concat(Stream.fromIterable(prelude), Stream.fromQueue(started.events)),
               result: started.outcome.pipe(
+                Effect.onInterrupt(() => lease.kernel.kill.pipe(Effect.ignore)),
                 Effect.onExit(() =>
                   capture(request.sessionId, lease).pipe(
                     Effect.andThen(Scope.close(cellScope, Exit.succeed(undefined))),

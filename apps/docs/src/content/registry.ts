@@ -1,8 +1,11 @@
 import type { DocsPage, PageGroup } from "../prose/page"
 import { dual } from "effect/Function"
+import { addressedMessaging } from "../pages/guides/addressed-messaging"
 import { approvals } from "../pages/guides/approvals"
 import { compaction } from "../pages/guides/compaction"
+import { continualHarness } from "../pages/guides/continual-harness"
 import { defineTools } from "../pages/guides/define-tools"
+import { durableCompositeTools } from "../pages/guides/durable-composite-tools"
 import { foldkitChat } from "../pages/guides/foldkit-chat"
 import { instructions } from "../pages/guides/instructions"
 import { mcp } from "../pages/guides/mcp"
@@ -17,9 +20,11 @@ import { steering } from "../pages/guides/steering"
 import { structuredOutput } from "../pages/guides/structured-output"
 import { testingEvals } from "../pages/guides/testing-evals"
 import { turnPolicy } from "../pages/guides/turn-policy"
+import { typescriptCells } from "../pages/guides/typescript-cells"
 import { agentLoop } from "../pages/learn/agent-loop"
 import { nativeRuntime } from "../pages/learn/native-runtime"
 import { comparisons } from "../pages/learn/comparisons"
+import { kernelBoundaries } from "../pages/learn/kernel-boundaries"
 import { onePayloadVocabulary } from "../pages/learn/one-payload-vocabulary"
 import { seamsAsServices } from "../pages/learn/seams-as-services"
 import { sessionsAndHistory } from "../pages/learn/sessions-and-history"
@@ -43,6 +48,7 @@ import { skillsReference } from "../pages/reference/skills"
 import { testReference } from "../pages/reference/test"
 import { transportReference } from "../pages/reference/transport"
 import { versioningReference } from "../pages/reference/versioning"
+import { cellAgent } from "../pages/start/cell-agent"
 import { examples } from "../pages/start/examples"
 import { installation } from "../pages/start/installation"
 import { introduction } from "../pages/start/introduction"
@@ -56,6 +62,7 @@ export const allPages: ReadonlyArray<DocsPage> = [
   installation,
   quickstart,
   researchAgent,
+  cellAgent,
   examples,
   agentLoop,
   onePayloadVocabulary,
@@ -63,6 +70,7 @@ export const allPages: ReadonlyArray<DocsPage> = [
   suspension,
   sessionsAndHistory,
   nativeRuntime,
+  kernelBoundaries,
   comparisons,
   defineTools,
   approvals,
@@ -78,6 +86,10 @@ export const allPages: ReadonlyArray<DocsPage> = [
   middleware,
   mcp,
   multiAgent,
+  typescriptCells,
+  continualHarness,
+  durableCompositeTools,
+  addressedMessaging,
   serveTransport,
   foldkitChat,
   testingEvals,

@@ -1,0 +1,16 @@
+created version: 1, createdAt: 2024-01-01T00:00:00.000Z
+authorship refused: pinned-revision
+after rollback: absent
+harness harness-snapshot:v1:sha256:3be72a563c867c9963edaebabf55b807d460093fb58a5304bcff91904967ad1c (scope thread:demo)
+
+prompt: 0
+
+memory: 0
+
+skill: 0
+
+subagent: 0
+
+recent refinements: 2
+- 2024-01-01T00:00:00.000Z proposal-1: Create:memory/prefers-bun
+- 2024-01-02T00:00:00.000Z rollback-1: Delete:memory/prefers-bun

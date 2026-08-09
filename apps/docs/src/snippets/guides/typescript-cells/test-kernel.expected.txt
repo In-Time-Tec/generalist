@@ -1,0 +1,3 @@
+value: 1 + 1
+stdout: printed
+epoch: 0, truncation entries: 0
