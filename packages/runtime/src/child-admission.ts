@@ -1,6 +1,7 @@
 import { Context, Effect, Schema } from "effect"
 import { ToolContext } from "@batonfx/core"
 import { make as makeAddress } from "./address.js"
+import { childSessionId } from "./child-session.js"
 import { make as makeMessage } from "./message.js"
 import { normalizePrompt } from "./memory/prompt.js"
 import type {
@@ -215,7 +216,7 @@ export const make = (store: RunStoreInterface): Interface => {
           message: makeMessage({
             id: `spawn:${idempotencyKey}`,
             to: makeAddress(`spawn:${input.parentRunId}`),
-            sessionId: `child:${input.parentRunId}:${invocationId}`,
+            sessionId: childSessionId({ parentRunId: input.parentRunId, invocationId }),
             prompt: normalizePrompt(input.prompt),
             idempotencyKey,
             correlationId: input.parentRunId,

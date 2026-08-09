@@ -35,11 +35,12 @@ describe("child session identity", () => {
   })
 
   it("stays bounded when a real invocation carries an escaped operation key", () => {
-    // A cell's invocation embeds an operation key that already embeds the tool call, so escaping it
-    // again grows the identity at every level. A Session identity is also a file name to a host.
+    // The invocation a cell composes carries the operation key twice over, already escaped, and the
+    // operation key carries the tool call. Escaping the whole of it again is what crossed the bound.
     const invocationId =
       "child-admit:run_mslng0c0_28qgmb38bdk%3Atool%3A0%3A0%3Aoracle-style%3Atypescript:" +
-      "run_mslng0c0_28qgmb38bdk%3Atool%3A0%3A0%3Aoracle-style%3Atypescript%230:Oracle"
+      "run_mslng0c0_28qgmb38bdk%253Atool%253A0%253A0%253Aoracle-style%253Atypescript%230:" +
+      "run_mslng0c0_28qgmb38bdk%253Atool%253A0%253A0%253Aoracle-style%253Atypescript%25230%253AOracle"
     const sessionId = childSessionId({ parentRunId: "run_mslng0c0_28qgmb38bdk", invocationId })
     expect(sessionId.length).toBeLessThanOrEqual(256)
     expect(encodeURIComponent(sessionId).length).toBeLessThanOrEqual(255)
