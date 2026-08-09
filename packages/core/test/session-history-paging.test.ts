@@ -78,6 +78,21 @@ describe("SessionHistory.pageHistory", () => {
     }),
   )
 
+  it.effect("reads the newest page when a cursor names no entry it holds", () =>
+    withSession(
+      Effect.gen(function* () {
+        // A cursor is a caller's string, so one that matches nothing has to select a window rather
+        // than an error or an empty answer a reader cannot tell from the end of the log.
+        const store = yield* Session.SessionStore
+        for (const text of ["a", "b", "c"]) yield* store.append(userEntry(text))
+        const path = yield* store.path()
+        const page = SessionHistory.pageHistory(path, { limit: 2, before: "no-such-entry" })
+        expect(page.entries.map((entry) => entry.id)).toEqual(path.slice(-2).map((entry) => entry.id))
+        expect(page.hasAfter).toBe(false)
+      }),
+    ),
+  )
+
   it.effect("bounds a limit larger than the log to the log itself", () =>
     Effect.gen(function* () {
       const path = yield* seed(3)
