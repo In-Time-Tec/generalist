@@ -41,6 +41,7 @@ export interface PoolOverrides {
   readonly workspaceRoot?: string
   readonly workerModuleOverride?: string
   readonly modules?: ReadonlyArray<HostBindingRegistry.Module>
+  readonly bootstrap?: string
 }
 
 /** What one real-worker test is handed. */
@@ -119,6 +120,7 @@ export const withPool = <A, E, R>(
       runtimeCommand: "bun",
       workerModule: overrides?.workerModuleOverride ?? workerModule,
       startTimeoutMillis: overrides?.startTimeoutMillis ?? 20_000,
+      ...(overrides?.bootstrap === undefined ? {} : { bootstrap: overrides.bootstrap }),
       interruptGraceMillis: overrides?.interruptGraceMillis ?? 250,
       maxConcurrentBoots: overrides?.maxConcurrentBoots ?? 4,
       idleTimeToLive: overrides?.idleTimeToLive ?? Duration.minutes(5),

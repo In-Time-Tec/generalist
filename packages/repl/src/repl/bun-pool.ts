@@ -31,6 +31,8 @@ export interface Options {
   readonly workerModule: string
   readonly startTimeoutMillis: number
   readonly interruptGraceMillis: number
+  /** @experimental Host source evaluated on every worker start, after restore, before any cell. */
+  readonly bootstrap?: string
   readonly captureTimeoutMillis?: number | undefined
   readonly maxConcurrentBoots: number
   readonly idleTimeToLive: Duration.Input
@@ -102,6 +104,24 @@ export const make = (
             const snapshot = yield* store.load(sessionId).pipe(Effect.orElseSucceed(() => undefined))
             if (snapshot !== undefined) {
               yield* kernel.restore(new TextDecoder().decode(snapshot.payload)).pipe(Effect.ignore)
+            }
+            /**
+             * A host assembles the mounted surface into whatever shape its cells are written
+             * against, and does it here: after restore, so the bootstrap always describes the
+             * worker that actually exists, and before any model cell, so the first cell sees the
+             * same surface as the last. It is deliberately not snapshot-restored — a restored
+             * binding would close over a dead worker's handles.
+             */
+            if (options.bootstrap !== undefined) {
+              const bootstrapped = yield* kernel.execute({
+                cellId: `bootstrap-${generation}`,
+                code: options.bootstrap,
+                deadlineMillis: options.profile.limits.cellDeadlineMillis,
+                channelBytes: options.profile.limits.channelBytes,
+                sequenceStart: 0,
+              })
+              yield* Stream.runDrain(Stream.fromQueue(bootstrapped.events)).pipe(Effect.ignore)
+              yield* bootstrapped.outcome.pipe(Effect.ignore)
             }
             const lease: Lease = { kernel, generation }
             yield* putState(sessionId, { ...state, lease })
