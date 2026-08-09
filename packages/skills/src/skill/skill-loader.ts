@@ -48,6 +48,7 @@ const loadSkill = (
     const frontmatter = yield* parseFrontmatter(file, headerBlock, directoryName)
     return {
       frontmatter,
+      directory: path.dirname(file),
       listing: SkillSource.makeListing(frontmatter, descriptionCap),
       body: fs.readFileString(file).pipe(
         Effect.mapError((error) => mapPlatformError(file, error)),

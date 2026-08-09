@@ -34,6 +34,12 @@ export interface Skill {
   readonly listing: string
   readonly body: Effect.Effect<string, SkillSourceError>
   readonly tools: ReadonlyArray<Tool.Any>
+  /**
+   * Where the skill was found, for a source that reads a filesystem. A host that resolves resources
+   * beside a skill needs the directory it came from rather than one derived from its name, because
+   * a source may find a skill anywhere beneath its root.
+   */
+  readonly directory?: string
 }
 
 /** @experimental Skill registry seam. */
