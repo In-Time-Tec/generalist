@@ -81,13 +81,16 @@ describe("SessionHistory.pageHistory", () => {
   it.effect("reads the newest page when a cursor names no entry it holds", () =>
     withSession(
       Effect.gen(function* () {
-        // A cursor is a caller's string, so one that matches nothing has to select a window rather
-        // than an error or an empty answer a reader cannot tell from the end of the log.
+        // A cursor is a caller's string, so one that matches nothing still selects a window. The
+        // window is the newest page, which is exactly what a caller asking for entries BEFORE
+        // something must not mistake for an answer, so the page names the cursor it could not use.
         const store = yield* Session.SessionStore
         for (const text of ["a", "b", "c"]) yield* store.append(userEntry(text))
         const path = yield* store.path()
         const page = SessionHistory.pageHistory(path, { limit: 2, before: "no-such-entry" })
         expect(page.entries.map((entry) => entry.id)).toEqual(path.slice(-2).map((entry) => entry.id))
+        expect(page.unknownCursors).toEqual(["no-such-entry"])
+        expect(SessionHistory.pageHistory(path, { limit: 2 }).unknownCursors).toBeUndefined()
         expect(page.hasAfter).toBe(false)
       }),
     ),

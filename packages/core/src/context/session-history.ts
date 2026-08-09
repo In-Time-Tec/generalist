@@ -22,6 +22,12 @@ export interface HistoryPage {
   readonly hasAfter: boolean
   readonly firstEntryId?: EntryId
   readonly lastEntryId?: EntryId
+  /**
+   * The cursors this page was asked for that the log does not hold. A cursor names no position, so
+   * the page falls back to the end it would have bounded; saying which cursor was ignored is what
+   * stops a caller reading the newest entries as though they preceded something.
+   */
+  readonly unknownCursors?: ReadonlyArray<EntryId>
 }
 
 /**
@@ -39,6 +45,10 @@ export const pageHistory: {
   const afterIndex = input.after === undefined ? -1 : path.findIndex((entry) => entry.id === input.after)
   const upper = beforeIndex === -1 ? path.length : beforeIndex
   const lower = afterIndex === -1 ? 0 : afterIndex + 1
+  const unknownCursors = [
+    ...(input.before !== undefined && beforeIndex === -1 ? [input.before] : []),
+    ...(input.after !== undefined && afterIndex === -1 ? [input.after] : []),
+  ]
   const window = path.slice(lower, Math.max(lower, upper))
   const entries = input.after === undefined ? window.slice(Math.max(0, window.length - limit)) : window.slice(0, limit)
   const start = lower + (input.after === undefined ? Math.max(0, window.length - limit) : 0)
@@ -47,6 +57,7 @@ export const pageHistory: {
     entries,
     hasBefore: start > 0,
     hasAfter: end < path.length,
+    ...(unknownCursors.length === 0 ? {} : { unknownCursors }),
     ...(entries[0] === undefined ? {} : { firstEntryId: entries[0].id }),
     ...(entries.at(-1) === undefined ? {} : { lastEntryId: entries.at(-1)!.id }),
   }
