@@ -24,12 +24,22 @@ const workspaceRoot = process.cwd()
  *
  * A descriptor is not by itself an authority boundary, though: cell code runs in this same process,
  * so it can name descriptor 3 and write to it. Every frame therefore also carries a boot-time
- * secret read from `frameIn` before any cell can run. The secret lives in this module's scope,
- * which the evaluation context genuinely cannot reach — a cell sees only the bindings the bootstrap
- * puts in its context, and `frameNonce` is not one of them. Argv and the environment would both be
- * readable by the cell, and the process table exposes argv to anything on the machine, so neither
- * the secret nor the workspace travels there: the secret arrives on the private descriptor that
- * only this process holds, and the workspace arrives as the spawned working directory.
+ * secret read from `frameIn` before any cell can run, which travels on that private descriptor
+ * rather than through argv or the environment, since the process table exposes argv to anything on
+ * the machine. The workspace arrives the same way, as the spawned working directory.
+ *
+ * THE SECRET IS NOT A SECURITY BOUNDARY AGAINST THE CELL. `node:vm` supplies a different global,
+ * not a severed realm: every object the bootstrap places in the context carries
+ * `.constructor.constructor`, which is the host `Function`, so `Function("return this")()` hands a
+ * cell the host `globalThis`. From there it can read this module's values and hook the intrinsics
+ * this file writes frames with, and forge a frame the session cannot distinguish from a real one.
+ * The secret raises the cost of an accidental collision — a cell that merely prints a line shaped
+ * like a frame — and nothing more.
+ *
+ * The boundary that does hold is the process: the kernel runs cell code in a child the host can
+ * kill, and the durable authority for what a cell did is the host's own run log rather than
+ * anything the cell reports about itself. Treat a cell as untrusted code inside its own process,
+ * and do not run one in a process holding anything a cell may not have.
  */
 const frameOut = 3
 const frameIn = 4
@@ -208,18 +218,22 @@ const execute = async (cellId: string, code: string, deadlineMillis: number): Pr
   const started = Bun.nanoseconds()
   const elapsed = (): number => Math.round((Bun.nanoseconds() - started) / 1_000_000)
   try {
-    const evaluated = cellScope.run(state, () => evaluate(cellId, code, deadlineMillis))
+    /**
+     * The listener is registered before evaluation because `evaluate` runs the cell's synchronous
+     * body in place: an abort that arrived during that body would already have fired, and
+     * `addEventListener` does not call a listener for an abort that has already happened, so the
+     * rejection would never arrive and the race would wait forever.
+     */
     const aborted = new Promise<never>((_, reject) => {
-      controller.signal.addEventListener(
-        "abort",
-        () => {
-          const error = new Error("the cell was aborted by its host")
-          error.name = "KernelCellAborted"
-          reject(error)
-        },
-        { once: true },
-      )
+      const rejectAborted = (): void => {
+        const error = new Error("the cell was aborted by its host")
+        error.name = "KernelCellAborted"
+        reject(error)
+      }
+      if (controller.signal.aborted) rejectAborted()
+      else controller.signal.addEventListener("abort", rejectAborted, { once: true })
     })
+    const evaluated = cellScope.run(state, () => evaluate(cellId, code, deadlineMillis))
     const settled = (await Promise.race([Promise.resolve(evaluated), aborted])) as { value?: unknown } | undefined
     write({ _tag: "Completed", cellId, value: format(settled?.value), durationMillis: elapsed() })
   } catch (error) {
@@ -355,7 +369,18 @@ process.on("SIGINT", () => {})
 
 write({ _tag: "Ready", wireVersion: 1 })
 
+/**
+ * Frames are serialized behind one promise so a cell, a capture, and a restore never interleave.
+ * A rejection is swallowed here rather than propagated: `then` carries a rejection forward, so one
+ * failed task would leave every later callback unrun and the worker silently answering nothing,
+ * which the host can only resolve by killing it and losing the namespace. Each task already reports
+ * its own outcome as a frame, so the chain only needs to sequence them.
+ */
 let tail: Promise<unknown> = Promise.resolve()
+
+const sequence = (task: () => unknown): void => {
+  tail = tail.then(task, task)
+}
 
 for await (const line of commands) {
   if (line.trim().length === 0) continue
@@ -366,11 +391,12 @@ for await (const line of commands) {
       code: string
       deadlineMillis: number
     }
-    tail = tail.then(() => execute(cellId, code, deadlineMillis))
+    sequence(() => execute(cellId, code, deadlineMillis))
     continue
   }
   if (frame._tag === "Interrupt") {
-    cell?.controller.abort()
+    const target = (frame as unknown as { readonly cellId?: string }).cellId
+    if (cell !== undefined && (target === undefined || cell.cellId === target)) cell.controller.abort()
     continue
   }
   if (frame._tag === "HostResponse") {
@@ -394,12 +420,12 @@ for await (const line of commands) {
   }
   if (frame._tag === "Restore") {
     const { requestId, payload } = frame as unknown as { requestId: string; payload: string }
-    tail = tail.then(() => restore(requestId, payload))
+    sequence(() => restore(requestId, payload))
     continue
   }
   if (frame._tag === "Capture") {
     const { requestId } = frame as unknown as { requestId: string }
-    tail = tail.then(() => {
+    sequence(() => {
       capture(requestId)
     })
     continue

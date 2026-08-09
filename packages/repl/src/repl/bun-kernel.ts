@@ -178,10 +178,16 @@ export const make = (
             return
           }
           if (frame._tag === "HostRequest") {
-            yield* answerHostRequest({ registry: options.registry, worker }, frame).pipe(
-              Effect.ignore,
-              Effect.forkScoped,
-            )
+            const running = yield* Ref.get(active)
+            yield* answerHostRequest(
+              {
+                registry: options.registry,
+                worker,
+                sessionId: options.sessionId,
+                ...(running === undefined ? {} : { cellId: running.cellId }),
+              },
+              frame,
+            ).pipe(Effect.ignore, Effect.forkScoped)
             return
           }
           const cell = yield* Ref.get(active)

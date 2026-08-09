@@ -24,6 +24,8 @@ export interface CellOutcome {
 export interface HostAnswerOptions {
   readonly registry: HostBindings | undefined
   readonly worker: Worker
+  readonly sessionId?: string
+  readonly cellId?: string
 }
 
 /** @experimental One request an executing cell raised against a mounted host module. */
@@ -47,25 +49,33 @@ export const answerHostRequest: {
           requestId: request.requestId,
           outcome: { _tag: "Rejected", message: `no host module named ${request.module} is mounted` },
         })
-      : options.registry.invoke({ module: request.module, operation: request.operation, input: request.input }).pipe(
-          Effect.matchEffect({
-            onSuccess: (response) =>
-              options.worker.send({
-                _tag: "HostResponse",
-                requestId: request.requestId,
-                outcome:
-                  response._tag === "Success"
-                    ? { _tag: "Success", output: response.output }
-                    : { _tag: "Failure", failure: response.failure },
-              }),
-            onFailure: (failure) =>
-              options.worker.send({
-                _tag: "HostResponse",
-                requestId: request.requestId,
-                outcome: { _tag: "Rejected", message: `${failure._tag}: ${request.module}.${request.operation}` },
-              }),
-          }),
-        ),
+      : options.registry
+          .invoke({
+            module: request.module,
+            operation: request.operation,
+            input: request.input,
+            ...(options.sessionId === undefined ? {} : { sessionId: options.sessionId }),
+            ...(options.cellId === undefined ? {} : { cellId: options.cellId }),
+          })
+          .pipe(
+            Effect.matchEffect({
+              onSuccess: (response) =>
+                options.worker.send({
+                  _tag: "HostResponse",
+                  requestId: request.requestId,
+                  outcome:
+                    response._tag === "Success"
+                      ? { _tag: "Success", output: response.output }
+                      : { _tag: "Failure", failure: response.failure },
+                }),
+              onFailure: (failure) =>
+                options.worker.send({
+                  _tag: "HostResponse",
+                  requestId: request.requestId,
+                  outcome: { _tag: "Rejected", message: `${failure._tag}: ${request.module}.${request.operation}` },
+                }),
+            }),
+          ),
 )
 
 /** @experimental One bounded channel of one cell: what it kept, and exactly what it dropped. */

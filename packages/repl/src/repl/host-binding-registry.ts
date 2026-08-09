@@ -33,6 +33,10 @@ export interface Request {
   readonly module: string
   readonly operation: string
   readonly input: unknown
+  /** @experimental The Session whose cell raised this request. */
+  readonly sessionId?: string
+  /** @experimental The cell that raised this request. */
+  readonly cellId?: string
 }
 
 /** @experimental Encoded outcome returned to the cell that issued the request. */
@@ -167,7 +171,16 @@ export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Interf
                             Effect.map((encoded): Response => ({ _tag: "Failure", failure: encoded })),
                           ),
                       }),
-                      Effect.provideContext(context),
+                      /**
+                       * The mounted surface is built once and shared by every Session a pool
+                       * serves, so the context captured here is the host's static one. A caller
+                       * that installs a per-call context — the tool call's own identity, its
+                       * cancellation signal, its durable operation key — must win over it, or
+                       * every Session would answer with one Session's identity. Merging under
+                       * the ambient context keeps the build-time services available while
+                       * letting the call supply the ones it owns.
+                       */
+                      Effect.updateContext((ambient: Context.Context<never>) => Context.merge(context, ambient)),
                     ),
                   ),
                 ),
