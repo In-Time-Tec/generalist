@@ -1,4 +1,5 @@
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Layer, Option, Schema } from "effect"
+import { ToolContext } from "@batonfx/core"
 
 /** @experimental Every host operation failure is tagged, so a cell can discriminate it as data. */
 export interface Tagged {
@@ -119,6 +120,21 @@ const index = <R>(modules: ReadonlyArray<Module<R>>): Map<string, Map<string, An
   return mounted
 }
 
+const callContext = <R>(request: Request, base: Context.Context<R>): Context.Context<R> => {
+  if (request.sessionId === undefined) return base
+  const ambient = Option.getOrUndefined(Context.getOption(base, ToolContext.ToolContext))
+  if (ambient === undefined) return base
+  return Context.add(
+    base,
+    ToolContext.ToolContext,
+    ToolContext.ToolContext.of({
+      ...ambient,
+      sessionId: request.sessionId,
+      ...(request.cellId === undefined ? {} : { toolCallId: request.cellId }),
+    }),
+  )
+}
+
 /** @experimental Mount modules and reject duplicate module or operation names. */
 export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Interface, HostBindingConflict, R> =>
   Effect.contextWith((context: Context.Context<R>) =>
@@ -179,8 +195,15 @@ export const make = <R>(modules: ReadonlyArray<Module<R>>): Effect.Effect<Interf
                        * every Session would answer with one Session's identity. Merging under
                        * the ambient context keeps the build-time services available while
                        * letting the call supply the ones it owns.
+                       *
+                       * The request names the Session and cell it came from, and a kernel answers
+                       * a cell on a fiber forked from its own boot rather than from any tool call,
+                       * so that naming is the only thing tying a host request back to its cell.
+                       * It is applied last, over both, for that reason.
                        */
-                      Effect.updateContext((ambient: Context.Context<never>) => Context.merge(context, ambient)),
+                      Effect.updateContext((ambient: Context.Context<never>) =>
+                        callContext(request, Context.merge(context, ambient)),
+                      ),
                     ),
                   ),
                 ),
