@@ -33,4 +33,37 @@ describe("child session identity", () => {
       fanOutMemberSessionId({ fanOutId: "fan_1", key: "lane-b" }),
     )
   })
+
+  it("stays bounded when a real invocation carries an escaped operation key", () => {
+    // A cell's invocation embeds an operation key that already embeds the tool call, so escaping it
+    // again grows the identity at every level. A Session identity is also a file name to a host.
+    const invocationId =
+      "child-admit:run_mslng0c0_28qgmb38bdk%3Atool%3A0%3A0%3Aoracle-style%3Atypescript:" +
+      "run_mslng0c0_28qgmb38bdk%3Atool%3A0%3A0%3Aoracle-style%3Atypescript%230:Oracle"
+    const sessionId = childSessionId({ parentRunId: "run_mslng0c0_28qgmb38bdk", invocationId })
+    expect(sessionId.length).toBeLessThanOrEqual(256)
+    expect(encodeURIComponent(sessionId).length).toBeLessThanOrEqual(255)
+    expect(sessionId.startsWith("child:")).toBe(true)
+  })
+
+  it("keeps a fan-out member bounded for a long key", () => {
+    const sessionId = fanOutMemberSessionId({ fanOutId: "run_abc", key: "k".repeat(400) })
+    expect(sessionId.length).toBeLessThanOrEqual(256)
+    expect(sessionId.startsWith("fanout:")).toBe(true)
+  })
+
+  it("stays bounded at every depth a delegation budget allows", () => {
+    // A deeper child carries a longer invocation, because each level composes the level above it
+    // into the key it admits under. A Session identity is a bounded key, so depth must not decide it.
+    let runId = "run_0"
+    let invocationId = "Oracle#0"
+    const lengths: Array<number> = []
+    for (let depth = 0; depth < 8; depth += 1) {
+      invocationId = `child-admit:${encodeURIComponent(runId)}:${encodeURIComponent(invocationId)}#${depth}:Oracle`
+      const sessionId = childSessionId({ parentRunId: runId, invocationId })
+      lengths.push(sessionId.length)
+      runId = `run_${depth + 1}`
+    }
+    expect(Math.max(...lengths)).toBeLessThanOrEqual(256)
+  })
 })
