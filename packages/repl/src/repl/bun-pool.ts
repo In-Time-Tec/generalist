@@ -1,4 +1,4 @@
-import { Clock, Duration, Effect, Exit, Layer, RcMap, Ref, Scope, Semaphore, Stream } from "effect"
+import { Clock, Duration, Effect, Exit, Fiber, Layer, RcMap, Ref, Scope, Semaphore, Stream } from "effect"
 import { ChildProcessSpawner } from "effect/unstable/process"
 import {
   type CellEvent,
@@ -120,8 +120,11 @@ export const make = (
                 channelBytes: options.profile.limits.channelBytes,
                 sequenceStart: 0,
               })
-              yield* Stream.runDrain(Stream.fromQueue(bootstrapped.events)).pipe(Effect.ignore)
+              const drained = yield* Effect.forkChild(
+                Stream.runDrain(Stream.fromQueue(bootstrapped.events)).pipe(Effect.ignore),
+              )
               yield* bootstrapped.outcome.pipe(Effect.ignore)
+              yield* Fiber.await(drained).pipe(Effect.ignore)
             }
             const lease: Lease = { kernel, generation }
             yield* putState(sessionId, { ...state, lease })
