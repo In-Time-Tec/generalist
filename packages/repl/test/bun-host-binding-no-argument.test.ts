@@ -6,12 +6,17 @@ import { liveOptions, platform, runCell, withPool } from "./bun-harness.js"
 const Out = Schema.Struct({ answered: Schema.Boolean })
 const Fail = Schema.TaggedStruct("Never", { reason: Schema.String })
 
+const seen: Array<unknown> = []
+
 const ping = {
   name: "ping",
   input: Schema.Struct({}),
   output: Out,
   failure: Fail,
-  handle: () => Effect.succeed({ answered: true }),
+  handle: (input: unknown) => {
+    seen.push(input)
+    return Effect.succeed({ answered: true })
+  },
 }
 
 layer(platform, liveOptions)("Bun kernel host bindings", (it) => {
@@ -32,6 +37,9 @@ layer(platform, liveOptions)("Bun kernel host bindings", (it) => {
             code: `(await probe.ping()).answered`,
           })
           expect(settled.value).toBe("true")
+          // An empty struct accepts any non-null value, so answering is not by itself proof that the
+          // call carried the object it stands for.
+          expect(seen).toEqual([{}])
         }),
     }),
   )
