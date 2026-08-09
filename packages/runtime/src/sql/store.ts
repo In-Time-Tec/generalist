@@ -39,6 +39,15 @@ import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } f
 import { withSql } from "./sql-effect.js"
 import { makeSqliteSessionStore } from "./session-store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "./store-steering.js"
+import {
+  admitMessage,
+  deliverPendingMessages,
+  directory,
+  listRelated,
+  pendingMessages,
+  registerAgentName,
+  resolveAddress,
+} from "./store-directory.js"
 import { makeEventHub } from "./subscribers.js"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { loadTreeHistory } from "./tree-history.js"
@@ -142,6 +151,13 @@ export const makeSqliteRunStore = (
       cancel: (input) => runBuffered((transactionHub) => cancel(transactionHub, input)),
       admitSteering: (input) => run(admitSteering(input)),
       readSteering: (input) => fenced(input, readSteering(input)),
+      directory: (runId) => runNoTxn(directory(runId)),
+      resolveAddress: (address) => runNoTxn(resolveAddress(address)),
+      registerAgentName: (input) => run(registerAgentName(input)),
+      listRelated: (runId) => runNoTxn(listRelated(runId)),
+      admitMessage: (input) => run(admitMessage(input)),
+      pendingMessages: (input) => runNoTxn(pendingMessages(input)),
+      deliverPendingMessages: (input) => run(deliverPendingMessages(input)),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {

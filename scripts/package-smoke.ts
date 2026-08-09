@@ -28,6 +28,7 @@ const exports = [
   "@batonfx/core",
   "@batonfx/test",
   "@batonfx/skills",
+  "@batonfx/harness",
   "@batonfx/memory",
   "@batonfx/providers",
   "@batonfx/providers/catalog",
@@ -43,6 +44,8 @@ const exports = [
   "@batonfx/providers/embedding",
   "@batonfx/mcp",
   "@batonfx/mcp/baton",
+  "@batonfx/repl",
+  "@batonfx/repl/bun",
   "@batonfx/runtime",
   "@batonfx/transport",
   "@batonfx/transport/client",
@@ -343,6 +346,7 @@ const { A2A } = await import("@batonfx/a2a")
 const { AgUi } = await import("@batonfx/ag-ui")
 const { Agent, Memory, ModelMiddleware, ModelRegistry, Session } = await import("@batonfx/core")
 const { VectorStore } = await import("@batonfx/memory")
+const { HarnessState, HarnessStore } = await import("@batonfx/harness")
 const { McpToolSource } = await import("@batonfx/mcp")
 const { Catalog, OpenAi } = await import("@batonfx/providers")
 const skills = await import("@batonfx/skills")

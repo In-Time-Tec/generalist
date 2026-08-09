@@ -4,7 +4,7 @@ import { AgentExecutionFailure } from "./errors.js"
 import { ExecutionHost } from "./execution-host.js"
 import { RunStore } from "./run-store.js"
 import type { Interface as RunStoreInterface } from "./run-store.js"
-import { isTerminal } from "./run.js"
+import { isTerminal, type RunInspection } from "./run.js"
 
 export interface Options {
   readonly workerId: string
@@ -22,9 +22,6 @@ export class LocalScheduler extends Context.Service<LocalScheduler, Interface>()
   "@batonfx/runtime/local-scheduler/LocalScheduler",
 ) {}
 
-const terminalStatuses = ["succeeded", "failed", "cancelled"] as const
-type TerminalStatus = (typeof terminalStatuses)[number]
-
 export const make = (
   options: Options,
 ): Effect.Effect<Interface, never, RunStore | ExecutionHost | ActiveExecutions | Scope.Scope> =>
@@ -37,44 +34,17 @@ export const make = (
     const selectionWindow = Math.max(concurrency * 2, 16)
     const reconcileWindow = 32
 
-    const watermarks = yield* Ref.make<Readonly<Record<TerminalStatus, string | undefined>>>({
-      succeeded: undefined,
-      failed: undefined,
-      cancelled: undefined,
-    })
-    const retry = yield* Ref.make<ReadonlySet<string>>(new Set())
+    const waitingCursor = yield* Ref.make<string | undefined>(undefined)
 
-    type ReconcileOutcome = "done" | "retry"
-
-    const setRetry = (runId: string, outcome: ReconcileOutcome) =>
-      outcome === "retry"
-        ? Ref.update(retry, (current) => (current.has(runId) ? current : new Set(current).add(runId)))
-        : Ref.update(retry, (current) => {
-            if (!current.has(runId)) return current
-            const next = new Set(current)
-            next.delete(runId)
-            return next
-          })
-
-    const reconcileChild = (store: RunStoreInterface, runId: string): Effect.Effect<ReconcileOutcome> =>
+    const reconcileChild = (store: RunStoreInterface, parent: RunInspection, runId: string): Effect.Effect<void> =>
       Effect.gen(function* () {
         const execution = yield* store.loadExecution(runId)
         const metadata = execution.message.metadata
-        if (
-          metadata?.runtimeChildTool !== true ||
-          typeof metadata.parentRunId !== "string" ||
-          typeof metadata.parentToolCallId !== "string"
-        ) {
-          return "done"
-        }
-        const parent = yield* store.inspect(metadata.parentRunId)
-        if (parent.status === "cancelling" || parent.status === "cancelled") return "done"
-        if (isTerminal(parent.status)) return "done"
-        const wait = parent.wait
-        if (wait?.waitId === metadata.parentToolCallId && wait.status === "responded") return "done"
-        if (wait?.waitId !== metadata.parentToolCallId || wait.status !== "open") return "retry"
+        if (metadata?.runtimeChildTool !== true) return
+        if (typeof metadata.parentRunId !== "string" || typeof metadata.parentToolCallId !== "string") return
+        if (metadata.parentRunId !== parent.runId || metadata.parentToolCallId !== parent.wait?.waitId) return
         const snapshot = yield* store.snapshot(runId)
-        if (snapshot.outcome === undefined) return "retry"
+        if (snapshot.outcome === undefined) return
         const result =
           snapshot.outcome._tag === "Succeeded"
             ? metadata.codeMode === true && "value" in snapshot.outcome.result
@@ -95,58 +65,36 @@ export const make = (
                   ...(snapshot.outcome.reason === undefined ? {} : { reason: snapshot.outcome.reason }),
                 }
         yield* store.resume({
-          runId: metadata.parentRunId,
+          runId: parent.runId,
           waitId: metadata.parentToolCallId,
           resolution: { _tag: "ToolResult", result, encodedResult: result },
         })
-        return "done"
-      }).pipe(Effect.orElseSucceed(() => "retry" as const))
+      }).pipe(Effect.ignore)
 
-    const processCandidate = (store: RunStoreInterface, runId: string) =>
+    const reconcileWaitingParent = (store: RunStoreInterface, parent: RunInspection) =>
       Effect.gen(function* () {
-        const outcome = yield* reconcileChild(store, runId)
-        yield* setRetry(runId, outcome)
-      })
+        if (parent.wait?.status !== "open") return
+        const related = yield* store.listRelated(parent.runId)
+        for (const entry of related) {
+          if (entry.parentRunId !== parent.runId || !isTerminal(entry.status)) continue
+          const current = yield* store.inspect(parent.runId)
+          if (current.wait?.waitId !== parent.wait.waitId || current.wait.status !== "open") return
+          yield* reconcileChild(store, current, entry.runId)
+        }
+      }).pipe(Effect.ignore)
 
     const reconcileTerminalChildren = (store: RunStoreInterface) =>
       Effect.gen(function* () {
-        const seen = new Set<string>()
-        const retrySnapshot = yield* Ref.get(retry)
-        for (const runId of retrySnapshot) {
-          if (seen.has(runId)) continue
-          seen.add(runId)
-          yield* processCandidate(store, runId)
-        }
-        for (const status of terminalStatuses) {
-          const recent = yield* store.list({ status, order: "newest", limit: reconcileWindow })
-          for (const run of recent) {
-            if (seen.has(run.runId)) continue
-            seen.add(run.runId)
-            if (run.parentRunId === undefined) continue
-            yield* processCandidate(store, run.runId)
-          }
-        }
-        for (const status of terminalStatuses) {
-          const watermark = (yield* Ref.get(watermarks))[status]
-          const batch = yield* store.list({
-            status,
-            order: "oldest",
-            limit: reconcileWindow,
-            ...(watermark === undefined ? {} : { afterRunId: watermark }),
-          })
-          for (const run of batch) {
-            if (seen.has(run.runId)) continue
-            seen.add(run.runId)
-            if (run.parentRunId === undefined) continue
-            yield* processCandidate(store, run.runId)
-          }
-          const last = batch[batch.length - 1]
-          if (last !== undefined) {
-            yield* Ref.update(watermarks, (current) =>
-              current[status] === last.runId ? current : { ...current, [status]: last.runId },
-            )
-          }
-        }
+        const cursor = yield* Ref.get(waitingCursor)
+        const waiting = yield* store.list({
+          status: "waiting",
+          order: "oldest",
+          limit: reconcileWindow,
+          ...(cursor === undefined ? {} : { afterRunId: cursor }),
+        })
+        for (const parent of waiting) yield* reconcileWaitingParent(store, parent)
+        const last = waiting[waiting.length - 1]
+        yield* Ref.set(waitingCursor, waiting.length === reconcileWindow ? last?.runId : undefined)
       })
 
     const sweepCancelling = (store: RunStoreInterface) =>
@@ -232,7 +180,7 @@ export const layer = (
     LocalScheduler,
     Effect.gen(function* () {
       const scheduler = yield* make(options)
-      const poll = options.pollInterval ?? "10 millis"
+      const poll = options.pollInterval ?? "250 millis"
       yield* Effect.forkScoped(
         Effect.sleep(poll).pipe(Effect.andThen(scheduler.tick), Effect.repeat(Schedule.spaced(poll))),
       )

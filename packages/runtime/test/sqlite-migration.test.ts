@@ -74,10 +74,12 @@ const inspect = (filename: string) => {
   expect(operationColumns).toContain("resolution_idempotency_key")
   expect(operationColumns).toContain("resolution_json")
   expect(tables).toEqual([
+    "baton_agent_names",
     "baton_executable_registrations",
     "baton_fan_out_members",
     "baton_fan_outs",
     "baton_lanes",
+    "baton_messages",
     "baton_program_operations",
     "baton_program_runs",
     "baton_run_events",

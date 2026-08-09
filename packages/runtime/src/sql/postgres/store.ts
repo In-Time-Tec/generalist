@@ -16,6 +16,7 @@ import { equals, resolveChild } from "../../executable-manifest.js"
 import { isTerminal } from "../../run.js"
 import { RunStore } from "../../run-store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
+import { messagingStoreMethods } from "./store-messaging.js"
 import type { RunRow } from "../rows.js"
 import { withSql } from "../sql-effect.js"
 import { makeEventHub } from "../subscribers.js"
@@ -40,13 +41,12 @@ import {
   emitAgentEvent,
   insertRun,
   loadEventsAfter,
-  lockRun,
   loadRun,
-  lockSpawnParent,
   requireRun,
   settleParent,
 } from "./pg-helpers.js"
 import type { PostgresStoreOptions } from "./runtime-layer.js"
+import { lockMailbox, lockRun, lockSpawnParent } from "./locks.js"
 import { programStoreMethods } from "./store-program.js"
 import { admitStart as admitExactStart } from "../store-admit.js"
 import { admitSend } from "./store-admit.js"
@@ -306,6 +306,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       cancel: (input) => run(lockRun(input.runId).pipe(Effect.andThen(cancelRun(input.runId, input.reason)))),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
       readSteering: (input) => run(requireExecutionClaim(input).pipe(Effect.andThen(readSteering(input)))),
+      ...messagingStoreMethods({ run, runNoTxn, lockRun, lockMailbox }),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {

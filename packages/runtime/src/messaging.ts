@@ -1,0 +1,228 @@
+import { Context, Effect, Layer } from "effect"
+import { DurableDriver, RunBudget, ToolContext } from "@batonfx/core"
+import type { Prompt } from "effect/unstable/ai"
+import type { Address } from "./address.js"
+import { relationship, type AddressInvalid, type DirectoryEntry, type Relationship } from "./agent-directory.js"
+import { MessagingUnauthorized, RuntimeUnavailable } from "./errors.js"
+import type {
+  AddressNotFound,
+  MailboxFull,
+  MailboxRateLimited,
+  MessageConflict,
+  RunNotFound,
+  RunTerminal,
+} from "./errors.js"
+import type { MailboxEntry, MessageReceipt } from "./mailbox.js"
+import type { Metadata } from "./message.js"
+import type { Interface as RunStoreInterface } from "./run-store.js"
+
+/** @experimental One authorization question about one exact sender and target. */
+export interface PolicyInput {
+  readonly sender: DirectoryEntry
+  readonly target: DirectoryEntry
+  readonly relationship: Relationship | undefined
+  readonly crossSession: boolean
+}
+
+/**
+ * @experimental The host seam for addressing beyond Baton's derived relationships.
+ *
+ * Baton always allows self, parent, direct child, and sibling-under-one-parent from authoritative
+ * durable identity. Everything else — notably addressing another Session — is a host decision, so
+ * cross-product addressing is opt-in rather than a consequence of knowing an id.
+ */
+export interface Interface {
+  readonly allow: (input: PolicyInput) => Effect.Effect<boolean>
+  readonly discover: (sender: DirectoryEntry) => Effect.Effect<ReadonlyArray<Address>>
+}
+
+/** @experimental */
+export class MessagingPolicy extends Context.Service<MessagingPolicy, Interface>()(
+  "@batonfx/runtime/messaging/MessagingPolicy",
+) {}
+
+const relationshipsOnly: Interface = {
+  allow: () => Effect.succeed(false),
+  discover: () => Effect.succeed([]),
+}
+
+/** @experimental */
+export const makePolicy = (policy: Partial<Interface> = {}): Interface => ({
+  allow: policy.allow ?? relationshipsOnly.allow,
+  discover: policy.discover ?? relationshipsOnly.discover,
+})
+
+/** @experimental Host policy over exact sender and target identity. */
+export const layer = (policy: Partial<Interface>): Layer.Layer<MessagingPolicy> =>
+  Layer.succeed(MessagingPolicy, MessagingPolicy.of(makePolicy(policy)))
+
+/** @experimental Input for one addressed send. Sender identity is a Run id, never caller-supplied text. */
+export interface SendMessageInput {
+  readonly fromRunId: string
+  readonly to: Address
+  readonly idempotencyKey: string
+  readonly prompt: Prompt.Prompt | Prompt.RawInput
+  readonly messageId?: string
+  readonly causationId?: string
+  readonly correlationId?: string
+  readonly inReplyTo?: string
+  readonly metadata?: Metadata
+}
+
+/** @experimental */
+export type SendMessageError =
+  | AddressNotFound
+  | AddressInvalid
+  | MessagingUnauthorized
+  | MailboxFull
+  | MailboxRateLimited
+  | MessageConflict
+  | RunTerminal
+  | RunNotFound
+  | RuntimeUnavailable
+
+/** @experimental */
+export type DirectoryError = RunNotFound | RuntimeUnavailable
+
+/**
+ * @experimental Decide one addressing attempt.
+ *
+ * Relationship is derived from durable parent links only. An Address a sender happens to know grants
+ * nothing on its own.
+ */
+export const authorize = (input: {
+  readonly sender: DirectoryEntry
+  readonly target: DirectoryEntry
+  readonly policy: Interface
+}): Effect.Effect<void, MessagingUnauthorized> =>
+  Effect.gen(function* () {
+    const derived = relationship(input.sender, input.target)
+    const crossSession = input.sender.sessionId !== input.target.sessionId
+    if (derived !== undefined) return
+    const allowed = yield* input.policy.allow({
+      sender: input.sender,
+      target: input.target,
+      relationship: derived,
+      crossSession,
+    })
+    if (allowed) return
+    return yield* MessagingUnauthorized.make({
+      from: input.sender.address,
+      to: input.target.address,
+      reason: crossSession ? "cross-session" : "unrelated",
+    })
+  })
+
+/** @experimental Directory entries one Run may reach under Baton relationships plus host policy. */
+export const reachable = (input: {
+  readonly store: RunStoreInterface
+  readonly policy: Interface
+  readonly runId: string
+}): Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError> =>
+  Effect.gen(function* () {
+    const sender = yield* input.store.directory(input.runId)
+    const related = yield* input.store.listRelated(input.runId)
+    const announced = yield* input.policy.discover(sender)
+    const resolved = yield* Effect.forEach(announced, (address) =>
+      input.store.resolveAddress(address).pipe(Effect.result),
+    ).pipe(Effect.map((results) => results.flatMap((result) => (result._tag === "Success" ? [result.success] : []))))
+    const allowed = yield* Effect.filter(resolved, (target) =>
+      authorize({ sender, target, policy: input.policy }).pipe(
+        Effect.as(true),
+        Effect.orElseSucceed(() => false),
+      ),
+    )
+    const seen = new Set<string>([input.runId])
+    const entries: Array<DirectoryEntry> = []
+    for (const entry of [...related, ...allowed]) {
+      if (seen.has(entry.runId)) continue
+      seen.add(entry.runId)
+      entries.push(entry)
+    }
+    return entries
+  })
+
+/** @experimental Runtime-owned addressed messaging for code running inside an execution. */
+export interface AgentMessagingInterface {
+  readonly send: (input: {
+    readonly to: Address
+    readonly idempotencyKey: string
+    readonly prompt: Prompt.Prompt | Prompt.RawInput
+    readonly inReplyTo?: string
+    readonly metadata?: Metadata
+  }) => Effect.Effect<
+    MessageReceipt,
+    | SendMessageError
+    | DurableDriver.DriverError
+    | DurableDriver.DriverStateInvalid
+    | DurableDriver.DriverUnknownReplay
+    | RunBudget.RunBudgetExhausted,
+    DurableDriver.DriverInterpreter | ToolContext.ToolContext
+  >
+  readonly inbox: (input: {
+    readonly limit: number
+  }) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError, ToolContext.ToolContext>
+  readonly directory: Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError, ToolContext.ToolContext>
+}
+
+/**
+ * @experimental
+ *
+ * @effect-expect-leaking ToolContext
+ * ToolContext is the per-call ambient identity of the running execution. Resolving it at Layer
+ * creation would bind one Run into the service and let a caller send under another Run's identity,
+ * which is exactly the forgery this contract exists to prevent.
+ */
+export class AgentMessaging extends Context.Service<AgentMessaging, AgentMessagingInterface>()(
+  "@batonfx/runtime/messaging/AgentMessaging",
+) {}
+
+const currentRunId = Effect.flatMap(ToolContext.ToolContext, (context) =>
+  context.runId === undefined
+    ? RuntimeUnavailable.make({ message: "addressed messaging requires a Runtime-owned ToolContext" })
+    : Effect.succeed(context.runId),
+)
+
+/**
+ * @experimental Build in-execution messaging over one RunStore and host policy.
+ *
+ * Every send is one durable `send` driver operation with a `never` replay policy: a crash between
+ * the journal record and the mailbox insert settles as an unknown operation for explicit resolution
+ * instead of silently duplicating or losing the message.
+ */
+export const make = (input: {
+  readonly store: RunStoreInterface
+  readonly policy: Interface
+  readonly sendMessage: (request: SendMessageInput) => Effect.Effect<MessageReceipt, SendMessageError>
+}): AgentMessagingInterface => ({
+  send: (request) =>
+    Effect.gen(function* () {
+      const runId = yield* currentRunId
+      return yield* DurableDriver.intercept(
+        {
+          kind: "send",
+          key: DurableDriver.operationKey([runId, "send", request.idempotencyKey]),
+          input: { to: request.to, idempotencyKey: request.idempotencyKey },
+          replayPolicy: "never",
+        },
+        input.sendMessage({
+          fromRunId: runId,
+          to: request.to,
+          idempotencyKey: request.idempotencyKey,
+          prompt: request.prompt,
+          ...(request.inReplyTo === undefined ? {} : { inReplyTo: request.inReplyTo }),
+          ...(request.metadata === undefined ? {} : { metadata: request.metadata }),
+        }),
+      )
+    }),
+  inbox: (request) =>
+    Effect.gen(function* () {
+      const runId = yield* currentRunId
+      const entry = yield* input.store.directory(runId)
+      return yield* input.store.pendingMessages({ sessionId: entry.sessionId, limit: request.limit })
+    }),
+  directory: Effect.gen(function* () {
+    const runId = yield* currentRunId
+    return yield* reachable({ store: input.store, policy: input.policy, runId })
+  }),
+})

@@ -5,15 +5,12 @@ import { validationFailure as toolSchedulingFailure } from "../agent/tool-schedu
 import { BudgetLimits } from "./run-budget.js"
 import { AgentPin, CapabilityPin, makeAgent, ModelPin } from "./pin.js"
 import { digest } from "./canonical-json.js"
+import { NamedCapability, PinnedContent, namedCapabilityWith, type NamedCapabilityEncoded } from "./capability.js"
 import { ProgramBudget, type ProgramAgentCapability } from "./program-manifest.js"
 
 const compareText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0)
 
-/** @experimental One named capability required by an Agent. */
-export interface NamedCapability {
-  readonly name: string
-  readonly pin: CapabilityPin
-}
+export { NamedCapability, PinnedContent, type NamedCapabilityEncoded }
 
 /** @experimental One named child selection bound to an exact Agent. */
 export interface ChildBinding {
@@ -74,10 +71,6 @@ export interface AgentManifest {
   readonly children: ReadonlyArray<ChildBinding>
 }
 
-export interface NamedCapabilityEncoded extends Omit<NamedCapability, "pin"> {
-  readonly pin: string
-}
-
 export interface ChildBindingEncoded extends Omit<ChildBinding, "agent"> {
   readonly agent: string
 }
@@ -115,12 +108,6 @@ export interface AgentManifestEncoded
   readonly children: ReadonlyArray<ChildBindingEncoded>
 }
 
-/** @experimental One named capability required by an Agent. */
-export const NamedCapability: Schema.Codec<NamedCapability, NamedCapabilityEncoded> = Schema.Struct({
-  name: Schema.String,
-  pin: CapabilityPin,
-})
-
 /** @experimental One named child selection bound to an exact Agent. */
 export const ChildBinding: Schema.Codec<ChildBinding, ChildBindingEncoded> = Schema.Struct({
   selection: Schema.String,
@@ -157,7 +144,7 @@ export const CompactionIdentity: Schema.Codec<CompactionIdentity, CompactionIden
   summaryPromptIdentity: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
 })
 const ProgramSelectionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
-const ProgramAuthorityNamedCapability = Schema.Struct({ name: ProgramSelectionId, pin: CapabilityPin })
+const ProgramAuthorityNamedCapability = namedCapabilityWith(ProgramSelectionId)
 const ProgramAuthorityAgentCapability = Schema.Struct({
   selection: ProgramSelectionId,
   agent: AgentPin,

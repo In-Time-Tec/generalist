@@ -133,8 +133,8 @@ for (const backend of ["memory", "sqlite"] as const) {
           if (childOutcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
           yield* store.suspend({
             ...parentClaim,
-            wait: openWait("child-tool"),
-            suspension: suspension("child-tool"),
+            wait: openWait({ waitId: "child-tool" }),
+            suspension: suspension({ waitId: "child-tool" }),
           })
           yield* store.complete({
             ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "finished-child" })),
@@ -430,31 +430,248 @@ for (const backend of ["memory", "sqlite"] as const) {
                 return store.snapshot(runId)
               },
             })
-            for (const tickIndex of [0, 1]) {
+            for (let tick = 0; tick < 2; tick += 1) {
               const before = calls.length
               yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
               const tickCalls = calls.slice(before)
-              expect(tickCalls.length).toBe(8)
+              // A terminal backlog of any size is never scanned: reconciliation reads waiting parents only.
+              expect(tickCalls.length).toBe(3)
               for (const call of tickCalls) {
                 expect(call.input.limit).toBeLessThanOrEqual(64)
               }
-              const terminalListCalls = tickCalls.filter(
-                (call) =>
-                  call.method === "list" && ["succeeded", "failed", "cancelled"].includes(String(call.input.status)),
-              )
-              expect(terminalListCalls.every((call) => call.input.limit === 32)).toBe(true)
-              if (tickIndex === 1) {
-                const progressed = tickCalls.filter(
-                  (call) => call.method === "list" && call.input.afterRunId !== undefined,
-                )
-                expect(progressed.length).toBeGreaterThanOrEqual(1)
-                expect(progressed.every((call) => call.input.status === "succeeded")).toBe(true)
-              }
+              expect(
+                tickCalls.filter(
+                  (call) =>
+                    call.method === "list" && ["succeeded", "failed", "cancelled"].includes(String(call.input.status)),
+                ),
+              ).toHaveLength(0)
             }
             expect(calls.filter((call) => call.method === "loadExecution")).toHaveLength(0)
             expect(calls.filter((call) => call.method === "snapshot")).toHaveLength(0)
           }),
         120_000,
+      )
+    })
+
+    layer(runtimeLayer)(`${backend} out-of-order terminal settlement still resumes the parent`, (it) => {
+      it.effect(
+        "resumes a parent whose child settles after a later-created run",
+        () =>
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const scheduler = yield* LocalScheduler.LocalScheduler
+            const store = yield* RunStore.RunStore
+            const parent = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: `scheduler-order:${backend}`,
+              idempotencyKey: "order-parent",
+              prompt: "parent",
+            })
+            const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "order-parent" })
+            const childOutcome = yield* ChildRuns.make(store).invoke({
+              parentRunId: parent.runId,
+              toolCallId: "order-child",
+              selection: "researcher",
+              prompt: "child",
+            })
+            if (childOutcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
+            yield* store.suspend({
+              ...parentClaim,
+              wait: openWait({ waitId: "order-child" }),
+              suspension: suspension({ waitId: "order-child" }),
+            })
+            const later = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: `scheduler-order-later:${backend}`,
+              idempotencyKey: "order-later",
+              prompt: "later",
+            })
+            yield* store.complete({
+              ...(yield* store.claimExecution({ runId: later.runId, ownerId: "order-later" })),
+              result: completedResult("later"),
+            })
+            yield* scheduler.tick
+            yield* store.complete({
+              ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "order-child-worker" })),
+              result: completedResult("child"),
+            })
+            yield* scheduler.tick
+            const snapshot = yield* store.snapshot(parent.runId)
+            expect(snapshot.run.status).not.toBe("waiting")
+          }),
+        60_000,
+      )
+    })
+
+    layer(runtimeLayer)(`${backend} a backlog larger than the reconcile window still drains`, (it) => {
+      it.effect(
+        "resumes a parent whose child sits beyond the reconcile window",
+        () =>
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const scheduler = yield* LocalScheduler.LocalScheduler
+            const store = yield* RunStore.RunStore
+            const filler = Effect.fn("backlog.filler")(function* (label: string) {
+              const receipt = yield* runtime.send({
+                to: assistantAddress,
+                sessionId: `scheduler-backlog-filler:${backend}:${label}`,
+                idempotencyKey: `backlog-filler-${label}`,
+                prompt: `filler-${label}`,
+              })
+              yield* store.complete({
+                ...(yield* store.claimExecution({ runId: receipt.runId, ownerId: "backlog-filler-worker" })),
+                result: completedResult("done"),
+              })
+            })
+            for (let index = 0; index < 100; index += 1) yield* filler(`before-${index}`)
+            const parent = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: `scheduler-backlog:${backend}`,
+              idempotencyKey: "backlog-parent",
+              prompt: "parent",
+            })
+            const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "backlog-parent-worker" })
+            const childOutcome = yield* ChildRuns.make(store).invoke({
+              parentRunId: parent.runId,
+              toolCallId: "backlog-child",
+              selection: "researcher",
+              prompt: "child",
+            })
+            if (childOutcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
+            yield* store.suspend({
+              ...parentClaim,
+              wait: openWait({ waitId: "backlog-child" }),
+              suspension: suspension({ waitId: "backlog-child" }),
+            })
+            yield* store.complete({
+              ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "backlog-child-worker" })),
+              result: completedResult("done"),
+            })
+            for (let index = 0; index < 100; index += 1) yield* filler(`after-${index}`)
+            const tickBudget = 100
+            let ticks = 0
+            while (ticks < tickBudget && (yield* runtime.inspect(parent.runId)).status === "waiting") {
+              yield* scheduler.tick
+              ticks += 1
+            }
+            expect((yield* runtime.inspect(parent.runId)).status).not.toBe("waiting")
+            expect(ticks).toBeLessThan(tickBudget)
+          }),
+        120_000,
+      )
+    })
+
+    layer(runtimeLayer)(`${backend} a waiting page wider than the reconcile window starves nobody`, (it) => {
+      it.effect(
+        "resumes a resolvable parent queued behind a full page of unresolvable ones",
+        () =>
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const scheduler = yield* LocalScheduler.LocalScheduler
+            const store = yield* RunStore.RunStore
+            // Approval waits no terminal child can ever answer, so reconciliation never
+            // shortens this page and the cursor is the only thing that can reach past it.
+            for (let index = 0; index < 34; index += 1) {
+              const blocked = yield* runtime.send({
+                to: assistantAddress,
+                sessionId: `scheduler-starve-blocked:${backend}:${index}`,
+                idempotencyKey: `starve-blocked-${index}`,
+                prompt: "blocked",
+              })
+              const blockedClaim = yield* store.claimExecution({
+                runId: blocked.runId,
+                ownerId: `starve-blocked-worker-${index}`,
+              })
+              yield* store.suspend({
+                ...blockedClaim,
+                wait: openWait({ waitId: `starve-approval-${index}`, reason: "approval" }),
+                suspension: suspension({ waitId: `starve-approval-${index}`, reason: "approval" }),
+              })
+            }
+            const parent = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: `scheduler-starve:${backend}`,
+              idempotencyKey: "starve-parent",
+              prompt: "parent",
+            })
+            const parentClaim = yield* store.claimExecution({ runId: parent.runId, ownerId: "starve-parent-worker" })
+            const childOutcome = yield* ChildRuns.make(store).invoke({
+              parentRunId: parent.runId,
+              toolCallId: "starve-child",
+              selection: "researcher",
+              prompt: "child",
+            })
+            if (childOutcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
+            yield* store.suspend({
+              ...parentClaim,
+              wait: openWait({ waitId: "starve-child" }),
+              suspension: suspension({ waitId: "starve-child" }),
+            })
+            yield* store.complete({
+              ...(yield* store.claimExecution({ runId: childOutcome.token, ownerId: "starve-child-worker" })),
+              result: completedResult("done"),
+            })
+            const tickBudget = 40
+            let ticks = 0
+            while (ticks < tickBudget && (yield* runtime.inspect(parent.runId)).status === "waiting") {
+              yield* scheduler.tick
+              ticks += 1
+            }
+            expect((yield* runtime.inspect(parent.runId)).status).not.toBe("waiting")
+            expect(ticks).toBeLessThan(tickBudget)
+          }),
+        120_000,
+      )
+    })
+
+    layer(runtimeLayer)(`${backend} idle reconciliation short-circuits`, (it) => {
+      it.effect("does no reconciliation work while nothing changes", () =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const scheduler = yield* LocalScheduler.LocalScheduler
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: assistantAddress,
+            sessionId: `scheduler-idle:${backend}`,
+            idempotencyKey: "idle-0",
+            prompt: "run-idle",
+          })
+          const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "idle-worker" })
+          yield* store.complete({ ...claim, result: completedResult("done") })
+          const calls: Array<{ readonly method: string; readonly status?: string }> = []
+          const spy = RunStore.RunStore.of({
+            ...store,
+            list: (input) => {
+              calls.push({ method: "list", status: String(input.status) })
+              return store.list(input)
+            },
+            listRelated: (runId) => {
+              calls.push({ method: "listRelated" })
+              return store.listRelated(runId)
+            },
+            loadExecution: (runId) => {
+              calls.push({ method: "loadExecution" })
+              return store.loadExecution(runId)
+            },
+            snapshot: (runId) => {
+              calls.push({ method: "snapshot" })
+              return store.snapshot(runId)
+            },
+          })
+          yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
+          calls.length = 0
+          yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
+          const waiting = yield* store.list({ status: "waiting", order: "oldest", limit: 64 })
+          // An idle tick reads one bounded waiting page and never scans the terminal backlog.
+          expect(calls.filter((call) => call.method === "list" && call.status === "waiting")).toHaveLength(1)
+          expect(
+            calls.filter(
+              (call) => call.method === "list" && ["succeeded", "failed", "cancelled"].includes(call.status ?? ""),
+            ),
+          ).toHaveLength(0)
+          // Only a parent that still holds an open wait is inspected, never a settled Run.
+          expect(calls.filter((call) => call.method === "listRelated").length).toBeLessThanOrEqual(waiting.length)
+        }),
       )
     })
   }
@@ -508,8 +725,8 @@ for (const backend of ["memory", "sqlite"] as const) {
           if (outcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
           yield* store.suspend({
             ...parentClaim,
-            wait: openWait("child-tool"),
-            suspension: suspension("child-tool"),
+            wait: openWait({ waitId: "child-tool" }),
+            suspension: suspension({ waitId: "child-tool" }),
           })
           yield* scheduler.tick
           yield* scheduler.idle
@@ -585,7 +802,11 @@ for (const backend of ["memory", "sqlite"] as const) {
             prompt: "child",
           })
           if (outcome._tag !== "Suspend") return yield* Effect.die("child did not suspend")
-          yield* store.suspend({ ...parentClaim, wait: openWait("child-tool"), suspension: suspension("child-tool") })
+          yield* store.suspend({
+            ...parentClaim,
+            wait: openWait({ waitId: "child-tool" }),
+            suspension: suspension({ waitId: "child-tool" }),
+          })
           yield* store.complete({
             ...(yield* store.claimExecution({ runId: outcome.token, ownerId: "manual-child" })),
             result: completedResult("done"),

@@ -3,6 +3,7 @@ import {
   CompactionIdentity,
   ChildBinding,
   NamedCapability,
+  PinnedContent,
   PolicyIdentity,
   PortablePolicy,
   ProgramAuthority,
@@ -61,10 +62,12 @@ import { ModelTelemetry } from "./model/facade-modelTelemetry.js"
 import { ModelToolCallValidation } from "./model/facade-modelToolCallValidation.js"
 import { Permissions } from "./policy/facade-permissions.js"
 import { Session } from "./context/facade-session.js"
+import { SessionHistory } from "./context/facade-sessionHistory.js"
 import { SessionSync } from "./context/facade-sessionSync.js"
 import { SkillSource } from "./context/facade-skillSource.js"
 import { Steering } from "./turn/facade-steering.js"
 import { ToolAuthorization } from "./tools/facade-toolAuthorization.js"
+import { NestedOperation } from "./tools/facade-nestedOperation.js"
 import { ToolContext } from "./tools/facade-toolContext.js"
 import { ToolExecutor } from "./tools/facade-toolExecutor.js"
 import { ToolOutput } from "./tools/facade-toolOutput.js"
@@ -277,6 +280,7 @@ export const AgentManifest = {
   CompactionIdentity,
   ChildBinding,
   NamedCapability,
+  PinnedContent,
   PolicyIdentity,
   PortablePolicy,
   ProgramAuthority,
@@ -287,6 +291,7 @@ export namespace AgentManifest {
   export type AgentManifest = import("./durable/agent-manifest.js").AgentManifest
   export type PinnedAgent = import("./durable/agent-manifest.js").PinnedAgent
   export type NamedCapability = import("./durable/agent-manifest.js").NamedCapability
+  export type PinnedContent = import("./durable/agent-manifest.js").PinnedContent
   export type ChildBinding = import("./durable/agent-manifest.js").ChildBinding
   export type PolicyIdentity = import("./durable/agent-manifest.js").PolicyIdentity
   export type CompactionIdentity = import("./durable/agent-manifest.js").CompactionIdentity
@@ -337,9 +342,11 @@ export {
   ModelStreamTermination,
   ModelTelemetry,
   ModelToolCallValidation,
+  NestedOperation,
   Permissions,
   RunBudget,
   Session,
+  SessionHistory,
   SessionSync,
   SkillSource,
   Steering,

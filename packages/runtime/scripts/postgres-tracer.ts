@@ -1,12 +1,14 @@
 import { Console, Effect, ManagedRuntime } from "effect"
 import { RunClaims, Runtime } from "../src/index.js"
 import { assistantAddress, completedResult, textPrompt } from "../test/helpers.js"
-import { postgresLayer, postgresUrl, preparePostgres, uniqueSession } from "../test/postgres/helpers.js"
+import { postgresAvailable, postgresDatabase, postgresLayer, uniqueSession } from "../test/postgres/helpers.js"
 
-const url = postgresUrl
-if (url === undefined || url.length === 0) {
+if (!postgresAvailable) {
   throw new Error("Set BATON_DATABASE_URL or DATABASE_URL to run the postgres tracer")
 }
+
+const database = postgresDatabase("cli-tracer")
+const url = database.url
 
 const encodeJson = (value: unknown): string => JSON.stringify(value)
 
@@ -42,11 +44,10 @@ const runTrace = (databaseUrl: string, sessionId: string) =>
     }
   })
 const program = Effect.gen(function* () {
-  yield* preparePostgres(url)
   const sessionId = uniqueSession("cli")
   const result = yield* runTrace(url, sessionId)
   yield* Console.log(encodeJson(result))
 })
 
-const runtime = ManagedRuntime.make(postgresLayer(url))
+const runtime = ManagedRuntime.make(database.provision(postgresLayer(url)))
 await runtime.runPromise(program.pipe(Effect.scoped))

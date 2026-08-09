@@ -1,4 +1,3 @@
-import { Function } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentEvent, AgentManifest } from "@batonfx/core"
 import {
@@ -156,15 +155,15 @@ type OpenWait = RunWait.RunWait
 
 type OpenWaitReason = "tool-wait" | "approval" | "signal" | "timer" | "external"
 
-const isOpenWaitReason = (value: string): value is OpenWaitReason =>
-  value === "tool-wait" || value === "approval" || value === "signal" || value === "timer" || value === "external"
+export interface OpenWaitOptions {
+  readonly waitId: string
+  readonly reason?: OpenWaitReason
+}
 
-export const openWait: {
-  (reason?: OpenWaitReason): (waitId: string) => OpenWait
-  (waitId: string, reason?: OpenWaitReason): OpenWait
-} = Function.dual(
-  (args) => args.length > 1 || !isOpenWaitReason(args[0]),
-  (waitId: string, reason: OpenWaitReason = "tool-wait"): OpenWait => ({
+export const openWait = (options: OpenWaitOptions): OpenWait => {
+  const waitId = options.waitId
+  const reason = options.reason ?? "tool-wait"
+  return {
     waitId,
     reason:
       reason === "approval"
@@ -181,21 +180,20 @@ export const openWait: {
               : { _tag: "External" as const },
     status: "open" as const,
     openedAt: "2026-08-03T00:00:00.000Z",
-  }),
-)
+  }
+}
 
-export const suspension: {
-  (reason?: "tool-wait" | "approval"): (waitId: string) => AgentEvent.AgentSuspended
-  (waitId: string, reason?: "tool-wait" | "approval"): AgentEvent.AgentSuspended
-} = Function.dual(
-  (args) => args.length > 1 || !(args[0] === "tool-wait" || args[0] === "approval"),
-  (waitId: string, reason: "tool-wait" | "approval" = "tool-wait"): AgentEvent.AgentSuspended =>
-    AgentEvent.AgentSuspended.make({
-      token: waitId,
-      reason,
-      tool_call_id: waitId,
-      tool_name: "test",
-      tool_params: {},
-      tool_call_batch: [],
-    }),
-)
+export interface SuspensionOptions {
+  readonly waitId: string
+  readonly reason?: "tool-wait" | "approval"
+}
+
+export const suspension = (options: SuspensionOptions): AgentEvent.AgentSuspended =>
+  AgentEvent.AgentSuspended.make({
+    token: options.waitId,
+    reason: options.reason ?? "tool-wait",
+    tool_call_id: options.waitId,
+    tool_name: "test",
+    tool_params: {},
+    tool_call_batch: [],
+  })

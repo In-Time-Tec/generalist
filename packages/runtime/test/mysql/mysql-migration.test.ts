@@ -1,13 +1,15 @@
+import { beforeAll } from "vitest"
 import { describe, expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { SchemaChecksumMismatch, SchemaDirty, SchemaVersionUnsupported } from "../../src/sql/errors.js"
 import { MysqlRunSchema } from "../../src/sql/mysql/run-schema.js"
 import { SCHEMA_VERSION, schemaChecksum } from "../../src/sql/mysql/schema.js"
-import { mysqlAvailable, mysqlClient, mysqlUrl } from "./helpers.js"
+import { mysqlAvailable, mysqlDatabase } from "./helpers.js"
 
 const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
-const client = mysqlClient(mysqlUrl!)
+const database = mysqlDatabase("migration")
+const client = database.client
 const tables = [
   "baton_run_registrations",
   "baton_executable_registrations",
@@ -18,6 +20,8 @@ const tables = [
   "baton_fan_out_members",
   "baton_fan_outs",
   "baton_run_steering",
+  "baton_messages",
+  "baton_agent_names",
   "baton_run_links",
   "baton_run_waits",
   "baton_run_operations",
@@ -62,6 +66,8 @@ const inspectSchema = Effect.gen(function* () {
 })
 
 describeMysql("mysql schema baseline", () => {
+  beforeAll(database.provisioned, 60_000)
+
   layer(client, { excludeTestServices: true })("creates the current v1 baseline and applies idempotently", (suite) => {
     suite.effect("creates the current v1 baseline and applies idempotently", () =>
       Effect.gen(function* () {

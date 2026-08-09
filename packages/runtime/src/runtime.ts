@@ -6,6 +6,11 @@ import type { Interface as ExecutableResolverInterface } from "./executable-reso
 import type { Cursor } from "./cursor.js"
 import type {
   AddressNotFound,
+  AgentNameConflict,
+  MailboxFull,
+  MailboxRateLimited,
+  MessageConflict,
+  MessagingUnauthorized,
   CursorExpired,
   IdempotencyConflict,
   RunIdConflict,
@@ -34,6 +39,9 @@ import type {
   StartInvalid,
 } from "./errors.js"
 import type { Metadata } from "./message.js"
+import type { AgentName, AddressInvalid, DirectoryEntry } from "./agent-directory.js"
+import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./mailbox.js"
+import type { Interface as MessagingPolicyInterface } from "./messaging.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunEvent } from "./run-event.js"
 import type { WaitResolution } from "./run-wait.js"
@@ -55,6 +63,9 @@ export interface LayerOptions {
   readonly addresses: ReadonlyArray<AddressBinding>
   readonly resolver: ExecutableResolverInterface
   readonly subscriberQueueCapacity?: number
+  /** Host policy for addressing beyond Baton's derived relationships. Absent means relationships only. */
+  readonly messagingPolicy?: MessagingPolicyInterface
+  readonly mailboxBounds?: Partial<MailboxBounds>
   readonly scheduler?: {
     readonly concurrency?: number
     readonly pollInterval?: Duration.Input
@@ -156,6 +167,36 @@ export interface SteerInput {
   readonly prompt: Prompt.Prompt | Prompt.RawInput
 }
 
+/**
+ * @experimental One addressed send between agents.
+ *
+ * `fromRunId` is the authoritative sender: Baton reads its identity, parentage, and session from the
+ * durable Run record, so callers cannot forge a sender by supplying an Address.
+ */
+export interface SendMessageInput {
+  readonly fromRunId: string
+  readonly to: Address
+  readonly idempotencyKey: string
+  readonly prompt: Prompt.Prompt | Prompt.RawInput
+  readonly messageId?: string
+  readonly causationId?: string
+  readonly correlationId?: string
+  readonly inReplyTo?: string
+  readonly metadata?: Metadata
+}
+
+/** @experimental */
+export interface MessagesInput {
+  readonly runId: string
+  readonly limit: number
+}
+
+/** @experimental */
+export interface RegisterAgentNameInput {
+  readonly runId: string
+  readonly name: AgentName
+}
+
 export type SendError =
   | AddressNotFound
   | IdempotencyConflict
@@ -181,6 +222,18 @@ export type StartError =
   | FanOutRemainderUnsupported
   | RuntimeUnavailable
 export type SpawnError = RunNotFound | RunTerminal | ChildSelectionMissing | IdempotencyConflict | RuntimeUnavailable
+export type SendMessageError =
+  | AddressNotFound
+  | AddressInvalid
+  | MessagingUnauthorized
+  | MailboxFull
+  | MailboxRateLimited
+  | MessageConflict
+  | RunTerminal
+  | RunNotFound
+  | RuntimeUnavailable
+export type DirectoryError = RunNotFound | RuntimeUnavailable
+export type RegisterAgentNameError = RunNotFound | AgentNameConflict | RuntimeUnavailable
 export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
 export type TreeEventsError = RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
 export type RespondError = RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable
@@ -219,6 +272,19 @@ export interface Interface {
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
   readonly steer: (input: SteerInput) => Effect.Effect<void, SteerError>
+  /**
+   * @experimental Send one addressed message into the target's durable inbox.
+   *
+   * Authorization is relationship-scoped from authoritative identity plus the host policy seam.
+   * Delivery to a live target lands at its next turn boundary; otherwise it waits for its next Run.
+   */
+  readonly sendMessage: (input: SendMessageInput) => Effect.Effect<MessageReceipt, SendMessageError>
+  /** @experimental Messages admitted for a Run's session that no Run has taken yet. */
+  readonly messages: (input: MessagesInput) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError>
+  /** @experimental Addresses this Run may reach under Baton relationships plus host policy. */
+  readonly directory: (runId: string) => Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError>
+  /** @experimental Bind one host-assigned name, unique within the Run's naming scope. */
+  readonly registerAgentName: (input: RegisterAgentNameInput) => Effect.Effect<DirectoryEntry, RegisterAgentNameError>
   readonly resolveOperation: (input: ResolveOperationInput) => Effect.Effect<void, ResolveOperationError>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, InspectError>
   readonly fanOut: (input: FanOutInput) => Effect.Effect<FanOutReceipt, FanOutError>

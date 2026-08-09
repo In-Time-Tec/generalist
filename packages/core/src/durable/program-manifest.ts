@@ -1,9 +1,8 @@
 import { Schema } from "effect"
+import { NamedCapability } from "./capability.js"
 import { AgentPin, CapabilityPin, makeProgram as makeProgramPin, ProgramPin } from "./pin.js"
 
 const compareText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0)
-
-const NamedCapabilitySchema = Schema.Struct({ name: Schema.String, pin: CapabilityPin })
 
 const uniqueSorted = <A>(
   values: ReadonlyArray<A>,
@@ -57,9 +56,9 @@ export type ProgramBudget = typeof ProgramBudget.Type
 
 /** @experimental Exact host capabilities visible inside one Agent Program sandbox. */
 export const ProgramCapabilityManifest = Schema.Struct({
-  tools: Schema.Array(NamedCapabilitySchema),
+  tools: Schema.Array(NamedCapability),
   agents: Schema.Array(ProgramAgentCapability),
-  steps: Schema.Array(NamedCapabilitySchema),
+  steps: Schema.Array(NamedCapability),
 })
 /** @experimental */
 export type ProgramCapabilityManifest = typeof ProgramCapabilityManifest.Type

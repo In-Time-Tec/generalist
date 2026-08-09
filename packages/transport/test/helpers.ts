@@ -57,6 +57,10 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
       respondApproval: () => Effect.die("unused respondApproval"),
       signal: () => Effect.die("unused signal"),
       steer: () => Effect.die("unused steer"),
+      sendMessage: () => Effect.die("unused sendMessage"),
+      messages: () => Effect.die("unused messages"),
+      directory: () => Effect.die("unused directory"),
+      registerAgentName: () => Effect.die("unused registerAgentName"),
       resolveOperation: () => Effect.die("unused resolveOperation"),
       cancel: () => Effect.void,
       inspect: (runId) =>

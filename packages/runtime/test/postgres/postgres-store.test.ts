@@ -29,14 +29,7 @@ import {
   registrationsFor,
   textPrompt,
 } from "../helpers.js"
-import {
-  postgresAvailable,
-  postgresLayer,
-  postgresUrl,
-  postgresWithWorker,
-  preparePostgres,
-  uniqueSession,
-} from "./helpers.js"
+import { postgresAvailable, postgresDatabase, postgresLayer, postgresWithWorker, uniqueSession } from "./helpers.js"
 import { testExecutable } from "../identity.js"
 
 const scopedWith =
@@ -50,11 +43,12 @@ const decodeJson = (text: string): Record<string, any> =>
 
 const describePostgres = postgresAvailable ? describe.sequential : describe.skip
 
-const url = postgresUrl!
+const database = postgresDatabase("store")
+const url = database.url
 
 const withSchema = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
-    yield* preparePostgres(url)
+    yield* database.ready
     return yield* effect
   })
 
@@ -75,8 +69,8 @@ const admitWaitForCancellation = (waitId: string) =>
       runId: receipt.runId,
       ownerId: parentClaim.workerId,
       attemptFence: parentClaim.attemptFence,
-      wait: openWait(waitId),
-      suspension: suspension(waitId),
+      wait: openWait({ waitId: waitId }),
+      suspension: suspension({ waitId: waitId }),
     })
     yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
@@ -247,8 +241,8 @@ describePostgres("postgres run store", () => {
           runId: receipt.runId,
           ownerId: claimed.workerId,
           attemptFence: claimed.attemptFence,
-          wait: openWait("wait:direct-resume"),
-          suspension: suspension("wait:direct-resume"),
+          wait: openWait({ waitId: "wait:direct-resume" }),
+          suspension: suspension({ waitId: "wait:direct-resume" }),
         })
         const resolution = { _tag: "Denied" as const, reason: "postgres exact resolution" }
         const resumeInput = { runId: receipt.runId, waitId: "wait:direct-resume", resolution }
@@ -630,7 +624,7 @@ describePostgres("postgres run store", () => {
             lease: "10 seconds",
           }),
         ).toBe(false)
-      }).pipe(scopedWith(postgresWithWorker(url, "tick-worker", 2))),
+      }).pipe(scopedWith(postgresWithWorker({ url, workerId: "tick-worker", concurrency: 2 }))),
     ),
   )
 
@@ -808,8 +802,8 @@ describePostgres("postgres run store", () => {
         let claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: claimed[0]!.attemptFence }
         yield* driver.suspend({
           ...claim,
-          wait: openWait("approval", "approval"),
-          suspension: suspension("approval", "approval"),
+          wait: openWait({ waitId: "approval", reason: "approval" }),
+          suspension: suspension({ waitId: "approval", reason: "approval" }),
         })
         expect((yield* runtime.inspect(successor.runId)).status).toBe("queued")
         yield* runtime.respond({ runId: waiting.runId, waitId: "approval", resolution: { _tag: "Approved" } })
@@ -818,8 +812,8 @@ describePostgres("postgres run store", () => {
         claim = { runId: waiting.runId, ownerId: "wait-w", attemptFence: approvalResume!.attemptFence }
         yield* driver.suspend({
           ...claim,
-          wait: openWait("signal-me", "signal"),
-          suspension: suspension("signal-me"),
+          wait: openWait({ waitId: "signal-me", reason: "signal" }),
+          suspension: suspension({ waitId: "signal-me" }),
         })
         yield* runtime.signal({ runId: waiting.runId, name: "signal-me" })
         const [signalResume] = yield* claims.claimReadyRuns({ workerId: "wait-w", limit: 1, lease: "10 seconds" })
@@ -1108,8 +1102,8 @@ describePostgres("postgres run store", () => {
             runId: admitted.runId,
             ownerId: "race-w",
             attemptFence: claimed!.attemptFence,
-            wait: openWait("approval", "approval"),
-            suspension: suspension("approval", "approval"),
+            wait: openWait({ waitId: "approval", reason: "approval" }),
+            suspension: suspension({ waitId: "approval", reason: "approval" }),
           })
 
           const respond = runtime
@@ -1165,8 +1159,8 @@ describePostgres("postgres run store", () => {
         expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
         yield* store.suspend({
           ...claim,
-          wait: openWait("approval", undefined),
-          suspension: suspension("approval", undefined),
+          wait: openWait({ waitId: "approval" }),
+          suspension: suspension({ waitId: "approval" }),
         })
         const inspection = yield* runtime.inspect(runId)
         expect(inspection.status).toBe("cancelling")

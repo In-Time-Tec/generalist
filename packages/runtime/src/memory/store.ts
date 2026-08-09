@@ -27,6 +27,15 @@ import {
 } from "./store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
 import { admitSteering, readSteering } from "./store-steering.js"
+import {
+  admitMessage,
+  deliverPendingMessages,
+  directory,
+  listRelated,
+  pendingMessages,
+  registerAgentName,
+  resolveAddress,
+} from "./store-directory.js"
 import { Prompt } from "effect/unstable/ai"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { makeCursor } from "../tree-cursor.js"
@@ -125,6 +134,22 @@ export const makeRunStore = (options: LayerOptions) =>
             }),
           ),
         ),
+      directory: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => directory(state, runId))),
+      resolveAddress: (address) =>
+        SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => resolveAddress(state, address))),
+      registerAgentName: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => registerAgentName(state, input)),
+      listRelated: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => listRelated(state, runId))),
+      admitMessage: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitMessage(state, input)),
+      pendingMessages: (input) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.flatMap((state) =>
+            state.closed
+              ? RuntimeUnavailable.make({ message: "runtime store released" })
+              : Effect.succeed(pendingMessages(state, input)),
+          ),
+        ),
+      deliverPendingMessages: (input) =>
+        SynchronizedRef.modifyEffect(stateRef, (state) => deliverPendingMessages(state, input)),
       inspect: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectRun(state, runId))),
       snapshot: (runId) =>
         SynchronizedRef.get(stateRef).pipe(

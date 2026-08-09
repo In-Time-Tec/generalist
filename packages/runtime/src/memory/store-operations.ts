@@ -135,7 +135,7 @@ export const completeOperation: {
     readonly attemptFence: number
     readonly operationId: string
     readonly outcome: OperationCompletionOutcome
-    readonly checkpoint: import("../execution-state.js").ExecutionCheckpoint
+    readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
     readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
     readonly continuation?: import("../steering.js").ExecutionContinuation | null
     readonly steeringEntryIds?: ReadonlyArray<string>
@@ -150,7 +150,7 @@ export const completeOperation: {
       readonly attemptFence: number
       readonly operationId: string
       readonly outcome: OperationCompletionOutcome
-      readonly checkpoint: import("../execution-state.js").ExecutionCheckpoint
+      readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
       readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
       readonly continuation?: import("../steering.js").ExecutionContinuation | null
       readonly steeringEntryIds?: ReadonlyArray<string>
@@ -166,7 +166,7 @@ export const completeOperation: {
       readonly attemptFence: number
       readonly operationId: string
       readonly outcome: OperationCompletionOutcome
-      readonly checkpoint: import("../execution-state.js").ExecutionCheckpoint
+      readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
       readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
       readonly continuation?: import("../steering.js").ExecutionContinuation | null
       readonly steeringEntryIds?: ReadonlyArray<string>
@@ -202,7 +202,7 @@ export const completeOperation: {
       const updatedRun = {
         ...run,
         executableRef,
-        checkpoint: input.checkpoint,
+        ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
         ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
         ...(input.continuation === undefined || input.continuation === null
           ? {}

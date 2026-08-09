@@ -15,6 +15,8 @@ export default defineConfig({
     },
   ],
   test: {
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
     environmentMatchGlobs: [["apps/docs/**", "happy-dom"]],
     include: [
       "packages/**/test/**/*.test.ts",

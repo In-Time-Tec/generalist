@@ -208,7 +208,7 @@ export const postgresOperations = (input: {
           }
           yield* sql`
             UPDATE baton_runs SET
-              driver_checkpoint_json = ${encodeJson(ExecutionCheckpoint, op.checkpoint)},
+              driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, op.checkpoint)}, driver_checkpoint_json),
               executable_ref_json = ${encodeExecutableRef(executableRef)},
               transcript_json = COALESCE(${op.transcript === undefined ? null : encodeJson(Prompt.Prompt, op.transcript)}, transcript_json),
               continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1

@@ -1,3 +1,4 @@
+import { beforeAll } from "vitest"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Exit, Layer, Redacted, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
@@ -14,7 +15,7 @@ import {
   researcherRef,
   textPrompt,
 } from "../helpers.js"
-import { mysqlAvailable, mysqlClient, mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "./helpers.js"
+import { mysqlAvailable, mysqlClient, mysqlDatabase, mysqlLayer, uniqueSession } from "./helpers.js"
 
 const scopedWith =
   <A, E>(layerValue: Layer.Layer<A, E, never>) =>
@@ -24,11 +25,12 @@ const scopedWith =
 const encodeJson = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
 const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
-const url = mysqlUrl!
+const database = mysqlDatabase("store")
+const url = database.url
 
 const withSchema = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
-    yield* prepareMysql(url)
+    yield* database.truncated
     return yield* effect
   })
 
@@ -50,6 +52,8 @@ const exactRegistrations = () => {
 }
 
 describeMysql("mysql run store", () => {
+  beforeAll(database.provisioned, 60_000)
+
   it.live("persists exact-start registrations and replays admission idempotently", () =>
     withSchema(
       Effect.gen(function* () {
@@ -139,8 +143,8 @@ describeMysql("mysql run store", () => {
           runId: receipt.runId,
           ownerId: claimed.workerId,
           attemptFence: claimed.attemptFence,
-          wait: openWait("wait:direct-resume"),
-          suspension: suspension("wait:direct-resume"),
+          wait: openWait({ waitId: "wait:direct-resume" }),
+          suspension: suspension({ waitId: "wait:direct-resume" }),
         })
         const resolution = { _tag: "Denied" as const, reason: "mysql exact resolution" }
         const resumeInput = { runId: receipt.runId, waitId: "wait:direct-resume", resolution }
@@ -464,10 +468,16 @@ describeMysql("mysql run store", () => {
         })
         const claimed = (yield* claims.claimReadyRuns({ workerId: "wait-worker", limit: 1 }))[0]!
         const suspending = { runId: receipt.runId, ownerId: "wait-worker", attemptFence: claimed.attemptFence }
+        const approvalWait = openWait({ waitId: "approval", reason: "approval" })
         yield* store.suspend({
           ...suspending,
-          wait: openWait("approval", "approval"),
-          suspension: suspension("approval", "approval"),
+          wait: approvalWait,
+          suspension: suspension({ waitId: "approval", reason: "approval" }),
+        })
+        expect((yield* runtime.inspect(receipt.runId)).wait).toMatchObject({
+          waitId: approvalWait.waitId,
+          reason: approvalWait.reason,
+          status: "open",
         })
         yield* runtime.respond({ runId: receipt.runId, waitId: "approval", resolution: { _tag: "Approved" } })
         const reclaimed = (yield* claims.claimReadyRuns({ workerId: "wait-worker", limit: 1 }))[0]!

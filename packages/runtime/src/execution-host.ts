@@ -17,6 +17,7 @@ import { commitDeferredProgramChildTerminal, makeDeferredProgramChildTerminal } 
 import { agentBudget } from "./execution-defaults.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "./code-mode.js"
 import { hostContext, sessionContext } from "./execution-context.js"
+import { make as makeNestedOperations } from "./nested-operations.js"
 import { settleInterruptedExecution } from "./execution-interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { approvalReason } from "./run-wait.js"
@@ -107,10 +108,9 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               environment: Layer.Layer<Agent.ClosedServices<Tools, R>>,
             ): Effect.Effect<void, never, Scope.Scope> =>
               Effect.gen(function* () {
-                // Session owns model-facing history, so a durable store hands each Run the conversation
-                // for its session identity. Without one the Run stays process-bound.
+                const nested = yield* makeNestedOperations({ claim, claimed, store })
                 const baseContext = Context.merge(
-                  yield* hostContext({ agent, environment, store, codeMode }),
+                  yield* hostContext({ agent, environment, store, codeMode, nested }),
                   yield* sessionContext({ store, sessionId: claimed.message.sessionId }),
                 )
                 const runHosted = (hostedAgent: Agent.Agent<Tools, R>): Effect.Effect<void> => {
@@ -139,6 +139,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                       const take = Effect.gen(function* () {
                         const current = yield* Ref.get(observed)
                         if (current.length > 0) return []
+                        yield* store.deliverPendingMessages({ runId })
                         const entries = yield* store.readSteering(claim)
                         yield* Ref.set(
                           observed,
@@ -415,6 +416,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                           })
                           return
                         }
+                        const nestedWait = yield* nested.waitFor(suspension)
                         yield* store.suspend({
                           ...claim,
                           suspension,
@@ -422,16 +424,18 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                           ...(latest.transcript === undefined ? {} : { transcript: latest.transcript }),
                           ...(latest.continuation === undefined ? {} : { continuation: latest.continuation }),
                           wait: {
-                            waitId: suspension.reason === "approval" ? suspension.token : suspension.tool_call_id,
-                            reason:
-                              suspension.reason === "approval"
-                                ? approvalReason({
-                                    approvalId: suspension.token,
-                                    operation: suspension.tool_call_id,
-                                    capability: suspension.tool_name,
-                                    input: suspension.tool_params,
-                                  })
-                                : { _tag: "ToolWait" },
+                            ...(nestedWait ?? {
+                              waitId: suspension.reason === "approval" ? suspension.token : suspension.tool_call_id,
+                              reason:
+                                suspension.reason === "approval"
+                                  ? approvalReason({
+                                      approvalId: suspension.token,
+                                      operation: suspension.tool_call_id,
+                                      capability: suspension.tool_name,
+                                      input: suspension.tool_params,
+                                    })
+                                  : ({ _tag: "ToolWait" } as const),
+                            }),
                             status: "open",
                             openedAt,
                           },

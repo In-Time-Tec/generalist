@@ -1,3 +1,4 @@
+import { beforeAll } from "vitest"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -6,10 +7,14 @@ import { Address, Errors, ExecutableResolver, RunClaims, Runtime, RuntimeWorker 
 import { closedTestAgent, testExecutable } from "../identity.js"
 import { assistant, assistantAddress, assistantRef, completedResult, registrationsFor } from "../helpers.js"
 import { provideScoped } from "../scoped-provide.js"
-import { mysqlAvailable, mysqlClient, mysqlUrl, prepareMysql, uniqueSession } from "./helpers.js"
+import { mysqlAvailable, mysqlClient, mysqlDatabase, uniqueSession } from "./helpers.js"
 import { SqlClient } from "effect/unstable/sql"
 
 const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
+
+const staleWorker = mysqlDatabase("worker-stale")
+const modelCancel = mysqlDatabase("worker-model-cancel")
+const toolCancel = mysqlDatabase("worker-tool-cancel")
 
 const finish = Response.makePart("finish", {
   reason: "stop",
@@ -21,72 +26,73 @@ const finish = Response.makePart("finish", {
 })
 
 describeMysql("mysql worker cancellation", () => {
+  beforeAll(modelCancel.provisioned, 60_000)
+  beforeAll(staleWorker.provisioned, 60_000)
+  beforeAll(toolCancel.provisioned, 60_000)
+
   {
-    const url = mysqlUrl!
-    layer(
-      Runtime.layerMysql({
-        url,
-        source: "mysql-worker-test",
-        resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
-        addresses: [
-          { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
-        ],
-      }),
-      { excludeTestServices: true },
-    )("rejects a stale worker commit after a replacement worker claims the Run", (suite) => {
-      suite.effect("rejects a stale worker commit after a replacement worker claims the Run", () =>
-        prepareMysql(url).pipe(
-          Effect.andThen(
-            Effect.gen(function* () {
-              const runtime = yield* Runtime.Runtime
-              const claims = yield* RunClaims.RunClaims
-              const receipt = yield* runtime.send({
-                to: assistantAddress,
-                sessionId: uniqueSession("stale-worker"),
-                idempotencyKey: "stale-worker",
-                prompt: "work",
-              })
-              const [staleClaim] = yield* claims.claimReadyRuns({
-                workerId: "stale-worker",
-                limit: 1,
-                lease: "30 seconds",
-              })
-              yield* provideScoped(
-                mysqlClient(url),
-                Effect.gen(function* () {
-                  const sql = yield* SqlClient.SqlClient
-                  yield* sql`UPDATE baton_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${receipt.runId}`
-                }),
-              )
-              const [replacementClaim] = yield* claims.claimReadyRuns({
-                workerId: "replacement-worker",
-                limit: 1,
-                lease: "30 seconds",
-              })
-              expect(replacementClaim!.attemptFence).toBeGreaterThan(staleClaim!.attemptFence)
-              expect(
-                yield* claims
-                  .commitWithClaim({
-                    runId: receipt.runId,
-                    workerId: staleClaim!.workerId,
-                    attemptFence: staleClaim!.attemptFence,
-                    transition: "complete",
-                    result: completedResult("stale result"),
-                  })
-                  .pipe(Effect.flip),
-              ).toBeInstanceOf(Errors.StaleClaim)
-            }),
-          ),
-        ),
-      )
+    const url = staleWorker.url
+    const runtimeLayer = Runtime.layerMysql({
+      url,
+      source: "mysql-worker-test",
+      resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+      addresses: [
+        { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+      ],
     })
+    layer(staleWorker.provision(runtimeLayer), { excludeTestServices: true })(
+      "rejects a stale worker commit after a replacement worker claims the Run",
+      (suite) => {
+        suite.effect("rejects a stale worker commit after a replacement worker claims the Run", () =>
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const claims = yield* RunClaims.RunClaims
+            const receipt = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: uniqueSession("stale-worker"),
+              idempotencyKey: "stale-worker",
+              prompt: "work",
+            })
+            const [staleClaim] = yield* claims.claimReadyRuns({
+              workerId: "stale-worker",
+              limit: 1,
+              lease: "30 seconds",
+            })
+            yield* provideScoped(
+              mysqlClient(url),
+              Effect.gen(function* () {
+                const sql = yield* SqlClient.SqlClient
+                yield* sql`UPDATE baton_runs SET lease_expires_at = '2000-01-01 00:00:00.000' WHERE run_id = ${receipt.runId}`
+              }),
+            )
+            const [replacementClaim] = yield* claims.claimReadyRuns({
+              workerId: "replacement-worker",
+              limit: 1,
+              lease: "30 seconds",
+            })
+            expect(replacementClaim!.attemptFence).toBeGreaterThan(staleClaim!.attemptFence)
+            expect(
+              yield* claims
+                .commitWithClaim({
+                  runId: receipt.runId,
+                  workerId: staleClaim!.workerId,
+                  attemptFence: staleClaim!.attemptFence,
+                  transition: "complete",
+                  result: completedResult("stale result"),
+                })
+                .pipe(Effect.flip),
+            ).toBeInstanceOf(Errors.StaleClaim)
+          }),
+        )
+      },
+    )
   }
 
   it.live(
     "interrupts an active model call from a separate runtime and finalizes worker resources in scope order",
     () => {
-      const url = mysqlUrl!
-      return prepareMysql(url).pipe(
+      const url = modelCancel.url
+      return modelCancel.ready.pipe(
         Effect.andThen(
           Effect.gen(function* () {
             const started = yield* Deferred.make<void>()
@@ -173,8 +179,8 @@ describeMysql("mysql worker cancellation", () => {
   )
 
   it.live("interrupts an active tool call when another runtime persists cancellation", () => {
-    const url = mysqlUrl!
-    return prepareMysql(url).pipe(
+    const url = toolCancel.url
+    return toolCancel.ready.pipe(
       Effect.andThen(
         Effect.gen(function* () {
           const started = yield* Deferred.make<void>()
@@ -189,7 +195,12 @@ describeMysql("mysql worker cancellation", () => {
               generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
               streamText: () =>
                 Stream.fromIterable<Response.StreamPartEncoded>([
-                  Response.makePart("tool-call", { id: "block-1", name: "block", params: {}, providerExecuted: false }),
+                  Response.makePart("tool-call", {
+                    id: "block-1",
+                    name: "block",
+                    params: {},
+                    providerExecuted: false,
+                  }),
                   finish,
                 ]),
             }),

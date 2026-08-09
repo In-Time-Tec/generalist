@@ -1,4 +1,4 @@
-import { Pins } from "@batonfx/core"
+import { AgentManifest, Pins } from "@batonfx/core"
 import { Effect, Function, Schema } from "effect"
 import type { PinnedExecutable } from "./executable-manifest.js"
 import { ExecutableRegistrationInvalid, ExecutableRegistrationMissing } from "./errors.js"
@@ -111,6 +111,34 @@ export const requiredPinsForActiveExecutable = (executable: PinnedExecutable): R
   return pins
 }
 
+const namedCapabilities = (executable: PinnedExecutable): ReadonlyArray<AgentManifest.NamedCapability> => {
+  const capabilities: Array<AgentManifest.NamedCapability> = []
+  for (const entry of executable.manifest.entries) {
+    if (entry._tag === "Agent") {
+      capabilities.push(...entry.manifest.tools, ...entry.manifest.skills, ...entry.manifest.services)
+      if (entry.manifest.programAuthority !== undefined) {
+        capabilities.push(...entry.manifest.programAuthority.tools, ...entry.manifest.programAuthority.steps)
+      }
+      continue
+    }
+    capabilities.push(...entry.manifest.capabilities.tools, ...entry.manifest.capabilities.steps)
+  }
+  return capabilities
+}
+
+const pinnedContents = (executable: PinnedExecutable): ReadonlyMap<string, AgentManifest.PinnedContent> => {
+  const contents = new Map<string, AgentManifest.PinnedContent>()
+  for (const capability of namedCapabilities(executable)) {
+    if (capability.content === undefined) continue
+    const current = contents.get(capability.pin)
+    if (current !== undefined && Pins.digest(current) !== Pins.digest(capability.content)) {
+      throw new TypeError(`capability pin has conflicting pinned content: ${capability.pin}`)
+    }
+    contents.set(capability.pin, capability.content)
+  }
+  return contents
+}
+
 const compactionPolicies = (executable: PinnedExecutable): ReadonlyMap<string, CompactionPolicy> => {
   const policies = new Map<string, CompactionPolicy>()
   for (const entry of executable.manifest.entries) {
@@ -165,11 +193,37 @@ export const validate: {
         try: () => compactionPolicies(executable),
         catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
       })
+      const contents = yield* Effect.try({
+        try: () => pinnedContents(executable),
+        catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
+      })
       const byPin = new Map<string, ExecutableRegistration>()
       for (const input of registrations) {
         const registration = yield* Schema.decodeUnknownEffect(ExecutableRegistration, {
           onExcessProperty: "error",
         })(input).pipe(Effect.mapError((error) => ExecutableRegistrationInvalid.make({ message: String(error) })))
+        const expectedContent = contents.get(registration.pin)
+        if (expectedContent !== undefined) {
+          if (registration.codec !== expectedContent.codec) {
+            return yield* ExecutableRegistrationInvalid.make({
+              message: `registration codec does not match pinned content: ${registration.pin}`,
+            })
+          }
+          if (registration.version !== expectedContent.version) {
+            return yield* ExecutableRegistrationInvalid.make({
+              message: `registration version does not match pinned content: ${registration.pin}`,
+            })
+          }
+          const payloadDigest = yield* Effect.try({
+            try: () => Pins.digest(registration.payload),
+            catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
+          })
+          if (payloadDigest !== expectedContent.digest) {
+            return yield* ExecutableRegistrationInvalid.make({
+              message: `registration payload does not match pinned content: ${registration.pin}`,
+            })
+          }
+        }
         const expectedPolicy = policies.get(registration.pin)
         if (expectedPolicy !== undefined) {
           const policy = yield* Schema.decodeUnknownEffect(CompactionPolicy, { onExcessProperty: "error" })(

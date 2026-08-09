@@ -1,12 +1,14 @@
 import { Console, Effect, ManagedRuntime, Stream } from "effect"
 import { RunClaims, Runtime } from "../src/index.js"
 import { assistantAddress, completedResult } from "../test/helpers.js"
-import { mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "../test/mysql/helpers.js"
+import { mysqlAvailable, mysqlDatabase, mysqlLayer, uniqueSession } from "../test/mysql/helpers.js"
 
-const url = mysqlUrl
-if (url === undefined || url.length === 0) {
+if (!mysqlAvailable) {
   throw new Error("Set BATON_MYSQL_URL or MYSQL_URL to run the MySQL tracer")
 }
+
+const database = mysqlDatabase("cli-tracer")
+const url = database.url
 
 const encodeJson = (value: unknown): string => JSON.stringify(value)
 
@@ -46,11 +48,10 @@ const runTrace = (databaseUrl: string, sessionId: string) =>
     }
   })
 const program = Effect.gen(function* () {
-  yield* prepareMysql(url)
   const sessionId = uniqueSession("cli")
   const result = yield* runTrace(url, sessionId)
   yield* Console.log(encodeJson(result))
 })
 
-const runtime = ManagedRuntime.make(mysqlLayer(url))
+const runtime = ManagedRuntime.make(database.provision(mysqlLayer(url)))
 await runtime.runPromise(program.pipe(Effect.scoped))

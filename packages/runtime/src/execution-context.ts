@@ -1,8 +1,9 @@
 import { Context, Effect, Layer, Option, type Scope } from "effect"
 import type { Tool } from "effect/unstable/ai"
-import { Agent, Session, ToolExecutor } from "@batonfx/core"
+import { Agent, NestedOperation, Session, ToolExecutor } from "@batonfx/core"
 import { ChildRuns, make as makeChildRuns } from "./child-runs.js"
 import { makeExecutor as makeCodeModeExecutor, type Interface as CodeMode } from "./code-mode.js"
+import type { Interface as NestedOperations } from "./nested-operations.js"
 import type { Interface as RunStoreInterface } from "./run-store.js"
 
 /**
@@ -14,9 +15,12 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
   readonly environment: Layer.Layer<Agent.ClosedServices<Tools, R>>
   readonly store: RunStoreInterface
   readonly codeMode: CodeMode | undefined
+  readonly nested: NestedOperations
 }): Effect.Effect<
-  | Context.Context<Agent.ClosedServices<Tools, R> | ChildRuns>
-  | Context.Context<Agent.ClosedServices<Tools, R> | ChildRuns | ToolExecutor.ToolExecutor>,
+  | Context.Context<Agent.ClosedServices<Tools, R> | ChildRuns | NestedOperation.NestedOperations>
+  | Context.Context<
+      Agent.ClosedServices<Tools, R> | ChildRuns | NestedOperation.NestedOperations | ToolExecutor.ToolExecutor
+    >,
   never,
   Scope.Scope
 > =>
@@ -24,7 +28,13 @@ export const hostContext = <Tools extends Record<string, Tool.Any>, R>(options: 
     const services = yield* Layer.build(options.environment)
     const ambient = yield* Effect.serviceOption(ToolExecutor.ToolExecutor)
     const resolved = Context.getOption(services, ToolExecutor.ToolExecutor)
-    const hosted = Context.merge(services, Context.make(ChildRuns, makeChildRuns(options.store)))
+    const hosted = Context.merge(
+      services,
+      Context.merge(
+        Context.make(ChildRuns, makeChildRuns(options.store)),
+        Context.make(NestedOperation.NestedOperations, NestedOperation.NestedOperations.of(options.nested)),
+      ),
+    )
     if (options.codeMode === undefined) return hosted
     return Context.merge(
       hosted,

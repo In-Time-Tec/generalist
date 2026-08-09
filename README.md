@@ -35,7 +35,7 @@ Use `@batonfx/core` directly for process-local agents and chat streaming. Add `@
 
 ```bash
 bun add effect @batonfx/core
-bun add @batonfx/providers @batonfx/mcp @batonfx/skills @batonfx/memory
+bun add @batonfx/providers @batonfx/mcp @batonfx/skills @batonfx/memory @batonfx/harness @batonfx/repl
 bun add @batonfx/runtime @batonfx/transport @batonfx/foldkit @batonfx/test
 bun add @batonfx/a2a @batonfx/ag-ui
 ```
@@ -52,6 +52,8 @@ GitHub releases and npm contain the same versioned package tarballs with compile
 | MCP discovery and Baton `ToolExecutor` adapter                      | `@batonfx/mcp`       | experimental |
 | SKILL.md and instruction-file sources                               | `@batonfx/skills`    | experimental |
 | Working memory, vector store, semantic recall                       | `@batonfx/memory`    | experimental |
+| Continual harness entries, refinements, rollback, snapshots         | `@batonfx/harness`   | experimental |
+| Persistent TypeScript cell contracts and the Bun kernel             | `@batonfx/repl`      | experimental |
 | Scripted models and normalized request capture                      | `@batonfx/test`      | experimental |
 | SSE, WebSocket, wire codecs, snapshots, and reconnecting clients    | `@batonfx/transport` | experimental |
 | FoldKit connection, subscription, commands, headless chat model     | `@batonfx/foldkit`   | experimental |
@@ -100,6 +102,7 @@ const clientTools = ToolExecutor.layerRouter([
 | `packages/mcp`       | `@batonfx/mcp` — MCP client bridge and Baton adapter.                        |
 | `packages/skills`    | `@batonfx/skills` — SKILL.md and instruction-file sources.                   |
 | `packages/memory`    | `@batonfx/memory` — non-durable memory implementations.                      |
+| `packages/repl`      | `@batonfx/repl` — persistent TypeScript cell contracts and the Bun kernel.   |
 | `packages/test`      | `@batonfx/test` — scripted model fixtures and normalized request capture.    |
 | `packages/transport` | `@batonfx/transport` — Runtime wire codecs, SSE, WS, snapshots, and clients. |
 | `packages/foldkit`   | `@batonfx/foldkit` — FoldKit adapter and headless chat model.                |

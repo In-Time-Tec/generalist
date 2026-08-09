@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const NOTIFY_CHANNEL = "baton_run_events"
@@ -117,6 +117,37 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
 )`,
   `CREATE INDEX IF NOT EXISTS baton_run_steering_pending_idx
     ON baton_run_steering(run_id, sequence) WHERE consumed_operation_id IS NULL`,
+  `CREATE TABLE IF NOT EXISTS baton_agent_names (
+  scope TEXT NOT NULL,
+  name TEXT NOT NULL,
+  run_id TEXT NOT NULL REFERENCES baton_runs(run_id),
+  PRIMARY KEY (scope, name)
+)`,
+  `CREATE INDEX IF NOT EXISTS baton_agent_names_run_idx ON baton_agent_names(run_id)`,
+  `CREATE TABLE IF NOT EXISTS baton_messages (
+  entry_id TEXT PRIMARY KEY,
+  target_session_id TEXT NOT NULL,
+  sequence BIGINT NOT NULL,
+  from_address TEXT NOT NULL,
+  from_run_id TEXT NOT NULL,
+  to_address TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  digest TEXT NOT NULL,
+  bytes BIGINT NOT NULL,
+  admitted_at_millis BIGINT NOT NULL,
+  prompt_json TEXT NOT NULL,
+  correlation_id TEXT NOT NULL,
+  causation_id TEXT,
+  in_reply_to TEXT,
+  metadata_json TEXT NOT NULL,
+  delivered_run_id TEXT,
+  steering_entry_id TEXT,
+  UNIQUE (target_session_id, message_id, idempotency_key),
+  UNIQUE (target_session_id, sequence)
+)`,
+  `CREATE INDEX IF NOT EXISTS baton_messages_pending_idx
+    ON baton_messages(target_session_id, sequence) WHERE delivered_run_id IS NULL`,
   `CREATE INDEX IF NOT EXISTS baton_runs_claim_idx
     ON baton_runs(status, lease_expires_at)
     WHERE status IN ('queued', 'running', 'waiting', 'needs-resolution', 'cancelling')`,

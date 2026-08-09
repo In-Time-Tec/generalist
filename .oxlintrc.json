@@ -116,6 +116,14 @@
   },
   "overrides": [
     {
+      "files": ["packages/repl/src/repl/bun-worker.ts"],
+      "rules": {
+        "effecttsgo/async-function": "off",
+        "effecttsgo/new-promise": "off",
+        "effecttsgo/node-builtin-import": "off"
+      }
+    },
+    {
       "files": ["packages/*/src/**/*.ts"],
       "rules": {
         "max-lines": [

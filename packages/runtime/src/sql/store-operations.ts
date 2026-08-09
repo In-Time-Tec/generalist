@@ -37,7 +37,7 @@ type CompleteOperationInput = {
   readonly runId: string
   readonly operationId: string
   readonly outcome: import("../run-store.js").OperationCompletionOutcome
-  readonly checkpoint: import("../execution-state.js").ExecutionCheckpoint
+  readonly checkpoint?: import("../execution-state.js").ExecutionCheckpoint
   readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
   readonly continuation?: import("../steering.js").ExecutionContinuation | null
   readonly steeringEntryIds?: ReadonlyArray<string>
@@ -208,7 +208,7 @@ export const completeOperation: {
     }
     yield* sql`
       UPDATE baton_runs SET
-        driver_checkpoint_json = ${encodeJson(ExecutionCheckpoint, input.checkpoint)},
+        driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
         transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
         continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1

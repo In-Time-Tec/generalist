@@ -39,6 +39,15 @@ import type { RunRow } from "../rows.js"
 import { makeEventHub } from "../subscribers.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
 import {
+  admitMessage,
+  deliverPendingMessages,
+  directory,
+  listRelated,
+  pendingMessages,
+  registerAgentName,
+  resolveAddress,
+} from "../store-directory.js"
+import {
   SchemaChecksumMismatch,
   SchemaDirty,
   SchemaMigrationFailed,
@@ -137,10 +146,16 @@ export const makeMysqlServices = (
       effect: Effect.Effect<A, E, SqlClient.SqlClient>,
     ) => run(lockRun(input.runId).pipe(Effect.andThen(requireExecutionClaim(input)), Effect.andThen(effect)))
     const lockNamed = <A, E>(key: string, effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      sql`INSERT IGNORE INTO baton_runtime_locks (lock_key) VALUES (${key})`.pipe(
-        Effect.andThen(sql`SELECT lock_key FROM baton_runtime_locks WHERE lock_key = ${key} FOR UPDATE`),
-        Effect.andThen(effect),
-      )
+      Effect.gen(function* () {
+        // Taking the exclusive lock first keeps concurrent holders off the shared-to-exclusive
+        // upgrade that InnoDB reports as a deadlock. Only the very first holder inserts the row.
+        const held = yield* sql`SELECT lock_key FROM baton_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
+        if (held.length === 0) {
+          yield* sql`INSERT IGNORE INTO baton_runtime_locks (lock_key) VALUES (${key})`
+          yield* sql`SELECT lock_key FROM baton_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
+        }
+        return yield* effect
+      })
     const suspend = (input: Parameters<RunStoreInterface["suspend"]>[0]) =>
       Effect.gen(function* () {
         const loaded = yield* loadRun(input.runId)
@@ -300,6 +315,13 @@ export const makeMysqlServices = (
         ),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
       readSteering: (input) => fenced(input, readSteering(input)),
+      directory: (runId) => runNoTxn(directory(runId)),
+      resolveAddress: (address) => runNoTxn(resolveAddress(address)),
+      registerAgentName: (input) => run(lockRun(input.runId).pipe(Effect.andThen(registerAgentName(input)))),
+      listRelated: (runId) => runNoTxn(listRelated(runId)),
+      admitMessage: (input) => run(lockNamed(`baton:mailbox:${input.targetSessionId}`, admitMessage(input))),
+      pendingMessages: (input) => runNoTxn(pendingMessages(input)),
+      deliverPendingMessages: (input) => run(lockRun(input.runId).pipe(Effect.andThen(deliverPendingMessages(input)))),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {

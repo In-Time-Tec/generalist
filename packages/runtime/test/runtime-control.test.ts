@@ -23,8 +23,8 @@ const admitWaitWithClaimedChild = (waitId: string) =>
     yield* store.claimExecution({ runId: child.runId, ownerId: "child" })
     yield* store.suspend({
       ...(yield* store.claimExecution({ runId: parent.runId, ownerId: "parent" })),
-      wait: openWait(waitId, "signal"),
-      suspension: suspension(waitId),
+      wait: openWait({ waitId: waitId, reason: "signal" }),
+      suspension: suspension({ waitId: waitId }),
     })
     return { runtime, store, runId: parent.runId }
   })
@@ -70,8 +70,8 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
       yield* driver.suspend({
         ...(yield* driver.claimExecution({ runId: receipt.runId, ownerId: "test" })),
         runId: receipt.runId,
-        wait: openWait("wait:1"),
-        suspension: suspension("wait:1"),
+        wait: openWait({ waitId: "wait:1" }),
+        suspension: suspension({ waitId: "wait:1" }),
       })
       yield* runtime.respond({
         runId: receipt.runId,
@@ -124,7 +124,7 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
       yield* store.suspend({
         ...claim,
         suspension: {
-          ...suspension("approval:delete-draft", "approval"),
+          ...suspension({ waitId: "approval:delete-draft", reason: "approval" }),
           tool_call_id: call.id,
           tool_name: call.name,
           tool_params: call.params,

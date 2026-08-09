@@ -19,6 +19,12 @@ const readWorkflow = (name: string) =>
     return yield* fileSystem.readFileString(path.resolve(".", `.github/workflows/${name}`))
   })
 
+const workspacePackages = Effect.gen(function* () {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  return (yield* fileSystem.readDirectory(path.resolve(".", "packages"))).toSorted()
+})
+
 layer(bunLayer)("release workflows", (it) => {
   it.effect("requires the behavioral test suite in continuous integration", () =>
     Effect.gen(function* () {
@@ -31,6 +37,7 @@ layer(bunLayer)("release workflows", (it) => {
   it.effect("keeps release recovery immutable, authenticated, and least-privileged", () =>
     Effect.gen(function* () {
       const source = yield* readWorkflow("publish.yml")
+      const packageNames = yield* workspacePackages
       const workflow = Bun.YAML.parse(source) as any
       expect(workflow.on.workflow_dispatch.inputs).toEqual({
         tag: expect.objectContaining({ required: true, type: "string" }),
@@ -69,20 +76,17 @@ layer(bunLayer)("release workflows", (it) => {
       expect(source).toContain('curl --fail --silent --show-error "https://registry.npmjs.org/${1/\\//%2f}/$2"')
       expect(source).not.toContain('npm view "$package@$VERSION"')
       expect(source.match(/'\.packages\[\] \| \.name'/g)).toHaveLength(2)
-      expect(source.match(/\(\.packages \| length\) == 11/g)).toHaveLength(2)
-      for (const packageName of [
-        "a2a",
-        "ag-ui",
-        "core",
-        "foldkit",
-        "mcp",
-        "memory",
-        "providers",
-        "runtime",
-        "skills",
-        "test",
-        "transport",
-      ]) {
+      expect(source.match(new RegExp(`\\(\\.packages \\| length\\) == ${packageNames.length}`, "g"))).toHaveLength(2)
+      expect(source.match(/\(\.packages \| length\) == \d+/g)).toHaveLength(2)
+      expect(source.match(/printf '@batonfx\/%s\\n' (.+)\)/g)).toHaveLength(2)
+      for (const roster of source.matchAll(/printf '@batonfx\/%s\\n' (.+?)\)/g)) {
+        expect(roster[1]!.trim().split(/\s+/)).toEqual(packageNames)
+      }
+      for (const manifests of source.matchAll(/for manifest in package\.json packages\/\{(.+?)\}/g)) {
+        expect(manifests[1]!.split(",")).toEqual(packageNames)
+      }
+      expect(source.match(/for manifest in package\.json packages\/\{/g)).toHaveLength(1)
+      for (const packageName of packageNames) {
         expect(source).toContain(`batonfx-${packageName}-\${VERSION}.tgz`)
       }
       expect(source).not.toMatch(/bun publish|Rewrite package manifests/)

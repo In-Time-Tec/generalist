@@ -92,8 +92,8 @@ const blockRootOnChild = (sessionId: string, invocationId: string) =>
     yield* store.suspend({
       ...(yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })),
       runId: root.runId,
-      wait: openWait(invocationId),
-      suspension: suspension(invocationId),
+      wait: openWait({ waitId: invocationId }),
+      suspension: suspension({ waitId: invocationId }),
     })
     return { runtime, store, root, child, childClaim }
   })
@@ -412,8 +412,8 @@ layer(memoryLayer)("RunTree", (it) => {
       yield* store.suspend({
         ...(yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })),
         runId: root.runId,
-        wait: openWait("approval:root", "approval"),
-        suspension: suspension("approval:root", "approval"),
+        wait: openWait({ waitId: "approval:root", reason: "approval" }),
+        suspension: suspension({ waitId: "approval:root", reason: "approval" }),
       })
       const watched = Array.from(yield* Fiber.join(yield* watchBlocked(root.runId)))
       expect(watched.some(({ runId, event }) => runId === root.runId && event._tag === "RunWaiting")).toBe(true)
@@ -427,8 +427,8 @@ layer(memoryLayer)("RunTree", (it) => {
       yield* store.suspend({
         ...childClaim,
         runId: child.runId,
-        wait: openWait("approval:child", "approval"),
-        suspension: suspension("approval:child", "approval"),
+        wait: openWait({ waitId: "approval:child", reason: "approval" }),
+        suspension: suspension({ waitId: "approval:child", reason: "approval" }),
       })
       const watched = Array.from(yield* Fiber.join(yield* watchBlocked(root.runId)))
       expect(watched.some(({ runId, event }) => runId === child.runId && event._tag === "RunWaiting")).toBe(true)
@@ -511,8 +511,8 @@ layer(memoryLayer)("RunTree", (it) => {
       yield* store.suspend({
         ...(yield* store.claimExecution({ runId: root.runId, ownerId: "root-worker" })),
         runId: root.runId,
-        wait: openWait("gate", "external"),
-        suspension: suspension("gate"),
+        wait: openWait({ waitId: "gate", reason: "external" }),
+        suspension: suspension({ waitId: "gate" }),
       })
       const blocked = yield* RunTree.inspect(root.runId)
       expect(blocked._tag).toBe("Active")
@@ -548,10 +548,10 @@ layer(memoryLayer)("RunTree", (it) => {
         { events: [second], cursor: late, hasMore: false },
       ]
       const inspections: ReadonlyArray<RunTree.Inspection> = [
-        inspectionWith({ ...openWait("gate", "external"), status: "responded" }, early),
+        inspectionWith({ ...openWait({ waitId: "gate", reason: "external" }), status: "responded" }, early),
         inspectionWith(undefined, early),
-        inspectionWith(openWait("gate", "external"), late),
-        inspectionWith(openWait("gate", "external"), late),
+        inspectionWith(openWait({ waitId: "gate", reason: "external" }), late),
+        inspectionWith(openWait({ waitId: "gate", reason: "external" }), late),
       ]
       const reads = yield* Ref.make(0)
       const inspects = yield* Ref.make(0)

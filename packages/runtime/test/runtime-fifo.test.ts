@@ -52,8 +52,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
       yield* driver.suspend({
         ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
         runId: first.runId,
-        wait: openWait("approval:1", "approval"),
-        suspension: suspension("approval:1", "approval"),
+        wait: openWait({ waitId: "approval:1", reason: "approval" }),
+        suspension: suspension({ waitId: "approval:1", reason: "approval" }),
       })
       expect((yield* runtime.inspect(first.runId)).status).toBe("waiting")
       expect((yield* runtime.inspect(second.runId)).status).toBe("queued")
@@ -123,8 +123,8 @@ layer(memoryLayer)("Runtime FIFO lanes", (it) => {
       yield* driver.suspend({
         ...(yield* driver.claimExecution({ runId: first.runId, ownerId: "test" })),
         runId: first.runId,
-        wait: openWait("timer:1", "timer"),
-        suspension: suspension("timer:1"),
+        wait: openWait({ waitId: "timer:1", reason: "timer" }),
+        suspension: suspension({ waitId: "timer:1" }),
       })
       const follower = yield* runtime
         .events({ runId: first.runId })

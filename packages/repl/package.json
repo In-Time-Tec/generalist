@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@batonfx/repl",
+  "version": "0.20.0",
+  "private": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./bun": {
+      "types": "./dist/repl/bun.d.ts",
+      "import": "./dist/repl/bun.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
+    "lint": "bun --cwd ../.. oxlint packages/repl/src packages/repl/test",
+    "test": "bun --cwd ../.. vitest run packages/repl/test",
+    "typecheck": "bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@batonfx/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-bun": "catalog:",
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "description": "Persistent TypeScript cell kernel contracts and Bun kernel for Baton agents",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/In-Time-Tec/batonfx.git",
+    "directory": "packages/repl"
+  },
+  "homepage": "https://github.com/In-Time-Tec/batonfx#readme",
+  "bugs": {
+    "url": "https://github.com/In-Time-Tec/batonfx/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,4 +1,5 @@
 import { ExecutableResolver, Runtime } from "../src/index.js"
+import type { MessagingOverrides } from "./messaging-helpers.js"
 import {
   analyst,
   analystRef,
@@ -19,17 +20,26 @@ export const tempDbPath = (label = "baton-runtime"): string => {
   return `${dir}/runtime.sqlite`
 }
 
-export const sqliteLayer = (filename: string) =>
-  Runtime.layerSqlite({
-    filename,
-    resolver: ExecutableResolver.makeStatic([
-      { executable: assistantRef, agent: closedTestAgent(assistant) },
-      { executable: researcherRef, agent: closedTestAgent(researcher) },
-      { executable: analystRef, agent: closedTestAgent(analyst) },
-    ]),
-    addresses: [
-      { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
-      { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
-    ],
-    subscriberQueueCapacity: 8,
-  })
+const options = {
+  resolver: ExecutableResolver.makeStatic([
+    { executable: assistantRef, agent: closedTestAgent(assistant) },
+    { executable: researcherRef, agent: closedTestAgent(researcher) },
+    { executable: analystRef, agent: closedTestAgent(analyst) },
+  ]),
+  addresses: [
+    { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+    { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
+  ],
+  subscriberQueueCapacity: 8,
+} satisfies Omit<Runtime.SqliteStoreOptions, "filename">
+
+export const sqliteLayer = (filename: string) => Runtime.layerSqlite({ filename, ...options })
+
+/**
+ * A SQLite Runtime whose mailbox bounds and messaging policy the test chooses.
+ *
+ * Bounds and policy are Runtime construction options, so each variant is its own Runtime over its
+ * own database file rather than a mutation of a shared one.
+ */
+export const sqliteMessagingLayer = (label: string) => (overrides: MessagingOverrides) =>
+  Runtime.layerSqlite({ filename: tempDbPath(label), ...options, ...overrides })

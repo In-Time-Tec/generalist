@@ -9,9 +9,11 @@
         "@batonfx/ag-ui": "workspace:*",
         "@batonfx/core": "workspace:*",
         "@batonfx/foldkit": "workspace:*",
+        "@batonfx/harness": "workspace:*",
         "@batonfx/mcp": "workspace:*",
         "@batonfx/memory": "workspace:*",
         "@batonfx/providers": "workspace:*",
+        "@batonfx/repl": "workspace:*",
         "@batonfx/runtime": "workspace:*",
         "@batonfx/skills": "workspace:*",
         "@batonfx/test": "workspace:*",
@@ -199,6 +201,7 @@
       "dependencies": {
         "@batonfx/core": "workspace:*",
         "@batonfx/foldkit": "workspace:*",
+        "@batonfx/harness": "workspace:*",
         "@batonfx/mcp": "workspace:*",
         "@batonfx/memory": "workspace:*",
         "@batonfx/providers": "workspace:*",
@@ -238,7 +241,7 @@
     },
     "packages/a2a": {
       "name": "@batonfx/a2a",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@a2a-js/sdk": "catalog:",
         "@batonfx/runtime": "workspace:*",
@@ -256,7 +259,7 @@
     },
     "packages/ag-ui": {
       "name": "@batonfx/ag-ui",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@ag-ui/core": "catalog:",
         "@batonfx/runtime": "workspace:*",
@@ -274,7 +277,7 @@
     },
     "packages/core": {
       "name": "@batonfx/core",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "devDependencies": {
         "@effect/vitest": "catalog:",
         "@types/bun": "catalog:",
@@ -288,7 +291,7 @@
     },
     "packages/foldkit": {
       "name": "@batonfx/foldkit",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@batonfx/runtime": "workspace:*",
         "@batonfx/transport": "workspace:*",
@@ -306,9 +309,27 @@
         "foldkit": "catalog:peer",
       },
     },
+    "packages/harness": {
+      "name": "@batonfx/harness",
+      "version": "0.20.0",
+      "dependencies": {
+        "@batonfx/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@effect/platform-bun": "catalog:",
+        "@effect/vitest": "catalog:",
+        "@types/bun": "catalog:",
+        "effect": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
     "packages/mcp": {
       "name": "@batonfx/mcp",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@batonfx/core": "workspace:*",
         "@modelcontextprotocol/sdk": "catalog:",
@@ -327,7 +348,7 @@
     },
     "packages/memory": {
       "name": "@batonfx/memory",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@batonfx/core": "workspace:*",
       },
@@ -344,7 +365,7 @@
     },
     "packages/providers": {
       "name": "@batonfx/providers",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@aws-sdk/client-bedrock-runtime": "catalog:",
         "@aws-sdk/credential-provider-node": "catalog:",
@@ -366,9 +387,27 @@
         "effect": "catalog:",
       },
     },
+    "packages/repl": {
+      "name": "@batonfx/repl",
+      "version": "0.20.0",
+      "dependencies": {
+        "@batonfx/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@effect/platform-bun": "catalog:",
+        "@effect/vitest": "catalog:",
+        "@types/bun": "catalog:",
+        "effect": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
     "packages/runtime": {
       "name": "@batonfx/runtime",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@batonfx/core": "workspace:*",
         "@effect/sql-mysql2": "catalog:",
@@ -389,7 +428,7 @@
     },
     "packages/skills": {
       "name": "@batonfx/skills",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@batonfx/core": "workspace:*",
       },
@@ -406,7 +445,7 @@
     },
     "packages/test": {
       "name": "@batonfx/test",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@batonfx/core": "workspace:*",
       },
@@ -423,7 +462,7 @@
     },
     "packages/transport": {
       "name": "@batonfx/transport",
-      "version": "0.19.2",
+      "version": "0.20.0",
       "dependencies": {
         "@batonfx/runtime": "workspace:*",
       },
@@ -609,11 +648,15 @@
 
     "@batonfx/foldkit": ["@batonfx/foldkit@workspace:packages/foldkit"],
 
+    "@batonfx/harness": ["@batonfx/harness@workspace:packages/harness"],
+
     "@batonfx/mcp": ["@batonfx/mcp@workspace:packages/mcp"],
 
     "@batonfx/memory": ["@batonfx/memory@workspace:packages/memory"],
 
     "@batonfx/providers": ["@batonfx/providers@workspace:packages/providers"],
+
+    "@batonfx/repl": ["@batonfx/repl@workspace:packages/repl"],
 
     "@batonfx/runtime": ["@batonfx/runtime@workspace:packages/runtime"],
 

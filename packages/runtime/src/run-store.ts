@@ -26,8 +26,14 @@ import type {
   ExecutableRegistrationConflict,
   StartInvalid,
   FanOutRemainderUnsupported,
+  AgentNameConflict,
+  MailboxFull,
+  MailboxRateLimited,
+  MessageConflict,
 } from "./errors.js"
-import type { Message } from "./message.js"
+import type { Message, Metadata } from "./message.js"
+import type { AddressInvalid, AgentName, DirectoryEntry } from "./agent-directory.js"
+import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./mailbox.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunWait, WaitResolution } from "./run-wait.js"
 import type { AgentLoopEvent } from "./agent-event.js"
@@ -123,6 +129,33 @@ export interface RecordOperationInput extends ExecutionClaim {
   readonly steeringEntryIds?: ReadonlyArray<string>
   readonly steeringEvents?: ReadonlyArray<AgentLoopEvent>
 }
+
+/** @experimental Exact durable mailbox admission derived from authoritative sender identity. */
+export interface AdmitMessageInput {
+  readonly fromRunId: string
+  readonly fromAddress: Address
+  readonly to: Address
+  readonly targetSessionId: string
+  readonly messageId: string
+  readonly idempotencyKey: string
+  readonly digest: string
+  readonly bytes: number
+  readonly prompt: Prompt.Prompt
+  readonly correlationId: string
+  readonly causationId?: string
+  readonly inReplyTo?: string
+  readonly metadata: Metadata
+  readonly bounds: MailboxBounds
+}
+
+/** @experimental */
+export type AdmitMessageError = MailboxFull | MailboxRateLimited | MessageConflict | RunNotFound | RuntimeUnavailable
+
+/** @experimental */
+export type DirectoryLookupError = RunNotFound | RuntimeUnavailable
+
+/** @experimental */
+export type ResolveAddressError = AddressNotFound | AddressInvalid | RuntimeUnavailable
 
 export interface AdmitSteeringInput {
   readonly runId: string
@@ -254,6 +287,39 @@ export interface Interface {
     input: AdmitSteeringInput,
   ) => Effect.Effect<void, RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable>
   readonly readSteering: (input: ExecutionClaim) => Effect.Effect<ReadonlyArray<SteeringEntry>, WorkerMutationError>
+  /**
+   * @experimental The authoritative directory record for one Run.
+   *
+   * Identity, parentage, and session membership are read from the durable Run record. Nothing is
+   * derived by parsing an Address or a Run id.
+   */
+  readonly directory: (runId: string) => Effect.Effect<DirectoryEntry, DirectoryLookupError>
+  readonly resolveAddress: (address: Address) => Effect.Effect<DirectoryEntry, ResolveAddressError>
+  /** @experimental Bind one host-assigned name, unique inside the naming scope that owns the Run. */
+  readonly registerAgentName: (input: {
+    readonly runId: string
+    readonly name: AgentName
+  }) => Effect.Effect<DirectoryEntry, RunNotFound | AgentNameConflict | RuntimeUnavailable>
+  /** @experimental Parent, direct children, and siblings under one parent, from durable links only. */
+  readonly listRelated: (runId: string) => Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryLookupError>
+  /**
+   * @experimental Admit one message into a target's durable inbox.
+   *
+   * Admission is idempotent on (target, messageId, idempotencyKey) and rejects a divergent payload
+   * under the same identity. An entry admitted while the target Run is live is bound to that Run's
+   * steering inbox, which the agent loop drains only at a turn boundary; otherwise it stays pending
+   * for the target's next Run.
+   */
+  readonly admitMessage: (input: AdmitMessageInput) => Effect.Effect<MessageReceipt, AdmitMessageError>
+  /** @experimental Messages admitted for one session that no Run has taken yet. */
+  readonly pendingMessages: (input: {
+    readonly sessionId: string
+    readonly limit: number
+  }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RuntimeUnavailable>
+  /** @experimental Bind every pending message for a Run's session to that Run's steering inbox. */
+  readonly deliverPendingMessages: (input: {
+    readonly runId: string
+  }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RunNotFound | RuntimeUnavailable>
   readonly inspect: (runId: string) => Effect.Effect<RunInspection, RunNotFound | RuntimeUnavailable>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, RunNotFound | RuntimeUnavailable>
   readonly inspectTree: (
@@ -326,7 +392,7 @@ export interface Interface {
       readonly runId: string
       readonly operationId: string
       readonly outcome: OperationCompletionOutcome
-      readonly checkpoint: ExecutionCheckpoint
+      readonly checkpoint?: ExecutionCheckpoint
       readonly transcript?: Prompt.Prompt
       readonly continuation?: ExecutionContinuation | null
       readonly steeringEntryIds?: ReadonlyArray<string>

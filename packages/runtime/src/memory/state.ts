@@ -16,6 +16,7 @@ import type { TreeEvent } from "../tree.js"
 import type { ProgramOperationRecord, ProgramRunState } from "../program-store.js"
 import type { ExecutableRegistration } from "../executable-registration.js"
 import type { PendingRunOutcome } from "../run-store.js"
+import type { MailboxEntry } from "../mailbox.js"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -70,6 +71,7 @@ export interface MemoryState {
   readonly nextSubscriberId: number
   readonly nextOperationCounter: number
   readonly nextSteeringCounter: number
+  readonly nextMessageCounter: number
   readonly runs: ReadonlyMap<string, StoredRun>
   readonly treeRoots: ReadonlyMap<string, TreeRoot>
   readonly lanes: ReadonlyMap<string, Lane>
@@ -80,6 +82,8 @@ export interface MemoryState {
   readonly programStates: ReadonlyMap<string, ProgramRunState>
   readonly programOperations: ReadonlyMap<string, ProgramOperationRecord>
   readonly addressBindings: ReadonlyMap<string, { readonly ref: ExecutableRef; readonly manifest: ExecutableManifest }>
+  readonly messages: ReadonlyMap<string, MailboxEntry>
+  readonly agentNames: ReadonlyMap<string, string>
   readonly subscriberQueueCapacity: number
 }
 
@@ -121,6 +125,7 @@ export const emptyState = (input: {
   nextSubscriberId: 1,
   nextOperationCounter: 1,
   nextSteeringCounter: 1,
+  nextMessageCounter: 1,
   runs: new Map(),
   treeRoots: new Map(),
   lanes: new Map(),
@@ -131,6 +136,8 @@ export const emptyState = (input: {
   programStates: new Map(),
   programOperations: new Map(),
   addressBindings: input.addressBindings,
+  messages: new Map(),
+  agentNames: new Map(),
   subscriberQueueCapacity: input.subscriberQueueCapacity,
 })
 
@@ -138,6 +145,11 @@ export const operationMapKey: {
   (operationId: string): (runId: string) => string
   (runId: string, operationId: string): string
 } = Function.dual(2, (runId: string, operationId: string): string => `${runId}\0${operationId}`)
+
+export const agentNameKey: {
+  (name: string): (scope: string) => string
+  (scope: string, name: string): string
+} = Function.dual(2, (scope: string, name: string): string => `${scope}\0${name}`)
 
 export const operationKeyMapKey: {
   (operationKey: string): (runId: string) => string

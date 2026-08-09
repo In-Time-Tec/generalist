@@ -52,7 +52,8 @@ Inline runs interpret operations immediately through existing Effect services. T
 
 Runtime hosts journal `DriverOperation` records and reconstruct `layerForRun` from the last fenced checkpoint. Core restores instrumentation's next model-call ordinal from that checkpoint's durable loop state, so model call and attempt IDs remain stable across restart and replay without an ExecutionHost-specific override. The journal also receives checkpoint-only budget mutations so every safe boundary is persisted. Durable persistence, Agent event projection, waits, same-Run resume, and worker orchestration live in `@batonfx/runtime`, not core.
 
+`send` is intercepted by `@batonfx/runtime`'s addressed messaging (`Messaging.make`) rather than by the core loop: one send from inside an execution is scheduled as a `send` operation with `never` replay policy, so a crash between the journal record and the mailbox insert settles as `Unknown` for explicit resolution instead of duplicating or losing a delivered message. A replayed success returns the recorded receipt without crossing the boundary again. See `docs/features/addressed-messaging.md`.
+
 ## Not yet intercepted
 
-- **`send`** — addressed messaging is not wired.
 - **Isolated `Handoff.register` / `fanOut` children** — still run without the parent interpreter; tree budget reservation for nested runs applies to inline `AgentTool` / `delegateTool` children only.

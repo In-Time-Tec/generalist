@@ -38,6 +38,11 @@ type Registrations = ReadonlyArray<ExecutableRegistration>
 import { validate as validateRegistrations } from "../executable-registration.js"
 import { LocalScheduler, layer as localSchedulerLayer } from "../local-scheduler.js"
 import { childSessionId, fanOutMemberSessionId } from "../child-session.js"
+import { runAddress } from "../agent-directory.js"
+import { authorize, makePolicy, reachable } from "../messaging.js"
+import { defaultBounds, digest as messageDigest, promptBytes } from "../mailbox.js"
+import { RunTerminal } from "../errors.js"
+import { isTerminal } from "../run.js"
 
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 
@@ -69,6 +74,8 @@ export const makeRuntime = (
   Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
+    const policy = makePolicy(options.messagingPolicy ?? {})
+    const bounds = { ...defaultBounds, ...options.mailboxBounds }
     const addresses = new Map<
       string,
       { readonly executable: PinnedExecutable; readonly registrations: Registrations }
@@ -352,6 +359,49 @@ export const makeRuntime = (
         const prompt = normalizePrompt(input.prompt)
         return store.admitSteering({ ...input, prompt, digest: steeringDigest(prompt) })
       },
+      sendMessage: (input) =>
+        Effect.gen(function* () {
+          const sender = yield* store.directory(input.fromRunId)
+          const target = yield* store.resolveAddress(input.to)
+          yield* authorize({ sender, target, policy })
+          if (isTerminal(target.status)) {
+            return yield* RunTerminal.make({ runId: target.runId, status: target.status })
+          }
+          const prompt = normalizePrompt(input.prompt)
+          const correlationId = input.correlationId ?? input.idempotencyKey
+          const metadata = input.metadata ?? {}
+          return yield* store.admitMessage({
+            fromRunId: sender.runId,
+            fromAddress: runAddress(sender.runId),
+            to: input.to,
+            targetSessionId: target.sessionId,
+            messageId: input.messageId ?? nextMessageId("msg", input.idempotencyKey),
+            idempotencyKey: input.idempotencyKey,
+            digest: messageDigest({
+              to: input.to,
+              from: runAddress(sender.runId),
+              prompt,
+              correlationId,
+              metadata,
+              ...(input.causationId === undefined ? {} : { causationId: input.causationId }),
+              ...(input.inReplyTo === undefined ? {} : { inReplyTo: input.inReplyTo }),
+            }),
+            bytes: promptBytes(prompt),
+            prompt,
+            correlationId,
+            metadata,
+            bounds,
+            ...(input.causationId === undefined ? {} : { causationId: input.causationId }),
+            ...(input.inReplyTo === undefined ? {} : { inReplyTo: input.inReplyTo }),
+          })
+        }),
+      messages: (input) =>
+        Effect.gen(function* () {
+          const entry = yield* store.directory(input.runId)
+          return yield* store.pendingMessages({ sessionId: entry.sessionId, limit: input.limit })
+        }),
+      directory: (runId) => reachable({ store, policy, runId }),
+      registerAgentName: (input) => store.registerAgentName(input),
       resolveOperation: (input) => store.resolveOperation(input),
       inspect: (runId) => store.inspect(runId),
       fanOut: (input) =>

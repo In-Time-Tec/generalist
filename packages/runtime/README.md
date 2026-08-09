@@ -52,6 +52,24 @@ Join modes are `AllSuccess`, `AllSettled`, `FirstSuccess`, `Quorum`, and `BestEf
 
 For model-authored work, `ChildRuns.tool` keeps `run_child` blocking for one dependent child. `ChildRuns.startGroupTool` returns ordered durable receipts without blocking, and `ChildRuns.awaitGroupTool` later joins that group through one durable parent suspension. `ChildRuns.makeTools` narrows model-facing selections from declared child authority.
 
+## Testing against PostgreSQL and MySQL
+
+The PostgreSQL and MySQL suites run against a real server and are skipped when no URL is configured. Start both servers, export their URLs, and run the suite:
+
+```sh
+docker compose -f packages/runtime/test/docker-compose.yml up -d --wait
+export BATON_DATABASE_URL=postgres://baton:baton@127.0.0.1:55432/baton
+export BATON_MYSQL_URL=mysql://baton:baton@127.0.0.1:33306/baton
+bun --bun vitest run packages/runtime/test
+docker compose -f packages/runtime/test/docker-compose.yml down -v
+```
+
+`BATON_DATABASE_URL` (or `DATABASE_URL`) selects the PostgreSQL server and `BATON_MYSQL_URL` (or `MYSQL_URL`) selects the MySQL server. Each test file provisions its own PostgreSQL schema or MySQL database from that server, so files never share tables and the suite is safe under Vitest file parallelism.
+
+Nested durable operations, non-blocking child admission, and stranded-message recovery are one suite each, instantiated per backend: `nested-operations.test.ts`, `child-admission.test.ts`, and `messaging-stranded-delivery.test.ts` cover memory and SQLite, and `postgres/runtime-parity.test.ts` and `mysql/runtime-parity.test.ts` run the same cases against real servers. The memory and SQLite Runtimes bundle a `LocalScheduler` that promotes a queued Run itself, so a store-level claim succeeds immediately. The PostgreSQL and MySQL Runtimes expect an external worker, so those suites claim ready work through `RunClaims` before acting on a Run.
+
+Addressed messaging follows the same shape across all four backends. Mailbox admission and bounds, authorization and directory scope, cross-session host policy, delivery idempotence, and the durable `send` operation are one suite each (`messaging-*-suite.ts`), instantiated for memory and SQLite by `messaging-*.test.ts` and for real servers by `postgres/messaging-parity.test.ts` and `mysql/messaging-parity.test.ts`. Mailbox bounds and messaging policy are Runtime construction options, so each backend supplies a Layer factory rather than a Layer and every bound or policy is its own Runtime. Mailbox durability across a close and reopen applies only to the durable backends, so that suite takes a store Layer directly.
+
 ## Errors, requirements, and resources
 
 Programs require `Runtime.Runtime`; host integration may use `RunStore.RunStore` for fenced execution and operation recording. Boundary failures are schema-backed (`AddressNotFound`, `ExecutableRegistrationInvalid`, `ExecutableRegistrationMissing`, `ExecutableRegistrationConflict`, `ChildSelectionMissing`, `IdempotencyConflict`, `SteeringConflict`, `RunIdConflict`, `RunNotFound`, `CursorExpired`, `SubscriberLagged`, `SchemaDirty`, `SchemaChecksumMismatch`, `SchemaVersionUnsupported`, `SchemaUpgradeRequired`, `StaleClaim`, `MultiWorkerUnsupported`, and related tags).

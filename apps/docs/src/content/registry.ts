@@ -33,9 +33,11 @@ import { coreToolsReference } from "../pages/reference/core-tools"
 import { a2aReference } from "../pages/reference/a2a"
 import { agUiReference } from "../pages/reference/ag-ui"
 import { foldkitReference } from "../pages/reference/foldkit"
+import { harnessReference } from "../pages/reference/harness"
 import { mcpReference } from "../pages/reference/mcp"
 import { memoryReference } from "../pages/reference/memory"
 import { providersReference } from "../pages/reference/providers"
+import { replReference } from "../pages/reference/repl"
 import { runtimeReference } from "../pages/reference/runtime"
 import { skillsReference } from "../pages/reference/skills"
 import { testReference } from "../pages/reference/test"
@@ -93,6 +95,8 @@ export const allPages: ReadonlyArray<DocsPage> = [
   skillsReference,
   testReference,
   memoryReference,
+  replReference,
+  harnessReference,
   transportReference,
   foldkitReference,
   versioningReference,

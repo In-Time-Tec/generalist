@@ -8,6 +8,7 @@
   "dependencies": {
     "@batonfx/core": "workspace:*",
     "@batonfx/foldkit": "workspace:*",
+    "@batonfx/harness": "workspace:*",
     "@batonfx/mcp": "workspace:*",
     "@batonfx/memory": "workspace:*",
     "@batonfx/providers": "workspace:*",

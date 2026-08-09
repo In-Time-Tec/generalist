@@ -26,10 +26,10 @@ layer(memoryLayer)("Runtime inspection contracts", (it) => {
       yield* store.suspend({
         ...(yield* store.claimExecution({ runId: receipt.runId, ownerId: "test" })),
         runId: receipt.runId,
-        wait: openWait("wait:inspection"),
-        suspension: suspension("wait:inspection"),
+        wait: openWait({ waitId: "wait:inspection" }),
+        suspension: suspension({ waitId: "wait:inspection" }),
       })
-      expect((yield* runtime.inspect(receipt.runId)).wait).toEqual(openWait("wait:inspection"))
+      expect((yield* runtime.inspect(receipt.runId)).wait).toEqual(openWait({ waitId: "wait:inspection" }))
       yield* runtime.respond({
         runId: receipt.runId,
         waitId: "wait:inspection",

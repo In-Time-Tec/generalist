@@ -171,6 +171,10 @@ const makeRuntime = (acceptedSequence = 0) => {
     },
     signal: () => Effect.void,
     steer: () => Effect.void,
+    sendMessage: () => Effect.die("not used"),
+    messages: () => Effect.die("not used"),
+    directory: () => Effect.die("not used"),
+    registerAgentName: () => Effect.die("not used"),
     resolveOperation: () => Effect.die("not used"),
     cancel: ({ runId, reason }) => {
       const run = runs.get(runId)!

@@ -18,6 +18,37 @@ jobs:
   check:
     name: check
     runs-on: blacksmith-2vcpu-ubuntu-2404
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: baton
+          POSTGRES_PASSWORD: baton
+          POSTGRES_DB: baton
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U baton -d baton"
+          --health-interval 1s
+          --health-timeout 3s
+          --health-retries 60
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: baton
+          MYSQL_DATABASE: baton
+          MYSQL_USER: baton
+          MYSQL_PASSWORD: baton
+        ports:
+          - 33306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ubaton -pbaton"
+          --health-interval 1s
+          --health-timeout 3s
+          --health-retries 60
+    env:
+      BATON_DATABASE_URL: postgres://baton:baton@127.0.0.1:55432/baton
+      BATON_MYSQL_URL: mysql://baton:baton@127.0.0.1:33306/baton
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -51,6 +82,9 @@ jobs:
 
       - name: Check
         run: bun run check
+
+      - name: Grant MySQL test databases
+        run: mysql -h 127.0.0.1 -P 33306 -uroot -pbaton -e "GRANT ALL PRIVILEGES ON \`baton\_%\`.* TO 'baton'@'%'; FLUSH PRIVILEGES;"
 
       - name: Test
         run: bun run test

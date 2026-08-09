@@ -183,3 +183,34 @@ export class FanOutRemainderUnsupported extends Schema.TaggedErrorClass<FanOutRe
   "@batonfx/runtime/FanOutRemainderUnsupported",
   { remainder: Schema.Literal("terminate"), durability: Schema.Literals(["ephemeral", "durable"]) },
 ) {}
+
+export class MessagingUnauthorized extends Schema.TaggedErrorClass<MessagingUnauthorized>()(
+  "@batonfx/runtime/MessagingUnauthorized",
+  {
+    from: Address,
+    to: Address,
+    reason: Schema.Literals(["unrelated", "cross-session", "policy"]),
+  },
+) {}
+
+export class MailboxFull extends Schema.TaggedErrorClass<MailboxFull>()("@batonfx/runtime/MailboxFull", {
+  to: Address,
+  dimension: Schema.Literals(["pending", "bytes"]),
+  limit: Schema.Int,
+}) {}
+
+export class MailboxRateLimited extends Schema.TaggedErrorClass<MailboxRateLimited>()(
+  "@batonfx/runtime/MailboxRateLimited",
+  { to: Address, limit: Schema.Int, windowMillis: Schema.Int },
+) {}
+
+export class MessageConflict extends Schema.TaggedErrorClass<MessageConflict>()("@batonfx/runtime/MessageConflict", {
+  to: Address,
+  messageId: Schema.String,
+  idempotencyKey: Schema.String,
+}) {}
+
+export class AgentNameConflict extends Schema.TaggedErrorClass<AgentNameConflict>()(
+  "@batonfx/runtime/AgentNameConflict",
+  { scope: Schema.String, name: Schema.String, existingRunId: Schema.String },
+) {}

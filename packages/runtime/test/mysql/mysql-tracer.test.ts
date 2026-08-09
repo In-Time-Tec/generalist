@@ -1,19 +1,21 @@
+import { beforeAll } from "vitest"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { RunClaims, Runtime } from "../../src/index.js"
 import { assistantAddress, completedResult } from "../helpers.js"
-import { mysqlAvailable, mysqlLayer, mysqlUrl, prepareMysql, uniqueSession } from "./helpers.js"
+import { mysqlAvailable, mysqlDatabase, mysqlLayer, uniqueSession } from "./helpers.js"
 
 const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
-const url = mysqlUrl!
+const database = mysqlDatabase("tracer")
 
 describeMysql("mysql tracer", () => {
-  layer(mysqlLayer(url), { excludeTestServices: true })(
+  beforeAll(database.provisioned, 60_000)
+
+  layer(database.provision(mysqlLayer(database.url)), { excludeTestServices: true })(
     "traces admit, multi-worker claim, commit, and replay",
     (suite) => {
       suite.effect("traces admit, multi-worker claim, commit, and replay", () =>
         Effect.gen(function* () {
-          yield* prepareMysql(url)
           const runtime = yield* Runtime.Runtime
           const claims = yield* RunClaims.RunClaims
           const first = yield* runtime.send({

@@ -12,6 +12,7 @@ export const OperationKind = Schema.Literals([
   "wait",
   "structured-output",
   "log",
+  "nested",
 ])
 export type OperationKind = typeof OperationKind.Type
 
