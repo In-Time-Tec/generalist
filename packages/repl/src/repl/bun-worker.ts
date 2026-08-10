@@ -4,6 +4,7 @@ import { writeSync } from "node:fs"
 import { createRequire } from "node:module"
 import { deserialize, serialize } from "node:v8"
 import { inspect as utilInspect, types } from "node:util"
+import { actionable as actionableTextResult, type PendingHostRequest } from "./text-result.js"
 
 interface Frame {
   readonly _tag: string
@@ -80,7 +81,7 @@ let cell: CellState | undefined
 const cellScope = new AsyncLocalStorage<CellState>()
 const owningCell = (): CellState | undefined => cellScope.getStore() ?? cell
 let hostRequestSeq = 0
-const pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: unknown) => void }>()
+const pending = new Map<string, PendingHostRequest>()
 const recordedImports = new Set<string>()
 
 /**
@@ -153,7 +154,7 @@ const hostRequest = (module: string, operation: string, input: unknown): Promise
   hostRequestSeq += 1
   const requestId = `hr-${hostRequestSeq}`
   return new Promise((resolve, reject) => {
-    pending.set(requestId, { resolve, reject })
+    pending.set(requestId, { module, operation, resolve, reject })
     write({ _tag: "HostRequest", cellId: owningCell()?.cellId, requestId, module, operation, input })
   })
 }
@@ -462,7 +463,10 @@ for await (const line of commands) {
     const settler = pending.get(requestId)
     pending.delete(requestId)
     if (settler === undefined) continue
-    if (outcome._tag === "Success") settler.resolve(outcome.output)
+    if (outcome._tag === "Success")
+      settler.resolve(
+        actionableTextResult({ module: settler.module, operation: settler.operation, output: outcome.output }),
+      )
     else if (outcome._tag === "Failure") settler.reject(outcome.failure)
     else settler.reject(new Error(outcome.message ?? "the host rejected the request"))
     continue

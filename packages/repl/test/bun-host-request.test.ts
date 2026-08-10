@@ -27,6 +27,19 @@ const slowModule = (input: {
   ],
 })
 
+const textModule: HostBindingRegistry.Module = {
+  name: "workspace",
+  operations: [
+    {
+      name: "read",
+      input: Schema.Struct({ path: Schema.String }),
+      output: Schema.Struct({ text: Schema.String, truncated: Schema.Boolean }),
+      failure: SlowFailure,
+      handle: () => Effect.succeed({ text: '{"answer":42}', truncated: false }),
+    },
+  ],
+}
+
 const echoModule: HostBindingRegistry.Module = {
   name: "host",
   operations: [
@@ -139,6 +152,58 @@ layer(platform)("Bun kernel host requests", (it) => {
           })
           yield* observed.result
           expect(observed.events.at(-1)?._tag).toBe("Result")
+        }),
+    }),
+  )
+
+  it.effect("makes text-result object misuse actionable without changing access or serialization", () =>
+    withPool({
+      overrides: { modules: [textModule] },
+      use: ({ pool }) =>
+        Effect.gen(function* () {
+          const result = yield* runCell({
+            pool,
+            sessionId: "s",
+            cellId: "c1",
+            code: [
+              'const readResult = await workspace.read({ path: "data.json" })',
+              "let sliceError = ''",
+              "let parseError = ''",
+              "try { readResult.slice(0, 1) } catch (error) { sliceError = error.message }",
+              "try { JSON.parse(readResult) } catch (error) { parseError = error.message }",
+              "[sliceError, parseError, readResult.text, JSON.stringify(readResult), typeof ({ text: 'local' }).slice].join('\\n---\\n')",
+            ].join("\n"),
+          })
+          const [sliceError, parseError, text, serialized, localSlice] = result.value.split("\n---\n")
+          expect(sliceError).toBe("workspace.read returns an object; did you mean `.text`?")
+          expect(parseError).toBe("workspace.read returns an object; did you mean `.text`?")
+          expect(text).toBe('{"answer":42}')
+          expect(serialized).toBe('{"text":"{\\"answer\\":42}","truncated":false}')
+          expect(localSlice).toBe("undefined")
+        }),
+    }),
+  )
+
+  it.effect("keeps a decorated text result snapshotable", () =>
+    withPool({
+      overrides: { modules: [textModule] },
+      use: ({ pool }) =>
+        Effect.gen(function* () {
+          yield* runCell({
+            pool,
+            sessionId: "s",
+            cellId: "c1",
+            code: 'const keptRead = await workspace.read({ path: "data.json" })',
+          })
+          const restart = yield* pool.restart("s", "requested")
+          expect(restart.restoredNames).toContain("keptRead")
+          const restored = yield* runCell({
+            pool,
+            sessionId: "s",
+            cellId: "c2",
+            code: "JSON.stringify(keptRead)",
+          })
+          expect(restored.value).toBe('{"text":"{\\"answer\\":42}","truncated":false}')
         }),
     }),
   )
