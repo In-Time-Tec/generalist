@@ -109,6 +109,36 @@ export const claimExecution: {
   }),
 )
 
+export const retryExecution: {
+  (
+    input: ExecutionClaim,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<
+    readonly [ExecutionRecord, MemoryState],
+    RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim
+  >
+  (
+    state: MemoryState,
+    input: ExecutionClaim,
+  ): Effect.Effect<readonly [ExecutionRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim>
+} = Function.dual(2, (state: MemoryState, input: ExecutionClaim) =>
+  Effect.gen(function* () {
+    const run = yield* requireRun(state, input.runId)
+    if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
+    if (run.status !== "running" || run.ownerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
+      return yield* StaleClaim.make({
+        runId: input.runId,
+        workerId: input.ownerId,
+        attemptFence: input.attemptFence,
+      })
+    }
+    const nextAttempt = run.attempt + 1
+    const [_, next] = yield* appendLifecycle(state, run.runId, makeAttemptStarted(nextAttempt), "running")
+    return [executionRecord(next.runs.get(run.runId)!), next] as const
+  }),
+)
+
 export const saveExecution: {
   (
     input: ExecutionClaim & {

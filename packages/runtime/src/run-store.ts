@@ -440,6 +440,7 @@ export interface Interface {
       readonly transcript?: import("effect/unstable/ai").Prompt.Prompt
     },
   ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | import("./sql/errors.js").StaleClaim>
+  readonly retryExecution: (input: ExecutionClaim) => Effect.Effect<ExecutionRecord, WorkerMutationError>
   readonly admitFanOut: (
     input: AdmitFanOutInput,
   ) => Effect.Effect<

@@ -25,6 +25,7 @@ import { NOTIFY_CHANNEL } from "./schema.js"
 import { makePostgresClaims } from "./store-claims.js"
 import { postgresOperations, type RunFn } from "./store-ops.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "../store-execution.js"
+import { retryExecution } from "../store-execution.js"
 import { decodeRunEffect, hasAdmission, loadRunWait } from "../store-helpers.js"
 import { WaitResolution } from "../../run-wait.js"
 import { fanOutStoreMethods } from "./store-fan-out.js"
@@ -485,6 +486,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       claimExecution: (input) => run(claimExecution(transactionHub, input)),
       loadExecution: (runId) => run(loadExecution(runId)),
       saveExecution: (input) => run(saveExecution(input)),
+      retryExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(retryExecution(transactionHub, input)))),
       ...fanOutStoreMethods({ sql, pg, hub: transactionHub, run, runNoTxn }),
       ...operations,
       ...programStoreMethods({ sql, hub: transactionHub, run, runNoTxn }),

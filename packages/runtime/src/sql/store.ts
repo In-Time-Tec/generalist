@@ -35,7 +35,13 @@ import {
   resolveOperation,
 } from "./store-operations.js"
 import { decodeRunEffect, hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
-import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
+import {
+  claimExecution,
+  loadExecution,
+  requireExecutionClaim,
+  retryExecution,
+  saveExecution,
+} from "./store-execution.js"
 import { withSql } from "./sql-effect.js"
 import { makeSqliteSessionStore } from "./session-store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "./store-steering.js"
@@ -268,6 +274,7 @@ export const makeSqliteRunStore = (
       claimExecution: (input) => runBuffered((transactionHub) => claimExecution(transactionHub, input)),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
       saveExecution: (input) => run(saveExecution(input)),
+      retryExecution: (input) => runBuffered((transactionHub) => retryExecution(transactionHub, input)),
       admitFanOut: (input) => runBuffered((transactionHub) => admitFanOut(transactionHub, input)),
       inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
       reserveProgramOperation: (input) => fenced(input, reserveProgramOperation(input)),

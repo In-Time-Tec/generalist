@@ -1,4 +1,4 @@
-import { Cause, Context, DateTime, Effect, Layer, Option, Ref, Schema, type Scope, Stream } from "effect"
+import { Cause, Context, DateTime, Effect, Layer, Ref, Schema, type Scope, Stream } from "effect"
 import { Prompt, type Tool } from "effect/unstable/ai"
 import { Agent, AgentEvent, DurableDriver, Handoff, Steering } from "@batonfx/core"
 import { RunStore, type ExecutionClaim } from "./run-store.js"
@@ -22,6 +22,8 @@ import { settleInterruptedExecution } from "./execution-interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { approvalReason } from "./run-wait.js"
 import { makeAgentExecutionFailure } from "./agent-execution-failure.js"
+import * as ExecutionRetry from "./execution-retry.js"
+import * as AgentRunOptions from "./agent-run-options.js"
 export interface Options {
   readonly workerId: string
   readonly resolver: ExecutableResolverInterface
@@ -113,12 +115,15 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                   yield* hostContext({ agent, environment, store, codeMode, nested }),
                   yield* sessionContext({ store, sessionId: claimed.message.sessionId }),
                 )
+                const executionRetry = yield* ExecutionRetry.make(claimed.attempt)
                 const runHosted = (hostedAgent: Agent.Agent<Tools, R>): Effect.Effect<void> => {
                   const runAgent = (
                     prompt: Prompt.RawInput,
                     history: Prompt.Prompt | undefined,
                     initialCheckpoint: DurableDriver.DriverCheckpoint | undefined,
                     continuation?: ExecutionContinuation,
+                    turnStart?: number,
+                    resume = false,
                   ): Effect.Effect<void> =>
                     Effect.gen(function* () {
                       const observed = yield* Ref.make<ReadonlyArray<string>>(continuation?.steeringEntryIds ?? [])
@@ -195,6 +200,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                                         steeringEntryIds,
                                       }
                                     : currentContinuation
+                            const attempt = yield* executionRetry.attempt
                             const record = yield* store.recordOperation({
                               ...claim,
                               operationKey: operation.key,
@@ -202,7 +208,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                               inputDigest: operation.inputDigest,
                               input: operation.input,
                               replayPolicy: operation.replayPolicy,
-                              attempt: claimed.attempt,
+                              attempt,
                               checkpoint,
                               ...(completed?._tag === "TurnCompleted" ? { transcript: completed.transcript } : {}),
                               ...(scheduledContinuation === undefined ? {} : { continuation: scheduledContinuation }),
@@ -318,66 +324,50 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                       ) {
                         return yield* store.fail({ ...claim, error: compactionOptionsMismatch })
                       }
-                      const persistedSuspension =
-                        claimed.suspension === undefined
-                          ? Option.none<AgentEvent.AgentSuspended>()
-                          : Schema.decodeUnknownOption(AgentEvent.AgentSuspended)(claimed.suspension)
-                      if (claimed.suspension !== undefined && Option.isNone(persistedSuspension)) {
+                      const runOptions = AgentRunOptions.make({
+                        claim,
+                        execution: claimed,
+                        attempt: yield* executionRetry.attempt,
+                        prompt,
+                        ...(history === undefined ? {} : { history }),
+                        ...(initialCheckpoint === undefined ? {} : { checkpoint: initialCheckpoint }),
+                        ...(continuation === undefined ? {} : { continuation }),
+                        ...(turnStart === undefined ? {} : { turnStart }),
+                        resume,
+                        budget: resolved.agent.budget ?? agentBudget,
+                        ...(resolved.runOptions?.compaction === undefined
+                          ? {}
+                          : { compaction: resolved.runOptions.compaction }),
+                      })
+                      if (runOptions === undefined) {
                         return yield* store.fail({ ...claim, error: undecodableSuspension })
                       }
-                      const resolvedCompaction = resolved.runOptions?.compaction
-                      const runOptions = {
-                        prompt,
-                        sessionId: claimed.message.sessionId,
-                        logicalOperationId: runId,
-                        invocation: {
-                          runId,
-                          rootRunId: claimed.rootRunId,
-                          attempt: claimed.attempt,
-                          admittedAt: claimed.admittedAt,
-                        },
-                        sessionOwnerToken: `${claim.ownerId}:${claim.attemptFence}`,
-                        executableRef: claimed.executableRef,
-                        executableManifest: claimed.executableManifest,
-                        budget: resolved.agent.budget ?? agentBudget,
-                        ...(resolvedCompaction === undefined ? {} : { compaction: resolvedCompaction }),
-                        ...(initialCheckpoint === undefined ? {} : { driverCheckpoint: initialCheckpoint }),
-                        ...(history === undefined ? {} : { history }),
-                        ...(continuation === undefined ? {} : { turnStart: continuation.nextTurn }),
-                        ...(Option.isNone(persistedSuspension)
-                          ? {}
-                          : {
-                              resume: {
-                                suspension: persistedSuspension.value,
-                                ...(claimed.resolution === undefined ? {} : { resolution: claimed.resolution }),
-                              },
-                            }),
-                      } satisfies Agent.RunOptions
                       const exit = yield* Agent.stream(hostedAgent, runOptions).pipe(
                         Stream.runForEach((event) =>
-                          event._tag === "Completed"
-                            ? Effect.gen(function* () {
-                                const result = {
-                                  text: event.text,
-                                  turns: event.turns,
-                                  transcript: event.transcript,
-                                }
-                                if (isProgramChild) {
-                                  yield* Ref.set(deferredProgramChildTerminal, { _tag: "Complete", result })
-                                  return
-                                }
-                                const outcome = yield* store.complete({ ...claim, result })
-                                if (outcome._tag === "SteeringPending") {
-                                  yield* Ref.set(pendingCompletion, outcome.continuation)
-                                }
-                              })
-                            : Effect.gen(function* () {
-                                if ((yield* Ref.get(observed)).length > 0) {
-                                  yield* Ref.update(bufferedEvents, (events) => [...events, event])
-                                  return
-                                }
-                                yield* store.emitAgentEvent({ ...claim, event })
-                              }),
+                          Effect.gen(function* () {
+                            yield* executionRetry.observe(event)
+                            if (event._tag === "Completed") {
+                              const result = {
+                                text: event.text,
+                                turns: event.turns,
+                                transcript: event.transcript,
+                              }
+                              if (isProgramChild) {
+                                yield* Ref.set(deferredProgramChildTerminal, { _tag: "Complete", result })
+                                return
+                              }
+                              const outcome = yield* store.complete({ ...claim, result })
+                              if (outcome._tag === "SteeringPending") {
+                                yield* Ref.set(pendingCompletion, outcome.continuation)
+                              }
+                              return
+                            }
+                            if ((yield* Ref.get(observed)).length > 0) {
+                              yield* Ref.update(bufferedEvents, (events) => [...events, event])
+                              return
+                            }
+                            yield* store.emitAgentEvent({ ...claim, event })
+                          }),
                         ),
                         Effect.provideContext(context),
                         Effect.exit,
@@ -390,7 +380,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                           latest.checkpoint !== undefined && "driverVersion" in latest.checkpoint
                             ? latest.checkpoint
                             : undefined
-                        return yield* runAgent(next.prompt, next.history, checkpoint, next)
+                        return yield* runAgent(next.prompt, next.history, checkpoint, next, undefined, false)
                       }
                       if (Cause.hasInterruptsOnly(exit.cause)) {
                         return yield* Effect.failCause(exit.cause)
@@ -443,6 +433,17 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         return
                       }
                       if ((yield* store.inspect(runId)).status === "needs-resolution") return
+                      const retry = isProgramChild ? undefined : yield* executionRetry.retry(store, claim)
+                      if (retry !== undefined) {
+                        return yield* runAgent(
+                          retry.continuation?.prompt ?? Prompt.empty,
+                          retry.continuation?.history ?? retry.transcript,
+                          retry.checkpoint,
+                          retry.continuation,
+                          retry.turn,
+                          false,
+                        )
+                      }
                       const failure = makeAgentExecutionFailure(exit.cause)
                       if (isProgramChild) {
                         yield* Ref.set(deferredProgramChildTerminal, { _tag: "Fail", error: failure })
@@ -465,6 +466,8 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                     continuation?.history ?? claimed.transcript,
                     checkpoint,
                     continuation,
+                    undefined,
+                    claimed.suspension !== undefined,
                   )
                 }
                 yield* codeMode === undefined ? runHosted(agent) : runHosted(withCodeModeTool(agent, codeMode))

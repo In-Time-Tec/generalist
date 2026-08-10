@@ -1,5 +1,5 @@
 import { Effect, Function } from "effect"
-import { SqlClient } from "effect/unstable/sql"
+import { SqlClient, SqlError } from "effect/unstable/sql"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { ExecutionClaim, ExecutionRecord } from "../run-store.js"
@@ -110,6 +110,33 @@ export const claimExecution: {
     const wait = yield* loadRunWait(started.runId, started.activeWaitId)
     const registrations = yield* loadRegistrations(input.runId)
     return { ...executionRecord(started, registrations, wait?.resolution), ownerId: input.ownerId }
+  }),
+)
+
+export const retryExecution: {
+  (input: ExecutionClaim): (hub: EventHub) => ReturnType<typeof retryExecution>
+  (
+    hub: EventHub,
+    input: ExecutionClaim,
+  ): Effect.Effect<
+    ExecutionRecord,
+    RunNotFound | RunTerminal | RuntimeUnavailable | SqlError.SqlError | StaleClaim,
+    SqlClient.SqlClient
+  >
+} = Function.dual(2, (hub: EventHub, input: ExecutionClaim) =>
+  Effect.gen(function* () {
+    const run = yield* requireRun(input.runId)
+    if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
+    if (run.status !== "running" || run.ownerWorkerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
+      return yield* StaleClaim.make({
+        runId: input.runId,
+        workerId: input.ownerId,
+        attemptFence: input.attemptFence,
+      })
+    }
+    const attempt = run.attempt + 1
+    yield* appendEvent(hub, { ...run, attempt }, { _tag: "RunAttemptStarted", attempt }, "running")
+    return yield* loadExecution(input.runId)
   }),
 )
 

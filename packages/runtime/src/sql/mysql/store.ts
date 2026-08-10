@@ -25,7 +25,7 @@ import {
   completeOperation,
   resolveOperation,
 } from "../store-operations.js"
-import { claimExecution, loadExecution, requireExecutionClaim } from "../store-execution.js"
+import { claimExecution, loadExecution, requireExecutionClaim, retryExecution } from "../store-execution.js"
 import {
   appendEvent,
   decodeRunEffect,
@@ -429,6 +429,7 @@ export const makeMysqlServices = (
       claimExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(claimExecution(transactionHub, input)))),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
       saveExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(saveExecution(input)))),
+      retryExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(retryExecution(transactionHub, input)))),
       admitFanOut: (input) =>
         run(
           lockNamed(

@@ -25,7 +25,13 @@ import {
   completeOperation,
   resolveOperation,
 } from "./store-operations.js"
-import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "./store-execution.js"
+import {
+  claimExecution,
+  loadExecution,
+  requireExecutionClaim,
+  retryExecution,
+  saveExecution,
+} from "./store-execution.js"
 import { admitSteering, readSteering } from "./store-steering.js"
 import {
   admitMessage,
@@ -341,6 +347,7 @@ export const makeRunStore = (options: LayerOptions) =>
       loadExecution: (runId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => loadExecution(state, runId))),
       saveExecution: (input) => update((state) => saveExecution(state, input)),
+      retryExecution: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => retryExecution(state, input)),
       admitFanOut: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => admitFanOut(state, input)),
       inspectFanOut: (fanOutId) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectFanOut(state, fanOutId))),
