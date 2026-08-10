@@ -66,8 +66,13 @@ const requireFromWorkspace = createRequire(`${workspaceRoot}/baton-kernel.js`)
 const transpiler = new Bun.Transpiler({ loader: "tsx", replMode: true })
 const encoder = new TextEncoder()
 
-const write = (frame: Frame): void => {
+const writeFrame = (frame: Frame): void => {
   writeSync(frameOut, encoder.encode(`${frameNonce}${JSON.stringify(frame)}\n`))
+}
+
+const write = (frame: Frame): void => {
+  flushOutput()
+  writeFrame(frame)
 }
 
 let cell: CellState | undefined
@@ -80,11 +85,44 @@ const recordedImports = new Set<string>()
 /**
  * Console output is a frame so it keeps its cell attribution and its order among the cell's other
  * frames. The bound lives in the host, which is the only place that sees every byte a cell emits.
+ *
+ * Adjacent writes to the same channel coalesce into one frame: a cell that logs in a tight loop
+ * would otherwise emit one frame per call, and every frame becomes one durable event downstream.
+ * A channel switch flushes first, so the order between stdout and stderr is preserved exactly, and
+ * so is every other frame the cell produces, because anything that writes a non-output frame for
+ * the cell flushes before it writes.
  */
+const flushAfterMillis = 25
+const flushAfterBytes = 8_192
+
+interface PendingOutput {
+  readonly cellId: string
+  readonly channel: "stdout" | "stderr"
+  text: string
+  readonly timer: ReturnType<typeof setTimeout>
+}
+
+let pendingOutput: PendingOutput | undefined
+
+const flushOutput = (): void => {
+  if (pendingOutput === undefined) return
+  const flushed = pendingOutput
+  pendingOutput = undefined
+  clearTimeout(flushed.timer)
+  writeFrame({ _tag: "Output", cellId: flushed.cellId, channel: flushed.channel, text: flushed.text })
+}
+
 const emit = (channel: "stdout" | "stderr", text: string): void => {
   const active = owningCell()
   if (active === undefined) return
-  write({ _tag: "Output", cellId: active.cellId, channel, text })
+  if (pendingOutput !== undefined && (pendingOutput.channel !== channel || pendingOutput.cellId !== active.cellId)) {
+    flushOutput()
+  }
+  if (pendingOutput === undefined) {
+    pendingOutput = { cellId: active.cellId, channel, text: "", timer: setTimeout(flushOutput, flushAfterMillis) }
+  }
+  pendingOutput.text += text
+  if (pendingOutput.text.length >= flushAfterBytes) flushOutput()
 }
 
 const format = (value: unknown): string =>
