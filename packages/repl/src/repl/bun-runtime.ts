@@ -72,7 +72,19 @@ export const answerHostRequest: {
                 options.worker.send({
                   _tag: "HostResponse",
                   requestId: request.requestId,
-                  outcome: { _tag: "Rejected", message: `${failure._tag}: ${request.module}.${request.operation}` },
+                  /**
+                   * A boundary failure names why it happened, and reporting only the operation left
+                   * a cell to guess which field was wrong. A model that cannot see the reason spends
+                   * turns re-shaping a call that was one field away.
+                   */
+                  outcome: {
+                    _tag: "Rejected",
+                    message: `${failure._tag}: ${request.module}.${request.operation}${
+                      "message" in failure && typeof failure.message === "string" && failure.message.length > 0
+                        ? `: ${failure.message}`
+                        : ""
+                    }`,
+                  },
                 }),
             }),
           ),
