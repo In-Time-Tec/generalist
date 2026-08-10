@@ -27,6 +27,7 @@ export const RefinementRejection = Schema.Literals([
   "duplicate-target",
   "kind-capacity",
   "pinned-revision",
+  "rollback-not-newest",
   "update-missing",
   "version-drift",
 ])
@@ -62,6 +63,7 @@ interface EditOutcome {
 
 /** @experimental Whether every edit of one proposal leaves its revision to the engine. */
 export const isAuthored = (proposal: RefinementProposal): boolean =>
+  proposal.rollbackOf === undefined &&
   proposal.edits.every((edit: RefinementEdit) => edit._tag === "Delete" || edit.revision === undefined)
 
 const rejection = (
@@ -186,6 +188,16 @@ export const applyTrustedProposal: {
     options: ApplyOptions = {},
   ): Result.Result<RefinementResult, RefinementRejected> => {
     const before = snapshotId(state)
+    if (proposal.rollbackOf !== undefined && state.refinements.at(-1)?.proposal !== proposal.rollbackOf) {
+      return Result.fail(
+        rejection(
+          proposal.id,
+          "rollback-not-newest",
+          "only the newest refinement can be rolled back",
+          proposal.rollbackOf,
+        ),
+      )
+    }
     if (proposal.baseSnapshot !== undefined && proposal.baseSnapshot !== before) {
       return Result.fail(rejection(proposal.id, "baseline-drift", `state is ${before}, not ${proposal.baseSnapshot}`))
     }
@@ -290,7 +302,8 @@ export const rollbackProposal: {
     at: options.at,
     ...(options.rationale === undefined ? {} : { rationale: options.rationale }),
     ...(options.source === undefined ? {} : { source: options.source }),
-    baseSnapshot: result.event.after,
+    baseSnapshot: snapshotId(result.state),
+    rollbackOf: result.event.proposal,
     edits: result.event.applied.toReversed().map(inverse),
   }),
 )

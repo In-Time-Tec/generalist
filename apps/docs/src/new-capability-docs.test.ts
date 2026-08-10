@@ -122,7 +122,7 @@ test("the harness guide keeps the authorship boundary and the durable-store guar
     "Refinement.rollbackProposal",
     "pinned-revision",
     "compile-time discriminator",
-    "baseline-drift",
+    "rollback-not-newest",
     "FileSystemHarnessStore.layer({ path })",
     "0600",
     "0700",

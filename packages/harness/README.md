@@ -81,7 +81,7 @@ Run `bun examples/package-composition-guides/src/harness.ts`.
 
 - Every entry carries `id`, `kind`, `scope`, `title`, `content`, optional `path`/`reference`/`arguments`/`metadata`/`source`, `createdAt`, `updatedAt`, and a monotonic `version`.
 - `applyProposal` rejects create-existing, update-missing, delete-missing, duplicate targets, stale `baseVersion`, a drifted `baseSnapshot`, per-kind capacity overflow, and a pinned `revision`.
-- Every applied edit records exact `before`/`after` entries, so `rollbackProposal` produces the inverse proposal that restores the earlier snapshot byte for byte.
+- Every applied edit records exact `before`/`after` entries, so `rollbackProposal` produces the inverse proposal that restores the earlier snapshot byte for byte. A rollback derives its baseline from the supplied current state and only the newest refinement may be rolled back; older targets fail with `rollback-not-newest`.
 - `HarnessMerge.mergeStates(outer, inner)` overlays scopes; an inner entry wins over an outer entry of the same kind and id, and each surviving entry keeps its authoring scope.
 - `HarnessOverview.formatOverview` output size depends only on the supplied bounds, never on state size, and its ordering is deterministic.
 - `HarnessSnapshot` pins one exact state as `harness-snapshot:v1:sha256:<digest>` plus the closed-JSON payload a durable host records in an executable registration under codec `@batonfx/harness/snapshot`, version `1`. Refinement history is audit data and is deliberately outside the pinned identity.

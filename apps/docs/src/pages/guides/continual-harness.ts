@@ -60,9 +60,9 @@ export const continualHarness = definePage({
       code("Refinement.rollbackProposal"),
       " builds the inverse proposal: edits reversed, each guarded by the version it undoes, and ",
       code("baseSnapshot"),
-      " pinned to the applied snapshot so a rollback against a state that moved on fails ",
-      code("baseline-drift"),
-      " instead of clobbering later work.",
+      " derived from the supplied current state. Applying any target other than the newest fails ",
+      code("rollback-not-newest"),
+      " before inverse edits are evaluated.",
     ),
     p(
       "Rollback is the trusted path and does set ",

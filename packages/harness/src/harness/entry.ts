@@ -170,6 +170,7 @@ const proposalFields = {
 /** @experimental An atomic set of requested changes with optional baseline pinning. */
 export const RefinementProposal = Schema.Struct({
   ...proposalFields,
+  rollbackOf: Schema.optionalKey(HarnessId),
   edits: Schema.Array(RefinementEdit).check(Schema.isNonEmpty()),
 })
 /** @experimental */

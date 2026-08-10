@@ -96,13 +96,32 @@ describe("Refinement.rollbackProposal", () => {
     expect("source" in inverse).toBe(false)
   })
 
-  it("is rejected against a state that moved on", () => {
+  it("reports that only the newest refinement can be rolled back after state moves on", () => {
     const result = applied({ state: seeded, proposal: proposal({ edits: [create({ kind: "memory", id: "a" })] }) })
     const moved = applied({
       state: result.state,
       proposal: proposal({ id: "p2", edits: [create({ kind: "memory", id: "b" })] }),
     })
-    expect(rejected({ state: moved.state, proposal: rollback(result) }).reason).toBe("baseline-drift")
+    const failure = rejected({ state: moved.state, proposal: rollback(result) })
+
+    expect(failure.reason).toBe("rollback-not-newest")
+    expect(failure.message).toBe("only the newest refinement can be rolled back")
+    expect(failure.target).toBe("proposal-1")
+  })
+
+  it("rolls back the newest refinement after an older edit recreated its target", () => {
+    const removed = applied({
+      state: seeded,
+      proposal: proposal({ edits: [remove({ kind: "skill", id: "target" })] }),
+    })
+    const recreated = applied({
+      state: removed.state,
+      proposal: proposal({ id: "proposal-2", edits: [create({ kind: "skill", id: "target" })] }),
+    })
+    const restored = applied({ state: recreated.state, proposal: rollback(recreated) })
+
+    expect(HarnessState.findEntry(restored.state, "skill", "target")).toBeUndefined()
+    expect(rollback(recreated).baseSnapshot).toBe(HarnessState.snapshotId(recreated.state))
   })
 
   it("guards each inverse edit with the version it undoes", () => {
