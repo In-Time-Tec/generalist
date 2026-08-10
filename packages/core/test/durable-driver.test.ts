@@ -822,6 +822,84 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
+  it.effect("replays reordered parallel tool calls by stable call id", () =>
+    Effect.gen(function* () {
+      const recorded = new Map<string, DurableDriver.OperationOutcome>()
+      let replayTools = false
+      let executions = 0
+      const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+        onScheduled: (operation) =>
+          Effect.sync(() => (replayTools && operation.kind === "tool" ? recorded.get(operation.key) : undefined)),
+        onCompleted: (operation, outcome) =>
+          Effect.sync(() => {
+            if (operation.kind === "tool") recorded.set(operation.key, outcome)
+          }),
+        onCheckpoint: () => Effect.void,
+      })
+      const modelLayer = (ids: ReadonlyArray<string>) => {
+        let modelCalls = 0
+        return Layer.effect(
+          LanguageModel.LanguageModel,
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+            streamText: () => {
+              modelCalls += 1
+              return withProviderFinish(
+                modelCalls === 1
+                  ? Stream.fromIterable(
+                      ids.map((id) =>
+                        Response.makePart("tool-call", {
+                          id,
+                          name: "echo",
+                          params: { text: id },
+                          providerExecuted: false,
+                        }),
+                      ),
+                    )
+                  : Stream.make(Response.makePart("text-delta", { id: "text", delta: "done" })),
+              )
+            },
+          }),
+        )
+      }
+      const agent = Agent.make({
+        name: "parallel-replay-agent",
+        toolkit: Toolkit.make(echoTool),
+        toolScheduling: { maxConcurrency: 2, parallelSafe: ["echo"] },
+      })
+      const run = (ids: ReadonlyArray<string>) =>
+        provideScoped(
+          Layer.mergeAll(
+            modelLayer(ids),
+            ToolExecutor.layerTest({
+              execute: (request) =>
+                Effect.sync(() => {
+                  executions += 1
+                  return { _tag: "Success" as const, result: request.call.id, encodedResult: request.call.id }
+                }),
+            }),
+            journalLayer,
+            unusedToolHandlerLayer,
+          ),
+          Agent.stream(agent, {
+            prompt: "use echo twice",
+            logicalOperationId: "parallel-replay",
+            sessionId: "parallel-replay",
+          }).pipe(Stream.runDrain),
+        )
+
+      yield* run(["call-a", "call-b"])
+      expect(executions).toBe(2)
+      replayTools = true
+      yield* run(["call-b", "call-a"])
+      expect(executions).toBe(2)
+      expect([...recorded.keys()].sort()).toEqual([
+        "parallel-replay:tool:0:call-a:echo",
+        "parallel-replay:tool:0:call-b:echo",
+      ])
+    }),
+  )
+
   it.effect("rejects unknown outcomes for never replay policy", () =>
     Effect.gen(function* () {
       const operation = DurableDriver.makeOperation({

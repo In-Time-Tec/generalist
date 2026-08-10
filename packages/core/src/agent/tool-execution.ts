@@ -206,7 +206,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
           const emitSemaphore = yield* Semaphore.make(1)
           const signal = yield* Effect.abortSignal
           const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
-          const durableOperationKey = operationKey(logicalId, "tool", turn, request.toolCallIndex, call.id, call.name)
+          const durableOperationKey = operationKey(logicalId, "tool", turn, call.id, call.name)
           const toolContext = ToolContext.of({
             signal,
             sessionId,
@@ -284,12 +284,7 @@ export const makeToolExecution = <T extends Record<string, Tool.Any>, R = never>
             {
               kind: "tool",
               key: durableOperationKey,
-              input: {
-                turn,
-                toolCallIndex: request.toolCallIndex,
-                callId: call.id,
-                name: call.name,
-              },
+              input: { turn, callId: call.id, name: call.name },
               replayPolicy: "never",
             },
             executionBase,
