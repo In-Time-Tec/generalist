@@ -56,7 +56,8 @@ test("bounds a multibyte result on a valid UTF-8 prefix", () => {
   if (event?._tag !== "Result") return
   const [kept, marker] = event.value.split("\n[result truncated:")
   expect(kept).toBe("x".repeat(maxResultBytes - 1))
-  expect([...kept!].join("")).toBe(kept)
+  expect(new TextDecoder("utf-8", { fatal: true }).decode(new TextEncoder().encode(kept!))).toBe(kept)
   expect(marker).toContain(`kept first ${maxResultBytes - 1} of ${new TextEncoder().encode(value).byteLength} bytes`)
   expect(event.value).not.toContain("TAIL")
+  expect(event.value.match(/\[result truncated:/g)).toHaveLength(1)
 })

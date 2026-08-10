@@ -17,7 +17,7 @@ it.effect("never splits a surrogate pair at the bound", () =>
   Effect.sync(() => {
     const result = ingest(emptyAccumulator, { channel: "stdout", text: "\u{1F600}".repeat(4), limit: 6 })
     expect(bytesOf(result.kept)).toBeLessThanOrEqual(6)
-    expect(result.kept).toBe([...result.kept].join(""))
+    expect(new TextDecoder("utf-8", { fatal: true }).decode(new TextEncoder().encode(result.kept))).toBe(result.kept)
   }),
 )
 
@@ -70,9 +70,7 @@ it.effect("seals a channel after the first dropped byte", () =>
     )
     expect(second.kept).toBe("")
     expect(second.truncated).toBe(true)
-    expect(outcome?.result?.stdout).toBe(
-      "[truncated: kept first 0 of 5 bytes — page or narrow the command]",
-    )
+    expect(outcome?.result?.stdout).toBe("[truncated: kept first 0 of 5 bytes — page or narrow the command]")
     expect(outcome?.result?.stdout.match(/\[truncated:/g)).toHaveLength(1)
   }),
 )
@@ -94,9 +92,10 @@ it.effect("marks truncated stderr on a stopped cell once", () =>
       { _tag: "Stopped", cellId: "cell", kind: "threw", name: "Error", message: "boom", durationMillis: 0 },
       { sessionId: "session", epoch: 0, sequence: 0, channels: ingested.channels },
     )
-    expect(outcome?.failure?.stderr).toContain(`kept first 8 of ${bytesOf(text)} bytes`)
-    expect(outcome?.failure?.stderr).toContain("page or narrow the command")
-    expect(outcome?.failure?.stderr.match(/\[truncated:/g)).toHaveLength(1)
+    expect(outcome?.failure?._tag).toBe("@batonfx/repl/CellExecutionFailed")
+    if (outcome?.failure?._tag !== "@batonfx/repl/CellExecutionFailed") return
+    expect(outcome.failure.stderr).toContain(`kept first 8 of ${bytesOf(text)} bytes`)
+    expect(outcome.failure.stderr).toContain("page or narrow the command")
+    expect(outcome.failure.stderr.match(/\[truncated:/g)).toHaveLength(1)
   }),
 )
-
