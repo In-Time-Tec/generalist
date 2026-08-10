@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks"
 import { writeSync } from "node:fs"
 import { createRequire } from "node:module"
 import { deserialize, serialize } from "node:v8"
+import { inspect as utilInspect, types } from "node:util"
 
 interface Frame {
   readonly _tag: string
@@ -125,8 +126,19 @@ const emit = (channel: "stdout" | "stderr", text: string): void => {
   if (pendingOutput.text.length >= flushAfterBytes) flushOutput()
 }
 
+/**
+ * `Bun.inspect` hides inherited properties only behind the host realm's own prototypes, and every
+ * value a cell makes lives in the `vm` context's realm, so a plain `{id: "x"}` would render with
+ * the ten methods of its foreign `Object.prototype` appended. `util.inspect` renders foreign
+ * plain values by their own properties, but shows a foreign error as `Error {}` because its
+ * message and stack are non-enumerable, so errors keep the `Bun.inspect` rendering that names them.
+ */
 const format = (value: unknown): string =>
-  typeof value === "string" ? value : Bun.inspect(value, { depth: 4, colors: false })
+  typeof value === "string"
+    ? value
+    : types.isNativeError(value)
+      ? Bun.inspect(value, { depth: 4, colors: false })
+      : utilInspect(value, { depth: 4, colors: false })
 
 const kernelConsole = {
   log: (...args: ReadonlyArray<unknown>) => emit("stdout", `${args.map(format).join(" ")}\n`),
