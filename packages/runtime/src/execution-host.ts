@@ -22,8 +22,8 @@ import { settleInterruptedExecution } from "./execution-interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { approvalReason } from "./run-wait.js"
 import { makeAgentExecutionFailure } from "./agent-execution-failure.js"
-import * as ExecutionRetry from "./execution-retry.js"
-import * as AgentRunOptions from "./agent-run-options.js"
+import { make as makeExecutionRetry } from "./execution-retry.js"
+import { make as makeAgentRunOptions } from "./agent-run-options.js"
 export interface Options {
   readonly workerId: string
   readonly resolver: ExecutableResolverInterface
@@ -115,7 +115,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                   yield* hostContext({ agent, environment, store, codeMode, nested }),
                   yield* sessionContext({ store, sessionId: claimed.message.sessionId }),
                 )
-                const executionRetry = yield* ExecutionRetry.make(claimed.attempt)
+                const executionRetry = yield* makeExecutionRetry(claimed.attempt)
                 const runHosted = (hostedAgent: Agent.Agent<Tools, R>): Effect.Effect<void> => {
                   const runAgent = (
                     prompt: Prompt.RawInput,
@@ -324,7 +324,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                       ) {
                         return yield* store.fail({ ...claim, error: compactionOptionsMismatch })
                       }
-                      const runOptions = AgentRunOptions.make({
+                      const runOptions = makeAgentRunOptions({
                         claim,
                         execution: claimed,
                         attempt: yield* executionRetry.attempt,
