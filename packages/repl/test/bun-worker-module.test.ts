@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, FileSystem } from "effect"
-import { workerModule as exportedWorkerModule } from "../src/repl/bun.js"
+import { workerModule as exportedWorkerModule, workerSupportModules } from "../src/repl/bun.js"
 import { liveOptions, platform, runCell, withPool } from "./bun-harness.js"
 
 layer(platform, liveOptions)("Bun kernel worker module", (it) => {
@@ -16,6 +16,10 @@ layer(platform, liveOptions)("Bun kernel worker module", (it) => {
         true,
       )
       expect(yield* fileSystem.exists(exportedWorkerModule)).toBe(true)
+      expect(workerSupportModules.map((module) => module.slice(module.lastIndexOf("/") + 1))).toEqual([
+        exportedWorkerModule.endsWith(".ts") ? "text-result.ts" : "text-result.js",
+      ])
+      for (const module of workerSupportModules) expect(yield* fileSystem.exists(module)).toBe(true)
     }),
   )
 

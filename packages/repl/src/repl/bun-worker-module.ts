@@ -11,3 +11,11 @@ const extension = import.meta.url.endsWith(".ts") ? "ts" : "js"
  * running against this repository's sources.
  */
 export const workerModule: string = fileURLToPath(new URL(`./bun-worker.${extension}`, import.meta.url))
+
+/**
+ * @experimental Filesystem paths of modules imported by the worker. A host that relocates the
+ * worker must copy these beside it with their basenames intact.
+ */
+export const workerSupportModules: ReadonlyArray<string> = [
+  fileURLToPath(new URL(`./text-result.${extension}`, import.meta.url)),
+]
