@@ -2,6 +2,7 @@ import {
   ModelResilience as ModelResilience_ModelResilience,
   ModelResilienceMisconfigured as ModelResilience_ModelResilienceMisconfigured,
   defaultClassify as ModelResilience_defaultClassify,
+  defaultPolicy as ModelResilience_defaultPolicy,
   none as ModelResilience_none,
   validate as ModelResilience_validate,
   make as ModelResilience_make,
@@ -14,6 +15,7 @@ export const ModelResilience = {
   ModelResilience: ModelResilience_ModelResilience,
   ModelResilienceMisconfigured: ModelResilience_ModelResilienceMisconfigured,
   defaultClassify: ModelResilience_defaultClassify,
+  defaultPolicy: ModelResilience_defaultPolicy,
   none: ModelResilience_none,
   validate: ModelResilience_validate,
   make: ModelResilience_make,
@@ -26,6 +28,7 @@ export namespace ModelResilience {
   export type ModelResilience = import("./model-resilience.js").ModelResilience
   export type ModelResilienceMisconfigured = import("./model-resilience.js").ModelResilienceMisconfigured
   export type defaultClassify = typeof import("./model-resilience.js").defaultClassify
+  export type defaultPolicy = typeof import("./model-resilience.js").defaultPolicy
   export type none = typeof import("./model-resilience.js").none
   export type validate = typeof import("./model-resilience.js").validate
   export type make = typeof import("./model-resilience.js").make

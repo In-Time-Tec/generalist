@@ -55,12 +55,27 @@ export const defaultClassify = (error: unknown): Classification =>
       ? "transient"
       : "terminal"
 
+const defaultProviderClassify = (error: unknown): Classification =>
+  AiError.isAiError(error) &&
+  (error.reason._tag === "RateLimitError" ||
+    error.reason._tag === "InternalProviderError" ||
+    (error.reason._tag === "NetworkError" && error.reason.reason === "TransportError"))
+    ? "transient"
+    : "terminal"
+
+/** @experimental */
+export const defaultPolicy: Interface = {
+  classify: defaultProviderClassify,
+  resolve: defaultResolveFailure,
+  retrySchedule: Schedule.exponential("2 seconds").pipe(Schedule.upTo({ times: 2, duration: "30 seconds" })),
+  invalidToolCallCorrectionLimit: 0,
+}
+
 /** @experimental */
 export const none: Interface = {
+  ...defaultPolicy,
   classify: () => "terminal",
-  resolve: defaultResolveFailure,
   retrySchedule: Schedule.recurs(0),
-  invalidToolCallCorrectionLimit: 0,
 }
 
 const misconfigured = (): ModelResilienceMisconfigured =>
@@ -82,8 +97,8 @@ export const validate = (implementation: Interface): Effect.Effect<Interface, Mo
 export const make = (input?: Partial<Interface>): Effect.Effect<Interface, ModelResilienceMisconfigured> =>
   validate({
     classify: input?.classify ?? defaultClassify,
-    resolve: input?.resolve ?? defaultResolveFailure,
-    retrySchedule: input?.retrySchedule ?? none.retrySchedule,
+    resolve: input?.resolve ?? defaultPolicy.resolve,
+    retrySchedule: input?.retrySchedule ?? defaultPolicy.retrySchedule,
     invalidToolCallCorrectionLimit: input?.invalidToolCallCorrectionLimit ?? 0,
     ...(input?.streamIdleTimeout === undefined ? {} : { streamIdleTimeout: input.streamIdleTimeout }),
   })

@@ -8,7 +8,7 @@ import { type Key, Memory } from "../context/memory.js"
 import { ModelMiddleware } from "../model/model-middleware.js"
 import { ModelRegistry } from "../model/model-registry.js"
 import { instrument, makeIdentityCell } from "../model/model-instrumentation.js"
-import { ModelResilience } from "../model/model-resilience.js"
+import { ModelResilience, defaultPolicy as defaultModelResilience } from "../model/model-resilience.js"
 import {
   Delivery,
   InvocationCoordinator,
@@ -285,7 +285,10 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       options.history === undefined && skillListings.length > 0 ? skillListingsInstructions(skillListings) : undefined,
     )
 
-    const resilienceService = yield* Effect.serviceOption(ModelResilience)
+    const configuredResilience = yield* Effect.serviceOption(ModelResilience)
+    const resilienceService = Option.orElse(configuredResilience, () =>
+      Option.some(ModelResilience.of(defaultModelResilience)),
+    )
     const deliveryService = yield* Effect.serviceOption(Delivery)
     const invocationCoordinator = yield* Effect.serviceOption(InvocationCoordinator)
     const telemetryRunId = yield* generateId

@@ -108,7 +108,7 @@ export const coreModelsReference = definePage({
     ),
     h2("model-resilience", "ModelResilience"),
     p(
-      "An optional seam wrapping model calls with retries. The interface is ",
+      "The agent loop wraps model calls with a default bounded retry policy, and this seam can replace or disable it. The interface is ",
       code(
         '{ resolve: (input) => AiError; classify: (error) => "transient" | "terminal"; retrySchedule: Schedule; invalidToolCallCorrectionLimit: number; streamIdleTimeout?: Duration.Input }',
       ),
@@ -129,10 +129,22 @@ export const coreModelsReference = definePage({
             " values and bounds unknown error-part payloads as terminal unknown errors",
           ],
         ],
+        [
+          [code("defaultPolicy")],
+          [
+            "Retry provider rate limits, internal failures, and transport failures twice with 2s and 4s backoff, bounded by a 30s schedule window",
+          ],
+        ],
         [[code("none")], ["Resolve unknown parts safely, classify everything terminal, ", code("Schedule.recurs(0)")]],
         [
           [code("make(input?)"), " / ", code("layer(input?)")],
-          ["Fill defaults from ", code("defaultClassify"), " and ", code("none")],
+          [
+            "Use ",
+            code("defaultClassify"),
+            " with the default policy's schedule and resolver; provide ",
+            code("none"),
+            " to disable retries",
+          ],
         ],
         [
           [code("apply(model, resilience)")],

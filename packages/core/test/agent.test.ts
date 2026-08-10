@@ -6222,7 +6222,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "does not retry model failures when ModelResilience is absent", () => {
+  ItLayer.make(it, "does not retry model failures when ModelResilience.none is provided", () => {
     let calls = 0
     return [
       Layer.mergeAll(
@@ -6232,12 +6232,13 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         }),
         unusedExecutor,
         Approvals.layerAutoApprove,
+        ModelResilience.layerTest(ModelResilience.none),
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
         const agent = Agent.make({ name: "no-model-retry-agent" })
 
-        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "retry absent" })))
+        const failure = yield* Effect.flip(Stream.runCollect(Agent.stream(agent, { prompt: "retry disabled" })))
 
         expect(calls).toBe(1)
         expect(failure._tag).toBe("@batonfx/core/AgentError")

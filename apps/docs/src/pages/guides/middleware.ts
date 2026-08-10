@@ -86,7 +86,7 @@ export const middleware = definePage({
     h2("retry-transient-failures", "3. Retry transient model failures"),
     p(
       code("ModelResilience"),
-      " is an optional seam that classifies model-call failures and retries only the ",
+      " classifies model-call failures and retries only the ",
       code("transient"),
       " ones on a schedule. The default classifier treats retryable ",
       code("AiError"),
@@ -99,7 +99,13 @@ export const middleware = definePage({
         "Set streamIdleTimeout only when the host wants an explicit model-silence deadline; Baton has no hidden timeout.",
         "Set invalidToolCallCorrectionLimit (0–2) to allow bounded, instrumented correction attempts under the same logical model call. Baton corrects only its precise pre-emission tool-parameter validation signal; generic model output decode failures are terminal unless ordinary provider resilience classifies them otherwise. Direct custom models with schema-backed tools must attach their exact compiler with ModelRegistry.withToolJsonSchemaCompiler. OpenAI, OpenAI-compatible, Anthropic, and Amazon Bedrock support this projection; OpenRouter fails typed before transport when schema-backed correction is enabled.",
       ],
-      ["Without the layer the default is ", code("ModelResilience.none"), ": every failure is terminal."],
+      [
+        "Without a layer the agent uses ",
+        code("ModelResilience.defaultPolicy"),
+        ": two retries after 2s and 4s, bounded by 30s. Provide ",
+        code("ModelResilience.none"),
+        " to make every failure terminal.",
+      ],
     ),
     h2("recipe-pii-scrub", "Recipe: scrub PII in both directions"),
     p(
