@@ -87,9 +87,26 @@ for (const backend of ["memory", "sqlite"] as const) {
             selection: "researcher",
             prompt: "child",
           })
+          expect((yield* runtime.inspect(child.runId)).status).toBe("queued")
+          expect(
+            (yield* runtime.history({ runId: child.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
+          ).toEqual(["RunAccepted"])
+          const recovered = yield* runtime.spawn({
+            parentRunId: parent.runId,
+            invocationId: "recovered",
+            selection: "researcher",
+            prompt: "recovered child",
+          })
+          yield* store.claimExecution({ runId: recovered.runId, ownerId: backend })
+          expect((yield* runtime.inspect(recovered.runId)).status).toBe("running")
           yield* scheduler.tick
           yield* scheduler.idle
           expect((yield* runtime.inspect(child.runId)).status).toBe("succeeded")
+          expect((yield* runtime.inspect(recovered.runId)).status).toBe("succeeded")
+          for (const runId of [child.runId, recovered.runId]) {
+            const tags = (yield* runtime.history({ runId, cursor: -1, limit: 100 })).map((event) => event._tag)
+            expect(tags.filter((tag) => tag === "RunAttemptStarted")).toHaveLength(1)
+          }
         }),
       )
     })
@@ -435,7 +452,7 @@ for (const backend of ["memory", "sqlite"] as const) {
               yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
               const tickCalls = calls.slice(before)
               // A terminal backlog of any size is never scanned: reconciliation reads waiting parents only.
-              expect(tickCalls.length).toBe(3)
+              expect(tickCalls.length).toBe(4)
               for (const call of tickCalls) {
                 expect(call.input.limit).toBeLessThanOrEqual(64)
               }
@@ -933,6 +950,68 @@ for (const backend of ["memory", "sqlite"] as const) {
               yield* Effect.sleep("20 millis")
             }
             expect(inFlight.peak).toBeLessThanOrEqual(2)
+            yield* Deferred.succeed(release, undefined)
+            yield* scheduler.idle
+          }),
+        )
+      },
+    )
+  }
+
+  {
+    const inFlight = { current: 0, peak: 0 }
+    const release = Deferred.makeUnsafe<void>()
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () =>
+          Stream.fromEffect(
+            Effect.sync(() => {
+              inFlight.current += 1
+              inFlight.peak = Math.max(inFlight.peak, inFlight.current)
+            }),
+          ).pipe(
+            Stream.drain,
+            Stream.concat(Stream.fromEffect(Deferred.await(release)).pipe(Stream.drain)),
+            Stream.concat(Stream.make(Response.makePart("text-delta", { id: "answer", delta: "done" }), finish)),
+          ),
+      }),
+    )
+    const options = {
+      resolver: makeStatic([{ executable: assistantRef, agent: Agent.close(assistant, model) }]),
+      addresses: [
+        { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
+      ],
+      scheduler: { pollInterval: "1 day" as const },
+    }
+    const runtimeLayer =
+      backend === "memory"
+        ? Runtime.layerMemory(options)
+        : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-unbounded-concurrency") })
+
+    layer(runtimeLayer, { excludeTestServices: true })(
+      `${backend} default concurrency starts every selected Run without a bound`,
+      (it) => {
+        it.effect("starts more than the former default bound", () =>
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const scheduler = yield* LocalScheduler.LocalScheduler
+            for (let index = 0; index < 6; index += 1) {
+              yield* runtime.send({
+                to: assistantAddress,
+                sessionId: `scheduler-unbounded-concurrency:${backend}:${index}`,
+                idempotencyKey: `unbounded-concurrency-${index}`,
+                prompt: `run-${index}`,
+              })
+            }
+            yield* scheduler.tick
+            let attempts = 0
+            while (inFlight.current < 6 && attempts < 20) {
+              yield* Effect.sleep("10 millis")
+              attempts += 1
+            }
+            expect(inFlight.peak).toBe(6)
             yield* Deferred.succeed(release, undefined)
             yield* scheduler.idle
           }),

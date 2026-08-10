@@ -424,7 +424,7 @@ export const makeMysqlServices = (
             Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
           ),
         ),
-      claimExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(claimExecution(input)))),
+      claimExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(claimExecution(transactionHub, input)))),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
       saveExecution: (input) => run(lockRun(input.runId).pipe(Effect.andThen(saveExecution(input)))),
       admitFanOut: (input) =>

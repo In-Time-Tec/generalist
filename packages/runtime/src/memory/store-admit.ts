@@ -20,7 +20,7 @@ import { narrow } from "../executable-registration.js"
 import type { Message } from "../message.js"
 import type { SpawnInput } from "../runtime.js"
 import type { StartReceipt } from "../runtime.js"
-import { appendLifecycle, makeAccepted, makeAttemptStarted, makeChildLinked } from "./append.js"
+import { appendLifecycle, makeAccepted, makeChildLinked } from "./append.js"
 import { childDigest, messageDigest, startDigest } from "./digest.js"
 import { enqueueLane, promoteHead } from "./lanes.js"
 import { idempotencyKey, laneKey, type MemoryState, type StoredRun } from "./state.js"
@@ -391,9 +391,6 @@ export const admitSpawn: {
         "queued",
       )
       next = accepted
-      const [, started] = yield* appendLifecycle(next, runId, makeAttemptStarted(1), "running")
-      next = started
-
       const receipt: RunReceipt = {
         runId,
         messageId: input.message.id,
@@ -487,8 +484,6 @@ export const admitProgramChild: {
       "queued",
     )
     next = accepted
-    const [, started] = yield* appendLifecycle(next, child.runId, makeAttemptStarted(1), "running")
-    next = started
     const receipt = { runId: child.runId, messageId: input.message.id, acceptedSequence: 0, duplicate: false }
     const idempotency = new Map(next.idempotency)
     idempotency.set(key, { digest, executable, receipt })

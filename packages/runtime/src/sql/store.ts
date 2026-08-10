@@ -263,7 +263,7 @@ export const makeSqliteRunStore = (
             Effect.andThen(settleAdmittedCancellation(hub, input.runId)),
           ),
         ),
-      claimExecution: (input) => run(claimExecution(input)),
+      claimExecution: (input) => runBuffered((transactionHub) => claimExecution(transactionHub, input)),
       loadExecution: (runId) => runNoTxn(loadExecution(runId)),
       saveExecution: (input) => run(saveExecution(input)),
       admitFanOut: (input) => runBuffered((transactionHub) => admitFanOut(transactionHub, input)),

@@ -1,7 +1,7 @@
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Clock, Effect, Layer } from "effect"
 import { Pins } from "@batonfx/core"
-import { Approval, ExecutionHost, ExecutableResolver, Runtime, RunStore } from "../src/index.js"
+import { Approval, ExecutionHost, ExecutableResolver, LocalScheduler, Runtime, RunStore } from "../src/index.js"
 import { registrationsFor } from "./helpers.js"
 import { tempDbPath } from "./sqlite-helpers.js"
 import {
@@ -441,15 +441,9 @@ describe("durable Agent Programs", () => {
       const fixture = agentMapProgramFixture()
       const mapAddress = fixture.address
       const executeReady = Effect.gen(function* () {
-        const store = yield* RunStore.RunStore
-        const host = yield* ExecutionHost.ExecutionHost
-        const ready = yield* store.list({ status: "running", limit: 2 })
-        yield* Effect.forEach(
-          ready,
-          (run) =>
-            store.claimExecution({ runId: run.runId, ownerId: "program-worker" }).pipe(Effect.flatMap(host.execute)),
-          { concurrency: 2, discard: true },
-        )
+        const scheduler = yield* LocalScheduler.LocalScheduler
+        yield* scheduler.tick
+        yield* scheduler.idle
       })
       const admit = Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
@@ -476,7 +470,7 @@ describe("durable Agent Programs", () => {
           expect(fixture.counts().childFinalizers).toBe(finalizersBefore + 2)
           expect((yield* runtime.inspect(childRunIds[0]!)).status).toBe("succeeded")
           expect((yield* runtime.inspect(childRunIds[1]!)).status).toBe("succeeded")
-          expect((yield* runtime.inspect(childRunIds[2]!)).status).toBe("running")
+          expect((yield* runtime.inspect(childRunIds[2]!)).status).toBe("queued")
           yield* executeReady
           expect(fixture.counts().childFinalizers).toBe(finalizersBefore + 3)
           expect((yield* runtime.inspect(childRunIds[2]!)).status).toBe("succeeded")

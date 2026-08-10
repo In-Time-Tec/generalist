@@ -17,7 +17,6 @@ import type { RunEvent } from "../run-event.js"
 import {
   appendLifecycle,
   makeAccepted,
-  makeAttemptStarted,
   makeCancellationRequested,
   makeCancelled,
   makeChildLinked,
@@ -130,7 +129,7 @@ export const admitFanOut: {
       })
       const child: StoredRun = {
         runId: member.childRunId,
-        status: active ? "running" : "queued",
+        status: "queued",
         executableRef: member.executableRef,
         executableManifest: parent.executableManifest,
         address,
@@ -140,8 +139,8 @@ export const admitFanOut: {
         invocationId: `${input.fanOutId}:${member.key}`,
         respondedWaitIds: new Set(),
         lastSequence: -1,
-        attempt: active ? 1 : 0,
-        attemptFence: active ? 1 : 0,
+        attempt: 0,
+        attemptFence: 0,
         cancellationRequested: false,
         children: [],
         events: [],
@@ -165,17 +164,8 @@ export const admitFanOut: {
         makeChildLinked(member.childRunId, `${input.fanOutId}:${member.key}`, member.selection, member.prompt),
       )
       next = linked
-      const [, accepted] = yield* appendLifecycle(
-        next,
-        member.childRunId,
-        makeAccepted(address, message.id),
-        active ? "running" : "queued",
-      )
+      const [, accepted] = yield* appendLifecycle(next, member.childRunId, makeAccepted(address, message.id), "queued")
       next = accepted
-      if (active) {
-        const [, started] = yield* appendLifecycle(next, member.childRunId, makeAttemptStarted(1), "running")
-        next = started
-      }
       memberResults.push({
         ordinal: member.ordinal,
         key: member.key,
@@ -338,15 +328,9 @@ export const reconcileFanOut: {
       }
       if (joined === undefined) {
         let active = members.filter((member) => member.status === "running").length
-        const runs = new Map(next.runs)
         for (let index = 0; index < members.length && active < current.concurrency; index++) {
           if (members[index]!.status !== "pending") continue
-          const run = runs.get(members[index]!.childRunId)!
-          runs.set(run.runId, { ...run, status: "running", attempt: 1, attemptFence: 1 })
           members[index] = { ...members[index]!, status: "running" }
-          next = { ...next, runs }
-          const [, started] = yield* appendLifecycle(next, run.runId, makeAttemptStarted(1), "running")
-          next = started
           active++
         }
       }

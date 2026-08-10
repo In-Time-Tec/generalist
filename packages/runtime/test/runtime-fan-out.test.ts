@@ -125,10 +125,22 @@ layer(memoryLayer)("Runtime fan-out", (it) => {
         yield* Effect.forEach(receipt.childRunIds, (runId) =>
           runtime.inspect(runId).pipe(Effect.map((run) => run.status)),
         ),
-      ).toEqual(["running", "queued", "queued"])
+      ).toEqual(["queued", "queued", "queued"])
+      expect((yield* runtime.inspectFanOut(receipt.fanOutId)).members.map((member) => member.status)).toEqual([
+        "running",
+        "pending",
+        "pending",
+      ])
+      const firstHistory = yield* runtime.history({ runId: receipt.childRunIds[0]!, limit: 100 })
+      expect(firstHistory.map((event) => event._tag)).toEqual(["RunAccepted"])
       yield* succeed(receipt.childRunIds[0]!)
-      expect((yield* runtime.inspect(receipt.childRunIds[1]!)).status).toBe("running")
+      expect((yield* runtime.inspect(receipt.childRunIds[1]!)).status).toBe("queued")
       expect((yield* runtime.inspect(receipt.childRunIds[2]!)).status).toBe("queued")
+      expect((yield* runtime.inspectFanOut(receipt.fanOutId)).members.map((member) => member.status)).toEqual([
+        "succeeded",
+        "running",
+        "pending",
+      ])
     }),
   )
 

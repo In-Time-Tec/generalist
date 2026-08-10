@@ -480,7 +480,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           }),
         ),
       emitAgentEvent: (input) => run(emitAgentEvent(transactionHub, input)),
-      claimExecution: (input) => run(claimExecution(input)),
+      claimExecution: (input) => run(claimExecution(transactionHub, input)),
       loadExecution: (runId) => run(loadExecution(runId)),
       saveExecution: (input) => run(saveExecution(input)),
       ...fanOutStoreMethods({ sql, pg, hub: transactionHub, run, runNoTxn }),

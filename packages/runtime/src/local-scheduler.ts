@@ -28,13 +28,14 @@ export const make = (
   Effect.gen(function* () {
     const host = yield* ExecutionHost
     const active = yield* ActiveExecutions
-    const concurrency = options.concurrency ?? 4
+    const concurrency = options.concurrency
     const tickLock = yield* Semaphore.make(1)
     const executions = yield* FiberMap.make<string, void, never>()
-    const selectionWindow = Math.max(concurrency * 2, 16)
+    const selectionWindow = concurrency === undefined ? 64 : Math.max(concurrency * 2, 16)
     const reconcileWindow = 32
 
     const waitingCursor = yield* Ref.make<string | undefined>(undefined)
+    const queuedCursor = yield* Ref.make<string | undefined>(undefined)
 
     const reconcileChild = (store: RunStoreInterface, parent: RunInspection, runId: string): Effect.Effect<void> =>
       Effect.gen(function* () {
@@ -123,33 +124,44 @@ export const make = (
                   }),
                   Effect.ignore,
                 ),
-          { concurrency, discard: true },
+          { concurrency: concurrency ?? "unbounded", discard: true },
         )
       })
 
     const selectReadyRuns = (store: RunStoreInterface) =>
       Effect.gen(function* () {
         const running = yield* store.list({ status: "running", order: "oldest", limit: selectionWindow })
+        const cursor = yield* Ref.get(queuedCursor)
+        const queued = yield* store.list({
+          status: "queued",
+          order: "oldest",
+          limit: selectionWindow,
+          ...(cursor === undefined ? {} : { afterRunId: cursor }),
+        })
+        const lastQueued = queued[queued.length - 1]
+        yield* Ref.set(queuedCursor, queued.length === selectionWindow ? lastQueued?.runId : undefined)
         const info = yield* store.info
         // Re-admitting a Run this process is already executing would fence out and interrupt that execution.
         const executing = yield* active.active
         const admitted = yield* Effect.sync(() => new Set(Array.from(executions, ([runId]) => runId)))
-        const available = yield* Effect.filter(running, (run) =>
-          executing.has(run.runId) || admitted.has(run.runId)
-            ? Effect.succeed(false)
-            : store
-                .loadExecution(run.runId)
-                .pipe(
-                  Effect.map(
-                    (execution) =>
-                      info.backend === "sqlite" ||
-                      execution.ownerId === undefined ||
-                      execution.ownerId === options.workerId,
+        const available = yield* Effect.filter(
+          [...running, ...queued.filter((run) => run.parentRunId !== undefined)],
+          (run) =>
+            executing.has(run.runId) || admitted.has(run.runId)
+              ? Effect.succeed(false)
+              : store
+                  .loadExecution(run.runId)
+                  .pipe(
+                    Effect.map(
+                      (execution) =>
+                        info.backend === "sqlite" ||
+                        execution.ownerId === undefined ||
+                        execution.ownerId === options.workerId,
+                    ),
                   ),
-                ),
         )
         yield* Effect.forEach(
-          available.slice(0, Math.max(0, concurrency - admitted.size)),
+          concurrency === undefined ? available : available.slice(0, Math.max(0, concurrency - admitted.size)),
           (run) =>
             FiberMap.run(
               executions,

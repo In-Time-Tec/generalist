@@ -324,9 +324,6 @@ export const admitSpawn: {
       },
       "queued",
     )
-    const started = (yield* loadRun(runId))!
-    yield* sql`UPDATE baton_runs SET attempt_fence = 1 WHERE run_id = ${runId}`
-    yield* appendEvent(hub, { ...started, attempt: 1 }, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
     return { runId, messageId: input.message.id, acceptedSequence: 0, duplicate: false }
   }),
 )
@@ -417,9 +414,6 @@ export const admitProgramChild: {
       { _tag: "RunAccepted", messageId: input.message.id, address: input.message.to },
       "queued",
     )
-    const started = (yield* loadRun(input.childRunId))!
-    yield* sql`UPDATE baton_runs SET attempt_fence = 1 WHERE run_id = ${input.childRunId}`
-    yield* appendEvent(hub, { ...started, attempt: 1 }, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
     return { runId: input.childRunId, messageId: input.message.id, acceptedSequence: 0, duplicate: false }
   }),
 )

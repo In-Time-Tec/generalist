@@ -84,7 +84,7 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
         yield* Effect.forEach(receipt.children, (child) =>
           runtime.inspect(child.childRunId).pipe(Effect.map((run) => run.status)),
         ),
-      ).toEqual(["running", "running", "running"])
+      ).toEqual(["queued", "queued", "queued"])
 
       const waiting = yield* children.awaitGroup({
         parentRunId: parent.runId,

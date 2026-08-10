@@ -152,7 +152,7 @@ export const admitFanOut: {
       })
       yield* insertRun({
         runId: member.childRunId,
-        status: active ? "running" : "queued",
+        status: "queued",
         message,
         digest,
         executableRef: member.executableRef,
@@ -161,7 +161,7 @@ export const admitFanOut: {
         parentRunId: parent.runId,
         invocationId: `${input.fanOutId}:${member.key}`,
         acceptedSequence: member.ordinal,
-        attempt: active ? 1 : 0,
+        attempt: 0,
       })
       const registrations = yield* narrow(
         { ref: member.executableRef, manifest: parent.executableManifest },
@@ -185,16 +185,7 @@ export const admitFanOut: {
         prompt: member.prompt,
       })
       const child = (yield* loadRun(member.childRunId))!
-      yield* defaultAppendEvent(
-        hub,
-        child,
-        { _tag: "RunAccepted", messageId: message.id, address },
-        active ? "running" : "queued",
-      )
-      if (active) {
-        const started = (yield* loadRun(member.childRunId))!
-        yield* defaultAppendEvent(hub, started, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
-      }
+      yield* defaultAppendEvent(hub, child, { _tag: "RunAccepted", messageId: message.id, address }, "queued")
     }
     const currentParent = (yield* loadRun(parent.runId))!
     yield* defaultAppendEvent(hub, currentParent, {
@@ -373,9 +364,6 @@ export const reconcileFanOutWith: {
           .slice(0, Math.max(0, Number(loaded.fanOut.concurrency) - active))
         for (const member of pending) {
           yield* sql`UPDATE baton_fan_out_members SET status = 'running' WHERE child_run_id = ${member.childRunId} AND status = 'pending'`
-          const run = (yield* loadRun(member.childRunId))!
-          yield* sql`UPDATE baton_runs SET status = 'running', attempt = 1, attempt_fence = 1 WHERE run_id = ${member.childRunId} AND status = 'queued'`
-          yield* append(hub, { ...run, attempt: 1 }, { _tag: "RunAttemptStarted", attempt: 1 }, "running")
         }
         return
       }

@@ -59,7 +59,7 @@ standalone.live("persists and resumes bounded fan-out across SQLite reopen", () 
         expect(before.members.map((member) => member.status)).toEqual(["running", "pending", "pending"])
         const first = yield* store.claimExecution({ runId: admitted.childRunIds[0]!, ownerId: "first" })
         yield* store.complete({ ...first, result: completedResult("first") })
-        expect((yield* runtime.inspect(admitted.childRunIds[1]!)).status).toBe("running")
+        expect((yield* runtime.inspect(admitted.childRunIds[1]!)).status).toBe("queued")
       }),
     )
 

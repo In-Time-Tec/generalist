@@ -5,6 +5,7 @@ import type { ExecutionClaim, ExecutionRecord } from "../run-store.js"
 import { StaleClaim } from "../sql/errors.js"
 import type { MemoryState } from "./state.js"
 import { checkpointRef } from "../executable-manifest.js"
+import { appendLifecycle, makeAttemptStarted } from "./append.js"
 
 const requireRun = (state: MemoryState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -75,21 +76,36 @@ export const claimExecution: {
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    if (run.status === "waiting" || run.status === "queued" || run.status === "needs-resolution") {
+    if (run.status === "waiting" || run.status === "needs-resolution") {
       return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is ${run.status}` })
+    }
+    if (run.status === "queued") {
+      if (run.parentRunId === undefined) {
+        return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is queued` })
+      }
+      const member = [...state.fanOuts.values()]
+        .flatMap((fanOut) => fanOut.members)
+        .find((candidate) => candidate.childRunId === run.runId)
+      if (member !== undefined && member.status !== "running") {
+        return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is awaiting fan-out admission` })
+      }
     }
     const claimed = {
       ...run,
       status: "running" as const,
       ownerId: input.ownerId,
       attemptFence: run.attemptFence + 1,
+      attempt: run.status === "queued" ? run.attempt + 1 : run.attempt,
     }
     const runs = new Map(state.runs)
     runs.set(run.runId, claimed)
-    return [
-      { ...executionRecord(claimed), ownerId: input.ownerId },
-      { ...state, runs },
-    ] as const
+    const claimedState = { ...state, runs }
+    const started =
+      run.status === "queued"
+        ? (yield* appendLifecycle(claimedState, run.runId, makeAttemptStarted(claimed.attempt), "running"))[1]
+        : claimedState
+    const loaded = started.runs.get(run.runId)!
+    return [{ ...executionRecord(loaded), ownerId: input.ownerId }, started] as const
   }),
 )
 

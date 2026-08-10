@@ -1,16 +1,17 @@
-import { Effect } from "effect"
+import { Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { ExecutionClaim, ExecutionRecord } from "../run-store.js"
 import { StaleClaim } from "./errors.js"
-import { loadRun, loadRunWait, nowIso } from "./store-helpers.js"
+import { appendEvent, loadRun, loadRunWait, nowIso } from "./store-helpers.js"
 import type { DecodedRun } from "./rows.js"
 import { checkpointRef } from "../executable-manifest.js"
 import { encodeExecutableRef, encodeJson } from "./codecs.js"
 import { loadRegistrations } from "./executable-registrations.js"
 import { Prompt } from "effect/unstable/ai"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../execution-state.js"
+import type { EventHub } from "./subscribers.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))))
@@ -55,34 +56,62 @@ export const loadExecution = (runId: string) =>
     return executionRecord(run, registrations, wait?.resolution)
   })
 
-export const claimExecution = (input: { readonly runId: string; readonly ownerId: string }) =>
+export const claimExecution: {
+  (input: { readonly runId: string; readonly ownerId: string }): (hub: EventHub) => ReturnType<typeof claimExecution>
+  (
+    hub: EventHub,
+    input: { readonly runId: string; readonly ownerId: string },
+  ): Effect.Effect<
+    ExecutionRecord & { readonly ownerId: string },
+    RunNotFound | RunTerminal | RuntimeUnavailable | StaleClaim,
+    SqlClient.SqlClient
+  >
+} = Function.dual(2, (hub: EventHub, input: { readonly runId: string; readonly ownerId: string }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const run = yield* requireRun(input.runId)
     if (isTerminal(run.status)) return yield* RunTerminal.make({ runId: run.runId, status: run.status })
-    if (run.status === "waiting" || run.status === "queued" || run.status === "needs-resolution") {
+    if (run.status === "waiting" || run.status === "needs-resolution") {
       return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is ${run.status}` })
     }
+    if (run.status === "queued") {
+      if (run.parentRunId === undefined) {
+        return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is queued` })
+      }
+      const members = yield* sql<{ status: string }>`
+        SELECT status FROM baton_fan_out_members WHERE child_run_id = ${run.runId} LIMIT 1
+      `
+      if (members[0]?.status !== undefined && members[0].status !== "running") {
+        return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is awaiting fan-out admission` })
+      }
+    }
     const nextAttemptFence = run.attemptFence + 1
+    const nextAttempt = run.status === "queued" ? run.attempt + 1 : run.attempt
     const updated = yield* nowIso
     yield* sql`
       UPDATE baton_runs SET
         owner_worker_id = ${input.ownerId},
         attempt_fence = attempt_fence + 1,
+        attempt = ${nextAttempt},
         status = 'running',
         updated_at = ${updated}
       WHERE run_id = ${input.runId}
-        AND status = 'running'
+        AND status IN ('queued', 'running')
         AND attempt_fence = ${run.attemptFence}
     `
     const claimed = yield* requireRun(input.runId)
     if (claimed.ownerWorkerId !== input.ownerId || claimed.attemptFence !== nextAttemptFence) {
       return yield* StaleClaim.make({ runId: input.runId, workerId: input.ownerId, attemptFence: run.attemptFence })
     }
-    const wait = yield* loadRunWait(claimed.runId, run.activeWaitId)
+    if (run.status === "queued") {
+      yield* appendEvent(hub, claimed, { _tag: "RunAttemptStarted", attempt: claimed.attempt }, "running")
+    }
+    const started = run.status === "queued" ? yield* requireRun(input.runId) : claimed
+    const wait = yield* loadRunWait(started.runId, started.activeWaitId)
     const registrations = yield* loadRegistrations(input.runId)
-    return { ...executionRecord(claimed, registrations, wait?.resolution), ownerId: input.ownerId }
-  })
+    return { ...executionRecord(started, registrations, wait?.resolution), ownerId: input.ownerId }
+  }),
+)
 
 export const saveExecution = (
   input: ExecutionClaim & {
