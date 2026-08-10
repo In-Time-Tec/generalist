@@ -1,13 +1,46 @@
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema } from "effect"
-import { AgentEvent } from "@batonfx/core"
+import { Response } from "effect/unstable/ai"
+import { AgentEvent, ToolContext, ToolExecutor } from "@batonfx/core"
 import { ChildRuns, Errors, Runtime, RunStore } from "../src/index.js"
 import { assistantAddress, completedResult, parentRelativeOptions } from "./helpers.js"
 import { tempDbPath } from "./sqlite-helpers.js"
+import { provideScoped } from "./scoped-provide.js"
 
 const scheduler = { pollInterval: "1 day" as const }
 const memoryGroupLayer = Runtime.layerMemory({ ...parentRelativeOptions, scheduler })
 const sqliteGroupLayer = (filename: string) => Runtime.layerSqlite({ ...parentRelativeOptions, scheduler, filename })
+
+const toolRequest = (name: string, params: unknown): ToolExecutor.Request => {
+  const call = Response.makePart("tool-call", { id: `call-${name}`, name, params, providerExecuted: false })
+  return {
+    call,
+    toolCallBatch: { calls: [call] },
+    turn: 0,
+    toolCallIndex: 0,
+    agentName: "child-group-test",
+    sessionId: "child-group:test",
+  }
+}
+
+const toolContextLayer = ToolContext.layerTest({
+  signal: new AbortController().signal,
+  emit: () => Effect.void,
+  sessionId: "child-group:test",
+  runId: "parent-run",
+  toolCallId: "call-start_child_group",
+})
+
+const childRunsLayer = Layer.succeed(
+  ChildRuns.ChildRuns,
+  ChildRuns.ChildRuns.of({
+    invoke: () => Effect.die("unexpected child invocation"),
+    startGroup: () => Effect.die("invalid input reached child-group admission"),
+    awaitGroup: () => Effect.die("unexpected child-group join"),
+  }),
+)
+
+const childGroupRouteLayer = Layer.merge(toolContextLayer, childRunsLayer)
 
 const groupSuspension = (waitId: string, groupId: string) =>
   AgentEvent.AgentSuspended.make({
@@ -61,8 +94,35 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
       ).toEqual(Option.none())
       expect(tools.runChild.name).toBe("run_child")
       expect(tools.startChildGroup.name).toBe("start_child_group")
+      expect(tools.startChildGroup.description).toContain("{ members: [{ key, selection, prompt }], concurrency }")
       expect(tools.awaitChildGroup.name).toBe("await_child_group")
     }),
+  )
+
+  suite.effect("reports the exact invalid child-group member field", () =>
+    ChildRuns.route
+      .execute(
+        toolRequest(ChildRuns.startGroupToolName, {
+          concurrency: 1,
+          members: [{ key: "one", selection: 42, prompt: "work" }],
+        }),
+      )
+      .pipe(
+        (effect) => provideScoped(childGroupRouteLayer, effect),
+        Effect.flip,
+        Effect.tap((failure) =>
+          Effect.sync(() => {
+            if (!Schema.is(ToolExecutor.FrameworkFailure)(failure)) {
+              throw new Error(`expected FrameworkFailure, got ${failure._tag}`)
+            }
+            expect({ stage: failure.stage, tool: failure.tool, message: failure.message }).toEqual({
+              stage: "decode-input",
+              tool: "start_child_group",
+              message: "Expected string, got 42\n  at members[0].selection",
+            })
+          }),
+        ),
+      ),
   )
 
   suite.effect("starts without blocking and resumes one durable join with ordered results", () =>

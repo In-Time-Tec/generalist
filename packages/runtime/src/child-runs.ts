@@ -1,4 +1,4 @@
-import { Context, Effect, Schema } from "effect"
+import { Context, Effect, Schema, SchemaIssue } from "effect"
 import { ToolContext, ToolExecutor } from "@batonfx/core"
 import type { Interface as RunStoreInterface } from "./run-store.js"
 import { make as makeAddress } from "./address.js"
@@ -55,6 +55,27 @@ const domainFailure = (error: unknown): ToolExecutor.Outcome => {
   }
   return { _tag: "DomainFailure", failure, encodedFailure: failure }
 }
+
+const schemaIssueFormatter = SchemaIssue.makeFormatterStandardSchemaV1()
+
+const formatIssuePath = (path: ReadonlyArray<PropertyKey>): string =>
+  path
+    .map((segment, index) => {
+      if (typeof segment === "number") return `[${segment}]`
+      if (typeof segment === "string" && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment)) {
+        return index === 0 ? segment : `.${segment}`
+      }
+      return `[${typeof segment === "string" ? JSON.stringify(segment) : String(segment)}]`
+    })
+    .join("")
+
+const schemaIssueMessage = (error: Schema.SchemaError): string =>
+  schemaIssueFormatter(error.issue)
+    .issues.map((issue) => {
+      const path = issue.path as ReadonlyArray<PropertyKey> | undefined
+      return path === undefined || path.length === 0 ? issue.message : `${issue.message}\n  at ${formatIssuePath(path)}`
+    })
+    .join("\n")
 
 /** @experimental Construct Runtime-owned child execution operations over one RunStore. */
 export const make = (store: RunStoreInterface): Interface => {
@@ -198,11 +219,11 @@ export const route: ToolExecutor.Route<ChildRuns | ToolContext.ToolContext> = To
       }
       if (request.call.name === startGroupToolName) {
         const input = yield* Schema.decodeUnknownEffect(StartGroupParameters)(request.call.params).pipe(
-          Effect.mapError(() =>
+          Effect.mapError((error) =>
             ToolExecutor.FrameworkFailure.make({
               stage: "decode-input",
               tool: startGroupToolName,
-              message: "start_child_group requires 1-64 keyed children and bounded concurrency",
+              message: schemaIssueMessage(error),
             }),
           ),
         )

@@ -106,7 +106,8 @@ const makeRunChildTool = (selection: Schema.Codec<string>): Tool.Any =>
 
 const makeStartGroupTool = (selection: Schema.Codec<string>): Tool.Any =>
   Tool.make(startGroupToolName, {
-    description: "Atomically start a bounded group of declared child Agents and return durable receipts immediately.",
+    description:
+      "Atomically start a bounded group of declared child Agents and return durable receipts immediately. Input: { members: [{ key, selection, prompt }], concurrency }. Pass members as a flat array, not a nested object or JSON string.",
     parameters: startGroupParametersFor(selection),
     success: GroupReceipt,
   })
