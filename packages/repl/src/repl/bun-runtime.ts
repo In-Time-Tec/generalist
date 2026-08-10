@@ -112,7 +112,7 @@ export const emptyAccumulator: Accumulator = { stdout: emptyChannel, stderr: emp
 
 /** @experimental One write offered to one bounded channel. */
 export interface IngestRequest {
-  readonly channel: Channel
+  readonly channel: Exclude<Channel, "result">
   readonly text: string
   readonly limit: number
 }
@@ -179,7 +179,6 @@ export const ingest: {
   (input: IngestRequest): (previous: Accumulator) => Ingested
   (previous: Accumulator, input: IngestRequest): Ingested
 } = Function.dual(2, (previous: Accumulator, input: IngestRequest): Ingested => {
-  if (input.channel === "result") return { channels: previous, kept: input.text, truncated: false }
   const before = previous[input.channel]
   const { state, kept } = metered(before, input.text, input.limit)
   return {
@@ -231,13 +230,37 @@ export const outputEvents = (input: {
     : kept
 }
 
+/**
+ * @experimental Largest formatted result value carried into a cell's terminal events. A cell's
+ * result enters the model's context whole, so it is bounded like every other channel; the bytes
+ * past the bound are named, and the value itself still lives in the kernel namespace.
+ */
+export const maxResultBytes = 16_384
+
+const boundResult = (value: string): { readonly value: string; readonly droppedBytes: number } => {
+  const bytes = new TextEncoder().encode(value).byteLength
+  if (bytes <= maxResultBytes) return { value, droppedBytes: 0 }
+  const kept = keptWithinBytes(value, maxResultBytes)
+  const keptBytes = new TextEncoder().encode(kept).byteLength
+  return {
+    value: `${kept}\n[result truncated: showing ${keptBytes} of ${bytes} bytes. The full value is still in the kernel — bind it to a variable and slice it, or write it to a file, instead of returning it whole]`,
+    droppedBytes: bytes - keptBytes,
+  }
+}
+
 /** @experimental Fold one worker frame into the cell event a host streams, if it produces one. */
 export const toCellEvent: {
   (sequence: number): (frame: WorkerFrame) => CellEvent | undefined
   (frame: WorkerFrame, sequence: number): CellEvent | undefined
 } = Function.dual(2, (frame: WorkerFrame, sequence: number): CellEvent | undefined => {
   if (frame._tag === "Completed") {
-    return { _tag: "Result", cellId: frame.cellId, sequence, value: frame.value, durationMillis: frame.durationMillis }
+    return {
+      _tag: "Result",
+      cellId: frame.cellId,
+      sequence,
+      value: boundResult(frame.value).value,
+      durationMillis: frame.durationMillis,
+    }
   }
   return undefined
 })
@@ -256,16 +279,23 @@ export const terminal: {
   (frame: WorkerFrame, input: TerminalContext): CellOutcome | undefined
 } = Function.dual(2, (frame: WorkerFrame, input: TerminalContext): CellOutcome | undefined => {
   if (frame._tag === "Completed") {
+    const bounded = boundResult(frame.value)
     return {
       result: {
         cellId: frame.cellId,
         epoch: input.epoch,
         sequence: input.sequence,
-        value: frame.value,
+        value: bounded.value,
         stdout: input.channels.stdout.text,
         stderr: input.channels.stderr.text,
         durationMillis: frame.durationMillis,
-        truncation: truncationOf(input.channels),
+        truncation:
+          bounded.droppedBytes === 0
+            ? truncationOf(input.channels)
+            : [
+                ...truncationOf(input.channels),
+                { channel: "result", droppedBytes: bounded.droppedBytes, droppedEvents: 0 },
+              ],
       },
       failure: undefined,
     }
