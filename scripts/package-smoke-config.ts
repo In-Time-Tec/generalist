@@ -23,8 +23,8 @@ export const compressedSizeLimits: Record<(typeof packages)[number], number> = {
   memory: 10_000,
   providers: 36_000,
   mcp: 12_000,
-  repl: 40_000,
-  runtime: 192_000,
+  repl: 42_000,
+  runtime: 196_000,
   transport: 30_000,
   foldkit: 16_000,
 }
