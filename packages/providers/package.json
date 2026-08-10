@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@batonfx/providers",
-  "version": "0.20.0",
+  "version": "0.20.1",
   "private": false,
   "type": "module",
   "exports": {
