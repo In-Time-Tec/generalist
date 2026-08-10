@@ -32,6 +32,7 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
 import { OperationResolution } from "../../operation-resolution.js"
 import { Prompt } from "effect/unstable/ai"
+import { admitChildSettlementFromEventId } from "../settlement-notifications.js"
 
 type StoreError = RuntimeUnavailable | SqlError
 type StoreEffect<A> = Effect.Effect<A, StoreError, SqlClient.SqlClient>
@@ -348,6 +349,7 @@ export const settleParent: {
       SET terminal_event_id = ${terminalEventId}, settled_at = NOW()
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId}
     `
+    yield* admitChildSettlementFromEventId({ parent, child, terminalEventId })
     if (!isTerminal(parent.status)) {
       yield* appendEvent(hub, parent, {
         _tag: "ChildSettled",

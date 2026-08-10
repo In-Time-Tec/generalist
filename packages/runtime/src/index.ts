@@ -252,6 +252,10 @@ export namespace Runtime {
   export type SteerInput = import("./runtime.js").SteerInput
   export type SendMessageInput = import("./runtime.js").SendMessageInput
   export type MessagesInput = import("./runtime.js").MessagesInput
+  export type ChildSettlementsInput = import("./runtime.js").ChildSettlementsInput
+  export type ChildSettlementChangesInput = import("./runtime.js").ChildSettlementChangesInput
+  export type AwaitChildSettlementInput = import("./runtime.js").AwaitChildSettlementInput
+  export type ChildSettlementError = import("./runtime.js").ChildSettlementError
   export type RegisterAgentNameInput = import("./runtime.js").RegisterAgentNameInput
   export type SendMessageError = import("./runtime.js").SendMessageError
   export type DirectoryError = import("./runtime.js").DirectoryError
@@ -277,6 +281,8 @@ export namespace Runtime {
 export * as AgentDirectory from "./agent-directory.js"
 
 export * as Mailbox from "./mailbox.js"
+
+export * as ChildSettlement from "./child-settlement.js"
 
 export * as Messaging from "./messaging.js"
 

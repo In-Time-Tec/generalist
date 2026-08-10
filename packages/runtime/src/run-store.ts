@@ -50,6 +50,7 @@ import type { ExecutionContinuation, SteeringEntry } from "./steering.js"
 import type { ExecutableRegistration } from "./executable-registration.js"
 import type { Prompt } from "effect/unstable/ai"
 import type { AdmitFanOutInput, FanOutInspection, FanOutReceipt, InitialFanOutInput } from "./fan-out.js"
+import type { Notification as ChildSettlementNotification } from "./child-settlement.js"
 import type {
   CompleteProgramInput,
   AdmitProgramAgentsInput,
@@ -316,6 +317,12 @@ export interface Interface {
     readonly sessionId: string
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RuntimeUnavailable>
+  /** @experimental Ordered durable child settlements addressed to one exact parent Run. */
+  readonly settlementNotifications: (input: {
+    readonly parentRunId: string
+    readonly afterSequence: number
+    readonly limit: number
+  }) => Effect.Effect<ReadonlyArray<ChildSettlementNotification>, RunNotFound | RuntimeUnavailable>
   /** @experimental Bind every pending message for a Run's session to that Run's steering inbox. */
   readonly deliverPendingMessages: (input: {
     readonly runId: string

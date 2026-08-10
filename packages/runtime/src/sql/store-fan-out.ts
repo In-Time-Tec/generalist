@@ -343,18 +343,7 @@ export const reconcileFanOutWith: {
           UPDATE baton_fan_out_members SET status = 'cancelled', terminal_event_id = ${cancelledEvent.eventId}, outcome_json = '{}'
           WHERE child_run_id = ${member.childRunId}
         `
-          yield* sql`
-          UPDATE baton_run_links SET terminal_event_id = ${cancelledEvent.eventId}, settled_at = ${yield* nowIso}
-          WHERE child_run_id = ${member.childRunId} AND terminal_event_id IS NULL
-        `
-          const parent = yield* loadRun(loaded.fanOut.parent_run_id)
-          if (parent !== undefined && !["succeeded", "failed", "cancelled"].includes(parent.status)) {
-            yield* append(hub, parent, {
-              _tag: "ChildSettled",
-              childRunId: member.childRunId,
-              terminalEventId: cancelledEvent.eventId,
-            })
-          }
+          yield* settle(hub, (yield* loadRun(member.childRunId))!, cancelledEvent.eventId)
         }
       }
       if (joined === undefined) {

@@ -1,4 +1,4 @@
-import { Effect, Layer, Stream } from "effect"
+import { Effect, Layer, Option, Ref, Stream } from "effect"
 import {
   AddressNotFound,
   ChildSelectionMissing,
@@ -7,6 +7,7 @@ import {
   FanOutInvalid,
   FanOutRemainderUnsupported,
   StartInvalid,
+  RuntimeUnavailable,
 } from "../errors.js"
 import { make as makeAddress, type Address } from "../address.js"
 import { origin as cursorOrigin } from "../cursor.js"
@@ -142,6 +143,41 @@ export const makeRuntime = (
         yield* Stream.runHead(changes)
         return yield* awaitFanOut(fanOutId)
       })
+    const childSettlementChanges = (
+      input: Parameters<RuntimeInterface["childSettlementChanges"]>[0],
+    ): ReturnType<RuntimeInterface["childSettlementChanges"]> =>
+      Stream.unwrap(
+        Effect.gen(function* () {
+          const parent = yield* store.directory(input.parentRunId)
+          const sequence = yield* Ref.make(input.afterSequence ?? -1)
+          return store.treeChanges(parent.rootRunId).pipe(
+            Stream.mapEffect(() =>
+              Effect.flatMap(Ref.get(sequence), (afterSequence) =>
+                store.settlementNotifications({
+                  parentRunId: input.parentRunId,
+                  afterSequence,
+                  limit: Number.MAX_SAFE_INTEGER,
+                }),
+              ),
+            ),
+            Stream.flattenIterable,
+            Stream.tap((notification) => Ref.set(sequence, notification.sequence)),
+          )
+        }),
+      )
+    const awaitChildSettlement = (
+      input: Parameters<RuntimeInterface["awaitChildSettlement"]>[0],
+    ): ReturnType<RuntimeInterface["awaitChildSettlement"]> =>
+      childSettlementChanges({ parentRunId: input.parentRunId }).pipe(
+        Stream.filter((notification) => notification.childRunId === input.childRunId),
+        Stream.runHead,
+        Effect.flatMap(
+          Option.match({
+            onNone: () => RuntimeUnavailable.make({ message: "child settlement subscription ended" }),
+            onSome: Effect.succeed,
+          }),
+        ),
+      )
     const normalizeFanOut = (parentRunId: string, input: InitialFanOutInput) =>
       Effect.gen(function* () {
         if (!Number.isSafeInteger(input.concurrency) || input.concurrency < 1) {
@@ -400,6 +436,14 @@ export const makeRuntime = (
           const entry = yield* store.directory(input.runId)
           return yield* store.pendingMessages({ sessionId: entry.sessionId, limit: input.limit })
         }),
+      childSettlements: (input) =>
+        store.settlementNotifications({
+          parentRunId: input.parentRunId,
+          afterSequence: input.afterSequence ?? -1,
+          limit: input.limit,
+        }),
+      childSettlementChanges,
+      awaitChildSettlement,
       directory: (runId) => reachable({ store, policy, runId }),
       registerAgentName: (input) => store.registerAgentName(input),
       resolveOperation: (input) => store.resolveOperation(input),

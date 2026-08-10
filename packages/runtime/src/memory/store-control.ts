@@ -26,6 +26,7 @@ import type { MemoryState, StoredRun } from "./state.js"
 import { reconcileFanOut } from "./store-fan-out.js"
 import { ProgramCapabilities } from "@batonfx/core"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
+import { admitChildSettlement } from "./store-directory.js"
 
 type RespondResult = Effect.Effect<
   MemoryState,
@@ -57,10 +58,14 @@ const settleParentChild = (
   Effect.gen(function* () {
     if (child.parentRunId === undefined) return state
     const parent = state.runs.get(child.parentRunId)
-    if (parent === undefined || isTerminal(parent.status)) return state
+    if (parent === undefined) return state
+    const terminalEvent = child.events.find((event) => event.eventId === terminalEventId)
+    const notified =
+      terminalEvent === undefined ? state : yield* admitChildSettlement(state, { parent, child, event: terminalEvent })
+    if (isTerminal(parent.status)) return notified
     const already = parent.events.some((event) => event._tag === "ChildSettled" && event.childRunId === child.runId)
-    if (already) return state
-    const [, next] = yield* appendLifecycle(state, parent.runId, makeChildSettled(child.runId, terminalEventId))
+    if (already) return notified
+    const [, next] = yield* appendLifecycle(notified, parent.runId, makeChildSettled(child.runId, terminalEventId))
     const currentParent = next.runs.get(parent.runId)
     if (currentParent?.status !== "queued" || hasUnsettledChild(next, parent.runId)) return next
     const [, started] = yield* appendLifecycle(

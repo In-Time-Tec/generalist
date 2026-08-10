@@ -78,6 +78,7 @@ import { encodeReason, WaitResolution } from "../../run-wait.js"
 import { Prompt } from "effect/unstable/ai"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
 import { makeSqlRunner } from "./transaction.js"
+import { settlementNotifications } from "../settlement-notifications.js"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
@@ -321,6 +322,7 @@ export const makeMysqlServices = (
       listRelated: (runId) => runNoTxn(listRelated(runId)),
       admitMessage: (input) => run(lockNamed(`baton:mailbox:${input.targetSessionId}`, admitMessage(input))),
       pendingMessages: (input) => runNoTxn(pendingMessages(input)),
+      settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
       deliverPendingMessages: (input) => run(lockRun(input.runId).pipe(Effect.andThen(deliverPendingMessages(input)))),
       inspect: (runId) =>
         runNoTxn(

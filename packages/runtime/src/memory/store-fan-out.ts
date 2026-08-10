@@ -30,6 +30,7 @@ import { resolveChild } from "../executable-manifest.js"
 import { digestFanOut } from "../fan-out.js"
 import { narrow } from "../executable-registration.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
+import { admitChildSettlement } from "./store-directory.js"
 
 const inspection = (fanOut: StoredFanOut): FanOutInspection => ({
   fanOutId: fanOut.fanOutId,
@@ -315,6 +316,10 @@ export const reconcileFanOut: {
           )
           next = cancelledState
           const parent = next.runs.get(current.parentRunId)
+          const settledChild = next.runs.get(run.runId)
+          if (parent !== undefined && settledChild !== undefined) {
+            next = yield* admitChildSettlement(next, { parent, child: settledChild, event: cancelledEvent })
+          }
           if (parent !== undefined && !isTerminal(parent.status)) {
             const [, settled] = yield* appendLifecycle(
               next,

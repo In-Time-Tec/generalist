@@ -16,6 +16,14 @@ import { deliveryPrompt } from "../mailbox.js"
 import { digest as steeringDigest } from "../steering.js"
 import { isTerminal } from "../run.js"
 import { agentNameKey, type MemoryState, type StoredRun } from "./state.js"
+import {
+  fromMailboxEntry,
+  mailboxEntry,
+  notificationIdFor,
+  payloadFromEvent,
+  type Notification,
+} from "../child-settlement.js"
+import type { RunEvent } from "../run-event.js"
 
 const requireRun = (state: MemoryState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -159,6 +167,77 @@ export const pendingMessages: {
       .filter((entry) => entry.targetSessionId === input.sessionId && owed(state, entry))
       .sort((left, right) => left.sequence - right.sequence)
       .slice(0, input.limit),
+)
+
+export const settlementNotifications: {
+  (input: {
+    readonly parentRunId: string
+    readonly afterSequence: number
+    readonly limit: number
+  }): (state: MemoryState) => Effect.Effect<ReadonlyArray<Notification>, RunNotFound | RuntimeUnavailable>
+  (
+    state: MemoryState,
+    input: { readonly parentRunId: string; readonly afterSequence: number; readonly limit: number },
+  ): Effect.Effect<ReadonlyArray<Notification>, RunNotFound | RuntimeUnavailable>
+} = Function.dual(
+  2,
+  (
+    state: MemoryState,
+    input: { readonly parentRunId: string; readonly afterSequence: number; readonly limit: number },
+  ) =>
+    Effect.gen(function* () {
+      const parent = yield* requireRun(state, input.parentRunId)
+      return [...state.messages.values()]
+        .filter((entry) => entry.targetSessionId === parent.message.sessionId && entry.sequence > input.afterSequence)
+        .sort((left, right) => left.sequence - right.sequence)
+        .flatMap((entry) => {
+          const notification = fromMailboxEntry(entry)
+          return notification?.parentRunId === input.parentRunId ? [notification] : []
+        })
+        .slice(0, input.limit)
+    }),
+)
+
+export const admitChildSettlement: {
+  (input: {
+    readonly parent: StoredRun
+    readonly child: StoredRun
+    readonly event: RunEvent
+  }): (state: MemoryState) => Effect.Effect<MemoryState>
+  (
+    state: MemoryState,
+    input: { readonly parent: StoredRun; readonly child: StoredRun; readonly event: RunEvent },
+  ): Effect.Effect<MemoryState>
+} = Function.dual(
+  2,
+  (state: MemoryState, input: { readonly parent: StoredRun; readonly child: StoredRun; readonly event: RunEvent }) =>
+    Effect.gen(function* () {
+      const notificationId = notificationIdFor(input.child.runId)
+      const key = messageKey({
+        sessionId: input.parent.message.sessionId,
+        messageId: notificationId,
+        key: notificationId,
+      })
+      if (state.messages.has(key)) return state
+      const payload = payloadFromEvent({
+        parentRunId: input.parent.runId,
+        childRunId: input.child.runId,
+        event: input.event,
+      })
+      if (payload === undefined) return state
+      const forSession = [...state.messages.values()].filter(
+        (entry) => entry.targetSessionId === input.parent.message.sessionId,
+      )
+      const entry = mailboxEntry({
+        payload,
+        parentSessionId: input.parent.message.sessionId,
+        sequence: forSession.reduce((highest, item) => Math.max(highest, item.sequence + 1), 0),
+        admittedAtMillis: yield* Clock.currentTimeMillis,
+      })
+      const messages = new Map(state.messages)
+      messages.set(key, entry)
+      return { ...state, messages }
+    }),
 )
 
 export const admitMessage: {

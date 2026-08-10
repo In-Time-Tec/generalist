@@ -64,6 +64,7 @@ import {
   startProgramOperation,
 } from "./store-program.js"
 import { ProgramCapabilities } from "@batonfx/core"
+import { settlementNotifications } from "./settlement-notifications.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly filename: string
@@ -157,6 +158,7 @@ export const makeSqliteRunStore = (
       listRelated: (runId) => runNoTxn(listRelated(runId)),
       admitMessage: (input) => run(admitMessage(input)),
       pendingMessages: (input) => runNoTxn(pendingMessages(input)),
+      settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
       deliverPendingMessages: (input) => run(deliverPendingMessages(input)),
       inspect: (runId) =>
         runNoTxn(

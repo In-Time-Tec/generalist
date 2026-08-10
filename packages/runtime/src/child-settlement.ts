@@ -1,0 +1,131 @@
+import { Option, Schema } from "effect"
+import { Prompt } from "effect/unstable/ai"
+import { runAddress } from "./agent-directory.js"
+import { promptBytes, type MailboxEntry } from "./mailbox.js"
+import type { Metadata } from "./message.js"
+import type { RunEvent } from "./run-event.js"
+
+/** @experimental Maximum UTF-8 result size carried inline by one settlement notification. */
+export const maxResultBytes = 16_384
+
+/** @experimental Durable payload written when a child Run reaches a terminal state. */
+export const Payload = Schema.TaggedStruct("ChildSettlement", {
+  notificationId: Schema.String,
+  parentRunId: Schema.String,
+  childRunId: Schema.String,
+  terminalEventId: Schema.String,
+  status: Schema.Literals(["succeeded", "failed", "cancelled"]),
+  resultText: Schema.String,
+  resultBytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  resultTruncated: Schema.Boolean,
+})
+/** @experimental */
+export type Payload = typeof Payload.Type
+
+/** @experimental One ordered durable child settlement notification. */
+export const Notification = Schema.Struct({
+  ...Payload.fields,
+  sequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  admittedAtMillis: Schema.Finite,
+})
+/** @experimental */
+export type Notification = typeof Notification.Type
+
+const metadataKey = "baton.childSettlement"
+const encoder = new TextEncoder()
+
+const stringify = (value: unknown): string => {
+  if (typeof value === "string") return value
+  try {
+    const encoded = JSON.stringify(value)
+    return encoded === undefined ? String(value) : encoded
+  } catch {
+    return String(value)
+  }
+}
+
+const boundedResult = (childRunId: string, text: string) => {
+  const resultBytes = encoder.encode(text).length
+  if (resultBytes <= maxResultBytes) return { resultText: text, resultBytes, resultTruncated: false } as const
+  return {
+    resultText: `[Result omitted: ${resultBytes} UTF-8 bytes exceeds the ${maxResultBytes}-byte notification limit. Recover it with Runtime.snapshot("${childRunId}").]`,
+    resultBytes,
+    resultTruncated: true,
+  } as const
+}
+
+/** @experimental Stable identity shared by retries of one child's settlement. */
+export const notificationIdFor = (childRunId: string): string => `child-settled:${childRunId}`
+
+/** @experimental Build the typed notification payload from the authoritative terminal event. */
+export const payloadFromEvent = (input: {
+  readonly parentRunId: string
+  readonly childRunId: string
+  readonly event: RunEvent
+}): Payload | undefined => {
+  let status: Payload["status"]
+  let text: string
+  if (input.event._tag === "RunCompleted") {
+    status = "succeeded"
+    text = "text" in input.event.result ? input.event.result.text : stringify(input.event.result.value)
+  } else if (input.event._tag === "RunFailed") {
+    status = "failed"
+    text = `${input.event.error._tag}: ${input.event.error.message}`
+  } else if (input.event._tag === "RunCancelled") {
+    status = "cancelled"
+    text = input.event.reason ?? "Child run cancelled"
+  } else return undefined
+  return {
+    _tag: "ChildSettlement",
+    notificationId: notificationIdFor(input.childRunId),
+    parentRunId: input.parentRunId,
+    childRunId: input.childRunId,
+    terminalEventId: input.event.eventId,
+    status,
+    ...boundedResult(input.childRunId, text),
+  }
+}
+
+/** @experimental Encode one settlement payload into the existing durable mailbox representation. */
+export const mailboxEntry = (input: {
+  readonly payload: Payload
+  readonly parentSessionId: string
+  readonly sequence: number
+  readonly admittedAtMillis: number
+}): MailboxEntry => {
+  const prompt = Prompt.make(
+    `Child run ${input.payload.childRunId} settled with status ${input.payload.status}.\n\n${input.payload.resultText}`,
+  )
+  const metadata: Metadata = { [metadataKey]: input.payload }
+  return {
+    entryId: input.payload.notificationId,
+    targetSessionId: input.parentSessionId,
+    sequence: input.sequence,
+    from: runAddress(input.payload.childRunId),
+    fromRunId: input.payload.childRunId,
+    to: runAddress(input.payload.parentRunId),
+    messageId: input.payload.notificationId,
+    idempotencyKey: input.payload.notificationId,
+    digest: input.payload.notificationId,
+    bytes: promptBytes(prompt),
+    admittedAtMillis: input.admittedAtMillis,
+    prompt,
+    correlationId: input.payload.notificationId,
+    metadata,
+  }
+}
+
+/** @experimental Decode a typed settlement notification from mailbox metadata. */
+export const fromMetadata = (input: {
+  readonly metadata: Metadata
+  readonly sequence: number
+  readonly admittedAtMillis: number
+}): Notification | undefined => {
+  const payload = Option.getOrUndefined(Schema.decodeUnknownOption(Payload)(input.metadata[metadataKey]))
+  if (payload === undefined) return undefined
+  return { ...payload, sequence: input.sequence, admittedAtMillis: input.admittedAtMillis }
+}
+
+/** @experimental Decode a typed settlement notification from a mailbox row. */
+export const fromMailboxEntry = (entry: MailboxEntry): Notification | undefined =>
+  fromMetadata({ metadata: entry.metadata, sequence: entry.sequence, admittedAtMillis: entry.admittedAtMillis })

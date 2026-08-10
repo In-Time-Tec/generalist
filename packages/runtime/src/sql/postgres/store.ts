@@ -54,6 +54,7 @@ import { associateRegistrations, loadRegistrations } from "../executable-registr
 import { narrow } from "../../executable-registration.js"
 import { PendingRunOutcome } from "../../run-store.js"
 import { approvalResponse } from "../respond-approval.js"
+import { settlementNotifications } from "../settlement-notifications.js"
 const nextId = (prefix: string): Effect.Effect<string> =>
   Effect.gen(function* () {
     const random = yield* Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER)
@@ -307,6 +308,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
       readSteering: (input) => run(requireExecutionClaim(input).pipe(Effect.andThen(readSteering(input)))),
       ...messagingStoreMethods({ run, runNoTxn, lockRun, lockMailbox }),
+      settlementNotifications: (input) => runNoTxn(settlementNotifications(input)),
       inspect: (runId) =>
         runNoTxn(
           Effect.gen(function* () {

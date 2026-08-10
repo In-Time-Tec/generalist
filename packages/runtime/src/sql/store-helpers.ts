@@ -22,8 +22,7 @@ import {
   encodeQueue,
 } from "./codecs.js"
 import type { EventHub } from "./subscribers.js"
-import type { DecodedRun, EventRow, OperationRow, RunRow } from "./rows.js"
-import type { WaitRow } from "./rows.js"
+import type { DecodedRun, EventRow, OperationRow, RunRow, WaitRow } from "./rows.js"
 import { decodeReason, WaitResolution, type RunWait } from "../run-wait.js"
 import { OperationResolution } from "../operation-resolution.js"
 import type { OperationRecord } from "./operations.js"
@@ -33,6 +32,7 @@ import { RuntimeUnavailable } from "../errors.js"
 import { checkpointRef, decodePinned } from "../executable-manifest.js"
 import { PendingRunOutcome } from "../run-store.js"
 import { Prompt } from "effect/unstable/ai"
+import { admitChildSettlementFromEventId } from "./settlement-notifications.js"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -369,7 +369,6 @@ export const afterTerminal: {
   })
 }
 
-/** A Run stays non-terminal while it still owns unsettled children. */
 export const hasUnsettledChild = (
   runId: string,
 ): Effect.Effect<boolean, RuntimeUnavailable | SqlError, SqlClient.SqlClient> =>
@@ -409,6 +408,7 @@ export const settleParent: {
       SET terminal_event_id = ${terminalEventId}, settled_at = ${settledAt}
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId}
     `
+    yield* admitChildSettlementFromEventId({ parent, child, terminalEventId })
     if (!isTerminal(parent.status)) {
       yield* appendEvent(hub, parent, {
         _tag: "ChildSettled",

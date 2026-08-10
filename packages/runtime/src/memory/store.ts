@@ -33,6 +33,7 @@ import {
   directory,
   listRelated,
   pendingMessages,
+  settlementNotifications,
   registerAgentName,
   resolveAddress,
 } from "./store-directory.js"
@@ -148,6 +149,8 @@ export const makeRunStore = (options: LayerOptions) =>
               : Effect.succeed(pendingMessages(state, input)),
           ),
         ),
+      settlementNotifications: (input) =>
+        SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => settlementNotifications(state, input))),
       deliverPendingMessages: (input) =>
         SynchronizedRef.modifyEffect(stateRef, (state) => deliverPendingMessages(state, input)),
       inspect: (runId) => SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => inspectRun(state, runId))),

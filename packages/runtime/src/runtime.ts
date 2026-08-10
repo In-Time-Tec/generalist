@@ -50,6 +50,7 @@ import type { ResolveOperationInput } from "./operation-resolution.js"
 import type { RespondInput as RespondApprovalInput } from "./approval.js"
 import type { ExecutableRegistration } from "./executable-registration.js"
 import type { Duration } from "effect"
+import type { Notification as ChildSettlementNotification } from "./child-settlement.js"
 
 export type { InitialFanOutInput } from "./fan-out.js"
 
@@ -192,6 +193,25 @@ export interface MessagesInput {
 }
 
 /** @experimental */
+export interface ChildSettlementsInput {
+  readonly parentRunId: string
+  readonly afterSequence?: number
+  readonly limit: number
+}
+
+/** @experimental */
+export interface ChildSettlementChangesInput {
+  readonly parentRunId: string
+  readonly afterSequence?: number
+}
+
+/** @experimental */
+export interface AwaitChildSettlementInput {
+  readonly parentRunId: string
+  readonly childRunId: string
+}
+
+/** @experimental */
 export interface RegisterAgentNameInput {
   readonly runId: string
   readonly name: AgentName
@@ -233,6 +253,7 @@ export type SendMessageError =
   | RunNotFound
   | RuntimeUnavailable
 export type DirectoryError = RunNotFound | RuntimeUnavailable
+export type ChildSettlementError = RunNotFound | RuntimeUnavailable
 export type RegisterAgentNameError = RunNotFound | AgentNameConflict | RuntimeUnavailable
 export type EventsError = RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable
 export type TreeEventsError = RunNotFound | TreeCursorInvalid | TreeCursorExpired | RuntimeUnavailable
@@ -281,6 +302,18 @@ export interface Interface {
   readonly sendMessage: (input: SendMessageInput) => Effect.Effect<MessageReceipt, SendMessageError>
   /** @experimental Messages admitted for a Run's session that no Run has taken yet. */
   readonly messages: (input: MessagesInput) => Effect.Effect<ReadonlyArray<MailboxEntry>, DirectoryError>
+  /** @experimental Read ordered durable child settlements for one exact parent Run. */
+  readonly childSettlements: (
+    input: ChildSettlementsInput,
+  ) => Effect.Effect<ReadonlyArray<ChildSettlementNotification>, ChildSettlementError>
+  /** @experimental Subscribe to durable child settlements, replaying entries after the requested sequence. */
+  readonly childSettlementChanges: (
+    input: ChildSettlementChangesInput,
+  ) => Stream.Stream<ChildSettlementNotification, ChildSettlementError>
+  /** @experimental Wait for one child's durable settlement without executing or scheduling the parent. */
+  readonly awaitChildSettlement: (
+    input: AwaitChildSettlementInput,
+  ) => Effect.Effect<ChildSettlementNotification, ChildSettlementError>
   /** @experimental Addresses this Run may reach under Baton relationships plus host policy. */
   readonly directory: (runId: string) => Effect.Effect<ReadonlyArray<DirectoryEntry>, DirectoryError>
   /** @experimental Bind one host-assigned name, unique within the Run's naming scope. */

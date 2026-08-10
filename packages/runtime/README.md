@@ -44,6 +44,20 @@ import {
 
 Approval suspensions are typed waits containing a stable approval ID and the exact requested operation, capability, and input. Inspect the Run or tree, then call `Approval.approve({ runId, approvalId })` or `Approval.deny({ runId, approvalId, reason })`. Exact duplicate decisions are idempotent; stale identities and changed decisions fail as `ApprovalStale` and `ApprovalMismatch`. Generic wait responses and unknown-operation resolution are separate controls.
 
+## Child settlement notifications
+
+Every child terminal transition atomically writes one deduplicated record to the parent's existing `baton_messages` inbox. The stable notification ID is `child-settled:<childRunId>`. Notifications contain the exact parent and child Run IDs, terminal event ID, `succeeded`, `failed`, or `cancelled` status, and result text. Result text is limited to 16 KiB; an oversized value is replaced by a marker that names `Runtime.snapshot(childRunId)` as the full-result recovery path.
+
+The next consumer should use only these exported Runtime operations:
+
+```ts
+runtime.childSettlements({ parentRunId, afterSequence: -1, limit: 100 })
+runtime.childSettlementChanges({ parentRunId, afterSequence: -1 })
+runtime.awaitChildSettlement({ parentRunId, childRunId })
+```
+
+`childSettlements` is a finite ordered read. `childSettlementChanges` replays durable entries after `afterSequence` and then follows committed tree changes. `awaitChildSettlement` waits for one exact child. None starts or resumes the parent Run, enters `LocalScheduler`'s execution `FiberMap`, or consumes an execution concurrency seat.
+
 ## Fan-out
 
 `Runtime.spawn` and `Runtime.fanOut` accept semantic child selections declared by the parent Run's active Agent manifest. Admission resolves each selection to an exact Agent pin from the persisted executable closure under the parent lock; address bindings and the executable resolver are not consulted. Fan-out resolves every member atomically, and the resolved refs participate in its idempotency digest. `Runtime.awaitFanOut` waits on committed child events until the durable join decision is available; `Runtime.inspectFanOut` remains the non-blocking inspection operation. Both return member outcomes in input ordinal order.
