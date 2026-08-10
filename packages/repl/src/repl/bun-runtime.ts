@@ -145,15 +145,22 @@ const keptWithinBytes = (text: string, budget: number): string => {
 
 const metered = (previous: ChannelState, text: string, limit: number): { state: ChannelState; kept: string } => {
   const size = new TextEncoder().encode(text).byteLength
-  const remaining = limit - previous.bytes
-  if (remaining <= 0) {
+  if (size === 0) return { state: previous, kept: "" }
+  if (previous.droppedEvents > 0) {
     return {
       state: { ...previous, droppedBytes: previous.droppedBytes + size, droppedEvents: previous.droppedEvents + 1 },
       kept: "",
     }
   }
+  const remaining = limit - previous.bytes
   if (size <= remaining) {
     return { state: { ...previous, text: previous.text + text, bytes: previous.bytes + size }, kept: text }
+  }
+  if (remaining <= 0) {
+    return {
+      state: { ...previous, droppedBytes: previous.droppedBytes + size, droppedEvents: previous.droppedEvents + 1 },
+      kept: "",
+    }
   }
   const kept = keptWithinBytes(text, remaining)
   const keptBytes = new TextEncoder().encode(kept).byteLength
@@ -187,6 +194,13 @@ export const ingest: {
     truncated: state.droppedEvents > before.droppedEvents,
   }
 })
+
+const renderedChannel = (state: ChannelState): string => {
+  if (state.droppedBytes === 0 && state.droppedEvents === 0) return state.text
+  const totalBytes = state.bytes + state.droppedBytes
+  const separator = state.text.length === 0 || state.text.endsWith("\n") ? "" : "\n"
+  return `${state.text}${separator}[truncated: kept first ${state.bytes} of ${totalBytes} bytes — page or narrow the command]`
+}
 
 /** @experimental What every channel of one cell dropped, reported per channel that dropped anything. */
 export const truncationOf = (channels: Accumulator): ReadonlyArray<Truncation> =>
@@ -243,7 +257,7 @@ const boundResult = (value: string): { readonly value: string; readonly droppedB
   const kept = keptWithinBytes(value, maxResultBytes)
   const keptBytes = new TextEncoder().encode(kept).byteLength
   return {
-    value: `${kept}\n[result truncated: showing ${keptBytes} of ${bytes} bytes. The full value is still in the kernel — bind it to a variable and slice it, or write it to a file, instead of returning it whole]`,
+    value: `${kept}\n[result truncated: kept first ${keptBytes} of ${bytes} bytes — the full value is still in the kernel; bind it to a variable and slice it, or write it to a file]`,
     droppedBytes: bytes - keptBytes,
   }
 }
@@ -286,8 +300,8 @@ export const terminal: {
         epoch: input.epoch,
         sequence: input.sequence,
         value: bounded.value,
-        stdout: input.channels.stdout.text,
-        stderr: input.channels.stderr.text,
+        stdout: renderedChannel(input.channels.stdout),
+        stderr: renderedChannel(input.channels.stderr),
         durationMillis: frame.durationMillis,
         truncation:
           bounded.droppedBytes === 0
@@ -310,8 +324,8 @@ export const terminal: {
         name: frame.kind === "threw" ? frame.name : `Cell${frame.kind}`,
         message: frame.message,
         ...(frame.stack === undefined ? {} : { stack: frame.stack }),
-        stdout: input.channels.stdout.text,
-        stderr: input.channels.stderr.text,
+        stdout: renderedChannel(input.channels.stdout),
+        stderr: renderedChannel(input.channels.stderr),
         durationMillis: frame.durationMillis,
         truncation: truncationOf(input.channels),
       }),

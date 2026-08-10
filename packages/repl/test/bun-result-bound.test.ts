@@ -1,6 +1,6 @@
-import { expect, layer } from "@effect/vitest"
+import { expect, it as test, layer } from "@effect/vitest"
 import { Effect } from "effect"
-import { maxResultBytes } from "../src/repl/bun-runtime.js"
+import { maxResultBytes, toCellEvent } from "../src/repl/bun-runtime.js"
 import { liveOptions, platform, runCell, withPool } from "./bun-harness.js"
 
 layer(platform, liveOptions)("Bun kernel result bound", (it) => {
@@ -19,7 +19,8 @@ layer(platform, liveOptions)("Bun kernel result bound", (it) => {
             code: "'x'.repeat(100_000)",
           })
           expect(new TextEncoder().encode(result.value).byteLength).toBeLessThan(maxResultBytes + 256)
-          expect(result.value).toContain("[result truncated: showing")
+          expect(result.value).toContain("[result truncated: kept first")
+          expect(result.value).toContain("of 100000 bytes")
           expect(result.value).toContain("still in the kernel")
           const truncation = result.truncation.find((entry) => entry.channel === "result")
           expect(truncation?.droppedBytes ?? 0).toBeGreaterThan(0)
@@ -37,4 +38,25 @@ layer(platform, liveOptions)("Bun kernel result bound", (it) => {
         }),
     }),
   )
+})
+
+test("keeps an exactly-at-limit result without a truncation marker", () => {
+  const value = "x".repeat(maxResultBytes)
+  const event = toCellEvent({ _tag: "Completed", cellId: "cell", value, durationMillis: 0 }, 0)
+  expect(event?._tag).toBe("Result")
+  if (event?._tag !== "Result") return
+  expect(event.value).toBe(value)
+  expect(event.value).not.toContain("[result truncated:")
+})
+
+test("bounds a multibyte result on a valid UTF-8 prefix", () => {
+  const value = `${"x".repeat(maxResultBytes - 1)}🙂TAIL`
+  const event = toCellEvent({ _tag: "Completed", cellId: "cell", value, durationMillis: 0 }, 0)
+  expect(event?._tag).toBe("Result")
+  if (event?._tag !== "Result") return
+  const [kept, marker] = event.value.split("\n[result truncated:")
+  expect(kept).toBe("x".repeat(maxResultBytes - 1))
+  expect([...kept!].join("")).toBe(kept)
+  expect(marker).toContain(`kept first ${maxResultBytes - 1} of ${new TextEncoder().encode(value).byteLength} bytes`)
+  expect(event.value).not.toContain("TAIL")
 })

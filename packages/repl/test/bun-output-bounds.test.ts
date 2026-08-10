@@ -157,7 +157,9 @@ layer(platform, liveOptions)("Bun kernel output bounds", (it) => {
               "'done'",
             ].join("\n"),
           })
-          expect(result.stdout.length).toBeLessThanOrEqual(channelBytes)
+          const [kept, marker] = result.stdout.split("\n[truncated:")
+          expect(new TextEncoder().encode(kept).byteLength).toBeLessThanOrEqual(channelBytes)
+          expect(marker).toContain("kept first")
           expect(result.truncation.some((entry) => entry.channel === "stdout")).toBe(true)
         }),
     }),
@@ -177,7 +179,9 @@ layer(platform, liveOptions)("Bun kernel output bounds", (it) => {
               "'done'",
             ].join("\n"),
           })
-          expect(result.stdout.length).toBeLessThanOrEqual(channelBytes)
+          const [kept, marker] = result.stdout.split("\n[truncated:")
+          expect(new TextEncoder().encode(kept).byteLength).toBeLessThanOrEqual(channelBytes)
+          expect(marker).toContain("kept first")
           expect(result.truncation.some((entry) => entry.channel === "stdout")).toBe(true)
         }),
     }),
