@@ -48,7 +48,7 @@ const boundedResult = (childRunId: string, text: string) => {
   const resultBytes = encoder.encode(text).length
   if (resultBytes <= maxResultBytes) return { resultText: text, resultBytes, resultTruncated: false } as const
   return {
-    resultText: `[Result omitted: ${resultBytes} UTF-8 bytes exceeds the ${maxResultBytes}-byte notification limit. Recover it with Runtime.snapshot("${childRunId}").]`,
+    resultText: `[Result omitted: ${resultBytes} UTF-8 bytes exceeds the ${maxResultBytes}-byte notification limit. Ask the host child-settlement result-handoff adapter for the full result of child ${childRunId}.]`,
     resultBytes,
     resultTruncated: true,
   } as const

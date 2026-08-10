@@ -92,7 +92,9 @@ for (const [backend, runtimeLayer] of layers) {
         expect(new TextEncoder().encode(notification!.resultText).length).toBeLessThanOrEqual(
           ChildSettlement.maxResultBytes,
         )
-        expect(notification!.resultText).toContain(`Runtime.snapshot("${child.runId}")`)
+        expect(notification!.resultText).toContain("host child-settlement result-handoff adapter")
+        expect(notification!.resultText).toContain(child.runId)
+        expect(notification!.resultText).not.toContain("Runtime.snapshot")
         expect(notification!.resultText).not.toContain("x".repeat(1000))
       }),
     )
