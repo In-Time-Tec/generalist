@@ -41,6 +41,11 @@ const synthesizeAnswer = (found: WebSearchSuccess): string => {
   ].join("\n")
 }
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const scriptedModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
@@ -48,7 +53,10 @@ const scriptedModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effect(
     streamText: (options) => {
       const found = findWebSearchResult(options.prompt)
       if (found !== undefined) {
-        return Stream.make(Response.makePart("text-delta", { id: "assistant", delta: synthesizeAnswer(found) }))
+        return Stream.make(
+          Response.makePart("text-delta", { id: "assistant", delta: synthesizeAnswer(found) }),
+          Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+        )
       }
       return Stream.make(
         Response.makePart("tool-call", {
@@ -57,6 +65,7 @@ const scriptedModel: Layer.Layer<LanguageModel.LanguageModel> = Layer.effect(
           params: { query: latestUserQuestion(options.prompt) },
           providerExecuted: false,
         }),
+        Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
       )
     },
   }),

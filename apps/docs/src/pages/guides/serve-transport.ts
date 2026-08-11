@@ -37,11 +37,17 @@ export const serveTransport = definePage({
       code("runId"),
       ". ",
       code("Runtime.events"),
-      " replays events after an optional exclusive cursor, then follows live events.",
+      " replays semantic and lifecycle events after an optional exclusive cursor, then follows live events. Provider fragments never enter this durable stream.",
     ),
     codeBlock({ label: "session-frames.ts", source: sessionFrames, expectedOutput: sessionFramesExpected }),
     bullets(
       [code("sequence"), " is 0-based and monotonic per run. SSE IDs and WebSocket cursors use the same value."],
+      [
+        code("ModelResponseCommitted"),
+        " carries the complete normalized response for a successful model operation; ",
+        code("ModelResponseInterrupted"),
+        " carries normalized output retained before cancellation or failure. Neither event contains provider deltas.",
+      ],
       [
         "Terminal lifecycle facts are ",
         code("RunCompleted"),
@@ -99,6 +105,10 @@ export const serveTransport = definePage({
         ".",
       ],
       [code("Snapshot.get(runId)"), " is a finite inspection resource, separate from the event stream."],
+      [
+        code("Runtime.previews({ runId })"),
+        " is a bounded, cumulative, lossy process-local observer. It is not transported, persisted, cursor-addressed, checkpointed, or replayed.",
+      ],
       [
         "Closing SSE or WebSocket never cancels the run. Cancellation is always explicit through ",
         code("Runtime.cancel"),

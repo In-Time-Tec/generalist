@@ -14,7 +14,10 @@ export const runtimeReference = definePage({
     table(
       ["Namespace", "Role"],
       [
-        [[code("Runtime")], "Admission, events, history, listing, waits, signals, cancellation, and inspection"],
+        [
+          [code("Runtime")],
+          "Admission, durable events and history, disposable live previews, listing, waits, signals, cancellation, and inspection",
+        ],
         [[code("RunEvent")], "Canonical persisted lifecycle and agent-loop event schema"],
         [[code("RunStore")], "Memory and SQLite storage seam"],
         [[code("RunSchema")], "PostgreSQL schema plan, check, and predeploy apply operations"],
@@ -22,6 +25,25 @@ export const runtimeReference = definePage({
         [[code("RunClaims"), " / ", code("RuntimeWorker")], "Multi-worker claims, leases, and worker loops"],
         [[code("Address"), " / ", code("ExecutableRef"), " / ", code("Cursor")], "Schema-backed boundary identities"],
       ],
+    ),
+    h2("model-output", "Semantic history and disposable previews"),
+    p(
+      code("Runtime.events"),
+      " and ",
+      code("Runtime.history"),
+      " expose semantic model outcomes: one ",
+      code("ModelResponseCommitted"),
+      " after a successful model operation, or one ",
+      code("ModelResponseInterrupted"),
+      " when a run settles after partial output. Their normalized response content is stored, cursor-addressed, replayable, and projected by transport adapters.",
+    ),
+    p(
+      code("Runtime.previews({ runId })"),
+      " is a separate process-local observer for cumulative text and reasoning while a provider attempt is live. A preview is bounded to ",
+      code("ModelPreview.MaxCharacters"),
+      ", cadence-limited by ",
+      code("ModelPreview.MaxCadenceMillis"),
+      ", lossy, conflated, and safe to drop. It is never written to a database, assigned a RunEvent sequence, included in a cursor or checkpoint, replayed, or projected through the transport and FoldKit Chat contracts.",
     ),
     h2("layers", "Runtime layers"),
     p(

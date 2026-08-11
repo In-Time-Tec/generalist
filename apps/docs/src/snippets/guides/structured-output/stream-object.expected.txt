@@ -2,14 +2,13 @@ TurnStarted
 ModelCallStarted
 ModelAttemptStarted
 ModelAttemptFirstOutput
-ModelPart
 ModelAttemptCompleted
 ModelCallCompleted
+ModelResponseCommitted
 TurnCompleted
 ModelCallStarted
 ModelAttemptStarted
 ModelAttemptFirstOutput
-ModelAttemptCompleted
 ModelCallCompleted
 StructuredOutput: {"total":42,"currency":"USD"}
 Completed

@@ -2,9 +2,9 @@ TurnStarted
 ModelCallStarted
 ModelAttemptStarted
 ModelAttemptFirstOutput
-ModelPart
 ModelAttemptCompleted
 ModelCallCompleted
+ModelResponseCommitted
 ToolExecutionStarted
 ToolExecutionCompleted
 TurnCompleted
@@ -12,8 +12,8 @@ TurnStarted
 ModelCallStarted
 ModelAttemptStarted
 ModelAttemptFirstOutput
-ModelPart
 ModelAttemptCompleted
 ModelCallCompleted
+ModelResponseCommitted
 TurnCompleted
 Completed

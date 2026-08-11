@@ -15,9 +15,18 @@ const entryView = (entry: Chat.ChatEntry): Html => {
   }
 }
 
-const streamingView = (streaming: Chat.Model["streaming"]): Html => {
+const runStateView = (run: Chat.RunState): Html => {
   const h = html<Message>()
-  return streaming === null ? h.div([], []) : h.div([h.Class("entry entry-streaming")], [streaming.text])
+  switch (run._tag) {
+    case "Idle":
+      return h.p([h.Class("run-state")], ["idle"])
+    case "Running":
+      return h.p([h.Class("run-state")], [`working on turn ${run.turn}`])
+    case "AwaitingApproval":
+      return h.p([h.Class("run-state")], ["waiting for approval"])
+    case "Failed":
+      return h.p([h.Class("run-state run-state-failed")], [run.message])
+  }
 }
 
 const approvalView = (run: Chat.RunState): Html => {
@@ -58,7 +67,7 @@ export const view = (model: Model): Document => {
       [
         h.p([h.Class("connection")], [`connection: ${model.chat.connection}`]),
         h.div([h.Class("entries")], model.chat.entries.map(entryView)),
-        streamingView(model.chat.streaming),
+        runStateView(model.chat.run),
         approvalView(model.chat.run),
         promptView(model),
       ],

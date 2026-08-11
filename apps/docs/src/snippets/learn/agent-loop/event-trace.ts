@@ -26,6 +26,11 @@ const agent = Agent.make({
 
 let calls = 0
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
@@ -40,8 +45,12 @@ const modelLayer = Layer.effect(
               params: { query: "turn policy" },
               providerExecuted: false,
             }),
+            Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
           )
-        : Stream.make(Response.makePart("text-delta", { id: "assistant", delta: "TurnPolicy caps follow-up turns." }))
+        : Stream.make(
+            Response.makePart("text-delta", { id: "assistant", delta: "TurnPolicy caps follow-up turns." }),
+            Response.makePart("finish", { reason: "stop", usage, response: undefined }),
+          )
     },
   }),
 )
@@ -57,6 +66,7 @@ const describe = (event: AgentEvent.Event): string =>
   event._tag === "Completed" ? `Completed after ${event.turns} turns` : `turn ${event.turn} ${event._tag}`
 
 const program = Agent.stream(agent, { prompt: "What does TurnPolicy do?" }).pipe(
+  Stream.filter((event) => event._tag !== "ModelPart"),
   Stream.runForEach((event) => Console.log(describe(event))),
 )
 

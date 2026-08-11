@@ -2,9 +2,9 @@ turn 0 TurnStarted
 turn 0 ModelCallStarted
 turn 0 ModelAttemptStarted
 turn 0 ModelAttemptFirstOutput
-turn 0 ModelPart
 turn 0 ModelAttemptCompleted
 turn 0 ModelCallCompleted
+turn 0 ModelResponseCommitted
 turn 0 ToolExecutionStarted
 turn 0 ToolExecutionCompleted
 turn 0 TurnCompleted
@@ -12,8 +12,8 @@ turn 1 TurnStarted
 turn 1 ModelCallStarted
 turn 1 ModelAttemptStarted
 turn 1 ModelAttemptFirstOutput
-turn 1 ModelPart
 turn 1 ModelAttemptCompleted
 turn 1 ModelCallCompleted
+turn 1 ModelResponseCommitted
 turn 1 TurnCompleted
 Completed after 2 turns

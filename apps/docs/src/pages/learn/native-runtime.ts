@@ -18,6 +18,13 @@ export const nativeRuntime = definePage({
     bullets(
       ["Idempotent admission through ", code("send"), " and child execution through ", code("spawn"), "."],
       ["Stable Run identity, ordered RunEvents, exclusive replay cursors, inspection, snapshots, and finite history."],
+      [
+        "Normalized model outcomes as one ",
+        code("ModelResponseCommitted"),
+        " or terminal ",
+        code("ModelResponseInterrupted"),
+        " event; raw provider parts never enter durable history.",
+      ],
       ["Durable waits, responses, signals, cancellation, parent-child links, and operation recovery."],
       [
         "Address bindings carry a pinned ",
@@ -29,6 +36,11 @@ export const nativeRuntime = definePage({
         code("ExecutableResolver"),
         " reconstructs the exact Agent and services only in the execution scope, then attests the persisted identity before work begins.",
       ],
+    ),
+    h2("live-previews", "Live previews are outside durability"),
+    p(
+      code("Runtime.previews({ runId })"),
+      " observes bounded cumulative text and reasoning from the live Runtime process. This lane is intentionally lossy, conflated, droppable, and non-authoritative: it is not stored, sequenced, cursor-addressed, checkpointed, replayed, transported, or folded into FoldKit Chat.Model. Losing every preview does not change execution or the eventual semantic response event.",
     ),
     h2("storage", "Choose the storage layer"),
     table(

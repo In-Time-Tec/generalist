@@ -1,1 +1,1 @@
-model parts seen by the loop: text-delta
+semantic parts committed by the loop: text, finish

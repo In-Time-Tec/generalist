@@ -21,10 +21,10 @@ export const researchAgent = definePage({
   navTitle: "Tutorial: research agent",
   group: "Start",
   description:
-    "Build a research agent with a real web_search tool, human approval over the wire, and a streaming FoldKit chat UI: zero-credential by default, live with one env var.",
+    "Build a research agent with a real web_search tool, human approval over the wire, and a live FoldKit chat UI: zero-credential by default, live with one env var.",
   content: [
     lead(
-      "In this tutorial we build a research agent with a real web_search tool, human approval, and a streaming FoldKit chat UI. It runs with zero credentials by default and goes live against a real model with one environment variable.",
+      "In this tutorial we build a research agent with a real web_search tool, human approval, and a live FoldKit chat UI. It runs with zero credentials by default and goes live against a real model with one environment variable.",
     ),
     p(
       "Three parts: a Bun server that streams agent runs over SSE and WebSocket, an approval resolved over the wire, and a browser chat UI. If you have not done ",
@@ -141,7 +141,7 @@ export const researchAgent = definePage({
     h3("wire-the-chat", "Wire the chat"),
     p(
       code("@batonfx/foldkit"),
-      " ships a headless chat submodel that does the frame decoding, streaming assembly, and approval state for you. The program embeds ",
+      " ships a headless chat submodel that decodes durable frames and projects normalized model responses, tool state, and approval state. The program embeds ",
       code("Chat.Model"),
       " in its own model, forwards ",
       code("Chat.subscriptions"),
@@ -159,13 +159,19 @@ export const researchAgent = definePage({
       code("Chat.ClickedApprove"),
       " and ",
       code("Chat.ClickedDeny"),
-      ". That is the same wire frame Part 2 sent by hand.",
+      ". That is the same wire frame Part 2 sent by hand. Assistant rows appear only when ",
+      code("ModelResponseCommitted"),
+      " or ",
+      code("ModelResponseInterrupted"),
+      " delivers normalized semantic content; ",
+      code("Chat.Model"),
+      " does not expose provider-fragment streaming state.",
     ),
     codeBlock({ label: "main.ts", source: webMainSource }),
     p("Run ", code("bunx vite"), " next to the ", code("index.html"), " and open the printed URL."),
     h2("success", "You have built the whole thing"),
     p(
-      "Ask a question in the browser; the agent pauses with an approval card; click Approve; watch the answer stream in live. Set ",
+      "Ask a question in the browser; the agent pauses with an approval card; click Approve; watch the committed answer appear as a semantic assistant entry. Set ",
       code("OPENROUTER_API_KEY"),
       " and restart the server to run the same flow against a real model.",
     ),
@@ -177,7 +183,7 @@ export const researchAgent = definePage({
         ".",
       ],
       [
-        "The chat model in depth (entries, streaming, reconnect states): ",
+        "The chat model in depth (semantic entries, run state, reconnect states): ",
         link("/docs/guides/foldkit-chat", "How to build a chat UI with FoldKit"),
         ".",
       ],

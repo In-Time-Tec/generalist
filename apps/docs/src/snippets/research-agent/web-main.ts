@@ -108,6 +108,20 @@ const entryView = (entry: Chat.ChatEntry): Html => {
   }
 }
 
+const runStateView = (runState: Chat.RunState): Html => {
+  const h = html<Message>()
+  switch (runState._tag) {
+    case "Idle":
+      return h.p([h.Class("text-sm text-gray-500")], ["Ready"])
+    case "Running":
+      return h.p([h.Class("text-sm text-gray-500")], [`Working on turn ${runState.turn}…`])
+    case "AwaitingApproval":
+      return h.p([h.Class("text-sm text-amber-700")], ["Waiting for approval"])
+    case "Failed":
+      return h.p([h.Class("text-sm text-red-700")], [runState.message])
+  }
+}
+
 const approvalView = (awaitingApproval: Extract<Chat.RunState, { _tag: "AwaitingApproval" }>): Html => {
   const h = html<Message>()
   return h.div(
@@ -167,15 +181,6 @@ const footerView = (model: Model): Html => {
 
 const view = (model: Model): Document => {
   const h = html<Message>()
-  const streaming =
-    model.chat.streaming === null
-      ? []
-      : [
-          h.div(
-            [h.Class("self-start whitespace-pre-wrap rounded-xl bg-gray-100 px-4 py-2")],
-            [model.chat.streaming.text],
-          ),
-        ]
   const approval = model.chat.run._tag === "AwaitingApproval" ? [approvalView(model.chat.run)] : []
   return {
     title: "Research Agent",
@@ -188,7 +193,7 @@ const view = (model: Model): Document => {
         ),
         h.div(
           [h.Class("flex flex-1 flex-col gap-3 overflow-y-auto p-4")],
-          [...model.chat.entries.map(entryView), ...streaming, ...approval],
+          [...model.chat.entries.map(entryView), runStateView(model.chat.run), ...approval],
         ),
         footerView(model),
       ],

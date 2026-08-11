@@ -100,3 +100,4 @@ const program = Effect.gen(function* () {
 
 const runtime = ManagedRuntime.make(runtimeLayer)
 await runtime.runPromise(program)
+await runtime.dispose()

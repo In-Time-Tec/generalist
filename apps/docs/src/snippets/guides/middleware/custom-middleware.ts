@@ -7,6 +7,11 @@ const dropReasoning: ModelMiddleware.Middleware = {
 
 const agent = Agent.make({ name: "terse-agent" })
 
+const usage = Response.Usage.make({
+  inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 0, text: 0, reasoning: 0 },
+})
+
 const modelLayer = Layer.effect(
   LanguageModel.LanguageModel,
   LanguageModel.make({
@@ -15,14 +20,17 @@ const modelLayer = Layer.effect(
       Stream.make(
         Response.makePart("reasoning-delta", { id: "thinking", delta: "Considering the question at length." }),
         Response.makePart("text-delta", { id: "assistant", delta: "Blue." }),
+        Response.makePart("finish", { reason: "stop", usage, response: undefined }),
       ),
   }),
 )
 
 const program = Effect.gen(function* () {
   const events = yield* Stream.runCollect(Agent.stream(agent, { prompt: "Favorite color?" }))
-  const partTypes = events.filter((event) => event._tag === "ModelPart").map((event) => event.part.type)
-  yield* Console.log(`model parts seen by the loop: ${partTypes.join(", ")}`)
+  const partTypes = events
+    .filter((event) => event._tag === "ModelResponseCommitted")
+    .flatMap((event) => event.response.content.map((part) => part.type))
+  yield* Console.log(`semantic parts committed by the loop: ${partTypes.join(", ")}`)
 })
 
 const runtimeLayer = Layer.mergeAll(

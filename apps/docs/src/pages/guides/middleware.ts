@@ -22,13 +22,13 @@ export const middleware = definePage({
       code("transformPrompt"),
       " rewrites the composed prompt before each model call, and ",
       code("transformPart"),
-      " rewrites or drops each streamed part before the loop folds, emits, or persists it. Guardrails are middleware combinators, not a separate subsystem.",
+      " rewrites or drops each provider stream part before the loop normalizes the response. Guardrails are middleware combinators, not a separate subsystem.",
     ),
     h2("write-a-middleware", "1. Write a middleware"),
     p(
       "To drop a part, return ",
       code("Option.none()"),
-      ". A dropped part never reaches the event stream or the transcript: the loop behaves as if the model never produced it.",
+      ". A dropped part never reaches the committed semantic response or the transcript: the loop behaves as if the model never produced it.",
     ),
     codeBlock({
       label: "custom-middleware.ts",
@@ -113,7 +113,7 @@ export const middleware = definePage({
       code("redactInput"),
       " and ",
       code("redactOutput"),
-      " scrubs sensitive text before the provider sees the prompt and before streamed deltas reach consumers. The scripted model below echoes its input, which makes both redactions visible in one answer.",
+      " scrubs sensitive text before the provider sees the prompt and before output enters the normalized response consumers read. The scripted model below echoes its input, which makes both redactions visible in one answer.",
     ),
     codeBlock({ label: "pii-scrub.ts", source: piiScrub, expectedOutput: piiScrubExpected }),
     p(

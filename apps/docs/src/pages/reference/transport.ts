@@ -27,7 +27,11 @@ export const transportReference = definePage({
     ),
     h2("replay", "Replay and snapshots"),
     p(
-      "A cursor is exclusive: cursor n requests persisted RunEvents with sequence greater than n. SSE IDs and WebSocket reconnect cursors are the Runtime event sequence. An expired cursor fails typed; recover through ",
+      "A cursor is exclusive: cursor n requests persisted RunEvents with sequence greater than n. Model output appears as normalized ",
+      code("ModelResponseCommitted"),
+      " or ",
+      code("ModelResponseInterrupted"),
+      " events, never provider fragments. SSE IDs and WebSocket reconnect cursors are the Runtime event sequence. An expired cursor fails typed; recover through ",
       code("Snapshot.get"),
       ", whose RunInspection is separate from the event stream.",
     ),
@@ -46,7 +50,9 @@ export const transportReference = definePage({
       " accepts Attach and explicit Cancel only. Closing an observer never cancels its Run.",
     ),
     p(
-      "Runtime owns subscriber capacity and lag failures. The WebSocket client reconnects from the last delivered sequence; a lag close carries that sequence so replay resumes without transport-owned state.",
+      "Runtime owns subscriber capacity and lag failures. The WebSocket client reconnects from the last delivered semantic or lifecycle RunEvent sequence; a lag close carries that sequence so replay resumes without transport-owned state. Disposable ",
+      code("Runtime.previews"),
+      " are process-local observers and are not part of SSE, WebSocket, cursors, snapshots, or replay.",
     ),
     p(
       "See ",
