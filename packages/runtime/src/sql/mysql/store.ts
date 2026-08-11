@@ -77,7 +77,7 @@ import { groupIdFromSuspension, resultFromInspection } from "../../child-group.j
 import { encodeReason, WaitResolution } from "../../run-wait.js"
 import { Prompt } from "effect/unstable/ai"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
-import { makeSqlRunner } from "./transaction.js"
+import { makeTransactionRunner } from "./transaction-events.js"
 import { settlementNotifications } from "../settlement-notifications.js"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
@@ -104,7 +104,6 @@ export const makeMysqlServices = (
     yield* checkSchema(source)
     const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
-    const transactionHub: typeof hub = { ...hub, publish: () => Effect.void }
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
     const connections = options.maxConnections ?? 10
@@ -127,7 +126,7 @@ export const makeMysqlServices = (
     if (isolation[0]?.isolation !== "READ-COMMITTED") {
       return yield* SchemaMigrationFailed.make({ source, message: "MySQL runtime requires READ COMMITTED" })
     }
-    const { run, runNoTxn, runInspection } = makeSqlRunner(sql)
+    const { run, runNoTxn, runInspection, transactionHub } = makeTransactionRunner({ sql, hub })
     const lockRun = (runId: string) => sql`SELECT run_id FROM baton_runs WHERE run_id = ${runId} FOR UPDATE`
     const lockParent = (runId: string) =>
       sql<{ parent_run_id: string | null }>`SELECT parent_run_id FROM baton_runs WHERE run_id = ${runId}`.pipe(
@@ -273,33 +272,41 @@ export const makeMysqlServices = (
       events: (input) =>
         Stream.unwrap(
           Effect.gen(function* () {
-            const cursor = yield* Ref.make(input.cursor)
-            const poll = Ref.get(cursor).pipe(
+            const pollCursor = yield* Ref.make(input.cursor)
+            const deliveredCursor = yield* Ref.make(input.cursor)
+            const poll = Ref.get(pollCursor).pipe(
               Effect.flatMap((after) => runNoTxn(loadEventsAfter(input.runId, after))),
               Effect.flatMap((events) =>
                 Effect.forEach(
                   events,
-                  (event) => hub.publish(input.runId, event).pipe(Effect.andThen(Ref.set(cursor, event.sequence))),
+                  (event) => hub.publish(input.runId, event).pipe(Effect.andThen(Ref.set(pollCursor, event.sequence))),
                   { discard: true },
                 ),
               ),
               Effect.ignore,
               Effect.repeat(Schedule.spaced(options.pollInterval ?? "50 millis")),
+              Effect.asVoid,
             )
-            return hub.subscribe({
-              runId: input.runId,
-              cursor: input.cursor,
-              loadReplay: runNoTxn(
-                Effect.gen(function* () {
-                  const loaded = yield* loadRun(input.runId)
-                  if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
-                  const replay = yield* loadEventsAfter(input.runId, input.cursor)
-                  return { replay, lastSequence: loaded.lastSequence }
-                }),
-              ),
-              capacity,
-              onSubscribed: poll,
-            })
+            return hub
+              .subscribe({
+                runId: input.runId,
+                cursor: input.cursor,
+                loadReplay: runNoTxn(
+                  Effect.gen(function* () {
+                    const loaded = yield* loadRun(input.runId)
+                    if (loaded === undefined) return yield* RunNotFound.make({ runId: input.runId })
+                    const replay = yield* loadEventsAfter(input.runId, input.cursor)
+                    return { replay, lastSequence: loaded.lastSequence }
+                  }),
+                ),
+                capacity,
+                onSubscribed: poll,
+              })
+              .pipe(
+                Stream.filterEffect((event) =>
+                  Ref.modify(deliveredCursor, (cursor) => [event.sequence > cursor, Math.max(cursor, event.sequence)]),
+                ),
+              )
           }),
         ),
       respond: (input) => run(lockRun(input.runId).pipe(Effect.andThen(respond(transactionHub, input)))),
