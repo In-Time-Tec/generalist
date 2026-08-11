@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.21.1
+
+- Make durable cancellation converge across stale claims, Session root trees, nested descendants, and non-replayable operation resolution, with explicit Session-wide terminal proof and startup repair of poisoned cancellation state.
+- Preserve exact Run, Name, and child-settlement inbox authority while allowing only explicit Session messages to carry forward, including consistent mailbox bounds and delivery across memory, SQLite, PostgreSQL, and MySQL.
+
 ## 0.21.0
 
 - Replace durable provider-fragment events with one digest-verified semantic model response per completed or explicitly interrupted call. `Agent.stream` retains process-local `ModelPart` output, while Runtime history, replay, AG-UI, Transport, and FoldKit consume `ModelResponseCommitted` or `ModelResponseInterrupted`.
