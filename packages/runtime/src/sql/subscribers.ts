@@ -1,4 +1,4 @@
-import { Effect, Queue, Stream, SynchronizedRef } from "effect"
+import { Effect, Queue, Scope, Stream, SynchronizedRef } from "effect"
 import { CursorExpired, RunNotFound, RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import type { Cursor } from "../cursor.js"
 import type { RunEvent } from "../run-event.js"
@@ -24,11 +24,11 @@ export interface EventHub {
       RunNotFound | RuntimeUnavailable
     >
     readonly capacity: number
-    readonly onSubscribed?: Effect.Effect<void>
+    readonly onSubscribed?: Effect.Effect<void, never, Scope.Scope>
   }) => Stream.Stream<RunEvent, RunNotFound | CursorExpired | SubscriberLagged | RuntimeUnavailable>
   readonly subscribeTree: (input: {
     readonly rootRunId: string
-    readonly onSubscribed?: Effect.Effect<void>
+    readonly onSubscribed?: Effect.Effect<void, never, Scope.Scope>
   }) => Stream.Stream<void, RuntimeUnavailable>
   readonly shutdown: Effect.Effect<void>
 }
