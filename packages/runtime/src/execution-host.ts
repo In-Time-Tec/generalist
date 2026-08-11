@@ -32,6 +32,8 @@ export interface Options {
 }
 export interface Interface {
   readonly execute: (claim: ExecutionClaim) => Effect.Effect<void>
+  /** Interrupt a process-local execution that this host owns, recording durable-cancel intent. */
+  readonly interrupt: (runId: string) => Effect.Effect<void>
 }
 export class ExecutionHost extends Context.Service<ExecutionHost, Interface>()(
   "@batonfx/runtime/execution-host/ExecutionHost",
@@ -484,7 +486,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
 
     const execute = (claim: ExecutionClaim): Effect.Effect<void> => active.run(claim.runId, executeClaim(claim))
 
-    return ExecutionHost.of({ execute })
+    return ExecutionHost.of({ execute, interrupt: (runId) => active.interrupt(runId) })
   })
 
 export const layer = (options: Options): Layer.Layer<ExecutionHost, never, RunStore | ActiveExecutions> =>

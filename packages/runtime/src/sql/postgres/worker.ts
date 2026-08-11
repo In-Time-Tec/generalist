@@ -46,7 +46,11 @@ export const makeWorker = (
       Effect.sleep(cancellationInterval).pipe(
         Effect.andThen(store.inspect(runId)),
         Effect.flatMap((run) =>
-          run.status === "cancelling" || isTerminal(run.status) ? Effect.void : watchCancellation(runId),
+          run.status === "cancelling"
+            ? host.interrupt(runId)
+            : isTerminal(run.status)
+              ? Effect.void
+              : watchCancellation(runId),
         ),
         Effect.catchTag("@batonfx/runtime/RunNotFound", () => Effect.void),
       )

@@ -33,6 +33,7 @@ it.effect("renews a claim for the lifetime of agent execution", () =>
     const refreshes = yield* Ref.make(0)
     const host = ExecutionHost.of({
       execute: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(release))),
+      interrupt: () => Effect.void,
     })
     const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
       Effect.provideService(ExecutionHost, host),
@@ -54,6 +55,34 @@ it.effect("renews a claim for the lifetime of agent execution", () =>
   }),
 )
 
+it.effect("interrupts a claimed Run once another node persists cancellation", () =>
+  Effect.gen(function* () {
+    const started = yield* Deferred.make<void>()
+    const interrupted = yield* Deferred.make<void>()
+    const host = ExecutionHost.of({
+      execute: () =>
+        Deferred.succeed(started, undefined).pipe(
+          Effect.andThen(Effect.never),
+          Effect.onInterrupt(() => Deferred.succeed(interrupted, undefined)),
+        ),
+      interrupt: () => Deferred.succeed(interrupted, undefined),
+    })
+    const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
+      Effect.provideService(ExecutionHost, host),
+      Effect.provideService(RunStore, storeService("cancelling")),
+      Effect.provideService(
+        RunClaims,
+        claimsService(() => Effect.succeed(true)),
+      ),
+    )
+    const fiber = yield* worker.execute.pipe(Effect.forkChild({ startImmediately: true }))
+    yield* Deferred.await(started)
+    yield* TestClock.adjust("150 millis")
+    yield* Deferred.await(interrupted)
+    yield* Fiber.join(fiber)
+  }),
+)
+
 it.effect("interrupts stale execution when lease renewal loses ownership", () =>
   Effect.gen(function* () {
     const started = yield* Deferred.make<void>()
@@ -64,6 +93,7 @@ it.effect("interrupts stale execution when lease renewal loses ownership", () =>
           Effect.andThen(Effect.never),
           Effect.onInterrupt(() => Deferred.succeed(interrupted, undefined)),
         ),
+      interrupt: () => Effect.void,
     })
     const worker = yield* makeWorker({ workerId: "worker-a", lease: "100 millis" }).pipe(
       Effect.provideService(ExecutionHost, host),

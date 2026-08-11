@@ -349,6 +349,7 @@ for (const backend of ["memory", "sqlite"] as const) {
           const host = ExecutionHost.ExecutionHost.of({
             execute: (claim) =>
               store.complete({ ...claim, result: completedResult("done") }).pipe(Effect.asVoid, Effect.orDie),
+            interrupt: () => Effect.void,
           })
           const scheduler = yield* makeLocalScheduler({ workerId: backend, concurrency: 4 }).pipe(
             Effect.provideService(RunStore.RunStore, store),
