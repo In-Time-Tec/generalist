@@ -260,7 +260,12 @@ export const completeOperation: {
       }
       const next = { ...withSession, operations, runs }
       if (input.outcome._tag !== "Unknown") return [record, next] as const
-      const [, unknown] = yield* appendLifecycle(next, run.runId, makeUnknown(input.operationId), "needs-resolution")
+      const [, unknown] = yield* appendLifecycle(
+        next,
+        run.runId,
+        makeUnknown(input.operationId),
+        run.cancellationRequested ? "cancelling" : "needs-resolution",
+      )
       return [record, unknown] as const
     }),
 )
@@ -435,7 +440,7 @@ export const expireRunningOperation: {
         { ...state, operations },
         run.runId,
         makeUnknown(input.operationId),
-        "needs-resolution",
+        run.cancellationRequested ? "cancelling" : "needs-resolution",
       )
       return [{ record, outcome: "unknown" as const }, next] as const
     }

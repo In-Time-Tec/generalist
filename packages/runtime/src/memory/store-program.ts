@@ -215,7 +215,7 @@ export const settleProgramOperation: {
   ): Effect.Effect<readonly [ProgramOperationRecord, MemoryState], RunNotFound | RuntimeUnavailable | StaleClaim, never>
 } = Function.dual(2, (state: MemoryState, input: SettleProgramOperationInput) =>
   Effect.gen(function* () {
-    yield* requireRun(state, input.runId)
+    const run = yield* requireRun(state, input.runId)
     const mapKey = key(input.runId, input.operation)
     const existing = state.programOperations.get(mapKey)
     if (existing === undefined)
@@ -252,7 +252,7 @@ export const settleProgramOperation: {
       next,
       input.runId,
       { _tag: "OperationUnknown", operationId: input.operation },
-      "needs-resolution",
+      run.cancellationRequested ? "cancelling" : "needs-resolution",
     )
     return [record, unresolved] as const
   }),

@@ -257,7 +257,7 @@ export const postgresOperations = (input: {
               hub,
               yield* requireRun(op.runId),
               { _tag: "OperationUnknown", operationId: op.operationId },
-              "needs-resolution",
+              loaded.cancellationRequested ? "cancelling" : "needs-resolution",
             )
           }
           const rows = yield* sql<OperationRow>`
@@ -295,7 +295,12 @@ export const postgresOperations = (input: {
             UPDATE baton_run_operations SET status = 'unknown', finished_at = NOW()
             WHERE run_id = ${op.runId} AND operation_id = ${op.operationId} AND status = 'running'
           `
-          yield* appendEvent(hub, loaded, { _tag: "OperationUnknown", operationId: op.operationId }, "needs-resolution")
+          yield* appendEvent(
+            hub,
+            loaded,
+            { _tag: "OperationUnknown", operationId: op.operationId },
+            loaded.cancellationRequested ? "cancelling" : "needs-resolution",
+          )
           const next = yield* sql<OperationRow>`
             SELECT * FROM baton_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
           `

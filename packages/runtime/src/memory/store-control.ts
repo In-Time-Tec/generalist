@@ -263,7 +263,7 @@ export const cancel: {
         }
       }
     }
-    if (terminal || needsResolution) return next
+    if (terminal) return next
     if (run.ownerId !== undefined && (run.status === "running" || run.status === "cancelling")) return next
     const current = next.runs.get(run.runId)
     if (

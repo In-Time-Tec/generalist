@@ -69,7 +69,7 @@ export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readon
           yield* cancelRun(child.runId, reason ?? "parent cancelled")
       }
       if (owned.length > 0) current = (yield* loadRun(runId))!
-      if (terminal || needsResolution) return
+      if (terminal) return
       if (executing) return
       if (isTerminal(current.status)) return
       const running = yield* input.sql<{ fan_out_id: string }>`

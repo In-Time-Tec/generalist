@@ -126,7 +126,7 @@ const completeMysqlOperation = (
         hub,
         yield* requireRun(op.runId),
         { _tag: "OperationUnknown", operationId: op.operationId },
-        "needs-resolution",
+        loaded.cancellationRequested ? "cancelling" : "needs-resolution",
       )
     }
     const completed = yield* sql<OperationRow>`

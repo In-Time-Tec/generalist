@@ -187,6 +187,52 @@ describePostgres("postgres run store", () => {
     ),
   )
 
+  it.live("settles cancel-first completeOperation Unknown without rewriting uncertainty", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const claims = yield* RunClaims.RunClaims
+        const receipt = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: uniqueSession("complete-unknown-cancel"),
+          idempotencyKey: "complete-unknown-cancel",
+          prompt: textPrompt("unknown"),
+        })
+        const [claimed] = yield* claims.claimReadyRuns({ workerId: "complete-unknown-cancel", limit: 1 })
+        if (claimed === undefined) return yield* Effect.die("claim missing")
+        const claim = {
+          runId: receipt.runId,
+          ownerId: claimed.workerId,
+          attemptFence: claimed.attemptFence,
+        }
+        const operation = yield* store.recordOperation({
+          ...claim,
+          operationKey: "never:complete-unknown-cancel",
+          kind: "send",
+          inputDigest: "unknown",
+          input: {},
+          replayPolicy: "never",
+          attempt: 1,
+        })
+        yield* store.startOperation({ ...claim, operationId: operation.operationId })
+        yield* runtime.cancel({ runId: receipt.runId, reason: "cancel first" })
+        const completed = yield* store.completeOperation({
+          ...claim,
+          operationId: operation.operationId,
+          outcome: { _tag: "Unknown" },
+        })
+        expect(completed.status).toBe("unknown")
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelling")
+        yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "interrupted" }) })
+        expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+        expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
+          "unknown",
+        )
+      }).pipe(scopedWith(postgresLayer(url))),
+    ),
+  )
+
   it.live("persists exact-start registrations and replays admission idempotently", () =>
     withSchema(
       Effect.gen(function* () {

@@ -118,7 +118,7 @@ const cancelRun = (
       }
       current = (yield* loadRun(run.runId))!
     }
-    if (terminal || needsResolution) return
+    if (terminal) return
     if (executing) return
     if (isTerminal(current.status)) return
     const running = yield* sql<{ fan_out_id: string }>`

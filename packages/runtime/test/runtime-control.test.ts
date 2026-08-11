@@ -352,7 +352,7 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
     }),
   )
 
-  it.effect("keeps a cancelled Run in needs-resolution until an unknown operation is resolved", () =>
+  it.effect("cancels a needs-resolution Run without rewriting its unknown operation", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
@@ -376,18 +376,11 @@ layer(memoryLayer)("Runtime control and terminals", (it) => {
       yield* store.expireRunningOperation({ ...claim, operationId: operation.operationId })
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
 
-      // Cancellation is admission, not settlement: an unknown outcome must not be projected as cancelled.
       yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
-      const afterCancel = yield* runtime.inspect(receipt.runId)
-      expect(afterCancel.status).toBe("needs-resolution")
-
-      yield* runtime.resolveOperation({
-        runId: receipt.runId,
-        operationId: operation.operationId,
-        idempotencyKey: "resolution:cancelled",
-        resolution: { _tag: "Succeeded", value: { answer: 1 } },
-      })
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+      expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
+        "unknown",
+      )
     }),
   )
 

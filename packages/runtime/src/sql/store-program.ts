@@ -270,7 +270,12 @@ export const settleProgramOperation: {
     if (outcome._tag !== "Unknown") return record
     const run = yield* loadRun(input.runId)
     if (run === undefined) return yield* RuntimeUnavailable.make({ message: `Run ${input.runId} is missing` })
-    yield* appendEvent(hub, run, { _tag: "OperationUnknown", operationId: input.operation }, "needs-resolution")
+    yield* appendEvent(
+      hub,
+      run,
+      { _tag: "OperationUnknown", operationId: input.operation },
+      run.cancellationRequested ? "cancelling" : "needs-resolution",
+    )
     return record
   }),
 )

@@ -258,7 +258,7 @@ export const completeOperation: {
         hub,
         yield* requireRun(input.runId),
         { _tag: "OperationUnknown", operationId: input.operationId },
-        "needs-resolution",
+        run.cancellationRequested ? "cancelling" : "needs-resolution",
       )
     }
     const rows = yield* sql<OperationRow>`
@@ -365,7 +365,12 @@ export const expireRunningOperation: {
       UPDATE baton_run_operations SET status = 'unknown', finished_at = ${finished}
       WHERE run_id = ${input.runId} AND operation_id = ${input.operationId} AND status = 'running'
     `
-    yield* appendEvent(hub, run, { _tag: "OperationUnknown", operationId: input.operationId }, "needs-resolution")
+    yield* appendEvent(
+      hub,
+      run,
+      { _tag: "OperationUnknown", operationId: input.operationId },
+      run.cancellationRequested ? "cancelling" : "needs-resolution",
+    )
     const next = yield* sql<OperationRow>`
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `

@@ -1305,7 +1305,7 @@ describe("ExecutionHost", () => {
     }),
   )
 
-  it.effect("interrupts active tool execution and waits for explicit uncertainty resolution", () =>
+  it.effect("interrupts active tool execution while preserving uncertainty", () =>
     Effect.gen(function* () {
       const started = yield* Deferred.make<void>()
       const interrupted = yield* Ref.make(false)
@@ -1372,20 +1372,15 @@ describe("ExecutionHost", () => {
           yield* runtime.cancel({ runId: receipt.runId, reason: "stop" })
           const exit = yield* Fiber.await(fiber)
           expect(exit._tag).toBe("Success")
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
           expect(yield* Ref.get(interrupted)).toBe(true)
           const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
             (event) => event._tag === "OperationUnknown",
           )
           if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
-          yield* runtime.resolveOperation({
-            runId: receipt.runId,
-            operationId: unknown.operationId,
-            idempotencyKey: "cancel-tool:resolved",
-            resolution: { _tag: "Failed", error: { message: "cancelled before result was observed" } },
-          })
-          yield* runtime.cancel({ runId: receipt.runId, reason: "settle after resolution" })
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+          expect((yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })).status).toBe(
+            "unknown",
+          )
           expect(
             (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
           ).not.toContain("RunFailed")
@@ -1395,7 +1390,7 @@ describe("ExecutionHost", () => {
   )
 
   for (const backend of ["memory", "sqlite"] as const) {
-    it.live(`${backend} records an interrupted external tool effect as unknown before cancellation settles`, () =>
+    it.live(`${backend} records an interrupted external tool effect as unknown while cancellation settles`, () =>
       Effect.gen(function* () {
         const started = yield* Deferred.make<void>()
         const toolFinalized = yield* Deferred.make<void>()
@@ -1507,21 +1502,11 @@ describe("ExecutionHost", () => {
               (event) => event._tag === "OperationUnknown",
             )
             expect(unknown?._tag).toBe("OperationUnknown")
-            expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+            expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
             if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
             const operation = yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })
             expect(operation.status).toBe("unknown")
             expect(operation.replayPolicy).toBe("never")
-            if (backend === "memory") {
-              yield* runtime.resolveOperation({
-                runId: receipt.runId,
-                operationId: operation.operationId,
-                idempotencyKey: "operator:committed",
-                resolution: { _tag: "Succeeded", value: 1 },
-              })
-              yield* runtime.cancel({ runId: receipt.runId, reason: "settle after resolution" })
-              expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
-            }
             return { runId: receipt.runId, operationId: operation.operationId }
           }),
         )
@@ -1531,19 +1516,11 @@ describe("ExecutionHost", () => {
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
               const store = yield* RunStore.RunStore
-              expect((yield* runtime.inspect(first.runId)).status).toBe("needs-resolution")
+              expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
               expect((yield* store.getOperation({ runId: first.runId, operationId: first.operationId })).status).toBe(
                 "unknown",
               )
               expect(externalCounter).toBe(1)
-              yield* runtime.resolveOperation({
-                runId: first.runId,
-                operationId: first.operationId,
-                idempotencyKey: "operator:committed",
-                resolution: { _tag: "Succeeded", value: 1 },
-              })
-              yield* runtime.cancel({ runId: first.runId, reason: "settle after resolution" })
-              expect((yield* runtime.inspect(first.runId)).status).toBe("cancelled")
             }),
           )
         }
