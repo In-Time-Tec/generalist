@@ -10,6 +10,7 @@ import {
 } from "../child-settlement.js"
 import { RunNotFound } from "../errors.js"
 import { Metadata } from "../message.js"
+import { runAddress } from "../agent-directory.js"
 import type { RunEvent } from "../run-event.js"
 import { decodeEvent, decodeJson, encodeJson } from "./codecs.js"
 import type { DecodedRun } from "./rows.js"
@@ -34,7 +35,8 @@ export const settlementNotifications = (input: {
     if (sessionId === undefined) return yield* RunNotFound.make({ runId: input.parentRunId })
     const rows = yield* sql<NotificationRow>`
       SELECT sequence, admitted_at_millis, metadata_json FROM baton_messages
-      WHERE target_session_id = ${sessionId} AND sequence > ${input.afterSequence}
+      WHERE target_session_id = ${sessionId} AND to_address = ${runAddress(input.parentRunId)}
+        AND entry_id LIKE 'child-settled:%' AND sequence > ${input.afterSequence}
       ORDER BY sequence
       LIMIT ${sql.literal(String(Math.max(0, Math.floor(input.limit))))}
     `

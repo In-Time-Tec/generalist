@@ -1,6 +1,13 @@
 import { Clock, Effect, Function } from "effect"
 import type { Address } from "../address.js"
-import { nameScope, parseAddress, runAddress, type AgentName, type DirectoryEntry } from "../agent-directory.js"
+import {
+  nameScope,
+  parseAddress,
+  runAddress,
+  sessionAddress,
+  type AgentName,
+  type DirectoryEntry,
+} from "../agent-directory.js"
 import {
   AddressNotFound,
   AgentNameConflict,
@@ -158,13 +165,32 @@ const owed = (state: MemoryState, entry: MailboxEntry): boolean => {
 }
 
 export const pendingMessages: {
-  (input: { readonly sessionId: string; readonly limit: number }): (state: MemoryState) => ReadonlyArray<MailboxEntry>
-  (state: MemoryState, input: { readonly sessionId: string; readonly limit: number }): ReadonlyArray<MailboxEntry>
+  (input: {
+    readonly sessionId: string
+    readonly runId?: string
+    readonly limit: number
+  }): (state: MemoryState) => ReadonlyArray<MailboxEntry>
+  (
+    state: MemoryState,
+    input: { readonly sessionId: string; readonly runId?: string; readonly limit: number },
+  ): ReadonlyArray<MailboxEntry>
 } = Function.dual(
   2,
-  (state: MemoryState, input: { readonly sessionId: string; readonly limit: number }): ReadonlyArray<MailboxEntry> =>
+  (
+    state: MemoryState,
+    input: { readonly sessionId: string; readonly runId?: string; readonly limit: number },
+  ): ReadonlyArray<MailboxEntry> =>
     [...state.messages.values()]
-      .filter((entry) => entry.targetSessionId === input.sessionId && owed(state, entry))
+      .filter(
+        (entry) =>
+          entry.targetSessionId === input.sessionId &&
+          !entry.entryId.startsWith("child-settled:") &&
+          (input.runId === undefined ||
+            entry.to === sessionAddress(input.sessionId) ||
+            (entry.to === runAddress(input.runId) &&
+              !isTerminal(state.runs.get(input.runId)?.status ?? "cancelled"))) &&
+          owed(state, entry),
+      )
       .sort((left, right) => left.sequence - right.sequence)
       .slice(0, input.limit),
 )
@@ -346,7 +372,11 @@ export const deliverPendingMessages: {
   Effect.gen(function* () {
     const run = yield* requireRun(state, input.runId)
     if (isTerminal(run.status) || run.pendingOutcome !== undefined) return [[], state] as const
-    const pending = pendingMessages(state, { sessionId: run.message.sessionId, limit: Number.MAX_SAFE_INTEGER })
+    const pending = pendingMessages(state, {
+      sessionId: run.message.sessionId,
+      runId: run.runId,
+      limit: Number.MAX_SAFE_INTEGER,
+    })
     if (pending.length === 0) return [[], state] as const
     const messages = new Map(state.messages)
     const steering = [...run.steering]

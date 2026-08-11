@@ -40,11 +40,12 @@ type Registrations = ReadonlyArray<ExecutableRegistration>
 import { validate as validateRegistrations } from "../executable-registration.js"
 import { LocalScheduler, layer as localSchedulerLayer } from "../local-scheduler.js"
 import { childSessionId, fanOutMemberSessionId } from "../child-session.js"
-import { runAddress } from "../agent-directory.js"
+import { parseAddress, runAddress } from "../agent-directory.js"
 import { authorize, makePolicy, reachable } from "../messaging.js"
 import { defaultBounds, digest as messageDigest, promptBytes } from "../mailbox.js"
 import { RunTerminal } from "../errors.js"
 import { isTerminal } from "../run.js"
+import { awaitSessionTerminal } from "../session-lifecycle.js"
 
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 
@@ -394,6 +395,15 @@ export const makeRuntime = (
           yield* store.cancel(input)
           yield* active.interrupt(input.runId)
         }),
+      cancelSession: (input) =>
+        Effect.gen(function* () {
+          const runIds = yield* store.cancelSession(input)
+          yield* Effect.forEach(runIds, (runId) => active.interrupt(runId), {
+            concurrency: "unbounded",
+            discard: true,
+          })
+        }),
+      awaitSessionTerminal: (input) => awaitSessionTerminal({ store, ...input }),
       steer: (input) => {
         const prompt = normalizePrompt(input.prompt)
         return store.admitSteering({ ...input, prompt, digest: steeringDigest(prompt) })
@@ -402,6 +412,8 @@ export const makeRuntime = (
         Effect.gen(function* () {
           const sender = yield* store.directory(input.fromRunId)
           const target = yield* store.resolveAddress(input.to)
+          const addressTarget = yield* parseAddress(input.to)
+          const durableTo = addressTarget._tag === "Session" ? input.to : runAddress(target.runId)
           yield* authorize({ sender, target, policy })
           if (isTerminal(target.status)) {
             return yield* RunTerminal.make({ runId: target.runId, status: target.status })
@@ -412,12 +424,12 @@ export const makeRuntime = (
           return yield* store.admitMessage({
             fromRunId: sender.runId,
             fromAddress: runAddress(sender.runId),
-            to: input.to,
+            to: durableTo,
             targetSessionId: target.sessionId,
             messageId: input.messageId ?? nextMessageId("msg", input.idempotencyKey),
             idempotencyKey: input.idempotencyKey,
             digest: messageDigest({
-              to: input.to,
+              to: durableTo,
               from: runAddress(sender.runId),
               prompt,
               correlationId,
@@ -437,7 +449,7 @@ export const makeRuntime = (
       messages: (input) =>
         Effect.gen(function* () {
           const entry = yield* store.directory(input.runId)
-          return yield* store.pendingMessages({ sessionId: entry.sessionId, limit: input.limit })
+          return yield* store.pendingMessages({ sessionId: entry.sessionId, runId: input.runId, limit: input.limit })
         }),
       childSettlements: (input) =>
         store.settlementNotifications({

@@ -46,6 +46,14 @@ for (const [backend, runtimeLayer] of layers) {
         yield* scheduler.tick
 
         const notifications = yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 100 })
+        expect(yield* runtime.messages({ runId: parent.runId, limit: 100 })).toHaveLength(0)
+        const later = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: (yield* store.directory(parent.runId)).sessionId,
+          idempotencyKey: "later-root",
+          prompt: textPrompt("later"),
+        })
+        expect(yield* runtime.messages({ runId: later.runId, limit: 100 })).toHaveLength(0)
         expect(notifications).toHaveLength(1)
         expect(notifications[0]).toMatchObject({
           notificationId: `child-settled:${child.runId}`,

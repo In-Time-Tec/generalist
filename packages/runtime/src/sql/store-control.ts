@@ -76,10 +76,11 @@ const cancelRun = (
 ): Effect.Effect<void, RunNotFound | RuntimeUnavailable | SqlError, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const terminal = isTerminal(run.status)
     const executing = run.ownerWorkerId !== undefined && (run.status === "running" || run.status === "cancelling")
     const needsResolution = run.status === "needs-resolution"
     let current = run
-    if (!current.cancellationRequested) {
+    if (!terminal && !current.cancellationRequested) {
       yield* appendEvent(
         hub,
         current,
@@ -88,7 +89,7 @@ const cancelRun = (
       )
       current = (yield* loadRun(run.runId))!
     }
-    yield* reconcileProgramCancellation(run.runId, reason ?? current.cancelReason)
+    if (!terminal) yield* reconcileProgramCancellation(run.runId, reason ?? current.cancelReason)
     yield* sql`
       UPDATE baton_run_waits SET status = 'cancelled', closed_at = ${yield* nowIso}
       WHERE run_id = ${run.runId} AND status = 'open'
@@ -117,7 +118,7 @@ const cancelRun = (
       }
       current = (yield* loadRun(run.runId))!
     }
-    if (needsResolution) return
+    if (terminal || needsResolution) return
     if (executing) return
     if (isTerminal(current.status)) return
     const running = yield* sql<{ fan_out_id: string }>`
@@ -236,7 +237,6 @@ export const cancel: {
   const input = maybeInput
   return Effect.gen(function* () {
     const run = yield* requireRun(input.runId)
-    if (isTerminal(run.status)) return
     yield* cancelRun(hub, run, input.reason)
   })
 }

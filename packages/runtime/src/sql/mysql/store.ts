@@ -5,17 +5,9 @@ import { checkpointRef } from "../../executable-manifest.js"
 import type { LayerOptions } from "../../runtime.js"
 import { RunStore, type Interface as RunStoreInterface } from "../../run-store.js"
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "../store-admit.js"
-import {
-  cancel,
-  complete,
-  emitAgentEvent,
-  fail,
-  respond,
-  respondApproval,
-  resume,
-  settleAdmittedCancellation,
-  signal,
-} from "../store-control.js"
+import { cancel, complete, emitAgentEvent, fail, respond } from "../store-control.js"
+import { respondApproval, resume, settleAdmittedCancellation, signal } from "../store-control.js"
+import { cancelSession } from "../store-session.js"
 import {
   expireRunningOperation,
   getOperation,
@@ -78,6 +70,7 @@ import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.
 import { makeTransactionRunner } from "./transaction-events.js"
 import { settlementNotifications } from "../settlement-notifications.js"
 import { makeMysqlSessionStore } from "./session-store.js"
+import { reconcileCancellationRequested, sessionRoots } from "../session-lifecycle.js"
 import { makeMysqlModelResponseOperations } from "./store-model-response.js"
 import { MysqlOperationCommit } from "./operation-commit.js"
 export interface MysqlStoreOptions extends LayerOptions {
@@ -107,6 +100,9 @@ export const makeMysqlServices = (
     yield* Effect.addFinalizer(() => hub.shutdown)
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
+    yield* reconcileCancellationRequested.pipe(
+      Effect.mapError((error) => SchemaMigrationFailed.make({ source, message: String(error) })),
+    )
     const connections = options.maxConnections ?? 10
     if (!Number.isSafeInteger(connections) || connections < 1) {
       return yield* SchemaMigrationFailed.make({ source, message: "MySQL maxConnections must be a positive integer" })
@@ -319,6 +315,7 @@ export const makeMysqlServices = (
             Effect.andThen(clearClaim(input.runId)),
           ),
         ),
+      cancelSession: (input) => run(cancelSession(transactionHub, input)),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
       readSteering: (input) => fenced(input, readSteering(input)),
       directory: (runId) => runNoTxn(directory(runId)),
@@ -348,6 +345,7 @@ export const makeMysqlServices = (
           }),
         ),
       snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
+      sessionRoots: (sessionId) => runNoTxn(sessionRoots(sessionId)),
       inspectTree: (rootRunId) => runInspection(loadTreeInspection(rootRunId)),
       history: (input) =>
         runNoTxn(

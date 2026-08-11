@@ -32,11 +32,11 @@ export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readon
       let current = yield* loadRun(runId).pipe(
         Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))),
       )
-      if (isTerminal(current.status)) return
+      const terminal = isTerminal(current.status)
       const needsResolution = current.status === "needs-resolution"
       const executing =
         current.ownerWorkerId !== undefined && (current.status === "running" || current.status === "cancelling")
-      if (!current.cancellationRequested) {
+      if (!terminal && !current.cancellationRequested) {
         yield* appendEvent(
           input.hub,
           current,
@@ -45,7 +45,7 @@ export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readon
         )
         current = (yield* loadRun(runId))!
       }
-      yield* reconcileProgramCancellation(runId, reason ?? current.cancelReason)
+      if (!terminal) yield* reconcileProgramCancellation(runId, reason ?? current.cancelReason)
       yield* input.sql`
         UPDATE baton_run_waits SET status = 'cancelled', closed_at = NOW()
         WHERE run_id = ${runId} AND status = 'open'
@@ -69,7 +69,7 @@ export const makeCancelRun = (input: { readonly sql: SqlClient.SqlClient; readon
           yield* cancelRun(child.runId, reason ?? "parent cancelled")
       }
       if (owned.length > 0) current = (yield* loadRun(runId))!
-      if (needsResolution) return
+      if (terminal || needsResolution) return
       if (executing) return
       if (isTerminal(current.status)) return
       const running = yield* input.sql<{ fan_out_id: string }>`

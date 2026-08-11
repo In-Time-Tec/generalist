@@ -194,7 +194,7 @@ export const resolveProgramOperation: {
     programOperations.set(mapKey, record)
     const runs = new Map(state.runs)
     const { ownerId: _, ...withoutOwner } = run
-    runs.set(run.runId, { ...withoutOwner, status: "running" })
+    runs.set(run.runId, { ...withoutOwner, status: run.cancellationRequested ? "cancelling" : "running" })
     return { ...state, programOperations, runs }
   }),
 )

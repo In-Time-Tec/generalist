@@ -285,48 +285,47 @@ for (const backend of ["memory", "sqlite"] as const) {
         ? Runtime.layerMemory(options)
         : Runtime.layerSqlite({ ...options, filename: tempDbPath("local-scheduler-claim-window") })
 
-    layer(runtimeLayer)(`${backend} the cancelling sweep never settles an owned but unregistered claim`, (it) => {
-      it.effect("never settles an owned but unregistered claim", () =>
-        Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
-          const store = yield* RunStore.RunStore
-          const workerId = backend === "memory" ? "memory" : "sqlite"
+    layer(runtimeLayer)(
+      `${backend} the cancelling sweep fences an owner absent from this process incarnation`,
+      (it) => {
+        it.effect("settles an owner absent from this process incarnation", () =>
+          Effect.gen(function* () {
+            const runtime = yield* Runtime.Runtime
+            const scheduler = yield* LocalScheduler.LocalScheduler
+            const store = yield* RunStore.RunStore
+            const workerId = backend === "memory" ? "memory" : "sqlite"
 
-          const owned = yield* runtime.send({
-            to: assistantAddress,
-            sessionId: `scheduler-claim-window:${backend}`,
-            idempotencyKey: "owned",
-            prompt: "owned",
-          })
-          yield* store.claimExecution({ runId: owned.runId, ownerId: workerId })
-          yield* runtime.cancel({ runId: owned.runId, reason: "stop" })
-          expect((yield* runtime.inspect(owned.runId)).status).toBe("cancelling")
+            const owned = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: `scheduler-claim-window:${backend}`,
+              idempotencyKey: "owned",
+              prompt: "owned",
+            })
+            yield* store.claimExecution({ runId: owned.runId, ownerId: workerId })
+            yield* runtime.cancel({ runId: owned.runId, reason: "stop" })
+            expect((yield* runtime.inspect(owned.runId)).status).toBe("cancelling")
 
-          const orphaned = yield* runtime.send({
-            to: assistantAddress,
-            sessionId: `scheduler-claim-window-ghost:${backend}`,
-            idempotencyKey: "ghost",
-            prompt: "ghost",
-          })
-          yield* store.claimExecution({ runId: orphaned.runId, ownerId: "ghost-owner" })
-          yield* runtime.cancel({ runId: orphaned.runId, reason: "stop" })
+            const orphaned = yield* runtime.send({
+              to: assistantAddress,
+              sessionId: `scheduler-claim-window-ghost:${backend}`,
+              idempotencyKey: "ghost",
+              prompt: "ghost",
+            })
+            yield* store.claimExecution({ runId: orphaned.runId, ownerId: "ghost-owner" })
+            yield* runtime.cancel({ runId: orphaned.runId, reason: "stop" })
 
-          yield* scheduler.tick
+            yield* scheduler.tick
 
-          expect((yield* runtime.inspect(owned.runId)).status).toBe("cancelling")
-          const fenceBefore = (yield* store.loadExecution(owned.runId)).attemptFence
-          const ownedExecution = yield* store.loadExecution(owned.runId)
-          expect(ownedExecution.ownerId).toBe(workerId)
-          expect(ownedExecution.attemptFence).toBe(fenceBefore)
-          const ownedTags = (yield* runtime.history({ runId: owned.runId, cursor: -1, limit: 100 })).map(
-            (event) => event._tag,
-          )
-          expect(ownedTags).not.toContain("RunCancelled")
-          expect((yield* runtime.inspect(orphaned.runId)).status).toBe("cancelled")
-        }),
-      )
-    })
+            expect((yield* runtime.inspect(owned.runId)).status).toBe("cancelled")
+            const ownedTags = (yield* runtime.history({ runId: owned.runId, cursor: -1, limit: 100 })).map(
+              (event) => event._tag,
+            )
+            expect(ownedTags.filter((tag) => tag === "RunCancelled")).toHaveLength(1)
+            expect((yield* runtime.inspect(orphaned.runId)).status).toBe("cancelled")
+          }),
+        )
+      },
+    )
   }
 
   {

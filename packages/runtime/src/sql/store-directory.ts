@@ -2,7 +2,14 @@ import { Clock, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
-import { nameScope, parseAddress, runAddress, type AgentName, type DirectoryEntry } from "../agent-directory.js"
+import {
+  nameScope,
+  parseAddress,
+  runAddress,
+  sessionAddress,
+  type AgentName,
+  type DirectoryEntry,
+} from "../agent-directory.js"
 import {
   AddressNotFound,
   AgentNameConflict,
@@ -201,12 +208,30 @@ export const listRelated = (runId: string) =>
  * a terminal state without consuming it was never seen by any model, so it returns to pending and
  * the session's next Run takes it. Binding alone must not strand a message on a dead Run.
  */
-export const pendingMessages = (input: { readonly sessionId: string; readonly limit: number }) =>
+export const pendingMessages = (input: {
+  readonly sessionId: string
+  readonly runId?: string
+  readonly limit: number
+}) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const rows = yield* sql<MessageRow>`
       SELECT * FROM baton_messages m
-      WHERE m.target_session_id = ${input.sessionId} AND (
+      WHERE m.target_session_id = ${input.sessionId}
+        AND m.entry_id NOT LIKE 'child-settled:%'
+        AND (
+          ${input.runId === undefined ? 1 : 0} = 1
+          OR m.to_address = ${sessionAddress(input.sessionId)}
+          OR (
+            m.to_address = ${input.runId === undefined ? "" : runAddress(input.runId)}
+            AND EXISTS (
+              SELECT 1 FROM baton_runs target
+              WHERE target.run_id = ${input.runId ?? ""}
+                AND target.status NOT IN ('succeeded', 'failed', 'cancelled')
+            )
+          )
+        )
+        AND (
         m.delivered_run_id IS NULL
         OR EXISTS (
           SELECT 1 FROM baton_runs r
@@ -254,7 +279,8 @@ export const admitMessage = (input: AdmitMessageInput) =>
     const now = yield* Clock.currentTimeMillis
     const pending = yield* sql<{ pending: number | string; pending_bytes: number | string | null }>`
       SELECT COUNT(*) AS pending, SUM(m.bytes) AS pending_bytes FROM baton_messages m
-      WHERE m.target_session_id = ${input.targetSessionId} AND (
+      WHERE m.target_session_id = ${input.targetSessionId}
+        AND m.entry_id NOT LIKE 'child-settled:%' AND (
         m.delivered_run_id IS NULL
         OR EXISTS (
           SELECT 1 FROM baton_runs r
@@ -280,7 +306,8 @@ export const admitMessage = (input: AdmitMessageInput) =>
     const windowStart = now - input.bounds.windowMillis
     const recent = yield* sql<{ recent: number | string }>`
       SELECT COUNT(*) AS recent FROM baton_messages
-      WHERE target_session_id = ${input.targetSessionId} AND admitted_at_millis > ${windowStart}
+      WHERE target_session_id = ${input.targetSessionId}
+        AND entry_id NOT LIKE 'child-settled:%' AND admitted_at_millis > ${windowStart}
     `
     if (Number(recent[0]?.recent ?? 0) >= input.bounds.maxPerWindow) {
       return yield* MailboxRateLimited.make({
@@ -323,7 +350,11 @@ export const deliverPendingMessages = (input: { readonly runId: string }) =>
     const run = yield* loadRun(input.runId)
     if (run === undefined) return yield* RunNotFound.make({ runId: input.runId })
     if (isTerminal(run.status) || run.pendingOutcome !== undefined) return []
-    const pending = yield* pendingMessages({ sessionId: run.message.sessionId, limit: Number.MAX_SAFE_INTEGER })
+    const pending = yield* pendingMessages({
+      sessionId: run.message.sessionId,
+      runId: run.runId,
+      limit: Number.MAX_SAFE_INTEGER,
+    })
     const delivered: Array<MailboxEntry> = []
     for (const entry of pending) {
       const idempotencyKey = steeringKey(entry.entryId)

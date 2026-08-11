@@ -1,16 +1,8 @@
 import { Effect, Equal, Option, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
-import {
-  ApprovalStale,
-  CursorExpired,
-  IdempotencyConflict,
-  ResponseConflict,
-  RunTerminal,
-  RuntimeUnavailable,
-  WaitNotOpen,
-  ChildSelectionMissing,
-} from "../../errors.js"
+import { ApprovalStale, CursorExpired, IdempotencyConflict, ResponseConflict } from "../../errors.js"
+import { ChildSelectionMissing, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
 import { childDigest } from "../../memory/digest.js"
 import { equals, resolveChild } from "../../executable-manifest.js"
 import { isTerminal } from "../../run.js"
@@ -57,6 +49,8 @@ import { associateRegistrations, loadRegistrations } from "../executable-registr
 import { narrow } from "../../executable-registration.js"
 import { approvalResponse } from "../respond-approval.js"
 import { settlementNotifications } from "../settlement-notifications.js"
+import { reconcileCancellationRequested, sessionRoots } from "../session-lifecycle.js"
+import { cancelSessionRuns } from "./session-cancellation.js"
 import { makePostgresSessionStore } from "./session-store.js"
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
@@ -67,6 +61,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
     yield* Effect.addFinalizer(() => hub.shutdown)
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
+    yield* reconcileCancellationRequested
     const pg = yield* PgClient.PgClient
     const { run, runNoTxn, transactionHub } = makeTransactionRunner({ sql, pg, hub })
     const runInspection: RunFn = (effect) =>
@@ -305,6 +300,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           }),
         ),
       cancel: (input) => run(lockRun(input.runId).pipe(Effect.andThen(cancelRun(input.runId, input.reason)))),
+      cancelSession: (input) => run(cancelSessionRuns({ sql, cancelRun, ...input })),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
       readSteering: (input) => run(requireExecutionClaim(input).pipe(Effect.andThen(readSteering(input)))),
       ...messagingStoreMethods({ run, runNoTxn, lockRun, lockMailbox }),
@@ -327,6 +323,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           }),
         ),
       snapshot: (runId) => runInspection(loadRunSnapshot(runId)),
+      sessionRoots: (sessionId) => runNoTxn(sessionRoots(sessionId)),
       inspectTree: (rootRunId) => runInspection(loadTreeInspection(rootRunId)),
       history: (input) =>
         runNoTxn(

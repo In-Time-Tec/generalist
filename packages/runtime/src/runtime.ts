@@ -168,6 +168,15 @@ export interface CancelInput {
   readonly reason?: string
 }
 
+export interface CancelSessionInput {
+  readonly sessionId: string
+  readonly reason?: string
+}
+
+export interface AwaitSessionTerminalInput {
+  readonly sessionId: string
+}
+
 export interface SteerInput {
   readonly runId: string
   readonly idempotencyKey: string
@@ -300,6 +309,8 @@ export interface Interface {
   readonly respondApproval: (input: RespondApprovalInput) => Effect.Effect<void, RespondApprovalError>
   readonly signal: (input: SignalInput) => Effect.Effect<void, SignalError>
   readonly cancel: (input: CancelInput) => Effect.Effect<void, CancelError>
+  readonly cancelSession: (input: CancelSessionInput) => Effect.Effect<void, RuntimeUnavailable>
+  readonly awaitSessionTerminal: (input: AwaitSessionTerminalInput) => Effect.Effect<void, RuntimeUnavailable>
   readonly steer: (input: SteerInput) => Effect.Effect<void, SteerError>
   /**
    * @experimental Send one addressed message into the target's durable inbox.

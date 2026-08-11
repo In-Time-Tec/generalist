@@ -35,6 +35,8 @@ export const make = (
     const reconcileWindow = 32
 
     const waitingCursor = yield* Ref.make<string | undefined>(undefined)
+    const cancellingCursor = yield* Ref.make<string | undefined>(undefined)
+    const runningCursor = yield* Ref.make<string | undefined>(undefined)
     const queuedCursor = yield* Ref.make<string | undefined>(undefined)
 
     const reconcileChild = (store: RunStoreInterface, parent: RunInspection, runId: string): Effect.Effect<void> =>
@@ -100,21 +102,29 @@ export const make = (
 
     const sweepCancelling = (store: RunStoreInterface) =>
       Effect.gen(function* () {
-        const cancelling = yield* store.list({ status: "cancelling", order: "oldest", limit: reconcileWindow })
+        const cursor = yield* Ref.get(cancellingCursor)
+        const cancelling = yield* store.list({
+          status: "cancelling",
+          order: "oldest",
+          limit: reconcileWindow,
+          ...(cursor === undefined ? {} : { afterRunId: cursor }),
+        })
+        const last = cancelling[cancelling.length - 1]
+        yield* Ref.set(cancellingCursor, cancelling.length === reconcileWindow ? last?.runId : undefined)
         yield* Effect.forEach(cancelling, (run) => active.interrupt(run.runId), {
           concurrency: "unbounded",
           discard: true,
         })
         const stillActive = yield* active.active
+        const admitted = yield* Effect.sync(() => new Set(Array.from(executions, ([runId]) => runId)))
         yield* Effect.forEach(
           cancelling,
           (run) =>
-            stillActive.has(run.runId)
+            stillActive.has(run.runId) || admitted.has(run.runId)
               ? Effect.void
               : store.loadExecution(run.runId).pipe(
                   Effect.flatMap((execution) => {
                     if (execution.ownerId === undefined) return store.cancel({ runId: run.runId })
-                    if (execution.ownerId === options.workerId) return Effect.void
                     return store.fail({
                       runId: run.runId,
                       ownerId: execution.ownerId,
@@ -130,7 +140,14 @@ export const make = (
 
     const selectReadyRuns = (store: RunStoreInterface) =>
       Effect.gen(function* () {
-        const running = yield* store.list({ status: "running", order: "oldest", limit: selectionWindow })
+        const priorRunning = yield* Ref.get(runningCursor)
+        const running = yield* store.list({
+          status: "running",
+          order: "oldest",
+          limit: selectionWindow,
+          ...(priorRunning === undefined ? {} : { afterRunId: priorRunning }),
+        })
+        const lastRunning = running[running.length - 1]
         const cursor = yield* Ref.get(queuedCursor)
         const queued = yield* store.list({
           status: "queued",
@@ -159,6 +176,12 @@ export const make = (
                         execution.ownerId === options.workerId,
                     ),
                   ),
+        )
+        const runningIds = new Set(running.map((run) => run.runId))
+        const runningAvailable = available.some((run) => runningIds.has(run.runId))
+        yield* Ref.set(
+          runningCursor,
+          running.length === selectionWindow && !runningAvailable ? lastRunning?.runId : undefined,
         )
         yield* Effect.forEach(
           concurrency === undefined ? available : available.slice(0, Math.max(0, concurrency - admitted.size)),

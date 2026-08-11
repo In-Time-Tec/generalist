@@ -464,13 +464,13 @@ export const resolveOperation: {
     }
     if (clearLease) {
       yield* sql`
-        UPDATE baton_runs SET status = ${claimableStatus}, owner_worker_id = NULL, lease_expires_at = NULL,
+        UPDATE baton_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, lease_expires_at = NULL,
           updated_at = ${finished}
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     } else {
       yield* sql`
-        UPDATE baton_runs SET status = ${claimableStatus}, owner_worker_id = NULL, updated_at = ${finished}
+        UPDATE baton_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE ${claimableStatus} END, owner_worker_id = NULL, updated_at = ${finished}
         WHERE run_id = ${input.runId} AND status = 'needs-resolution'
       `
     }

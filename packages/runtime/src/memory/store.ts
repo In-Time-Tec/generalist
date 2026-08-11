@@ -27,6 +27,7 @@ import {
   commitInterruptedModelResponse,
 } from "./store-operations.js"
 import { resolveOperation } from "./store-operation-resolution.js"
+import { cancelSession } from "./store-session.js"
 import {
   claimExecution,
   loadExecution,
@@ -134,6 +135,7 @@ export const makeRunStore = (options: LayerOptions) =>
       respondApproval: (input) => update((state) => respondApproval(state, input)),
       signal: (input) => update((state) => signal(state, input)),
       cancel: (input) => update((state) => cancel(state, input)),
+      cancelSession: (input) => SynchronizedRef.modifyEffect(stateRef, (state) => cancelSession(state, input)),
       admitSteering: (input) => update((state) => admitSteering(state, input)),
       readSteering: (input) =>
         SynchronizedRef.get(stateRef).pipe(
@@ -179,6 +181,14 @@ export const makeRunStore = (options: LayerOptions) =>
                 firstTreePosition: 0,
               })
             }),
+          ),
+        ),
+      sessionRoots: (sessionId) =>
+        SynchronizedRef.get(stateRef).pipe(
+          Effect.map((state) =>
+            [...state.runs.values()]
+              .filter((run) => run.rootRunId === run.runId && run.message.sessionId === sessionId)
+              .map((run) => run.runId),
           ),
         ),
       inspectTree: (rootRunId) =>

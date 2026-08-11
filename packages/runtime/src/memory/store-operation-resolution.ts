@@ -52,7 +52,7 @@ export const resolveOperation: {
     operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
     const runs = new Map(state.runs)
     const { ownerId: _, ...withoutOwner } = run
-    runs.set(run.runId, { ...withoutOwner, status: "running" })
+    runs.set(run.runId, { ...withoutOwner, status: run.cancellationRequested ? "cancelling" : "running" })
     return { ...state, operations, runs }
   }),
 )

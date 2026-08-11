@@ -286,6 +286,10 @@ export interface Interface {
   ) => Effect.Effect<void, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable>
   readonly signal: (input: SignalInput) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable>
   readonly cancel: (input: CancelInput) => Effect.Effect<void, RunNotFound | RuntimeUnavailable>
+  readonly cancelSession: (input: {
+    readonly sessionId: string
+    readonly reason?: string
+  }) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable>
   readonly admitSteering: (
     input: AdmitSteeringInput,
   ) => Effect.Effect<void, RunNotFound | RunTerminal | SteeringConflict | RuntimeUnavailable>
@@ -317,6 +321,7 @@ export interface Interface {
   /** @experimental Messages admitted for one session that no Run has taken yet. */
   readonly pendingMessages: (input: {
     readonly sessionId: string
+    readonly runId?: string
     readonly limit: number
   }) => Effect.Effect<ReadonlyArray<MailboxEntry>, RuntimeUnavailable>
   /** @experimental Ordered durable child settlements addressed to one exact parent Run. */
@@ -334,6 +339,7 @@ export interface Interface {
   readonly inspectTree: (
     rootRunId: string,
   ) => Effect.Effect<import("./tree.js").Inspection, RunNotFound | RuntimeUnavailable>
+  readonly sessionRoots: (sessionId: string) => Effect.Effect<ReadonlyArray<string>, RuntimeUnavailable>
   readonly history: (input: {
     readonly runId: string
     readonly cursor: Cursor

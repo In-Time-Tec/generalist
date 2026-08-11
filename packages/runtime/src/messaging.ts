@@ -219,7 +219,7 @@ export const make = (input: {
     Effect.gen(function* () {
       const runId = yield* currentRunId
       const entry = yield* input.store.directory(runId)
-      return yield* input.store.pendingMessages({ sessionId: entry.sessionId, limit: request.limit })
+      return yield* input.store.pendingMessages({ sessionId: entry.sessionId, runId, limit: request.limit })
     }),
   directory: Effect.gen(function* () {
     const runId = yield* currentRunId

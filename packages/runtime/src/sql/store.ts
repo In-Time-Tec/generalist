@@ -25,6 +25,7 @@ import {
   signal,
   suspend,
 } from "./store-control.js"
+import { cancelSession } from "./store-session.js"
 import {
   expireRunningOperation,
   getOperation,
@@ -73,6 +74,7 @@ import {
 } from "./store-program.js"
 import { ProgramCapabilities } from "@batonfx/core"
 import { settlementNotifications } from "./settlement-notifications.js"
+import { reconcileCancellationRequested, sessionRoots } from "./session-lifecycle.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly filename: string
@@ -103,6 +105,9 @@ export const makeSqliteRunStore = (
     yield* Effect.addFinalizer(() => hub.shutdown)
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
+    yield* withSql(sql, reconcileCancellationRequested).pipe(
+      Effect.mapError((error) => SchemaMigrationFailed.make({ source: options.filename, message: error.message })),
+    )
     const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, sql.withTransaction(effect))
     const runNoTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) => withSql(sql, effect)
     const runBuffered = <A, E>(makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>) =>
@@ -158,6 +163,7 @@ export const makeSqliteRunStore = (
       respondApproval: (input) => runBuffered((transactionHub) => respondApproval(transactionHub, input)),
       signal: (input) => runBuffered((transactionHub) => signal(transactionHub, input)),
       cancel: (input) => runBuffered((transactionHub) => cancel(transactionHub, input)),
+      cancelSession: (input) => runBuffered((transactionHub) => cancelSession(transactionHub, input)),
       admitSteering: (input) => run(admitSteering(input)),
       readSteering: (input) => fenced(input, () => readSteering(input)),
       directory: (runId) => runNoTxn(directory(runId)),
@@ -188,6 +194,7 @@ export const makeSqliteRunStore = (
         ),
       snapshot: (runId) => run(loadRunSnapshot(runId)),
       inspectTree: (rootRunId) => run(loadTreeInspection(rootRunId)),
+      sessionRoots: (sessionId) => runNoTxn(sessionRoots(sessionId)),
       history: (input) =>
         runNoTxn(
           Effect.gen(function* () {

@@ -230,10 +230,10 @@ export const cancel: {
 } = Function.dual(2, (state: MemoryState, input: CancelInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
-    if (isTerminal(run.status)) return state
+    const terminal = isTerminal(run.status)
     const needsResolution = run.status === "needs-resolution"
     let next = state
-    if (!run.cancellationRequested) {
+    if (!terminal && !run.cancellationRequested) {
       const [, requested] = yield* appendLifecycle(
         next,
         run.runId,
@@ -242,7 +242,7 @@ export const cancel: {
       )
       next = requested
     }
-    next = reconcileProgramCancellation(next, run.runId, input.reason ?? run.cancelReason)
+    if (!terminal) next = reconcileProgramCancellation(next, run.runId, input.reason ?? run.cancelReason)
     for (const childRunId of run.children) {
       const fanOutChild = [...next.fanOuts.values()].some((fanOut) =>
         fanOut.members.some((member) => member.childRunId === childRunId),
@@ -263,7 +263,7 @@ export const cancel: {
         }
       }
     }
-    if (needsResolution) return next
+    if (terminal || needsResolution) return next
     if (run.ownerId !== undefined && (run.status === "running" || run.status === "cancelling")) return next
     const current = next.runs.get(run.runId)
     if (

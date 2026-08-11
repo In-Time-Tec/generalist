@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { Errors, Runtime, RunStore } from "../src/index.js"
+import { AgentDirectory, Errors, Runtime, RunStore } from "../src/index.js"
 import { family } from "./messaging-helpers.js"
-import { textPrompt } from "./helpers.js"
+import { assistantAddress, textPrompt } from "./helpers.js"
 import { provideScoped } from "./scoped-provide.js"
 
 export interface StrandedDeliverySuiteOptions<StoreError, Extra = never> {
@@ -22,6 +22,31 @@ export const strandedDeliverySuite = <StoreError, Extra = never>(
   const familyFor = (sessionId: string) => family(sessionId).pipe(Effect.tap(({ first }) => activate(first.runId)))
 
   describeBackend(`stranded delivery (${options.name})`, () => {
+    it.live("never migrates an exact Run message to a later Run in the same Session", () =>
+      Effect.gen(function* () {
+        const { runtime, store, parent, first } = yield* familyFor("session:exact-run")
+        yield* runtime.sendMessage({
+          fromRunId: parent.runId,
+          to: first.address,
+          idempotencyKey: "exact-run",
+          prompt: textPrompt("only for this execution"),
+        })
+        expect(yield* store.deliverPendingMessages({ runId: first.runId })).toHaveLength(1)
+        const claim = yield* store.claimExecution({ runId: first.runId, ownerId: "doomed" })
+        yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "worker died" }) })
+        expect(
+          yield* store.pendingMessages({ sessionId: first.sessionId, runId: first.runId, limit: 10 }),
+        ).toHaveLength(0)
+
+        const later = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: first.sessionId,
+          idempotencyKey: "later-run",
+          prompt: textPrompt("later"),
+        })
+        expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(0)
+      }).pipe(provide),
+    )
     /**
      * A message bound to a Run that dies before consuming it is still owed to the session.
      *
@@ -33,7 +58,7 @@ export const strandedDeliverySuite = <StoreError, Extra = never>(
         const { runtime, store, parent, first } = yield* familyFor("session:stranded-terminal")
         yield* runtime.sendMessage({
           fromRunId: parent.runId,
-          to: first.address,
+          to: AgentDirectory.sessionAddress(first.sessionId),
           idempotencyKey: "stranded",
           prompt: textPrompt("are you there?"),
         })
@@ -57,7 +82,7 @@ export const strandedDeliverySuite = <StoreError, Extra = never>(
         const { runtime, store, parent, first } = yield* family("session:stranded-cancelled")
         yield* runtime.sendMessage({
           fromRunId: parent.runId,
-          to: first.address,
+          to: AgentDirectory.sessionAddress(first.sessionId),
           idempotencyKey: "stranded-cancel",
           prompt: textPrompt("are you there?"),
         })
@@ -79,7 +104,7 @@ export const strandedDeliverySuite = <StoreError, Extra = never>(
         const { runtime, store, parent, first } = yield* familyFor("session:consumed-terminal")
         yield* runtime.sendMessage({
           fromRunId: parent.runId,
-          to: first.address,
+          to: AgentDirectory.sessionAddress(first.sessionId),
           idempotencyKey: "consumed",
           prompt: textPrompt("seen"),
         })
@@ -109,7 +134,7 @@ export const strandedDeliverySuite = <StoreError, Extra = never>(
         const { runtime, store, parent, first } = yield* familyFor("session:live-holder")
         yield* runtime.sendMessage({
           fromRunId: parent.runId,
-          to: first.address,
+          to: AgentDirectory.sessionAddress(first.sessionId),
           idempotencyKey: "live",
           prompt: textPrompt("hold"),
         })
@@ -124,7 +149,7 @@ export const strandedDeliverySuite = <StoreError, Extra = never>(
         const { runtime, store, parent, first } = yield* familyFor("session:returned-bound")
         yield* runtime.sendMessage({
           fromRunId: parent.runId,
-          to: first.address,
+          to: AgentDirectory.sessionAddress(first.sessionId),
           idempotencyKey: "bound-once",
           prompt: textPrompt("one"),
         })

@@ -330,7 +330,11 @@ export const postgresOperations = (input: {
           yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${op.runId} FOR UPDATE`
           const loaded = yield* requireRun(op.runId)
           const program = yield* getProgramOperation({ runId: op.runId, operation: op.operationId })
-          if (program !== undefined) return yield* resolveProgramOperation(op, "queued", true)
+          if (program !== undefined) {
+            yield* resolveProgramOperation(op, "queued", true)
+            yield* settleAdmittedCancellation(hub, op.runId)
+            return
+          }
           const rows = yield* sql<OperationRow>`
             SELECT * FROM baton_run_operations
             WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
@@ -380,7 +384,7 @@ export const postgresOperations = (input: {
             `
           }
           yield* sql`
-            UPDATE baton_runs SET status = 'queued', owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW()
+            UPDATE baton_runs SET status = CASE WHEN cancellation_requested THEN 'cancelling' ELSE 'queued' END, owner_worker_id = NULL, lease_expires_at = NULL, updated_at = NOW()
             WHERE run_id = ${op.runId} AND status = 'needs-resolution'
           `
           yield* settleAdmittedCancellation(hub, op.runId)
