@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.21.0
+
+- Replace durable provider-fragment events with one digest-verified semantic model response per completed or explicitly interrupted call. `Agent.stream` retains process-local `ModelPart` output, while Runtime history, replay, AG-UI, Transport, and FoldKit consume `ModelResponseCommitted` or `ModelResponseInterrupted`.
+- Make Session storage the authoritative conversation history across memory, SQLite, PostgreSQL, and MySQL, including deterministic handoff projections, stable idempotent appends, isolated spawned-child Sessions, and sequential owner takeover.
+- Add bounded, cumulative, lossy Runtime previews on a non-blocking observer lane. Preview congestion cannot delay cancellation or approval, and final semantic output replaces tentative output.
+- Publish Run events only after native transaction commit in every SQL dialect and settle explicit cancellation or terminal failure with one normalized partial response before the terminal Run state.
+
 ## 0.19.2
 
 - Export `decodeConfig` from the `OpenRouter` provider namespace so consumers
