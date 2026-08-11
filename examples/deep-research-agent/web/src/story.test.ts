@@ -66,35 +66,37 @@ const toolResult = Response.makePart("tool-result", {
 const completionFrames: ReadonlyArray<Connection.Incoming> = [
   eventFrame(0, { _tag: "TurnStarted", turn: 0 }),
   eventFrame(1, {
-    _tag: "ModelPart",
+    _tag: "ModelResponseCommitted",
     turn: 0,
+    operationKey: `${sessionId}:model:0`,
     modelCallId: "model-call-0",
     modelAttemptId: "model-attempt-0",
     attempt: 0,
-    part: toolCall,
+    response: { content: [toolCall], finishReason: "tool-calls" },
+    digest: "model-response-0",
   }),
   eventFrame(2, { _tag: "ToolExecutionStarted", turn: 0, call: toolCall }),
   eventFrame(3, { _tag: "ToolExecutionCompleted", turn: 0, call: toolCall, result: toolResult }),
   eventFrame(4, { _tag: "TurnCompleted", turn: 0, transcript: Prompt.empty }),
   eventFrame(5, { _tag: "TurnStarted", turn: 1 }),
   eventFrame(6, {
-    _tag: "ModelPart",
+    _tag: "ModelResponseCommitted",
     turn: 1,
+    operationKey: `${sessionId}:model:1`,
     modelCallId: "model-call-1",
     modelAttemptId: "model-attempt-1",
     attempt: 0,
-    part: Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "Compare transport frames." }),
+    response: {
+      content: [
+        Response.makePart("reasoning", { text: "Compare transport frames." }),
+        Response.makePart("text", { text: "Final cited answer" }),
+      ],
+      finishReason: "stop",
+    },
+    digest: "model-response-1",
   }),
-  eventFrame(7, {
-    _tag: "ModelPart",
-    turn: 1,
-    modelCallId: "model-call-1",
-    modelAttemptId: "model-attempt-1",
-    attempt: 0,
-    part: Response.makePart("text-delta", { id: "assistant", delta: "Final cited answer" }),
-  }),
-  eventFrame(8, { _tag: "TurnCompleted", turn: 1, transcript: Prompt.empty }),
-  eventFrame(9, {
+  eventFrame(7, { _tag: "TurnCompleted", turn: 1, transcript: Prompt.empty }),
+  eventFrame(8, {
     _tag: "RunCompleted",
     result: { turns: 2, text: "Final cited answer\n\nSources:\n[1] Baton docs", transcript: Prompt.empty },
   }),
@@ -109,7 +111,6 @@ describe("deep-research-agent web update", () => {
       Story.model((model) => {
         expect(model.chat.run._tag).toBe("Idle")
         expect(model.chat.connection).toBe("open")
-        expect(model.chat.streaming).toBeNull()
         expect(model.chat.entries.map((entry) => entry._tag)).toEqual(["UserEntry", "ToolEntry", "AssistantEntry"])
 
         const user = model.chat.entries[0]

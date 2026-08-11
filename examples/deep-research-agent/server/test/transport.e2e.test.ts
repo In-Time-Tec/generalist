@@ -131,7 +131,11 @@ describe("deep-research-agent Baton transport e2e", () => {
             Stream.runCollect,
           )
           const all = [...first, ...second]
-          const toolCall = all.find((event) => event._tag === "ModelPart" && event.part.type === "tool-call")
+          const committedResponse = all.find((event) => event._tag === "ModelResponseCommitted")
+          const toolCall =
+            committedResponse?._tag === "ModelResponseCommitted"
+              ? committedResponse.response.content.find((part) => part.type === "tool-call")
+              : undefined
           const completedTool = all.find((event) => event._tag === "ToolExecutionCompleted")
           const completed = all.find((event) => event._tag === "RunCompleted")
 
@@ -161,12 +165,9 @@ describe("deep-research-agent Baton transport e2e", () => {
             waiting.wait.reason._tag === "Approval" ? waiting.wait.reason.request : undefined,
           )
           expect(toolCall).toMatchObject({
-            _tag: "ModelPart",
-            part: {
-              type: "tool-call",
-              name: "web_search",
-              params: { query: "What makes Baton agent framework standalone?" },
-            },
+            type: "tool-call",
+            name: "web_search",
+            params: { query: "What makes Baton agent framework standalone?" },
           })
           expect(completedTool).toMatchObject({
             _tag: "ToolExecutionCompleted",

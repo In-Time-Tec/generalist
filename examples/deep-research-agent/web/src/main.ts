@@ -375,16 +375,6 @@ const chatEntryView = (model: Model, entry: Chat.ChatEntry, index: number): Html
   }
 }
 
-const streamingEntryView = (model: Model, streaming: NonNullable<Chat.Model["streaming"]>): Html =>
-  message({ align: "start" }, [
-    messageContent({}, [
-      ...(streaming.reasoning.length > 0
-        ? [reasoningBlockView(model, "reasoning-streaming", streaming.reasoning, true)]
-        : []),
-      streaming.text.length > 0 ? response({}, [responseText({}, streaming.text)]) : runningIndicatorView(),
-    ]),
-  ])
-
 const transcriptView = (model: Model): ReadonlyArray<Html> => {
   const h = html<Message>()
   const failure =
@@ -397,7 +387,7 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
           ),
         ]
       : []
-  if (model.chat.entries.length === 0 && model.chat.streaming === null) {
+  if (model.chat.entries.length === 0) {
     if (failure.length > 0) return failure
     return [
       h.keyed("div")(
@@ -413,12 +403,8 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
     ]
   }
   const entries = model.chat.entries.map((entry, index) => chatEntryView(model, entry, index))
-  const streaming =
-    model.chat.streaming === null
-      ? []
-      : [h.keyed("div")("streaming-row", [], [streamingEntryView(model, model.chat.streaming)])]
   const waiting =
-    model.chat.run._tag === "Running" && model.chat.streaming === null
+    model.chat.run._tag === "Running"
       ? [
           h.keyed("div")(
             "waiting-row",
@@ -427,7 +413,7 @@ const transcriptView = (model: Model): ReadonlyArray<Html> => {
           ),
         ]
       : []
-  return [...entries, ...streaming, ...waiting, ...failure]
+  return [...entries, ...waiting, ...failure]
 }
 
 const sessionBannerView = (session: SessionState): Html => {
