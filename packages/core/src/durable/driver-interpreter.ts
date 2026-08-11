@@ -289,16 +289,21 @@ export const makeInline = (input: {
               typeof spec.input.modelCallOrdinal === "number"
                 ? spec.input.modelCallOrdinal
                 : undefined
+            const emitted = new Array<A>()
             return stream.pipe(
               Stream.provideService(CurrentModelCallOrdinal, ordinal),
-              Stream.onExit((exit) => {
-                const outcome = outcomeFromExit(operation, exit)
-                return outcome === undefined
-                  ? Effect.void
-                  : outcome._tag === "Unknown"
-                    ? Effect.uninterruptible(commit(operation, outcome, nested)).pipe(Effect.orDie)
-                    : commit(operation, outcome, nested).pipe(Effect.orDie)
-              }),
+              Stream.tap((value) => Effect.sync(() => void emitted.push(value))),
+              Stream.onExit((exit) =>
+                Effect.gen(function* () {
+                  const outcome = Exit.isSuccess(exit)
+                    ? ({ _tag: "Succeeded", value: emitted } as const)
+                    : outcomeFromExit(operation, exit)
+                  if (outcome === undefined) return
+                  yield* outcome._tag === "Unknown"
+                    ? Effect.uninterruptible(commit(operation, outcome, nested))
+                    : commit(operation, outcome, nested)
+                }).pipe(Effect.orDie),
+              ),
             )
           }),
         ) as Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>,

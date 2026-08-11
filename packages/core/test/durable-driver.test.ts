@@ -1017,6 +1017,43 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
+  it.effect("replays journaled stream values without executing the source again", () =>
+    Effect.gen(function* () {
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream-replay", sessionId: "stream-replay" })
+      const initial = yield* driver.initial({ prompt: Prompt.make("stream-replay"), budget: RunBudget.allocate({}) })
+      const outcomes = new Map<string, DurableDriver.OperationOutcome>()
+      let replay = false
+      let sourceRuns = 0
+      const journal: DurableDriver.DriverJournal = {
+        onScheduled: (operation) => Effect.succeed(replay ? outcomes.get(operation.key) : undefined),
+        onCompleted: (operation, outcome) =>
+          Effect.sync(() => {
+            outcomes.set(operation.key, outcome)
+          }),
+        onCheckpoint: () => Effect.void,
+      }
+      const makeInterpreter = DurableDriver.makeInline({ driver, initial, journal })
+      const spec = { kind: "tool" as const, key: "stream-replay:tool", input: {}, replayPolicy: "never" as const }
+      const source = Stream.unwrap(
+        Effect.sync(() => {
+          sourceRuns += 1
+          return Stream.fromIterable(["first", "second", "third"])
+        }),
+      )
+
+      const first = yield* Stream.runCollect((yield* makeInterpreter).runStream(spec, source))
+      replay = true
+      const second = yield* Stream.runCollect(
+        (yield* makeInterpreter).runStream(spec, Stream.die("replayed stream source must not execute")),
+      )
+
+      expect(first).toEqual(["first", "second", "third"])
+      expect(second).toEqual(first)
+      expect(sourceRuns).toBe(1)
+      expect(outcomes.get(spec.key)).toEqual({ _tag: "Succeeded", value: ["first", "second", "third"] })
+    }),
+  )
+
   it.effect("records a defective non-replayable stream as unknown after stream finalizers", () =>
     Effect.gen(function* () {
       const lifecycle: Array<string> = []
