@@ -29,8 +29,7 @@ export const postgresAvailable = typeof postgresUrl === "string" && postgresUrl.
 
 export const postgresTestMaxConnections = 8
 
-export const postgresClient = (url: string) =>
-  PgClient.layer({ url: Redacted.make(url), maxConnections: postgresTestMaxConnections })
+export const postgresClient = (url: string) => PgClient.layer({ url: Redacted.make(url), maxConnections: 2 })
 
 type PostgresWorkerLayer = Layer.Layer<
   | import("../../src/execution-host.js").ExecutionHost
