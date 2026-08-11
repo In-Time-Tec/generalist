@@ -18,6 +18,7 @@ export type AttemptBody = (
   retryOverflow: boolean,
   compactOverflow?: boolean,
   overflowCause?: Cause.Cause<RunError>,
+  operationKey?: string,
 ) => Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel | DriverInterpreter>
 
 const encodeMessages = Schema.encodeUnknownSync(Schema.Array(Prompt.Message))
@@ -159,7 +160,7 @@ export const wrapDriverAttempt =
             input: { turn: input.turn, modelCallOrdinal: ordinal, purpose: "conversation" },
             replayPolicy: "never",
           },
-          input.attemptBody(activePrompt, retryOverflow, compactOverflow, overflowCause),
+          input.attemptBody(activePrompt, retryOverflow, compactOverflow, overflowCause, operationId),
           {
             successCodec: successCodec({
               operationId,

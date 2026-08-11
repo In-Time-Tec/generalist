@@ -28,6 +28,9 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
   readonly agentModelRegistry: typeof ModelRegistry.Service | undefined
   readonly agentModel: ModelSelection | undefined
   readonly resilienceService: Option.Option<typeof ModelResilience.Service>
+  readonly activeModelResponse: Option.Option<
+    typeof import("../model/active-model-response.js").ActiveModelResponse.Service
+  >
   readonly telemetryIdentity: {
     readonly current:
       | { readonly modelCallId: string; readonly modelAttemptId: string; readonly attempt: number }

@@ -45,6 +45,7 @@ import { digest } from "./durable/canonical-json.js"
 import { DurableDriver } from "./durable/facade-durableDriver.js"
 import { RunBudget } from "./durable/facade-runBudget.js"
 import { Agent } from "./agent/facade-agent.js"
+import { ActiveModelResponse } from "./model/facade-activeModelResponse.js"
 import { AgentEvent } from "./agent/facade-agentEvent.js"
 import { AgentTool } from "./agent/facade-agentTool.js"
 import { Approvals } from "./policy/facade-approvals.js"
@@ -325,6 +326,7 @@ export namespace ExecutableManifest {
 }
 
 export {
+  ActiveModelResponse,
   Agent,
   AgentEvent,
   AgentTool,

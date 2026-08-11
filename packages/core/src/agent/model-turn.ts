@@ -6,11 +6,7 @@ import { coalesceAdjacentText } from "../context/session-sync.js"
 import { applyPartChain, applyPromptChain } from "./agent-message.js"
 import { type Registry, select } from "../tools/tool-registry.js"
 import { type Request } from "../tools/tool-executor.js"
-import {
-  classifyFailure as classifyModelFailure,
-  type LanguageModelNotRegistered,
-  type ModelSelection,
-} from "../model/model-registry.js"
+import { classifyFailure as classifyModelFailure, type LanguageModelNotRegistered } from "../model/model-registry.js"
 import { CurrentInstrumentation, CurrentPurpose, type ModelCallPurpose } from "../model/model-telemetry.js"
 import { type AnyToolCall, type ToolCallIdState } from "./agent-tool-result.js"
 import type { RuntimeContext, StaticToolServices } from "./model-turn-context.js"
@@ -28,9 +24,11 @@ import { wrapDriverAttempt } from "./model-turn-driver.js"
 import type { AttemptCompleted, AttemptEvent, CompletedModelOperation } from "../model/model-operation.js"
 import { captureFinishPart, captureStructuredUsage, chargeAttemptUsageWith } from "./model-turn-finish.js"
 import { schedule as scheduleTools } from "./tool-scheduler.js"
-import { classifyOtherFailure, isToolNameCollision } from "./model-turn-parts.js"
+import { classifyOtherFailure, isToolNameCollision, makeRetryableOverflow, singleFailure } from "./model-turn-parts.js"
 import { committedEvent } from "./model-turn-commit.js"
-import { make as makeModelResponse, text as modelResponseText } from "../model/model-response-builder.js"
+import { text as modelResponseText } from "../model/model-response-builder.js"
+import { clearCommittedResponse, makeAttemptResponse } from "./model-turn-response.js"
+import { makeActiveTurn } from "./model-turn-active.js"
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
     agent,
@@ -38,6 +36,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     agentModel,
     agentModelRegistry,
     resilienceService,
+    activeModelResponse,
     telemetryIdentity,
     instrumentModel,
     chain,
@@ -51,27 +50,11 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     persisted,
     toolCallEvents,
   } = context
-  const activeAgentName = (_turn: number): Effect.Effect<string> =>
-    handoffStateRef === undefined
-      ? Effect.succeed(agent.name)
-      : Ref.get(handoffStateRef).pipe(
-          Effect.map((handoffRun) => handoffRun.active.name),
-          Effect.orElseSucceed(() => agent.name),
-        )
-  const activeModelSelection = (): Effect.Effect<ModelSelection | undefined> =>
-    handoffStateRef === undefined
-      ? Effect.succeed(agentModel)
-      : Ref.get(handoffStateRef).pipe(
-          Effect.map((handoffRun) => handoffRun.active.agent.model ?? agentModel),
-          Effect.orElseSucceed(() => agentModel),
-        )
-  const activeToolScheduling = (): Effect.Effect<ToolSchedulingPolicy> =>
-    handoffStateRef === undefined
-      ? Effect.succeed(agent.toolScheduling)
-      : Ref.get(handoffStateRef).pipe(
-          Effect.map((handoffRun) => handoffRun.active.agent.toolScheduling),
-          Effect.orElseSucceed(() => agent.toolScheduling),
-        )
+  const { activeAgentName, activeModelSelection, activeToolScheduling } = makeActiveTurn({
+    agent,
+    ...(handoffStateRef === undefined ? {} : { handoffStateRef }),
+    agentModel,
+  })
   const captureProviderOutput = (part: Response.StreamPart<Record<string, Tool.Any>>): void => {
     if (part.type === "text-delta") state.providerOutput.textCharacters += part.delta.length
     if (part.type === "reasoning-delta") state.providerOutput.reasoningCharacters += part.delta.length
@@ -191,7 +174,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
   const modelTurn = (turn: number, prompt: Prompt.RawInput, registry: Registry, overrides?: TurnOverrides) =>
     Stream.unwrap(
       Effect.gen(function* () {
-        const agentName = yield* activeAgentName(turn)
+        const agentName = yield* activeAgentName()
         const selection = yield* activeModelSelection()
         const toolScheduling = yield* activeToolScheduling()
         const activeRegistry = overrides?.activeTools === undefined ? registry : select(registry, overrides.activeTools)
@@ -245,34 +228,27 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
           ),
         ),
       )
+    let completedResponseAuthority: ReturnType<ReturnType<typeof makeAttemptResponse>["authority"]>
     const attemptBody = (
       activePrompt: Prompt.Prompt,
       retryOverflow: boolean,
       compactOverflow = false,
       overflowCause?: Cause.Cause<RunError>,
+      operationKey?: string,
     ): Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel | DriverInterpreter> => {
       let emitted = false
       let classifyFailure = classifyOtherFailure
-      const responseBuilder = makeModelResponse<Record<string, Tool.Any>>()
+      const attemptResponse = makeAttemptResponse({
+        service: activeModelResponse,
+        ...(operationKey === undefined ? {} : { operationKey }),
+        turn,
+      })
       let preparedState: { readonly history: Prompt.Prompt; readonly preparedPrompt: Prompt.Prompt } | undefined
-      const singleFailure = (cause: Cause.Cause<unknown>) => {
-        const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
-        return reason !== undefined && Cause.isFailReason(reason) ? Option.some(reason.error) : Option.none()
-      }
-      const retryableOverflow = (cause: Cause.Cause<unknown>, hasEmitted: boolean): boolean => {
-        const failure = singleFailure(cause)
-        if (Option.isNone(failure)) return false
-        const classifiedFailure =
-          Schema.is(AgentError)(failure.value) && failure.value.cause !== undefined
-            ? failure.value.cause
-            : failure.value
-        return (
-          retryOverflow &&
-          !hasEmitted &&
-          Option.isSome(compactionService) &&
-          classifyFailure(classifiedFailure) === "context-overflow"
-        )
-      }
+      const retryableOverflow = makeRetryableOverflow({
+        retryOverflow,
+        canCompact: Option.isSome(compactionService),
+        classify: (error) => classifyFailure(error),
+      })
       return Stream.unwrap(
         Effect.succeed(
           Stream.fromChannel(
@@ -353,7 +329,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                               const identity = telemetryIdentity.current
                               if (identity === undefined)
                                 throw new Error("ModelPart produced outside an instrumented model attempt")
-                              responseBuilder.accept(part)
+                              attemptResponse.accept(identity, part)
                               return {
                                 _tag: "Part",
                                 part,
@@ -372,13 +348,15 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                             const identity = telemetryIdentity.current
                             if (identity === undefined)
                               throw new Error("Model attempt completed outside an instrumented model attempt")
+                            const response = attemptResponse.complete(identity)
+                            completedResponseAuthority = attemptResponse.authority()
                             return {
                               _tag: "Completed",
                               messages,
                               modelCallId: identity.modelCallId,
                               modelAttemptId: identity.modelAttemptId,
                               attempt: identity.attempt,
-                              response: responseBuilder.complete(),
+                              response,
                             }
                           }),
                         ),
@@ -394,11 +372,13 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         Stream.catchCause((cause) => {
           if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
           if (retryableOverflow(cause, emitted)) {
+            attemptResponse.discard()
             return attemptBody(
               preparedState?.preparedPrompt ?? activePrompt,
               false,
               true,
               cause as Cause.Cause<RunError>,
+              operationKey,
             )
           }
           return Stream.failCause(cause)
@@ -453,6 +433,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
             Effect.suspend(() => {
               const operation = completedOperation
               const attempt = completedAttempt
+              const responseAuthority = completedResponseAuthority
               if (operation === undefined || attempt === undefined)
                 return Effect.die(new Error("Model operation exhausted without a committed response"))
               state.text = `${state.text}${modelResponseText(attempt.response)}`
@@ -470,6 +451,11 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                 ),
                 Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
                 Effect.orDie,
+                Effect.andThen(
+                  Effect.sync(() =>
+                    clearCommittedResponse({ service: activeModelResponse, authority: responseAuthority }),
+                  ),
+                ),
                 Effect.as(committedEvent({ operation, attempt })),
               )
             }),

@@ -6,6 +6,7 @@ import { Compaction } from "../turn/compaction.js"
 import { Instructions, openEpoch } from "../context/instructions.js"
 import { type Key, Memory } from "../context/memory.js"
 import { ModelMiddleware } from "../model/model-middleware.js"
+import { ActiveModelResponse } from "../model/active-model-response.js"
 import { ModelRegistry } from "../model/model-registry.js"
 import { instrument, makeIdentityCell } from "../model/model-instrumentation.js"
 import { ModelResilience, defaultPolicy as defaultModelResilience } from "../model/model-resilience.js"
@@ -35,7 +36,6 @@ import { validationFailure as toolSchedulingFailure } from "./tool-scheduler.js"
 type StaticDeclaration = { readonly origin: import("./agent-event.js").ToolOrigin; readonly tool: Tool.Any }
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-
 const appendInstructionFragment = (base: string | undefined, fragment: string | undefined): string | undefined => {
   if (fragment === undefined || fragment.length === 0) return base
   if (base === undefined || base.length === 0) return fragment
@@ -49,7 +49,6 @@ const progressOverflowPolicySchema = Schema.Union([
   Schema.TaggedStruct("Sliding", { capacity: progressCapacitySchema }),
   Schema.TaggedStruct("Fail", { capacity: progressCapacitySchema }),
 ])
-
 const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
   Effect.gen(function* () {
     const persistenceOptions = options.persistence
@@ -187,6 +186,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     const chain = yield* Effect.serviceOption(ModelMiddleware).pipe(
       Effect.map(Option.match({ onNone: () => [], onSome: (service) => service })),
     )
+    const activeModelResponse = yield* Effect.serviceOption(ActiveModelResponse)
     if (
       options.toolOutputMaxBytes !== undefined &&
       (!Number.isFinite(options.toolOutputMaxBytes) || options.toolOutputMaxBytes < 0)
@@ -222,7 +222,6 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       })
     }
     const progressPolicy: ProgressOverflowPolicy = decodedProgressPolicy.value
-
     const invalidToolScheduling = toolSchedulingFailure(agent.toolScheduling, Object.keys(agent.toolkit.tools))
     if (invalidToolScheduling !== undefined) {
       return yield* AgentError.make({ message: invalidToolScheduling, turn: 0 })
@@ -446,6 +445,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       executor,
       approvals,
       chain,
+      activeModelResponse,
       progressPolicy,
       sessionId,
       sessionOwnerToken,

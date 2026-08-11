@@ -15,6 +15,7 @@ import {
   Toolkit as EffectToolkit,
 } from "effect/unstable/ai"
 import {
+  ActiveModelResponse,
   AiError,
   Chat,
   EmbeddingModel,
@@ -35,6 +36,7 @@ describe("@batonfx/core public surface", () => {
     Effect.gen(function* () {
       const module = yield* Effect.promise(() => import("../src/index.js"))
       expect(Object.keys(module).toSorted()).toEqual([
+        "ActiveModelResponse",
         "Agent",
         "AgentEvent",
         "AgentManifest",
@@ -103,6 +105,14 @@ describe("@batonfx/core public surface", () => {
     expect(IdGenerator).toBe(EffectIdGenerator)
     expect(Model).toBe(EffectModel)
     expect(Telemetry).toBe(EffectTelemetry)
+  })
+
+  it("exports only the read-only active response handle", () => {
+    const handle = ActiveModelResponse.make()
+    expect(ActiveModelResponse.ActiveModelResponse).toBeDefined()
+    expect(Effect.isEffect(handle.snapshot)).toBe(true)
+    expect("accept" in handle).toBe(false)
+    expect(Object.keys(ActiveModelResponse).toSorted()).toEqual(["ActiveModelResponse", "make"])
   })
 
   it("exports the model telemetry contract", () => {
