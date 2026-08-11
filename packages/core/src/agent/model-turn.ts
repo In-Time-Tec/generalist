@@ -27,7 +27,8 @@ import type { TurnOverrides } from "../turn/turn-policy.js"
 import { wrapDriverAttempt } from "./model-turn-driver.js"
 import { captureFinishPart, captureStructuredUsage, chargeAttemptUsageWith } from "./model-turn-finish.js"
 import { schedule as scheduleTools } from "./tool-scheduler.js"
-import { attemptText, classifyOtherFailure, isToolNameCollision } from "./model-turn-parts.js"
+import { classifyOtherFailure, isToolNameCollision } from "./model-turn-parts.js"
+import { make as makeModelResponse, text as modelResponseText } from "../model/model-response-builder.js"
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
     agent,
@@ -262,7 +263,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
       let emitted = false
       let completed = false
       let classifyFailure = classifyOtherFailure
-      const transformedParts = new Array<Response.StreamPart<Record<string, Tool.Any>>>()
+      const responseBuilder = makeModelResponse<Record<string, Tool.Any>>()
       let preparedState: { readonly history: Prompt.Prompt; readonly preparedPrompt: Prompt.Prompt } | undefined
       const singleFailure = (cause: Cause.Cause<unknown>) => {
         const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
@@ -362,7 +363,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                         accept: validateToolCallId(toolCallIds, part).pipe(
                           Effect.andThen(
                             Effect.sync(() => {
-                              transformedParts.push(part)
+                              responseBuilder.accept(part)
                             }),
                           ),
                         ),
@@ -383,13 +384,14 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                 (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
                   ? Effect.void
                   : Effect.suspend(() => {
-                      state.text = `${state.text}${attemptText(transformedParts)}`
+                      const response = responseBuilder.complete()
+                      state.text = `${state.text}${modelResponseText(response)}`
                       return Ref.set(
                         chat.history,
                         Prompt.concat(
                           Prompt.concat(preparedState!.history, preparedState!.preparedPrompt),
                           Prompt.fromMessages(
-                            Prompt.fromResponseParts(transformedParts).content.map(coalesceAdjacentText),
+                            Prompt.fromResponseParts(response.content).content.map(coalesceAdjacentText),
                           ),
                         ),
                       )
