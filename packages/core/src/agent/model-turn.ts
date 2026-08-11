@@ -415,6 +415,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     let completedAttempt: AttemptCompleted | undefined
     const driverAttempt = wrapDriverAttempt({
       turn,
+      toolkit: activeRegistry.toolkit,
       attemptBody,
       completed: (operation, attempt) => {
         completedOperation = operation

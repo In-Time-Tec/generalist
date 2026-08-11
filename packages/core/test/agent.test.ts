@@ -1002,6 +1002,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             "ModelPart",
             "ModelAttemptCompleted",
             "ModelCallCompleted",
+            "ModelResponseCommitted",
             "TurnCompleted",
             "Completed",
           ])
@@ -1850,6 +1851,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "TurnCompleted",
           "Completed",
         ])
@@ -2803,6 +2805,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "ApprovalRequested",
           "TurnCompleted",
         ])
@@ -3140,6 +3143,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "TurnCompleted",
           "Completed",
         ])
@@ -3288,6 +3292,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "TurnCompleted",
           "Completed",
         ])
@@ -5578,6 +5583,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "TurnCompleted",
           "ModelCallStarted",
           "ModelAttemptStarted",
@@ -5651,6 +5657,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "TurnCompleted",
           "ModelCallStarted",
           "ModelAttemptStarted",
@@ -5689,7 +5696,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const agent = Agent.make({ name: "structured-lazy-span-agent" })
 
         const events = yield* Agent.stream(agent, { prompt: "make object", output: { schema: objectSchema } }).pipe(
-          Stream.take(9),
+          Stream.take(10),
           Stream.runCollect,
           Effect.withTracer(tracer),
         )
@@ -5703,6 +5710,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "TurnCompleted",
         ])
         expect(structuredCalled).toBe(false)
@@ -5783,6 +5791,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "ToolExecutionStarted",
           "ToolExecutionCompleted",
           "TurnCompleted",
@@ -5794,6 +5803,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "TurnCompleted",
           "ModelCallStarted",
           "ModelAttemptStarted",
@@ -6009,6 +6019,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "ModelPart",
           "ModelAttemptCompleted",
           "ModelCallCompleted",
+          "ModelResponseCommitted",
           "TurnCompleted",
           "ModelCallStarted",
           "ModelAttemptStarted",
@@ -7502,6 +7513,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
             "ModelPart",
             "ModelAttemptCompleted",
             "ModelCallCompleted",
+            "ModelResponseCommitted",
             "TurnCompleted",
             "Completed",
           ])

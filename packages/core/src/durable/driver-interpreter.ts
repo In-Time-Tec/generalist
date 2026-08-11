@@ -33,7 +33,6 @@ import {
 } from "./loop-driver.js"
 import type { Agent, RunOptions } from "../agent/agent.js"
 import type { HandoffControlState } from "../agent/handoff-state.js"
-
 /** @experimental Operation scheduled at one agent-loop effect boundary. */
 export interface OperationSpec {
   readonly kind: DriverOperationKind
@@ -64,16 +63,15 @@ export interface DriverJournal {
 export class DriverJournalService extends Context.Service<DriverJournalService, DriverJournal>()(
   "@batonfx/core/durable/driver-interpreter/DriverJournalService",
 ) {}
-
 /** @experimental Caller-owned successful stream result and replay codec. */
 export interface StreamSuccessCodec<A, Success> {
   readonly observe: (value: A) => void
+  /** Whether the source reached its authored semantic terminal value rather than a downstream consumer stopping early. */
+  readonly isComplete?: () => boolean
   readonly complete: () => Success
   readonly replay: (success: Success) => ReadonlyArray<A>
 }
-
 type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted
-
 /** @experimental Inline interpreter executing driver operations through Effect services. */
 export interface Interface {
   readonly checkpoint: Effect.Effect<DriverCheckpoint>
@@ -104,7 +102,6 @@ export interface Interface {
   readonly refundChild: (child: RunBudget) => Effect.Effect<void>
   readonly setHandoffState: (state: HandoffControlState) => Effect.Effect<void, DriverStateInvalid>
 }
-
 /** @experimental */
 export class DriverUnknownReplay extends Schema.TaggedErrorClass<DriverUnknownReplay>()(
   "@batonfx/core/DriverUnknownReplay",
@@ -315,7 +312,9 @@ export const makeInline = (input: {
               Stream.onExit((exit) =>
                 Effect.gen(function* () {
                   const outcome = Exit.isSuccess(exit)
-                    ? ({ _tag: "Succeeded", value: codec === undefined ? emitted! : codec.complete() } as const)
+                    ? codec?.isComplete?.() === false
+                      ? undefined
+                      : ({ _tag: "Succeeded", value: codec === undefined ? emitted! : codec.complete() } as const)
                     : outcomeFromExit(operation, exit)
                   if (outcome === undefined) return
                   yield* outcome._tag === "Unknown"

@@ -1,5 +1,5 @@
 import { Cause, Effect, Schema, Stream } from "effect"
-import { LanguageModel, Prompt, Response, Tool } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { checkpoint, logicalOperationId } from "../durable/driver-run.js"
 import { digest as canonicalDigest } from "../durable/canonical-json.js"
 import { DriverInterpreter, operationKey, type StreamSuccessCodec } from "../durable/driver-interpreter.js"
@@ -21,6 +21,20 @@ export type AttemptBody = (
 ) => Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel | DriverInterpreter>
 
 const encodeMessages = Schema.encodeUnknownSync(Schema.Array(Prompt.Message))
+
+const BigIntTag = "@batonfx/core/BigInt"
+const closeBigInts = (value: unknown): unknown => {
+  if (typeof value === "bigint") return { [BigIntTag]: value.toString() }
+  if (Array.isArray(value)) return value.map(closeBigInts)
+  if (value === null || typeof value !== "object" || value instanceof Uint8Array || value instanceof URL) return value
+  return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, closeBigInts(nested)]))
+}
+const openBigInts = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(openBigInts)
+  if (value === null || typeof value !== "object") return value
+  if (BigIntTag in value && typeof value[BigIntTag] === "string") return BigInt(value[BigIntTag])
+  return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, openBigInts(nested)]))
+}
 
 const operationDigest = (value: unknown): string =>
   canonicalDigest(JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value)))
@@ -51,10 +65,17 @@ const replayParts = (operationId: string, completed: AttemptCompleted): Readonly
 const successCodec = (input: {
   readonly operationId: string
   readonly turn: number
+  readonly toolkit: Toolkit.Toolkit<Record<string, Tool.Any>>
   readonly completed: (operation: CompletedModelOperation, attempt: AttemptCompleted) => void
 }): StreamSuccessCodec<AttemptEvent, CompletedModelOperation> => {
-  const encodeContent = Schema.encodeUnknownSync(ModelResponseContent)
-  const decodeContent = Schema.decodeUnknownSync(ModelResponseContent)
+  const contentSchema = Schema.Array(Response.Part(input.toolkit)) as unknown as Schema.Codec<
+    ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
+    typeof ModelResponseContent.Encoded,
+    never,
+    never
+  >
+  const encodeContent = Schema.encodeUnknownSync(contentSchema)
+  const decodeContent = Schema.decodeUnknownSync(contentSchema)
   const decodeMessages = Schema.decodeUnknownSync(Schema.Array(Prompt.Message))
   let terminal: AttemptCompleted | undefined
   return {
@@ -64,6 +85,7 @@ const successCodec = (input: {
         throw new Error(`Model operation ${input.operationId} emitted more than one completion`)
       terminal = event
     },
+    isComplete: () => terminal !== undefined,
     complete: () => {
       if (terminal === undefined) throw new Error(`Model operation ${input.operationId} completed without a response`)
       const value = {
@@ -72,7 +94,7 @@ const successCodec = (input: {
         modelCallId: terminal.modelCallId,
         modelAttemptId: terminal.modelAttemptId,
         attempt: terminal.attempt,
-        messages: encodeMessages(terminal.messages),
+        messages: encodeMessages(closeBigInts(terminal.messages)),
         content: encodeContent(terminal.response.content),
         ...(terminal.response.usage === undefined
           ? {}
@@ -96,7 +118,7 @@ const successCodec = (input: {
       >
       const attempt: AttemptCompleted = {
         _tag: "Completed",
-        messages: decodeMessages(operation.messages),
+        messages: openBigInts(decodeMessages(operation.messages)) as ReadonlyArray<Prompt.Message>,
         modelCallId: operation.modelCallId,
         modelAttemptId: operation.modelAttemptId,
         attempt: operation.attempt,
@@ -115,6 +137,7 @@ const successCodec = (input: {
 export const wrapDriverAttempt =
   (input: {
     readonly turn: number
+    readonly toolkit: Toolkit.Toolkit<Record<string, Tool.Any>>
     readonly attemptBody: AttemptBody
     readonly completed: (operation: CompletedModelOperation, attempt: AttemptCompleted) => void
   }): AttemptBody =>
@@ -141,6 +164,7 @@ export const wrapDriverAttempt =
             successCodec: successCodec({
               operationId,
               turn: input.turn,
+              toolkit: input.toolkit,
               completed: input.completed,
             }),
           },
