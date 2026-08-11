@@ -1,4 +1,4 @@
-import { Effect, Equal, Option, Random, Stream } from "effect"
+import { Effect, Equal, Option, Stream } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import {
@@ -22,6 +22,8 @@ import { withSql } from "../sql-effect.js"
 import { makeEventHub } from "../subscribers.js"
 import { check as checkSchema } from "./run-schema.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
+import { makeTransactionRunner, nextId } from "./transaction-events.js"
+import { makeEventStream } from "./event-stream.js"
 import { makePostgresClaims } from "./store-claims.js"
 import { postgresOperations, type RunFn } from "./store-ops.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "../store-execution.js"
@@ -56,11 +58,6 @@ import { narrow } from "../../executable-registration.js"
 import { PendingRunOutcome } from "../../run-store.js"
 import { approvalResponse } from "../respond-approval.js"
 import { settlementNotifications } from "../settlement-notifications.js"
-const nextId = (prefix: string): Effect.Effect<string> =>
-  Effect.gen(function* () {
-    const random = yield* Random.nextIntBetween(0, Number.MAX_SAFE_INTEGER)
-    return `${prefix}_${random.toString(36)}`
-  })
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
@@ -68,13 +65,10 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
     yield* checkSchema(source)
     const hub = yield* makeEventHub
     yield* Effect.addFinalizer(() => hub.shutdown)
-    const transactionHub: typeof hub = { ...hub, publish: () => Effect.void }
     const capacity = options.subscriberQueueCapacity ?? 64
     const sql = yield* SqlClient.SqlClient
     const pg = yield* PgClient.PgClient
-    const run: RunFn = (effect) =>
-      withSql(sql, sql.withTransaction(effect.pipe(Effect.provideService(PgClient.PgClient, pg))))
-    const runNoTxn: RunFn = (effect) => withSql(sql, effect.pipe(Effect.provideService(PgClient.PgClient, pg)))
+    const { run, runNoTxn, transactionHub } = makeTransactionRunner({ sql, pg, hub })
     const runInspection: RunFn = (effect) =>
       withSql(sql, withConsistentSnapshot(sql, "postgres", effect.pipe(Effect.provideService(PgClient.PgClient, pg))))
     const cancelRun = makeCancelRun({ sql, hub: transactionHub })
@@ -159,7 +153,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, terminal_event_id, created_at, settled_at)
               VALUES (${parent.runId}, ${runId}, ${input.invocationId}, NULL, NOW(), NULL)
             `
-            yield* appendEvent(hub, parent, {
+            yield* appendEvent(transactionHub, parent, {
               _tag: "ChildLinked",
               childRunId: runId,
               invocationId: input.invocationId,
@@ -168,7 +162,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             })
             const child = (yield* loadRun(runId))!
             yield* appendEvent(
-              hub,
+              transactionHub,
               child,
               { _tag: "RunAccepted", messageId: input.message.id, address: input.message.to },
               "queued",
@@ -185,9 +179,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           }),
         ),
       events: (input) =>
-        hub.subscribe({
+        makeEventStream({
+          hub,
+          pg,
           runId: input.runId,
           cursor: input.cursor,
+          capacity,
           loadReplay: runNoTxn(
             Effect.gen(function* () {
               const loaded = yield* requireRun(input.runId)
@@ -195,20 +192,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               return { replay, lastSequence: loaded.lastSequence }
             }),
           ),
-          capacity,
-          onSubscribed: pg.listen(NOTIFY_CHANNEL).pipe(
-            Stream.runForEach((payload) => {
-              if (payload !== input.runId) return Effect.void
-              return runNoTxn(
-                Effect.gen(function* () {
-                  const latest = yield* requireRun(input.runId)
-                  const events = yield* loadEventsAfter(input.runId, Math.max(input.cursor, latest.lastSequence - 8))
-                  yield* Effect.forEach(events, (event) => hub.publish(input.runId, event), { discard: true })
-                }),
-              ).pipe(Effect.ignore)
-            }),
-            Effect.ignore,
-          ),
+          loadAfter: (cursor) => runNoTxn(loadEventsAfter(input.runId, cursor)),
         }),
       respond: (input) =>
         run(
@@ -250,7 +234,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'waiting'
             `
             const current = (yield* loadRun(loaded.runId))!
-            yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
+            yield* appendEvent(
+              transactionHub,
+              current,
+              { _tag: "RunResumed", waitId: input.waitId, resolution },
+              "running",
+            )
           }),
         ),
       respondApproval: (input) =>
@@ -280,7 +269,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               WHERE run_id = ${loaded.runId} AND wait_id = ${response.waitId} AND status = 'waiting'
             `
             const current = (yield* loadRun(loaded.runId))!
-            yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: response.waitId, resolution }, "running")
+            yield* appendEvent(
+              transactionHub,
+              current,
+              { _tag: "RunResumed", waitId: response.waitId, resolution },
+              "running",
+            )
           }),
         ),
       signal: (input) =>
@@ -302,7 +296,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               UPDATE baton_run_waits SET status = 'signaled', response_json = ${encodeJson(WaitResolution, resolution)}, closed_at = NOW()
               WHERE run_id = ${loaded.runId} AND wait_id = ${loaded.activeWaitId} AND status = 'open'
             `
-            yield* appendEvent(hub, loaded, { _tag: "RunResumed", waitId: loaded.activeWaitId, resolution }, "running")
+            yield* appendEvent(
+              transactionHub,
+              loaded,
+              { _tag: "RunResumed", waitId: loaded.activeWaitId, resolution },
+              "running",
+            )
           }),
         ),
       cancel: (input) => run(lockRun(input.runId).pipe(Effect.andThen(cancelRun(input.runId, input.reason)))),
@@ -479,7 +478,12 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               WHERE run_id = ${loaded.runId} AND wait_id = ${input.waitId} AND status = 'waiting'
             `
             const current = (yield* loadRun(loaded.runId))!
-            yield* appendEvent(hub, current, { _tag: "RunResumed", waitId: input.waitId, resolution }, "running")
+            yield* appendEvent(
+              transactionHub,
+              current,
+              { _tag: "RunResumed", waitId: input.waitId, resolution },
+              "running",
+            )
           }),
         ),
       emitAgentEvent: (input) => run(emitAgentEvent(transactionHub, input)),
