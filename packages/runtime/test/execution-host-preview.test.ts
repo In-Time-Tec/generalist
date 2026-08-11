@@ -10,8 +10,8 @@ import { tempDbPath } from "./sqlite-helpers.js"
 const finish = Response.makePart("finish", {
   reason: "stop",
   usage: Response.Usage.make({
-    inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
-    outputTokens: { total: 1, text: 1, reasoning: undefined },
+    inputTokens: { total: 1, uncached: 1, cacheRead: 0, cacheWrite: 0 },
+    outputTokens: { total: 1, text: 1, reasoning: 0 },
   }),
   response: undefined,
 })
@@ -21,7 +21,11 @@ const scopedWith =
   <B, E2, R extends A | Scope.Scope>(effect: Effect.Effect<B, E2, R>) =>
     Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
-const execute = (input: { readonly observer: "absent" | "slow"; readonly backend: "memory" | "sqlite" }) =>
+const execute = (input: {
+  readonly observer: "absent" | "slow"
+  readonly backend: "memory" | "sqlite"
+  readonly chunks?: number
+}) =>
   Effect.gen(function* () {
     const releaseModel = yield* Deferred.make<void>()
     const previewSeen = yield* Deferred.make<Runtime.ModelPreview>()
@@ -32,15 +36,20 @@ const execute = (input: { readonly observer: "absent" | "slow"; readonly backend
       LanguageModel.LanguageModel,
       LanguageModel.make({
         generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-        streamText: () =>
-          Stream.make(
-            Response.makePart("text-delta", { id: "answer", delta: "" }),
-            Response.makePart("text-delta", { id: "answer", delta: "live answer" }),
+        streamText: () => {
+          const chunks = input.chunks ?? 1
+          const deltas =
+            chunks === 1
+              ? ["live answer"]
+              : Array.from({ length: chunks }, (_, index) => (index % 2 === 0 ? "" : "live answer"[(index - 1) / 2]!))
+          return Stream.fromIterable(
+            deltas.map((delta) => Response.makePart("text-delta", { id: "answer", delta })),
           ).pipe(
             Stream.concat(
               Stream.fromEffect(Deferred.await(releaseModel)).pipe(Stream.flatMap(() => Stream.make(finish))),
             ),
-          ),
+          )
+        },
       }),
     )
     const resolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, model) }])
@@ -83,6 +92,7 @@ const execute = (input: { readonly observer: "absent" | "slow"; readonly backend
           status: snapshot.run.status,
           result: snapshot.outcome?._tag === "Succeeded" ? snapshot.outcome.result : undefined,
           tags: history.map((event) => event._tag),
+          responses: history.flatMap((event) => (event._tag === "ModelResponseCommitted" ? [event.response] : [])),
         }
       }),
     )
@@ -118,5 +128,22 @@ it.effect("never writes Core ModelPart events to SQLite history", () =>
     expect(completed.tags).not.toContain("ModelPart")
     expect(completed.tags).toContain("TurnCompleted")
     expect(completed.tags).toContain("RunCompleted")
+  }),
+)
+
+it.effect("commits one chunk-independent semantic model response to memory and SQLite", () =>
+  Effect.gen(function* () {
+    for (const backend of ["memory", "sqlite"] as const) {
+      const whole = yield* execute({ backend, observer: "absent", chunks: 1 })
+      const fragmented = yield* execute({ backend, observer: "absent", chunks: 23 })
+      expect(whole.responses).toHaveLength(1)
+      expect(fragmented.responses).toHaveLength(1)
+      expect(fragmented.responses).toEqual(whole.responses)
+      const text = fragmented.responses[0]?.content.filter((part) => part.type === "text")
+      expect(text).toHaveLength(1)
+      expect(text?.[0]).toMatchObject({ type: "text", text: "live answer" })
+      expect(fragmented.tags.filter((tag) => tag === "ModelResponseCommitted")).toHaveLength(1)
+      expect(fragmented.tags).not.toContain("ModelPart")
+    }
   }),
 )

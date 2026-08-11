@@ -3,7 +3,7 @@ import { DateTime, Effect, Equal, Function, Option } from "effect"
 import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { CancelInput, RespondInput, SignalInput } from "../runtime.js"
-import type { AgentLoopEvent } from "../agent-event.js"
+import type { EmittableAgentLoopEvent } from "../agent-event.js"
 import type { ExecutionResult } from "../execution-state.js"
 import type { RunFailure } from "../run-event.js"
 import type { RunWait, WaitResolution } from "../run-wait.js"
@@ -480,9 +480,9 @@ export const resume: {
 )
 
 export const emitAgentEvent: {
-  (input: { readonly runId: string; readonly event: AgentLoopEvent }): (state: MemoryState) => SignalResult
-  (state: MemoryState, input: { readonly runId: string; readonly event: AgentLoopEvent }): SignalResult
-} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly event: AgentLoopEvent }) =>
+  (input: { readonly runId: string; readonly event: EmittableAgentLoopEvent }): (state: MemoryState) => SignalResult
+  (state: MemoryState, input: { readonly runId: string; readonly event: EmittableAgentLoopEvent }): SignalResult
+} = Function.dual(2, (state: MemoryState, input: { readonly runId: string; readonly event: EmittableAgentLoopEvent }) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const terminal = rejectIfTerminal(run)

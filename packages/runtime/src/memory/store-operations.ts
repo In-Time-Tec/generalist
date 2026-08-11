@@ -1,13 +1,14 @@
-import { Effect, Function } from "effect"
+import { Effect, Function, Schema } from "effect"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
-import type { OperationCompletionOutcome, RecordOperationInput } from "../run-store.js"
+import type { CommitModelResponseInput, OperationCompletionOutcome, RecordOperationInput } from "../run-store.js"
 import { canBlindRetry, type OperationRecord, type OperationStatus } from "../sql/operations.js"
 import { makeUnknown, appendAgentEvent, appendLifecycle, rejectIfTerminal } from "./append.js"
 import { Option } from "effect"
 import { operationKeyMapKey, operationMapKey, type MemoryState } from "./state.js"
 import { checkpointRef } from "../executable-manifest.js"
 import { digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
+import { sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
 
 const getRun = (state: MemoryState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -220,6 +221,50 @@ export const completeOperation: {
       const [, unknown] = yield* appendLifecycle(next, run.runId, makeUnknown(input.operationId), "needs-resolution")
       return [record, unknown] as const
     }),
+)
+
+export const commitModelResponse: {
+  (
+    input: CommitModelResponseInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+  (
+    state: MemoryState,
+    input: CommitModelResponseInput,
+  ): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+} = Function.dual(2, (state: MemoryState, input: CommitModelResponseInput) =>
+  Effect.gen(function* () {
+    const run = yield* getRun(state, input.runId)
+    const current = state.operations.get(operationMapKey(input.runId, input.operationId))
+    if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
+    const validated = validateModelResponseCommit({ record: current, input })
+    if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
+    if (current.status === "succeeded") {
+      const priorInput = { ...input, outcome: { _tag: "Succeeded" as const, value: current.result } }
+      const priorValidation = validateModelResponseCommit({ record: current, input: priorInput })
+      if (Schema.is(RuntimeUnavailable)(priorValidation)) return yield* priorValidation
+      const prior = run.events.find(
+        (event) => event._tag === "ModelResponseCommitted" && event.operationKey === input.event.operationKey,
+      )
+      if (
+        prior === undefined ||
+        prior._tag !== "ModelResponseCommitted" ||
+        !sameModelResponseEvent({ left: prior, right: input.event })
+      )
+        return yield* RuntimeUnavailable.make({
+          message: `model operation ${input.operationId} has a divergent outbox retry`,
+        })
+      return [current, state] as const
+    }
+    if (current.status === "failed" || current.status === "unknown")
+      return yield* RuntimeUnavailable.make({
+        message: `model operation ${input.operationId} already completed as ${current.status}`,
+      })
+    const [record, completed] = yield* completeOperation(state, input)
+    const [, appended] = yield* appendAgentEvent(completed, input.runId, input.event)
+    return [record, appended] as const
+  }),
 )
 
 export const expireRunningOperation: {

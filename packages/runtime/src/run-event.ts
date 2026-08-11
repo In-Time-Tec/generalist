@@ -1,7 +1,7 @@
 import { Effect, Function, Schema, SchemaParser } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { ExecutableRef } from "./executable-manifest.js"
-import type { AgentLoopEvent } from "./agent-event.js"
+import type { DurableAgentLoopEvent } from "./agent-event.js"
 import type { ExecutionResult } from "./execution-state.js"
 import { ExecutionResult as ExecutionResultSchema, RunFailure as RunFailureSchema, RunId } from "./run.js"
 import { RunWait, WaitResolution } from "./run-wait.js"
@@ -9,7 +9,7 @@ import { Address } from "./address.js"
 import { AgentEvent, ModelTelemetry } from "@batonfx/core"
 import { FanOutJoin, FanOutRemainder } from "./fan-out.js"
 
-export type { AgentLoopEvent, ExecutionResult }
+export type { DurableAgentLoopEvent, ExecutionResult }
 
 export const SpecVersion = Schema.Literals(["1"])
 export type SpecVersion = typeof SpecVersion.Type
@@ -134,7 +134,7 @@ export type LifecycleEvent =
   | RunCancelled
   | ProgramLog
 
-export type RunEvent = (RunEventBase & AgentLoopEvent) | LifecycleEvent
+export type RunEvent = (RunEventBase & DurableAgentLoopEvent) | LifecycleEvent
 
 export const LifecycleTag = Schema.Literals([
   "RunAccepted",
@@ -191,26 +191,6 @@ const FinishPart = Schema.Struct({
   usage: Usage,
   response: Schema.optionalKey(Schema.UndefinedOr(Response.HttpResponseDetails)),
 })
-const StreamPart = Schema.Union([
-  Response.TextStartPart,
-  Response.TextDeltaPart,
-  Response.TextEndPart,
-  Response.ReasoningStartPart,
-  Response.ReasoningDeltaPart,
-  Response.ReasoningEndPart,
-  Response.ToolParamsStartPart,
-  Response.ToolParamsDeltaPart,
-  Response.ToolParamsEndPart,
-  Response.ToolApprovalRequestPart,
-  Response.FilePart,
-  Response.DocumentSourcePart,
-  Response.UrlSourcePart,
-  Response.ResponseMetadataPart,
-  FinishPart,
-  Response.ErrorPart,
-  ToolCall,
-  ToolResult,
-])
 const Part = Schema.Union([
   Response.TextPart,
   Response.ReasoningPart,
@@ -242,14 +222,22 @@ const ModelTelemetryEventSchema = Schema.Union([
   ModelTelemetry.CompactionApplied,
   ModelTelemetry.CompactionFailed,
 ])
+export const CompletedModelResponse = Schema.Struct({
+  content: Schema.Array(Part),
+  usage: Schema.optionalKey(Usage),
+  finishReason: Schema.optionalKey(Response.FinishReason),
+})
+
 const AgentLoopEventSchema = Schema.Union([
   Schema.TaggedStruct("TurnStarted", { turn: Schema.Finite, ...optionalMetadata }),
-  Schema.TaggedStruct("ModelPart", {
+  Schema.TaggedStruct("ModelResponseCommitted", {
     turn: Schema.Finite,
+    operationKey: Schema.String,
     modelCallId: Schema.String,
     modelAttemptId: Schema.String,
     attempt: Schema.Finite,
-    part: StreamPart,
+    response: CompletedModelResponse,
+    digest: Schema.String,
     ...optionalMetadata,
   }),
   Schema.TaggedStruct("ToolExecutionStarted", { turn: Schema.Finite, call: ToolCall, ...optionalMetadata }),

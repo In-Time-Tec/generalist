@@ -1,20 +1,21 @@
-import { Clock, Effect, Function, Random } from "effect"
+import { Clock, Effect, Function, Random, Schema } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import { ExecutionCheckpoint } from "../execution-state.js"
 import { Prompt } from "effect/unstable/ai"
-import type { RecordOperationInput } from "../run-store.js"
+import type { CommitModelResponseInput, RecordOperationInput } from "../run-store.js"
 import { decodeJson, encodeExecutableRef, encodeJson, encodeJsonValue } from "./codecs.js"
 import { canBlindRetry, type OperationRecord } from "./operations.js"
 import type { OperationRow } from "./rows.js"
-import { appendEvent, loadRun, nowIso, toOperationRecord } from "./store-helpers.js"
+import { appendEvent, loadEventsAfter, loadRun, nowIso, toOperationRecord } from "./store-helpers.js"
 import type { EventHub } from "./subscribers.js"
 import { encodeContinuation } from "../steering.js"
 import { checkpointRef } from "../executable-manifest.js"
 
 import { OperationResolution, digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
+import { sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
 
 const nextId = (prefix: string): Effect.Effect<string> =>
   Effect.gen(function* () {
@@ -231,6 +232,56 @@ export const completeOperation: {
     const row = rows[0]
     if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     return toOperationRecord(row)
+  }),
+)
+
+export const commitModelResponse: {
+  (input: CommitModelResponseInput): (hub: EventHub) => CompleteEffect
+  (hub: EventHub, input: CommitModelResponseInput): CompleteEffect
+} = Function.dual(2, (hub: EventHub, input: CommitModelResponseInput) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<OperationRow>`
+      SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
+    `
+    const row = rows[0]
+    if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
+    const current = toOperationRecord(row)
+    const validated = validateModelResponseCommit({ record: current, input })
+    if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
+    if (current.status === "succeeded") {
+      const priorValidation = validateModelResponseCommit({
+        record: current,
+        input: {
+          ...input,
+          outcome: { _tag: "Succeeded", value: current.result },
+        },
+      })
+      if (Schema.is(RuntimeUnavailable)(priorValidation)) return yield* priorValidation
+      const prior = (yield* loadEventsAfter(input.runId, -1)).find(
+        (event) => event._tag === "ModelResponseCommitted" && event.operationKey === input.event.operationKey,
+      )
+      if (
+        prior === undefined ||
+        prior._tag !== "ModelResponseCommitted" ||
+        !sameModelResponseEvent({ left: prior, right: input.event })
+      )
+        return yield* RuntimeUnavailable.make({
+          message: `model operation ${input.operationId} has a divergent outbox retry`,
+        })
+      return current
+    }
+    if (current.status === "failed" || current.status === "unknown")
+      return yield* RuntimeUnavailable.make({
+        message: `model operation ${input.operationId} already completed as ${current.status}`,
+      })
+    const completed = yield* completeOperation(hub, input)
+    yield* appendEvent(
+      hub,
+      yield* requireRun(input.runId),
+      input.event as unknown as { readonly _tag: string } & Record<string, unknown>,
+    )
+    return completed
   }),
 )
 

@@ -32,6 +32,7 @@ import {
   recordOperation,
   startOperation,
   completeOperation,
+  commitModelResponse,
   resolveOperation,
 } from "./store-operations.js"
 import { decodeRunEffect, hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
@@ -117,10 +118,7 @@ export const makeSqliteRunStore = (
     const fenced = <A, E>(
       input: import("../run-store.js").ExecutionClaim,
       makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>,
-    ) =>
-      runBuffered((transactionHub) =>
-        requireExecutionClaim(input).pipe(Effect.andThen(makeEffect(transactionHub))),
-      )
+    ) => runBuffered((transactionHub) => requireExecutionClaim(input).pipe(Effect.andThen(makeEffect(transactionHub))))
 
     return RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
@@ -262,6 +260,7 @@ export const makeSqliteRunStore = (
       recordOperation: (input) => fenced(input, (transactionHub) => recordOperation(transactionHub, input)),
       startOperation: (input) => fenced(input, () => startOperation(input)),
       completeOperation: (input) => fenced(input, (transactionHub) => completeOperation(transactionHub, input)),
+      commitModelResponse: (input) => fenced(input, (transactionHub) => commitModelResponse(transactionHub, input)),
       expireRunningOperation: (input) =>
         fenced(input, (transactionHub) => expireRunningOperation(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),

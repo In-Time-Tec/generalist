@@ -1,7 +1,7 @@
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { eventIdFor, type AgentLoopEvent, type ExecutionResult, type RunEvent, type RunFailure } from "../run-event.js"
+import { eventIdFor, type RunEvent } from "../run-event.js"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../execution-state.js"
 import type { ExecutableManifest, ExecutableRef } from "../executable-manifest.js"
 import type { Message } from "../message.js"
@@ -496,5 +496,3 @@ export const toOperationRecord = (row: OperationRow): OperationRecord => ({
   ...(row.resolution_idempotency_key === null ? {} : { resolutionIdempotencyKey: row.resolution_idempotency_key }),
   ...(row.resolution_json === null ? {} : { resolution: decodeJson(OperationResolution, row.resolution_json) }),
 })
-
-export type { AgentLoopEvent, ExecutionResult, RunFailure }

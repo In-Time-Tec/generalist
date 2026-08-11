@@ -23,6 +23,7 @@ import {
   recordOperation,
   startOperation,
   completeOperation,
+  commitModelResponse,
   resolveOperation,
 } from "../store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim, retryExecution } from "../store-execution.js"
@@ -418,6 +419,7 @@ export const makeMysqlServices = (
       recordOperation: (input) => fenced(input, recordOperation(transactionHub, input)),
       startOperation: (input) => fenced(input, startOperation(input)),
       completeOperation: (input) => fenced(input, completeOperation(transactionHub, input)),
+      commitModelResponse: (input) => fenced(input, commitModelResponse(transactionHub, input)),
       expireRunningOperation: (input) => fenced(input, expireRunningOperation(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),

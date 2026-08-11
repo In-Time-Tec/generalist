@@ -66,6 +66,11 @@ describePostgres("postgres schema baseline", () => {
   for (const [label, update, expected] of [
     ["dirty", "UPDATE baton_schema_meta SET dirty = TRUE WHERE id = 1", SchemaDirty],
     ["checksum", "UPDATE baton_schema_meta SET checksum = 'wrong' WHERE id = 1", SchemaChecksumMismatch],
+    [
+      "legacy semantic-event contract",
+      `UPDATE baton_schema_meta SET version = ${SCHEMA_VERSION - 1} WHERE id = 1`,
+      SchemaChecksumMismatch,
+    ],
     ["future", `UPDATE baton_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`, SchemaVersionUnsupported],
   ] as const) {
     layer(database.provisionEmpty(client), { excludeTestServices: true })(`rejects a ${label} schema`, (suite) => {

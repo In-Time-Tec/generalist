@@ -12,7 +12,7 @@ import {
 } from "./executable-resolver.js"
 import { decodePinned, equals } from "./executable-manifest.js"
 import type { ExecutionContinuation } from "./steering.js"
-import type { AgentLoopEvent } from "./agent-event.js"
+import type { DurableAgentLoopEvent } from "./agent-event.js"
 import { commitDeferredProgramChildTerminal, makeDeferredProgramChildTerminal } from "./program-child-terminal.js"
 import { agentBudget } from "./execution-defaults.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "./code-mode.js"
@@ -25,6 +25,7 @@ import { makeAgentExecutionFailure } from "./agent-execution-failure.js"
 import { make as makeExecutionRetry } from "./execution-retry.js"
 import { make as makeAgentRunOptions } from "./agent-run-options.js"
 import { ModelPreviewLane, open as openModelPreview } from "./model-preview.js"
+import { clearDriverOperation, commitDriverOperation, verifyCommittedModelEvent } from "./execution-model-response.js"
 export interface Options {
   readonly workerId: string
   readonly resolver: ExecutableResolverInterface
@@ -129,7 +130,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                       const observed = yield* Ref.make<ReadonlyArray<string>>(continuation?.steeringEntryIds ?? [])
                       const observedPrompt = yield* Ref.make<Prompt.Prompt | undefined>(continuation?.prompt)
                       const activeContinuation = yield* Ref.make(continuation)
-                      const bufferedEvents = yield* Ref.make<ReadonlyArray<AgentLoopEvent>>(
+                      const bufferedEvents = yield* Ref.make<ReadonlyArray<DurableAgentLoopEvent>>(
                         continuation === undefined
                           ? []
                           : [
@@ -281,33 +282,24 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                               outcome._tag === "Succeeded" && operation.kind === "handoff"
                                 ? Schema.decodeUnknownOption(Handoff.HandoffCommit)(outcome.value)
                                 : undefined
-                            yield* store.completeOperation({
-                              ...claim,
+                            yield* commitDriverOperation({
+                              store,
+                              claim,
+                              operation,
                               operationId,
-                              outcome:
-                                outcome._tag === "Succeeded"
-                                  ? { _tag: "Succeeded", value: outcome.value }
-                                  : outcome._tag === "Failed"
-                                    ? { _tag: "Failed", error: outcome.error }
-                                    : { _tag: "Unknown" },
+                              outcome,
                               checkpoint,
-                              ...prepared,
-                              ...(handoffCommit?._tag === "Some" ? { transcript: handoffCommit.value.transcript } : {}),
+                              prepared,
+                              ...(handoffCommit?._tag === "Some"
+                                ? { handoffTranscript: handoffCommit.value.transcript }
+                                : {}),
                             })
-                            yield* Ref.update(preparedCompletions, (current) => {
-                              const next = new Map(current)
-                              next.delete(operation.key)
-                              return next
-                            })
-                            yield* Ref.update(activeOperationIds, (current) => {
-                              const next = new Set(current)
-                              next.delete(operationId)
-                              return next
-                            })
-                            yield* Ref.update(completingRetrySafeOperationIds, (current) => {
-                              const next = new Set(current)
-                              next.delete(operationId)
-                              return next
+                            yield* clearDriverOperation({
+                              prepared: preparedCompletions,
+                              active: activeOperationIds,
+                              completingRetrySafe: completingRetrySafeOperationIds,
+                              operationKey: operation.key,
+                              operationId,
                             })
                           }).pipe(Effect.orDie),
                         onCheckpoint: (checkpoint) => store.saveExecution({ ...claim, checkpoint }).pipe(Effect.orDie),
@@ -348,6 +340,11 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                             yield* executionRetry.observe(event)
                             if (event._tag === "ModelPart") {
                               yield* preview.offer(event)
+                              return
+                            }
+                            if (event._tag === "ModelResponseCommitted") {
+                              yield* verifyCommittedModelEvent({ store, claim, event }).pipe(Effect.orDie)
+                              yield* preview.clear
                               return
                             }
                             if (event._tag === "Completed") {

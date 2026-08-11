@@ -23,6 +23,7 @@ import {
   recordOperation,
   startOperation,
   completeOperation,
+  commitModelResponse,
   resolveOperation,
 } from "./store-operations.js"
 import {
@@ -320,6 +321,7 @@ export const makeRunStore = (options: LayerOptions) =>
       recordOperation: (input) => fencedModify(input, (state) => recordOperation(state, input)),
       startOperation: (input) => fencedModify(input, (state) => startOperation(state, input)),
       completeOperation: (input) => fencedModify(input, (state) => completeOperation(state, input)),
+      commitModelResponse: (input) => fencedModify(input, (state) => commitModelResponse(state, input)),
       expireRunningOperation: (input) => fencedModify(input, (state) => expireRunningOperation(state, input)),
       getOperation: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => getOperation(state, input))),

@@ -3,7 +3,7 @@ import type { Prompt } from "effect/unstable/ai"
 import type { Address } from "../address.js"
 import { RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import { isTerminal, type RunStatus } from "../run.js"
-import type { AgentLoopEvent } from "../agent-event.js"
+import type { DurableAgentLoopEvent } from "../agent-event.js"
 import type { ExecutionResult } from "../execution-state.js"
 import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run-event.js"
 import type { MemoryState, StoredRun, SubscriberQueue } from "./state.js"
@@ -156,14 +156,14 @@ export const appendLifecycle: {
 export const appendAgentEvent: {
   (
     runId: string,
-    event: AgentLoopEvent,
+    event: DurableAgentLoopEvent,
   ): (state: MemoryState) => Effect.Effect<readonly [RunEvent, MemoryState], RuntimeUnavailable>
   (
     state: MemoryState,
     runId: string,
-    event: AgentLoopEvent,
+    event: DurableAgentLoopEvent,
   ): Effect.Effect<readonly [RunEvent, MemoryState], RuntimeUnavailable>
-} = Function.dual(3, (state: MemoryState, runId: string, event: AgentLoopEvent) =>
+} = Function.dual(3, (state: MemoryState, runId: string, event: DurableAgentLoopEvent) =>
   appendEvent(state, runId, (base) => ({ ...base, ...event })),
 )
 

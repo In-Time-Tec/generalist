@@ -11,7 +11,7 @@ import {
   WaitNotOpen,
 } from "../errors.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import type { AgentLoopEvent } from "../agent-event.js"
+import type { EmittableAgentLoopEvent } from "../agent-event.js"
 import { ExecutionCheckpoint, ExecutionSuspension, type ExecutionResult } from "../execution-state.js"
 import type { CancelInput, RespondInput, SignalInput } from "../runtime.js"
 import type { RespondInput as RespondApprovalInput } from "../approval.js"
@@ -67,7 +67,7 @@ type ResumeEffect = Effect.Effect<
 type CompleteInput = { readonly runId: string; readonly result: ExecutionResult }
 type FailInput = { readonly runId: string; readonly error: RunFailure }
 type ResumeInput = { readonly runId: string; readonly waitId: string; readonly resolution: WaitResolution }
-type AgentEventInput = { readonly runId: string; readonly event: AgentLoopEvent }
+type AgentEventInput = { readonly runId: string; readonly event: EmittableAgentLoopEvent }
 type SuspendInput = Parameters<import("../run-store.js").Interface["suspend"]>[0]
 
 const cancelRun = (

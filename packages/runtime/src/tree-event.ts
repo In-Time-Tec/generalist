@@ -15,20 +15,6 @@ const callIdentity = (event: RunEvent) => {
   ) {
     toolCallId = event.call.id
   }
-  if (event._tag === "ModelPart") {
-    switch (event.part.type) {
-      case "tool-call":
-      case "tool-result":
-      case "tool-params-start":
-      case "tool-params-delta":
-      case "tool-params-end":
-        toolCallId = event.part.id
-        break
-      case "tool-approval-request":
-        toolCallId = event.part.toolCallId
-        break
-    }
-  }
   return {
     ...(modelCallId === undefined ? {} : { modelCallId }),
     ...(modelAttemptId === undefined ? {} : { modelAttemptId }),

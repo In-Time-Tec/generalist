@@ -36,7 +36,7 @@ import type { AddressInvalid, AgentName, DirectoryEntry } from "./agent-director
 import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./mailbox.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunWait, WaitResolution } from "./run-wait.js"
-import type { AgentLoopEvent } from "./agent-event.js"
+import type { DurableAgentLoopEvent, EmittableAgentLoopEvent, ModelResponseCommitted } from "./agent-event.js"
 import { ExecutionResult } from "./execution-state.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "./execution-state.js"
 import { RunFailure } from "./run-event.js"
@@ -128,7 +128,7 @@ export interface RecordOperationInput extends ExecutionClaim {
   readonly transcript?: Prompt.Prompt
   readonly continuation?: ExecutionContinuation | null
   readonly steeringEntryIds?: ReadonlyArray<string>
-  readonly steeringEvents?: ReadonlyArray<AgentLoopEvent>
+  readonly steeringEvents?: ReadonlyArray<DurableAgentLoopEvent>
 }
 
 /** @experimental Exact durable mailbox admission derived from authoritative sender identity. */
@@ -198,6 +198,18 @@ export interface ExecutionClaim {
   readonly runId: string
   readonly ownerId: string
   readonly attemptFence: number
+}
+
+/** @experimental Atomic canonical model outcome and semantic Run outbox commit. */
+export interface CommitModelResponseInput extends ExecutionClaim {
+  readonly runId: string
+  readonly operationId: string
+  readonly outcome: { readonly _tag: "Succeeded"; readonly value: unknown }
+  readonly checkpoint?: ExecutionCheckpoint
+  readonly transcript?: Prompt.Prompt
+  readonly continuation?: ExecutionContinuation | null
+  readonly steeringEntryIds?: ReadonlyArray<string>
+  readonly event: ModelResponseCommitted
 }
 
 export type WorkerMutationError =
@@ -384,7 +396,7 @@ export interface Interface {
   readonly emitAgentEvent: (
     input: ExecutionClaim & {
       readonly runId: string
-      readonly event: AgentLoopEvent
+      readonly event: EmittableAgentLoopEvent
     },
   ) => Effect.Effect<void, WorkerMutationError>
   readonly recordOperation: (input: RecordOperationInput) => Effect.Effect<OperationRecord, WorkerMutationError>
@@ -405,6 +417,7 @@ export interface Interface {
       readonly steeringEntryIds?: ReadonlyArray<string>
     },
   ) => Effect.Effect<OperationRecord, WorkerMutationError>
+  readonly commitModelResponse: (input: CommitModelResponseInput) => Effect.Effect<OperationRecord, WorkerMutationError>
   readonly expireRunningOperation: (
     input: ExecutionClaim & {
       readonly runId: string

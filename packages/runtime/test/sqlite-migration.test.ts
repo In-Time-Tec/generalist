@@ -110,6 +110,11 @@ it.live("creates the current SQLite baseline and applies idempotently", () =>
 it.live.each([
   ["dirty", "UPDATE baton_schema_meta SET dirty = 1 WHERE id = 1", SchemaDirty],
   ["checksum", "UPDATE baton_schema_meta SET checksum = 'wrong' WHERE id = 1", SchemaChecksumMismatch],
+  [
+    "legacy semantic-event contract",
+    `UPDATE baton_schema_meta SET version = ${SCHEMA_VERSION - 1} WHERE id = 1`,
+    SchemaChecksumMismatch,
+  ],
   ["future", `UPDATE baton_schema_meta SET version = ${SCHEMA_VERSION + 1} WHERE id = 1`, SchemaVersionUnsupported],
 ] as const)("rejects a %s SQLite schema", ([, update, expected]) =>
   Effect.gen(function* () {

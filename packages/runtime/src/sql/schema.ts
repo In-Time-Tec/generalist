@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 

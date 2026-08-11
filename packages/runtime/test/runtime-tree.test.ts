@@ -1,7 +1,6 @@
 import { expect, it as testIt, layer } from "@effect/vitest"
 import { Effect, Fiber, Ref, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Pins, ProgramManifest } from "@batonfx/core"
 import { Errors, ExecutableRegistration, RunStore, RunTree, Runtime, RunWait } from "../src/index.js"
 import { makeCursor, type TreeCursor } from "../src/tree-cursor.js"
@@ -269,44 +268,11 @@ layer(memoryLayer)("RunTree", (it) => {
           startedAt: 0,
         },
       })
-      const toolParts = [
-        Response.makePart("tool-params-start", {
-          id: "tool:stream",
-          name: "search",
-          providerExecuted: false,
-        }),
-        Response.makePart("tool-params-delta", { id: "tool:stream", delta: '{"query":' }),
-        Response.makePart("tool-params-end", { id: "tool:stream" }),
-        Response.makePart("tool-approval-request", {
-          approvalId: "approval:1",
-          toolCallId: "tool:approval",
-        }),
-      ] as const
-      yield* Effect.forEach(toolParts, (part) =>
-        store.emitAgentEvent({
-          ...claim,
-          event: {
-            _tag: "ModelPart",
-            turn: 0,
-            modelCallId: "model-call:parts",
-            modelAttemptId: "model-attempt:parts",
-            attempt: 0,
-            part,
-          },
-        }),
-      )
       const page = yield* RunTree.history({ rootRunId: root.runId, limit: 100 })
       expect(page.events.find((entry) => entry.event._tag === "ToolProgress")?.toolCallId).toBe("tool:1")
       const attempt = page.events.find((entry) => entry.event._tag === "ModelAttemptStarted")
       expect(attempt?.modelCallId).toBe("model-call:1")
       expect(attempt?.modelAttemptId).toBe("model-attempt:1")
-      const projectedParts = page.events.filter((entry) => entry.event._tag === "ModelPart")
-      expect(projectedParts.map((entry) => entry.toolCallId)).toEqual([
-        "tool:stream",
-        "tool:stream",
-        "tool:stream",
-        "tool:approval",
-      ])
     }),
   )
 

@@ -25,7 +25,7 @@ import type { DecodedRun, EventRow, OperationRow, RunRow } from "../rows.js"
 import type { OperationRecord } from "../operations.js"
 import { decodePersistedEvents, decodeRunEffect, nowIso } from "../store-helpers.js"
 import { NOTIFY_CHANNEL } from "./schema.js"
-import type { AgentLoopEvent } from "../../agent-event.js"
+import type { EmittableAgentLoopEvent } from "../../agent-event.js"
 import { PendingRunOutcome, type ExecutionClaim } from "../../run-store.js"
 import type { ExecutionResult } from "../../execution-state.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
@@ -61,9 +61,9 @@ export const requireRun = (runId: string) =>
   )
 
 export const emitAgentEvent: {
-  (input: ExecutionClaim & { readonly event: AgentLoopEvent }): (hub: EventHub) => AgentEventEffect
-  (hub: EventHub, input: ExecutionClaim & { readonly event: AgentLoopEvent }): AgentEventEffect
-} = Function.dual(2, (hub: EventHub, input: ExecutionClaim & { readonly event: AgentLoopEvent }) =>
+  (input: ExecutionClaim & { readonly event: EmittableAgentLoopEvent }): (hub: EventHub) => AgentEventEffect
+  (hub: EventHub, input: ExecutionClaim & { readonly event: EmittableAgentLoopEvent }): AgentEventEffect
+} = Function.dual(2, (hub: EventHub, input: ExecutionClaim & { readonly event: EmittableAgentLoopEvent }) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`SELECT run_id FROM baton_runs WHERE run_id = ${input.runId} FOR UPDATE`
