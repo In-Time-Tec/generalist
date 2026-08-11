@@ -27,7 +27,7 @@ export const postgresUrl = Effect.runSync(
 
 export const postgresAvailable = typeof postgresUrl === "string" && postgresUrl.length > 0
 
-export const postgresTestMaxConnections = 4
+export const postgresTestMaxConnections = 8
 
 export const postgresClient = (url: string) =>
   PgClient.layer({ url: Redacted.make(url), maxConnections: postgresTestMaxConnections })
