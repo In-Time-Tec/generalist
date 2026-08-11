@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.21.2
+
+- Restore delivery of a child settlement that outlives its addressed parent Run: when the parent is terminal and never consumed the notification, the session's next Run receives it through the same exactly-once steering mechanism, so the settlement still appears in the next model turn.
+
 ## 0.21.1
 
 - Make durable cancellation converge across stale claims, Session root trees, nested descendants, and non-replayable operation resolution, with explicit Session-wide terminal proof and startup repair of poisoned cancellation state.
