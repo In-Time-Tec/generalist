@@ -3,12 +3,12 @@ import { EventSchemas } from "@ag-ui/core"
 import { Effect, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { Errors, ExecutableManifest, RunEvent } from "@batonfx/runtime"
-import { makeState, project, stateSnapshot } from "../src/projection.js"
+import { project, stateSnapshot } from "../src/projection.js"
 
 const executableRef = ExecutableManifest.makeTest("assistant", "1").ref
 
 const base = {
-  specVersion: "1",
+  specVersion: "1" as const,
   eventId: "run-1:1",
   runId: "run-1",
   sequence: 1,
@@ -17,32 +17,106 @@ const base = {
   occurredAt: "2026-08-03T00:00:00.000Z",
 }
 
-const modelPart = (part: Response.AnyPart) => ({
+const committed = (content: ReadonlyArray<Response.AnyPart>) => ({
   ...base,
-  _tag: "ModelPart",
+  _tag: "ModelResponseCommitted" as const,
   turn: 0,
+  operationKey: "run-1:model:0",
   modelCallId: "model-1",
   modelAttemptId: "attempt-1",
   attempt: 0,
-  part,
+  response: { content, finishReason: "tool-calls" as const },
+  digest: "committed-digest",
+})
+
+const interrupted = (content: ReadonlyArray<Response.AnyPart>) => ({
+  ...base,
+  eventId: "run-1:2",
+  sequence: 2,
+  _tag: "ModelResponseInterrupted" as const,
+  turn: 0,
+  operationKey: "run-1:model:0",
+  modelCallId: "model-1",
+  modelAttemptId: "attempt-1",
+  attempt: 0,
+  response: { content },
+  reason: "failure" as const,
+  digest: "interrupted-digest",
 })
 
 describe("AG-UI event projection", () => {
-  it.effect("maps text, reasoning, streamed tool arguments, results, steps, and success", () =>
+  it.effect("projects every committed semantic text, reasoning, and tool unit with deterministic lifecycles", () =>
     Effect.gen(function* () {
-      const state = makeState()
+      const response = committed([
+        Response.makePart("text", { text: "hello" }),
+        Response.makePart("reasoning", { text: "inspect the repository" }),
+        Response.makePart("tool-call", {
+          id: "tool-1",
+          name: "search",
+          params: { q: "baton" },
+          providerExecuted: false,
+        }),
+        Response.makePart("text", { text: "after the tool" }),
+      ])
+      expect(Schema.is(RunEvent.RunEvent)(response)).toBe(true)
+
+      const events = yield* project(response, "thread-1")
+
+      expect(events).toEqual([
+        { type: "TEXT_MESSAGE_START", messageId: "run-1:1:text:0", role: "assistant" },
+        { type: "TEXT_MESSAGE_CONTENT", messageId: "run-1:1:text:0", delta: "hello" },
+        { type: "TEXT_MESSAGE_END", messageId: "run-1:1:text:0" },
+        { type: "REASONING_START", messageId: "run-1:1:reasoning:1" },
+        { type: "REASONING_MESSAGE_START", messageId: "run-1:1:reasoning:1", role: "reasoning" },
+        {
+          type: "REASONING_MESSAGE_CONTENT",
+          messageId: "run-1:1:reasoning:1",
+          delta: "inspect the repository",
+        },
+        { type: "REASONING_MESSAGE_END", messageId: "run-1:1:reasoning:1" },
+        { type: "REASONING_END", messageId: "run-1:1:reasoning:1" },
+        { type: "TOOL_CALL_START", toolCallId: "tool-1", toolCallName: "search" },
+        { type: "TOOL_CALL_ARGS", toolCallId: "tool-1", delta: '{"q":"baton"}' },
+        { type: "TOOL_CALL_END", toolCallId: "tool-1" },
+        { type: "TEXT_MESSAGE_START", messageId: "run-1:1:text:3", role: "assistant" },
+        { type: "TEXT_MESSAGE_CONTENT", messageId: "run-1:1:text:3", delta: "after the tool" },
+        { type: "TEXT_MESSAGE_END", messageId: "run-1:1:text:3" },
+      ])
+      expect(events.every((event) => EventSchemas.safeParse(event).success)).toBe(true)
+    }),
+  )
+
+  it.effect("projects an interrupted normalized partial before terminal failure without fragment state", () =>
+    Effect.gen(function* () {
+      const partial = interrupted([Response.makePart("text", { text: "retained partial" })])
+      const failed = {
+        ...base,
+        eventId: "run-1:3",
+        sequence: 3,
+        _tag: "RunFailed" as const,
+        error: Errors.AgentExecutionFailure.make({ message: "model terminated" }),
+      }
+      expect(Schema.is(RunEvent.RunEvent)(partial)).toBe(true)
+      expect(Schema.is(RunEvent.RunEvent)(failed)).toBe(true)
+
+      const events = [...(yield* project(partial, "thread-1")), ...(yield* project(failed, "thread-1"))]
+
+      expect(events).toEqual([
+        { type: "TEXT_MESSAGE_START", messageId: "run-1:2:text:0", role: "assistant" },
+        { type: "TEXT_MESSAGE_CONTENT", messageId: "run-1:2:text:0", delta: "retained partial" },
+        { type: "TEXT_MESSAGE_END", messageId: "run-1:2:text:0" },
+        { type: "RUN_ERROR", message: "model terminated", code: "RUN_FAILED" },
+      ])
+      expect(events.filter((event) => event.type === "TEXT_MESSAGE_CONTENT").map((event) => event.delta)).toEqual([
+        "retained partial",
+      ])
+    }),
+  )
+
+  it.effect("maps tool results, steps, terminal success, waits, progress, and structured output", () =>
+    Effect.gen(function* () {
       const inputs = [
         { ...base, _tag: "TurnStarted", turn: 0 },
-        modelPart(Response.makePart("text-start", { id: "message-1" })),
-        modelPart(Response.makePart("text-delta", { id: "message-1", delta: "hello" })),
-        modelPart(Response.makePart("text-end", { id: "message-1" })),
-        modelPart(Response.makePart("reasoning-start", { id: "reasoning-1" })),
-        modelPart(Response.makePart("reasoning-delta", { id: "reasoning-1", delta: "think" })),
-        modelPart(Response.makePart("reasoning-end", { id: "reasoning-1" })),
-        modelPart(Response.makePart("tool-params-start", { id: "tool-1", name: "search", providerExecuted: false })),
-        modelPart(Response.makePart("tool-params-delta", { id: "tool-1", delta: '{"q":' })),
-        modelPart(Response.makePart("tool-params-delta", { id: "tool-1", delta: '"baton"}' })),
-        modelPart(Response.makePart("tool-params-end", { id: "tool-1" })),
         {
           ...base,
           _tag: "ToolExecutionCompleted",
@@ -69,35 +143,6 @@ describe("AG-UI event projection", () => {
         },
         { ...base, _tag: "TurnCompleted", turn: 0, transcript: Prompt.empty },
         { ...base, _tag: "RunCompleted", result: { text: "hello", turns: 1, transcript: Prompt.empty } },
-      ]
-      expect(inputs.findIndex((input) => !Schema.is(RunEvent.RunEvent)(input))).toBe(-1)
-      const batches = yield* Effect.forEach(inputs, (input) => project(state, input, "thread-1"))
-      const events = batches.flat()
-      expect(events.map((event) => event.type)).toEqual([
-        "STEP_STARTED",
-        "TEXT_MESSAGE_START",
-        "TEXT_MESSAGE_CONTENT",
-        "TEXT_MESSAGE_END",
-        "REASONING_START",
-        "REASONING_MESSAGE_START",
-        "REASONING_MESSAGE_CONTENT",
-        "REASONING_MESSAGE_END",
-        "REASONING_END",
-        "TOOL_CALL_START",
-        "TOOL_CALL_ARGS",
-        "TOOL_CALL_ARGS",
-        "TOOL_CALL_END",
-        "TOOL_CALL_RESULT",
-        "STEP_FINISHED",
-        "RUN_FINISHED",
-      ])
-      expect(events.every((event) => EventSchemas.safeParse(event).success)).toBe(true)
-    }),
-  )
-
-  it.effect("maps waits, failure, cancellation, progress, and structured output", () =>
-    Effect.gen(function* () {
-      const inputs = [
         { ...base, _tag: "ToolProgress", turn: 0, toolCallId: "tool-1", message: "working", data: { percent: 50 } },
         {
           ...base,
@@ -122,29 +167,56 @@ describe("AG-UI event projection", () => {
             openedAt: "2026-08-03T00:00:00.000Z",
           },
         },
-        {
-          ...base,
-          _tag: "RunFailed",
-          error: Errors.AgentExecutionFailure.make({ message: "failed" }),
-        },
-        { ...base, _tag: "RunCancelled", reason: "stopped" },
       ]
       expect(inputs.findIndex((input) => !Schema.is(RunEvent.RunEvent)(input))).toBe(-1)
-      const batches = yield* Effect.forEach(inputs, (input) => project(makeState(), input, "thread-1"))
-      expect(batches.flat().map((event) => event.type)).toEqual([
+
+      const batches = yield* Effect.forEach(inputs, (input) => project(input, "thread-1"))
+      const events = batches.flat()
+
+      expect(events.map((event) => event.type)).toEqual([
+        "STEP_STARTED",
+        "TOOL_CALL_RESULT",
+        "STEP_FINISHED",
+        "RUN_FINISHED",
         "CUSTOM",
         "CUSTOM",
         "RUN_FINISHED",
-        "RUN_ERROR",
-        "RUN_ERROR",
       ])
-      expect(batches[2]?.[0]).toMatchObject({ outcome: { type: "interrupt", interrupts: [{ id: "tool-1" }] } })
+      expect(events[1]).toEqual({
+        type: "TOOL_CALL_RESULT",
+        messageId: "run-1:1:result",
+        toolCallId: "tool-1",
+        content: '["found"]',
+      })
+      expect(events[3]).toMatchObject({
+        type: "RUN_FINISHED",
+        threadId: "thread-1",
+        runId: "run-1",
+        outcome: { type: "success" },
+      })
+      expect(events[6]).toMatchObject({ outcome: { type: "interrupt", interrupts: [{ id: "tool-1" }] } })
     }),
   )
 
-  it.effect("rejects malformed Runtime events and validates snapshots", () =>
+  it.effect("rejects removed transport fragments, malformed Runtime events, and validates snapshots", () =>
     Effect.gen(function* () {
-      const failure = yield* project(makeState(), { _tag: "RunCompleted" }, "thread-1").pipe(Effect.flip)
+      const removedFragment = {
+        ...base,
+        _tag: "ModelPart",
+        turn: 0,
+        modelCallId: "model-1",
+        modelAttemptId: "attempt-1",
+        attempt: 0,
+        part: { type: "text-delta", id: "message-1", delta: "legacy" },
+      }
+      expect(Schema.is(RunEvent.RunEvent)(removedFragment)).toBe(false)
+      const fragmentFailure = yield* project(removedFragment, "thread-1").pipe(Effect.flip)
+      expect(fragmentFailure).toMatchObject({
+        _tag: "@batonfx/ag-ui/EventInvalid",
+        source: "runtime",
+      })
+
+      const failure = yield* project({ _tag: "RunCompleted" }, "thread-1").pipe(Effect.flip)
       expect(failure._tag).toBe("@batonfx/ag-ui/EventInvalid")
       const snapshot = yield* stateSnapshot({ run: { runId: "run-1" }, cursor: 5 })
       expect(snapshot).toEqual({ type: "STATE_SNAPSHOT", snapshot: { run: { runId: "run-1" }, cursor: 5 } })

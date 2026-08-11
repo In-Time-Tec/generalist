@@ -2,7 +2,7 @@ import { RunAgentInputSchema, type AGUIEvent, type RunAgentInput } from "@ag-ui/
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { Cursor, type Address, Errors, Runtime } from "@batonfx/runtime"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
-import { makeState, project, stateSnapshot } from "./projection.js"
+import { project, stateSnapshot } from "./projection.js"
 
 const encodeJsonValue = (value: unknown): string => Schema.encodeSync(Schema.UnknownFromJsonString)(value)
 
@@ -75,11 +75,10 @@ const recover = (
   runtime: Runtime.Interface,
   runId: string,
   threadId: string,
-  state: ReturnType<typeof makeState>,
   cursor: Cursor.Cursor,
 ): Stream.Stream<AGUIEvent, RunError> =>
   runtime.events({ runId, cursor }).pipe(
-    Stream.mapEffect((event) => project(state, event, threadId)),
+    Stream.mapEffect((event) => project(event, threadId)),
     Stream.flattenIterable,
     Stream.catchIf(
       (error): error is Errors.SubscriberLagged | Errors.CursorExpired =>
@@ -90,7 +89,7 @@ const recover = (
             Effect.map((snapshot) =>
               Stream.concat(
                 Stream.fromEffect(stateSnapshot(snapshot)),
-                Stream.suspend(() => recover(runtime, runId, threadId, makeState(), snapshot.cursor)),
+                Stream.suspend(() => recover(runtime, runId, threadId, snapshot.cursor)),
               ),
             ),
           ),
@@ -110,7 +109,6 @@ export const layer = (options: LayerOptions): Layer.Layer<AgUi, never, Runtime.R
           Effect.gen(function* () {
             const input = yield* validate(untrusted)
             yield* rejectAuthority(input)
-            const state = makeState()
             let cursor = Cursor.origin
             if (input.resume !== undefined && input.resume.length > 0) {
               const current = yield* runtime.snapshot(input.runId)
@@ -157,7 +155,7 @@ export const layer = (options: LayerOptions): Layer.Layer<AgUi, never, Runtime.R
                 prompt: final.prompt,
               })
             }
-            return recover(runtime, input.runId, input.threadId, state, cursor)
+            return recover(runtime, input.runId, input.threadId, cursor)
           }),
         )
       return AgUi.of({ run, snapshot })

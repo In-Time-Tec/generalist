@@ -43,6 +43,7 @@ const mockRuntime = (implementation: Partial<Runtime.Interface>): Runtime.Interf
   Runtime.Runtime.of({
     start: () => unused(),
     send: () => unused(),
+    previews: () => Stream.empty,
     spawn: () => unused(),
     events: () => Stream.empty,
     snapshot: () => unused(),
