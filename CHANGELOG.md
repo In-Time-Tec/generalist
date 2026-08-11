@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.21.3
+
+- Harden live previews: each Run gets its own conflated memory-only preview lane with a retained cumulative snapshot replayed to late subscribers, and a clear tombstone with a generation guard so a stale preview can never publish after commit or interruption. Subscribers register before replay with an atomic high-water so a large replay cannot overflow a bounded queue, and PostgreSQL/MySQL multi-subscriber polling advances the cursor exactly once.
+- Keep exact messaging authority: child settlements, mailbox bounds, and exact-parent isolation are unchanged.
+
 ## 0.21.2
 
 - Restore delivery of a child settlement that outlives its addressed parent Run: when the parent is terminal and never consumed the notification, the session's next Run receives it through the same exactly-once steering mechanism, so the settlement still appears in the next model turn.
