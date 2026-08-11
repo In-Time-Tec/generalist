@@ -98,6 +98,32 @@ for (const [backend, runtimeLayer] of layers) {
       }),
     )
 
+    it.effect(
+      "delivers a settlement owed to the session into the next Run after the addressed parent is terminal",
+      () =>
+        Effect.gen(function* () {
+          const { runtime, parent, child } = yield* admit
+          const store = yield* RunStore.RunStore
+          yield* store.fail({
+            ...(yield* store.claimExecution({ runId: parent.runId, ownerId: "finished" })),
+            error: Errors.AgentExecutionFailure.make({ message: "parent turn ended" }),
+          })
+          yield* store.complete({
+            ...(yield* store.claimExecution({ runId: child.runId, ownerId: "test" })),
+            result: completedResult("notes"),
+          })
+          const later = yield* runtime.send({
+            to: assistantAddress,
+            sessionId: (yield* store.directory(parent.runId)).sessionId,
+            idempotencyKey: "next-run",
+            prompt: textPrompt("next"),
+          })
+          const delivered = yield* store.deliverPendingMessages({ runId: later.runId })
+          expect(delivered.map((entry) => entry.messageId)).toEqual([`child-settled:${child.runId}`])
+          expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(0)
+        }),
+    )
+
     it.effect("publishes failure detail immediately", () =>
       Effect.gen(function* () {
         const { runtime, parent, child } = yield* admit

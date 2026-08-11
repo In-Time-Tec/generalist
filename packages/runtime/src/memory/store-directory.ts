@@ -163,6 +163,13 @@ const deliverable = (state: MemoryState, entry: MailboxEntry): boolean => {
   return target !== undefined && !isTerminal(target.status)
 }
 
+/** One child-settled notification still reaches its addressed Run while that Run is alive. */
+const settlementDeliverable = (state: MemoryState, entry: MailboxEntry): boolean => {
+  if (entry.to === sessionAddress(entry.targetSessionId)) return false
+  const addressed = [...state.runs.values()].find((run) => runAddress(run.runId) === entry.to)
+  return addressed !== undefined && !isTerminal(addressed.status)
+}
+
 const owed = (state: MemoryState, entry: MailboxEntry): boolean => {
   if (entry.deliveredRunId === undefined) return true
   const holder = state.runs.get(entry.deliveredRunId)
@@ -392,12 +399,24 @@ export const deliverPendingMessages: {
       runId: run.runId,
       limit: Number.MAX_SAFE_INTEGER,
     })
-    if (pending.length === 0) return [[], state] as const
+    // Child settlements are deliberately excluded from pendingMessages (the messages channel), but
+    // a notification whose addressed parent Run is terminal was never seen by any model, so it is
+    // still owed to the session and the session's next Run takes it, exactly like any other
+    // message that outlives its bound Run. Deliver owed settlements into the same steering inbox so
+    // the settlement reaches the model exactly once.
+    const settlements = [...state.messages.values()].filter(
+      (entry) =>
+        entry.targetSessionId === run.message.sessionId &&
+        entry.entryId.startsWith("child-settled:") &&
+        owed(state, entry) &&
+        !settlementDeliverable(state, entry),
+    )
+    if (pending.length === 0 && settlements.length === 0) return [[], state] as const
     const messages = new Map(state.messages)
     const steering = [...run.steering]
     const delivered: Array<MailboxEntry> = []
     let counter = state.nextSteeringCounter
-    for (const entry of pending) {
+    for (const entry of [...pending, ...settlements]) {
       const idempotencyKey = steeringKey(entry.entryId)
       const prompt = deliveryPrompt(entry)
       const steeringEntryId = `steer_${counter}`

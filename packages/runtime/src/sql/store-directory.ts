@@ -380,8 +380,39 @@ export const deliverPendingMessages = (input: { readonly runId: string }) =>
       runId: run.runId,
       limit: Number.MAX_SAFE_INTEGER,
     })
+    // Child settlements are deliberately excluded from pendingMessages (the messages channel), but
+    // a notification whose addressed parent Run is terminal was never seen by any model, so it is
+    // still owed to the session and the session's next Run takes it, exactly like any other
+    // message that outlives its bound Run. Deliver owed settlements into the same steering inbox so
+    // the settlement reaches the model exactly once.
+    const settlements = yield* sql<MessageRow>`
+      SELECT * FROM baton_messages m
+      WHERE m.target_session_id = ${run.message.sessionId}
+        AND m.entry_id LIKE 'child-settled:%'
+        AND (
+          m.delivered_run_id IS NULL
+          OR EXISTS (
+            SELECT 1 FROM baton_runs holder
+            WHERE holder.run_id = m.delivered_run_id
+              AND holder.status IN ('succeeded', 'failed', 'cancelled')
+              AND NOT EXISTS (
+                SELECT 1 FROM baton_run_steering s
+                WHERE s.run_id = m.delivered_run_id
+                  AND s.entry_id = m.steering_entry_id
+                  AND s.consumed_operation_id IS NOT NULL
+              )
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM baton_runs addressed
+          WHERE addressed.session_id = ${run.message.sessionId}
+            AND REPLACE(m.to_address, 'run:', '') = addressed.run_id
+            AND addressed.status NOT IN ('succeeded', 'failed', 'cancelled')
+        )
+      ORDER BY m.sequence
+    `
     const delivered: Array<MailboxEntry> = []
-    for (const entry of pending) {
+    for (const entry of [...pending, ...settlements.map(decodeEntry)]) {
       const idempotencyKey = steeringKey(entry.entryId)
       const rows = yield* sql<{ next_sequence: number | string }>`
         SELECT COALESCE(MAX(sequence), -1) + 1 AS next_sequence
