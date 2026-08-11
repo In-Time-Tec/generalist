@@ -50,13 +50,17 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
         ModelMiddleware.layerIdentity,
       ),
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "fenced-append-agent" })
+        const agent = Agent.make({ name: "fenced-append-agent", instructions: "current instructions" })
         const events = yield* Stream.runCollect(
           Agent.stream(agent, { prompt: "hello", sessionOwnerToken: "execution:turn-1:epoch:7" }),
         )
         expect(events.at(-1)?._tag).toBe("Completed")
         expect(appendOptions.length).toBeGreaterThan(0)
         expect(appendOptions.every((options) => options?.ownerToken === "execution:turn-1:epoch:7")).toBe(true)
+        expect(appendOptions.map((options) => options?.id)).toEqual([
+          "fenced-append-agent:model:0:session-entry:1:user",
+          "fenced-append-agent:model:0:session-entry:2:assistant",
+        ])
       }),
     ] as const
   })

@@ -9,6 +9,11 @@ type CheckpointAppend = Session.CheckpointAppend
 type CompactionEntry = Session.CompactionEntry
 type PreparedCheckpoint = Session.PreparedCheckpoint
 
+const entryPayloadEquivalence = Schema.toEquivalence(Session.EntryPayload)
+
+const appendMatches = (entry: Entry, input: AppendInput, parentId: EntryId | null): boolean =>
+  entry.parentId === parentId && entryPayloadEquivalence(entry as Session.EntryPayload, input as Session.EntryPayload)
+
 interface EntryRow {
   readonly entry_id: string
   readonly parent_id: string | null
@@ -170,6 +175,30 @@ export const makeSqliteSessionStore = (options: {
       sql.withTransaction(
         Effect.gen(function* () {
           const session = yield* ensureSession
+          if (appendOptions?.id !== undefined) {
+            const rows = yield* sql<EntryRow>`
+              SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+              WHERE session_id = ${options.sessionId} AND entry_id = ${appendOptions.id}
+            `
+            const existing = rows[0]
+            if (existing !== undefined) {
+              const persisted = toEntry(existing)
+              if (!appendMatches(persisted, entry, appendOptions.expectedLeafId)) {
+                return yield* Session.SessionConflict.make({
+                  reason: "entry-id-reused",
+                  message: `Session entry id ${appendOptions.id} was reused with different parent or content`,
+                })
+              }
+              const activePath = yield* pathTo(session.leaf_id)
+              if (!activePath.some((active) => active.id === persisted.id)) {
+                return yield* Session.SessionConflict.make({
+                  reason: "stale-leaf",
+                  message: `Session entry id ${appendOptions.id} is not on the active path from ${String(session.leaf_id)}`,
+                })
+              }
+              return persisted
+            }
+          }
           if (appendOptions?.expectedLeafId !== undefined && appendOptions.expectedLeafId !== session.leaf_id) {
             return yield* Session.SessionConflict.make({
               reason: "stale-leaf",
@@ -177,7 +206,12 @@ export const makeSqliteSessionStore = (options: {
             })
           }
           const created = yield* now
-          const id = String(session.next_seq)
+          let generatedSequence = session.next_seq
+          if (appendOptions?.id === undefined) {
+            const ids = new Set((yield* entriesFor).map((row) => row.entry_id))
+            while (ids.has(String(generatedSequence))) generatedSequence += 1
+          }
+          const id = appendOptions?.id ?? String(generatedSequence)
           yield* insertEntry({
             id,
             parentId: session.leaf_id,
@@ -186,7 +220,7 @@ export const makeSqliteSessionStore = (options: {
             payload: fromEntry(entry as never),
             created,
           })
-          yield* advance(id, session.next_seq + 1, created)
+          yield* advance(id, appendOptions?.id === undefined ? generatedSequence + 1 : session.next_seq + 1, created)
           yield* claim(appendOptions?.ownerToken, created)
           return { ...entry, id, parentId: session.leaf_id } as Entry
         }),
@@ -250,9 +284,12 @@ export const makeSqliteSessionStore = (options: {
         sql.withTransaction(
           Effect.gen(function* () {
             const session = yield* ensureSession
+            const ids = new Set((yield* entriesFor).map((row) => row.entry_id))
+            let sequence = session.next_seq
+            while (ids.has(String(sequence))) sequence += 1
             const created = yield* now
-            yield* advance(session.leaf_id, session.next_seq + 1, created)
-            return String(session.next_seq)
+            yield* advance(session.leaf_id, sequence + 1, created)
+            return String(sequence)
           }),
         ),
       ).pipe(Effect.catchDefect((defect) => storeError(String(defect)))),

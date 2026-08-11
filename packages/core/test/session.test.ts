@@ -62,6 +62,77 @@ describe("Session", () => {
 
   ItLayer.make(
     it,
+    "retries an ambiguously committed stable append without duplication or sequence advance",
+    () =>
+      [
+        Session.layerMemory,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+          const entry = { _tag: "Message" as const, message: user("committed once") }
+          const options = { id: "logical:model:0:session-entry:0:user", expectedLeafId: null }
+          const committed = yield* Deferred.make<void>()
+          const append = store.append(entry, options).pipe(
+            Effect.tap(() => Deferred.succeed(committed, undefined)),
+            Effect.andThen(Effect.never),
+          )
+          const fiber = yield* Effect.forkChild(append, { startImmediately: true })
+
+          yield* Deferred.await(committed)
+          yield* Fiber.interrupt(fiber)
+          const retried = yield* store.append(entry, options)
+          const divergentPayload = yield* Effect.flip(
+            store.append({ ...entry, message: user("different digest") }, options),
+          )
+          const divergentParent = yield* Effect.flip(
+            store.append(entry, { ...options, expectedLeafId: "different-parent" }),
+          )
+
+          expect(retried.id).toBe(options.id)
+          expect(divergentPayload._tag).toBe("@batonfx/core/SessionConflict")
+          expect(divergentParent._tag).toBe("@batonfx/core/SessionConflict")
+          if (divergentPayload._tag === "@batonfx/core/SessionConflict") {
+            expect(divergentPayload.reason).toBe("entry-id-reused")
+          }
+          if (divergentParent._tag === "@batonfx/core/SessionConflict") {
+            expect(divergentParent.reason).toBe("entry-id-reused")
+          }
+          expect((yield* store.path()).filter((candidate) => candidate.id === options.id)).toHaveLength(1)
+
+          const next = yield* store.append({ _tag: "Message", message: user("next") })
+          expect(next.id).toBe("1")
+          expect((yield* store.append(entry, options)).id).toBe(options.id)
+          expect((yield* store.path()).filter((candidate) => candidate.id === options.id)).toHaveLength(1)
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
+    "rejects an exact stable append retry after its branch is abandoned",
+    () =>
+      [
+        Session.layerMemory,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+          const entry = { _tag: "Message" as const, message: user("old branch") }
+          const options = { id: "logical:model:0:session-entry:0:user", expectedLeafId: null }
+          yield* store.append(entry, options)
+          yield* store.setLeaf(null)
+          yield* store.append(
+            { _tag: "Message", message: user("new branch") },
+            { id: "logical:model:1:session-entry:0:user", expectedLeafId: null },
+          )
+
+          const stale = yield* Effect.flip(store.append(entry, options))
+
+          expect(stale._tag).toBe("@batonfx/core/SessionConflict")
+          if (stale._tag === "@batonfx/core/SessionConflict") expect(stale.reason).toBe("stale-leaf")
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
     "moves the leaf pointer to fork a branch",
     () =>
       [

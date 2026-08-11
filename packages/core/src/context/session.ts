@@ -8,50 +8,23 @@ export type EntryId = string
 /** @experimental Host-defined metadata carried by session entries. */
 export type Metadata = Readonly<Record<string, unknown>>
 /** @experimental Common fields for session entries. */
-export interface BaseEntry {
-  readonly id: EntryId
-  readonly parentId: EntryId | null
-  readonly metadata?: Metadata
-}
+export type BaseEntry = { readonly id: EntryId; readonly parentId: EntryId | null; readonly metadata?: Metadata }
 /** @experimental A verbatim conversation message. */
-export interface MessageEntry extends BaseEntry {
-  readonly _tag: "Message"
-  readonly message: Prompt.Message
-}
+export type MessageEntry = BaseEntry & { readonly _tag: "Message"; readonly message: Prompt.Message }
 /** @experimental A model-requested tool call. */
-export interface ToolCallEntry extends BaseEntry {
-  readonly _tag: "ToolCall"
-  readonly part: Prompt.ToolCallPart
-}
+export type ToolCallEntry = BaseEntry & { readonly _tag: "ToolCall"; readonly part: Prompt.ToolCallPart }
 /** @experimental A tool execution result. */
-export interface ToolResultEntry extends BaseEntry {
-  readonly _tag: "ToolResult"
-  readonly part: Prompt.ToolResultPart
-}
+export type ToolResultEntry = BaseEntry & { readonly _tag: "ToolResult"; readonly part: Prompt.ToolResultPart }
 /** @experimental Recalled or persisted memory context. */
-export interface MemoryEntry extends BaseEntry {
-  readonly _tag: "Memory"
-  readonly items: ReadonlyArray<string>
-}
+export type MemoryEntry = BaseEntry & { readonly _tag: "Memory"; readonly items: ReadonlyArray<string> }
 /** @experimental An activated skill body. */
-export interface SkillEntry extends BaseEntry {
-  readonly _tag: "Skill"
-  readonly name: string
-  readonly body: string
-}
+export type SkillEntry = BaseEntry & { readonly _tag: "Skill"; readonly name: string; readonly body: string }
 /** @experimental Live steering input preserved as a prompt message. */
-export interface SteeringEntry extends BaseEntry {
-  readonly _tag: "Steering"
-  readonly message: Prompt.Message
-}
+export type SteeringEntry = BaseEntry & { readonly _tag: "Steering"; readonly message: Prompt.Message }
 /** @experimental A handoff context note. */
-export interface HandoffEntry extends BaseEntry {
-  readonly _tag: "Handoff"
-  readonly target: string
-  readonly summary: string
-}
+export type HandoffEntry = BaseEntry & { readonly _tag: "Handoff"; readonly target: string; readonly summary: string }
 /** @experimental An exact point-in-time compaction projection. */
-export interface CompactionEntry extends BaseEntry {
+export type CompactionEntry = BaseEntry & {
   readonly _tag: "Compaction"
   readonly projectedHistory: Prompt.Prompt
   readonly telemetry: ReadonlyArray<ModelTelemetryEvent>
@@ -59,10 +32,7 @@ export interface CompactionEntry extends BaseEntry {
   readonly summary?: string
 }
 /** @experimental A summary of an abandoned branch. */
-export interface BranchSummaryEntry extends BaseEntry {
-  readonly _tag: "BranchSummary"
-  readonly summary: string
-}
+export type BranchSummaryEntry = BaseEntry & { readonly _tag: "BranchSummary"; readonly summary: string }
 /** @experimental Closed union of session entries. */
 export type Entry =
   | MessageEntry
@@ -77,6 +47,9 @@ export type Entry =
 type AppendEntryInput<Item extends Entry> = Item extends CompactionEntry ? never : Omit<Item, "id" | "parentId">
 /** @experimental Session entry input appended by a store implementation. */
 export type AppendInput = AppendEntryInput<Entry>
+const payloadMetadata = {
+  metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+}
 /**
  * @experimental Durable wire form of a Session entry.
  *
@@ -85,20 +58,21 @@ export type AppendInput = AppendEntryInput<Entry>
  * as columns by the owning store; only the tag-specific payload is encoded here.
  */
 export const EntryPayload = Schema.Union([
-  Schema.TaggedStruct("Message", { message: Prompt.Message }),
-  Schema.TaggedStruct("ToolCall", { part: Prompt.ToolCallPart }),
-  Schema.TaggedStruct("ToolResult", { part: Prompt.ToolResultPart }),
-  Schema.TaggedStruct("Memory", { items: Schema.Array(Schema.String) }),
-  Schema.TaggedStruct("Skill", { name: Schema.String, body: Schema.String }),
-  Schema.TaggedStruct("Steering", { message: Prompt.Message }),
-  Schema.TaggedStruct("Handoff", { target: Schema.String, summary: Schema.String }),
+  Schema.TaggedStruct("Message", { message: Prompt.Message, ...payloadMetadata }),
+  Schema.TaggedStruct("ToolCall", { part: Prompt.ToolCallPart, ...payloadMetadata }),
+  Schema.TaggedStruct("ToolResult", { part: Prompt.ToolResultPart, ...payloadMetadata }),
+  Schema.TaggedStruct("Memory", { items: Schema.Array(Schema.String), ...payloadMetadata }),
+  Schema.TaggedStruct("Skill", { name: Schema.String, body: Schema.String, ...payloadMetadata }),
+  Schema.TaggedStruct("Steering", { message: Prompt.Message, ...payloadMetadata }),
+  Schema.TaggedStruct("Handoff", { target: Schema.String, summary: Schema.String, ...payloadMetadata }),
   Schema.TaggedStruct("Compaction", {
     projectedHistory: Prompt.Prompt,
     telemetry: Schema.Array(ModelTelemetryEvent),
     compactionCommit: Schema.optionalKey(CompactionCommit),
     summary: Schema.optionalKey(Schema.String),
+    ...payloadMetadata,
   }),
-  Schema.TaggedStruct("BranchSummary", { summary: Schema.String }),
+  Schema.TaggedStruct("BranchSummary", { summary: Schema.String, ...payloadMetadata }),
 ])
 /** @experimental */
 export type EntryPayload = typeof EntryPayload.Type
@@ -106,16 +80,27 @@ export type EntryPayload = typeof EntryPayload.Type
 export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError>()("@batonfx/core/SessionStoreError", {
   message: Schema.String,
 }) {}
-/** @experimental Session append conflict with the active path or checkpoint identity. */
+/** @experimental Session append conflict with the active path or entry identity. */
 export class SessionConflict extends Schema.TaggedErrorClass<SessionConflict>()("@batonfx/core/SessionConflict", {
-  reason: Schema.Literals(["stale-leaf", "checkpoint-id-reused", "checkpoint-not-on-active-path", "fenced"]),
+  reason: Schema.Literals([
+    "stale-leaf",
+    "entry-id-reused",
+    "checkpoint-id-reused",
+    "checkpoint-not-on-active-path",
+    "fenced",
+  ]),
   message: Schema.String,
 }) {}
-/** @experimental Expected active leaf and host write-ownership token for a normal Session append. */
-export interface AppendOptions {
+type AppendOptionsBase = { readonly ownerToken?: string }
+/** @experimental Expected active leaf for a store-assigned Session entry identity. */
+export type GeneratedAppendOptions = AppendOptionsBase & {
+  readonly id?: never
   readonly expectedLeafId?: EntryId | null
-  readonly ownerToken?: string
 }
+/** @experimental Exact identity and parent for an idempotent normal Session append. */
+export type StableAppendOptions = AppendOptionsBase & { readonly id: EntryId; readonly expectedLeafId: EntryId | null }
+/** @experimental Identity, expected active leaf, and host write-ownership token for a normal Session append. */
+export type AppendOptions = GeneratedAppendOptions | StableAppendOptions
 /** @experimental Exact idempotent projection. Atomically persist projection, telemetry, and commit; remote failure is ambiguous. */
 export interface PreparedCheckpoint {
   readonly id: EntryId
@@ -157,17 +142,9 @@ interface State {
   readonly leaf: EntryId | null
   readonly counter: number
 }
-interface Success<A> {
-  readonly _tag: "Success"
-  readonly value: A
-}
-
-interface Failure {
-  readonly _tag: "Failure"
-  readonly error: SessionStoreError
-}
+type Success<A> = { readonly _tag: "Success"; readonly value: A }
+type Failure = { readonly _tag: "Failure"; readonly error: SessionStoreError }
 type Result<A> = Success<A> | Failure
-
 const initialState: State = {
   entries: HashMap.empty(),
   order: [],
@@ -233,11 +210,43 @@ const pathFromState = (state: State, leaf: EntryId): Result<ReadonlyArray<Entry>
   return success(entries.toReversed())
 }
 
+const entryPayloadEquivalence = Schema.toEquivalence(EntryPayload)
+
+/** @experimental Canonical exact normal-entry equivalence, excluding the write-owner token. */
+const appendMatches = (entry: Entry, input: AppendInput, parentId: EntryId | null): boolean =>
+  entry.parentId === parentId &&
+  entryPayloadEquivalence(entry as EntryPayload, entryFromInput(input, entry.id, parentId) as EntryPayload)
+
 const appendState = (
   state: State,
   input: AppendInput,
   options?: AppendOptions,
 ): readonly [Result<Entry> | SessionConflict, State] => {
+  if (options?.id !== undefined) {
+    const existing = HashMap.get(state.entries, options.id)
+    if (Option.isSome(existing)) {
+      if (!appendMatches(existing.value, input, options.expectedLeafId)) {
+        return [
+          SessionConflict.make({
+            reason: "entry-id-reused",
+            message: `Session entry id ${options.id} was reused with different parent or content`,
+          }),
+          state,
+        ]
+      }
+      const activePath = state.leaf === null ? success<ReadonlyArray<Entry>>([]) : pathFromState(state, state.leaf)
+      if (activePath._tag === "Failure" || !activePath.value.some((active) => active.id === options.id)) {
+        return [
+          SessionConflict.make({
+            reason: "stale-leaf",
+            message: `Session entry id ${options.id} is not on the active path from ${String(state.leaf)}`,
+          }),
+          state,
+        ]
+      }
+      return [success(existing.value), state]
+    }
+  }
   if (options?.expectedLeafId !== undefined && options.expectedLeafId !== state.leaf) {
     return [
       SessionConflict.make({
@@ -247,7 +256,11 @@ const appendState = (
       state,
     ]
   }
-  const id = String(state.counter)
+  let generatedCounter = state.counter
+  if (options?.id === undefined) {
+    while (Option.isSome(HashMap.get(state.entries, String(generatedCounter)))) generatedCounter += 1
+  }
+  const id = options?.id ?? String(generatedCounter)
   const entry = entryFromInput(input, id, state.leaf)
   return [
     success(entry),
@@ -255,7 +268,7 @@ const appendState = (
       entries: HashMap.set(state.entries, id, entry),
       order: [...state.order, id],
       leaf: id,
-      counter: state.counter + 1,
+      counter: options?.id === undefined ? generatedCounter + 1 : state.counter + 1,
     },
   ]
 }
@@ -451,10 +464,11 @@ export const layerMemory: Layer.Layer<SessionStore> = Layer.effect(
   Ref.make(initialState).pipe(
     Effect.map((state) =>
       SessionStore.of({
-        reserveEntryId: Ref.modify(state, (current) => [
-          String(current.counter),
-          { ...current, counter: current.counter + 1 },
-        ]),
+        reserveEntryId: Ref.modify(state, (current) => {
+          let counter = current.counter
+          while (Option.isSome(HashMap.get(current.entries, String(counter)))) counter += 1
+          return [String(counter), { ...current, counter: counter + 1 }]
+        }),
         append: (entry, options) =>
           Ref.modify(state, (current) => appendState(current, entry, options)).pipe(
             Effect.flatMap(effectFromAppendResult),

@@ -122,11 +122,16 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
             })
           }
           let expectedLeafId = path.at(-1)?.id ?? null
+          const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
           // The system message is derived per Run from live instructions, so it never becomes a Session
           // entry. Persisting it would pin a resumed Session to the instructions captured on its first Run.
-          for (const message of transcript.content.slice(cursor.value)) {
-            if (message.role === "system") continue
-            const appended = yield* session.append({ _tag: "Message", message }, sessionAppendOptions(expectedLeafId))
+          for (const [position, message] of transcript.content.entries()) {
+            if (position < cursor.value || message.role === "system") continue
+            const id = operationKey(logicalId, "model", turn, "session-entry", position, message.role)
+            const appended = yield* session.append(
+              { _tag: "Message", message },
+              { ...sessionAppendOptions(expectedLeafId), id },
+            )
             expectedLeafId = appended.id
           }
           if (expectedLeafId !== (path.at(-1)?.id ?? null)) path = yield* session.path()
