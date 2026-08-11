@@ -156,6 +156,7 @@ export namespace DurableDriver {
   export type DriverInterpreter = import("./driver-interpreter.js").DriverInterpreter
   export type DriverJournal = import("./driver-interpreter.js").DriverJournal
   export type DriverJournalService = import("./driver-interpreter.js").DriverJournalService
+  export type StreamSuccessCodec<A, Success> = import("./driver-interpreter.js").StreamSuccessCodec<A, Success>
   export type DriverUnknownReplay = import("./driver-interpreter.js").DriverUnknownReplay
   export type guardUnknownNeverReplay = typeof import("./driver-interpreter.js").guardUnknownNeverReplay
   export type makeInline = typeof import("./driver-interpreter.js").makeInline

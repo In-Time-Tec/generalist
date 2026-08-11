@@ -31,8 +31,7 @@ import {
   withHandoffState,
   withPending,
 } from "./loop-driver.js"
-import type { Agent } from "../agent/agent.js"
-import type { RunOptions } from "../agent/agent.js"
+import type { Agent, RunOptions } from "../agent/agent.js"
 import type { HandoffControlState } from "../agent/handoff-state.js"
 
 /** @experimental Operation scheduled at one agent-loop effect boundary. */
@@ -42,14 +41,12 @@ export interface OperationSpec {
   readonly input: unknown
   readonly replayPolicy: ReplayPolicy
 }
-
 /** @experimental Recorded operation for tests and future runtime journaling. */
 export interface RecordedOperation {
   readonly operation: DriverOperation
   readonly outcome: OperationOutcome
   readonly checkpoint: DriverCheckpoint
 }
-
 /** @experimental Host hook surface for durable operation journaling without runtime imports. */
 export interface DriverJournal {
   readonly onScheduled: (
@@ -63,23 +60,34 @@ export interface DriverJournal {
   ) => Effect.Effect<void>
   readonly onCheckpoint: (checkpoint: DriverCheckpoint) => Effect.Effect<void>
 }
-
 /** @experimental Optional host journal service merged into Agent.stream driver layers. */
 export class DriverJournalService extends Context.Service<DriverJournalService, DriverJournal>()(
   "@batonfx/core/durable/driver-interpreter/DriverJournalService",
 ) {}
 
+/** @experimental Caller-owned successful stream result and replay codec. */
+export interface StreamSuccessCodec<A, Success> {
+  readonly observe: (value: A) => void
+  readonly complete: () => Success
+  readonly replay: (success: Success) => ReadonlyArray<A>
+}
+
+type OperationError<E> = E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted
+
 /** @experimental Inline interpreter executing driver operations through Effect services. */
 export interface Interface {
   readonly checkpoint: Effect.Effect<DriverCheckpoint>
-  readonly run: <A, E, R>(
-    spec: OperationSpec,
-    effect: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>
-  readonly runStream: <A, E, R>(
-    spec: OperationSpec,
-    stream: Stream.Stream<A, E, R>,
-  ) => Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>
+  readonly run: <A, E, R>(spec: OperationSpec, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, OperationError<E>, R>
+  readonly runStream: {
+    <A, E, R>(spec: OperationSpec, stream: Stream.Stream<A, E, R>): Stream.Stream<A, OperationError<E>, R>
+    <A, E, R, Success>(
+      spec: OperationSpec,
+      stream: Stream.Stream<A, E, R>,
+      options: {
+        readonly successCodec: StreamSuccessCodec<A, Success>
+      },
+    ): Stream.Stream<A, OperationError<E>, R>
+  }
   readonly recordSuspension: (input: {
     readonly waitId: string
     readonly reason: string
@@ -265,15 +273,24 @@ export const makeInline = (input: {
     const interpreter: Interface = {
       checkpoint: Ref.get(checkpointRef),
       run,
-      runStream: <A, E, R>(spec: OperationSpec, stream: Stream.Stream<A, E, R>) =>
+      runStream: <A, E, R, Success>(
+        spec: OperationSpec,
+        stream: Stream.Stream<A, E, R>,
+        options?: { readonly successCodec: StreamSuccessCodec<A, Success> },
+      ) =>
         Stream.unwrap(
           Effect.gen(function* () {
             const { operation, replay, nested } = yield* schedule(spec)
+            const codec = options?.successCodec
             if (replay !== undefined) {
               yield* guardUnknownNeverReplay(operation, replay)
               return (
                 replay._tag === "Succeeded"
-                  ? Stream.fromIterable((Array.isArray(replay.value) ? replay.value : []) as ReadonlyArray<A>)
+                  ? Stream.fromIterable(
+                      codec === undefined
+                        ? ((Array.isArray(replay.value) ? replay.value : []) as ReadonlyArray<A>)
+                        : codec.replay(replay.value as Success),
+                    )
                   : replay._tag === "Failed"
                     ? Stream.fail(replay.error as E)
                     : Stream.fail(
@@ -289,14 +306,16 @@ export const makeInline = (input: {
               typeof spec.input.modelCallOrdinal === "number"
                 ? spec.input.modelCallOrdinal
                 : undefined
-            const emitted = new Array<A>()
+            const emitted = codec === undefined ? new Array<A>() : undefined
             return stream.pipe(
               Stream.provideService(CurrentModelCallOrdinal, ordinal),
-              Stream.tap((value) => Effect.sync(() => void emitted.push(value))),
+              Stream.tap((value) =>
+                Effect.sync(() => (codec === undefined ? void emitted!.push(value) : codec.observe(value))),
+              ),
               Stream.onExit((exit) =>
                 Effect.gen(function* () {
                   const outcome = Exit.isSuccess(exit)
-                    ? ({ _tag: "Succeeded", value: emitted } as const)
+                    ? ({ _tag: "Succeeded", value: codec === undefined ? emitted! : codec.complete() } as const)
                     : outcomeFromExit(operation, exit)
                   if (outcome === undefined) return
                   yield* outcome._tag === "Unknown"
@@ -306,7 +325,7 @@ export const makeInline = (input: {
               ),
             )
           }),
-        ) as Stream.Stream<A, E | DriverError | DriverStateInvalid | DriverUnknownReplay | RunBudgetExhausted, R>,
+        ) as Stream.Stream<A, OperationError<E>, R>,
       recordSuspension: (suspension) =>
         run(
           {

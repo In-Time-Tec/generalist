@@ -1054,6 +1054,71 @@ describe("DurableDriver Agent.stream integration", () => {
     }),
   )
 
+  it.effect("journals and replays a custom stream success without retaining emitted values", () =>
+    Effect.gen(function* () {
+      const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "stream-codec", sessionId: "stream-codec" })
+      const initial = yield* driver.initial({ prompt: Prompt.make("stream-codec"), budget: RunBudget.allocate({}) })
+      const outcomes = new Map<string, DurableDriver.OperationOutcome>()
+      let replay = false
+      let sourceRuns = 0
+      let total = 0
+      let count = 0
+      let completions = 0
+      const successCodec: DurableDriver.StreamSuccessCodec<number, { readonly total: number; readonly count: number }> =
+        {
+          observe: (value) => {
+            total += value
+            count += 1
+          },
+          complete: () => {
+            completions += 1
+            return { total, count }
+          },
+          replay: (success) => [success.total, success.count],
+        }
+      const makeInterpreter = DurableDriver.makeInline({
+        driver,
+        initial,
+        journal: {
+          onScheduled: (operation) => Effect.succeed(replay ? outcomes.get(operation.key) : undefined),
+          onCompleted: (operation, outcome) => Effect.sync(() => void outcomes.set(operation.key, outcome)),
+          onCheckpoint: () => Effect.void,
+        },
+      })
+      const spec = { kind: "tool" as const, key: "stream-codec:tool", input: {}, replayPolicy: "never" as const }
+      const source = Stream.unwrap(
+        Effect.sync(() => {
+          sourceRuns += 1
+          return Stream.fromIterable([1, 2, 3])
+        }),
+      )
+
+      expect(yield* Stream.runCollect((yield* makeInterpreter).runStream(spec, source, { successCodec }))).toEqual([
+        1, 2, 3,
+      ])
+      expect(outcomes.get(spec.key)).toEqual({ _tag: "Succeeded", value: { total: 6, count: 3 } })
+
+      replay = true
+      expect(
+        yield* Stream.runCollect(
+          (yield* makeInterpreter).runStream(spec, Stream.die("replayed stream source must not execute"), {
+            successCodec,
+          }),
+        ),
+      ).toEqual([6, 3])
+      expect(sourceRuns).toBe(1)
+
+      replay = false
+      const failedSpec = { ...spec, key: "stream-codec:failed" }
+      const failure = yield* (yield* makeInterpreter)
+        .runStream(failedSpec, Stream.make(4).pipe(Stream.concat(Stream.fail("stream failed"))), { successCodec })
+        .pipe(Stream.runDrain, Effect.flip)
+      expect(failure).toBe("stream failed")
+      expect(completions).toBe(1)
+      expect(outcomes.get(failedSpec.key)).toEqual({ _tag: "Failed", error: "stream failed" })
+    }),
+  )
+
   it.effect("records a defective non-replayable stream as unknown after stream finalizers", () =>
     Effect.gen(function* () {
       const lifecycle: Array<string> = []
