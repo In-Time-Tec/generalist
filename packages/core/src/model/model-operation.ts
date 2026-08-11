@@ -44,6 +44,7 @@ export interface CompletedModelOperation {
   readonly modelCallId: string
   readonly modelAttemptId: string
   readonly attempt: number
+  readonly sessionParentId: string | null
   readonly messages: ReadonlyArray<Prompt.MessageEncoded>
   readonly content: typeof ModelResponseContent.Encoded
   readonly usage?: typeof Response.Usage.Encoded
@@ -57,6 +58,7 @@ const CompletedModelOperationFields = Schema.Struct({
   modelCallId: Schema.String,
   modelAttemptId: Schema.String,
   attempt: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  sessionParentId: Schema.NullOr(Schema.String),
   messages: Schema.Array(Schema.toEncoded(Prompt.Message)),
   content: Schema.toEncoded(ModelResponseContent),
   usage: Schema.optionalKey(Schema.toEncoded(Response.Usage)),
@@ -87,6 +89,7 @@ export interface AttemptCompleted {
   readonly modelCallId: string
   readonly modelAttemptId: string
   readonly attempt: number
+  readonly sessionParentId: string | null
   readonly response: CompletedModelResponse<Record<string, Tool.Any>>
 }
 

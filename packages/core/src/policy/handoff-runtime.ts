@@ -1,5 +1,5 @@
 import { Effect, Function, Option, Ref, Schema } from "effect"
-import { Chat, Tool } from "effect/unstable/ai"
+import { Chat, Prompt, Tool } from "effect/unstable/ai"
 import {
   edgeCount,
   edgeLabel,
@@ -22,6 +22,7 @@ import { defaultContextProjection, HandoffInput, type ContextProjection } from "
 import type { HandoffTarget } from "./handoff-target.js"
 import { ModelRegistry } from "../model/model-registry.js"
 import { validateRef } from "../durable/executable-manifest.js"
+import { SessionStore } from "../context/session.js"
 
 export class HandoffRejected extends Schema.TaggedErrorClass<HandoffRejected>()("@batonfx/core/HandoffRejected", {
   handoffId: Schema.String,
@@ -108,6 +109,8 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
     const source = current.active.name
     const repeated = edgeCount(current.edgeCounts, source, resolved.name)
     const handoffId = operationKey(logicalId, "handoff", input.turn, input.toolCallId, resolved.pin ?? resolved.name)
+    const sessionEntryId = `${handoffId}:session-projection`
+    const sessionService = yield* Effect.serviceOption(SessionStore)
     if (resolved.agent.model !== undefined) {
       const registry = yield* Effect.serviceOption(ModelRegistry)
       if (Option.isNone(registry)) {
@@ -186,6 +189,18 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
         const projected = yield* project(history, handoffInput).pipe(
           Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: error.message })),
         )
+        const projectedHistory = Prompt.fromMessages(
+          projected.history.content.filter((message) => message.role !== "system"),
+        )
+        const sessionParentId = Option.isNone(sessionService)
+          ? null
+          : ((yield* sessionService.value
+              .path()
+              .pipe(
+                Effect.mapError((error) =>
+                  HandoffRejected.make({ handoffId, turn: input.turn, reason: error.message }),
+                ),
+              )).at(-1)?.id ?? null)
         const next: HandoffRunState = {
           root: current.root,
           active: resolved,
@@ -211,7 +226,9 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
         return {
           _tag: "HandoffCommit",
           state: toHandoffControlState(next),
-          transcript: projected.history,
+          sessionEntryId,
+          sessionParentId,
+          projectedHistory,
           ...(resolved.pin === undefined ? {} : { targetAgentPin: resolved.pin }),
         } satisfies HandoffCommit
       }),
@@ -223,7 +240,24 @@ export const executeSameRunHandoff = (input: ExecuteHandoffInput) =>
     if (committedTarget === undefined) {
       return yield* HandoffTargetMissing.make({ target: durable.state.active, turn: input.turn })
     }
-    yield* Ref.set(input.chat.history, durable.transcript)
+    if (Option.isSome(sessionService)) {
+      yield* sessionService.value
+        .append(
+          {
+            _tag: "Handoff",
+            handoffId,
+            target: durable.state.active,
+            projectedHistory: durable.projectedHistory,
+          },
+          {
+            id: durable.sessionEntryId,
+            expectedLeafId: durable.sessionParentId,
+            ...(input.options.sessionOwnerToken === undefined ? {} : { ownerToken: input.options.sessionOwnerToken }),
+          },
+        )
+        .pipe(Effect.mapError((error) => HandoffRejected.make({ handoffId, turn: input.turn, reason: error.message })))
+    }
+    yield* Ref.set(input.chat.history, durable.projectedHistory)
     const registry = yield* assemble(staticCandidates(committedTarget))
     yield* Ref.set(input.toolState, {
       registry,

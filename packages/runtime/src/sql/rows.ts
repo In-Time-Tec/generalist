@@ -28,7 +28,6 @@ export interface RunRow {
   readonly responded_wait_ids_json: string
   readonly driver_checkpoint_json: string | null
   readonly suspension_json: string | null
-  readonly transcript_json: string | null
   readonly continuation_json: string | null
   readonly pending_outcome_json: string | null
   readonly owner_worker_id?: string | null

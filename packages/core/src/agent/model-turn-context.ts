@@ -48,6 +48,10 @@ export type RuntimeContext<T extends Record<string, Tool.Any>, R> = {
     LanguageModel.LanguageModel | DriverInterpreter
   >
   readonly countTokens: (turn: number, prompt: Prompt.Prompt) => Effect.Effect<number, AgentError>
+  readonly syncSession: (
+    turn: number,
+    transcript: Prompt.Prompt,
+  ) => Effect.Effect<ReadonlyArray<import("../context/session.js").Entry>, RunError, DriverInterpreter>
   readonly emitTelemetry: (payload: DeliveryEventPayload) => Effect.Effect<void>
   readonly chat: Chat.Service
   readonly compactionService: Option.Option<typeof import("../turn/compaction.js").Compaction.Service>

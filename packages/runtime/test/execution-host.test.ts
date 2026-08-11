@@ -10,6 +10,7 @@ import {
   ExecutableManifest,
   Pins,
   Session,
+  Handoff,
   ToolContext,
   ToolExecutor,
 } from "@batonfx/core"
@@ -286,41 +287,24 @@ describe("ExecutionHost", () => {
     }),
   )
 
-  it.effect("continues one durable Session across separate Runs and a store reopen", () =>
+  it.effect("continues one durable Session across separate Runs and a store reopen without Compaction", () =>
     Effect.gen(function* () {
       const filename = tempDbPath("durable-session-continuity")
       const prompts: Array<string> = []
       const agent = Agent.make({ name: "durable-session-agent", instructions: "Stay consistent." })
       const model = Pins.makeModel({ model: "conversation", route: "conversation-route:v1" })
-      const compaction = {
-        service: Pins.makeCapability({ service: "compaction", revision: 1 }),
-        summaryModel: Pins.makeModel({ model: "summary", route: "summary-route:v1" }),
-        contextWindow: 1_000_000,
-        reserveTokens: 0,
-        keepRecentTokens: 1,
-        strategyIdentity: "default:v1",
-        summaryPromptIdentity: "summary:v1",
-      }
       const pinned = AgentManifest.fromLiveAgent(agent, {
         model,
         tools: [],
         skills: [],
         services: [],
         policy: { _tag: "Portable", policy: { _tag: "Forever" } },
-        compaction,
         budget: {},
         children: [],
       })
       const executable = ExecutableManifest.make({ root: pinned.pin, entries: [{ _tag: "Agent", ...pinned }] })
       const registrations = [
         { pin: model, codec: "test-model", version: "1", payload: { route: "conversation-route:v1" } },
-        {
-          pin: compaction.service,
-          codec: "compaction-policy",
-          version: "1",
-          payload: { keepRecentTokens: 1, strategyIdentity: "default:v1", summaryPromptIdentity: "summary:v1" },
-        },
-        { pin: compaction.summaryModel, codec: "test-model", version: "1", payload: { route: "summary-route:v1" } },
       ]
       const resolver = ExecutableResolver.ExecutableResolver.of({
         resolve: () =>
@@ -328,37 +312,22 @@ describe("ExecutionHost", () => {
             _tag: "Agent" as const,
             agent: Agent.close(
               agent,
-              Layer.mergeAll(
-                Layer.effect(
-                  LanguageModel.LanguageModel,
-                  LanguageModel.make({
-                    generateText: () => Effect.succeed([]),
-                    streamText: (options) => {
-                      prompts.push(JSON.stringify(options.prompt.content))
-                      return Stream.fromIterable<Response.StreamPartEncoded>([
-                        Response.makePart("text-start", { id: "text" }),
-                        Response.makePart("text-delta", { id: "text", delta: `reply ${prompts.length}` }),
-                        Response.makePart("text-end", { id: "text" }),
-                        finish,
-                      ])
-                    },
-                  }),
-                ),
-                Compaction.layer({
-                  contextWindow: 1_000_000,
-                  reserveTokens: 0,
-                  keepRecentTokens: 1_000_000,
-                  summaryModel: Layer.effect(
-                    LanguageModel.LanguageModel,
-                    LanguageModel.make({
-                      generateText: () => Effect.succeed([]),
-                      streamText: () => Stream.empty,
-                    }),
-                  ),
+              Layer.effect(
+                LanguageModel.LanguageModel,
+                LanguageModel.make({
+                  generateText: () => Effect.succeed([]),
+                  streamText: (options) => {
+                    prompts.push(JSON.stringify(options.prompt.content))
+                    return Stream.fromIterable<Response.StreamPartEncoded>([
+                      Response.makePart("text-start", { id: "text" }),
+                      Response.makePart("text-delta", { id: "text", delta: `reply ${prompts.length}` }),
+                      Response.makePart("text-end", { id: "text" }),
+                      finish,
+                    ])
+                  },
                 }),
               ),
             ),
-            runOptions: { compaction: { contextWindow: 1_000_000, reserveTokens: 0 } },
             attestation: executable,
           }),
       })
@@ -380,7 +349,6 @@ describe("ExecutionHost", () => {
           }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped),
         )
 
-      // Each turn opens its own Runtime scope, so the second and third cross a store reopen.
       yield* turn("turn-1", "first question")
       yield* turn("turn-2", "second question")
       yield* turn("turn-3", "third question")
@@ -391,8 +359,33 @@ describe("ExecutionHost", () => {
       expect(prompts[1]).toContain("reply 1")
       expect(prompts[1]).toContain("second question")
       expect(prompts[2]).toContain("first question")
+      expect(prompts[2]).toContain("reply 1")
       expect(prompts[2]).toContain("second question")
+      expect(prompts[2]).toContain("reply 2")
       expect(prompts[2]).toContain("third question")
+
+      const database = new Database(filename)
+      const runColumns = database.query<{ name: string }, []>("PRAGMA table_info(baton_runs)").all()
+      expect(runColumns.map((column) => column.name)).not.toContain("transcript_json")
+      database.exec(`
+        PRAGMA foreign_keys = OFF;
+        DELETE FROM baton_run_events;
+        DELETE FROM baton_run_operations;
+        DELETE FROM baton_runs;
+      `)
+      database.close()
+
+      const projection = yield* Effect.gen(function* () {
+        const store = yield* RunStore.RunStore
+        const session = yield* store.sessionStore("thread:durable-continuity")
+        if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
+        return Session.buildContext(yield* session.value.path())
+      }).pipe((effect) => provideScoped(layerSqlite(), effect), Effect.scoped)
+      expect(projection.content).toHaveLength(6)
+      const projectionJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(projection.content)
+      expect(projectionJson).toContain("first question")
+      expect(projectionJson).toContain("reply 2")
+      expect(projectionJson).toContain("third question")
     }),
   )
 
@@ -931,7 +924,12 @@ describe("ExecutionHost", () => {
         if (persisted.checkpoint === undefined || !("driverVersion" in persisted.checkpoint)) return
         expect(persisted.checkpoint.driverVersion).toBe("1")
         expect(persisted.checkpoint.executable).toEqual(ref.ref)
-        expect(persisted.transcript).toBeDefined()
+        expect(persisted.transcript).toBeUndefined()
+        const durableSession = yield* store.sessionStore("session:durable")
+        expect(Option.isSome(durableSession)).toBe(true)
+        if (Option.isSome(durableSession)) {
+          expect(Session.buildContext(yield* durableSession.value.path()).content.length).toBeGreaterThan(0)
+        }
         expect(persisted.suspension?.token).toBe("approval-token")
         expect(lifecycle).toEqual([
           "admission resolver acquired",
@@ -1087,7 +1085,6 @@ describe("ExecutionHost", () => {
         idempotencyKey: "response:first",
         resolution: { _tag: "ToolResult", result: "second", encodedResult: "second" },
       })
-
       yield* execute("second")
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({
         status: "waiting",
@@ -1681,6 +1678,114 @@ describe("ExecutionHost", () => {
     ),
   )
 
+  it.effect("atomically imports memory handoff projections with exact retry and divergent rollback", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: Address.make("agent:atomic-operation"),
+        sessionId: "session:memory-handoff-projection",
+        idempotencyKey: "memory-handoff-projection",
+        prompt: "supervisor sentinel",
+      })
+      const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "atomic-worker" })
+      const operationKey = "handoff:memory-projection"
+      const operation = yield* store.recordOperation({
+        ...claim,
+        operationKey,
+        kind: "handoff",
+        inputDigest: "handoff:memory-projection",
+        input: { targetAgentPin: researcherRef.ref.active },
+        replayPolicy: "pure",
+        attempt: claim.attempt,
+      })
+      yield* store.startOperation({ ...claim, operationId: operation.operationId })
+      const projectedHistory = Prompt.make("projected-for-specialist")
+      const commit: Handoff.HandoffCommit = {
+        _tag: "HandoffCommit",
+        state: {
+          root: assistant.name,
+          active: "specialist",
+          path: [{ handoffId: operationKey, source: assistant.name, target: "specialist", turn: 0 }],
+          edgeCounts: [{ source: assistant.name, target: "specialist", count: 1 }],
+          handoffCount: 1,
+          pendingContinuation: { prompt: Prompt.make("continue") },
+        },
+        sessionEntryId: `${operationKey}:session-projection`,
+        sessionParentId: null,
+        projectedHistory,
+        targetAgentPin: researcherRef.ref.active as NonNullable<Handoff.HandoffCommit["targetAgentPin"]>,
+      }
+      const checkpoint = {
+        driverVersion: "1" as const,
+        executable: researcherRef.ref,
+        turn: 1,
+        budget: { allocation: {}, remaining: {}, depth: 0 },
+        state: {},
+      }
+      const completion = {
+        ...claim,
+        operationId: operation.operationId,
+        outcome: { _tag: "Succeeded" as const, value: commit },
+        checkpoint,
+      }
+      const invalidProjection = yield* store
+        .completeOperation({
+          ...completion,
+          outcome: {
+            _tag: "Succeeded",
+            value: {
+              ...commit,
+              projectedHistory: Prompt.fromMessages([Prompt.makeMessage("system", { content: "must not persist" })]),
+            },
+          },
+        })
+        .pipe(Effect.flip)
+      expect(invalidProjection).toBeInstanceOf(Errors.RuntimeUnavailable)
+      expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
+        "running",
+      )
+      expect((yield* store.loadExecution(receipt.runId)).executableRef).toEqual(assistantRef.ref)
+      yield* store.completeOperation(completion)
+      yield* store.completeOperation(completion)
+      const session = yield* store.sessionStore("session:memory-handoff-projection")
+      if (Option.isNone(session)) return yield* Effect.die("expected memory Session")
+      yield* session.value.append({ _tag: "Message", message: Prompt.make("descendant").content[0]! })
+      yield* store.completeOperation(completion)
+      const beforeDivergence = yield* session.value.path()
+      const divergentCheckpoint = yield* store
+        .completeOperation({ ...completion, checkpoint: { ...checkpoint, state: { divergent: true } } })
+        .pipe(Effect.flip)
+      expect(divergentCheckpoint).toBeInstanceOf(Errors.RuntimeUnavailable)
+      const divergent = yield* store
+        .completeOperation({
+          ...completion,
+          outcome: {
+            _tag: "Succeeded",
+            value: { ...commit, projectedHistory: Prompt.make("divergent projection") },
+          },
+        })
+        .pipe(Effect.flip)
+      expect(divergent).toBeInstanceOf(Errors.RuntimeUnavailable)
+      expect(yield* session.value.path()).toEqual(beforeDivergence)
+      expect(Session.buildContext(beforeDivergence)).toEqual(Prompt.concat(projectedHistory, Prompt.make("descendant")))
+      expect((yield* store.loadExecution(receipt.runId)).executableRef).toEqual(researcherRef.ref)
+    }).pipe(
+      scopedWith(
+        Runtime.layerMemory({
+          resolver: ExecutableResolver.makeStatic([{ executable: assistantRef, agent: closedTestAgent(assistant) }]),
+          addresses: [
+            {
+              address: Address.make("agent:atomic-operation"),
+              executable: assistantRef,
+              registrations: registrationsFor(assistantRef),
+            },
+          ],
+        }),
+      ),
+    ),
+  )
+
   it.effect("atomically commits failed, unknown, and suspended execution state", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -1757,7 +1862,7 @@ describe("ExecutionHost", () => {
       const inspection = yield* runtime.inspect(receipt.runId)
       expect(execution.suspension).toEqual(suspension)
       expect(execution.checkpoint).toEqual(checkpoint)
-      expect(execution.transcript).toEqual(Prompt.make("saved transcript"))
+      expect(execution.transcript).toBeUndefined()
       expect(inspection.status).toBe("waiting")
       expect(inspection.wait?.waitId).toBe("approval")
     }).pipe(

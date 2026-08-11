@@ -1,6 +1,6 @@
 import { Cause, Context, DateTime, Effect, Layer, Ref, Schema, type Scope, Stream } from "effect"
 import { Prompt, type Tool } from "effect/unstable/ai"
-import { Agent, AgentEvent, DurableDriver, Handoff, Steering } from "@batonfx/core"
+import { Agent, AgentEvent, DurableDriver, Steering } from "@batonfx/core"
 import { RunStore, type ExecutionClaim } from "./run-store.js"
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, ExecutableIdentityMismatch, RunTerminal, undecodableSuspension } from "./errors.js"
@@ -197,7 +197,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                                     ? {
                                         schemaVersion: 1 as const,
                                         prompt: steeringPrompt!,
-                                        history: completed.transcript,
                                         nextTurn: completed.turn + 1,
                                         steeringEntryIds,
                                       }
@@ -280,10 +279,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                                 new Error(`Scheduled operation ${operation.key} has no prepared state`),
                               )
                             }
-                            const handoffCommit =
-                              outcome._tag === "Succeeded" && operation.kind === "handoff"
-                                ? Schema.decodeUnknownOption(Handoff.HandoffCommit)(outcome.value)
-                                : undefined
                             yield* commitDriverOperation({
                               store,
                               claim,
@@ -292,9 +287,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                               outcome,
                               checkpoint,
                               prepared,
-                              ...(handoffCommit?._tag === "Some"
-                                ? { handoffTranscript: handoffCommit.value.transcript }
-                                : {}),
                             })
                             yield* clearDriverOperation({
                               prepared: preparedCompletions,
@@ -384,7 +376,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                           latest.checkpoint !== undefined && "driverVersion" in latest.checkpoint
                             ? latest.checkpoint
                             : undefined
-                        return yield* runAgent(next.prompt, next.history, checkpoint, next, undefined, false)
+                        return yield* runAgent(next.prompt, undefined, checkpoint, next, undefined, false)
                       }
                       if (Cause.hasInterruptsOnly(exit.cause)) {
                         return yield* Effect.failCause(exit.cause)
@@ -441,7 +433,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                       if (retry !== undefined) {
                         return yield* runAgent(
                           retry.continuation?.prompt ?? Prompt.empty,
-                          retry.continuation?.history ?? retry.transcript,
+                          undefined,
                           retry.checkpoint,
                           retry.continuation,
                           retry.turn,
@@ -462,7 +454,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                       : undefined
                   return runAgent(
                     continuation?.prompt ?? claimed.message.prompt,
-                    continuation?.history ?? claimed.transcript,
+                    undefined,
                     checkpoint,
                     continuation,
                     undefined,

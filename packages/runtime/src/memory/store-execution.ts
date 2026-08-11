@@ -30,7 +30,6 @@ const executionRecord = (
   ...(run.checkpoint === undefined ? {} : { checkpoint: run.checkpoint }),
   ...(run.suspension === undefined ? {} : { suspension: run.suspension }),
   ...(run.wait?.resolution === undefined ? {} : { resolution: run.wait.resolution }),
-  ...(run.transcript === undefined ? {} : { transcript: run.transcript }),
   ...(run.continuation === undefined ? {} : { continuation: run.continuation }),
   registrations: run.registrations,
 })
@@ -184,7 +183,6 @@ export const saveExecution: {
         executableRef,
         ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
         ...(input.suspension === undefined ? {} : { suspension: input.suspension }),
-        ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
       })
       return { ...state, runs }
     }),

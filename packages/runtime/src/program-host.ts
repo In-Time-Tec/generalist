@@ -9,6 +9,7 @@ import {
 import type { ExecutionClaim, ExecutionRecord, Interface as RunStore } from "./run-store.js"
 import type { ProgramOperationKind, ProgramReservation } from "./program-store.js"
 import { childRunIdFor, fanOutIdFor } from "./fan-out.js"
+import { fanOutMemberSessionId } from "./child-session.js"
 import {
   AgentFanOut,
   AgentMap,
@@ -275,7 +276,7 @@ export const make = (input: {
               childRunId: childRunIdFor(fanOutId, ordinal),
               selection: member.selection,
               prompt: member.prompt,
-              sessionId: `program:${input.claim.runId}:${request.operation}`,
+              sessionId: fanOutMemberSessionId({ fanOutId, key: member.member }),
               metadata: { programOperation: request.operation, programMember: member.member },
             })),
             concurrency,

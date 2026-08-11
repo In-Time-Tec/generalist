@@ -64,7 +64,6 @@ const inspect = (filename: string) => {
     "responded_wait_ids_json",
     "driver_checkpoint_json",
     "suspension_json",
-    "transcript_json",
     "continuation_json",
     "pending_outcome_json",
     "owner_worker_id",

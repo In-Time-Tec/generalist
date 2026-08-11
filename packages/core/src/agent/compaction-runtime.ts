@@ -8,7 +8,8 @@ import {
   type Result as CompactionResult,
   type Usage,
 } from "../turn/compaction.js"
-import { diagnose as diagnoseSessionSync, equivalentMessages } from "../context/session-sync.js"
+import { diagnose as diagnoseSessionSync } from "../context/session-sync.js"
+import { SessionSyncInternals } from "./session-sync.js"
 import { checkpointMatches, buildContext } from "../context/session.js"
 import { recalledMessages, detachEntry, detachPrompt, preservesRecalledMessages } from "./agent-message.js"
 import { conversationOnly, withDerivedSystem } from "./session-history.js"
@@ -76,22 +77,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     sessionError,
   } = context
   const promptEquivalence = Schema.toEquivalence(Prompt.Prompt)
-  const sessionTranscriptCursor = (
-    projection: ReadonlyArray<Prompt.Message>,
-    transcript: ReadonlyArray<Prompt.Message>,
-  ): Option.Option<number> => {
-    if (projection.length === 0) return Option.some(0)
-    const matches: Array<number> = []
-    for (let start = 0; start <= transcript.length - projection.length; start += 1) {
-      if (
-        transcript.slice(0, start).every((message) => message.role === "system") &&
-        projection.every((message, index) => equivalentMessages(message, transcript[start + index] as Prompt.Message))
-      ) {
-        matches.push(start + projection.length)
-      }
-    }
-    return matches.length === 1 ? Option.some(matches[0] as number) : Option.none()
-  }
+  const { isAppendOnlyDescendant, sessionTranscriptCursor } = SessionSyncInternals
 
   const syncSessionBody = (turn: number, transcript: Prompt.Prompt): Effect.Effect<ReadonlyArray<Entry>, AgentError> =>
     Option.match(activeSession, {
@@ -125,8 +111,6 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
           const checkpoint = path.findLast((entry) => entry._tag === "Compaction")
           const root = checkpoint === undefined ? "root" : `checkpoint:${checkpoint.id}`
-          // The system message is derived per Run from live instructions, so it never becomes a Session
-          // entry. Persisting it would pin a resumed Session to the instructions captured on its first Run.
           for (const [position, message] of transcript.content.entries()) {
             if (position < cursor.value || message.role === "system") continue
             const id = operationKey(logicalId, "model", turn, "session-entry", root, position, message.role)
@@ -157,6 +141,26 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
     )
   }
 
+  const sessionPathForCompaction = (
+    turn: number,
+    history: Prompt.Prompt,
+    prompt: Prompt.Prompt,
+  ): Effect.Effect<ReadonlyArray<Entry>, RunError, DriverInterpreter> =>
+    Option.match(activeSession, {
+      onNone: () => Effect.succeed([]),
+      onSome: (session) =>
+        Effect.gen(function* () {
+          const path = yield* session.path().pipe(Effect.mapError((error) => sessionError(turn, error)))
+          const projection = buildContext(path)
+          if (
+            projection.content.length > conversationOnly(history).content.length &&
+            Option.isSome(sessionTranscriptCursor(projection.content, Prompt.concat(history, prompt).content))
+          )
+            return path
+          return yield* syncSession(turn, history)
+        }),
+    })
+
   const countTokens = (turn: number, prompt: Prompt.Prompt): Effect.Effect<number, AgentError> =>
     Option.match(tokenizerService, {
       onNone: () => Effect.succeed(estimatePromptTokens(prompt)),
@@ -166,10 +170,6 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn, cause: error })),
         ),
     })
-
-  const isAppendOnlyDescendant = (ancestor: Prompt.Prompt, descendant: Prompt.Prompt): boolean =>
-    ancestor.content.length <= descendant.content.length &&
-    ancestor.content.every((message, index) => Equal.equals(message, descendant.content[index]))
 
   const compactionUsage = (
     turn: number,
@@ -390,7 +390,7 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
       onSome: (compaction) =>
         Effect.gen(function* () {
           const history = yield* Ref.get(chat.history)
-          const path = yield* syncSession(turn, history)
+          const path = yield* sessionPathForCompaction(turn, history, prompt)
           const usage = yield* compactionUsage(turn, history, prompt)
           if (compaction.willCompact !== undefined && !compaction.willCompact({ usage, overflow }))
             return { prompt, changed: false }

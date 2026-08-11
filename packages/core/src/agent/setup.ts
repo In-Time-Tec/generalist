@@ -19,7 +19,15 @@ import {
 } from "../model/model-telemetry.js"
 import { Permissions, RuleStore } from "../policy/permissions.js"
 import { SessionStore, buildContext } from "../context/session.js"
-import { initialChat, restoreCheckpointTelemetry, seedFromSession } from "./session-history.js"
+import {
+  initialChat,
+  refreshResumeSystem,
+  restoreCheckpointTelemetry,
+  resumeChat as chatForResume,
+  seedFromSession,
+  SessionHistoryInternal,
+  withDerivedSystem,
+} from "./session-history.js"
 import { SkillSource, selectListings } from "../context/skill-source.js"
 import { Steering } from "../turn/steering.js"
 import { ToolAuthorizerService, make as makeToolAuthorizer } from "../tools/tool-authorization.js"
@@ -27,28 +35,15 @@ import { ToolExecutor } from "../tools/tool-executor.js"
 import { type Candidate, assemble } from "../tools/tool-registry.js"
 import { LoopDriverState, modelCallOrdinal as checkpointModelCallOrdinal } from "../durable/loop-driver-state.js"
 import type { Agent, ProgressOverflowPolicy, RunOptions } from "./agent.js"
+import { SetupHelpers, type StaticDeclaration } from "./setup-helpers.js"
 import { Runtime } from "./agent-persistence-lock.js"
 import { activateSkillTool, skillListingBudgetTokens } from "./agent-skill-tool.js"
 import { dispatchForOrigin } from "./tool-dispatch.js"
-import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "./agent-suspension.js"
+import type { SuspensionCheckpoint } from "./agent-suspension.js"
 import { skillListingsInstructions } from "./agent-message.js"
 import { validationFailure as toolSchedulingFailure } from "./tool-scheduler.js"
-type StaticDeclaration = { readonly origin: import("./agent-event.js").ToolOrigin; readonly tool: Tool.Any }
-const errorMessage = (error: unknown): string =>
-  error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-const appendInstructionFragment = (base: string | undefined, fragment: string | undefined): string | undefined => {
-  if (fragment === undefined || fragment.length === 0) return base
-  if (base === undefined || base.length === 0) return fragment
-  return `${base}\n\n${fragment}`
-}
-const defaultProgressOverflowPolicy = { _tag: "Backpressure", capacity: 64 } as const
-const progressCapacitySchema = Schema.Finite.pipe(Schema.check(Schema.isInt(), Schema.isGreaterThan(0)))
-const progressOverflowPolicySchema = Schema.Union([
-  Schema.TaggedStruct("Backpressure", { capacity: progressCapacitySchema }),
-  Schema.TaggedStruct("Dropping", { capacity: progressCapacitySchema }),
-  Schema.TaggedStruct("Sliding", { capacity: progressCapacitySchema }),
-  Schema.TaggedStruct("Fail", { capacity: progressCapacitySchema }),
-])
+const { errorMessage, appendInstructionFragment, defaultProgressOverflowPolicy, progressOverflowPolicySchema } =
+  SetupHelpers
 const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>, options: RunOptions) =>
   Effect.gen(function* () {
     const persistenceOptions = options.persistence
@@ -57,8 +52,7 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     const runtimeService = yield* Effect.serviceOption(Runtime)
     const compactionService = yield* Effect.serviceOption(Compaction)
     const sessionService = yield* Effect.serviceOption(SessionStore)
-    // Session is authoritative for model-facing history only when Compaction can maintain it.
-    const activeSession = Option.isSome(compactionService) ? sessionService : Option.none<typeof SessionStore.Service>()
+    const activeSession = sessionService
     const persisted: Chat.Persisted | undefined =
       persistenceOptions === undefined
         ? undefined
@@ -130,24 +124,12 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
     let resumeChat: Chat.Service | undefined
     let validatedResume: SuspensionCheckpoint | undefined
     if (resume !== undefined) {
-      resumeChat = persisted ?? (yield* options.history === undefined ? Chat.empty : Chat.fromPrompt(options.history))
+      resumeChat = yield* chatForResume({ persisted, activeSession, suppliedHistory: options.history }).pipe(
+        Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
+      )
       const received = resume.suspension
       const resumeHistory = recoveredHistory ?? (yield* Ref.get(resumeChat.history))
-      validatedResume = yield* Effect.succeed(resumeHistory).pipe(
-        Effect.flatMap((history) => {
-          const expected = suspensionCheckpoint(history.content)
-          if (expected === undefined) {
-            return ResumeMismatch.make({ reason: "checkpoint-not-found", received })
-          }
-          return sameSuspension(expected.suspension, received)
-            ? Effect.succeed(expected)
-            : ResumeMismatch.make({
-                reason: "identity-mismatch",
-                expected: expected.suspension,
-                received,
-              })
-        }),
-      )
+      validatedResume = yield* SessionHistoryInternal.validateResume(resumeHistory, received)
       if (recoveredHistory !== undefined && persisted !== undefined) {
         yield* Ref.set(persisted.history, recoveredHistory)
         yield* persisted.save.pipe(
@@ -268,8 +250,9 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
           ]
         : []),
     ])
+    const derivesCurrentSystem = options.history === undefined || Option.isSome(activeSession)
     const instructionsEpoch =
-      options.system === undefined && options.history === undefined && Option.isSome(instructionsService)
+      options.system === undefined && derivesCurrentSystem && Option.isSome(instructionsService)
         ? yield* openEpoch(instructionsService.value, { agentName: agent.name, turn: 0 })
         : undefined
     const baseSystem =
@@ -281,7 +264,11 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
           : instructionsEpoch)
     const system = appendInstructionFragment(
       baseSystem,
-      options.history === undefined && skillListings.length > 0 ? skillListingsInstructions(skillListings) : undefined,
+      derivesCurrentSystem && skillListings.length > 0 ? skillListingsInstructions(skillListings) : undefined,
+    )
+
+    yield* refreshResumeSystem({ chat: resumeChat, activeSession, system }).pipe(
+      Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
     )
 
     const configuredResilience = yield* Effect.serviceOption(ModelResilience)
@@ -426,6 +413,12 @@ const setupRunImpl = <T extends Record<string, Tool.Any>, R>(agent: Agent<T, R>,
       Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
     )
     const freshChat = initialChat({ sessionHistory, suppliedHistory: options.history, system })
+    if (persisted !== undefined && Option.isSome(sessionHistory)) {
+      yield* Ref.set(persisted.history, withDerivedSystem({ system, projection: sessionHistory.value })).pipe(
+        Effect.andThen(persisted.save),
+        Effect.mapError((error) => AgentError.make({ message: errorMessage(error), turn: 0, cause: error })),
+      )
+    }
     const chat: Chat.Service = resumeChat ?? persisted ?? (yield* freshChat)
     return {
       persistenceOptions,

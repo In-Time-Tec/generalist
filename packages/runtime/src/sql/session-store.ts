@@ -14,14 +14,14 @@ const entryPayloadEquivalence = Schema.toEquivalence(Session.EntryPayload)
 const appendMatches = (entry: Entry, input: AppendInput, parentId: EntryId | null): boolean =>
   entry.parentId === parentId && entryPayloadEquivalence(entry as Session.EntryPayload, input as Session.EntryPayload)
 
-interface EntryRow {
+export interface EntryRow {
   readonly entry_id: string
   readonly parent_id: string | null
   readonly seq: number
   readonly payload_json: string
 }
 
-interface SessionRow {
+export interface SessionRow {
   readonly leaf_id: string | null
   readonly next_seq: number
   readonly owner_token: string | null
@@ -70,6 +70,14 @@ const fromEntry = (entry: { readonly _tag: string } & Record<string, unknown>): 
   const { id: _id, parentId: _parentId, ...payload } = entry as Record<string, unknown>
   return encodePayload(payload as Session.EntryPayload)
 }
+
+/** @internal Shared SQLite Session row codec used by atomic response commits. */
+export const SessionStorage: {
+  readonly entryPayloadEquivalence: (self: Session.EntryPayload, that: Session.EntryPayload) => boolean
+  readonly storeError: (message: string) => Session.SessionStoreError
+  readonly encodePayload: (payload: Session.EntryPayload) => string
+  readonly toEntry: (row: EntryRow) => Entry
+} = { entryPayloadEquivalence, storeError, encodePayload, toEntry }
 
 /** Append or verify one stable interrupted assistant projection inside the caller's SQL transaction. */
 export const appendInterruptedSessionEntry = (

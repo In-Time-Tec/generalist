@@ -236,6 +236,12 @@ The title spawn at `baton-execution.ts:205` and the review fan-out members at `:
 
 Rika deletes nothing structural. This is deliberate: the missing capability is Baton's.
 
+## Implemented boundary
+
+Core now treats every provided `SessionStore` as conversation authority, without requiring Compaction. It durably synchronizes each non-system model-input prefix before provider contact. Runtime memory and SQLite atomically commit the normalized completed assistant Session entry with the canonical operation outcome and one semantic response event; exact retries deduplicate and divergent identity, parent, or payload retries roll back. Same-run handoff completion likewise atomically imports its deterministic conversation-only Handoff projection with the succeeded operation, checkpoint advance, and executable switch; recovery starts from the latest Compaction or Handoff boundary. SQLite schema version 5 removes the Run transcript column, and memory/SQLite continuation and suspension recovery rebuild from Session.
+
+Postgres and MySQL Session storage and the same completed-response transaction remain unfinished parity work. Their current execution schemas still carry `transcript_json`; they must gain dialect-native Session tables/transactions and then delete that column and its compatibility paths.
+
 ## Acceptance
 
 Baton:

@@ -4,7 +4,6 @@ import { SqlClient } from "effect/unstable/sql"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import { ExecutionCheckpoint } from "../execution-state.js"
-import { Prompt } from "effect/unstable/ai"
 import type { RecordOperationInput } from "../run-store.js"
 import { decodeJson, encodeExecutableRef, encodeJson, encodeJsonValue } from "./codecs.js"
 import { canBlindRetry, type OperationRecord } from "./operations.js"
@@ -16,7 +15,14 @@ import { checkpointRef } from "../executable-manifest.js"
 
 import { OperationResolution, digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
 import type { SqlError } from "effect/unstable/sql/SqlError"
-import { sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
+import { completedSessionEntry, sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
+import {
+  appendCompletedSessionEntry,
+  appendHandoffSessionEntry,
+  verifyCompletedSessionEntry,
+  verifyHandoffSessionEntry,
+} from "./completed-model-response.js"
+import { handoffSessionEntry, isHandoffCommit, sameHandoffCheckpoint, sameHandoffCommit } from "../handoff-session.js"
 
 const nextId = (prefix: string): Effect.Effect<string> =>
   Effect.gen(function* () {
@@ -116,7 +122,6 @@ export const recordOperation: {
         UPDATE baton_runs SET
           driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
           executable_ref_json = ${encodeExecutableRef(executableRef)},
-          transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
           continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
             THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
             ELSE continuation_json END
@@ -171,7 +176,26 @@ export const completeOperation: {
     `
     if (existing[0] === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     if (existing[0].status === "succeeded" || existing[0].status === "failed" || existing[0].status === "unknown") {
-      return toOperationRecord(existing[0])
+      const current = toOperationRecord(existing[0])
+      if (current.kind === "handoff" && current.status === "succeeded" && isHandoffCommit(current.result)) {
+        if (
+          input.outcome._tag !== "Succeeded" ||
+          !sameHandoffCommit(current.result, input.outcome.value) ||
+          !sameHandoffCheckpoint(run.driverCheckpoint, input.checkpoint)
+        ) {
+          return yield* RuntimeUnavailable.make({ message: "handoff operation has a divergent completion retry" })
+        }
+        const entry = handoffSessionEntry({
+          sessionId: run.message.sessionId,
+          operationKey: current.operationKey,
+          value: input.outcome.value,
+        })
+        if (Schema.is(RuntimeUnavailable)(entry)) return yield* entry
+        yield* verifyHandoffSessionEntry(entry).pipe(
+          Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+        )
+      }
+      return current
     }
     for (const entryId of new Set(input.steeringEntryIds ?? [])) {
       const rows = yield* sql<SteeringConsumptionRow>`
@@ -186,6 +210,17 @@ export const completeOperation: {
       try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
       catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
     })
+    if (existing[0].kind === "handoff" && input.outcome._tag === "Succeeded" && isHandoffCommit(input.outcome.value)) {
+      const entry = handoffSessionEntry({
+        sessionId: run.message.sessionId,
+        operationKey: existing[0].operation_key,
+        value: input.outcome.value,
+      })
+      if (Schema.is(RuntimeUnavailable)(entry)) return yield* entry
+      yield* appendHandoffSessionEntry(entry).pipe(
+        Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+      )
+    }
     const finished = yield* nowIso
     if (input.outcome._tag === "Succeeded") {
       yield* sql`
@@ -212,7 +247,6 @@ export const completeOperation: {
       UPDATE baton_runs SET
         driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
-        transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
         continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
           THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
           ELSE continuation_json END,
@@ -242,6 +276,7 @@ export const commitModelResponse: {
 } = Function.dual(2, (hub: EventHub, input: CommitModelResponseInput) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
+    const run = yield* requireRun(input.runId)
     const rows = yield* sql<OperationRow>`
       SELECT * FROM baton_run_operations WHERE run_id = ${input.runId} AND operation_id = ${input.operationId}
     `
@@ -250,6 +285,13 @@ export const commitModelResponse: {
     const current = toOperationRecord(row)
     const validated = validateModelResponseCommit({ record: current, input })
     if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
+    const sessionEntry = completedSessionEntry({
+      runId: input.runId,
+      sessionId: run.message.sessionId,
+      operation: validated,
+      event: input.event,
+    })
+    if (Schema.is(RuntimeUnavailable)(sessionEntry)) return yield* sessionEntry
     if (current.status === "succeeded") {
       const priorValidation = validateModelResponseCommit({
         record: current,
@@ -270,12 +312,18 @@ export const commitModelResponse: {
         return yield* RuntimeUnavailable.make({
           message: `model operation ${input.operationId} has a divergent outbox retry`,
         })
+      yield* verifyCompletedSessionEntry(sessionEntry).pipe(
+        Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+      )
       return current
     }
     if (current.status === "failed" || current.status === "unknown")
       return yield* RuntimeUnavailable.make({
         message: `model operation ${input.operationId} already completed as ${current.status}`,
       })
+    yield* appendCompletedSessionEntry(sessionEntry).pipe(
+      Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+    )
     const completed = yield* completeOperation(hub, input)
     yield* appendEvent(
       hub,

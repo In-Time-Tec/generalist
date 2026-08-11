@@ -1,7 +1,7 @@
 import type { CommitModelResponseInput } from "../model-response-commit.js"
 import type { CommitInterruptedModelResponseInput } from "../model-response-interrupted.js"
 import { Effect, Function, Schema } from "effect"
-import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
+import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { OperationCompletionOutcome, RecordOperationInput } from "../run-store.js"
 import { canBlindRetry, type OperationRecord, type OperationStatus } from "../sql/operations.js"
@@ -9,14 +9,21 @@ import { makeUnknown, appendAgentEvent, appendLifecycle, rejectIfTerminal } from
 import { Option } from "effect"
 import { operationKeyMapKey, operationMapKey, type MemoryState } from "./state.js"
 import { checkpointRef } from "../executable-manifest.js"
-import { digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
-import { sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
+import { completedSessionEntry, sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
 import {
   sameInterruptedModelOutcome,
   sameInterruptedModelResponse,
   validateInterruptedModelResponse,
 } from "../model-response-interrupted.js"
-import { appendInterruptedSessionEntry, verifyInterruptedSessionEntry } from "./session-store.js"
+import {
+  appendCompletedSessionEntry,
+  appendHandoffSessionEntry,
+  appendInterruptedSessionEntry,
+  verifyCompletedSessionEntry,
+  verifyHandoffSessionEntry,
+  verifyInterruptedSessionEntry,
+} from "./session-store.js"
+import { handoffSessionEntry, isHandoffCommit, sameHandoffCheckpoint, sameHandoffCommit } from "../handoff-session.js"
 
 const getRun = (state: MemoryState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -79,7 +86,6 @@ export const recordOperation: {
       ...run,
       executableRef,
       ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
-      ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
       ...(input.continuation === undefined || input.continuation === null ? {} : { continuation: input.continuation }),
       steering: run.steering.map((entry) =>
         (input.steeringEntryIds ?? []).includes(entry.entryId)
@@ -182,13 +188,30 @@ export const completeOperation: {
     },
   ) =>
     Effect.gen(function* () {
-      yield* getRun(state, input.runId)
+      const run = yield* getRun(state, input.runId)
       const current = state.operations.get(operationMapKey(input.runId, input.operationId))
       if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
       if (current.status === "succeeded" || current.status === "failed" || current.status === "unknown") {
+        if (current.kind === "handoff" && current.status === "succeeded" && isHandoffCommit(current.result)) {
+          if (
+            input.outcome._tag !== "Succeeded" ||
+            !sameHandoffCommit(current.result, input.outcome.value) ||
+            !sameHandoffCheckpoint(run.checkpoint, input.checkpoint)
+          ) {
+            return yield* RuntimeUnavailable.make({ message: "handoff operation has a divergent completion retry" })
+          }
+          const entry = handoffSessionEntry({
+            sessionId: run.message.sessionId,
+            operationKey: current.operationKey,
+            value: input.outcome.value,
+          })
+          if (Schema.is(RuntimeUnavailable)(entry)) return yield* entry
+          yield* verifyHandoffSessionEntry({ state, entry }).pipe(
+            Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+          )
+        }
         return [current, state] as const
       }
-      const run = yield* getRun(state, input.runId)
       for (const entryId of input.steeringEntryIds ?? []) {
         const entry = run.steering.find((candidate) => candidate.entryId === entryId)
         if (entry?.consumedOperationId !== input.operationId) {
@@ -199,6 +222,18 @@ export const completeOperation: {
         try: () => checkpointRef(run.executableRef, run.executableManifest, input.checkpoint),
         catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
       })
+      let withSession = state
+      if (current.kind === "handoff" && input.outcome._tag === "Succeeded" && isHandoffCommit(input.outcome.value)) {
+        const entry = handoffSessionEntry({
+          sessionId: run.message.sessionId,
+          operationKey: current.operationKey,
+          value: input.outcome.value,
+        })
+        if (Schema.is(RuntimeUnavailable)(entry)) return yield* entry
+        withSession = yield* appendHandoffSessionEntry({ state, entry }).pipe(
+          Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+        )
+      }
       const record: OperationRecord =
         input.outcome._tag === "Succeeded"
           ? { ...current, status: "succeeded", result: input.outcome.value }
@@ -212,7 +247,6 @@ export const completeOperation: {
         ...run,
         executableRef,
         ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
-        ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
         ...(input.continuation === undefined || input.continuation === null
           ? {}
           : { continuation: input.continuation }),
@@ -224,7 +258,7 @@ export const completeOperation: {
       } else {
         runs.set(run.runId, updatedRun)
       }
-      const next = { ...state, operations, runs }
+      const next = { ...withSession, operations, runs }
       if (input.outcome._tag !== "Unknown") return [record, next] as const
       const [, unknown] = yield* appendLifecycle(next, run.runId, makeUnknown(input.operationId), "needs-resolution")
       return [record, unknown] as const
@@ -248,6 +282,13 @@ export const commitModelResponse: {
     if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     const validated = validateModelResponseCommit({ record: current, input })
     if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
+    const sessionEntry = completedSessionEntry({
+      runId: input.runId,
+      sessionId: run.message.sessionId,
+      operation: validated,
+      event: input.event,
+    })
+    if (Schema.is(RuntimeUnavailable)(sessionEntry)) return yield* sessionEntry
     if (current.status === "succeeded") {
       const priorInput = { ...input, outcome: { _tag: "Succeeded" as const, value: current.result } }
       const priorValidation = validateModelResponseCommit({ record: current, input: priorInput })
@@ -263,13 +304,19 @@ export const commitModelResponse: {
         return yield* RuntimeUnavailable.make({
           message: `model operation ${input.operationId} has a divergent outbox retry`,
         })
+      yield* verifyCompletedSessionEntry({ state, entry: sessionEntry }).pipe(
+        Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+      )
       return [current, state] as const
     }
     if (current.status === "failed" || current.status === "unknown")
       return yield* RuntimeUnavailable.make({
         message: `model operation ${input.operationId} already completed as ${current.status}`,
       })
-    const [record, completed] = yield* completeOperation(state, input)
+    const withSession = yield* appendCompletedSessionEntry({ state, entry: sessionEntry }).pipe(
+      Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+    )
+    const [record, completed] = yield* completeOperation(withSession, input)
     const [, appended] = yield* appendAgentEvent(completed, input.runId, input.event)
     return [record, appended] as const
   }),
@@ -430,52 +477,5 @@ export const getOperationByKey: {
   Effect.gen(function* () {
     yield* getRun(state, input.runId)
     return state.operations.get(operationKeyMapKey(input.runId, input.operationKey))
-  }),
-)
-
-export const resolveOperation: {
-  (
-    input: ResolveOperationInput,
-  ): (state: MemoryState) => Effect.Effect<MemoryState, RunNotFound | OperationResolutionConflict | RuntimeUnavailable>
-  (
-    state: MemoryState,
-    input: ResolveOperationInput,
-  ): Effect.Effect<MemoryState, RunNotFound | OperationResolutionConflict | RuntimeUnavailable>
-} = Function.dual(2, (state: MemoryState, input: ResolveOperationInput) =>
-  Effect.gen(function* () {
-    const run = yield* getRun(state, input.runId)
-    const current = state.operations.get(operationMapKey(input.runId, input.operationId))
-    const conflict = () =>
-      OperationResolutionConflict.make({
-        runId: input.runId,
-        operationId: input.operationId,
-        idempotencyKey: input.idempotencyKey,
-      })
-    if (current === undefined) return yield* conflict()
-    if (current.resolutionIdempotencyKey !== undefined) {
-      if (
-        current.resolutionIdempotencyKey === input.idempotencyKey &&
-        current.resolution !== undefined &&
-        resolutionDigest(current.resolution) === resolutionDigest(input.resolution)
-      ) {
-        return state
-      }
-      return yield* conflict()
-    }
-    if (run.status !== "needs-resolution" || current.status !== "unknown") return yield* conflict()
-    const resolved = { resolutionIdempotencyKey: input.idempotencyKey, resolution: input.resolution }
-    const record: OperationRecord =
-      input.resolution._tag === "Succeeded"
-        ? { ...current, ...resolved, status: "succeeded", result: input.resolution.value }
-        : input.resolution._tag === "Failed"
-          ? { ...current, ...resolved, status: "failed", error: input.resolution.error }
-          : { ...current, ...resolved, status: "requested" }
-    const operations = new Map(state.operations)
-    operations.set(operationMapKey(input.runId, input.operationId), record)
-    operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
-    const runs = new Map(state.runs)
-    const { ownerId: _, ...withoutOwner } = run
-    runs.set(run.runId, { ...withoutOwner, status: "running" })
-    return { ...state, operations, runs }
   }),
 )

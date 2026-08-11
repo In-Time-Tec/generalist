@@ -25,8 +25,8 @@ import {
   completeOperation,
   commitModelResponse,
   commitInterruptedModelResponse,
-  resolveOperation,
 } from "./store-operations.js"
+import { resolveOperation } from "./store-operation-resolution.js"
 import {
   claimExecution,
   loadExecution,
@@ -298,12 +298,11 @@ export const makeRunStore = (options: LayerOptions) =>
                         (prompt, entry) => Prompt.concat(prompt, entry.prompt),
                         Prompt.empty,
                       ),
-                      history: input.result.transcript,
                       nextTurn: input.result.turns,
                       steeringEntryIds: pending.map((entry) => entry.entryId),
                     }
                     const runs = new Map(state.runs)
-                    runs.set(run.runId, { ...run, transcript: input.result.transcript, continuation })
+                    runs.set(run.runId, { ...run, continuation })
                     const outcome: CompletionOutcome = { _tag: "SteeringPending", continuation }
                     return [outcome, { ...state, runs }] as const
                   }

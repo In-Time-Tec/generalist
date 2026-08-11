@@ -22,7 +22,6 @@ export const commitDriverOperation = (input: {
   readonly outcome: DurableDriver.OperationOutcome
   readonly checkpoint: DurableDriver.DriverCheckpoint
   readonly prepared: PreparedCompletion
-  readonly handoffTranscript?: Prompt.Prompt
 }) => {
   const { store, claim, operation, operationId, outcome, checkpoint, prepared } = input
   if (operation.kind === "model" && outcome._tag === "Succeeded") {
@@ -41,7 +40,6 @@ export const commitDriverOperation = (input: {
           : { _tag: "Unknown" },
     checkpoint,
     ...prepared,
-    ...(input.handoffTranscript === undefined ? {} : { transcript: input.handoffTranscript }),
   })
 }
 

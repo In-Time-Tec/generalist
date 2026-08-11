@@ -413,7 +413,6 @@ export const suspend: {
       wait: input.wait,
       suspension: input.suspension,
       ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
-      ...(input.transcript === undefined ? {} : { transcript: input.transcript }),
       ...(input.continuation === undefined || input.continuation === null ? {} : { continuation: input.continuation }),
     }
     if (input.continuation === null) {
@@ -491,7 +490,7 @@ export const emitAgentEvent: {
     if (input.event._tag !== "TurnCompleted") return next
     const runs = new Map(next.runs)
     const { continuation: _, ...withoutContinuation } = next.runs.get(run.runId)!
-    runs.set(run.runId, { ...withoutContinuation, transcript: input.event.transcript })
+    runs.set(run.runId, withoutContinuation)
     return { ...next, runs }
   }),
 )

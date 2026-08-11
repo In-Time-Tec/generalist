@@ -1,10 +1,10 @@
-import { Pins } from "@batonfx/core"
+import { Pins, SessionSync } from "@batonfx/core"
 import { Schema } from "effect"
 import { RuntimeUnavailable } from "./errors.js"
 import type { ModelResponseCommitted } from "./agent-event.js"
 import type { ExecutionClaim } from "./run-store.js"
 import type { ExecutionCheckpoint } from "./execution-state.js"
-import type { Prompt } from "effect/unstable/ai"
+import { Prompt, Response } from "effect/unstable/ai"
 import { CompletedModelResponse } from "./run-event.js"
 import type { OperationRecord } from "./sql/operations.js"
 
@@ -20,16 +20,26 @@ export interface CommitModelResponseInput extends ExecutionClaim {
   readonly event: ModelResponseCommitted
 }
 
-interface CompletedOperation {
+export interface CompletedOperation {
   readonly operationId: string
   readonly turn: number
   readonly modelCallId: string
   readonly modelAttemptId: string
   readonly attempt: number
+  readonly sessionParentId: string | null
   readonly messages: unknown
   readonly content: unknown
   readonly usage?: unknown
   readonly finishReason?: unknown
+  readonly digest: string
+}
+
+/** Exact stable assistant Session append derived from the canonical completed response. */
+export interface CompletedSessionEntry {
+  readonly sessionId: string
+  readonly entryId: string
+  readonly parentId: string | null
+  readonly message: Prompt.AssistantMessage
   readonly digest: string
 }
 
@@ -46,6 +56,7 @@ const operationValue = (value: unknown): CompletedOperation | undefined => {
     typeof candidate.modelCallId === "string" &&
     typeof candidate.modelAttemptId === "string" &&
     typeof candidate.attempt === "number" &&
+    (candidate.sessionParentId === null || typeof candidate.sessionParentId === "string") &&
     Array.isArray(candidate.messages) &&
     Array.isArray(candidate.content) &&
     typeof candidate.digest === "string"
@@ -78,6 +89,30 @@ export const modelResponseEvent = (value: unknown): ModelResponseCommitted | Run
     }
   } catch (error) {
     return fail(`model operation response is invalid: ${String(error)}`)
+  }
+}
+
+export const completedSessionEntryId = (input: { readonly runId: string; readonly operationKey: string }): string =>
+  `${input.runId}:model-response-committed:${input.operationKey}`
+
+/** Derive the normalized assistant Session entry from the same semantic response as the Run event. */
+export const completedSessionEntry = (input: {
+  readonly runId: string
+  readonly sessionId: string
+  readonly operation: CompletedOperation
+  readonly event: ModelResponseCommitted
+}): CompletedSessionEntry | RuntimeUnavailable => {
+  const prompt = Prompt.fromResponseParts(input.event.response.content as ReadonlyArray<Response.AnyPart>)
+  const message = prompt.content[0]
+  if (prompt.content.length !== 1 || message?.role !== "assistant") {
+    return fail(`completed model operation ${input.event.operationKey} did not project one assistant message`)
+  }
+  return {
+    sessionId: input.sessionId,
+    entryId: completedSessionEntryId({ runId: input.runId, operationKey: input.event.operationKey }),
+    parentId: input.operation.sessionParentId,
+    message: SessionSync.coalesceAdjacentText(message) as Prompt.AssistantMessage,
+    digest: input.event.digest,
   }
 }
 

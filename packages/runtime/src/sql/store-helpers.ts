@@ -31,7 +31,6 @@ import { reconcileFanOut } from "./store-fan-out.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { checkpointRef, decodePinned } from "../executable-manifest.js"
 import { PendingRunOutcome } from "../run-store.js"
-import { Prompt } from "effect/unstable/ai"
 import { admitChildSettlementFromEventId } from "./settlement-notifications.js"
 
 export const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
@@ -87,9 +86,6 @@ export const decodeRun = (row: RunRow): DecodedRun => {
     ...(row.suspension_json === null || row.suspension_json === undefined
       ? {}
       : { suspension: decodeJson(ExecutionSuspension, row.suspension_json) }),
-    ...(row.transcript_json === null || row.transcript_json === undefined
-      ? {}
-      : { transcript: decodeJson(Prompt.Prompt, row.transcript_json) }),
     ...(row.continuation_json === null || row.continuation_json === undefined
       ? {}
       : { continuation: decodeContinuation(row.continuation_json) }),

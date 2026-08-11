@@ -42,6 +42,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
     chain,
     preparePrompt,
     countTokens,
+    syncSession,
     emitTelemetry,
     chat,
     compactionService,
@@ -262,7 +263,13 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                   Effect.gen(function* () {
                     const activeModel = yield* LanguageModel.LanguageModel
                     classifyFailure = (error) => classifyModelFailure(activeModel, error)
-                    const prepared = yield* preparePrompt(turn, activePrompt, compactOverflow)
+                    const normalizedActiveContent = activePrompt.content.map(coalesceAdjacentText)
+                    const normalizedActivePrompt = normalizedActiveContent.some(
+                      (message: Prompt.Message, index: number) => message !== activePrompt.content[index],
+                    )
+                      ? Prompt.fromMessages(normalizedActiveContent)
+                      : activePrompt
+                    const prepared = yield* preparePrompt(turn, normalizedActivePrompt, compactOverflow)
                     if (compactOverflow && !prepared.changed && overflowCause !== undefined) {
                       return yield* Effect.failCause(overflowCause)
                     }
@@ -275,6 +282,8 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                     const history = yield* Ref.get(chat.history)
                     preparedState = { history, preparedPrompt }
                     const responsePrompt = Prompt.concat(history, preparedPrompt)
+                    const sessionPath = yield* syncSession(turn, responsePrompt)
+                    const sessionParentId = sessionPath.at(-1)?.id ?? null
                     if (Option.isSome(compactionService)) {
                       state.currentContext = responsePrompt
                       state.currentContextTokens = yield* countTokens(turn, responsePrompt)
@@ -356,6 +365,7 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                               modelCallId: identity.modelCallId,
                               modelAttemptId: identity.modelAttemptId,
                               attempt: identity.attempt,
+                              sessionParentId,
                               response,
                             }
                           }),

@@ -8,7 +8,6 @@ import type { RunEvent } from "../run-event.js"
 import type { CursorExpired, RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import type { OperationRecord } from "../sql/operations.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution-state.js"
-import type { Prompt } from "effect/unstable/ai"
 import type { RunWait } from "../run-wait.js"
 import type { ExecutionContinuation, SteeringEntry } from "../steering.js"
 import type { FanOutJoin, FanOutMemberResult, FanOutRemainder, FanOutStatus } from "../fan-out.js"
@@ -48,7 +47,6 @@ export interface StoredRun {
   readonly ownerId?: string
   readonly checkpoint?: ExecutionCheckpoint
   readonly suspension?: ExecutionSuspension
-  readonly transcript?: Prompt.Prompt
   readonly continuation?: ExecutionContinuation
   readonly cancellationRequested: boolean
   readonly cancelReason?: string

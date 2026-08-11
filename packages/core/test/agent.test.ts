@@ -3263,7 +3263,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
     ] as const
   })
 
-  ItLayer.make(it, "leaves Session untouched when Compaction is absent", () => {
+  ItLayer.make(it, "keeps Session authoritative when Compaction is absent", () => {
     let calls = 0
     return [
       Layer.mergeAll(
@@ -3296,7 +3296,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
           "TurnCompleted",
           "Completed",
         ])
-        expect(yield* session.path()).toEqual([])
+        const projection = Session.buildContext(yield* session.path())
+        expect(projection.content.map((message) => message.role)).toEqual(["user", "assistant"])
       }),
     ] as const
   })

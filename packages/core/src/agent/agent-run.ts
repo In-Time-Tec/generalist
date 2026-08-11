@@ -404,6 +404,7 @@ const streamInternalImpl = <Tools extends Record<string, Tool.Any>, R, Structure
         chain,
         preparePrompt,
         countTokens,
+        syncSession,
         emitTelemetry,
         chat,
         compactionService,

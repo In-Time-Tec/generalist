@@ -1,8 +1,8 @@
 import { Database } from "bun:sqlite"
 import { expect, it, layer } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Scope, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
-import { Agent, ExecutableManifest, Handoff, ToolExecutor } from "@batonfx/core"
+import { Agent, ExecutableManifest, Handoff, Session, ToolExecutor } from "@batonfx/core"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../src/index.js"
 import { layer as activeExecutionsLayer } from "../src/active-executions.js"
 import { make as makeExecutionHost } from "../src/execution-host.js"
@@ -463,6 +463,118 @@ it.live("persists a handoff checkpoint and active pin atomically across reopen",
   })
 })
 
+it.live("atomically imports SQLite handoff projections with exact retry and divergent rollback", () => {
+  const filename = tempDbPath("handoff-session-projection")
+  let runId = ""
+  let operationId = ""
+  const operationKey = "handoff:sqlite-projection"
+  const projectedHistory = Prompt.make("projected-for-specialist")
+  const checkpoint = {
+    driverVersion: "1" as const,
+    executable: researcherRef.ref,
+    turn: 1,
+    budget: { allocation: {}, remaining: {}, depth: 0 },
+    state: {},
+  }
+  const commit: Handoff.HandoffCommit = {
+    _tag: "HandoffCommit",
+    state: {
+      root: assistant.name,
+      active: "specialist",
+      path: [{ handoffId: operationKey, source: assistant.name, target: "specialist", turn: 0 }],
+      edgeCounts: [{ source: assistant.name, target: "specialist", count: 1 }],
+      handoffCount: 1,
+      pendingContinuation: { prompt: Prompt.make("continue") },
+    },
+    sessionEntryId: `${operationKey}:session-projection`,
+    sessionParentId: null,
+    projectedHistory,
+    targetAgentPin: researcherRef.ref.active as NonNullable<Handoff.HandoffCommit["targetAgentPin"]>,
+  }
+  const commitAndRetry = Effect.gen(function* () {
+    const runtime = yield* Runtime.Runtime
+    const store = yield* RunStore.RunStore
+    const receipt = yield* runtime.send({
+      to: assistantAddress,
+      sessionId: "session:sqlite-handoff-projection",
+      idempotencyKey: "sqlite-handoff-projection",
+      prompt: "supervisor sentinel",
+    })
+    runId = receipt.runId
+    const claim = yield* store.claimExecution({ runId, ownerId: "handoff-projection-a" })
+    const operation = yield* store.recordOperation({
+      ...claim,
+      operationKey,
+      kind: "handoff",
+      inputDigest: operationKey,
+      input: { targetAgentPin: researcherRef.ref.active },
+      replayPolicy: "pure",
+      attempt: claim.attempt,
+    })
+    operationId = operation.operationId
+    yield* store.startOperation({ ...claim, operationId })
+    const completion = {
+      ...claim,
+      operationId,
+      outcome: { _tag: "Succeeded" as const, value: commit },
+      checkpoint,
+    }
+    const invalidProjection = yield* store
+      .completeOperation({
+        ...completion,
+        outcome: {
+          _tag: "Succeeded",
+          value: {
+            ...commit,
+            projectedHistory: Prompt.fromMessages([Prompt.makeMessage("system", { content: "must not persist" })]),
+          },
+        },
+      })
+      .pipe(Effect.flip)
+    expect(invalidProjection).toBeInstanceOf(Errors.RuntimeUnavailable)
+    expect((yield* store.getOperation({ runId: runId, operationId: operationId })).status).toBe("running")
+    expect((yield* store.loadExecution(runId)).executableRef).toEqual(assistantRef.ref)
+    yield* store.completeOperation(completion)
+    yield* store.completeOperation(completion)
+    const session = yield* store.sessionStore("session:sqlite-handoff-projection")
+    if (Option.isNone(session)) return yield* Effect.die("expected SQLite Session")
+    yield* session.value.append({ _tag: "Message", message: Prompt.make("descendant").content[0]! })
+    yield* store.completeOperation(completion)
+    const beforeDivergence = yield* session.value.path()
+    const divergentCheckpoint = yield* store
+      .completeOperation({ ...completion, checkpoint: { ...checkpoint, state: { divergent: true } } })
+      .pipe(Effect.flip)
+    expect(divergentCheckpoint).toBeInstanceOf(Errors.RuntimeUnavailable)
+    const divergent = yield* store
+      .completeOperation({
+        ...completion,
+        outcome: {
+          _tag: "Succeeded",
+          value: { ...commit, projectedHistory: Prompt.make("divergent projection") },
+        },
+      })
+      .pipe(Effect.flip)
+    expect(divergent).toBeInstanceOf(Errors.RuntimeUnavailable)
+    expect(yield* session.value.path()).toEqual(beforeDivergence)
+    expect(Session.buildContext(beforeDivergence)).toEqual(Prompt.concat(projectedHistory, Prompt.make("descendant")))
+    expect((yield* store.loadExecution(runId)).executableRef).toEqual(researcherRef.ref)
+  })
+  const reopen = Effect.gen(function* () {
+    const store = yield* RunStore.RunStore
+    expect((yield* store.getOperation({ runId, operationId })).status).toBe("succeeded")
+    const session = yield* store.sessionStore("session:sqlite-handoff-projection")
+    if (Option.isNone(session)) return yield* Effect.die("expected reopened SQLite Session")
+    expect(Session.buildContext(yield* session.value.path())).toEqual(
+      Prompt.concat(projectedHistory, Prompt.make("descendant")),
+    )
+    expect((yield* store.loadExecution(runId)).executableRef).toEqual(researcherRef.ref)
+  })
+  return Effect.gen(function* () {
+    yield* scopedWith(sqliteLayer(filename))(commitAndRetry)
+    yield* scopedWith(sqliteLayer(filename))(reopen)
+  })
+})
+
 it.live("recovers a committed ExecutionHost handoff through the active Agent after reopen", () =>
   Effect.gen(function* () {
     const filename = tempDbPath("execution-host-handoff-reopen")
@@ -472,7 +584,14 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
     const supervisor = Handoff.supervisor({
       name: "durable-supervisor",
       specialists: [specialist],
-      handoffOptions: { maxRepeatedEdge: 2 },
+      handoffOptions: {
+        maxRepeatedEdge: 2,
+        projection: () =>
+          Effect.succeed({
+            history: Prompt.make("projected-for-specialist"),
+            prompt: Prompt.make("continue with committed context"),
+          }),
+      },
     })
     const root = pinnedTestAgent(supervisor.agent, "handoff-a", [{ selection: childAgent.name, agent: child.pin }])
     const admittedExecutable = ExecutableManifest.make({
@@ -579,7 +698,10 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
         runId: receipt.runId,
         operationKey: checkpointState?.handoff?.path[0]?.handoffId ?? "missing",
       })
-      return { runId: receipt.runId, fiber, execution, operation }
+      const session = yield* store.sessionStore("session:durable-handoff")
+      if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
+      const sessionPath = yield* session.value.path()
+      return { runId: receipt.runId, fiber, execution, operation, sessionPath }
     })
     const committedResult = yield* scopedWith(
       Runtime.layerSqlite({
@@ -592,7 +714,17 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
     yield* Fiber.interrupt(committedResult.fiber)
     expect(committedResult.operation?.status).toBe("succeeded")
     expect(committedResult.execution.executableRef).toEqual(activeRef.ref)
-    expect(committedResult.execution.transcript).toBeDefined()
+    expect(committedResult.execution.transcript).toBeUndefined()
+    expect(committedResult.sessionPath.at(-1)).toMatchObject({
+      _tag: "Handoff",
+      target: childAgent.name,
+      projectedHistory: Prompt.make("projected-for-specialist"),
+    })
+    expect(Session.buildContext(committedResult.sessionPath)).toEqual(Prompt.make("projected-for-specialist"))
+    const handoffEntryJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(
+      committedResult.sessionPath.at(-1),
+    )
+    expect(handoffEntryJson).not.toContain("start with the supervisor")
     const committedState = (
       committedResult.execution.checkpoint !== undefined && "state" in committedResult.execution.checkpoint
         ? committedResult.execution.checkpoint.state
@@ -639,6 +771,9 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
       const host = yield* ExecutionHost.ExecutionHost
+      const session = yield* store.sessionStore("session:durable-handoff")
+      if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
+      const conversationBeforeContinuation = Session.buildContext(yield* session.value.path())
       const claim = yield* store.claimExecution({ runId: committedResult.runId, ownerId: "after-reopen" })
       yield* host.execute(claim)
       expect(resolvedActive).toBe(child.pin)
@@ -654,7 +789,13 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
         handoffCount: 1,
       })
       expect(completedState.handoff?.pendingContinuation).toBeUndefined()
-      expect(receivedByChild).toEqual(Prompt.concat(committedResult.execution.transcript!, continuation))
+      const expectedSpecialistInput = Prompt.concat(Prompt.make("projected-for-specialist"), continuation)
+      expect(conversationBeforeContinuation).toEqual(Prompt.make("projected-for-specialist"))
+      expect(receivedByChild?.content.filter((message) => message.role !== "system")).toEqual(
+        expectedSpecialistInput.content,
+      )
+      const receivedJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(receivedByChild)
+      expect(receivedJson).not.toContain("start with the supervisor")
     })
     yield* scopedWith(
       Runtime.layerSqlite({

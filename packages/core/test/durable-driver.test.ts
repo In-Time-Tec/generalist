@@ -32,7 +32,7 @@ describe("executable identity", () => {
     const root = makeAgent({ name: "a" })
     const child = makeAgent({ name: "b" })
     const executable = makeExecutable({ root, child })
-    const transcript = Prompt.make("committed transcript")
+    const projectedHistory = Prompt.make("committed projection")
     const commit = {
       _tag: "HandoffCommit" as const,
       state: {
@@ -43,7 +43,9 @@ describe("executable identity", () => {
         handoffCount: 1,
         pendingContinuation: { prompt: Prompt.make("continue"), instructions: "Act as B." },
       },
-      transcript,
+      sessionEntryId: "h1:session-projection",
+      sessionParentId: null,
+      projectedHistory,
       targetAgentPin: child,
     }
     return Effect.gen(function* () {

@@ -95,6 +95,7 @@ const successCodec = (input: {
         modelCallId: terminal.modelCallId,
         modelAttemptId: terminal.modelAttemptId,
         attempt: terminal.attempt,
+        sessionParentId: terminal.sessionParentId,
         messages: encodeMessages(closeBigInts(terminal.messages)),
         content: encodeContent(terminal.response.content),
         ...(terminal.response.usage === undefined
@@ -123,6 +124,7 @@ const successCodec = (input: {
         modelCallId: operation.modelCallId,
         modelAttemptId: operation.modelAttemptId,
         attempt: operation.attempt,
+        sessionParentId: operation.sessionParentId,
         response: {
           content,
           ...(operation.usage === undefined ? {} : { usage: Schema.decodeSync(Response.Usage)(operation.usage) }),

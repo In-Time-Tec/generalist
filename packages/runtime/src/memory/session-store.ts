@@ -1,6 +1,8 @@
 import { Effect, Schema, SynchronizedRef } from "effect"
 import { Session } from "@batonfx/core"
 import type { InterruptedSessionEntry } from "../agent-event.js"
+import type { CompletedSessionEntry } from "../model-response-commit.js"
+import { handoffPayload, type HandoffSessionEntry } from "../handoff-session.js"
 import type { MemorySession, MemoryState } from "./state.js"
 
 type Entry = Session.Entry
@@ -78,6 +80,106 @@ const append = (
     },
   ]
 }
+
+const completedPayload = (input: CompletedSessionEntry): Session.AppendInput => ({
+  _tag: "Message",
+  message: input.message,
+  metadata: { modelResponseDigest: input.digest },
+})
+
+export const verifyCompletedSessionEntry = (input: {
+  readonly state: MemoryState
+  readonly entry: CompletedSessionEntry
+}): Effect.Effect<void, Session.SessionConflict> => {
+  const session = input.state.sessions.get(input.entry.sessionId) ?? emptySession()
+  const existing = session.entries.get(input.entry.entryId)
+  if (
+    existing === undefined ||
+    existing.parentId !== input.entry.parentId ||
+    !samePayload(existing, completedPayload(input.entry))
+  ) {
+    return Effect.fail(
+      conflict("entry-id-reused", `Session entry id ${input.entry.entryId} does not match the completed response`),
+    )
+  }
+  if (!onActivePath(session, input.entry.entryId)) {
+    return Effect.fail(conflict("stale-leaf", `Session entry id ${input.entry.entryId} is not on the active path`))
+  }
+  return Effect.void
+}
+
+/** Append or verify one exact completed assistant projection at its durable input-prefix leaf. */
+export const appendCompletedSessionEntry = (input: {
+  readonly state: MemoryState
+  readonly entry: CompletedSessionEntry
+}): Effect.Effect<MemoryState, Session.SessionConflict | Session.SessionStoreError> =>
+  Effect.gen(function* () {
+    const session = input.state.sessions.get(input.entry.sessionId) ?? emptySession()
+    const payload = completedPayload(input.entry)
+    const existing = session.entries.get(input.entry.entryId)
+    let nextSession: MemorySession
+    if (existing !== undefined) {
+      yield* verifyCompletedSessionEntry(input)
+      nextSession = session
+    } else {
+      const result = append(session, payload, {
+        id: input.entry.entryId,
+        expectedLeafId: input.entry.parentId,
+      })
+      if (!isAppendSuccess(result)) return yield* result
+      nextSession = result[1]
+    }
+    return {
+      ...input.state,
+      sessions: new Map(input.state.sessions).set(input.entry.sessionId, nextSession),
+    }
+  })
+
+export const verifyHandoffSessionEntry = (input: {
+  readonly state: MemoryState
+  readonly entry: HandoffSessionEntry
+}): Effect.Effect<void, Session.SessionConflict> => {
+  const session = input.state.sessions.get(input.entry.sessionId) ?? emptySession()
+  const existing = session.entries.get(input.entry.entryId)
+  if (
+    existing === undefined ||
+    existing.parentId !== input.entry.parentId ||
+    !samePayload(existing, handoffPayload(input.entry))
+  ) {
+    return Effect.fail(
+      conflict("entry-id-reused", `Session entry id ${input.entry.entryId} does not match the handoff projection`),
+    )
+  }
+  if (!onActivePath(session, input.entry.entryId)) {
+    return Effect.fail(conflict("stale-leaf", `Session entry id ${input.entry.entryId} is not on the active path`))
+  }
+  return Effect.void
+}
+
+export const appendHandoffSessionEntry = (input: {
+  readonly state: MemoryState
+  readonly entry: HandoffSessionEntry
+}): Effect.Effect<MemoryState, Session.SessionConflict | Session.SessionStoreError> =>
+  Effect.gen(function* () {
+    const session = input.state.sessions.get(input.entry.sessionId) ?? emptySession()
+    const existing = session.entries.get(input.entry.entryId)
+    let nextSession: MemorySession
+    if (existing !== undefined) {
+      yield* verifyHandoffSessionEntry(input)
+      nextSession = session
+    } else {
+      const result = append(session, handoffPayload(input.entry), {
+        id: input.entry.entryId,
+        expectedLeafId: input.entry.parentId,
+      })
+      if (!isAppendSuccess(result)) return yield* result
+      nextSession = result[1]
+    }
+    return {
+      ...input.state,
+      sessions: new Map(input.state.sessions).set(input.entry.sessionId, nextSession),
+    }
+  })
 
 const interruptedPayload = (input: InterruptedSessionEntry): Session.AppendInput => ({
   _tag: "Message",

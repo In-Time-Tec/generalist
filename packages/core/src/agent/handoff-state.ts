@@ -43,7 +43,9 @@ export type HandoffControlState = typeof HandoffControlState.Type
 
 export const HandoffCommit = Schema.TaggedStruct("HandoffCommit", {
   state: HandoffControlState,
-  transcript: Prompt.Prompt,
+  sessionEntryId: Schema.String,
+  sessionParentId: Schema.NullOr(Schema.String),
+  projectedHistory: Prompt.Prompt,
   targetAgentPin: Schema.optionalKey(AgentPin),
 })
 

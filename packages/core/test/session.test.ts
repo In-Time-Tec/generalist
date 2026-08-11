@@ -278,7 +278,7 @@ describe("Session", () => {
 
   ItLayer.make(
     it,
-    "projects memory, skills, steering, tool calls, tool results, and handoffs as prompt context",
+    "projects memory, skills, steering, tool calls, and tool results as prompt context",
     () =>
       [
         Session.layerMemory,
@@ -302,7 +302,6 @@ describe("Session", () => {
           yield* store.append({ _tag: "Steering", message: user("Prioritize docs.") })
           yield* store.append({ _tag: "ToolCall", part: toolCall })
           yield* store.append({ _tag: "ToolResult", part: toolResult })
-          yield* store.append({ _tag: "Handoff", target: "reviewer", summary: "Reviewer found no issues." })
           const path = yield* store.path()
 
           const prompt = Session.buildContext(path)
@@ -313,7 +312,6 @@ describe("Session", () => {
             "user",
             "assistant",
             "tool",
-            "system",
           ])
           expect(promptTexts(prompt)).toEqual([
             "<memory>\ncustomer is enterprise\n</memory>",
@@ -321,10 +319,79 @@ describe("Session", () => {
             "Prioritize docs.",
             "",
             "",
-            '<handoff target="reviewer">\nReviewer found no issues.\n</handoff>',
           ])
           expect(prompt.content[3]?.content).toEqual([toolCall])
           expect(prompt.content[4]?.content).toEqual([toolResult])
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
+    "treats the latest handoff or compaction as a self-contained conversation boundary",
+    () =>
+      [
+        Session.layerMemory,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+          const source = yield* store.append({ _tag: "Message", message: user("source sentinel") })
+          const checkpointId = yield* store.reserveEntryId
+          yield* store.appendCheckpoint({
+            id: checkpointId,
+            parentId: source.id,
+            projectedHistory: Prompt.fromMessages([user("compacted")]),
+            telemetry: [],
+          })
+          const between = yield* store.append({ _tag: "Message", message: assistant("between") })
+          yield* store.append(
+            {
+              _tag: "Handoff",
+              handoffId: "handoff-1",
+              target: "specialist",
+              projectedHistory: Prompt.fromMessages([user("projected-for-specialist")]),
+            },
+            { id: "handoff-entry-1", expectedLeafId: between.id },
+          )
+          yield* store.append({ _tag: "Message", message: assistant("after") })
+          const path = yield* store.path()
+
+          expect(promptTexts(Session.buildContext(path))).toEqual(["projected-for-specialist", "after"])
+          expect(promptTexts(Session.buildMemoryContext(path))).toEqual(["source sentinel", "between", "after"])
+        }),
+      ] as const,
+  )
+
+  ItLayer.make(
+    it,
+    "imports exact handoff projections idempotently and rejects divergent or inactive reuse",
+    () =>
+      [
+        Session.layerMemory,
+        Effect.gen(function* () {
+          const store = yield* Session.SessionStore
+          const source = yield* store.append({ _tag: "Message", message: user("source") })
+          const handoff = {
+            _tag: "Handoff" as const,
+            handoffId: "handoff-exact",
+            target: "specialist",
+            projectedHistory: Prompt.fromMessages([user("exact projection")]),
+          }
+          const appended = yield* store.append(handoff, { id: "handoff-entry", expectedLeafId: source.id })
+          yield* store.append({ _tag: "Message", message: assistant("descendant") })
+          const repeated = yield* store.append(handoff, { id: "handoff-entry", expectedLeafId: source.id })
+          const divergent = yield* Effect.flip(
+            store.append(
+              { ...handoff, projectedHistory: Prompt.fromMessages([user("different")]) },
+              { id: "handoff-entry", expectedLeafId: source.id },
+            ),
+          )
+          expect(repeated).toEqual(appended)
+          expect(divergent).toMatchObject({ reason: "entry-id-reused" })
+          expect(promptTexts(Session.buildContext(yield* store.path()))).toEqual(["exact projection", "descendant"])
+
+          yield* store.setLeaf(source.id)
+          const inactive = yield* Effect.flip(store.append(handoff, { id: "handoff-entry", expectedLeafId: source.id }))
+          expect(inactive).toMatchObject({ reason: "stale-leaf" })
         }),
       ] as const,
   )

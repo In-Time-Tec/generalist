@@ -3,7 +3,16 @@ import { Json } from "./json"
 import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Persistence } from "effect/unstable/persistence"
-import { Agent, AgentEvent, Approvals, Compaction, ModelMiddleware, Session, ToolExecutor } from "../src/index"
+import {
+  Agent,
+  AgentEvent,
+  Approvals,
+  Compaction,
+  Instructions,
+  ModelMiddleware,
+  Session,
+  ToolExecutor,
+} from "../src/index"
 import { unusedToolHandlerLayer } from "./tool-handler-layer"
 import { ItLayer } from "./it-layer"
 import { withProviderFinish } from "./provider-finish"
@@ -111,6 +120,59 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
 
   ItLayer.make(
     it,
+    "Session continues sequential runs without Compaction and re-derives only the current system prompt",
+    () => {
+      const requests: Array<Prompt.Prompt> = []
+      let currentSystem = "system revision 1"
+      let calls = 0
+      return [
+        Layer.mergeAll(
+          modelLayer((options) => {
+            requests.push(options.prompt)
+            calls += 1
+            return assistantText(`session-reply-${calls}`, `session reply ${calls}`)
+          }),
+          unusedExecutor,
+          Approvals.layerAutoApprove,
+          ModelMiddleware.layerIdentity,
+          Instructions.layer([
+            {
+              id: "current",
+              render: () => Effect.succeedSome(currentSystem),
+            },
+          ]),
+          Session.layerMemory,
+        ),
+        Effect.gen(function* () {
+          const agent = Agent.make({ name: "session-authority-agent" })
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "session user 1", sessionId: "shared-session" }))
+          currentSystem = "system revision 2"
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "session user 2", sessionId: "shared-session" }))
+          currentSystem = "system revision 3"
+          yield* Stream.runDrain(Agent.stream(agent, { prompt: "session user 3", sessionId: "shared-session" }))
+
+          expect(requests).toHaveLength(3)
+          expect(Json.stringify(requests[1]!.content)).toContain("session user 1")
+          expect(Json.stringify(requests[1]!.content)).toContain("session reply 1")
+          expect(Json.stringify(requests[2]!.content)).toContain("session user 2")
+          expect(Json.stringify(requests[2]!.content)).toContain("session reply 2")
+          expect(Json.stringify(requests[0]!.content)).toContain("system revision 1")
+          expect(Json.stringify(requests[1]!.content)).toContain("system revision 2")
+          expect(Json.stringify(requests[1]!.content)).not.toContain("system revision 1")
+          expect(Json.stringify(requests[2]!.content)).toContain("system revision 3")
+          expect(Json.stringify(requests[2]!.content)).not.toContain("system revision 2")
+
+          const session = yield* Session.SessionStore
+          const projection = Session.buildContext(yield* session.path())
+          expect(projection.content).toHaveLength(6)
+          expect(projection.content.every((message) => message.role !== "system")).toBe(true)
+        }),
+      ] as const
+    },
+  )
+
+  ItLayer.make(
+    it,
     "system seeding: exactly one system message, not re-added on the second run",
     () =>
       [
@@ -206,7 +268,7 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
 
   ItLayer.make(
     it,
-    "multi-text-part input keeps the persisted chat a faithful prefix of the session",
+    "multi-text-part provider input remains durable across persisted Chat normalization",
     () =>
       [
         Layer.mergeAll(
@@ -241,9 +303,10 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           const chat = yield* persistence.get("multipart")
           const history = yield* Ref.get(chat.history)
           const session = yield* Session.SessionStore
-          expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(history))
+          const sessionContext = Session.buildContext(yield* session.path())
+          expect(sessionContext.content).toEqual(conversation(history))
 
-          // A second turn must not fail the session prefix invariant.
+          // A second turn must rebuild from the provider-facing Session without a prefix conflict.
           yield* Stream.runDrain(Agent.stream(agent, { prompt: "follow up", persistence: { chatId: "multipart" } }))
           expect(yield* historyText("multipart")).toContain("follow up")
         }),
@@ -615,9 +678,15 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
         }),
       ),
     )
+    const originalHistoryEntry: Session.MessageEntry = {
+      _tag: "Message",
+      id: "original-history",
+      parentId: null,
+      message: Prompt.make("original history").content[0]!,
+    }
     const sessionLayer = Layer.effect(
       Session.SessionStore,
-      Ref.make<ReadonlyArray<Session.Entry>>([]).pipe(
+      Ref.make<ReadonlyArray<Session.Entry>>([originalHistoryEntry]).pipe(
         Effect.map((entries) =>
           Session.SessionStore.of({
             reserveEntryId: Effect.succeed("checkpoint-0"),
@@ -710,7 +779,9 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent persist
           const session = yield* Session.SessionStore
 
           expect(failure._tag).toBe("@batonfx/core/DuplicateToolCallId")
-          expect(Session.buildContext(yield* session.path()).content).toEqual(conversation(history))
+          const projection = Session.buildContext(yield* session.path())
+          expect(Json.stringify(projection.content)).toContain("duplicate")
+          expect(conversation(history)).toEqual([])
         }),
       ] as const,
   )

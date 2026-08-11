@@ -1,15 +1,15 @@
 import { Database } from "bun:sqlite"
 import { expect, it, layer } from "@effect/vitest"
-import { Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
+import { Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
-import { Pins } from "@batonfx/core"
+import { Pins, Session } from "@batonfx/core"
 import { Runtime, RunStore } from "../src/index.js"
 import { assistantAddress, memoryLayer, textPrompt } from "./helpers.js"
 import { sqliteLayer, tempDbPath } from "./sqlite-helpers.js"
 
 const jsonValue = (value: unknown): unknown => JSON.parse(Schema.encodeSync(Schema.UnknownFromJsonString)(value))
 
-const completion = (operationKey: string, text = "semantic answer") => {
+const completion = (operationKey: string, sessionParentId: string | null, text = "semantic answer") => {
   const response = {
     content: [Response.makePart("text", { text })],
     finishReason: "stop" as const,
@@ -20,6 +20,7 @@ const completion = (operationKey: string, text = "semantic answer") => {
     modelCallId: "model-call:1",
     modelAttemptId: "model-attempt:1",
     attempt: 0,
+    sessionParentId,
     messages: [],
     content: Schema.encodeSync(Schema.Array(Response.TextPart))(response.content),
     finishReason: "stop" as const,
@@ -55,7 +56,21 @@ const schedule = (runId: string) =>
       attempt: 0,
     })
     yield* store.startOperation({ ...claim, operationId: operation.operationId })
-    return { store, claim, operation, operationKey }
+    const execution = yield* store.loadExecution(runId)
+    const maybeSession = yield* store.sessionStore(execution.message.sessionId)
+    if (Option.isNone(maybeSession)) return yield* Effect.die("expected Session store")
+    const prefix = yield* maybeSession.value.append({
+      _tag: "Message",
+      message: textPrompt("durable model input").content[0]!,
+    })
+    return { store, claim, operation, operationKey, sessionParentId: prefix.id }
+  })
+
+const sessionProjection = (store: RunStore.Interface, sessionId: string) =>
+  Effect.gen(function* () {
+    const maybeSession = yield* store.sessionStore(sessionId)
+    if (Option.isNone(maybeSession)) return yield* Effect.die("expected Session store")
+    return Session.buildContext(yield* maybeSession.value.path())
   })
 
 layer(memoryLayer)("atomic model response memory commit", (suite) => {
@@ -68,11 +83,11 @@ layer(memoryLayer)("atomic model response memory commit", (suite) => {
         idempotencyKey: "model-commit-memory",
         prompt: textPrompt("answer"),
       })
-      const { store, claim, operation, operationKey } = yield* schedule(receipt.runId)
-      const exact = completion(operationKey)
+      const { store, claim, operation, operationKey, sessionParentId } = yield* schedule(receipt.runId)
+      const exact = completion(operationKey, sessionParentId)
       const divergent = {
         ...exact,
-        event: { ...exact.event, response: completion(operationKey, "wrong").event.response },
+        event: { ...exact.event, response: completion(operationKey, sessionParentId, "wrong").event.response },
       }
       const rejected = yield* Effect.exit(
         store.commitModelResponse({ ...claim, operationId: operation.operationId, ...divergent }),
@@ -86,14 +101,25 @@ layer(memoryLayer)("atomic model response memory commit", (suite) => {
           (event) => event._tag === "ModelResponseCommitted",
         ),
       ).toBe(false)
+      expect((yield* sessionProjection(store, "session:model-commit-memory")).content).toHaveLength(1)
 
       yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact })
       yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact })
+      const divergentRetry = completion(operationKey, sessionParentId, "divergent retry")
+      expect(
+        (yield* Effect.exit(
+          store.commitModelResponse({ ...claim, operationId: operation.operationId, ...divergentRetry }),
+        ))._tag,
+      ).toBe("Failure")
       const responses = (yield* runtime.history({ runId: receipt.runId, limit: 100 })).filter(
         (event) => event._tag === "ModelResponseCommitted",
       )
       expect(responses).toHaveLength(1)
       expect(responses[0]).toMatchObject({ digest: exact.event.digest, response: exact.event.response })
+      const projection = yield* sessionProjection(store, "session:model-commit-memory")
+      expect(projection.content).toHaveLength(2)
+      const projectionJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(projection.content)
+      expect(projectionJson).toContain("semantic answer")
     }),
   )
 })
@@ -114,8 +140,8 @@ it.live("keeps rolled-back SQLite model completion invisible until commit", () =
         idempotencyKey: "model-response-rollback",
         prompt: textPrompt("answer"),
       })
-      const { store, claim, operation, operationKey } = yield* schedule(receipt.runId)
-      const exact = completion(operationKey)
+      const { store, claim, operation, operationKey, sessionParentId } = yield* schedule(receipt.runId)
+      const exact = completion(operationKey, sessionParentId)
       const before = yield* runtime.history({ runId: receipt.runId, limit: 100 })
       const seen = yield* Ref.make<ReadonlyArray<string>>([])
       const subscriber = yield* runtime.events({ runId: receipt.runId, cursor: before.at(-1)!.sequence }).pipe(
@@ -145,11 +171,19 @@ it.live("keeps rolled-back SQLite model completion invisible until commit", () =
       expect((yield* store.getOperation({ runId: receipt.runId, operationId: operation.operationId })).status).toBe(
         "running",
       )
+      expect((yield* sessionProjection(store, "session:model-response-rollback")).content).toHaveLength(1)
       expect(yield* Ref.get(seen)).toEqual([])
 
       database.exec("DROP TRIGGER fail_model_completion_after_event")
       database.close()
       yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact })
+      yield* store.commitModelResponse({ ...claim, operationId: operation.operationId, ...exact })
+      const divergentRetry = completion(operationKey, sessionParentId, "divergent sqlite retry")
+      expect(
+        (yield* Effect.exit(
+          store.commitModelResponse({ ...claim, operationId: operation.operationId, ...divergentRetry }),
+        ))._tag,
+      ).toBe("Failure")
       const observed = Array.from(yield* Fiber.join(subscriber))
       expect(observed).toHaveLength(1)
       expect(observed[0]?._tag).toBe("ModelResponseCommitted")
@@ -158,6 +192,10 @@ it.live("keeps rolled-back SQLite model completion invisible until commit", () =
           (event) => event._tag === "ModelResponseCommitted",
         ),
       ).toHaveLength(1)
+      const projection = yield* sessionProjection(store, "session:model-response-rollback")
+      expect(projection.content).toHaveLength(2)
+      const projectionJson = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(projection.content)
+      expect(projectionJson).toContain("semantic answer")
     }),
   )
 })

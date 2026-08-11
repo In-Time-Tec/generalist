@@ -101,14 +101,11 @@ export const saveCompletionContinuation: {
         : {
             schemaVersion: 1,
             prompt: entries.reduce<Prompt.Prompt>((prompt, entry) => Prompt.concat(prompt, entry.prompt), Prompt.empty),
-            history: result.transcript,
             nextTurn: result.turns,
             steeringEntryIds: entries.map((entry) => entry.entryId),
           }
     yield* sql`
-      UPDATE baton_runs SET
-        transcript_json = ${encodeJson(Prompt.Prompt, result.transcript)},
-        continuation_json = ${continuation === undefined ? null : encodeContinuation(continuation)}
+      UPDATE baton_runs SET continuation_json = ${continuation === undefined ? null : encodeContinuation(continuation)}
       WHERE run_id = ${runId}
     `
     return continuation

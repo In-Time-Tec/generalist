@@ -16,7 +16,6 @@ export interface SteeringEntry {
 export const ExecutionContinuation = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   prompt: Prompt.Prompt,
-  history: Prompt.Prompt,
   nextTurn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   steeringEntryIds: Schema.Array(Schema.String),
 })

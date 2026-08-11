@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 
@@ -42,7 +42,6 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   responded_wait_ids_json TEXT NOT NULL,
   driver_checkpoint_json TEXT,
   suspension_json TEXT,
-  transcript_json TEXT,
   continuation_json TEXT,
   pending_outcome_json TEXT,
   owner_worker_id TEXT,

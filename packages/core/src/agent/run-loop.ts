@@ -448,9 +448,7 @@ export const makeRunLoop = <
     Stream.catchCause((cause) => {
       const reason = cause.reasons.length === 1 ? cause.reasons[0] : undefined
       if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(DuplicateToolCallId)(reason.error)) {
-        return Stream.unwrap(
-          checkpointPending(state.turn, pendingResults()).pipe(Effect.map(() => Stream.failCause<RunError>(cause))),
-        )
+        return Stream.failCause<RunError>(cause)
       }
       if (reason !== undefined && Cause.isFailReason(reason) && Schema.is(AgentSuspended)(reason.error)) {
         const suspension = reason.error

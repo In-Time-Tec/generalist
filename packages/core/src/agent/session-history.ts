@@ -1,7 +1,9 @@
-import { Effect, Option } from "effect"
+import { Effect, Option, Ref } from "effect"
 import { Chat, Prompt } from "effect/unstable/ai"
 import { SessionStore, buildContext } from "../context/session.js"
 import type { Event as ModelTelemetryEvent } from "../model/model-telemetry.js"
+import { ResumeMismatch } from "./agent-event.js"
+import { sameSuspension, suspensionCheckpoint, type SuspensionCheckpoint } from "./agent-suspension.js"
 import { withSystem } from "./agent-message.js"
 
 /**
@@ -39,10 +41,7 @@ export const seedFromSession = (input: {
 }): Effect.Effect<Option.Option<Prompt.Prompt>, import("../context/session.js").SessionStoreError> =>
   input.suppliedHistory !== undefined || Option.isNone(input.activeSession)
     ? Effect.succeedNone
-    : input.activeSession.value.path().pipe(
-        Effect.map(buildContext),
-        Effect.map((projection) => (projection.content.length === 0 ? Option.none() : Option.some(projection))),
-      )
+    : input.activeSession.value.path().pipe(Effect.map(buildContext), Effect.map(Option.some))
 
 /** @experimental Build the Chat a run starts from, preferring an active Session over supplied history. */
 export const initialChat = (input: {
@@ -56,6 +55,56 @@ export const initialChat = (input: {
   return input.system === undefined
     ? Chat.empty
     : Chat.fromPrompt([Prompt.makeMessage("system", { content: input.system })])
+}
+
+/** @internal Validate one resume request against the authoritative Session projection. */
+const validateResume = (
+  history: Prompt.Prompt,
+  received: import("./agent-event.js").AgentSuspended,
+): Effect.Effect<SuspensionCheckpoint, ResumeMismatch> => {
+  const expected = suspensionCheckpoint(history.content)
+  if (expected === undefined) return ResumeMismatch.make({ reason: "checkpoint-not-found", received })
+  return sameSuspension(expected.suspension, received)
+    ? Effect.succeed(expected)
+    : ResumeMismatch.make({ reason: "identity-mismatch", expected: expected.suspension, received })
+}
+
+/** @internal Helpers shared by Session-backed setup without widening the public package facade. */
+export const SessionHistoryInternal = { validateResume }
+
+/** @internal Rebuild a resume Chat from Session when no persisted Chat owns the live view. */
+export const resumeChat = (input: {
+  readonly persisted: Chat.Persisted | undefined
+  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly suppliedHistory: Prompt.RawInput | undefined
+}): Effect.Effect<Chat.Service, import("../context/session.js").SessionStoreError> => {
+  if (Option.isSome(input.activeSession)) {
+    return input.activeSession.value.path().pipe(
+      Effect.map(buildContext),
+      Effect.flatMap((projection) =>
+        input.persisted === undefined
+          ? Chat.fromPrompt(projection)
+          : Ref.set(input.persisted.history, projection).pipe(Effect.as(input.persisted)),
+      ),
+    )
+  }
+  if (input.persisted !== undefined) return Effect.succeed(input.persisted)
+  return input.suppliedHistory === undefined ? Chat.empty : Chat.fromPrompt(input.suppliedHistory)
+}
+
+/** @internal Refresh a resumed Session Chat with the system message derived for this Run. */
+export const refreshResumeSystem = (input: {
+  readonly chat: Chat.Service | undefined
+  readonly activeSession: Option.Option<typeof SessionStore.Service>
+  readonly system: string | undefined
+}): Effect.Effect<void, import("../context/session.js").SessionStoreError> => {
+  if (input.chat === undefined || Option.isNone(input.activeSession)) return Effect.void
+  return input.activeSession.value.path().pipe(
+    Effect.map(buildContext),
+    Effect.flatMap((projection) =>
+      Ref.set(input.chat!.history, withDerivedSystem({ system: input.system, projection })),
+    ),
+  )
 }
 
 /**
