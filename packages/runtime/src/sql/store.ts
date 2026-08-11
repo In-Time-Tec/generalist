@@ -116,17 +116,20 @@ export const makeSqliteRunStore = (
       })
     const fenced = <A, E>(
       input: import("../run-store.js").ExecutionClaim,
-      effect: Effect.Effect<A, E, SqlClient.SqlClient>,
-    ) => run(requireExecutionClaim(input).pipe(Effect.andThen(effect)))
+      makeEffect: (transactionHub: typeof hub) => Effect.Effect<A, E, SqlClient.SqlClient>,
+    ) =>
+      runBuffered((transactionHub) =>
+        requireExecutionClaim(input).pipe(Effect.andThen(makeEffect(transactionHub))),
+      )
 
     return RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "sqlite", multiWorker: false }),
       sessionStore: (sessionId: string) =>
         withSql(sql, makeSqliteSessionStore({ sessionId })).pipe(Effect.orDie, Effect.map(Option.some)),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
-      admitSend: (input) => run(admitSend(hub, addressBindings, input)),
+      admitSend: (input) => runBuffered((transactionHub) => admitSend(transactionHub, addressBindings, input)),
       admitStart: (input) => runBuffered((transactionHub) => admitStart(transactionHub, input)),
-      admitSpawn: (input) => run(admitSpawn(hub, input)),
+      admitSpawn: (input) => runBuffered((transactionHub) => admitSpawn(transactionHub, input)),
       admitProgramChild: (input) =>
         runBuffered((transactionHub) =>
           requireExecutionClaim(input).pipe(Effect.andThen(admitProgramChild(transactionHub, input))),
@@ -152,12 +155,12 @@ export const makeSqliteRunStore = (
           ),
           capacity,
         }),
-      respond: (input) => run(respond(hub, input)),
-      respondApproval: (input) => run(respondApproval(hub, input)),
-      signal: (input) => run(signal(hub, input)),
+      respond: (input) => runBuffered((transactionHub) => respond(transactionHub, input)),
+      respondApproval: (input) => runBuffered((transactionHub) => respondApproval(transactionHub, input)),
+      signal: (input) => runBuffered((transactionHub) => signal(transactionHub, input)),
       cancel: (input) => runBuffered((transactionHub) => cancel(transactionHub, input)),
       admitSteering: (input) => run(admitSteering(input)),
-      readSteering: (input) => fenced(input, readSteering(input)),
+      readSteering: (input) => fenced(input, () => readSteering(input)),
       directory: (runId) => runNoTxn(directory(runId)),
       resolveAddress: (address) => runNoTxn(resolveAddress(address)),
       registerAgentName: (input) => run(registerAgentName(input)),
@@ -253,22 +256,23 @@ export const makeSqliteRunStore = (
         ),
       fail: (input) =>
         runBuffered((transactionHub) => requireExecutionClaim(input).pipe(Effect.andThen(fail(transactionHub, input)))),
-      suspend: (input) => fenced(input, suspend(hub, input)),
-      resume: (input) => run(resume(hub, input)),
-      emitAgentEvent: (input) => fenced(input, emitAgentEvent(hub, input)),
-      recordOperation: (input) => fenced(input, recordOperation(hub, input)),
-      startOperation: (input) => fenced(input, startOperation(input)),
-      completeOperation: (input) => fenced(input, completeOperation(hub, input)),
-      expireRunningOperation: (input) => fenced(input, expireRunningOperation(hub, input)),
+      suspend: (input) => fenced(input, (transactionHub) => suspend(transactionHub, input)),
+      resume: (input) => runBuffered((transactionHub) => resume(transactionHub, input)),
+      emitAgentEvent: (input) => fenced(input, (transactionHub) => emitAgentEvent(transactionHub, input)),
+      recordOperation: (input) => fenced(input, (transactionHub) => recordOperation(transactionHub, input)),
+      startOperation: (input) => fenced(input, () => startOperation(input)),
+      completeOperation: (input) => fenced(input, (transactionHub) => completeOperation(transactionHub, input)),
+      expireRunningOperation: (input) =>
+        fenced(input, (transactionHub) => expireRunningOperation(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),
       resolveOperation: (input) =>
-        run(
+        runBuffered((transactionHub) =>
           getProgramOperation({ runId: input.runId, operation: input.operationId }).pipe(
             Effect.flatMap((program) =>
               program === undefined ? resolveOperation(input, "running") : resolveProgramOperation(input, "running"),
             ),
-            Effect.andThen(settleAdmittedCancellation(hub, input.runId)),
+            Effect.andThen(settleAdmittedCancellation(transactionHub, input.runId)),
           ),
         ),
       claimExecution: (input) => runBuffered((transactionHub) => claimExecution(transactionHub, input)),
@@ -277,7 +281,7 @@ export const makeSqliteRunStore = (
       retryExecution: (input) => runBuffered((transactionHub) => retryExecution(transactionHub, input)),
       admitFanOut: (input) => runBuffered((transactionHub) => admitFanOut(transactionHub, input)),
       inspectFanOut: (fanOutId) => runNoTxn(inspectFanOut(fanOutId)),
-      reserveProgramOperation: (input) => fenced(input, reserveProgramOperation(input)),
+      reserveProgramOperation: (input) => fenced(input, () => reserveProgramOperation(input)),
       admitProgramAgents: (input) =>
         runBuffered((transactionHub) =>
           requireExecutionClaim(input).pipe(Effect.andThen(admitProgramAgents(transactionHub, input, suspend))),
@@ -290,7 +294,7 @@ export const makeSqliteRunStore = (
         runBuffered((transactionHub) =>
           requireExecutionClaim(input).pipe(Effect.andThen(settleProgramOperation(transactionHub, input))),
         ),
-      startProgramOperation: (input) => fenced(input, startProgramOperation(input)),
+      startProgramOperation: (input) => fenced(input, () => startProgramOperation(input)),
       loadProgramState: (runId) =>
         runNoTxn(
           Effect.gen(function* () {
