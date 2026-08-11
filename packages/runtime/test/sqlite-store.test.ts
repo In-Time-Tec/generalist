@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite"
 import { expect, it, layer } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Handoff, ToolExecutor } from "@batonfx/core"
 import { Address, ExecutionHost, Errors, ExecutableResolver, Runtime, RunStore, RunTree } from "../src/index.js"
@@ -1234,6 +1234,82 @@ layer(sqliteLayer(tempDbPath("terminal")))("first terminal wins", (suite) => {
         .pipe(Effect.flip)
       expect(again).toBeInstanceOf(Errors.RunTerminal)
       expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")
+    }),
+  )
+})
+
+const rollbackPublicationFilename = tempDbPath("rollback-publication")
+layer(sqliteLayer(rollbackPublicationFilename))("publishes SQL events only after commit", (suite) => {
+  suite.effect("hides rolled-back events and publishes committed events once in order", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const parent = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:rollback-publication",
+        idempotencyKey: "parent",
+        prompt: textPrompt("parent"),
+      })
+      const before = yield* runtime.history({ runId: parent.runId, cursor: -1, limit: 100 })
+      const lastSequence = before.at(-1)!.sequence
+      const observed = yield* Ref.make<Array<number>>([])
+      const subscribed = yield* Deferred.make<void>()
+      const committed = yield* Deferred.make<void>()
+      const subscriber = yield* runtime.events({ runId: parent.runId, cursor: lastSequence - 1 }).pipe(
+        Stream.tap((event) =>
+          Ref.update(observed, (sequences) => [...sequences, event.sequence]).pipe(
+            Effect.andThen(
+              event.sequence === lastSequence
+                ? Deferred.succeed(subscribed, undefined)
+                : Deferred.succeed(committed, undefined),
+            ),
+          ),
+        ),
+        Stream.runDrain,
+        Effect.forkChild({ startImmediately: true }),
+      )
+      yield* Deferred.await(subscribed)
+
+      const database = yield* Effect.acquireRelease(
+        Effect.sync(() => new Database(rollbackPublicationFilename)),
+        (connection) => Effect.sync(() => connection.close()),
+      )
+      const parentId = parent.runId.replaceAll("'", "''")
+      database.exec(`
+        CREATE TRIGGER fail_spawn_after_parent_event
+        BEFORE INSERT ON baton_run_events
+        WHEN NEW.run_id <> '${parentId}'
+        BEGIN
+          SELECT RAISE(ABORT, 'forced post-append failure');
+        END
+      `)
+      const failed = yield* runtime
+        .spawn({
+          parentRunId: parent.runId,
+          invocationId: "rolled-back-child",
+          selection: "researcher",
+          prompt: textPrompt("rolled back"),
+        })
+        .pipe(Effect.exit)
+      expect(Exit.isFailure(failed)).toBe(true)
+      yield* Effect.yieldNow
+
+      expect(yield* runtime.history({ runId: parent.runId, cursor: -1, limit: 100 })).toEqual(before)
+      expect(yield* Ref.get(observed)).toEqual([lastSequence])
+
+      database.exec("DROP TRIGGER fail_spawn_after_parent_event")
+      yield* runtime.spawn({
+        parentRunId: parent.runId,
+        invocationId: "committed-child",
+        selection: "researcher",
+        prompt: textPrompt("committed"),
+      })
+      yield* Deferred.await(committed)
+
+      const after = yield* runtime.history({ runId: parent.runId, cursor: -1, limit: 100 })
+      expect(after.map((event) => event.sequence)).toEqual([...before.map((event) => event.sequence), lastSequence + 1])
+      expect(after.at(-1)?._tag).toBe("ChildLinked")
+      expect(yield* Ref.get(observed)).toEqual([lastSequence, lastSequence + 1])
+      yield* Fiber.interrupt(subscriber)
     }),
   )
 })
