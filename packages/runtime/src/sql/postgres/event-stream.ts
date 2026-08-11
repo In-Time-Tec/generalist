@@ -30,7 +30,7 @@ export const makeEventStream = (input: {
               Effect.as(events.at(-1)?.sequence ?? current),
             ),
           ),
-          Effect.map((last) => [last, current] as const),
+          Effect.map((last) => [last, last] as const),
         ),
       ).pipe(Effect.ignore)
       return input.hub.subscribe({

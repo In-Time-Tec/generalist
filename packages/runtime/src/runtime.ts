@@ -51,7 +51,7 @@ import type { RespondInput as RespondApprovalInput } from "./approval.js"
 import type { ExecutableRegistration } from "./executable-registration.js"
 import type { Duration } from "effect"
 import type { Notification as ChildSettlementNotification } from "./child-settlement.js"
-import type { ModelPreview } from "./model-preview.js"
+import type { PreviewFrame } from "./model-preview.js"
 
 export type { InitialFanOutInput } from "./fan-out.js"
 
@@ -140,7 +140,7 @@ export interface HistoryInput extends EventsInput {
   readonly limit: number
 }
 
-/** @experimental Select the disposable live preview lane for one Run. */
+/** @experimental Select the memory-only live preview lane for one Run. */
 export interface PreviewsInput {
   readonly runId: string
 }
@@ -295,8 +295,14 @@ export interface Interface {
   readonly send: (input: SendInput) => Effect.Effect<RunReceipt, SendError>
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>
-  /** @experimental Observe bounded memory-only model previews without replay or execution authority. */
-  readonly previews: (input: PreviewsInput) => Stream.Stream<ModelPreview>
+  /**
+   * @experimental Observe the memory-only live preview lane for one Run.
+   *
+   * Subscribing replays the lane's current cumulative snapshot immediately, then streams
+   * cumulative snapshots and clear tombstones. Each Run owns one conflated lane, so one
+   * Run's previews never evict another's. Frames are memory-only and never durable RunEvents.
+   */
+  readonly previews: (input: PreviewsInput) => Stream.Stream<PreviewFrame>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, InspectError>
   readonly history: (input: HistoryInput) => Effect.Effect<ReadonlyArray<RunEvent>, EventsError>
   readonly treeHistory: (

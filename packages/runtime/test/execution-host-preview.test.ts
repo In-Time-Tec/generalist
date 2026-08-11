@@ -28,7 +28,7 @@ const execute = (input: {
 }) =>
   Effect.gen(function* () {
     const releaseModel = yield* Deferred.make<void>()
-    const previewSeen = yield* Deferred.make<Runtime.ModelPreview>()
+    const previewSeen = yield* Deferred.make<Runtime.PreviewFrame>()
     const agent = Agent.make({ name: `preview-${input.backend}-${input.observer}` })
     const executable = testExecutable(agent, `preview-${input.backend}-${input.observer}`)
     const address = Address.make(`agent:preview-${input.backend}-${input.observer}`)

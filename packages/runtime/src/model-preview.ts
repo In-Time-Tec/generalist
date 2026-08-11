@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, Option, PubSub, Queue, Ref, Stream, type Scope } from "effect"
+import { Clock, Context, Effect, Layer, Option, Queue, Ref, Stream, SynchronizedRef, type Scope } from "effect"
 import type { AgentLoopEvent } from "./agent-event.js"
 
 type ModelPart = Extract<AgentLoopEvent, { readonly _tag: "ModelPart" }>
@@ -16,6 +16,17 @@ export interface ModelPreview {
   readonly reasoning: string
   readonly truncated: boolean
 }
+
+/** @experimental Tombstone frame emitted when a Run's live preview lane is cleared. */
+export interface PreviewCleared {
+  readonly _tag: "Cleared"
+  readonly runId: string
+  readonly attemptFence: number
+  readonly generation: number
+}
+
+/** @experimental One live preview frame: a cumulative snapshot or a clear tombstone. */
+export type PreviewFrame = ModelPreview | PreviewCleared
 
 /** @experimental Maximum combined text and reasoning characters retained by a preview attempt. */
 export const MaxCharacters = 4_096
@@ -44,9 +55,23 @@ interface State {
   readonly publishedAt: number
 }
 
+interface LaneState {
+  readonly generation: number
+  readonly retained: ModelPreview | undefined
+  readonly subscribers: ReadonlyMap<number, Queue.Queue<PreviewFrame>>
+  readonly nextSubscriberId: number
+}
+
+const clearedLane = (generation: number): LaneState => ({
+  generation,
+  retained: undefined,
+  subscribers: new Map(),
+  nextSubscriberId: 1,
+})
+
 interface Interface {
   readonly open: (runId: string, attemptFence: number) => Effect.Effect<Sink, never, Scope.Scope>
-  readonly previews: (runId: string) => Stream.Stream<ModelPreview>
+  readonly previews: (runId: string) => Stream.Stream<PreviewFrame>
 }
 
 export class ModelPreviewLane extends Context.Service<ModelPreviewLane, Interface>()(
@@ -113,20 +138,49 @@ const update = (state: State, part: ModelPart, now: number): readonly [Snapshot 
 }
 
 export const make: Effect.Effect<Interface, never, Scope.Scope> = Effect.gen(function* () {
-  const published = yield* PubSub.sliding<ModelPreview>(1)
-  yield* Effect.addFinalizer(() => PubSub.shutdown(published))
+  const lanes = yield* SynchronizedRef.make<ReadonlyMap<string, LaneState>>(new Map())
+  const publish = (runId: string, generation: number, preview: ModelPreview): Effect.Effect<void> =>
+    SynchronizedRef.modifyEffect(lanes, (current) => {
+      const lane = current.get(runId)
+      if (lane === undefined || lane.generation !== generation) return Effect.succeed([undefined, current] as const)
+      const next = new Map(current)
+      next.set(runId, { ...lane, retained: preview })
+      return Effect.forEach(lane.subscribers.values(), (queue) => Queue.offer(queue, preview), {
+        discard: true,
+      }).pipe(Effect.as([undefined, next] as const))
+    })
+  const clear = (runId: string, attemptFence: number): Effect.Effect<void> =>
+    SynchronizedRef.modifyEffect(lanes, (current) => {
+      const lane = current.get(runId)
+      if (lane === undefined) return Effect.succeed([undefined, current] as const)
+      const generation = lane.generation + 1
+      const tombstone: PreviewFrame = { _tag: "Cleared", runId, attemptFence, generation }
+      const next = new Map(current)
+      next.set(runId, { ...lane, generation, retained: undefined })
+      return Effect.forEach(lane.subscribers.values(), (queue) => Queue.offer(queue, tombstone), {
+        discard: true,
+      }).pipe(Effect.as([undefined, next] as const))
+    })
   const open = (runId: string, attemptFence: number): Effect.Effect<Sink, never, Scope.Scope> =>
     Effect.gen(function* () {
-      const slot = yield* Queue.sliding<ModelPreview>(1)
+      yield* SynchronizedRef.update(lanes, (current) =>
+        current.has(runId) ? current : new Map(current).set(runId, clearedLane(0)),
+      )
+      const slot = yield* Queue.sliding<readonly [number, ModelPreview]>(1)
       const state = yield* Ref.make<State | undefined>(undefined)
       const closed = yield* Ref.make(false)
+      const cleared = yield* Ref.make(false)
       yield* Queue.take(slot).pipe(
-        Effect.tap((preview) => PubSub.publish(published, preview)),
+        Effect.flatMap(([generation, preview]) => publish(runId, generation, preview)),
         Effect.forever,
         Effect.forkScoped,
       )
       yield* Effect.addFinalizer(() =>
-        Ref.set(closed, true).pipe(Effect.andThen(Queue.shutdown(slot)), Effect.andThen(Ref.set(state, undefined))),
+        Effect.gen(function* () {
+          yield* Ref.set(closed, true)
+          if (!(yield* Ref.get(cleared))) yield* clear(runId, attemptFence)
+          yield* Queue.shutdown(slot)
+        }),
       )
       return {
         offer: (part) =>
@@ -137,15 +191,43 @@ export const make: Effect.Effect<Interface, never, Scope.Scope> = Effect.gen(fun
               const [snapshot, next] = update(previous ?? initialState(part), part, now)
               return [snapshot, next]
             })
-            return preview === undefined ? false : yield* Queue.offer(slot, { ...preview, runId, attemptFence })
+            if (preview === undefined) return false
+            const generation = yield* SynchronizedRef.get(lanes).pipe(Effect.map((map) => map.get(runId)!.generation))
+            return yield* Queue.offer(slot, [generation, { ...preview, runId, attemptFence }])
           }),
-        clear: Ref.set(state, undefined).pipe(Effect.andThen(Queue.poll(slot)), Effect.asVoid),
+        clear: Effect.gen(function* () {
+          if (yield* Ref.get(cleared)) return
+          yield* Ref.set(cleared, true)
+          yield* Ref.set(state, undefined)
+          yield* Queue.poll(slot)
+          yield* clear(runId, attemptFence)
+        }),
       }
     })
-  return ModelPreviewLane.of({
-    open,
-    previews: (runId) => Stream.fromPubSub(published).pipe(Stream.filter((preview) => preview.runId === runId)),
-  })
+  const previews = (runId: string): Stream.Stream<PreviewFrame> =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        const queue = yield* Queue.sliding<PreviewFrame>(1)
+        const [retained, subscriberId] = yield* SynchronizedRef.modify(lanes, (current) => {
+          const lane = current.get(runId) ?? clearedLane(0)
+          const id = lane.nextSubscriberId
+          const subscribers = new Map(lane.subscribers).set(id, queue)
+          const next = new Map(current).set(runId, { ...lane, subscribers, nextSubscriberId: id + 1 })
+          return [[lane.retained, id], next] as const
+        })
+        yield* Effect.addFinalizer(() =>
+          SynchronizedRef.update(lanes, (current) => {
+            const lane = current.get(runId)
+            if (lane === undefined) return current
+            const subscribers = new Map(lane.subscribers)
+            subscribers.delete(subscriberId)
+            return new Map(current).set(runId, { ...lane, subscribers })
+          }).pipe(Effect.andThen(Queue.shutdown(queue))),
+        )
+        return Stream.concat(retained === undefined ? Stream.empty : Stream.make(retained), Stream.fromQueue(queue))
+      }),
+    )
+  return ModelPreviewLane.of({ open, previews })
 })
 
 export const layer: Layer.Layer<ModelPreviewLane> = Layer.effect(ModelPreviewLane, make)
@@ -160,5 +242,5 @@ export const open =
 
 export const previews =
   (lane: Option.Option<Interface>) =>
-  (runId: string): Stream.Stream<ModelPreview> =>
+  (runId: string): Stream.Stream<PreviewFrame> =>
     Option.match(lane, { onNone: () => Stream.empty, onSome: (service) => service.previews(runId) })

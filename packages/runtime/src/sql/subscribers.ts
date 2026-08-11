@@ -11,6 +11,7 @@ interface HubState {
   readonly nextId: number
   readonly byRun: ReadonlyMap<string, ReadonlyMap<number, SubscriberQueue>>
   readonly byTreeRoot: ReadonlyMap<string, ReadonlyMap<number, TreeSubscriberQueue>>
+  readonly lastSequenceByRun: ReadonlyMap<string, number>
 }
 
 export interface EventHub {
@@ -38,6 +39,7 @@ export const makeEventHub: Effect.Effect<EventHub> = Effect.gen(function* () {
     nextId: 1,
     byRun: new Map(),
     byTreeRoot: new Map(),
+    lastSequenceByRun: new Map(),
   })
 
   const wakeTree = (rootRunId: string) =>
@@ -50,8 +52,11 @@ export const makeEventHub: Effect.Effect<EventHub> = Effect.gen(function* () {
   const publish = (runId: string, event: RunEvent) =>
     SynchronizedRef.modifyEffect(stateRef, (state) =>
       Effect.gen(function* () {
+        const lastSequence = state.lastSequenceByRun.get(runId)
+        if (lastSequence !== undefined && event.sequence <= lastSequence) return [false, state] as const
+        const nextState = { ...state, lastSequenceByRun: new Map(state.lastSequenceByRun).set(runId, event.sequence) }
         const subscribers = state.byRun.get(runId)
-        if (subscribers === undefined) return [undefined, state] as const
+        if (subscribers === undefined) return [true, nextState] as const
         const nextSubs = new Map(subscribers)
         for (const [id, queue] of subscribers) {
           const offered = yield* Queue.offer(queue, event)
@@ -63,9 +68,12 @@ export const makeEventHub: Effect.Effect<EventHub> = Effect.gen(function* () {
         const byRun = new Map(state.byRun)
         if (nextSubs.size === 0) byRun.delete(runId)
         else byRun.set(runId, nextSubs)
-        return [undefined, { ...state, byRun }] as const
+        return [true, { ...nextState, byRun }] as const
       }),
-    ).pipe(Effect.andThen(wakeTree(event.rootRunId)), Effect.asVoid)
+    ).pipe(
+      Effect.flatMap((published) => (published ? wakeTree(event.rootRunId) : Effect.void)),
+      Effect.asVoid,
+    )
 
   const subscribe: EventHub["subscribe"] = (input) =>
     Stream.unwrap(
@@ -91,7 +99,6 @@ export const makeEventHub: Effect.Effect<EventHub> = Effect.gen(function* () {
             return { ...state, byRun }
           }).pipe(Effect.andThen(Queue.shutdown(liveQueue)), Effect.asVoid),
         )
-        if (input.onSubscribed !== undefined) yield* Effect.forkScoped(input.onSubscribed)
         const { replay, lastSequence } = yield* input.loadReplay
         if (input.cursor < -1 || input.cursor > lastSequence) {
           return yield* CursorExpired.make({
@@ -101,6 +108,7 @@ export const makeEventHub: Effect.Effect<EventHub> = Effect.gen(function* () {
           })
         }
         const replayCutoff = replay.at(-1)?.sequence ?? input.cursor
+        if (input.onSubscribed !== undefined) yield* Effect.forkScoped(input.onSubscribed)
         return Stream.concat(
           Stream.fromIterable(replay),
           Stream.fromQueue(liveQueue).pipe(Stream.filter((event) => event.sequence > replayCutoff)),

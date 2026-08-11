@@ -225,6 +225,8 @@ export const ModelPreview = {
 } as const
 export namespace ModelPreview {
   export type ModelPreview = import("./model-preview.js").ModelPreview
+  export type PreviewFrame = import("./model-preview.js").PreviewFrame
+  export type PreviewCleared = import("./model-preview.js").PreviewCleared
 }
 
 import { Runtime as Runtime_Runtime } from "./runtime.js"
@@ -258,6 +260,8 @@ export namespace Runtime {
   export type HistoryInput = import("./runtime.js").HistoryInput
   export type PreviewsInput = import("./runtime.js").PreviewsInput
   export type ModelPreview = import("./model-preview.js").ModelPreview
+  export type PreviewFrame = import("./model-preview.js").PreviewFrame
+  export type PreviewCleared = import("./model-preview.js").PreviewCleared
   export type ListInput = import("./runtime.js").ListInput
   export type RespondInput = import("./runtime.js").RespondInput
   export type RespondApprovalInput = import("./approval.js").RespondInput
