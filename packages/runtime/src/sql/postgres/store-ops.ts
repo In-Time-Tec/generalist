@@ -11,14 +11,20 @@ import { decodeJson, encodeExecutableRef, encodeJson, encodeJsonValue } from "..
 import { canBlindRetry } from "../operations.js"
 import type { DecodedRun, OperationRow } from "../rows.js"
 import type { EventHub } from "../subscribers.js"
-import { appendEvent, loadEventsAfter, toOperationRecord } from "./pg-helpers.js"
+import { appendEvent, toOperationRecord } from "./pg-helpers.js"
 import { encodeContinuation } from "../../steering.js"
 import { checkpointRef } from "../../executable-manifest.js"
 import { getProgramOperation, resolveProgramOperation } from "../store-program.js"
 import { settleAdmittedCancellation } from "../store-control.js"
-import { Prompt } from "effect/unstable/ai"
+import { postgresModelResponseOperations } from "./store-model-response.js"
 import type { WithoutSqlError } from "../sql-effect.js"
-import { sameModelResponseEvent, validateModelResponseCommit } from "../../model-response-commit.js"
+import { appendHandoffSessionEntry, verifyHandoffSessionEntry } from "./session-store.js"
+import {
+  handoffSessionEntry,
+  isHandoffCommit,
+  sameHandoffCheckpoint,
+  sameHandoffCommit,
+} from "../../handoff-session.js"
 
 type SqlR = SqlClient.SqlClient | PgClient.PgClient
 export type RunFn = <A, E>(
@@ -107,12 +113,11 @@ export const postgresOperations = (input: {
               ${op.attempt}, NULL, NULL, NULL, NULL
             )
           `
-          if (op.checkpoint !== undefined || op.transcript !== undefined || op.continuation !== undefined) {
+          if (op.checkpoint !== undefined || op.continuation !== undefined) {
             yield* sql`
               UPDATE baton_runs SET
                 driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, op.checkpoint)}, driver_checkpoint_json),
                 executable_ref_json = ${encodeExecutableRef(executableRef)},
-                transcript_json = COALESCE(${op.transcript === undefined ? null : encodeJson(Prompt.Prompt, op.transcript)}, transcript_json),
                 continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
                   THEN ${op.continuation === null || op.continuation === undefined ? null : encodeContinuation(op.continuation)}
                   ELSE continuation_json END
@@ -164,14 +169,31 @@ export const postgresOperations = (input: {
           const existing = yield* sql<OperationRow>`
             SELECT * FROM baton_run_operations
             WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
+            FOR UPDATE
           `
-          if (existing[0] === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-          if (
-            existing[0].status === "succeeded" ||
-            existing[0].status === "failed" ||
-            existing[0].status === "unknown"
-          ) {
-            return toOperationRecord(existing[0])
+          const row = existing[0]
+          if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
+          const current = toOperationRecord(row)
+          if (row.status === "succeeded" || row.status === "failed" || row.status === "unknown") {
+            if (current.kind === "handoff" && current.status === "succeeded" && isHandoffCommit(current.result)) {
+              if (
+                op.outcome._tag !== "Succeeded" ||
+                !sameHandoffCommit(current.result, op.outcome.value) ||
+                !sameHandoffCheckpoint(loaded.driverCheckpoint, op.checkpoint)
+              ) {
+                return yield* RuntimeUnavailable.make({ message: "handoff operation has a divergent completion retry" })
+              }
+              const entry = handoffSessionEntry({
+                sessionId: loaded.message.sessionId,
+                operationKey: current.operationKey,
+                value: op.outcome.value,
+              })
+              if (Schema.is(RuntimeUnavailable)(entry)) return yield* entry
+              yield* verifyHandoffSessionEntry(entry).pipe(
+                Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+              )
+            }
+            return current
           }
           for (const entryId of new Set(op.steeringEntryIds ?? [])) {
             const rows = yield* sql<{ readonly consumed_operation_id: string | null }>`
@@ -188,6 +210,17 @@ export const postgresOperations = (input: {
             try: () => checkpointRef(loaded.executableRef, loaded.executableManifest, op.checkpoint),
             catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
           })
+          if (row.kind === "handoff" && op.outcome._tag === "Succeeded" && isHandoffCommit(op.outcome.value)) {
+            const entry = handoffSessionEntry({
+              sessionId: loaded.message.sessionId,
+              operationKey: row.operation_key,
+              value: op.outcome.value,
+            })
+            if (Schema.is(RuntimeUnavailable)(entry)) return yield* entry
+            yield* appendHandoffSessionEntry(entry).pipe(
+              Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+            )
+          }
           if (op.outcome._tag === "Succeeded") {
             yield* sql`
               UPDATE baton_run_operations
@@ -213,7 +246,6 @@ export const postgresOperations = (input: {
             UPDATE baton_runs SET
               driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, op.checkpoint)}, driver_checkpoint_json),
               executable_ref_json = ${encodeExecutableRef(executableRef)},
-              transcript_json = COALESCE(${op.transcript === undefined ? null : encodeJson(Prompt.Prompt, op.transcript)}, transcript_json),
               continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
                 THEN ${op.continuation === null || op.continuation === undefined ? null : encodeContinuation(op.continuation)}
                 ELSE continuation_json END,
@@ -234,90 +266,7 @@ export const postgresOperations = (input: {
           return toOperationRecord(rows[0]!)
         }),
       ),
-    commitInterruptedModelResponse: () =>
-      RuntimeUnavailable.make({ message: "interrupted model response settlement is not supported by postgres yet" }),
-    commitModelResponse: (op) =>
-      fenced(
-        op,
-        Effect.gen(function* () {
-          const loaded = yield* requireRun(op.runId)
-          const existing = yield* sql<OperationRow>`
-            SELECT * FROM baton_run_operations
-            WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
-          `
-          const row = existing[0]
-          if (row === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
-          const current = toOperationRecord(row)
-          const validated = validateModelResponseCommit({ record: current, input: op })
-          if (Schema.is(RuntimeUnavailable)(validated)) return yield* validated
-          if (current.status === "succeeded") {
-            const priorValidation = validateModelResponseCommit({
-              record: current,
-              input: {
-                ...op,
-                outcome: { _tag: "Succeeded", value: current.result },
-              },
-            })
-            if (Schema.is(RuntimeUnavailable)(priorValidation)) return yield* priorValidation
-            const prior = (yield* loadEventsAfter(op.runId, -1)).find(
-              (event) => event._tag === "ModelResponseCommitted" && event.operationKey === op.event.operationKey,
-            )
-            if (
-              prior === undefined ||
-              prior._tag !== "ModelResponseCommitted" ||
-              !sameModelResponseEvent({ left: prior, right: op.event })
-            )
-              return yield* RuntimeUnavailable.make({
-                message: `model operation ${op.operationId} has a divergent outbox retry`,
-              })
-            return current
-          }
-          if (current.status === "failed" || current.status === "unknown")
-            return yield* RuntimeUnavailable.make({
-              message: `model operation ${op.operationId} already completed as ${current.status}`,
-            })
-          for (const entryId of new Set(op.steeringEntryIds ?? [])) {
-            const rows = yield* sql<{ readonly consumed_operation_id: string | null }>`
-              SELECT consumed_operation_id FROM baton_run_steering
-              WHERE run_id = ${op.runId} AND entry_id = ${entryId}
-            `
-            if (rows[0]?.consumed_operation_id !== op.operationId)
-              return yield* RuntimeUnavailable.make({
-                message: `steering entry ${entryId} does not belong to operation`,
-              })
-          }
-          const executableRef = yield* Effect.try({
-            try: () => checkpointRef(loaded.executableRef, loaded.executableManifest, op.checkpoint),
-            catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-          })
-          yield* sql`
-            UPDATE baton_run_operations
-            SET status = 'succeeded', result_json = ${encodeJsonValue(op.outcome.value)}, finished_at = NOW()
-            WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
-              AND status IN ('requested', 'running')
-          `
-          yield* sql`
-            UPDATE baton_runs SET
-              driver_checkpoint_json = COALESCE(${op.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, op.checkpoint)}, driver_checkpoint_json),
-              executable_ref_json = ${encodeExecutableRef(executableRef)},
-              transcript_json = COALESCE(${op.transcript === undefined ? null : encodeJson(Prompt.Prompt, op.transcript)}, transcript_json),
-              continuation_json = CASE WHEN ${op.continuation === undefined ? 0 : 1} = 1
-                THEN ${op.continuation === null || op.continuation === undefined ? null : encodeContinuation(op.continuation)}
-                ELSE continuation_json END,
-              updated_at = NOW()
-            WHERE run_id = ${op.runId}
-          `
-          yield* appendEvent(
-            hub,
-            yield* requireRun(op.runId),
-            op.event as unknown as { readonly _tag: string } & Record<string, unknown>,
-          )
-          const rows = yield* sql<OperationRow>`
-            SELECT * FROM baton_run_operations WHERE run_id = ${op.runId} AND operation_id = ${op.operationId}
-          `
-          return toOperationRecord(rows[0]!)
-        }),
-      ),
+    ...postgresModelResponseOperations(input),
     expireRunningOperation: (op) =>
       fenced(
         op,

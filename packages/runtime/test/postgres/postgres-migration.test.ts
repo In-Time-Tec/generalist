@@ -13,6 +13,7 @@ const client = database.client
 const resetSchema = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   yield* sql.unsafe(`DROP TABLE IF EXISTS
+    baton_session_entries, baton_sessions,
     baton_run_registrations, baton_executable_registrations, baton_program_operations, baton_program_runs,
     baton_tree_event_index, baton_tree_roots, baton_fan_out_members, baton_fan_outs, baton_run_steering,
     baton_messages, baton_agent_names,
@@ -25,6 +26,11 @@ const inspectSchema = Effect.gen(function* () {
   const columns = yield* sql<{ column_name: string }>`
     SELECT column_name FROM information_schema.columns
     WHERE table_schema = current_schema() AND table_name = 'baton_runs'
+  `
+  const sessionTables = yield* sql<{ table_name: string }>`
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema = current_schema() AND table_name IN ('baton_sessions', 'baton_session_entries')
+    ORDER BY table_name
   `
   const meta = yield* sql<{
     version: number
@@ -46,6 +52,8 @@ const inspectSchema = Effect.gen(function* () {
       "pending_outcome_json",
     ]),
   )
+  expect(columns.map((row) => row.column_name)).not.toContain("transcript_json")
+  expect(sessionTables.map((row) => row.table_name)).toEqual(["baton_session_entries", "baton_sessions"])
 })
 
 describePostgres("postgres schema baseline", () => {

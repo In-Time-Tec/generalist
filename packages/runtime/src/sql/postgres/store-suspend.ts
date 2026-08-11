@@ -15,7 +15,6 @@ import { appendEvent, requireRun } from "./pg-helpers.js"
 import { requireExecutionClaim } from "../store-execution.js"
 import { groupIdFromSuspension, resultFromInspection } from "../../child-group.js"
 import { inspectFanOut } from "../store-fan-out.js"
-import { Prompt } from "effect/unstable/ai"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
 
 type SuspendEffect = Effect.Effect<
@@ -46,7 +45,6 @@ export const suspend: {
         driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
         executable_ref_json = ${encodeExecutableRef(executableRef)},
         suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
-        transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
         continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
           THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
           ELSE continuation_json END,

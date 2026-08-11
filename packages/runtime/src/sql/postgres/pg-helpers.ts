@@ -31,7 +31,6 @@ import type { ExecutionResult } from "../../execution-state.js"
 import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { StaleClaim } from "../errors.js"
 import { OperationResolution } from "../../operation-resolution.js"
-import { Prompt } from "effect/unstable/ai"
 import { admitChildSettlementFromEventId } from "../settlement-notifications.js"
 
 type StoreError = RuntimeUnavailable | SqlError
@@ -79,10 +78,7 @@ export const emitAgentEvent: {
     if (isTerminal(loaded.status)) return yield* RunTerminal.make({ runId: loaded.runId, status: loaded.status })
     yield* appendEvent(hub, loaded, input.event as EventPartial)
     if (input.event._tag === "TurnCompleted") {
-      yield* sql`
-        UPDATE baton_runs SET transcript_json = ${encodeJson(Prompt.Prompt, input.event.transcript)}, continuation_json = NULL
-        WHERE run_id = ${loaded.runId}
-      `
+      yield* sql`UPDATE baton_runs SET continuation_json = NULL WHERE run_id = ${loaded.runId}`
     }
   }),
 )

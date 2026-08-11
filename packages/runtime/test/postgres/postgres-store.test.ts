@@ -519,7 +519,6 @@ describePostgres("postgres run store", () => {
           ownerId: claimed!.workerId,
           attemptFence: claimed!.attemptFence,
         }
-        const newerTranscript = textPrompt("owner-b transcript")
         const locked = yield* Deferred.make<void>()
         const takeover = Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient
@@ -543,7 +542,6 @@ describePostgres("postgres run store", () => {
               yield* sql`
                 UPDATE baton_runs
                 SET owner_worker_id = 'owner-b', attempt_fence = attempt_fence + 1,
-                  transcript_json = ${encodeJson(newerTranscript)},
                   lease_expires_at = NOW() + INTERVAL '10 seconds', updated_at = NOW()
                 WHERE run_id = ${receipt.runId}
               `
@@ -576,9 +574,8 @@ describePostgres("postgres run store", () => {
           const [run] = yield* sql<{
             readonly owner_worker_id: string | null
             readonly attempt_fence: number
-            readonly transcript_json: string | null
           }>`
-            SELECT owner_worker_id, attempt_fence, transcript_json
+            SELECT owner_worker_id, attempt_fence
             FROM baton_runs WHERE run_id = ${receipt.runId}
           `
           const [events] = yield* sql<{ readonly count: string }>`
@@ -590,7 +587,6 @@ describePostgres("postgres run store", () => {
         expect(state.run).toEqual({
           owner_worker_id: "owner-b",
           attempt_fence: claim.attemptFence + 1,
-          transcript_json: encodeJson(newerTranscript),
         })
         expect(state.eventCount).toBe(0)
       }).pipe(scopedWith(postgresLayer(url))),

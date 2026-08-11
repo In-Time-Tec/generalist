@@ -71,7 +71,7 @@ const fromEntry = (entry: { readonly _tag: string } & Record<string, unknown>): 
   return encodePayload(payload as Session.EntryPayload)
 }
 
-/** @internal Shared SQLite Session row codec used by atomic response commits. */
+/** @internal Shared SQL Session row codec used by dialect-native stores and atomic response commits. */
 export const SessionStorage: {
   readonly entryPayloadEquivalence: (self: Session.EntryPayload, that: Session.EntryPayload) => boolean
   readonly storeError: (message: string) => Session.SessionStoreError

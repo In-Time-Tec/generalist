@@ -14,7 +14,7 @@ import {
 import { childDigest } from "../../memory/digest.js"
 import { equals, resolveChild } from "../../executable-manifest.js"
 import { isTerminal } from "../../run.js"
-import { RunStore } from "../../run-store.js"
+import { PendingRunOutcome, RunStore } from "../../run-store.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
 import { messagingStoreMethods } from "./store-messaging.js"
 import type { RunRow } from "../rows.js"
@@ -55,9 +55,9 @@ import { admitStart as admitExactStart } from "../store-admit.js"
 import { admitSend } from "./store-admit.js"
 import { associateRegistrations, loadRegistrations } from "../executable-registrations.js"
 import { narrow } from "../../executable-registration.js"
-import { PendingRunOutcome } from "../../run-store.js"
 import { approvalResponse } from "../respond-approval.js"
 import { settlementNotifications } from "../settlement-notifications.js"
+import { makePostgresSessionStore } from "./session-store.js"
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
@@ -83,7 +83,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
     })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "postgres", multiWorker: true }),
-      sessionStore: () => Effect.succeed(Option.none()),
+      sessionStore: (sessionId) => Effect.succeed(Option.some(makePostgresSessionStore({ sessionId, run, runNoTxn }))),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) => run(admitSend(transactionHub, addressBindings, nextId, input)),
       admitStart: (input) =>
