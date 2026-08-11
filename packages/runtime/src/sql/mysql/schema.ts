@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const MIGRATION_LOCK = "baton_runtime_schema"
@@ -52,7 +52,6 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   responded_wait_ids_json LONGTEXT NOT NULL,
   driver_checkpoint_json LONGTEXT,
   suspension_json LONGTEXT,
-  transcript_json LONGTEXT,
   continuation_json LONGTEXT,
   pending_outcome_json LONGTEXT,
   owner_worker_id VARCHAR(255),
@@ -259,6 +258,26 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   CONSTRAINT baton_run_registrations_pin_fk FOREIGN KEY (pin) REFERENCES baton_executable_registrations(pin)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE INDEX baton_run_registrations_pin_idx ON baton_run_registrations(pin)`,
+  `CREATE TABLE IF NOT EXISTS baton_sessions (
+  session_id VARCHAR(255) PRIMARY KEY,
+  leaf_id VARCHAR(255),
+  next_seq BIGINT NOT NULL DEFAULT 0,
+  owner_token VARCHAR(255),
+  updated_at VARCHAR(30) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS baton_session_entries (
+  session_id VARCHAR(255) NOT NULL,
+  entry_id VARCHAR(255) NOT NULL,
+  parent_id VARCHAR(255),
+  seq BIGINT NOT NULL,
+  tag VARCHAR(32) NOT NULL,
+  payload_json LONGTEXT NOT NULL,
+  created_at VARCHAR(30) NOT NULL,
+  PRIMARY KEY (session_id, entry_id),
+  UNIQUE KEY baton_session_entries_seq_idx (session_id, seq),
+  KEY baton_session_entries_parent_idx (session_id, parent_id),
+  CONSTRAINT baton_session_entries_session_fk FOREIGN KEY (session_id) REFERENCES baton_sessions(session_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
 ]
 
 export const schemaChecksum = (): string => {

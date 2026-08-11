@@ -71,6 +71,8 @@ export const mysqlMessagingLayer = (database: MysqlDatabase) => (overrides: Mess
   )
 
 const RUNTIME_TABLES = [
+  "baton_session_entries",
+  "baton_sessions",
   "baton_run_registrations",
   "baton_executable_registrations",
   "baton_program_operations",

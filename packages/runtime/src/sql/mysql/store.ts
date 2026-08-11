@@ -22,8 +22,6 @@ import {
   getOperationByKey,
   recordOperation,
   startOperation,
-  completeOperation,
-  commitModelResponse,
   resolveOperation,
 } from "../store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim, retryExecution } from "../store-execution.js"
@@ -76,10 +74,12 @@ import {
 import { ProgramCapabilities } from "@batonfx/core"
 import { groupIdFromSuspension, resultFromInspection } from "../../child-group.js"
 import { encodeReason, WaitResolution } from "../../run-wait.js"
-import { Prompt } from "effect/unstable/ai"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../../execution-state.js"
 import { makeTransactionRunner } from "./transaction-events.js"
 import { settlementNotifications } from "../settlement-notifications.js"
+import { makeMysqlSessionStore } from "./session-store.js"
+import { makeMysqlModelResponseOperations } from "./store-model-response.js"
+import { MysqlOperationCommit } from "./operation-commit.js"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
@@ -169,7 +169,6 @@ export const makeMysqlServices = (
             driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
             executable_ref_json = ${encodeExecutableRef(executableRef)},
             suspension_json = ${encodeJson(ExecutionSuspension, input.suspension)},
-            transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
             continuation_json = CASE WHEN ${input.continuation === undefined ? 0 : 1} = 1
               THEN ${input.continuation === null || input.continuation === undefined ? null : encodeContinuation(input.continuation)}
               ELSE continuation_json END,
@@ -235,14 +234,14 @@ export const makeMysqlServices = (
             driver_checkpoint_json = COALESCE(${input.checkpoint === undefined ? null : encodeJson(ExecutionCheckpoint, input.checkpoint)}, driver_checkpoint_json),
             executable_ref_json = ${encodeExecutableRef(executableRef)},
             suspension_json = COALESCE(${input.suspension === undefined ? null : encodeJson(ExecutionSuspension, input.suspension)}, suspension_json),
-            transcript_json = COALESCE(${input.transcript === undefined ? null : encodeJson(Prompt.Prompt, input.transcript)}, transcript_json),
             updated_at = ${yield* nowIso}
           WHERE run_id = ${input.runId} AND owner_worker_id = ${input.ownerId} AND attempt_fence = ${input.attemptFence}
         `
       })
+    const modelResponseOperations = makeMysqlModelResponseOperations({ sql, hub: transactionHub, run })
     const store = RunStore.of({
       info: Effect.succeed({ durability: "durable", backend: "mysql", multiWorker: true }),
-      sessionStore: () => Effect.succeed(Option.none()),
+      sessionStore: (sessionId) => Effect.succeed(Option.some(makeMysqlSessionStore({ sessionId, run, runNoTxn }))),
       hasAdmission: (input) => runNoTxn(hasAdmission(input)),
       admitSend: (input) =>
         run(
@@ -416,9 +415,8 @@ export const makeMysqlServices = (
       emitAgentEvent: (input) => fenced(input, emitAgentEvent(transactionHub, input)),
       recordOperation: (input) => fenced(input, recordOperation(transactionHub, input)),
       startOperation: (input) => fenced(input, startOperation(input)),
-      completeOperation: (input) => fenced(input, completeOperation(transactionHub, input)),
-      commitModelResponse: (input) => fenced(input, commitModelResponse(transactionHub, input)),
-      commitInterruptedModelResponse: () => RuntimeUnavailable.make({ message: "unsupported by mysql" }),
+      completeOperation: (input) => fenced(input, MysqlOperationCommit.complete(transactionHub, input)),
+      ...modelResponseOperations,
       expireRunningOperation: (input) => fenced(input, expireRunningOperation(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),

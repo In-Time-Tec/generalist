@@ -53,7 +53,8 @@ export const strandedDeliverySuite = <StoreError, Extra = never>(
 
     it.live("returns a message to pending when its bound Run is cancelled without consuming it", () =>
       Effect.gen(function* () {
-        const { runtime, store, parent, first } = yield* familyFor("session:stranded-cancelled")
+        // This case owns cancellation before execution starts; an activated SQL Run is intentionally only cancelling.
+        const { runtime, store, parent, first } = yield* family("session:stranded-cancelled")
         yield* runtime.sendMessage({
           fromRunId: parent.runId,
           to: first.address,

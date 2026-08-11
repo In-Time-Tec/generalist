@@ -11,6 +11,8 @@ const describeMysql = mysqlAvailable ? describe.sequential : describe.skip
 const database = mysqlDatabase("migration")
 const client = database.client
 const tables = [
+  "baton_session_entries",
+  "baton_sessions",
   "baton_run_registrations",
   "baton_executable_registrations",
   "baton_program_operations",
@@ -54,7 +56,8 @@ const inspectSchema = Effect.gen(function* () {
     version: SCHEMA_VERSION,
     checksum: schemaChecksum(),
   })
-  expect(columns.map((row) => row.column_name)).toEqual(
+  const runColumns = columns.map((row) => row.column_name)
+  expect(runColumns).toEqual(
     expect.arrayContaining([
       "executable_ref_json",
       "executable_manifest_json",
@@ -62,6 +65,13 @@ const inspectSchema = Effect.gen(function* () {
       "pending_outcome_json",
     ]),
   )
+  expect(runColumns).not.toContain("transcript_json")
+  const sessionTables = yield* sql<{ table_name: string }>`
+    SELECT TABLE_NAME AS table_name FROM information_schema.tables
+    WHERE table_schema = DATABASE() AND table_name IN ('baton_sessions', 'baton_session_entries')
+    ORDER BY table_name
+  `
+  expect(sessionTables.map((row) => row.table_name)).toEqual(["baton_session_entries", "baton_sessions"])
   expect(migrations.map((row) => Number(row.migration_id))).toEqual([1])
 })
 
