@@ -155,6 +155,14 @@ const messageKey = (input: { readonly sessionId: string; readonly messageId: str
  * a terminal state without consuming it was never seen by any model, so it returns to pending and
  * the session's next Run takes it. Binding alone must not strand a message on a dead Run.
  */
+const settlementEntry = (entry: MailboxEntry): boolean => entry.entryId.startsWith("child-settled:")
+
+const deliverable = (state: MemoryState, entry: MailboxEntry): boolean => {
+  if (entry.to === sessionAddress(entry.targetSessionId)) return true
+  const target = [...state.runs.values()].find((run) => runAddress(run.runId) === entry.to)
+  return target !== undefined && !isTerminal(target.status)
+}
+
 const owed = (state: MemoryState, entry: MailboxEntry): boolean => {
   if (entry.deliveredRunId === undefined) return true
   const holder = state.runs.get(entry.deliveredRunId)
@@ -184,7 +192,7 @@ export const pendingMessages: {
       .filter(
         (entry) =>
           entry.targetSessionId === input.sessionId &&
-          !entry.entryId.startsWith("child-settled:") &&
+          !settlementEntry(entry) &&
           (input.runId === undefined ||
             entry.to === sessionAddress(input.sessionId) ||
             (entry.to === runAddress(input.runId) &&
@@ -214,7 +222,13 @@ export const settlementNotifications: {
     Effect.gen(function* () {
       const parent = yield* requireRun(state, input.parentRunId)
       return [...state.messages.values()]
-        .filter((entry) => entry.targetSessionId === parent.message.sessionId && entry.sequence > input.afterSequence)
+        .filter(
+          (entry) =>
+            entry.targetSessionId === parent.message.sessionId &&
+            entry.to === runAddress(input.parentRunId) &&
+            entry.entryId.startsWith("child-settled:") &&
+            entry.sequence > input.afterSequence,
+        )
         .sort((left, right) => left.sequence - right.sequence)
         .flatMap((entry) => {
           const notification = fromMailboxEntry(entry)
@@ -306,7 +320,8 @@ export const admitMessage: {
     }
     const now = yield* Clock.currentTimeMillis
     const forSession = [...state.messages.values()].filter((entry) => entry.targetSessionId === input.targetSessionId)
-    const pending = forSession.filter((entry) => owed(state, entry))
+    const quotaEntries = forSession.filter((entry) => !settlementEntry(entry) && deliverable(state, entry))
+    const pending = quotaEntries.filter((entry) => owed(state, entry))
     if (pending.length >= input.bounds.maxPending) {
       return yield* MailboxFull.make({ to: input.to, dimension: "pending", limit: input.bounds.maxPending })
     }
@@ -315,7 +330,7 @@ export const admitMessage: {
       return yield* MailboxFull.make({ to: input.to, dimension: "bytes", limit: input.bounds.maxPendingBytes })
     }
     const windowStart = now - input.bounds.windowMillis
-    const recent = forSession.filter((entry) => entry.admittedAtMillis > windowStart)
+    const recent = quotaEntries.filter((entry) => entry.admittedAtMillis > windowStart)
     if (recent.length >= input.bounds.maxPerWindow) {
       return yield* MailboxRateLimited.make({
         to: input.to,

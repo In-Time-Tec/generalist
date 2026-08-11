@@ -74,6 +74,52 @@ const decodeEntry = (row: MessageRow): MailboxEntry => ({
   ...(row.steering_entry_id === null ? {} : { steeringEntryId: row.steering_entry_id }),
 })
 
+const deliverable = (entry: MailboxEntry) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const target = yield* parseAddress(entry.to).pipe(Effect.option)
+    if (target._tag === "None") return false
+    if (target.value._tag === "Session") return true
+    const runId =
+      target.value._tag === "Run"
+        ? target.value.runId
+        : (yield* sql<{ run_id: string }>`
+              SELECT run_id FROM baton_agent_names
+              WHERE scope = ${target.value.scope} AND name = ${target.value.name}
+            `)[0]?.run_id
+    if (runId === undefined) return false
+    const run = yield* loadRun(runId)
+    return run !== undefined && !isTerminal(run.status)
+  })
+
+const quotaEntries = (input: { readonly sessionId: string; readonly admittedAfter?: number }) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const after = input.admittedAfter === undefined ? sql`` : sql`AND m.admitted_at_millis > ${input.admittedAfter}`
+    const rows = yield* sql<MessageRow>`
+      SELECT * FROM baton_messages m
+      WHERE m.target_session_id = ${input.sessionId}
+        AND m.entry_id NOT LIKE 'child-settled:%' ${after}
+        AND (
+          ${input.admittedAfter === undefined ? 0 : 1} = 1
+          OR m.delivered_run_id IS NULL
+          OR EXISTS (
+            SELECT 1 FROM baton_runs r
+            WHERE r.run_id = m.delivered_run_id
+              AND r.status IN ('succeeded', 'failed', 'cancelled')
+              AND NOT EXISTS (
+                SELECT 1 FROM baton_run_steering s
+                WHERE s.run_id = m.delivered_run_id
+                  AND s.entry_id = m.steering_entry_id
+                  AND s.consumed_operation_id IS NOT NULL
+              )
+          )
+        )
+    `
+    const decoded = rows.map(decodeEntry)
+    return yield* Effect.filter(decoded, deliverable)
+  })
+
 const entryFor = (input: {
   readonly runId: string
   readonly rootRunId: string
@@ -277,39 +323,18 @@ export const admitMessage = (input: AdmitMessageInput) =>
       } satisfies MessageReceipt
     }
     const now = yield* Clock.currentTimeMillis
-    const pending = yield* sql<{ pending: number | string; pending_bytes: number | string | null }>`
-      SELECT COUNT(*) AS pending, SUM(m.bytes) AS pending_bytes FROM baton_messages m
-      WHERE m.target_session_id = ${input.targetSessionId}
-        AND m.entry_id NOT LIKE 'child-settled:%' AND (
-        m.delivered_run_id IS NULL
-        OR EXISTS (
-          SELECT 1 FROM baton_runs r
-          WHERE r.run_id = m.delivered_run_id
-            AND r.status IN ('succeeded', 'failed', 'cancelled')
-            AND NOT EXISTS (
-              SELECT 1 FROM baton_run_steering s
-              WHERE s.run_id = m.delivered_run_id
-                AND s.entry_id = m.steering_entry_id
-                AND s.consumed_operation_id IS NOT NULL
-            )
-        )
-      )
-    `
-    const pendingCount = Number(pending[0]?.pending ?? 0)
+    const pending = yield* quotaEntries({ sessionId: input.targetSessionId })
+    const pendingCount = pending.length
     if (pendingCount >= input.bounds.maxPending) {
       return yield* MailboxFull.make({ to: input.to, dimension: "pending", limit: input.bounds.maxPending })
     }
-    const pendingBytes = Number(pending[0]?.pending_bytes ?? 0)
+    const pendingBytes = pending.reduce((total, entry) => total + entry.bytes, 0)
     if (pendingBytes + input.bytes > input.bounds.maxPendingBytes) {
       return yield* MailboxFull.make({ to: input.to, dimension: "bytes", limit: input.bounds.maxPendingBytes })
     }
     const windowStart = now - input.bounds.windowMillis
-    const recent = yield* sql<{ recent: number | string }>`
-      SELECT COUNT(*) AS recent FROM baton_messages
-      WHERE target_session_id = ${input.targetSessionId}
-        AND entry_id NOT LIKE 'child-settled:%' AND admitted_at_millis > ${windowStart}
-    `
-    if (Number(recent[0]?.recent ?? 0) >= input.bounds.maxPerWindow) {
+    const recent = yield* quotaEntries({ sessionId: input.targetSessionId, admittedAfter: windowStart })
+    if (recent.length >= input.bounds.maxPerWindow) {
       return yield* MailboxRateLimited.make({
         to: input.to,
         limit: input.bounds.maxPerWindow,

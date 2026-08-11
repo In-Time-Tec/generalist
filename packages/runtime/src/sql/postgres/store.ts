@@ -1,4 +1,5 @@
 import { Effect, Equal, Option, Stream } from "effect"
+import { listRuns } from "../store-list.js"
 import { SqlClient } from "effect/unstable/sql"
 import { PgClient } from "@effect/sql-pg"
 import { ApprovalStale, CursorExpired, IdempotencyConflict, ResponseConflict } from "../../errors.js"
@@ -20,7 +21,7 @@ import { makePostgresClaims } from "./store-claims.js"
 import { postgresOperations, type RunFn } from "./store-ops.js"
 import { claimExecution, loadExecution, requireExecutionClaim, saveExecution } from "../store-execution.js"
 import { retryExecution } from "../store-execution.js"
-import { decodeRunEffect, hasAdmission, loadRunWait } from "../store-helpers.js"
+import { hasAdmission, loadRunWait } from "../store-helpers.js"
 import { WaitResolution } from "../../run-wait.js"
 import { fanOutStoreMethods } from "./store-fan-out.js"
 import { deferCancelledFanOutParent, makeCancelRun } from "./store-cancel.js"
@@ -300,7 +301,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           }),
         ),
       cancel: (input) => run(lockRun(input.runId).pipe(Effect.andThen(cancelRun(input.runId, input.reason)))),
-      cancelSession: (input) => run(cancelSessionRuns({ sql, cancelRun, ...input })),
+      cancelSession: (input) => run(cancelSessionRuns({ lockRun, cancelRun, ...input })),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
       readSteering: (input) => run(requireExecutionClaim(input).pipe(Effect.andThen(readSteering(input)))),
       ...messagingStoreMethods({ run, runNoTxn, lockRun, lockMailbox }),
@@ -349,31 +350,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             Effect.ignore,
           ),
         }),
-      list: (input) =>
-        runNoTxn(
-          Effect.gen(function* () {
-            const rows =
-              input.status === undefined
-                ? yield* sql<RunRow>`SELECT * FROM baton_runs ORDER BY created_at DESC LIMIT ${input.limit}`
-                : yield* sql<RunRow>`SELECT * FROM baton_runs WHERE status = ${input.status} ORDER BY created_at DESC LIMIT ${input.limit}`
-            return yield* Effect.forEach(rows, (row) =>
-              Effect.gen(function* () {
-                const loaded = yield* decodeRunEffect(row)
-                const wait = yield* loadRunWait(loaded.runId, loaded.activeWaitId)
-                return {
-                  runId: loaded.runId,
-                  status: loaded.status,
-                  executableRef: loaded.executableRef,
-                  executableManifest: loaded.executableManifest,
-                  lastSequence: loaded.lastSequence,
-                  durability: "durable" as const,
-                  ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
-                  ...(wait === undefined ? {} : { wait }),
-                }
-              }),
-            )
-          }),
-        ),
+      list: (input) => runNoTxn(listRuns(input)),
       complete: (input) =>
         run(
           Effect.gen(function* () {

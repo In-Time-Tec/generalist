@@ -1,4 +1,5 @@
 import { Effect, Layer, Option } from "effect"
+import { listRuns } from "./store-list.js"
 import type { Scope } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import { CursorExpired, RunNotFound } from "../errors.js"
@@ -36,7 +37,7 @@ import {
   commitModelResponse,
   resolveOperation,
 } from "./store-operations.js"
-import { decodeRunEffect, hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
+import { hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
 import { commitInterruptedModelResponse } from "./interrupted-model-response.js"
 import {
   claimExecution,
@@ -208,42 +209,7 @@ export const makeSqliteRunStore = (
         ),
       treeHistory: (input) => runNoTxn(loadTreeHistory(input)),
       treeChanges: (rootRunId) => hub.subscribeTree({ rootRunId }),
-      list: (input) =>
-        runNoTxn(
-          Effect.gen(function* () {
-            const newest = (input.order ?? "newest") === "newest"
-            const statusFilter = input.status === undefined ? sql`` : sql`AND status = ${input.status}`
-            const afterFilter =
-              input.afterRunId === undefined
-                ? sql``
-                : newest
-                  ? sql`AND (r.created_at, r.run_id) < (SELECT w.created_at, w.run_id FROM baton_runs w WHERE w.run_id = ${input.afterRunId})`
-                  : sql`AND (r.created_at, r.run_id) > (SELECT w.created_at, w.run_id FROM baton_runs w WHERE w.run_id = ${input.afterRunId})`
-            const direction = newest ? sql`DESC` : sql`ASC`
-            const rows = yield* sql<import("./rows.js").RunRow>`
-              SELECT * FROM baton_runs r
-              WHERE r.run_id IS NOT NULL ${statusFilter} ${afterFilter}
-              ORDER BY r.created_at ${direction}, r.run_id ${direction}
-              LIMIT ${input.limit}
-            `
-            return yield* Effect.forEach(rows, (row) =>
-              Effect.gen(function* () {
-                const loaded = yield* decodeRunEffect(row)
-                const activeWait = yield* loadRunWait(loaded.runId, loaded.activeWaitId)
-                return {
-                  runId: loaded.runId,
-                  status: loaded.status,
-                  executableRef: loaded.executableRef,
-                  executableManifest: loaded.executableManifest,
-                  lastSequence: loaded.lastSequence,
-                  durability: "durable" as const,
-                  ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
-                  ...(activeWait === undefined ? {} : { wait: activeWait }),
-                }
-              }),
-            )
-          }),
-        ),
+      list: (input) => runNoTxn(listRuns(input)),
       complete: (input) =>
         runBuffered((transactionHub) =>
           requireExecutionClaim(input).pipe(

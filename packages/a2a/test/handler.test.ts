@@ -197,6 +197,8 @@ const makeRuntime = (acceptedSequence = 0) => {
       run.pending = []
       return Effect.void
     },
+    cancelSession: () => Effect.die("not used"),
+    awaitSessionTerminal: () => Effect.die("not used"),
     inspect: (runId) => Effect.succeed(inspection(runId, runs.get(runId)!)),
   }
   return { runtime, runs, sentRunIds, observedCursors }

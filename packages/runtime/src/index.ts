@@ -263,6 +263,8 @@ export namespace Runtime {
   export type RespondApprovalInput = import("./approval.js").RespondInput
   export type SignalInput = import("./runtime.js").SignalInput
   export type CancelInput = import("./runtime.js").CancelInput
+  export type CancelSessionInput = import("./runtime.js").CancelSessionInput
+  export type AwaitSessionTerminalInput = import("./runtime.js").AwaitSessionTerminalInput
   export type SteerInput = import("./runtime.js").SteerInput
   export type SendMessageInput = import("./runtime.js").SendMessageInput
   export type MessagesInput = import("./runtime.js").MessagesInput

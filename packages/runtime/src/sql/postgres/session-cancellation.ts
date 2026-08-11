@@ -3,10 +3,10 @@ import type { PgClient } from "@effect/sql-pg"
 import type { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import type { RunNotFound, RuntimeUnavailable } from "../../errors.js"
-import { activeSessionRuns, sessionRoots } from "../session-lifecycle.js"
+import { activeSessionRuns, sessionRoots, sessionRuns } from "../session-lifecycle.js"
 
 export const cancelSessionRuns = (input: {
-  readonly sql: SqlClient.SqlClient
+  readonly lockRun: (runId: string) => Effect.Effect<void, SqlError, SqlClient.SqlClient>
   readonly cancelRun: (
     runId: string,
     reason?: string,
@@ -16,7 +16,9 @@ export const cancelSessionRuns = (input: {
 }) =>
   Effect.gen(function* () {
     const roots = yield* sessionRoots(input.sessionId)
+    const runs = yield* sessionRuns(input.sessionId)
     const active = yield* activeSessionRuns(input.sessionId)
+    for (const runId of runs) yield* input.lockRun(runId)
     for (const runId of roots) {
       yield* input
         .cancelRun(runId, input.reason)

@@ -415,7 +415,7 @@ export const makeRuntime = (
           const addressTarget = yield* parseAddress(input.to)
           const durableTo = addressTarget._tag === "Session" ? input.to : runAddress(target.runId)
           yield* authorize({ sender, target, policy })
-          if (isTerminal(target.status)) {
+          if (addressTarget._tag !== "Session" && isTerminal(target.status)) {
             return yield* RunTerminal.make({ runId: target.runId, status: target.status })
           }
           const prompt = normalizePrompt(input.prompt)

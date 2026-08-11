@@ -52,6 +52,39 @@ const exactRegistrations = () => {
 }
 
 describeMysql("mysql run store", () => {
+  it.live("paginates every Run in deterministic keyset order beyond one scheduler window", () =>
+    withSchema(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const admitted: Array<string> = []
+        for (let index = 0; index < 70; index += 1) {
+          const receipt = yield* runtime.send({
+            to: assistantAddress,
+            sessionId: uniqueSession(`list-window-${index}`),
+            idempotencyKey: `list-window-${index}`,
+            prompt: textPrompt(`run ${index}`),
+          })
+          admitted.push(receipt.runId)
+        }
+        const listed: Array<string> = []
+        let afterRunId: string | undefined
+        do {
+          const page = yield* store.list({
+            order: "oldest",
+            limit: 16,
+            ...(afterRunId === undefined ? {} : { afterRunId }),
+          })
+          listed.push(...page.map((run) => run.runId))
+          afterRunId = page.length === 16 ? page[page.length - 1]?.runId : undefined
+          if (page.length < 16) break
+        } while (afterRunId !== undefined)
+        expect(listed).toHaveLength(70)
+        expect(new Set(listed)).toEqual(new Set(admitted))
+      }).pipe(scopedWith(mysqlLayer(url))),
+    ),
+  )
+
   beforeAll(database.provisioned, 60_000)
 
   it.live("persists exact-start registrations and replays admission idempotently", () =>

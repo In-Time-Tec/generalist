@@ -1,4 +1,5 @@
 import { Duration, Effect, Option, Ref, Schedule, Stream, type Scope } from "effect"
+import { listRuns } from "../store-list.js"
 import { SqlClient } from "effect/unstable/sql"
 import { CursorExpired, RunNotFound, RuntimeUnavailable } from "../../errors.js"
 import { checkpointRef } from "../../executable-manifest.js"
@@ -7,7 +8,6 @@ import { RunStore, type Interface as RunStoreInterface } from "../../run-store.j
 import { admitProgramChild, admitSend, admitSpawn, admitStart } from "../store-admit.js"
 import { cancel, complete, emitAgentEvent, fail, respond } from "../store-control.js"
 import { respondApproval, resume, settleAdmittedCancellation, signal } from "../store-control.js"
-import { cancelSession } from "../store-session.js"
 import {
   expireRunningOperation,
   getOperation,
@@ -17,16 +17,7 @@ import {
   resolveOperation,
 } from "../store-operations.js"
 import { claimExecution, loadExecution, requireExecutionClaim, retryExecution } from "../store-execution.js"
-import {
-  appendEvent,
-  decodeRunEffect,
-  hasAdmission,
-  loadEventsAfter,
-  loadRun,
-  loadRunWait,
-  nowIso,
-} from "../store-helpers.js"
-import type { RunRow } from "../rows.js"
+import { appendEvent, hasAdmission, loadEventsAfter, loadRun, loadRunWait, nowIso } from "../store-helpers.js"
 import { makeEventHub } from "../subscribers.js"
 import { admitSteering, readSteering, saveCompletionContinuation } from "../store-steering.js"
 import {
@@ -71,6 +62,7 @@ import { makeTransactionRunner } from "./transaction-events.js"
 import { settlementNotifications } from "../settlement-notifications.js"
 import { makeMysqlSessionStore } from "./session-store.js"
 import { reconcileCancellationRequested, sessionRoots } from "../session-lifecycle.js"
+import { cancelSessionRuns } from "./session-cancellation.js"
 import { makeMysqlModelResponseOperations } from "./store-model-response.js"
 import { MysqlOperationCommit } from "./operation-commit.js"
 export interface MysqlStoreOptions extends LayerOptions {
@@ -315,7 +307,8 @@ export const makeMysqlServices = (
             Effect.andThen(clearClaim(input.runId)),
           ),
         ),
-      cancelSession: (input) => run(cancelSession(transactionHub, input)),
+      cancelSession: (input) =>
+        run(cancelSessionRuns({ hub: transactionHub, lockRun, lockParent, clearClaim, ...input })),
       admitSteering: (input) => run(lockRun(input.runId).pipe(Effect.andThen(admitSteering(input)))),
       readSteering: (input) => fenced(input, readSteering(input)),
       directory: (runId) => runNoTxn(directory(runId)),
@@ -359,32 +352,7 @@ export const makeMysqlServices = (
         ),
       treeHistory: (input) => runNoTxn(loadTreeHistory(input)),
       treeChanges: (rootRunId) => hub.subscribeTree({ rootRunId }),
-      list: (input) =>
-        runNoTxn(
-          Effect.gen(function* () {
-            const limit = sql.literal(String(Math.max(0, Math.floor(input.limit))))
-            const rows =
-              input.status === undefined
-                ? yield* sql<RunRow>`SELECT * FROM baton_runs ORDER BY created_at DESC LIMIT ${limit}`
-                : yield* sql<RunRow>`SELECT * FROM baton_runs WHERE status = ${input.status} ORDER BY created_at DESC LIMIT ${limit}`
-            return yield* Effect.forEach(rows, (row) =>
-              Effect.gen(function* () {
-                const loaded = yield* decodeRunEffect(row)
-                const activeWait = yield* loadRunWait(loaded.runId, loaded.activeWaitId)
-                return {
-                  runId: loaded.runId,
-                  status: loaded.status,
-                  executableRef: loaded.executableRef,
-                  executableManifest: loaded.executableManifest,
-                  lastSequence: loaded.lastSequence,
-                  durability: "durable" as const,
-                  ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
-                  ...(activeWait === undefined ? {} : { wait: activeWait }),
-                }
-              }),
-            )
-          }),
-        ),
+      list: (input) => runNoTxn(listRuns(input)),
       complete: (input) =>
         fenced(
           input,

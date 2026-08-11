@@ -53,6 +53,27 @@ export const strandedDeliverySuite = <StoreError, Extra = never>(
      * Binding is not delivery. The model only sees a message when the turn carrying it commits, so a
      * Run that reaches a terminal state without that commit must not take the message with it.
      */
+    it.live("admits an explicit Session message after the currently resolved Run is terminal", () =>
+      Effect.gen(function* () {
+        const { runtime, store, parent, first } = yield* familyFor("session:terminal-admission")
+        const claim = yield* store.claimExecution({ runId: first.runId, ownerId: "finished" })
+        yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "finished" }) })
+        yield* runtime.sendMessage({
+          fromRunId: parent.runId,
+          to: AgentDirectory.sessionAddress(first.sessionId),
+          idempotencyKey: "after-terminal",
+          prompt: textPrompt("for the next run"),
+        })
+        const later = yield* runtime.send({
+          to: assistantAddress,
+          sessionId: first.sessionId,
+          idempotencyKey: "later-session-run",
+          prompt: textPrompt("later"),
+        })
+        expect(yield* store.deliverPendingMessages({ runId: later.runId })).toHaveLength(1)
+      }).pipe(provide),
+    )
+
     it.live("returns a message to pending when its bound Run dies without consuming it", () =>
       Effect.gen(function* () {
         const { runtime, store, parent, first } = yield* familyFor("session:stranded-terminal")

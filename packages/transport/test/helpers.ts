@@ -67,6 +67,8 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
       registerAgentName: () => Effect.die("unused registerAgentName"),
       resolveOperation: () => Effect.die("unused resolveOperation"),
       cancel: () => Effect.void,
+      cancelSession: () => Effect.void,
+      awaitSessionTerminal: () => Effect.void,
       inspect: (runId) =>
         Effect.succeed({
           runId,

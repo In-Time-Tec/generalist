@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
-import { Errors } from "../src/index.js"
+import { AgentDirectory, Errors } from "../src/index.js"
 import { completedResult, textPrompt } from "./helpers.js"
 import { messagingBackend, type MessagingBackend } from "./messaging-helpers.js"
 
@@ -271,7 +271,7 @@ export const messagingMailboxSuite = <StoreError, Extra = never>(backend: Messag
         for (const key of ["one", "two"]) {
           yield* runtime.sendMessage({
             fromRunId: parent.runId,
-            to: first.address,
+            to: AgentDirectory.sessionAddress(first.sessionId),
             idempotencyKey: key,
             prompt: textPrompt(key),
           })
@@ -285,6 +285,27 @@ export const messagingMailboxSuite = <StoreError, Extra = never>(backend: Messag
         // The holder never consumed them, so the session is owed both again and its bound is full.
         expect(yield* store.pendingMessages({ sessionId: first.sessionId, limit: 10 })).toHaveLength(2)
       }).pipe(provide({ mailboxBounds: { maxPending: 2 } })),
+    )
+
+    it.live("does not charge an undeliverable exact message after its Run terminates", () =>
+      Effect.gen(function* () {
+        const { runtime, store, parent, first } = yield* familyFor(session("exact-terminal-bound"))
+        yield* runtime.sendMessage({
+          fromRunId: parent.runId,
+          to: first.address,
+          idempotencyKey: "exact",
+          prompt: textPrompt("exact"),
+        })
+        const claim = yield* store.claimExecution({ runId: first.runId, ownerId: "doomed" })
+        yield* store.fail({ ...claim, error: Errors.AgentExecutionFailure.make({ message: "worker died" }) })
+        const admitted = yield* runtime.sendMessage({
+          fromRunId: parent.runId,
+          to: AgentDirectory.sessionAddress(first.sessionId),
+          idempotencyKey: "session",
+          prompt: textPrompt("session"),
+        })
+        expect(admitted.duplicate).toBe(false)
+      }).pipe(provide({ mailboxBounds: { maxPending: 1 } })),
     )
 
     it.live("refuses a message that would exceed the pending byte bound", () =>
