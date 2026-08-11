@@ -56,7 +56,6 @@ export const update: {
           lastSeq: -1,
           run: Idle(),
           entries: [],
-          streaming: null,
         },
         [],
         Option.none(),

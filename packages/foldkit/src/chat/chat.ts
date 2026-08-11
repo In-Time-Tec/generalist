@@ -35,11 +35,6 @@ const AwaitingApprovalFields = {
 }
 const ClickedDenyFields = { reason: Schema.NullOr(Schema.String) }
 const ReceivedAgentFields = { incoming: Incoming }
-const ModelStreaming = Schema.Struct({
-  turn: Schema.Finite,
-  text: Schema.String,
-  reasoning: Schema.String,
-})
 const ModelConnection = Schema.Literals(["disconnected", "connecting", "open", "reconnecting"])
 
 /** @experimental */
@@ -96,7 +91,6 @@ export interface Model {
   readonly lastSeq: number
   readonly run: RunState
   readonly entries: ReadonlyArray<ChatEntry>
-  readonly streaming: typeof ModelStreaming.Type | null
   readonly draft: string
 }
 
@@ -107,7 +101,6 @@ export const Model: Schema.Schema<Model> = Schema.Struct({
   lastSeq: Schema.Finite,
   run: RunState,
   entries: Schema.Array(ChatEntry),
-  streaming: Schema.NullOr(ModelStreaming),
   draft: Schema.String,
 })
 
@@ -229,7 +222,7 @@ export const PromptInputStatus = Schema.Literals(["idle", "submitted", "streamin
 export type PromptInputStatus = typeof PromptInputStatus.Type
 
 /** @experimental */
-export const ToolStatus = Schema.Literals(["input-streaming", "input-available", "output-available", "output-error"])
+export const ToolStatus = Schema.Literals(["input-available", "output-available", "output-error"])
 
 /** @experimental */
 export type ToolStatus = typeof ToolStatus.Type
@@ -262,24 +255,6 @@ export const ToolConversationItem: CallableTaggedStruct<
   entry: ToolEntry,
   status: ToolStatus,
   input: Schema.String,
-})
-
-/** @experimental */
-export const StreamingConversationItem: CallableTaggedStruct<
-  "StreamingConversationItem",
-  {
-    key: typeof Schema.String
-    align: typeof MessageAlign
-    text: typeof Schema.String
-    reasoning: typeof Schema.String
-    isStreaming: typeof Schema.Boolean
-  }
-> = m("StreamingConversationItem", {
-  key: Schema.String,
-  align: MessageAlign,
-  text: Schema.String,
-  reasoning: Schema.String,
-  isStreaming: Schema.Boolean,
 })
 
 /** @experimental */
@@ -317,7 +292,6 @@ export type ConversationItem =
   | typeof UserConversationItem.Type
   | typeof AssistantConversationItem.Type
   | typeof ToolConversationItem.Type
-  | typeof StreamingConversationItem.Type
   | typeof WaitingConversationItem.Type
   | typeof ApprovalConversationItem.Type
   | typeof FailureConversationItem.Type
@@ -327,7 +301,6 @@ export const ConversationItem: Schema.Schema<ConversationItem> = Schema.Union([
   UserConversationItem,
   AssistantConversationItem,
   ToolConversationItem,
-  StreamingConversationItem,
   WaitingConversationItem,
   ApprovalConversationItem,
   FailureConversationItem,
@@ -343,7 +316,6 @@ export const initialModel = (sessionId: string | null = null): Model => ({
   lastSeq: -1,
   run: Idle(),
   entries: [],
-  streaming: null,
   draft: "",
 })
 
@@ -425,7 +397,7 @@ export const promptInputStatusOf = (run: RunState): PromptInputStatus => {
 export const toolStatusOf = (entry: typeof ToolEntry.Type): ToolStatus => {
   switch (entry.outcome._tag) {
     case "Pending":
-      return entry.phase === "executing" ? "input-available" : "input-streaming"
+      return "input-available"
     case "Completed":
       return entry.outcome.isFailure ? "output-error" : "output-available"
   }
@@ -451,22 +423,8 @@ const conversationItemFor = (entry: ChatEntry, index: number): ConversationItem 
 /** @experimental */
 export const conversationItems = (model: Model): ReadonlyArray<ConversationItem> => {
   const entries = model.entries.map(conversationItemFor)
-  const streaming =
-    model.streaming === null
-      ? []
-      : [
-          StreamingConversationItem({
-            key: "streaming-assistant",
-            align: "start",
-            text: model.streaming.text,
-            reasoning: model.streaming.reasoning,
-            isStreaming: true,
-          }),
-        ]
   const waiting =
-    model.run._tag === "Running" && model.streaming === null
-      ? [WaitingConversationItem({ key: "waiting-assistant", align: "start" })]
-      : []
+    model.run._tag === "Running" ? [WaitingConversationItem({ key: "waiting-assistant", align: "start" })] : []
   const approval =
     model.run._tag === "AwaitingApproval"
       ? [
@@ -483,7 +441,7 @@ export const conversationItems = (model: Model): ReadonlyArray<ConversationItem>
     model.run._tag === "Failed"
       ? [FailureConversationItem({ key: "run-failure", align: "start", message: model.run.message })]
       : []
-  return [...entries, ...streaming, ...waiting, ...approval, ...failure]
+  return [...entries, ...waiting, ...approval, ...failure]
 }
 
 export { update, subscriptions } from "./chat-update-logic.js"

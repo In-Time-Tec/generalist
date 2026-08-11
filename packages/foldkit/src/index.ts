@@ -33,7 +33,6 @@ import {
   UserConversationItem as Chat_UserConversationItem,
   AssistantConversationItem as Chat_AssistantConversationItem,
   ToolConversationItem as Chat_ToolConversationItem,
-  StreamingConversationItem as Chat_StreamingConversationItem,
   WaitingConversationItem as Chat_WaitingConversationItem,
   ApprovalConversationItem as Chat_ApprovalConversationItem,
   FailureConversationItem as Chat_FailureConversationItem,
@@ -83,7 +82,6 @@ export const Chat = {
   UserConversationItem: Chat_UserConversationItem,
   AssistantConversationItem: Chat_AssistantConversationItem,
   ToolConversationItem: Chat_ToolConversationItem,
-  StreamingConversationItem: Chat_StreamingConversationItem,
   WaitingConversationItem: Chat_WaitingConversationItem,
   ApprovalConversationItem: Chat_ApprovalConversationItem,
   FailureConversationItem: Chat_FailureConversationItem,
@@ -133,7 +131,6 @@ export namespace Chat {
   export type UserConversationItem = typeof import("./chat/chat.js").UserConversationItem
   export type AssistantConversationItem = typeof import("./chat/chat.js").AssistantConversationItem
   export type ToolConversationItem = typeof import("./chat/chat.js").ToolConversationItem
-  export type StreamingConversationItem = typeof import("./chat/chat.js").StreamingConversationItem
   export type WaitingConversationItem = typeof import("./chat/chat.js").WaitingConversationItem
   export type ApprovalConversationItem = typeof import("./chat/chat.js").ApprovalConversationItem
   export type FailureConversationItem = typeof import("./chat/chat.js").FailureConversationItem

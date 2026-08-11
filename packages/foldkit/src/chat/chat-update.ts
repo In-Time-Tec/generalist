@@ -66,64 +66,17 @@ const catchCommandFailure = <A>(
     ),
   )
 
-interface StreamingState {
-  readonly turn: number
-  readonly text: string
-  readonly reasoning: string
-}
-
-interface ToolCallLike {
-  readonly type: "tool-call"
-  readonly id: string
-  readonly name: string
-  readonly params: unknown
-}
-
-interface ToolResultLike {
-  readonly type: "tool-result"
-  readonly id: string
-  readonly name: string
-  readonly result: unknown
-  readonly isFailure: boolean
-}
-
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null
-
-const isToolCall = (value: unknown): value is ToolCallLike =>
-  isRecord(value) &&
-  value.type === "tool-call" &&
-  typeof value.id === "string" &&
-  typeof value.name === "string" &&
-  "params" in value
-
-const isToolResult = (value: unknown): value is ToolResultLike =>
-  isRecord(value) &&
-  value.type === "tool-result" &&
-  typeof value.id === "string" &&
-  typeof value.name === "string" &&
-  "result" in value &&
-  typeof value.isFailure === "boolean"
-
-const streamingFor = (model: Model, turn: number): StreamingState =>
-  model.streaming ?? { turn, text: "", reasoning: "" }
-
-const appendStreaming = (model: Model, turn: number, field: "text" | "reasoning", delta: string): Model => {
-  const streaming = streamingFor(model, turn)
-  return { ...model, streaming: { ...streaming, [field]: streaming[field] + delta } }
-}
-
-const flushStreaming = (model: Model): Model => {
-  if (model.streaming === null) return model
-  const { text, reasoning } = model.streaming
-  const entry =
-    text.length === 0 && reasoning.length === 0 ? [] : [AssistantEntry({ text, reasoning: reasoning || null })]
-  return { ...model, entries: [...model.entries, ...entry], streaming: null }
-}
+type ModelResponseEvent = Extract<
+  RunEvent.RunEvent,
+  { readonly _tag: "ModelResponseCommitted" | "ModelResponseInterrupted" }
+>
+type SemanticPart = ModelResponseEvent["response"]["content"][number]
+type ToolCallLike = Extract<SemanticPart, { readonly type: "tool-call" }>
+type ToolResultLike = Extract<SemanticPart, { readonly type: "tool-result" }>
 
 const upsertToolCall = (
   entries: ReadonlyArray<ChatEntry>,
-  call: ToolCallLike,
+  call: Pick<ToolCallLike, "id" | "name" | "params">,
   phase: ToolPendingPhase = "called",
 ): ReadonlyArray<ChatEntry> => {
   const index = entries.findIndex((entry) => entry._tag === "ToolEntry" && entry.callId === call.id)
@@ -142,8 +95,11 @@ const upsertToolCall = (
   return entries.map((entry, entryIndex) => (entryIndex === index ? next : entry))
 }
 
-const resolveTool = (entries: ReadonlyArray<ChatEntry>, result: ToolResultLike): ReadonlyArray<ChatEntry> => {
-  const withCall = upsertToolCall(entries, { type: "tool-call", id: result.id, name: result.name, params: undefined })
+const resolveTool = (
+  entries: ReadonlyArray<ChatEntry>,
+  result: Pick<ToolResultLike, "id" | "name" | "result" | "isFailure">,
+): ReadonlyArray<ChatEntry> => {
+  const withCall = upsertToolCall(entries, { id: result.id, name: result.name, params: undefined })
   return withCall.map((entry) =>
     entry._tag === "ToolEntry" && entry.callId === result.id
       ? ToolEntry({
@@ -172,31 +128,39 @@ const addProgress = (entries: ReadonlyArray<ChatEntry>, callId: string, message:
       : entry,
   )
 
-const applyPart = (model: Model, turn: number, part: unknown): Model => {
-  if (!isRecord(part) || typeof part.type !== "string") return model
-  switch (part.type) {
-    case "text-delta":
-      return typeof part.delta === "string" ? appendStreaming(model, turn, "text", part.delta) : model
-    case "reasoning-delta":
-      return typeof part.delta === "string" ? appendStreaming(model, turn, "reasoning", part.delta) : model
-    case "tool-call":
-      return isToolCall(part) ? { ...model, entries: upsertToolCall(model.entries, part) } : model
-    case "tool-result":
-      return isToolResult(part) ? { ...model, entries: resolveTool(model.entries, part) } : model
-    default:
-      return model
+const applyModelResponse = (model: Model, event: ModelResponseEvent): Model => {
+  let entries = model.entries
+  let text = ""
+  let reasoning = ""
+  for (const part of event.response.content) {
+    switch (part.type) {
+      case "text":
+        text += part.text
+        break
+      case "reasoning":
+        reasoning += part.text
+        break
+      case "tool-call":
+        entries = upsertToolCall(entries, part)
+        break
+      case "tool-result":
+        entries = resolveTool(entries, part)
+        break
+    }
   }
+  if (text.length > 0 || reasoning.length > 0) {
+    entries = [...entries, AssistantEntry({ text, reasoning: reasoning || null })]
+  }
+  return { ...model, entries }
 }
 
 const applyEvent = (model: Model, event: RunEvent.RunEvent): readonly [Model, Option.Option<Output>] => {
   switch (event._tag) {
     case "TurnStarted":
-      return [
-        { ...model, run: Running({ turn: event.turn }), streaming: { turn: event.turn, text: "", reasoning: "" } },
-        Option.none(),
-      ]
-    case "ModelPart":
-      return [applyPart(model, event.turn, event.part), Option.none()]
+      return [{ ...model, run: Running({ turn: event.turn }) }, Option.none()]
+    case "ModelResponseCommitted":
+    case "ModelResponseInterrupted":
+      return [applyModelResponse(model, event), Option.none()]
     case "ToolExecutionStarted":
       return [{ ...model, entries: upsertToolCall(model.entries, event.call, "executing") }, Option.none()]
     case "ApprovalRequested":
@@ -225,7 +189,7 @@ const applyEvent = (model: Model, event: RunEvent.RunEvent): readonly [Model, Op
     case "CompactionFailed":
       return [model, Option.none()]
     case "TurnCompleted":
-      return [flushStreaming(model), Option.none()]
+      return [model, Option.none()]
     case "StructuredOutput":
       return [model, Option.none()]
     default:
@@ -252,16 +216,15 @@ const applyRunEvent = (model: Model, event: RunEvent.RunEvent): readonly [Model,
           ]
         : [withSequence, Option.none()]
     case "RunCompleted": {
-      const flushed = flushStreaming(withSequence)
       const text = "_tag" in event.result ? (JSON.stringify(event.result.value) ?? "null") : event.result.text
-      return [{ ...flushed, run: Idle() }, Option.some(RunCompleted({ text }))]
+      return [{ ...withSequence, run: Idle() }, Option.some(RunCompleted({ text }))]
     }
     case "RunFailed": {
       const message = event.error.message
       return [{ ...withSequence, run: Failed({ message }) }, Option.some(RunFailed({ message }))]
     }
     case "RunCancelled":
-      return [{ ...withSequence, run: Idle(), streaming: null }, Option.none()]
+      return [{ ...withSequence, run: Idle() }, Option.none()]
     default:
       return applyEvent(withSequence, event)
   }
