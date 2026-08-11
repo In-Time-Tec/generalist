@@ -94,6 +94,110 @@ const trailingParts: ReadonlyArray<StreamPart> = [
 ]
 
 describe("model response builder", () => {
+  it("takes stable partial snapshots without finalizing the builder", () => {
+    const builder = make<Tools>()
+    const call = Response.makePart("tool-call", {
+      id: "call",
+      name: "lookup",
+      params: { query: "baton" },
+      providerExecuted: false,
+      metadata: { provider: { validated: true } },
+    })
+
+    builder.accept(
+      Response.makePart("text-delta", {
+        id: "answer",
+        delta: "hel",
+        metadata: { provider: { phase: "partial" } },
+      }),
+    )
+    builder.accept(
+      Response.makePart("reasoning-delta", {
+        id: "reasoning",
+        delta: "think",
+        metadata: { provider: { phase: "partial" } },
+      }),
+    )
+    builder.accept(Response.makePart("tool-params-start", { id: "call", name: "lookup", providerExecuted: false }))
+    builder.accept(Response.makePart("tool-params-delta", { id: "call", delta: '{"query":"bat' }))
+
+    const partial = builder.snapshot()
+
+    expect(partial.content).toEqual([
+      Response.makePart("text", { text: "hel", metadata: { provider: { phase: "partial" } } }),
+      Response.makePart("reasoning", { text: "think", metadata: { provider: { phase: "partial" } } }),
+    ])
+    expect(partial.content.every((part) => part.type !== "tool-call")).toBe(true)
+    expect(Object.hasOwn(partial, "usage")).toBe(false)
+    expect(Object.hasOwn(partial, "finishReason")).toBe(false)
+
+    builder.accept(
+      Response.makePart("text-delta", {
+        id: "answer",
+        delta: "lo",
+        metadata: { provider: { final: true } },
+      }),
+    )
+    builder.accept(
+      Response.makePart("reasoning-delta", {
+        id: "reasoning",
+        delta: " again",
+        metadata: { provider: { signed: true } },
+      }),
+    )
+    builder.accept(Response.makePart("tool-params-end", { id: "call" }))
+    builder.accept(call)
+    builder.accept(finish)
+
+    const finalSnapshot = builder.snapshot()
+
+    expect(finalSnapshot.content).toEqual([
+      Response.makePart("text", {
+        text: "hello",
+        metadata: { provider: { phase: "partial", final: true } },
+      }),
+      Response.makePart("reasoning", {
+        text: "think again",
+        metadata: { provider: { phase: "partial", signed: true } },
+      }),
+      call,
+      finish,
+    ])
+    expect(finalSnapshot.usage).toBe(usage)
+    expect(finalSnapshot.finishReason).toBe("tool-calls")
+    expect(partial.content).toEqual([
+      Response.makePart("text", { text: "hel", metadata: { provider: { phase: "partial" } } }),
+      Response.makePart("reasoning", { text: "think", metadata: { provider: { phase: "partial" } } }),
+    ])
+
+    const completed = builder.complete()
+    expect(completed).toEqual(finalSnapshot)
+    expect(builder.complete()).toBe(completed)
+    expect(builder.snapshot()).toBe(completed)
+    expect(Object.isFrozen(completed)).toBe(true)
+    expect(Object.isFrozen(completed.content)).toBe(true)
+    expect(() => builder.accept(Response.makePart("text-delta", { id: "answer", delta: "!" }))).toThrow(
+      "Cannot accept a model response part after completion",
+    )
+  })
+
+  it("snapshots 10,000 fragments and continues accumulating", () => {
+    const builder = make<Tools>()
+    for (let index = 0; index < 10_000; index += 1) {
+      builder.accept(Response.makePart("text-delta", { id: "answer", delta: "x" }))
+    }
+
+    const partial = builder.snapshot()
+    expect(text(partial)).toBe("x".repeat(10_000))
+
+    builder.accept(Response.makePart("text-delta", { id: "answer", delta: "tail" }))
+    const next = builder.snapshot()
+
+    expect(text(partial)).toBe("x".repeat(10_000))
+    expect(text(next)).toBe(`${"x".repeat(10_000)}tail`)
+    expect(builder.complete()).toEqual(next)
+  })
+
   it("normalizes one delta and 10,000 provider fragments to identical semantic output", () => {
     const expectedText = "x".repeat(5_000)
     const oneDelta = normalize([

@@ -10,6 +10,7 @@ export interface CompletedModelResponse<Tools extends Record<string, Tool.Any>> 
 /** @experimental Incrementally normalizes validated provider stream parts. */
 export interface Builder<Tools extends Record<string, Tool.Any>> {
   readonly accept: (part: Response.StreamPart<Tools>) => void
+  readonly snapshot: () => CompletedModelResponse<Tools>
   readonly complete: () => CompletedModelResponse<Tools>
 }
 
@@ -155,29 +156,35 @@ export const make = <Tools extends Record<string, Tool.Any>>(): Builder<Tools> =
     }
   }
 
-  const complete = (): CompletedModelResponse<Tools> => {
-    if (completed !== undefined) return completed
+  const materialize = (): CompletedModelResponse<Tools> => {
     const content = new Array<Response.Part<Tools>>()
     for (const entry of entries) {
       if (entry.kind === "part") {
         content.push(entry.part)
       } else if (entry.buffer.size > 0 || hasMetadata(entry.metadata)) {
+        const metadata = { ...entry.metadata }
         content.push(
           entry.kind === "text"
-            ? Response.makePart("text", { text: entry.buffer.toString(), metadata: entry.metadata })
-            : Response.makePart("reasoning", { text: entry.buffer.toString(), metadata: entry.metadata }),
+            ? Response.makePart("text", { text: entry.buffer.toString(), metadata })
+            : Response.makePart("reasoning", { text: entry.buffer.toString(), metadata }),
         )
       }
     }
-    completed = Object.freeze({
+    return Object.freeze({
       content: Object.freeze(content),
       ...(usage === undefined ? {} : { usage }),
       ...(finishReason === undefined ? {} : { finishReason }),
     })
+  }
+
+  const snapshot = (): CompletedModelResponse<Tools> => completed ?? materialize()
+
+  const complete = (): CompletedModelResponse<Tools> => {
+    if (completed === undefined) completed = materialize()
     return completed
   }
 
-  return { accept, complete }
+  return { accept, snapshot, complete }
 }
 
 /** @experimental Concatenates the normalized visible text of a completed response. */
