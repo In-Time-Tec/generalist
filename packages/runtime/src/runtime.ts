@@ -51,6 +51,7 @@ import type { RespondInput as RespondApprovalInput } from "./approval.js"
 import type { ExecutableRegistration } from "./executable-registration.js"
 import type { Duration } from "effect"
 import type { Notification as ChildSettlementNotification } from "./child-settlement.js"
+import type { ModelPreview } from "./model-preview.js"
 
 export type { InitialFanOutInput } from "./fan-out.js"
 
@@ -137,6 +138,11 @@ export interface EventsInput {
 
 export interface HistoryInput extends EventsInput {
   readonly limit: number
+}
+
+/** @experimental Select the disposable live preview lane for one Run. */
+export interface PreviewsInput {
+  readonly runId: string
 }
 
 export interface ListInput {
@@ -280,6 +286,8 @@ export interface Interface {
   readonly send: (input: SendInput) => Effect.Effect<RunReceipt, SendError>
   readonly spawn: (input: SpawnInput) => Effect.Effect<RunReceipt, SpawnError>
   readonly events: (input: EventsInput) => Stream.Stream<RunEvent, EventsError>
+  /** @experimental Observe bounded memory-only model previews without replay or execution authority. */
+  readonly previews: (input: PreviewsInput) => Stream.Stream<ModelPreview>
   readonly snapshot: (runId: string) => Effect.Effect<RunSnapshot, InspectError>
   readonly history: (input: HistoryInput) => Effect.Effect<ReadonlyArray<RunEvent>, EventsError>
   readonly treeHistory: (

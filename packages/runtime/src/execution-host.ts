@@ -24,6 +24,7 @@ import { approvalReason } from "./run-wait.js"
 import { makeAgentExecutionFailure } from "./agent-execution-failure.js"
 import { make as makeExecutionRetry } from "./execution-retry.js"
 import { make as makeAgentRunOptions } from "./agent-run-options.js"
+import { ModelPreviewLane, open as openModelPreview } from "./model-preview.js"
 export interface Options {
   readonly workerId: string
   readonly resolver: ExecutableResolverInterface
@@ -38,6 +39,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
   Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
+    const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
     const executeClaim = (claim: ExecutionClaim): Effect.Effect<void> =>
       Effect.gen(function* () {
         const claimed = yield* store.loadExecution(claim.runId)
@@ -57,7 +59,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
           activeOperationIds,
           completingRetrySafeOperationIds,
         })
-
         const scopedExecution = Effect.scoped(
           Effect.gen(function* () {
             const resolution = yield* options.resolver
@@ -91,12 +92,10 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               })
               return
             }
-
             if (resolved._tag === "Program") {
               yield* executeProgram({ claim, claimed, store, resolution: resolved })
               return
             }
-
             const activeEntry = claimed.executableManifest.entries.find(
               (entry) => entry._tag === "Agent" && entry.pin === claimed.executableRef.active,
             )
@@ -111,6 +110,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
             ): Effect.Effect<void, never, Scope.Scope> =>
               Effect.gen(function* () {
                 const nested = yield* makeNestedOperations({ claim, claimed, store })
+                const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
                 const baseContext = Context.merge(
                   yield* hostContext({ agent, environment, store, codeMode, nested }),
                   yield* sessionContext({ store, sessionId: claimed.message.sessionId }),
@@ -346,6 +346,10 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         Stream.runForEach((event) =>
                           Effect.gen(function* () {
                             yield* executionRetry.observe(event)
+                            if (event._tag === "ModelPart") {
+                              yield* preview.offer(event)
+                              return
+                            }
                             if (event._tag === "Completed") {
                               const result = {
                                 text: event.text,
@@ -372,6 +376,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         Effect.provideContext(context),
                         Effect.exit,
                       )
+                      yield* preview.clear
                       if (exit._tag === "Success") {
                         const next = yield* Ref.get(pendingCompletion)
                         if (next === undefined) return
@@ -455,7 +460,6 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                           Effect.catch((error) => (Schema.is(RunTerminal)(error) ? Effect.void : Effect.fail(error))),
                         )
                     }).pipe(Effect.orDie)
-
                   const continuation = claimed.continuation
                   const checkpoint =
                     claimed.checkpoint !== undefined && "driverVersion" in claimed.checkpoint

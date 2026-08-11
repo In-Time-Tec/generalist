@@ -215,6 +215,18 @@ export namespace RunEvent {
 
 export { Errors } from "./facade/errors.js"
 
+import {
+  MaxCharacters as ModelPreview_MaxCharacters,
+  MaxCadenceMillis as ModelPreview_MaxCadenceMillis,
+} from "./model-preview.js"
+export const ModelPreview = {
+  MaxCharacters: ModelPreview_MaxCharacters,
+  MaxCadenceMillis: ModelPreview_MaxCadenceMillis,
+} as const
+export namespace ModelPreview {
+  export type ModelPreview = import("./model-preview.js").ModelPreview
+}
+
 import { Runtime as Runtime_Runtime } from "./runtime.js"
 import { layer as Runtime_layer, layerMemory as Runtime_layerMemory } from "./memory/runtime-layer.js"
 import { layerSqlite as Runtime_layerSqlite } from "./platform-layers.js"
@@ -244,6 +256,8 @@ export namespace Runtime {
   export type SpawnInput = import("./runtime.js").SpawnInput
   export type EventsInput = import("./runtime.js").EventsInput
   export type HistoryInput = import("./runtime.js").HistoryInput
+  export type PreviewsInput = import("./runtime.js").PreviewsInput
+  export type ModelPreview = import("./model-preview.js").ModelPreview
   export type ListInput = import("./runtime.js").ListInput
   export type RespondInput = import("./runtime.js").RespondInput
   export type RespondApprovalInput = import("./approval.js").RespondInput

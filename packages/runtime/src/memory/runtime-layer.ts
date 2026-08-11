@@ -34,6 +34,7 @@ import { parseCursor } from "../tree-parse.js"
 import { decodePinned, equals, resolveChild, type PinnedExecutable } from "../executable-manifest.js"
 import { makeInput as makeResolverInput } from "../executable-resolver.js"
 import type { ExecutableRegistration } from "../executable-registration.js"
+import { ModelPreviewLane, layer as modelPreviewLayer, previews as modelPreviews } from "../model-preview.js"
 
 type Registrations = ReadonlyArray<ExecutableRegistration>
 import { validate as validateRegistrations } from "../executable-registration.js"
@@ -75,6 +76,7 @@ export const makeRuntime = (
   Effect.gen(function* () {
     const store = yield* RunStore
     const active = yield* ActiveExecutions
+    const previewLane = yield* Effect.serviceOption(ModelPreviewLane)
     const policy = makePolicy(options.messagingPolicy ?? {})
     const bounds = { ...defaultBounds, ...options.mailboxBounds }
     const addresses = new Map<
@@ -372,6 +374,7 @@ export const makeRuntime = (
           runId: input.runId,
           cursor: input.cursor ?? cursorOrigin,
         }),
+      previews: (input) => modelPreviews(previewLane)(input.runId),
       snapshot: (runId) => store.snapshot(runId),
       history: (input) =>
         store.history({ runId: input.runId, cursor: input.cursor ?? cursorOrigin, limit: input.limit }),
@@ -460,9 +463,10 @@ export const makeRuntime = (
 export const layer = (options: LayerOptions): Layer.Layer<Runtime | RunStore | ExecutionHost | LocalScheduler> => {
   const store = Layer.effect(RunStore, makeRunStore(options))
   const active = activeExecutionsLayer
-  const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(Layer.merge(store, active)))
+  const dependencies = Layer.mergeAll(store, active, modelPreviewLayer)
+  const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(dependencies))
   const host = Layer.effect(ExecutionHost, makeExecutionHost({ workerId: "memory", resolver: options.resolver })).pipe(
-    Layer.provide(Layer.merge(store, active)),
+    Layer.provide(dependencies),
   )
   const scheduler = localSchedulerLayer({ workerId: "memory", ...options.scheduler }).pipe(
     Layer.provide(Layer.mergeAll(store, active, host)),

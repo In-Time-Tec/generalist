@@ -8,6 +8,7 @@ import { Runtime } from "../../runtime.js"
 import { RunStore } from "../../run-store.js"
 import { RunClaims } from "../run-claims.js"
 import { makeMysqlServices, type MysqlStoreError, type MysqlStoreOptions } from "./store.js"
+import { layer as modelPreviewLayer } from "../../model-preview.js"
 
 export type { MysqlStoreOptions }
 
@@ -24,7 +25,7 @@ export const layerMysql = (
       Effect.map(({ store, claims }) => Context.make(RunStore, store).pipe(Context.add(RunClaims, claims))),
     ),
   ).pipe(Layer.provide(client))
-  const dependencies = Layer.merge(services, activeExecutionsLayer)
+  const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
   const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(dependencies))
   const host = Layer.effect(ExecutionHost, makeExecutionHost({ workerId: "mysql", resolver: options.resolver })).pipe(
     Layer.provide(dependencies),

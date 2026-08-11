@@ -9,6 +9,7 @@ import { makePostgresServices } from "./store.js"
 import { ExecutionHost, make as makeExecutionHost } from "../../execution-host.js"
 import { layer as activeExecutionsLayer } from "../../active-executions.js"
 import type { LayerOptions } from "../../runtime.js"
+import { layer as modelPreviewLayer } from "../../model-preview.js"
 import type {
   SchemaChecksumMismatch,
   SchemaDirty,
@@ -37,7 +38,7 @@ export const layerPostgres = (
       Effect.map(({ store, claims }) => Context.make(RunStore, store).pipe(Context.add(RunClaims, claims))),
     ),
   ).pipe(Layer.provide(client))
-  const dependencies = Layer.merge(services, activeExecutionsLayer)
+  const dependencies = Layer.mergeAll(services, activeExecutionsLayer, modelPreviewLayer)
   const runtime = Layer.effect(Runtime, makeRuntime(options)).pipe(Layer.provide(dependencies))
   const host = Layer.effect(
     ExecutionHost,
