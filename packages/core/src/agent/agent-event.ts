@@ -1,6 +1,7 @@
 import { Function, Schema } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { type Event as ModelTelemetryEvent } from "../model/model-telemetry.js"
+import type { CompletedModelResponse } from "../model/model-response-builder.js"
 import { Diagnostics as SessionSyncDiagnostics } from "../context/session-sync.js"
 import { StopReason } from "../turn/turn-policy.js"
 /** @experimental Escape-hatch metadata carried by loop events. */
@@ -25,6 +26,19 @@ export interface ModelPart {
   readonly modelAttemptId: string
   readonly attempt: number
   readonly part: Response.StreamPart<Record<string, Tool.Any>>
+  readonly metadata?: Metadata
+}
+
+/** @experimental One normalized model response after its durable operation commit. */
+export interface ModelResponseCommitted {
+  readonly _tag: "ModelResponseCommitted"
+  readonly turn: number
+  readonly operationKey: string
+  readonly modelCallId: string
+  readonly modelAttemptId: string
+  readonly attempt: number
+  readonly response: CompletedModelResponse<Record<string, Tool.Any>>
+  readonly digest: string
   readonly metadata?: Metadata
 }
 
@@ -191,6 +205,7 @@ export const addUsage: {
 export type Event =
   | TurnStarted
   | ModelPart
+  | ModelResponseCommitted
   | ToolExecutionStarted
   | ToolProgress
   | ToolExecutionCompleted

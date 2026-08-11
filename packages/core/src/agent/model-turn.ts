@@ -25,9 +25,11 @@ import { DuplicateToolCallId, MiddlewareViolation } from "./agent-event.js"
 import type { RunError, ToolSchedulingPolicy } from "./agent.js"
 import type { TurnOverrides } from "../turn/turn-policy.js"
 import { wrapDriverAttempt } from "./model-turn-driver.js"
+import type { AttemptCompleted, AttemptEvent, CompletedModelOperation } from "../model/model-operation.js"
 import { captureFinishPart, captureStructuredUsage, chargeAttemptUsageWith } from "./model-turn-finish.js"
 import { schedule as scheduleTools } from "./tool-scheduler.js"
 import { classifyOtherFailure, isToolNameCollision } from "./model-turn-parts.js"
+import { committedEvent } from "./model-turn-commit.js"
 import { make as makeModelResponse, text as modelResponseText } from "../model/model-response-builder.js"
 export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
@@ -93,14 +95,11 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
   const partEvents = (
     turn: number,
     part: Response.StreamPart<Record<string, Tool.Any>>,
+    identity: Pick<AttemptCompleted, "modelCallId" | "modelAttemptId" | "attempt">,
   ): Stream.Stream<Event, RunError> => {
     if (part.type === "error") {
       if (isToolNameCollision(part.error)) return Stream.fail(part.error)
       return Stream.fail(AgentError.make({ message: errorMessage(part.error), turn, cause: part.error }))
-    }
-    const identity = telemetryIdentity.current
-    if (identity === undefined) {
-      return Stream.fromEffect(Effect.die(new Error("ModelPart produced outside an instrumented model attempt")))
     }
     const modelPart = Stream.fromIterable<Event>([
       {
@@ -251,17 +250,8 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
       retryOverflow: boolean,
       compactOverflow = false,
       overflowCause?: Cause.Cause<RunError>,
-    ): Stream.Stream<
-      {
-        readonly part: Response.StreamPart<Record<string, Tool.Any>>
-        readonly messages: ReadonlyArray<Prompt.Message>
-        readonly accept: Effect.Effect<void, DuplicateToolCallId>
-      },
-      RunError,
-      LanguageModel.LanguageModel | DriverInterpreter
-    > => {
+    ): Stream.Stream<AttemptEvent, RunError, LanguageModel.LanguageModel | DriverInterpreter> => {
       let emitted = false
-      let completed = false
       let classifyFailure = classifyOtherFailure
       const responseBuilder = makeModelResponse<Record<string, Tool.Any>>()
       let preparedState: { readonly history: Prompt.Prompt; readonly preparedPrompt: Prompt.Prompt } | undefined
@@ -284,9 +274,8 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         )
       }
       return Stream.unwrap(
-        Effect.gen(function* () {
-          const interpreter = yield* DriverInterpreter
-          return Stream.fromChannel(
+        Effect.succeed(
+          Stream.fromChannel(
             Channel.acquireUseRelease(
               Ref.make<ToolCallIdState>({
                 nextIndex: 0,
@@ -357,53 +346,50 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                     return rawParts.pipe(
                       Stream.mapEffect((part) => transformPart(turn, activeRegistry.toolkit, part)),
                       Stream.flatMap(Option.match({ onNone: () => Stream.empty, onSome: Stream.make })),
-                      Stream.map((part) => ({
-                        part,
-                        messages,
-                        accept: validateToolCallId(toolCallIds, part).pipe(
+                      Stream.mapEffect((part) =>
+                        validateToolCallId(toolCallIds, part).pipe(
                           Effect.andThen(
-                            Effect.sync(() => {
+                            Effect.sync((): AttemptEvent => {
+                              const identity = telemetryIdentity.current
+                              if (identity === undefined)
+                                throw new Error("ModelPart produced outside an instrumented model attempt")
                               responseBuilder.accept(part)
+                              return {
+                                _tag: "Part",
+                                part,
+                                messages,
+                                modelCallId: identity.modelCallId,
+                                modelAttemptId: identity.modelAttemptId,
+                                attempt: identity.attempt,
+                              }
                             }),
                           ),
                         ),
-                      })),
+                      ),
                       Stream.concat(
                         Stream.fromEffect(
-                          Effect.sync(() => {
-                            completed = true
+                          Effect.sync((): AttemptEvent => {
+                            const identity = telemetryIdentity.current
+                            if (identity === undefined)
+                              throw new Error("Model attempt completed outside an instrumented model attempt")
+                            return {
+                              _tag: "Completed",
+                              messages,
+                              modelCallId: identity.modelCallId,
+                              modelAttemptId: identity.modelAttemptId,
+                              attempt: identity.attempt,
+                              response: responseBuilder.complete(),
+                            }
                           }),
-                        ).pipe(Stream.drain),
+                        ),
                       ),
                     )
                   }),
                 ).pipe(Stream.toChannel),
-              (_toolCallIds, exit: Exit.Exit<unknown, RunError>) =>
-                preparedState === undefined ||
-                !completed ||
-                (Exit.isFailure(exit) && retryableOverflow(exit.cause, emitted))
-                  ? Effect.void
-                  : Effect.suspend(() => {
-                      const response = responseBuilder.complete()
-                      state.text = `${state.text}${modelResponseText(response)}`
-                      return Ref.set(
-                        chat.history,
-                        Prompt.concat(
-                          Prompt.concat(preparedState!.history, preparedState!.preparedPrompt),
-                          Prompt.fromMessages(
-                            Prompt.fromResponseParts(response.content).content.map(coalesceAdjacentText),
-                          ),
-                        ),
-                      )
-                    }).pipe(
-                      Effect.andThen(chargeAttemptUsageWith(interpreter, state)),
-                      Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
-                      Effect.orDie,
-                      Effect.asVoid,
-                    ),
+              (_toolCallIds, _exit: Exit.Exit<unknown, RunError>) => Effect.void,
             ),
-          )
-        }),
+          ),
+        ),
       ).pipe(
         Stream.catchCause((cause) => {
           if (Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
@@ -425,7 +411,16 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
         }),
       )
     }
-    const driverAttempt = wrapDriverAttempt(turn, attemptBody)
+    let completedOperation: CompletedModelOperation | undefined
+    let completedAttempt: AttemptCompleted | undefined
+    const driverAttempt = wrapDriverAttempt({
+      turn,
+      attemptBody,
+      completed: (operation, attempt) => {
+        completedOperation = operation
+        completedAttempt = attempt
+      },
+    })
     const parts = Stream.unwrap(
       applyPromptChain(chain, Prompt.make(prompt), { agentName, turn }).pipe(
         Effect.map((transformedPrompt) => {
@@ -438,8 +433,8 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
           }>()
           const toolCallBatch: Request["toolCallBatch"] = { calls }
           const accepted = instrumentTurnStream(driverAttempt(transformedPrompt, true)).pipe(
-            Stream.mapEffect(({ accept, part, messages }) => accept.pipe(Effect.as({ part, messages }))),
-            Stream.map(({ part, messages }) => {
+            Stream.filter((event): event is Extract<AttemptEvent, { readonly _tag: "Part" }> => event._tag === "Part"),
+            Stream.map(({ part, messages, modelCallId, modelAttemptId, attempt }) => {
               const toolCallIndex = nextToolCallIndex
               if (part.type === "tool-call" && part.providerExecuted !== true) {
                 const call = part as AnyToolCall
@@ -447,20 +442,45 @@ export const makeModelTurn = <T extends Record<string, Tool.Any>, R>(context: Ru
                 calls.push(call)
                 executions.push({ call, messages, toolCallIndex })
               }
-              return { part, messages, toolCallIndex }
+              return { part, modelCallId, modelAttemptId, attempt, toolCallIndex }
             }),
-            Stream.flatMap(({ part }) => partEvents(turn, part)),
+            Stream.flatMap(({ part, modelCallId, modelAttemptId, attempt }) =>
+              partEvents(turn, part, { modelCallId, modelAttemptId, attempt }),
+            ),
           )
-          return Stream.concat(
-            accepted,
-            Stream.suspend(() => {
-              Object.freeze(calls)
-              Object.freeze(toolCallBatch)
-              return scheduleTools(executions, toolScheduling, ({ call, messages, toolCallIndex }) =>
-                toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
+          const committed = Stream.fromEffect(
+            Effect.suspend(() => {
+              const operation = completedOperation
+              const attempt = completedAttempt
+              if (operation === undefined || attempt === undefined)
+                return Effect.die(new Error("Model operation exhausted without a committed response"))
+              state.text = `${state.text}${modelResponseText(attempt.response)}`
+              return Ref.set(
+                chat.history,
+                Prompt.concat(
+                  Prompt.fromMessages(attempt.messages),
+                  Prompt.fromMessages(
+                    Prompt.fromResponseParts(attempt.response.content).content.map(coalesceAdjacentText),
+                  ),
+                ),
+              ).pipe(
+                Effect.andThen(
+                  Effect.flatMap(DriverInterpreter, (interpreter) => chargeAttemptUsageWith(interpreter, state)),
+                ),
+                Effect.andThen(persisted === undefined ? Effect.void : persisted.save),
+                Effect.orDie,
+                Effect.as(committedEvent({ operation, attempt })),
               )
             }),
           )
+          const tools = Stream.suspend(() => {
+            Object.freeze(calls)
+            Object.freeze(toolCallBatch)
+            return scheduleTools(executions, toolScheduling, ({ call, messages, toolCallIndex }) =>
+              toolCallEvents(turn, toolCallBatch, toolCallIndex, call, messages, activeRegistry),
+            )
+          })
+          return Stream.concat(accepted, Stream.concat(committed, tools))
         }),
       ),
     )

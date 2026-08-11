@@ -784,7 +784,7 @@ describe("DurableDriver Agent.stream integration", () => {
       suite.effect("records model and tool operations through the driver journal seam", () =>
         Effect.gen(function* () {
           yield* Agent.stream(agent, { prompt: "use echo", logicalOperationId: "stable-run" }).pipe(Stream.runDrain)
-          expect(scheduled.some((operation) => operation.kind === "model")).toBe(true)
+          expect(scheduled.find((operation) => operation.kind === "model")?.replayPolicy).toBe("never")
           expect(scheduled.some((operation) => operation.kind === "tool")).toBe(true)
           expect(scheduled.find((operation) => operation.kind === "tool")?.replayPolicy).toBe("never")
         }),
@@ -819,6 +819,55 @@ describe("DurableDriver Agent.stream integration", () => {
       const second = yield* runKeys()
       expect(first).toEqual(second)
       expect(first.some((key) => key.includes("logical-1:model:0:0:conversation"))).toBe(true)
+    }),
+  )
+
+  it.effect("replays one semantic model result without contacting the provider", () =>
+    Effect.gen(function* () {
+      const recorded = new Map<string, DurableDriver.OperationOutcome>()
+      let replay = false
+      let providerCalls = 0
+      const journalLayer = Layer.succeed(DurableDriver.DriverJournalService, {
+        onScheduled: (operation) => Effect.sync(() => (replay ? recorded.get(operation.key) : undefined)),
+        onCompleted: (operation, outcome) =>
+          Effect.sync(() => {
+            recorded.set(operation.key, outcome)
+          }),
+        onCheckpoint: () => Effect.void,
+      })
+      const modelLayer = Layer.effect(
+        LanguageModel.LanguageModel,
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: () => {
+            providerCalls += 1
+            return withProviderFinish(Stream.make(Response.makePart("text-delta", { id: "text", delta: "durable" })))
+          },
+        }),
+      )
+      const agent = Agent.make({ name: "semantic-replay-agent" })
+      const run = provideScoped(
+        Layer.mergeAll(modelLayer, journalLayer),
+        Agent.stream(agent, {
+          prompt: "reply",
+          logicalOperationId: "semantic-replay",
+          sessionId: "semantic-replay",
+        }).pipe(Stream.runCollect),
+      )
+
+      const live = yield* run
+      replay = true
+      const replayed = yield* run
+
+      expect(providerCalls).toBe(1)
+      expect(live.at(-1)).toEqual(replayed.at(-1))
+      const outcome = recorded.get("semantic-replay:model:0:0:conversation")
+      expect(outcome?._tag).toBe("Succeeded")
+      if (outcome?._tag === "Succeeded") {
+        expect(outcome.value).toMatchObject({ turn: 0 })
+        expect(outcome.value).toHaveProperty("content.0", expect.objectContaining({ type: "text", text: "durable" }))
+        expect(outcome.value).not.toHaveProperty("values")
+      }
     }),
   )
 
