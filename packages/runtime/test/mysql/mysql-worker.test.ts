@@ -3,7 +3,7 @@ import { describe, expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "@batonfx/core"
-import { Address, Errors, ExecutableResolver, RunClaims, Runtime, RuntimeWorker } from "../../src/index.js"
+import { Address, Errors, ExecutableResolver, RunClaims, Runtime, RuntimeWorker, RunStore } from "../../src/index.js"
 import { closedTestAgent, testExecutable } from "../identity.js"
 import { assistant, assistantAddress, assistantRef, completedResult, registrationsFor } from "../helpers.js"
 import { provideScoped } from "../scoped-provide.js"
@@ -145,9 +145,10 @@ describeMysql("mysql worker cancellation", () => {
               Effect.gen(function* () {
                 const runtime = yield* Runtime.Runtime
                 const worker = yield* RuntimeWorker.RuntimeWorker
+                const sessionId = uniqueSession("cancel-model")
                 const receipt = yield* runtime.send({
                   to: address,
-                  sessionId: uniqueSession("cancel-model"),
+                  sessionId,
                   idempotencyKey: "cancel-model",
                   prompt: "wait",
                 })
@@ -162,6 +163,7 @@ describeMysql("mysql worker cancellation", () => {
                   }),
                 )
                 yield* Fiber.join(executing)
+                yield* runtime.awaitSessionTerminal({ sessionId })
                 expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
                 yield* Deferred.await(finalized)
                 expect(lifecycle).toEqual([
@@ -230,6 +232,7 @@ describeMysql("mysql worker cancellation", () => {
             }).pipe(Layer.provideMerge(Runtime.layerMysql(options))),
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
+              const store = yield* RunStore.RunStore
               const worker = yield* RuntimeWorker.RuntimeWorker
               const receipt = yield* runtime.send({
                 to: address,
@@ -248,10 +251,14 @@ describeMysql("mysql worker cancellation", () => {
               )
               yield* Fiber.join(executing)
               expect(yield* Ref.get(interrupted)).toBe(true)
-              expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+              expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
+              const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
+                (event) => event._tag === "OperationUnknown",
+              )
+              if (unknown?._tag !== "OperationUnknown") return yield* Effect.die("unknown operation event missing")
               expect(
-                (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).map((event) => event._tag),
-              ).toContain("OperationUnknown")
+                (yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })).status,
+              ).toBe("unknown")
             }),
           )
         }),

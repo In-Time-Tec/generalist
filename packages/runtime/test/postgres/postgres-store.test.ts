@@ -1135,7 +1135,7 @@ describePostgres("postgres run store", () => {
             ),
           )
           yield* Fiber.join(execution)
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("needs-resolution")
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
           expect(lifecycle).toEqual(["service acquired", "service finalized", "tool finalized"])
           const unknown = (yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })).find(
             (event) => event._tag === "OperationUnknown",
@@ -1144,14 +1144,6 @@ describePostgres("postgres run store", () => {
           expect((yield* store.getOperation({ runId: receipt.runId, operationId: unknown.operationId })).status).toBe(
             "unknown",
           )
-          yield* runtime.resolveOperation({
-            runId: receipt.runId,
-            operationId: unknown.operationId,
-            idempotencyKey: "cross-process-tool-resolution",
-            resolution: { _tag: "Failed", error: { message: "tool was interrupted" } },
-          })
-          yield* runtime.cancel({ runId: receipt.runId, reason: "settle cancellation" })
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("cancelled")
         }).pipe(scopedWith(workerLayer))
       }),
     ),
