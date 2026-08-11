@@ -122,7 +122,7 @@ bun run check
 bun run package
 ```
 
-`bun run package` builds once, verifies clean Bun and npm consumers, and writes eleven tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification and publish the same tarballs to npm.
+`bun run package` builds once, verifies clean Bun and npm consumers, and writes thirteen tarballs plus release evidence and checksums. Tag pushes named exactly `v<committed version>` create draft-first GitHub releases after checksum and provenance verification and publish the same tarballs to npm.
 
 The npm smoke uses `--legacy-peer-deps` only because the currently pinned external `foldkit@0.122.0` declares `effect@4.0.0-beta.88` while Baton uses beta.98. The installed graph is still checked for one physical Effect package; Bun installation and both runtimes use beta.98.
 
