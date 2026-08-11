@@ -31,6 +31,7 @@ export const runtimeLayer = (implementation: Partial<Runtime.Interface> = {}): L
       start: () => Effect.die("unused start"),
       send: () => Effect.die("unused send"),
       spawn: () => Effect.die("unused spawn"),
+      previews: () => Stream.empty,
       events: ({ cursor }) =>
         Stream.fromIterable([event(0), event(1), event(2)].filter((item) => item.sequence > (cursor ?? -1))),
       snapshot: (runId) =>

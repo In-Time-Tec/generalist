@@ -117,6 +117,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     fanOut: () => Effect.die("not used"),
     inspectFanOut: () => Effect.die("not used"),
     awaitFanOut: () => Effect.die("not used"),
+    previews: () => Stream.empty,
     events: ({ runId, cursor = -1 }) => {
       observedCursors.push(cursor)
       const run = runs.get(runId)!
