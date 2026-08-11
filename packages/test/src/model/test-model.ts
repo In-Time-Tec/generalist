@@ -1,5 +1,6 @@
 import { Duration, Effect, Function, Layer, Option, Schema, Stream, SubscriptionRef } from "effect"
 import { AiError, LanguageModel, ModelRegistry, Prompt, Response, Tool } from "@batonfx/core"
+import { compile, type CompiledStream } from "./test-model-compile.js"
 
 /** @experimental */
 export interface TextPart {
@@ -30,6 +31,7 @@ export interface StepOptions {
   readonly finishReason?: Response.FinishReason
   readonly usage?: Response.Usage
   readonly delay?: Duration.Input
+  readonly streamPartDelay?: Duration.Input
 }
 
 /** @experimental */
@@ -51,6 +53,7 @@ export interface TruncatedStep {
   readonly parts: ReadonlyArray<Part>
   readonly stopAfter: TruncationPoint
   readonly delay?: Duration.Input
+  readonly streamPartDelay?: Duration.Input
 }
 
 /** @experimental */
@@ -122,12 +125,6 @@ interface Claimed {
   readonly request: Request
 }
 
-const emptyUsage = (): Response.Usage =>
-  Response.Usage.make({
-    inputTokens: { uncached: undefined, total: undefined, cacheRead: undefined, cacheWrite: undefined },
-    outputTokens: { total: undefined, text: undefined, reasoning: undefined },
-  })
-
 const invalidRequest = (method: Operation, description: string): AiError.AiError =>
   AiError.make({
     module: "@batonfx/test/TestModel",
@@ -155,106 +152,6 @@ const captureRequest = (
   previousResponseId: options.previousResponseId,
   incrementalPrompt: options.incrementalPrompt,
 })
-
-const finishReason = (step: TurnStep): Response.FinishReason =>
-  step.finishReason ?? (step.parts.some((part) => part._tag === "ToolCall") ? "tool-calls" : "stop")
-
-const finish = (reason: Response.FinishReason, usage: Response.Usage): Response.FinishPartEncoded => ({
-  type: "finish",
-  reason,
-  usage,
-  response: undefined,
-})
-
-const compileToolCall = (
-  part: ToolCallPart,
-  requestIndex: number,
-  partIndex: number,
-): Response.ToolCallPartEncoded => ({
-  type: "tool-call",
-  id: part.id ?? `test-call-${requestIndex}-${partIndex}`,
-  name: part.name,
-  params: part.params,
-  providerExecuted: part.providerExecuted,
-})
-
-const compileGenerate = (step: TurnStep, requestIndex: number): Array<Response.PartEncoded> => [
-  ...step.parts.map(
-    (part, partIndex): Response.PartEncoded =>
-      part._tag === "Text"
-        ? { type: "text", text: part.text }
-        : part._tag === "Reasoning"
-          ? { type: "reasoning", text: part.text }
-          : compileToolCall(part, requestIndex, partIndex),
-  ),
-  finish(finishReason(step), step.usage ?? emptyUsage()),
-]
-
-const compileStream = (step: TurnStep, requestIndex: number): Array<Response.StreamPartEncoded> => {
-  const output: Array<Response.StreamPartEncoded> = []
-  for (let partIndex = 0; partIndex < step.parts.length; partIndex += 1) {
-    const part = step.parts[partIndex] as Part
-    if (part._tag === "ToolCall") {
-      output.push(compileToolCall(part, requestIndex, partIndex))
-      continue
-    }
-    const kind = part._tag === "Text" ? "text" : "reasoning"
-    const id = `test-${kind}-${requestIndex}-${partIndex}`
-    output.push({ type: `${kind}-start`, id })
-    output.push({ type: `${kind}-delta`, id, delta: part.text })
-    output.push({ type: `${kind}-end`, id })
-  }
-  output.push(finish(finishReason(step), step.usage ?? emptyUsage()))
-  return output
-}
-
-const truncationInvalid = (stopAfter: TruncationPoint, expected: string): AiError.AiError =>
-  invalidRequest("streamText", `Truncated step stopping after ${stopAfter} requires a final ${expected} part`)
-
-const compileTruncated = (
-  step: TruncatedStep,
-  requestIndex: number,
-): Array<Response.StreamPartEncoded> | AiError.AiError => {
-  const output: Array<Response.StreamPartEncoded> = [
-    {
-      type: "response-metadata",
-      id: `test-response-${requestIndex}`,
-      modelId: "scripted",
-      timestamp: undefined,
-      request: undefined,
-    },
-  ]
-  if (step.stopAfter === "response-metadata") return output
-  const lastIndex = step.parts.length - 1
-  const last = step.parts[lastIndex]
-  if (last === undefined) return truncationInvalid(step.stopAfter, "content")
-  for (let partIndex = 0; partIndex < lastIndex; partIndex += 1) {
-    const part = step.parts[partIndex] as Part
-    if (part._tag === "ToolCall") {
-      output.push(compileToolCall(part, requestIndex, partIndex))
-      continue
-    }
-    const kind = part._tag === "Text" ? "text" : "reasoning"
-    const id = `test-${kind}-${requestIndex}-${partIndex}`
-    output.push({ type: `${kind}-start`, id })
-    output.push({ type: `${kind}-delta`, id, delta: part.text })
-    output.push({ type: `${kind}-end`, id })
-  }
-  if (step.stopAfter === "tool-params-delta") {
-    if (last._tag !== "ToolCall") return truncationInvalid(step.stopAfter, "ToolCall")
-    const id = last.id ?? `test-call-${requestIndex}-${lastIndex}`
-    output.push({ type: "tool-params-start", id, name: last.name, providerExecuted: last.providerExecuted })
-    output.push({ type: "tool-params-delta", id, delta: JSON.stringify(last.params).slice(0, -1) })
-    return output
-  }
-  const kind = step.stopAfter === "text-delta" ? "text" : "reasoning"
-  const expected = kind === "text" ? "Text" : "Reasoning"
-  if (last._tag !== expected) return truncationInvalid(step.stopAfter, expected)
-  const id = `test-${kind}-${requestIndex}-${lastIndex}`
-  output.push({ type: `${kind}-start`, id })
-  output.push({ type: `${kind}-delta`, id, delta: last.text })
-  return output
-}
 
 const applyDelay = (step: ClaimedStep): Effect.Effect<void> =>
   step.delay === undefined ? Effect.void : Effect.sleep(step.delay)
@@ -301,19 +198,22 @@ const executeGenerate = (
       const encoded = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(step.value).pipe(
         Effect.mapError(() => invalidRequest(claimed.request.operation, "Object step is not JSON serializable")),
       )
-      return [{ type: "text", text: encoded }, finish(step.finishReason ?? "stop", step.usage ?? emptyUsage())]
+      return [
+        { type: "text", text: encoded },
+        compile.finish(step.finishReason ?? "stop", step.usage ?? compile.emptyUsage()),
+      ]
     }
     if (options.responseFormat.type === "json") {
       return yield* invalidRequest(claimed.request.operation, "generateObject requires an Object step")
     }
-    return compileGenerate(step, claimed.request.index)
+    return compile.compileGenerate(step, claimed.request.index)
   })
 
 const executeStream = (
   state: SubscriptionRef.SubscriptionRef<State>,
   script: ReadonlyArray<Step>,
   options: LanguageModel.ProviderOptions,
-): Effect.Effect<Array<Response.StreamPartEncoded>, AiError.AiError> =>
+): Effect.Effect<CompiledStream, AiError.AiError> =>
   Effect.gen(function* () {
     const claimed = yield* claim(state, script, "streamText", options)
     const step = claimed.step
@@ -325,11 +225,9 @@ const executeStream = (
     if (step._tag === "Object") {
       return yield* invalidRequest(claimed.request.operation, "Object step requires generateObject")
     }
-    if (step._tag === "Truncated") {
-      const compiled = compileTruncated(step, claimed.request.index)
-      return Array.isArray(compiled) ? compiled : yield* compiled
-    }
-    return compileStream(step, claimed.request.index)
+    const compiled = compile.compileStreamFor(step, claimed.request.index)
+    if (AiError.isAiError(compiled)) return yield* compiled
+    return compiled
   })
 
 /** @experimental */
@@ -375,14 +273,26 @@ export const truncated: {
   (options: {
     readonly stopAfter: TruncationPoint
     readonly delay?: Duration.Input
+    readonly streamPartDelay?: Duration.Input
   }): (parts: ReadonlyArray<Part>) => TruncatedStep
   (
     parts: ReadonlyArray<Part>,
-    options: { readonly stopAfter: TruncationPoint; readonly delay?: Duration.Input },
+    options: {
+      readonly stopAfter: TruncationPoint
+      readonly delay?: Duration.Input
+      readonly streamPartDelay?: Duration.Input
+    },
   ): TruncatedStep
 } = Function.dual(
   (args) => Array.isArray(args[0]),
-  (parts: ReadonlyArray<Part>, options: { readonly stopAfter: TruncationPoint; readonly delay?: Duration.Input }) => ({
+  (
+    parts: ReadonlyArray<Part>,
+    options: {
+      readonly stopAfter: TruncationPoint
+      readonly delay?: Duration.Input
+      readonly streamPartDelay?: Duration.Input
+    },
+  ) => ({
     _tag: "Truncated",
     parts,
     ...options,
@@ -390,7 +300,9 @@ export const truncated: {
 )
 
 const isStepOptionsLike = (value: unknown): value is StepOptions =>
-  typeof value === "object" && value !== null && ("finishReason" in value || "usage" in value || "delay" in value)
+  typeof value === "object" &&
+  value !== null &&
+  ("finishReason" in value || "usage" in value || "delay" in value || "streamPartDelay" in value)
 
 /** @experimental */
 export const object: {
@@ -431,7 +343,11 @@ export const make: {
         generateText: (providerOptions) => executeGenerate(state, script, providerOptions),
         streamText: (providerOptions) =>
           Stream.unwrap(
-            executeStream(state, script, providerOptions).pipe(Effect.map((parts) => Stream.fromIterable(parts))),
+            executeStream(state, script, providerOptions).pipe(
+              Effect.map(({ parts, partDelay }) =>
+                partDelay === undefined ? Stream.fromIterable(parts) : compile.paceParts(parts, partDelay),
+              ),
+            ),
           ),
       })
       const modelLayer = Layer.succeed(LanguageModel.LanguageModel, service)

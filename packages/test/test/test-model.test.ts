@@ -1,5 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Cause, Context, Effect, Exit, Fiber, Layer, Schedule, Schema, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import {
   Agent,
   AiError,
@@ -100,6 +101,43 @@ layer(
       expect(reportedUsage?.outputTokens.total).toBe(2)
       expect(generated.text).toBe("generated")
       expect(generated.finishReason).toBe("stop")
+    }),
+  )
+})
+
+layer(Layer.empty)("TestModel: paced provider streams", (it) => {
+  it.effect("delays each provider part independently", () =>
+    Effect.gen(function* () {
+      const fixture = yield* TestModel.make([
+        TestModel.turn([TestModel.reasoning("thinking"), TestModel.text("answer")], {
+          streamPartDelay: "100 millis",
+        }),
+      ])
+      const services = yield* Layer.build(fixture.layer)
+      const observed: Array<string> = []
+      const fiber = yield* LanguageModel.streamText({ prompt: "pace the response" }).pipe(
+        Stream.runForEach((part) => Effect.sync(() => observed.push(part.type))),
+        Effect.provide(services),
+        Effect.forkChild,
+      )
+
+      yield* Effect.yieldNow
+      expect(observed).toEqual([])
+      for (let count = 1; count <= 7; count += 1) {
+        yield* TestClock.adjust("100 millis")
+        yield* Effect.yieldNow
+        expect(observed).toHaveLength(count)
+      }
+      yield* Fiber.join(fiber)
+      expect(observed).toEqual([
+        "reasoning-start",
+        "reasoning-delta",
+        "reasoning-end",
+        "text-start",
+        "text-delta",
+        "text-end",
+        "finish",
+      ])
     }),
   )
 })
