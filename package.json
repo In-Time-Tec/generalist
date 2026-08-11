@@ -8,7 +8,7 @@
   "packageManager": "bun@1.3.14",
   "scripts": {
     "build": "bun turbo build",
-    "check": "prettier --cache --check . && oxlint packages apps examples scripts test && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck && bun run repository-policy && bun run repository-graph -- check",
+    "check": "bun run build && prettier --cache --check . && oxlint packages apps examples scripts test && ast-grep scan --config sgconfig.yml --filter '^(no-|tenant-|update-)' && bun run typecheck && bun run repository-policy && bun run repository-graph -- check",
     "repository-policy": "bun scripts/repository-policy.ts",
     "repository-graph": "bun scripts/repository-graph.ts",
     "install-preflight": "bun scripts/install-preflight.ts",
