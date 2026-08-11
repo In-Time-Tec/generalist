@@ -123,11 +123,13 @@ export const makeCompactionRuntime = (context: CompactionContext) => {
           }
           let expectedLeafId = path.at(-1)?.id ?? null
           const logicalId = options.logicalOperationId ?? options.sessionId ?? agent.name
+          const checkpoint = path.findLast((entry) => entry._tag === "Compaction")
+          const root = checkpoint === undefined ? "root" : `checkpoint:${checkpoint.id}`
           // The system message is derived per Run from live instructions, so it never becomes a Session
           // entry. Persisting it would pin a resumed Session to the instructions captured on its first Run.
           for (const [position, message] of transcript.content.entries()) {
             if (position < cursor.value || message.role === "system") continue
-            const id = operationKey(logicalId, "model", turn, "session-entry", position, message.role)
+            const id = operationKey(logicalId, "model", turn, "session-entry", root, position, message.role)
             const appended = yield* session.append(
               { _tag: "Message", message },
               { ...sessionAppendOptions(expectedLeafId), id },

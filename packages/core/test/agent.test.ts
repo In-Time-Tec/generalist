@@ -3871,8 +3871,16 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Agent", (it) 
         const session = yield* Session.SessionStore
         const path = yield* session.path()
         const completed = events.at(-1)
+        const checkpoint = path.find((entry) => entry._tag === "Compaction")
+        const messages = path.filter((entry) => entry._tag === "Message")
 
-        expect(path.some((entry) => entry._tag === "Compaction")).toBe(true)
+        expect(checkpoint).toBeDefined()
+        expect(messages).toHaveLength(3)
+        expect(new Set(messages.map((entry) => entry.id)).size).toBe(3)
+        expect(messages[0]?.id).toContain(":session-entry:root:0:user")
+        expect(messages[1]?.id).toContain(`:session-entry:checkpoint:${checkpoint?.id ?? "missing"}:0:user`)
+        expect(messages[1]?.parentId).toBe(checkpoint?.id)
+        expect(Json.stringify(path)).toContain("old prompt")
         expect(completed?._tag).toBe("Completed")
         if (completed?._tag === "Completed") {
           expect(Json.stringify(Session.buildContext(path).content)).toBe(

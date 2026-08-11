@@ -58,8 +58,8 @@ layer(Layer.mergeAll(unusedToolHandlerLayer, Agent.layerRuntime))("Session fenci
         expect(appendOptions.length).toBeGreaterThan(0)
         expect(appendOptions.every((options) => options?.ownerToken === "execution:turn-1:epoch:7")).toBe(true)
         expect(appendOptions.map((options) => options?.id)).toEqual([
-          "fenced-append-agent:model:0:session-entry:1:user",
-          "fenced-append-agent:model:0:session-entry:2:assistant",
+          "fenced-append-agent:model:0:session-entry:root:1:user",
+          "fenced-append-agent:model:0:session-entry:root:2:assistant",
         ])
       }),
     ] as const
