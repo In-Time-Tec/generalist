@@ -113,7 +113,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
     }),
   )
 
-  ItLayer.make(it, "inserts text and file content from multiple recalled items in source order", () => {
+  ItLayer.make(it, "inserts recalled content and remembers only the authored completed transcript", () => {
     let modelPrompt: Prompt.Prompt | undefined
     let middlewarePrompt: Prompt.Prompt | undefined
     let remembered: Memory.RememberInput | undefined
@@ -169,7 +169,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
         expect(recalledMessage?.options).toEqual({
           "@batonfx/core/memory": { origin: "memoryRecall" },
         })
-        expect(remembered?.transcript.content.map(messageText)).toEqual(["system instructions", "live prompt"])
+        expect(remembered?.transcript.content.map(messageText)).toEqual(["system instructions", "live prompt", "done"])
       }),
     ] as const
   })
@@ -370,7 +370,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
 
         expect(result.text).toBe("done")
         expect(modelPrompt?.content.map(messageText)).toEqual(["recalled MASK", "authored MASK"])
-        expect(remembered?.transcript.content.map(messageText)).toEqual(["authored MASK"])
+        expect(remembered?.transcript.content.map(messageText)).toEqual(["authored MASK", "done"])
       }),
     ] as const
   })
