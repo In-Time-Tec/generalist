@@ -27,6 +27,11 @@ export const postgresUrl = Effect.runSync(
 
 export const postgresAvailable = typeof postgresUrl === "string" && postgresUrl.length > 0
 
+export const postgresTestMaxConnections = 4
+
+export const postgresClient = (url: string) =>
+  PgClient.layer({ url: Redacted.make(url), maxConnections: postgresTestMaxConnections })
+
 type PostgresWorkerLayer = Layer.Layer<
   | import("../../src/execution-host.js").ExecutionHost
   | import("../../src/sql/run-claims.js").RunClaims
@@ -54,6 +59,7 @@ export const postgresLayer = (url: string) =>
     resolver,
     addresses,
     subscriberQueueCapacity: 8,
+    maxConnections: postgresTestMaxConnections,
   })
 
 /**
@@ -70,6 +76,7 @@ export const postgresMessagingLayer = (database: PostgresDatabase) => (overrides
       resolver,
       addresses,
       subscriberQueueCapacity: 8,
+      maxConnections: postgresTestMaxConnections,
       ...overrides,
     }),
   )
@@ -112,9 +119,9 @@ export const postgresDatabase = (label: string): PostgresDatabase => {
   const schema = schemaName(label)
   const separator = serverUrl.includes("?") ? "&" : "?"
   const url = `${serverUrl}${separator}options=${encodeURIComponent(`-c search_path=${schema}`)}`
-  const client = PgClient.layer({ url: Redacted.make(url) })
+  const client = postgresClient(url)
   const empty = provideScoped(
-    PgClient.layer({ url: Redacted.make(serverUrl) }),
+    postgresClient(serverUrl),
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       yield* sql.unsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`)

@@ -10,17 +10,18 @@ import { ExecutionHost, make as makeExecutionHost } from "../../execution-host.j
 import { layer as activeExecutionsLayer } from "../../active-executions.js"
 import type { LayerOptions } from "../../runtime.js"
 import { layer as modelPreviewLayer } from "../../model-preview.js"
-import type {
-  SchemaChecksumMismatch,
-  SchemaDirty,
+import {
   SchemaMigrationFailed,
-  SchemaUpgradeRequired,
-  SchemaVersionUnsupported,
+  type SchemaChecksumMismatch,
+  type SchemaDirty,
+  type SchemaUpgradeRequired,
+  type SchemaVersionUnsupported,
 } from "../errors.js"
 
 export interface PostgresStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
+  readonly maxConnections?: number
 }
 export type PostgresStoreError =
   | SchemaDirty
@@ -32,7 +33,18 @@ export type PostgresStoreError =
 export const layerPostgres = (
   options: PostgresStoreOptions,
 ): Layer.Layer<Runtime | RunStore | RunClaims | ExecutionHost, PostgresStoreError | SqlError> => {
-  const client = PgClient.layer({ url: Redacted.make(options.url) })
+  const maxConnections = options.maxConnections ?? 10
+  const client = Layer.unwrap(
+    Effect.gen(function* () {
+      if (!Number.isSafeInteger(maxConnections) || maxConnections < 1) {
+        return yield* SchemaMigrationFailed.make({
+          source: options.source ?? "postgres",
+          message: "PostgreSQL maxConnections must be a positive integer",
+        })
+      }
+      return PgClient.layer({ url: Redacted.make(options.url), maxConnections })
+    }),
+  )
   const services = Layer.effectContext(
     makePostgresServices(options).pipe(
       Effect.map(({ store, claims }) => Context.make(RunStore, store).pipe(Context.add(RunClaims, claims))),

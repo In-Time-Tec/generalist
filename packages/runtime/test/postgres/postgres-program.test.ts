@@ -1,7 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest"
-import { Clock, Effect, Redacted } from "effect"
+import { Clock, Effect } from "effect"
 import { Pins } from "@batonfx/core"
-import { PgClient } from "@effect/sql-pg"
 import { SqlClient } from "effect/unstable/sql"
 import { Errors, ExecutionHost, RunClaims, Runtime, RunStore } from "../../src/index.js"
 import {
@@ -13,7 +12,7 @@ import {
   programFixture,
 } from "../program-fixture.js"
 import { provideScoped } from "../scoped-provide.js"
-import { postgresAvailable, postgresDatabase } from "./helpers.js"
+import { postgresAvailable, postgresClient, postgresDatabase, postgresTestMaxConnections } from "./helpers.js"
 import { registrationsFor } from "../helpers.js"
 import {
   programBudgetContract,
@@ -31,6 +30,7 @@ describePostgres("postgres Program store contract", () => {
     const fixture = programFixture()
     const options = {
       url: database0.url,
+      maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
       addresses: [
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
@@ -56,6 +56,7 @@ describePostgres("postgres Program store contract", () => {
     const fixture = programFixture()
     const runtimeLayer = Runtime.layerPostgres({
       url: database1.url,
+      maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
       addresses: [
         {
@@ -103,6 +104,7 @@ describePostgres("postgres Program store contract", () => {
     let runId = ""
     const options = {
       url: database2.url,
+      maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
       addresses: [
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
@@ -186,6 +188,7 @@ describePostgres("postgres Program store contract", () => {
     const fixture = approvalProgramFixture()
     const options = {
       url: database3.url,
+      maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
       addresses: [
         { address: programAddress, executable: programExecutable, registrations: registrationsFor(programExecutable) },
@@ -211,7 +214,7 @@ describePostgres("postgres Program store contract", () => {
             const operation = yield* store.getProgramOperation({ runId: receipt.runId, operation: "echo" })
             if (operation?.waitId === undefined) return yield* Effect.die("Program approval wait is missing")
             yield* provideScoped(
-              PgClient.layer({ url: Redacted.make(database3.url) }),
+              postgresClient(database3.url),
               Effect.gen(function* () {
                 const sql = yield* SqlClient.SqlClient
                 yield* sql`
@@ -245,6 +248,7 @@ describePostgres("postgres Program store contract", () => {
     const fixture = agentMapProgramFixture()
     const runtimeLayer = Runtime.layerPostgres({
       url: database4.url,
+      maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
       addresses: [
         {
@@ -352,6 +356,7 @@ describePostgres("postgres Program store contract", () => {
     const fixture = programFixture()
     const runtimeLayer = Runtime.layerPostgres({
       url: database5.url,
+      maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
       addresses: [
         {

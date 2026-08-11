@@ -3,7 +3,7 @@ import { Effect } from "effect"
 import { ExecutionHost, RunClaims, Runtime, RunStore } from "../../src/index.js"
 import { registrationsFor } from "../helpers.js"
 import { agentMapProgramFixture } from "../program-fixture.js"
-import { postgresAvailable, postgresDatabase } from "./helpers.js"
+import { postgresAvailable, postgresDatabase, postgresTestMaxConnections } from "./helpers.js"
 
 const describePostgres = postgresAvailable ? describe.sequential : describe.skip
 
@@ -14,6 +14,7 @@ describePostgres("postgres Program registration parity", () => {
     const fixture = agentMapProgramFixture()
     const runtimeLayer = Runtime.layerPostgres({
       url: database.url,
+      maxConnections: postgresTestMaxConnections,
       resolver: fixture.resolver,
       addresses: [
         {
