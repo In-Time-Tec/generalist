@@ -1235,7 +1235,7 @@ describe("ExecutionHost", () => {
     }),
   )
 
-  it.live("keeps a host-interrupted SQLite Run recoverable after reopen", () =>
+  it.live("keeps a host-interrupted never-replay model operation in needs-resolution after reopen", () =>
     Effect.gen(function* () {
       const filename = tempDbPath("host-interruption-recovery")
       const started = yield* Deferred.make<void>()
@@ -1276,13 +1276,15 @@ describe("ExecutionHost", () => {
         }),
       )
 
-      const recoveredStarted = yield* Deferred.make<void>()
+      let recoveredModelCalls = 0
       const recoveredModel = Layer.effect(
         LanguageModel.LanguageModel,
         LanguageModel.make({
           generateText: () => Effect.never,
-          streamText: () =>
-            Stream.fromEffect(Deferred.succeed(recoveredStarted, undefined)).pipe(Stream.flatMap(() => Stream.never)),
+          streamText: () => {
+            recoveredModelCalls += 1
+            return Stream.never
+          },
         }),
       )
       const secondResolver = ExecutableResolver.makeStatic([{ executable, agent: Agent.close(agent, recoveredModel) }])
@@ -1296,14 +1298,11 @@ describe("ExecutionHost", () => {
       )(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* ExecutionHost.ExecutionHost
-          const store = yield* RunStore.RunStore
-          expect((yield* runtime.inspect(runId)).status).toBe("running")
+          expect((yield* runtime.inspect(runId)).status).toBe("needs-resolution")
           const history = yield* runtime.history({ runId, limit: 100 })
+          expect(history.map((event) => event._tag)).toContain("OperationUnknown")
           expect(history.map((event) => event._tag)).not.toContain("RunFailed")
-          yield* host.execute(yield* store.claimExecution({ runId, ownerId: "after-reopen" })).pipe(Effect.forkScoped)
-          yield* Deferred.await(recoveredStarted)
-          expect((yield* runtime.inspect(runId)).status).toBe("running")
+          expect(recoveredModelCalls).toBe(0)
         }),
       )
     }),
@@ -1778,107 +1777,107 @@ describe("ExecutionHost", () => {
   )
 
   for (const backend of ["memory", "sqlite"] as const) {
-    for (const outcome of ["recovers", "exhausts"] as const) {
-      it.effect(`${backend} ${outcome} a failed parent model stream from its durable child-work checkpoint`, () => {
-        let modelCalls = 0
-        let childDispatches = 0
-        const prompts: Array<string> = []
-        const childWork = Tool.make("child_work", { parameters: Schema.Struct({}), success: Schema.String })
-        const toolkit = Toolkit.make(childWork)
-        const agent = Agent.make({ name: "parent-resume", toolkit })
-        const executable = testExecutable(agent, "parent-resume-v1")
-        const address = Address.make("agent:parent-resume")
-        const escaped = AiError.make({
-          module: "ParentResumeModel",
-          method: "streamText",
-          reason: AiError.RateLimitError.make({}),
-        })
-        const model = Layer.effect(
-          LanguageModel.LanguageModel,
-          LanguageModel.make({
-            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-            streamText: (request) => {
-              modelCalls += 1
-              prompts.push(JSON.stringify(request.prompt.content))
-              if (modelCalls === 1) {
-                return Stream.fromIterable<Response.StreamPartEncoded>([
-                  Response.makePart("tool-call", {
-                    id: "child-work-1",
-                    name: "child_work",
-                    params: {},
-                    providerExecuted: false,
-                  }),
-                  finish,
-                ])
-              }
-              if (modelCalls === 2 || outcome === "exhausts") {
-                const partial: Stream.Stream<Response.StreamPartEncoded, AiError.AiError> = Stream.make(
-                  Response.makePart("text-delta", { id: "failed-parent", delta: "discard me" }),
-                )
-                return partial.pipe(Stream.concat(Stream.fail(escaped)))
-              }
+    it.effect(`${backend} does not recontact a failed never-replay model after a durable child checkpoint`, () => {
+      let modelCalls = 0
+      let childDispatches = 0
+      const prompts: Array<string> = []
+      const childWork = Tool.make("child_work", { parameters: Schema.Struct({}), success: Schema.String })
+      const toolkit = Toolkit.make(childWork)
+      const agent = Agent.make({ name: "parent-resume", toolkit })
+      const executable = testExecutable(agent, "parent-resume-v1")
+      const address = Address.make("agent:parent-resume")
+      const escaped = AiError.make({
+        module: "ParentResumeModel",
+        method: "streamText",
+        reason: AiError.RateLimitError.make({}),
+      })
+      const model = Layer.effect(
+        LanguageModel.LanguageModel,
+        LanguageModel.make({
+          generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+          streamText: (request) => {
+            modelCalls += 1
+            prompts.push(JSON.stringify(request.prompt.content))
+            if (modelCalls === 1) {
               return Stream.fromIterable<Response.StreamPartEncoded>([
-                Response.makePart("text-delta", { id: "resumed-parent", delta: "resumed once" }),
+                Response.makePart("tool-call", {
+                  id: "child-work-1",
+                  name: "child_work",
+                  params: {},
+                  providerExecuted: false,
+                }),
                 finish,
               ])
-            },
-          }),
-        )
-        const executor = ToolExecutor.layerTest({
-          execute: () =>
-            Effect.sync(() => {
-              childDispatches += 1
-              return { _tag: "Success" as const, result: "child complete", encodedResult: "child complete" }
-            }),
-        })
-        const handlers = toolkit.toLayer({ child_work: () => Effect.die("ToolExecutor owns child work") })
-        const resolver = ExecutableResolver.makeStatic([
-          { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
-        ])
-
-        const options = {
-          resolver,
-          addresses: [{ address, executable, registrations: registrationsFor(executable) }],
-        }
-        return scopedWith(
-          backend === "memory"
-            ? Runtime.layerMemory(options)
-            : Runtime.layerSqlite({ ...options, filename: tempDbPath("parent-resume") }),
-        )(
-          Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
-            const host = yield* ExecutionHost.ExecutionHost
-            const store = yield* RunStore.RunStore
-            const receipt = yield* runtime.send({
-              to: address,
-              sessionId: "session:parent-resume",
-              idempotencyKey: "parent-resume",
-              prompt: "delegate then answer",
-            })
-            yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "parent-resume" }))
-
-            const history = yield* runtime.history({ runId: receipt.runId, limit: 200 })
-            expect((yield* runtime.inspect(receipt.runId)).status).toBe(outcome === "recovers" ? "succeeded" : "failed")
-            expect(childDispatches).toBe(1)
-            expect(modelCalls).toBe(outcome === "recovers" ? 3 : 4)
-            expect(prompts.slice(1).every((prompt) => prompt.includes("child complete"))).toBe(true)
-            expect(history.filter((event) => event._tag === "RunAttemptStarted").map((event) => event.attempt)).toEqual(
-              outcome === "recovers" ? [1, 2] : [1, 2, 3],
-            )
-            const failed = history.filter((event) => event._tag === "RunFailed")
-            expect(failed).toHaveLength(outcome === "recovers" ? 0 : 1)
-            if (outcome === "exhausts" && failed[0]?._tag === "RunFailed") {
-              expect(failed[0].error).toBeInstanceOf(Errors.AgentExecutionFailure)
-              expect(failed[0].error.message).not.toBe("")
             }
-            expect(history.filter((event) => event._tag === "RunCompleted")).toHaveLength(
-              outcome === "recovers" ? 1 : 0,
-            )
-            expect(new Set(history.map((event) => event.runId))).toEqual(new Set([receipt.runId]))
+            if (modelCalls === 2) {
+              const partial: Stream.Stream<Response.StreamPartEncoded, AiError.AiError> = Stream.make(
+                Response.makePart("text-delta", { id: "failed-parent", delta: "discard me" }),
+              )
+              return partial.pipe(Stream.concat(Stream.fail(escaped)))
+            }
+            return Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("text-delta", { id: "resumed-parent", delta: "resumed once" }),
+              finish,
+            ])
+          },
+        }),
+      )
+      const executor = ToolExecutor.layerTest({
+        execute: () =>
+          Effect.sync(() => {
+            childDispatches += 1
+            return { _tag: "Success" as const, result: "child complete", encodedResult: "child complete" }
           }),
-        )
       })
-    }
+      const handlers = toolkit.toLayer({ child_work: () => Effect.die("ToolExecutor owns child work") })
+      const resolver = ExecutableResolver.makeStatic([
+        { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+      ])
+
+      const options = {
+        resolver,
+        addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+      }
+      return scopedWith(
+        backend === "memory"
+          ? Runtime.layerMemory(options)
+          : Runtime.layerSqlite({ ...options, filename: tempDbPath("parent-resume") }),
+      )(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const host = yield* ExecutionHost.ExecutionHost
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: address,
+            sessionId: "session:parent-resume",
+            idempotencyKey: "parent-resume",
+            prompt: "delegate then answer",
+          })
+          yield* host.execute(yield* store.claimExecution({ runId: receipt.runId, ownerId: "parent-resume" }))
+
+          const history = yield* runtime.history({ runId: receipt.runId, limit: 200 })
+          expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
+          expect(childDispatches).toBe(1)
+          expect(modelCalls).toBe(2)
+          expect(prompts[1]).toContain("child complete")
+          expect(history.filter((event) => event._tag === "RunAttemptStarted").map((event) => event.attempt)).toEqual([
+            1,
+          ])
+          const interruptedIndex = history.findIndex((event) => event._tag === "ModelResponseInterrupted")
+          const failedIndex = history.findIndex((event) => event._tag === "RunFailed")
+          expect(interruptedIndex).toBeGreaterThan(-1)
+          expect(interruptedIndex).toBeLessThan(failedIndex)
+          const failed = history[failedIndex]
+          expect(failed?._tag).toBe("RunFailed")
+          if (failed?._tag === "RunFailed") {
+            expect(failed.error).toBeInstanceOf(Errors.AgentExecutionFailure)
+            expect(failed.error.message).not.toBe("")
+          }
+          expect(history.filter((event) => event._tag === "RunCompleted")).toHaveLength(0)
+          expect(new Set(history.map((event) => event.runId))).toEqual(new Set([receipt.runId]))
+        }),
+      )
+    })
   }
 
   it.effect("resolves the checkpoint active pin when recovering a Run", () => {

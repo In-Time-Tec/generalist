@@ -2,9 +2,23 @@ import { Pins } from "@batonfx/core"
 import { Schema } from "effect"
 import { RuntimeUnavailable } from "./errors.js"
 import type { ModelResponseCommitted } from "./agent-event.js"
-import type { CommitModelResponseInput } from "./run-store.js"
+import type { ExecutionClaim } from "./run-store.js"
+import type { ExecutionCheckpoint } from "./execution-state.js"
+import type { Prompt } from "effect/unstable/ai"
 import { CompletedModelResponse } from "./run-event.js"
 import type { OperationRecord } from "./sql/operations.js"
+
+/** Atomic canonical model outcome and semantic Run outbox commit. */
+export interface CommitModelResponseInput extends ExecutionClaim {
+  readonly runId: string
+  readonly operationId: string
+  readonly outcome: { readonly _tag: "Succeeded"; readonly value: unknown }
+  readonly checkpoint?: ExecutionCheckpoint
+  readonly transcript?: Prompt.Prompt
+  readonly continuation?: import("./steering.js").ExecutionContinuation | null
+  readonly steeringEntryIds?: ReadonlyArray<string>
+  readonly event: ModelResponseCommitted
+}
 
 interface CompletedOperation {
   readonly operationId: string

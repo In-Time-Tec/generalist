@@ -24,6 +24,7 @@ import {
   startOperation,
   completeOperation,
   commitModelResponse,
+  commitInterruptedModelResponse,
   resolveOperation,
 } from "./store-operations.js"
 import {
@@ -45,6 +46,7 @@ import {
   resolveAddress,
 } from "./store-directory.js"
 import { Prompt } from "effect/unstable/ai"
+import { makeMemorySessionStore } from "./session-store.js"
 import { admitFanOut, inspectFanOut } from "./store-fan-out.js"
 import { makeCursor } from "../tree-cursor.js"
 import { projectRunSnapshot, projectTreeInspection, type InspectionRun } from "../inspection.js"
@@ -89,7 +91,7 @@ export const makeRunStore = (options: LayerOptions) =>
 
     return RunStore.of({
       info: Effect.succeed({ durability: "ephemeral", backend: "memory", multiWorker: false }),
-      sessionStore: () => Effect.succeed(Option.none()),
+      sessionStore: (sessionId) => Effect.succeed(Option.some(makeMemorySessionStore({ stateRef, sessionId }))),
       hasAdmission: (input) =>
         SynchronizedRef.get(stateRef).pipe(
           Effect.flatMap((state) =>
@@ -322,6 +324,8 @@ export const makeRunStore = (options: LayerOptions) =>
       startOperation: (input) => fencedModify(input, (state) => startOperation(state, input)),
       completeOperation: (input) => fencedModify(input, (state) => completeOperation(state, input)),
       commitModelResponse: (input) => fencedModify(input, (state) => commitModelResponse(state, input)),
+      commitInterruptedModelResponse: (input) =>
+        fencedModify(input, (state) => commitInterruptedModelResponse(state, input)),
       expireRunningOperation: (input) => fencedModify(input, (state) => expireRunningOperation(state, input)),
       getOperation: (input) =>
         SynchronizedRef.get(stateRef).pipe(Effect.flatMap((state) => getOperation(state, input))),

@@ -36,6 +36,7 @@ import {
   resolveOperation,
 } from "./store-operations.js"
 import { decodeRunEffect, hasAdmission, loadEventsAfter, loadRun, loadRunWait } from "./store-helpers.js"
+import { commitInterruptedModelResponse } from "./interrupted-model-response.js"
 import {
   claimExecution,
   loadExecution,
@@ -261,6 +262,8 @@ export const makeSqliteRunStore = (
       startOperation: (input) => fenced(input, () => startOperation(input)),
       completeOperation: (input) => fenced(input, (transactionHub) => completeOperation(transactionHub, input)),
       commitModelResponse: (input) => fenced(input, (transactionHub) => commitModelResponse(transactionHub, input)),
+      commitInterruptedModelResponse: (input) =>
+        fenced(input, (transactionHub) => commitInterruptedModelResponse(transactionHub, input)),
       expireRunningOperation: (input) =>
         fenced(input, (transactionHub) => expireRunningOperation(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),

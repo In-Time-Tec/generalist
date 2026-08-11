@@ -17,6 +17,7 @@ import type { ProgramOperationRecord, ProgramRunState } from "../program-store.j
 import type { ExecutableRegistration } from "../executable-registration.js"
 import type { PendingRunOutcome } from "../run-store.js"
 import type { MailboxEntry } from "../mailbox.js"
+import type { Session } from "@batonfx/core"
 
 export type SubscriberError = SubscriberLagged | CursorExpired | RuntimeUnavailable
 export type SubscriberQueue = Queue.Queue<RunEvent, SubscriberError>
@@ -65,6 +66,13 @@ export interface Lane {
   readonly acceptedSequence: number
 }
 
+export interface MemorySession {
+  readonly entries: ReadonlyMap<string, Session.Entry>
+  readonly order: ReadonlyArray<string>
+  readonly leaf: string | null
+  readonly counter: number
+}
+
 export interface MemoryState {
   readonly closed: boolean
   readonly nextRunCounter: number
@@ -73,6 +81,7 @@ export interface MemoryState {
   readonly nextSteeringCounter: number
   readonly nextMessageCounter: number
   readonly runs: ReadonlyMap<string, StoredRun>
+  readonly sessions: ReadonlyMap<string, MemorySession>
   readonly treeRoots: ReadonlyMap<string, TreeRoot>
   readonly lanes: ReadonlyMap<string, Lane>
   readonly idempotency: ReadonlyMap<string, IdempotencyEntry>
@@ -127,6 +136,7 @@ export const emptyState = (input: {
   nextSteeringCounter: 1,
   nextMessageCounter: 1,
   runs: new Map(),
+  sessions: new Map(),
   treeRoots: new Map(),
   lanes: new Map(),
   idempotency: new Map(),

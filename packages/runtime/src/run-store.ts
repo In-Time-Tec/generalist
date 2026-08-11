@@ -36,7 +36,9 @@ import type { AddressInvalid, AgentName, DirectoryEntry } from "./agent-director
 import type { MailboxBounds, MailboxEntry, MessageReceipt } from "./mailbox.js"
 import type { RunInspection, RunReceipt, RunSnapshot, RunStatus } from "./run.js"
 import type { RunWait, WaitResolution } from "./run-wait.js"
-import type { DurableAgentLoopEvent, EmittableAgentLoopEvent, ModelResponseCommitted } from "./agent-event.js"
+import type { DurableAgentLoopEvent, EmittableAgentLoopEvent } from "./agent-event.js"
+import type { CommitModelResponseInput } from "./model-response-commit.js"
+import type { CommitInterruptedModelResponseInput } from "./model-response-interrupted.js"
 import { ExecutionResult } from "./execution-state.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "./execution-state.js"
 import { RunFailure } from "./run-event.js"
@@ -198,18 +200,6 @@ export interface ExecutionClaim {
   readonly runId: string
   readonly ownerId: string
   readonly attemptFence: number
-}
-
-/** @experimental Atomic canonical model outcome and semantic Run outbox commit. */
-export interface CommitModelResponseInput extends ExecutionClaim {
-  readonly runId: string
-  readonly operationId: string
-  readonly outcome: { readonly _tag: "Succeeded"; readonly value: unknown }
-  readonly checkpoint?: ExecutionCheckpoint
-  readonly transcript?: Prompt.Prompt
-  readonly continuation?: ExecutionContinuation | null
-  readonly steeringEntryIds?: ReadonlyArray<string>
-  readonly event: ModelResponseCommitted
 }
 
 export type WorkerMutationError =
@@ -418,6 +408,9 @@ export interface Interface {
     },
   ) => Effect.Effect<OperationRecord, WorkerMutationError>
   readonly commitModelResponse: (input: CommitModelResponseInput) => Effect.Effect<OperationRecord, WorkerMutationError>
+  readonly commitInterruptedModelResponse: (
+    input: CommitInterruptedModelResponseInput,
+  ) => Effect.Effect<OperationRecord, WorkerMutationError>
   readonly expireRunningOperation: (
     input: ExecutionClaim & {
       readonly runId: string

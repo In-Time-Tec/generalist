@@ -22,7 +22,7 @@ const scopedWith =
     Effect.scoped(Effect.flatMap(Layer.build(layer), (context) => effect.pipe(Effect.provideContext(context))))
 
 const execute = (input: {
-  readonly observer: "absent" | "slow"
+  readonly observer: "absent" | "slow" | "disconnected"
   readonly backend: "memory" | "sqlite"
   readonly chunks?: number
 }) =>
@@ -74,15 +74,19 @@ const execute = (input: {
           idempotencyKey: `preview:${input.backend}:${input.observer}`,
           prompt: "answer",
         })
-        if (input.observer === "slow") {
-          yield* runtime.previews({ runId: receipt.runId }).pipe(
-            Stream.runForEach((preview) => Deferred.succeed(previewSeen, preview).pipe(Effect.andThen(Effect.never))),
-            Effect.forkChild({ startImmediately: true }),
-          )
-        }
+        const subscriber =
+          input.observer === "absent"
+            ? undefined
+            : yield* runtime.previews({ runId: receipt.runId }).pipe(
+                Stream.runForEach((preview) =>
+                  Deferred.succeed(previewSeen, preview).pipe(Effect.andThen(Effect.never)),
+                ),
+                Effect.forkChild({ startImmediately: true }),
+              )
         const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "preview-test" })
         const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
-        const preview = input.observer === "slow" ? yield* Deferred.await(previewSeen) : undefined
+        const preview = input.observer === "absent" ? undefined : yield* Deferred.await(previewSeen)
+        if (input.observer === "disconnected" && subscriber !== undefined) yield* Fiber.interrupt(subscriber)
         yield* Deferred.succeed(releaseModel, undefined)
         yield* Fiber.join(execution)
         const history = yield* runtime.history({ runId: receipt.runId, limit: 100 })
@@ -102,6 +106,7 @@ it.effect("publishes live preview without allowing a blocked subscriber to affec
   Effect.gen(function* () {
     const baseline = yield* execute({ backend: "memory", observer: "absent" })
     const observed = yield* execute({ backend: "memory", observer: "slow" })
+    const disconnected = yield* execute({ backend: "memory", observer: "disconnected" })
 
     expect(observed.preview).toMatchObject({
       attemptFence: 1,
@@ -117,6 +122,9 @@ it.effect("publishes live preview without allowing a blocked subscriber to affec
     expect(observed.tags).toEqual(baseline.tags)
     expect(observed.tags).not.toContain("ModelPart")
     expect(observed.tags).toContain("TurnCompleted")
+    expect(disconnected.status).toBe("succeeded")
+    expect(disconnected.result).toEqual(baseline.result)
+    expect(disconnected.tags).toEqual(baseline.tags)
   }),
 )
 

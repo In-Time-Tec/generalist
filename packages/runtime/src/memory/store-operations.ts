@@ -1,7 +1,9 @@
+import type { CommitModelResponseInput } from "../model-response-commit.js"
+import type { CommitInterruptedModelResponseInput } from "../model-response-interrupted.js"
 import { Effect, Function, Schema } from "effect"
 import { OperationResolutionConflict, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
-import type { CommitModelResponseInput, OperationCompletionOutcome, RecordOperationInput } from "../run-store.js"
+import type { OperationCompletionOutcome, RecordOperationInput } from "../run-store.js"
 import { canBlindRetry, type OperationRecord, type OperationStatus } from "../sql/operations.js"
 import { makeUnknown, appendAgentEvent, appendLifecycle, rejectIfTerminal } from "./append.js"
 import { Option } from "effect"
@@ -9,6 +11,12 @@ import { operationKeyMapKey, operationMapKey, type MemoryState } from "./state.j
 import { checkpointRef } from "../executable-manifest.js"
 import { digest as resolutionDigest, type ResolveOperationInput } from "../operation-resolution.js"
 import { sameModelResponseEvent, validateModelResponseCommit } from "../model-response-commit.js"
+import {
+  sameInterruptedModelOutcome,
+  sameInterruptedModelResponse,
+  validateInterruptedModelResponse,
+} from "../model-response-interrupted.js"
+import { appendInterruptedSessionEntry, verifyInterruptedSessionEntry } from "./session-store.js"
 
 const getRun = (state: MemoryState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -263,6 +271,69 @@ export const commitModelResponse: {
       })
     const [record, completed] = yield* completeOperation(state, input)
     const [, appended] = yield* appendAgentEvent(completed, input.runId, input.event)
+    return [record, appended] as const
+  }),
+)
+
+export const commitInterruptedModelResponse: {
+  (
+    input: CommitInterruptedModelResponseInput,
+  ): (
+    state: MemoryState,
+  ) => Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+  (
+    state: MemoryState,
+    input: CommitInterruptedModelResponseInput,
+  ): Effect.Effect<readonly [OperationRecord, MemoryState], RunNotFound | RunTerminal | RuntimeUnavailable>
+} = Function.dual(2, (state: MemoryState, input: CommitInterruptedModelResponseInput) =>
+  Effect.gen(function* () {
+    const run = yield* getRun(state, input.runId)
+    const current = state.operations.get(operationMapKey(input.runId, input.operationId))
+    if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
+    const sessionEntry = validateInterruptedModelResponse({
+      runId: input.runId,
+      sessionId: run.message.sessionId,
+      record: current,
+      outcome: input.outcome,
+      event: input.event,
+    })
+    if (Schema.is(RuntimeUnavailable)(sessionEntry)) return yield* sessionEntry
+    if (current.status === "failed") {
+      if (!sameInterruptedModelOutcome({ left: { _tag: "Failed", error: current.error }, right: input.outcome })) {
+        return yield* RuntimeUnavailable.make({
+          message: `model operation ${input.operationId} has a divergent interrupted outcome retry`,
+        })
+      }
+      const prior = run.events.find(
+        (event) => event._tag === "ModelResponseInterrupted" && event.operationKey === input.event.operationKey,
+      )
+      if (
+        prior === undefined ||
+        prior._tag !== "ModelResponseInterrupted" ||
+        !sameInterruptedModelResponse({ left: prior, right: input.event })
+      ) {
+        return yield* RuntimeUnavailable.make({
+          message: `model operation ${input.operationId} has a divergent interrupted outbox retry`,
+        })
+      }
+      yield* verifyInterruptedSessionEntry({ state, entry: sessionEntry }).pipe(
+        Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+      )
+      return [current, state] as const
+    }
+    if (current.status !== "running") {
+      return yield* RuntimeUnavailable.make({
+        message: `model operation ${input.operationId} cannot commit an interruption from ${current.status}`,
+      })
+    }
+    const withSession = yield* appendInterruptedSessionEntry({ state, entry: sessionEntry }).pipe(
+      Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
+    )
+    const record: OperationRecord = { ...current, status: "failed", error: input.outcome.error }
+    const operations = new Map(withSession.operations)
+    operations.set(operationMapKey(input.runId, input.operationId), record)
+    operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
+    const [, appended] = yield* appendAgentEvent({ ...withSession, operations }, input.runId, input.event)
     return [record, appended] as const
   }),
 )

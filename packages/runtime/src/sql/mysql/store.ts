@@ -148,8 +148,6 @@ export const makeMysqlServices = (
     ) => run(lockRun(input.runId).pipe(Effect.andThen(requireExecutionClaim(input)), Effect.andThen(effect)))
     const lockNamed = <A, E>(key: string, effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
       Effect.gen(function* () {
-        // Taking the exclusive lock first keeps concurrent holders off the shared-to-exclusive
-        // upgrade that InnoDB reports as a deadlock. Only the very first holder inserts the row.
         const held = yield* sql`SELECT lock_key FROM baton_runtime_locks WHERE lock_key = ${key} FOR UPDATE`
         if (held.length === 0) {
           yield* sql`INSERT IGNORE INTO baton_runtime_locks (lock_key) VALUES (${key})`
@@ -420,6 +418,7 @@ export const makeMysqlServices = (
       startOperation: (input) => fenced(input, startOperation(input)),
       completeOperation: (input) => fenced(input, completeOperation(transactionHub, input)),
       commitModelResponse: (input) => fenced(input, commitModelResponse(transactionHub, input)),
+      commitInterruptedModelResponse: () => RuntimeUnavailable.make({ message: "unsupported by mysql" }),
       expireRunningOperation: (input) => fenced(input, expireRunningOperation(transactionHub, input)),
       getOperation: (input) => runNoTxn(getOperation(input)),
       getOperationByKey: (input) => runNoTxn(getOperationByKey(input)),

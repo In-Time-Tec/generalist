@@ -41,6 +41,7 @@ export const postgresOperations = (input: {
   | "startOperation"
   | "completeOperation"
   | "commitModelResponse"
+  | "commitInterruptedModelResponse"
   | "expireRunningOperation"
   | "getOperation"
   | "getOperationByKey"
@@ -233,6 +234,8 @@ export const postgresOperations = (input: {
           return toOperationRecord(rows[0]!)
         }),
       ),
+    commitInterruptedModelResponse: () =>
+      RuntimeUnavailable.make({ message: "interrupted model response settlement is not supported by postgres yet" }),
     commitModelResponse: (op) =>
       fenced(
         op,

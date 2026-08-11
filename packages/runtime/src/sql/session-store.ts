@@ -71,6 +71,124 @@ const fromEntry = (entry: { readonly _tag: string } & Record<string, unknown>): 
   return encodePayload(payload as Session.EntryPayload)
 }
 
+/** Append or verify one stable interrupted assistant projection inside the caller's SQL transaction. */
+export const appendInterruptedSessionEntry = (
+  input: import("../agent-event.js").InterruptedSessionEntry,
+): Effect.Effect<
+  Session.Entry,
+  Session.SessionConflict | Session.SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
+  SqlClient.SqlClient
+> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const created = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
+    yield* sql`
+      INSERT OR IGNORE INTO baton_sessions (session_id, leaf_id, next_seq, owner_token, updated_at)
+      VALUES (${input.sessionId}, NULL, 0, NULL, ${created})
+    `
+    const sessionRows = yield* sql<SessionRow>`
+      SELECT leaf_id, next_seq, owner_token FROM baton_sessions WHERE session_id = ${input.sessionId}
+    `
+    const session = sessionRows[0]
+    if (session === undefined) return yield* storeError(`Session ${input.sessionId} could not be initialized`)
+    const payload: Session.AppendInput = {
+      _tag: "Message",
+      message: input.message,
+      metadata: { interruptionDigest: input.digest },
+    }
+    const existingRows = yield* sql<EntryRow>`
+      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
+    `
+    const existing = existingRows[0]
+    if (existing !== undefined) {
+      const entry = toEntry(existing)
+      if (!entryPayloadEquivalence(entry as Session.EntryPayload, payload as Session.EntryPayload)) {
+        return yield* Session.SessionConflict.make({
+          reason: "entry-id-reused",
+          message: `Session entry id ${input.entryId} was reused with different interrupted response content`,
+        })
+      }
+      const all = yield* sql<EntryRow>`
+        SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+        WHERE session_id = ${input.sessionId} ORDER BY seq
+      `
+      const byId = new Map(all.map((row) => [row.entry_id, row] as const))
+      let cursor = session.leaf_id
+      let active = false
+      for (let count = 0; cursor !== null && count <= all.length; count += 1) {
+        if (cursor === input.entryId) active = true
+        cursor = byId.get(cursor)?.parent_id ?? null
+      }
+      if (!active) {
+        return yield* Session.SessionConflict.make({
+          reason: "stale-leaf",
+          message: `Session entry id ${input.entryId} is not on the active path`,
+        })
+      }
+      return entry
+    }
+    yield* sql`
+      INSERT INTO baton_session_entries (session_id, entry_id, parent_id, seq, tag, payload_json, created_at)
+      VALUES (${input.sessionId}, ${input.entryId}, ${session.leaf_id}, ${session.next_seq}, 'Message',
+        ${encodePayload(payload as Session.EntryPayload)}, ${created})
+    `
+    yield* sql`
+      UPDATE baton_sessions SET leaf_id = ${input.entryId}, next_seq = ${session.next_seq + 1}, updated_at = ${created}
+      WHERE session_id = ${input.sessionId}
+    `
+    return { ...payload, id: input.entryId, parentId: session.leaf_id } as Session.MessageEntry
+  })
+
+export const verifyInterruptedSessionEntry = (
+  input: import("../agent-event.js").InterruptedSessionEntry,
+): Effect.Effect<
+  void,
+  Session.SessionConflict | Session.SessionStoreError | import("effect/unstable/sql/SqlError").SqlError,
+  SqlClient.SqlClient
+> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const sessionRows = yield* sql<SessionRow>`
+      SELECT leaf_id, next_seq, owner_token FROM baton_sessions WHERE session_id = ${input.sessionId}
+    `
+    const session = sessionRows[0]
+    const existingRows = yield* sql<EntryRow>`
+      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      WHERE session_id = ${input.sessionId} AND entry_id = ${input.entryId}
+    `
+    const existing = existingRows[0]
+    const payload: Session.AppendInput = {
+      _tag: "Message",
+      message: input.message,
+      metadata: { interruptionDigest: input.digest },
+    }
+    if (
+      session === undefined ||
+      existing === undefined ||
+      !entryPayloadEquivalence(toEntry(existing) as Session.EntryPayload, payload as Session.EntryPayload)
+    ) {
+      return yield* Session.SessionConflict.make({
+        reason: "entry-id-reused",
+        message: `Session entry id ${input.entryId} does not match the interrupted response`,
+      })
+    }
+    const all = yield* sql<EntryRow>`
+      SELECT entry_id, parent_id, seq, payload_json FROM baton_session_entries
+      WHERE session_id = ${input.sessionId} ORDER BY seq
+    `
+    const byId = new Map(all.map((row) => [row.entry_id, row] as const))
+    let cursor = session.leaf_id
+    for (let count = 0; cursor !== null && count <= all.length; count += 1) {
+      if (cursor === input.entryId) return
+      cursor = byId.get(cursor)?.parent_id ?? null
+    }
+    return yield* Session.SessionConflict.make({
+      reason: "stale-leaf",
+      message: `Session entry id ${input.entryId} is not on the active path`,
+    })
+  })
+
 /**
  * @experimental Durable single-writer Session store.
  *

@@ -18,7 +18,7 @@ import { agentBudget } from "./execution-defaults.js"
 import { make as makeCodeMode, withTool as withCodeModeTool } from "./code-mode.js"
 import { hostContext, sessionContext } from "./execution-context.js"
 import { make as makeNestedOperations } from "./nested-operations.js"
-import { settleInterruptedExecution } from "./execution-interruption.js"
+import { makeExecutionInterruption } from "./execution-interruption.js"
 import { executeProgram } from "./execute-program.js"
 import { approvalReason } from "./run-wait.js"
 import { makeAgentExecutionFailure } from "./agent-execution-failure.js"
@@ -53,7 +53,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
         const completingRetrySafeOperationIds = yield* Ref.make<ReadonlySet<string>>(new Set())
         const deferredProgramChildTerminal = yield* makeDeferredProgramChildTerminal
         const isProgramChild = claimed.message.metadata?.programOperation !== undefined
-        const settleInterruption = settleInterruptedExecution({
+        const interruption = makeExecutionInterruption({
           store,
           claim,
           runId,
@@ -112,9 +112,10 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               Effect.gen(function* () {
                 const nested = yield* makeNestedOperations({ claim, claimed, store })
                 const preview = yield* openModelPreview(previewLane)(runId, claim.attemptFence)
-                const baseContext = Context.merge(
+                const baseContext = Context.mergeAll(
                   yield* hostContext({ agent, environment, store, codeMode, nested }),
                   yield* sessionContext({ store, sessionId: claimed.message.sessionId }),
+                  interruption.context,
                 )
                 const executionRetry = yield* makeExecutionRetry(claimed.attempt)
                 const runHosted = (hostedAgent: Agent.Agent<Tools, R>): Effect.Effect<void> => {
@@ -267,6 +268,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                             if (persisted === undefined)
                               return yield* Effect.die(new Error(`Scheduled operation ${operation.key} is missing`))
                             const operationId = persisted.operationId
+                            if (operation.kind === "model" && outcome._tag !== "Succeeded") return
                             if (operation.replayPolicy !== "never") {
                               yield* Ref.update(completingRetrySafeOperationIds, (current) =>
                                 new Set(current).add(operationId),
@@ -435,7 +437,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         return
                       }
                       if ((yield* store.inspect(runId)).status === "needs-resolution") return
-                      const retry = isProgramChild ? undefined : yield* executionRetry.retry(store, claim)
+                      const retry = yield* interruption.retry(isProgramChild, executionRetry.retry(store, claim))
                       if (retry !== undefined) {
                         return yield* runAgent(
                           retry.continuation?.prompt ?? Prompt.empty,
@@ -451,11 +453,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
                         yield* Ref.set(deferredProgramChildTerminal, { _tag: "Fail", error: failure })
                         return
                       }
-                      yield* store
-                        .fail({ ...claim, error: failure })
-                        .pipe(
-                          Effect.catch((error) => (Schema.is(RunTerminal)(error) ? Effect.void : Effect.fail(error))),
-                        )
+                      yield* interruption.settle({ reason: "failure", error: failure })
                     }).pipe(Effect.orDie)
                   const continuation = claimed.continuation
                   const checkpoint =
@@ -482,7 +480,11 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
           Effect.onInterrupt(() =>
             active
               .cancellationRequested(runId)
-              .pipe(Effect.flatMap((requested) => (requested ? settleInterruption : Effect.void))),
+              .pipe(
+                Effect.flatMap((requested) =>
+                  requested ? interruption.settle({ reason: "cancel" }) : interruption.abandon,
+                ),
+              ),
           ),
         )
         yield* execution

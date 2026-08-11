@@ -227,6 +227,7 @@ export const CompletedModelResponse = Schema.Struct({
   usage: Schema.optionalKey(Usage),
   finishReason: Schema.optionalKey(Response.FinishReason),
 })
+export type CompletedModelResponse = typeof CompletedModelResponse.Type
 
 const AgentLoopEventSchema = Schema.Union([
   Schema.TaggedStruct("TurnStarted", { turn: Schema.Finite, ...optionalMetadata }),
@@ -239,6 +240,16 @@ const AgentLoopEventSchema = Schema.Union([
     response: CompletedModelResponse,
     digest: Schema.String,
     ...optionalMetadata,
+  }),
+  Schema.TaggedStruct("ModelResponseInterrupted", {
+    turn: Schema.Finite,
+    operationKey: Schema.String,
+    modelCallId: Schema.String,
+    modelAttemptId: Schema.String,
+    attempt: Schema.Finite,
+    response: CompletedModelResponse,
+    reason: Schema.Literals(["cancel", "failure"]),
+    digest: Schema.String,
   }),
   Schema.TaggedStruct("ToolExecutionStarted", { turn: Schema.Finite, call: ToolCall, ...optionalMetadata }),
   Schema.TaggedStruct("ToolProgress", {
