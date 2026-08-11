@@ -91,9 +91,13 @@ Completion atomically compares the scheduled operation and fence, records the no
 
 Dropping every preview must leave Run status, operation state, driver checkpoint, Session, durable transcript, usage, tool admission, projection revision, and terminal result unchanged. Preview delivery is bounded, conflated, droppable, and scoped to the live execution attempt.
 
-### Final output replaces preview
+### Final or interrupted output replaces preview
 
-A preview is keyed by Run, attempt fence, model call, and model attempt. A committed response replaces the overlay; it is never concatenated with it. Retry, cancellation, handoff, and completion reject stale preview frames.
+A preview is keyed by Run, attempt fence, model call, and model attempt. A committed response replaces the overlay; it is never concatenated with it. An explicit cancellation or terminal failure first commits one normalized `ModelResponseInterrupted` snapshot for the active operation, then settles the Run and clears the overlay. Internal retries discard their tentative attempt instead. Stale fences, calls, and attempts are always rejected.
+
+### Terminal interruption preserves what was shown
+
+Closing or cancelling a TUI never owns server durability. On explicit cancellation or terminal model failure, the server stops the provider, reads the authoritative in-flight response accumulator, and atomically persists one normalized interrupted-response event plus an idempotent Session append before the terminal Run event. This work continues without a subscriber. Provider fragments remain non-durable, incomplete tool parameters never become calls, and an abrupt process kill remains honest unless a separate bounded checkpoint policy is introduced.
 
 ### Session remains conversation authority
 
@@ -132,7 +136,7 @@ Baton Core owns provider-part normalization and construction of one completed Ef
 Runtime owns model-operation scheduling, fencing, recovery, the semantic Run journal, and post-commit publication.
 
 - A durable model operation executes as an Effect producing `CompletedModelResponse`, not as a replayable stream of chunks.
-- Runtime persists one response outcome and one semantic response event.
+- Runtime persists one completed response outcome and semantic response event, or one terminally interrupted normalized snapshot before failure/cancellation settlement.
 - Runtime never includes Core `ModelPart` in `RunEvent` or Run-tree history.
 - Attempt/retry lifecycle events remain durable only when replay changes a user-visible or recovery decision. Raw telemetry belongs in the telemetry sink.
 - Tool progress follows the same rule: bounded live preview is disposable; tool start, terminal result, uncertainty, approval, and failure are durable.
@@ -328,7 +332,7 @@ Wire the optional observer only in the Rika Server composition.
 - Render it using bounded physical rows.
 - Replace it with committed transcript units on the matching semantic event.
 - Reject stale-fence and stale-attempt frames.
-- Clear it on reconnect, resync, cancel, failure, and terminal state.
+- Clear it on reconnect or resync. On explicit cancel or terminal failure, replace it with the committed interrupted-response projection before clearing; on internal retry, discard it.
 - Conflate preview by key and render only the latest value at display cadence; do not queue and apply stale previews.
 - Deliver each durable projection once. Delete callback-plus-return replay/deduplication and keep only one rare durable-gap `ResyncRequired` path.
 
@@ -383,6 +387,10 @@ Run identical semantic output split into 1, 10,000, and adversarial empty/cumula
 ### Transaction visibility
 
 Inject failure at each point of model commit, including after event insertion and before transaction completion. An attached subscriber sees no rolled-back event. Replay exposes exactly the committed prefix.
+
+### Terminal interruption
+
+Cancel or terminally fail after several visible deltas and after the TUI disconnects. Assert one normalized `ModelResponseInterrupted`, one idempotent Session entry, then the terminal Run event; reconnect and a later Run must see the same partial assistant content. Repeat the settlement and require no duplicates. An internal provider retry must persist none of the discarded attempt. Incomplete tool-parameter fragments must never become a committed call.
 
 ### Restart frontier
 
