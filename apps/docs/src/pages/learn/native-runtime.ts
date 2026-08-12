@@ -40,7 +40,7 @@ export const nativeRuntime = definePage({
     h2("live-previews", "Live previews are outside durability"),
     p(
       code("Runtime.previews({ runId })"),
-      " observes bounded cumulative text and reasoning from the live Runtime process. This lane is intentionally lossy, conflated, droppable, and non-authoritative: it is not stored, sequenced, cursor-addressed, checkpointed, replayed, transported, or folded into FoldKit Chat.Model. Losing every preview does not change execution or the eventual semantic response event.",
+      " observes bounded append frames for text and reasoning from the live Runtime process. Contiguous per-attempt sequences and per-channel UTF-16 offsets let consumers detect a dropped frame. This lane is intentionally lossy, droppable, and non-authoritative: it is not stored, cursor-addressed, checkpointed, durably replayed, transported, or folded into FoldKit Chat.Model. Losing every preview does not change execution or the eventual semantic response event.",
     ),
     h2("storage", "Choose the storage layer"),
     table(

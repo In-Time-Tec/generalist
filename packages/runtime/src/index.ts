@@ -222,17 +222,20 @@ export namespace RunEvent {
 export { Errors } from "./facade/errors.js"
 
 import {
-  MaxCharacters as ModelPreview_MaxCharacters,
   MaxCadenceMillis as ModelPreview_MaxCadenceMillis,
+  MaxPayloadCharacters as ModelPreview_MaxPayloadCharacters,
+  SubscriberCapacity as ModelPreview_SubscriberCapacity,
 } from "./model-preview.js"
 export const ModelPreview = {
-  MaxCharacters: ModelPreview_MaxCharacters,
   MaxCadenceMillis: ModelPreview_MaxCadenceMillis,
+  MaxPayloadCharacters: ModelPreview_MaxPayloadCharacters,
+  SubscriberCapacity: ModelPreview_SubscriberCapacity,
 } as const
 export namespace ModelPreview {
-  export type ModelPreview = import("./model-preview.js").ModelPreview
-  export type PreviewFrame = import("./model-preview.js").PreviewFrame
-  export type PreviewCleared = import("./model-preview.js").PreviewCleared
+  export type Change = import("./model-preview.js").ModelPreviewChange
+  export type Frame = import("./model-preview.js").ModelPreviewFrame
+  export type Cleared = import("./model-preview.js").ModelPreviewCleared
+  export type Event = import("./model-preview.js").ModelPreviewEvent
 }
 
 export * as Steering from "./steering.js"
@@ -267,9 +270,10 @@ export namespace Runtime {
   export type EventsInput = import("./runtime.js").EventsInput
   export type HistoryInput = import("./runtime.js").HistoryInput
   export type PreviewsInput = import("./runtime.js").PreviewsInput
-  export type ModelPreview = import("./model-preview.js").ModelPreview
-  export type PreviewFrame = import("./model-preview.js").PreviewFrame
-  export type PreviewCleared = import("./model-preview.js").PreviewCleared
+  export type ModelPreviewChange = import("./model-preview.js").ModelPreviewChange
+  export type ModelPreviewFrame = import("./model-preview.js").ModelPreviewFrame
+  export type ModelPreviewCleared = import("./model-preview.js").ModelPreviewCleared
+  export type ModelPreviewEvent = import("./model-preview.js").ModelPreviewEvent
   export type ListInput = import("./runtime.js").ListInput
   export type RespondInput = import("./runtime.js").RespondInput
   export type RespondApprovalInput = import("./approval.js").RespondInput

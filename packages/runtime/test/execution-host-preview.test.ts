@@ -28,7 +28,7 @@ const execute = (input: {
 }) =>
   Effect.gen(function* () {
     const releaseModel = yield* Deferred.make<void>()
-    const previewSeen = yield* Deferred.make<Runtime.PreviewFrame>()
+    const previewSeen = yield* Deferred.make<Runtime.ModelPreviewEvent>()
     const agent = Agent.make({ name: `preview-${input.backend}-${input.observer}` })
     const executable = testExecutable(agent, `preview-${input.backend}-${input.observer}`)
     const address = Address.make(`agent:preview-${input.backend}-${input.observer}`)
@@ -109,13 +109,12 @@ it.effect("publishes live preview without allowing a blocked subscriber to affec
     const disconnected = yield* execute({ backend: "memory", observer: "disconnected" })
 
     expect(observed.preview).toMatchObject({
+      _tag: "ModelPreview",
       attemptFence: 1,
       turn: 0,
       attempt: 0,
-      revision: 1,
-      text: "live answer",
-      reasoning: "",
-      truncated: false,
+      sequence: 0,
+      changes: [{ channel: "text", offset: 0, delta: "live answer" }],
     })
     expect(observed.status).toBe("succeeded")
     expect(observed.result).toEqual(baseline.result)
