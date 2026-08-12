@@ -8,6 +8,7 @@ import { RunWait, WaitResolution } from "./run-wait.js"
 import { Address } from "./address.js"
 import { AgentEvent, ModelTelemetry } from "@batonfx/core"
 import { FanOutJoin, FanOutMemberOrigin, FanOutRemainder, type FanOutMemberOrigin as FanOutOrigin } from "./fan-out.js"
+import { ChildReadiness } from "./child-readiness.js"
 
 export type { DurableAgentLoopEvent, ExecutionResult }
 
@@ -94,9 +95,15 @@ export type ChildLinked = RunEventBase & {
   readonly selection: string
   readonly prompt: Prompt.Prompt
   readonly childDepth: number
+  readonly readiness: ChildReadiness
   readonly key?: string
   readonly label?: string
   readonly origin?: FanOutOrigin
+}
+export type ChildReadinessChanged = RunEventBase & {
+  readonly _tag: "ChildReadinessChanged"
+  readonly childRunId: string
+  readonly readiness: ChildReadiness
 }
 export type ChildSettled = RunEventBase & {
   readonly _tag: "ChildSettled"
@@ -158,6 +165,7 @@ export type LifecycleEvent =
   | SteeringDiscarded
   | OperationUnknown
   | ChildLinked
+  | ChildReadinessChanged
   | ChildSettled
   | FanOutAdmitted
   | FanOutJoined
@@ -179,6 +187,7 @@ export const LifecycleTag = Schema.Literals([
   "SteeringDiscarded",
   "OperationUnknown",
   "ChildLinked",
+  "ChildReadinessChanged",
   "ChildSettled",
   "FanOutAdmitted",
   "FanOutJoined",
@@ -379,10 +388,12 @@ const LifecycleEventSchema = Schema.Union([
     selection: Schema.String,
     prompt: Prompt.Prompt,
     childDepth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+    readiness: ChildReadiness,
     key: Schema.optionalKey(Schema.String),
     label: Schema.optionalKey(Schema.String),
     origin: Schema.optionalKey(FanOutMemberOrigin),
   }),
+  Schema.TaggedStruct("ChildReadinessChanged", { childRunId: RunId, readiness: ChildReadiness }),
   Schema.TaggedStruct("ChildSettled", { childRunId: RunId, terminalEventId: Schema.String }),
   Schema.TaggedStruct("FanOutAdmitted", {
     fanOutId: Schema.String,

@@ -17,6 +17,7 @@ export const toInspection = (
   lastSequence: run.lastSequence,
   durability: "ephemeral",
   ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
+  ...(run.childReadiness === undefined ? {} : { childReadiness: run.childReadiness }),
   ...(run.wait === undefined ? {} : { wait: run.wait }),
 })
 

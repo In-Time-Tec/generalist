@@ -5,6 +5,7 @@ import { FanOutJoin, FanOutMemberOrigin, type FanOutInspection, type FanOutMembe
 import type { RunEvent } from "../run-event.js"
 import { Prompt } from "effect/unstable/ai"
 import { FanOutNotFound } from "../errors.js"
+import type { ChildReadiness } from "../child-readiness.js"
 
 export interface FanOutRow {
   readonly fan_out_id: string
@@ -25,6 +26,7 @@ export interface MemberRow {
   readonly origin_json: string | null
   readonly child_run_id: string
   readonly depth: number | string
+  readonly readiness: ChildReadiness
   readonly status: FanOutMemberResult["status"]
   readonly terminal_event_id: string | null
   readonly outcome_json: string | null
@@ -35,7 +37,11 @@ export const loadFanOut = (fanOutId: string) =>
     const fanOut = (yield* sql<FanOutRow>`SELECT * FROM baton_fan_outs WHERE fan_out_id = ${fanOutId}`)[0]
     if (fanOut === undefined) return undefined
     const members = yield* sql<MemberRow>`
-      SELECT * FROM baton_fan_out_members WHERE fan_out_id = ${fanOutId} ORDER BY ordinal ASC
+      SELECT m.*, l.readiness
+      FROM baton_fan_out_members m
+      JOIN baton_run_links l ON l.child_run_id = m.child_run_id
+      WHERE m.fan_out_id = ${fanOutId}
+      ORDER BY m.ordinal ASC
     `
     return { fanOut, members }
   })
@@ -66,6 +72,7 @@ export const decodeMember = (row: MemberRow): FanOutMemberResult => {
     ...(row.origin_json === null ? {} : { origin: decodeJson(FanOutMemberOrigin, row.origin_json) }),
     childRunId: row.child_run_id,
     depth: Number(row.depth),
+    readiness: row.readiness,
     status: row.status,
     ...(row.terminal_event_id === null ? {} : { terminalEventId: row.terminal_event_id }),
     ...(outcome.result === undefined ? {} : { result: outcome.result }),

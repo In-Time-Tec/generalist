@@ -64,9 +64,9 @@ runtime.awaitChildSettlement({ parentRunId, childRunId })
 
 Join modes are `AllSuccess`, `AllSettled`, `FirstSuccess`, `Quorum`, and `BestEffort`. Remainder policies are `await`, `request-cancel`, and `abandon`. `terminate` is rejected until a host can prove that all member effects terminated.
 
-`ChildRuns.tool` (`run_child`) blocks for one child; `ChildRuns.runGroupTool` (`run_child_group`) atomically admits an exact group and blocks one durable parent suspension until every member settles, returning complete ordered outcomes. Start/await tools remain lower-level detached operations. ExecutionHost omits blocking child tools at `maxDepth`, at zero width, or after lifetime quota exhaustion. Store admission remains authoritative under races.
+`ChildRuns.tool` (`run_child`) blocks for one child; `ChildRuns.runGroupTool` (`run_child_group`) atomically admits an exact group and blocks one durable parent suspension until every member settles, returning complete ordered outcomes. Start/await tools remain lower-level detached operations. ExecutionHost omits blocking child tools at `maxDepth`, at zero capacity, or while active capacity is exhausted. Store admission remains authoritative under races.
 
-Each root admission may pin `{ maxDepth, maxSubagents }`. Root depth is zero; child depth is derived from its parent. `maxSubagents` is a per-parent lifetime direct-child limit shared by singleton and group paths, not a global depth pool. Replays do not spend quota again, terminal children are never refunded, and an over-limit exact group leaves no partial state.
+Each root admission may pin `{ maxDepth, maxSubagents }`. Root depth is zero; child depth is derived from its parent. `maxSubagents` is each parent's active direct-child capacity, not a lifetime quota or global depth pool. An exact group may exceed that capacity: excess members are durably `queued`, become `ready` as siblings settle, and retain admission order in the all-settled result. Optional group `concurrency` may narrow but never widen the pinned capacity. `ChildLinked`, `ChildReadinessChanged`, Run inspection, child inspection, and fan-out inspection project `queued | ready | settled` directly.
 
 Core Agent budgets retain `childRuns` and `depth` for inline `AgentTool` nesting, but hosted child tools do not inspect them. `TreePolicy` is their sole recursive admission bound.
 

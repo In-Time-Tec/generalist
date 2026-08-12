@@ -5,11 +5,11 @@ import { SCHEMA_VERSION as mysqlVersion, schemaChecksum as mysqlChecksum } from 
 
 it("freezes schema checksums for every dialect", () => {
   expect({ sqliteVersion, postgresVersion, mysqlVersion }).toEqual({
-    sqliteVersion: 6,
-    postgresVersion: 5,
-    mysqlVersion: 5,
+    sqliteVersion: 7,
+    postgresVersion: 6,
+    mysqlVersion: 6,
   })
-  expect(sqliteChecksum()).toBe("2f7577598f2eb330eecfd0103fd5da32f7afb56b302b2cffefb17f9dcb9124bd")
-  expect(postgresChecksum()).toBe("8c6590014f6b8c9935896fc29d9ec061274023fc7f41c9a283ad5e84d2bf2f26")
-  expect(mysqlChecksum()).toBe("3b1418878291309105920ede9eaadf823fa823bfb7d50f770457fe834e7abbd6")
+  expect(sqliteChecksum()).toBe("848485ca16e31dcfa790f6293c5ce8182a1ea5cc0468b7b37dba77f4aea71529")
+  expect(postgresChecksum()).toBe("453d8a861a831fca98dc969226d130d1f64d767b93893621553682a1adcec022")
+  expect(mysqlChecksum()).toBe("89475b3daaa109e63fdf7d8fdec81db5c76cbca10e413732549041f51b7847d6")
 })

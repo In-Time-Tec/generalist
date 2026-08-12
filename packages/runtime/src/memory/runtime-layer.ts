@@ -184,7 +184,7 @@ export const makeRuntime = (
       )
     const normalizeFanOut = (parentRunId: string, input: InitialFanOutInput) =>
       Effect.gen(function* () {
-        if (!Number.isSafeInteger(input.concurrency) || input.concurrency < 1) {
+        if (input.concurrency !== undefined && (!Number.isSafeInteger(input.concurrency) || input.concurrency < 1)) {
           return yield* FanOutInvalid.make({ message: "fan-out concurrency must be a positive integer" })
         }
         if (input.members.length === 0 || input.members.length > MAX_FAN_OUT_MEMBERS) {
@@ -223,7 +223,7 @@ export const makeRuntime = (
           parentRunId,
           idempotencyKey: input.idempotencyKey,
           members,
-          concurrency: Math.min(input.concurrency, members.length),
+          ...(input.concurrency === undefined ? {} : { concurrency: Math.min(input.concurrency, members.length) }),
           join: input.join,
           remainder: input.remainder,
           fanOutId,

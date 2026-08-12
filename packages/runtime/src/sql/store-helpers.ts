@@ -3,7 +3,7 @@ import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { eventIdFor, type RunEvent } from "../run-event.js"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../execution-state.js"
-import type { ExecutableManifest, ExecutableRef } from "../executable-manifest.js"
+import { checkpointRef, decodePinned, type ExecutableManifest, type ExecutableRef } from "../executable-manifest.js"
 import type { Message } from "../message.js"
 import { isTerminal, type RunStatus } from "../run.js"
 import {
@@ -30,7 +30,6 @@ import { decodeContinuation } from "../steering.js"
 import { reconcileFanOut } from "./store-fan-out.js"
 import { hasUnsettledChild, loadTerminalEvent, reconcileChildWaitWith } from "./store-child-settlement.js"
 import { RuntimeUnavailable } from "../errors.js"
-import { checkpointRef, decodePinned } from "../executable-manifest.js"
 import { PendingRunOutcome } from "../run-store.js"
 import { admitChildSettlementFromEventId } from "./settlement-notifications.js"
 import { discardPendingSteering } from "./store-steering-disposition.js"
@@ -396,12 +395,17 @@ export const settleParent: {
     const settledAt = yield* nowIso
     yield* sql`
       UPDATE baton_run_links
-      SET terminal_event_id = ${terminalEventId}, settled_at = ${settledAt}
+      SET readiness = 'settled', terminal_event_id = ${terminalEventId}, settled_at = ${settledAt}
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId}
     `
     yield* admitChildSettlementFromEventId({ parent, child, terminalEventId })
     if (!isTerminal(parent.status)) {
       yield* appendEvent(hub, parent, {
+        _tag: "ChildReadinessChanged",
+        childRunId: child.runId,
+        readiness: "settled",
+      })
+      yield* appendEvent(hub, (yield* loadRun(parent.runId))!, {
         _tag: "ChildSettled",
         childRunId: child.runId,
         terminalEventId,

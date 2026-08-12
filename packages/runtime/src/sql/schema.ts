@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 
@@ -95,6 +95,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   parent_run_id TEXT NOT NULL,
   child_run_id TEXT NOT NULL,
   invocation_id TEXT NOT NULL,
+  readiness TEXT NOT NULL,
   terminal_event_id TEXT,
   created_at TEXT NOT NULL,
   settled_at TEXT,
@@ -103,6 +104,7 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
   FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
 )`,
+  `CREATE INDEX IF NOT EXISTS baton_run_links_readiness_idx ON baton_run_links(parent_run_id, readiness, created_at, child_run_id)`,
   `CREATE TABLE IF NOT EXISTS baton_run_steering (
   entry_id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL,

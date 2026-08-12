@@ -66,6 +66,7 @@ import { cancelSessionRuns } from "./session-cancellation.js"
 import { makeMysqlModelResponseOperations } from "./store-model-response.js"
 import { MysqlOperationCommit } from "./operation-commit.js"
 import { loadTerminalEvent, reconcileChildWaitWith } from "../store-child-settlement.js"
+import { loadChildReadiness } from "../store-child-capacity.js"
 export interface MysqlStoreOptions extends LayerOptions {
   readonly url: string
   readonly source?: string
@@ -346,6 +347,7 @@ export const makeMysqlServices = (
             const loaded = yield* loadRun(runId)
             if (loaded === undefined) return yield* RunNotFound.make({ runId })
             const activeWait = yield* loadRunWait(runId, loaded.activeWaitId)
+            const childReadiness = yield* loadChildReadiness(runId)
             return {
               runId: loaded.runId,
               status: loaded.status,
@@ -356,6 +358,7 @@ export const makeMysqlServices = (
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
               ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
+              ...(childReadiness === undefined ? {} : { childReadiness }),
               ...(activeWait === undefined ? {} : { wait: activeWait }),
             }
           }),

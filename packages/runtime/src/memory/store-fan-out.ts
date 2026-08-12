@@ -4,7 +4,6 @@ import { make as makeAddress } from "../address.js"
 import {
   FanOutConflict,
   FanOutInvalid,
-  FanOutNotFound,
   ChildSelectionMissing,
   RunNotFound,
   RunTerminal,
@@ -12,7 +11,7 @@ import {
   ChildDepthExceeded,
   ChildLimitExceeded,
 } from "../errors.js"
-import type { AdmitFanOutInput, FanOutInspection, FanOutMemberResult, FanOutReceipt } from "../fan-out.js"
+import type { AdmitFanOutInput, FanOutMemberResult, FanOutReceipt } from "../fan-out.js"
 import { make as makeMessage } from "../message.js"
 import { isTerminal } from "../run.js"
 import type { RunEvent } from "../run-event.js"
@@ -22,6 +21,7 @@ import {
   makeCancellationRequested,
   makeCancelled,
   makeChildLinked,
+  makeChildReadinessChanged,
   makeChildSettled,
   makeFanOutAdmitted,
   makeFanOutJoined,
@@ -33,26 +33,7 @@ import { digestFanOut, validateAdmission } from "../fan-out.js"
 import { narrow } from "../executable-registration.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 import { admitChildSettlement } from "./store-directory.js"
-
-const inspection = (fanOut: StoredFanOut): FanOutInspection => ({
-  fanOutId: fanOut.fanOutId,
-  parentRunId: fanOut.parentRunId,
-  idempotencyKey: fanOut.idempotencyKey,
-  status: fanOut.status,
-  join: fanOut.join,
-  remainder: fanOut.remainder,
-  concurrency: fanOut.concurrency,
-  members: fanOut.members,
-})
-
-export const inspectFanOut: {
-  (fanOutId: string): (state: MemoryState) => Effect.Effect<FanOutInspection, FanOutNotFound | RuntimeUnavailable>
-  (state: MemoryState, fanOutId: string): Effect.Effect<FanOutInspection, FanOutNotFound | RuntimeUnavailable>
-} = Function.dual(2, (state: MemoryState, fanOutId: string) => {
-  if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
-  const fanOut = state.fanOuts.get(fanOutId)
-  return fanOut === undefined ? Effect.fail(FanOutNotFound.make({ fanOutId })) : Effect.succeed(inspection(fanOut))
-})
+import { activeChildCount, promoteChildCapacity, settleFanOutMember } from "./store-child-capacity.js"
 
 export const admitFanOut: {
   (
@@ -143,22 +124,28 @@ export const admitFanOut: {
         limit: parent.treePolicy.maxDepth,
       })
     }
-    if (parent.children.length + members.length > parent.treePolicy.maxSubagents) {
+    if (parent.treePolicy.maxSubagents === 0) {
       return yield* ChildLimitExceeded.make({
         parentRunId: parent.runId,
         rootRunId: parent.rootRunId,
         parentDepth: parent.depth,
         depth,
         requested: members.length,
-        current: parent.children.length,
+        current: 0,
         limit: parent.treePolicy.maxSubagents,
       })
     }
+    const concurrency = Math.min(input.concurrency ?? members.length, members.length, parent.treePolicy.maxSubagents)
+    const readyCount = Math.min(
+      concurrency,
+      Math.max(0, parent.treePolicy.maxSubagents - activeChildCount(state, parent)),
+    )
 
     let next = state
     const memberResults: Array<FanOutMemberResult> = []
     for (const member of members) {
-      const active = member.ordinal < input.concurrency
+      const ready = member.ordinal < readyCount
+      const readiness = ready ? ("ready" as const) : ("queued" as const)
       const address = makeAddress(`fanout:${input.fanOutId}`)
       const message = makeMessage({
         id: `fanout:${input.fanOutId}:${member.ordinal}`,
@@ -180,6 +167,7 @@ export const admitFanOut: {
         depth,
         treePolicy: parent.treePolicy,
         parentRunId: parent.runId,
+        childReadiness: readiness,
         invocationId: `${input.fanOutId}:${member.key}`,
         respondedWaitIds: new Set(),
         lastSequence: -1,
@@ -206,6 +194,7 @@ export const admitFanOut: {
         next,
         parent.runId,
         makeChildLinked(member.childRunId, `${input.fanOutId}:${member.key}`, member.selection, member.prompt, depth, {
+          readiness,
           key: member.key,
           ...(member.label === undefined ? {} : { label: member.label }),
           ...(member.origin === undefined ? {} : { origin: member.origin }),
@@ -223,17 +212,34 @@ export const admitFanOut: {
         ...(member.origin === undefined ? {} : { origin: member.origin }),
         childRunId: member.childRunId,
         depth,
-        status: active ? "running" : "pending",
+        readiness,
+        status: ready ? "running" : "pending",
       })
     }
-    const fanOut: StoredFanOut = { ...input, digest, status: "running", members: memberResults }
+    const fanOut: StoredFanOut = {
+      fanOutId: input.fanOutId,
+      parentRunId: input.parentRunId,
+      idempotencyKey: input.idempotencyKey,
+      digest,
+      status: "running",
+      join: input.join,
+      remainder: input.remainder,
+      concurrency,
+      members: memberResults,
+    }
     const fanOuts = new Map(next.fanOuts)
     fanOuts.set(input.fanOutId, fanOut)
     next = { ...next, fanOuts }
     const [, admitted] = yield* appendLifecycle(
       next,
       parent.runId,
-      makeFanOutAdmitted(input.fanOutId, input.members.length, input.concurrency, input.join, input.remainder),
+      makeFanOutAdmitted({
+        fanOutId: input.fanOutId,
+        memberCount: input.members.length,
+        concurrency,
+        join: input.join,
+        remainder: input.remainder,
+      }),
     )
     return [
       {
@@ -246,19 +252,6 @@ export const admitFanOut: {
     ] as const
   }),
 )
-
-const terminalResult = (member: FanOutMemberResult, event: RunEvent): FanOutMemberResult => {
-  if (event._tag === "RunCompleted")
-    return { ...member, status: "succeeded", terminalEventId: event.eventId, result: event.result }
-  if (event._tag === "RunFailed")
-    return { ...member, status: "failed", terminalEventId: event.eventId, error: event.error }
-  return {
-    ...member,
-    status: "cancelled",
-    terminalEventId: event.eventId,
-    ...(event._tag === "RunCancelled" && event.reason !== undefined ? { reason: event.reason } : {}),
-  }
-}
 
 export const reconcileFanOut: {
   (
@@ -284,33 +277,35 @@ export const reconcileFanOut: {
       const current = [...state.fanOuts.values()].find((fanOut) =>
         fanOut.members.some((member) => member.childRunId === child.runId),
       )
-      if (current === undefined) return state
+      if (current === undefined) {
+        return child.parentRunId === undefined ? state : yield* promoteChildCapacity(state, child.parentRunId)
+      }
       const memberIndex = current.members.findIndex((member) => member.childRunId === child.runId)
-      if (
-        memberIndex < 0 ||
-        ["succeeded", "failed", "cancelled", "abandoned"].includes(current.members[memberIndex]!.status)
-      )
-        return state
-      const members = [...current.members]
-      members[memberIndex] = terminalResult(members[memberIndex]!, event)
+      if (memberIndex < 0) return state
+      if (["succeeded", "failed", "cancelled", "abandoned"].includes(current.members[memberIndex]!.status)) {
+        return yield* promoteChildCapacity(state, current.parentRunId)
+      }
+      let members = [...current.members]
+      members[memberIndex] = settleFanOutMember(members[memberIndex]!, event)
+      const settledFanOuts = new Map(state.fanOuts)
+      settledFanOuts.set(current.fanOutId, { ...current, members })
+      let next: MemoryState = { ...state, fanOuts: settledFanOuts }
       if (current.status !== "running") {
-        const fanOuts = new Map(state.fanOuts)
-        fanOuts.set(current.fanOutId, { ...current, members })
-        return { ...state, fanOuts }
+        return yield* promoteChildCapacity(next, current.parentRunId)
       }
       const succeeded = members.filter((member) => member.status === "succeeded").length
       const failed = members.filter((member) => member.status === "failed").length
       const cancelled = members.filter((member) => member.status === "cancelled").length
       const unsettled = members.filter((member) => member.status === "pending" || member.status === "running").length
-      const cancellingParent = state.runs.get(current.parentRunId)
+      const cancellingParent = next.runs.get(current.parentRunId)
       if (cancellingParent?.cancellationRequested === true) {
-        const fanOuts = new Map(state.fanOuts)
+        const fanOuts = new Map(next.fanOuts)
         fanOuts.set(current.fanOutId, {
           ...current,
           status: unsettled === 0 ? "cancelled" : "running",
           members,
         })
-        return { ...state, fanOuts }
+        return { ...next, fanOuts }
       }
       let joined: "succeeded" | "failed" | undefined
       switch (current.join._tag) {
@@ -345,7 +340,6 @@ export const reconcileFanOut: {
                 childRunId: member.childRunId,
                 action: current.remainder === "abandon" ? ("abandoned" as const) : ("cancellation-requested" as const),
               }))
-      let next = state
       if (joined !== undefined && current.remainder === "abandon") {
         for (let index = 0; index < members.length; index++) {
           if (members[index]!.status === "pending" || members[index]!.status === "running")
@@ -377,9 +371,16 @@ export const reconcileFanOut: {
           if (parent !== undefined && settledChild !== undefined) {
             next = yield* admitChildSettlement(next, { parent, child: settledChild, event: cancelledEvent })
           }
-          if (parent !== undefined && !isTerminal(parent.status)) {
+          if (parent !== undefined && settledChild !== undefined && !isTerminal(parent.status)) {
+            const runs = new Map(next.runs)
+            runs.set(run.runId, { ...settledChild, childReadiness: "settled" })
+            const [, readinessChanged] = yield* appendLifecycle(
+              { ...next, runs },
+              parent.runId,
+              makeChildReadinessChanged(run.runId, "settled"),
+            )
             const [, settled] = yield* appendLifecycle(
-              next,
+              readinessChanged,
               parent.runId,
               makeChildSettled(run.runId, cancelledEvent.eventId),
             )
@@ -387,23 +388,18 @@ export const reconcileFanOut: {
           }
           members[index] = {
             ...member,
+            readiness: "settled",
             status: "cancelled",
             terminalEventId: cancelledEvent.eventId,
             reason: "fan-out remainder",
           }
         }
       }
-      if (joined === undefined) {
-        let active = members.filter((member) => member.status === "running").length
-        for (let index = 0; index < members.length && active < current.concurrency; index++) {
-          if (members[index]!.status !== "pending") continue
-          members[index] = { ...members[index]!, status: "running" }
-          active++
-        }
-      }
       const fanOuts = new Map(next.fanOuts)
       fanOuts.set(current.fanOutId, { ...current, status: joined ?? "running", members })
       next = { ...next, fanOuts }
+      next = yield* promoteChildCapacity(next, current.parentRunId)
+      members = [...next.fanOuts.get(current.fanOutId)!.members]
       if (joined !== undefined) {
         const counts = {
           succeeded: members.filter((member) => member.status === "succeeded").length,

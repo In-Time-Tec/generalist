@@ -66,6 +66,7 @@ const representativeEvents: ReadonlyArray<RunTree.TreeEvent> = [
       selection: "researcher",
       prompt: Prompt.make("research the request"),
       childDepth: 1,
+      readiness: "ready",
     },
     cursor: makeCursor(rootRunId, 2),
   },

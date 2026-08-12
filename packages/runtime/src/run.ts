@@ -15,6 +15,7 @@ import {
 import { ExecutionResult as ExecutionResultSchema } from "./execution-state.js"
 import type { ExecutionResult as ExecutionResultType } from "./execution-state.js"
 import { TreePolicy } from "./tree-policy.js"
+import { ChildReadiness } from "./child-readiness.js"
 
 export const ExecutionResult = ExecutionResultSchema
 export type ExecutionResult = ExecutionResultType
@@ -58,6 +59,7 @@ export interface RunInspection {
   readonly executableRef: ExecutableRef
   readonly executableManifest: ExecutableManifest
   readonly parentRunId?: RunId
+  readonly childReadiness?: ChildReadiness
   readonly depth: number
   readonly treePolicy: TreePolicy
   readonly wait?: RunWait
@@ -90,6 +92,7 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
   executableRef: ExecutableRef,
   executableManifest: ExecutableManifest,
   parentRunId: Schema.optionalKey(RunId),
+  childReadiness: Schema.optionalKey(ChildReadiness),
   depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   treePolicy: TreePolicy,
   wait: Schema.optionalKey(RunWait),
