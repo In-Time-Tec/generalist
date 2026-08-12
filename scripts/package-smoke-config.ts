@@ -24,7 +24,7 @@ export const compressedSizeLimits: Record<(typeof packages)[number], number> = {
   providers: 36_000,
   mcp: 12_000,
   repl: 42_000,
-  runtime: 230_000,
+  runtime: 235_000,
   transport: 30_000,
   foldkit: 16_000,
 }

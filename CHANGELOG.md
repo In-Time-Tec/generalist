@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.21.5
+
 - Give every durable steering admission one stable `SteeringReceipt { entryId, sequence }` across idempotent retries, and journal exact `SteeringAccepted`, `SteeringConsumed`, and `SteeringDiscarded` lifecycle facts atomically with steering insertion, model-operation consumption, and terminal disposition in memory, SQLite, PostgreSQL, and MySQL.
 
 ## 0.21.4
