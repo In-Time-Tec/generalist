@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.23.0
+
+- Replace direct child Agent-pin edges with version-2 Agent selection allowlists and one version-2 executable-level pinned profile registry, enabling finite self- and mutually recursive profiles without static depth unrolling or digest cycles.
+- Derive hosted child-tool availability from persisted Run depth and lifetime direct-child count, and remove Runtime's default `childRuns` / `depth` budget caps so the root-pinned `TreePolicy` is the sole hosted recursion authority.
+
 ## 0.22.0
 
 - Add root-pinned bounded recursive subagents with derived depth, per-parent lifetime direct-child quotas, atomic exact group admission, and typed policy failures across memory, SQLite, PostgreSQL, and MySQL.
