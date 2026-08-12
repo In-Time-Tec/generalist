@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Scope, Stream } from "effect"
-import { LanguageModel, Response } from "effect/unstable/ai"
-import { Agent } from "@batonfx/core"
+import { Deferred, Effect, Fiber, Layer, Schema, Scope, Stream } from "effect"
+import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { Agent, ToolExecutor } from "@batonfx/core"
 import { Address, ExecutableResolver, ExecutionHost, Runtime, RunStore } from "../src/index.js"
 import { testExecutable } from "./identity.js"
 import { registrationsFor } from "./helpers.js"
@@ -124,6 +124,105 @@ it.effect("publishes live preview without allowing a blocked subscriber to affec
     expect(disconnected.status).toBe("succeeded")
     expect(disconnected.result).toEqual(baseline.result)
     expect(disconnected.tags).toEqual(baseline.tags)
+  }),
+)
+
+it.effect("keeps the claim-wide preview sink open across a tool continuation", () =>
+  Effect.gen(function* () {
+    const releaseSecondModel = yield* Deferred.make<void>()
+    const secondPreview = yield* Deferred.make<Runtime.ModelPreviewFrame>()
+    const tool = Tool.make("continue", { parameters: Schema.Struct({}), success: Schema.String })
+    const toolkit = Toolkit.make(tool)
+    const agent = Agent.make({ name: "preview-tool-continuation", toolkit })
+    const executable = testExecutable(agent, "preview-tool-continuation")
+    const address = Address.make("agent:preview-tool-continuation")
+    let modelCalls = 0
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => {
+          modelCalls += 1
+          if (modelCalls === 1) {
+            return Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("text-delta", { id: "first", delta: "first call" }),
+              Response.makePart("tool-call", {
+                id: "continue-1",
+                name: "continue",
+                params: {},
+                providerExecuted: false,
+              }),
+              finish,
+            ])
+          }
+          return Stream.make(Response.makePart("text-delta", { id: "second", delta: "second call" })).pipe(
+            Stream.concat(
+              Stream.fromEffect(Deferred.await(releaseSecondModel)).pipe(Stream.flatMap(() => Stream.make(finish))),
+            ),
+          )
+        },
+      }),
+    )
+    const executor = ToolExecutor.layerTest({
+      execute: () => Effect.succeed({ _tag: "Success", result: "continued", encodedResult: "continued" }),
+    })
+    const handlers = toolkit.toLayer({ continue: () => Effect.die("ToolExecutor test layer owns execution") })
+    const layer = Runtime.layerMemory({
+      resolver: ExecutableResolver.makeStatic([
+        { executable, agent: Agent.close(agent, Layer.mergeAll(model, executor, handlers)) },
+      ]),
+      addresses: [{ address, executable, registrations: registrationsFor(executable) }],
+      scheduler: { pollInterval: "1 day" },
+    })
+
+    yield* scopedWith(layer)(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* ExecutionHost.ExecutionHost
+        const store = yield* RunStore.RunStore
+        const receipt = yield* runtime.send({
+          to: address,
+          sessionId: "session:preview-tool-continuation",
+          idempotencyKey: "preview-tool-continuation",
+          prompt: "use the tool, then answer",
+        })
+        const subscriber = yield* runtime.previews({ runId: receipt.runId }).pipe(
+          Stream.runForEach((event) =>
+            event._tag === "ModelPreview" &&
+            event.turn === 1 &&
+            event.changes.some((change) => change.channel === "text" && change.delta === "second call")
+              ? Deferred.succeed(secondPreview, event)
+              : Effect.void,
+          ),
+          Effect.forkChild({ startImmediately: true }),
+        )
+        const claim = yield* store.claimExecution({ runId: receipt.runId, ownerId: "preview-test" })
+        const execution = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
+
+        expect(yield* Deferred.await(secondPreview)).toMatchObject({
+          _tag: "ModelPreview",
+          attemptFence: 1,
+          turn: 1,
+          attempt: 0,
+          sequence: 0,
+          changes: [{ channel: "text", offset: 0, delta: "second call" }],
+        })
+        expect((yield* runtime.snapshot(receipt.runId)).run.status).toBe("running")
+        expect((yield* runtime.history({ runId: receipt.runId, limit: 100 })).map((event) => event._tag)).not.toContain(
+          "RunCompleted",
+        )
+
+        yield* Deferred.succeed(releaseSecondModel, undefined)
+        yield* Fiber.join(execution)
+        expect(modelCalls).toBe(2)
+        expect(
+          (yield* runtime.history({ runId: receipt.runId, limit: 100 })).filter(
+            (event) => event._tag === "ModelResponseCommitted",
+          ),
+        ).toHaveLength(2)
+        yield* Fiber.interrupt(subscriber)
+      }),
+    )
   }),
 )
 

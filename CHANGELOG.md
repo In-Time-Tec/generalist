@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.21.6
+
+- Keep the claim-wide model preview sink open across tool continuations so every model call in one execution can publish live frames; provider terminal parts still flush attempt state and final execution cleanup still clears the memory-only lane.
+
 ## 0.21.5
 
 - Give every durable steering admission one stable `SteeringReceipt { entryId, sequence }` across idempotent retries, and journal exact `SteeringAccepted`, `SteeringConsumed`, and `SteeringDiscarded` lifecycle facts atomically with steering insertion, model-operation consumption, and terminal disposition in memory, SQLite, PostgreSQL, and MySQL.
