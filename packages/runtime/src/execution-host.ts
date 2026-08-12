@@ -106,7 +106,7 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               activeEntry?._tag === "Agent" &&
               activeEntry.manifest.children.length > 0 &&
               claimed.depth < claimed.treePolicy.maxDepth &&
-              claimed.directChildCount < claimed.treePolicy.maxSubagents
+              claimed.activeChildCount < claimed.treePolicy.maxSubagents
                 ? makeChildRunTools({ children: activeEntry.manifest.children })
                 : undefined
             const programAuthority = activeEntry?._tag === "Agent" ? activeEntry.manifest.programAuthority : undefined

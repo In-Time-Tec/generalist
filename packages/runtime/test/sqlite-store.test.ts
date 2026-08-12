@@ -1503,7 +1503,7 @@ it.live("child link reconciliation and cursor replay after reopen", () =>
         result: completedResult("child-done"),
       })
       const parentTags = yield* runtime.events({ runId: parent.runId }).pipe(
-        Stream.take(4),
+        Stream.take(5),
         Stream.runCollect,
         Effect.map((chunk) => [...chunk].map((event) => event._tag)),
       )

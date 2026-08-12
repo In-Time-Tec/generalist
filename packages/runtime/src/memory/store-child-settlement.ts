@@ -3,7 +3,7 @@ import { RuntimeUnavailable } from "../errors.js"
 import { ownsChildSuspension, resultFromChildEvent } from "../child-group.js"
 import { isTerminal } from "../run.js"
 import type { RunEvent } from "../run-event.js"
-import { appendLifecycle, makeChildSettled, makeResumed } from "./append.js"
+import { appendLifecycle, makeChildReadinessChanged, makeChildSettled, makeResumed } from "./append.js"
 import type { MemoryState, StoredRun } from "./state.js"
 import { admitChildSettlement } from "./store-directory.js"
 
@@ -81,13 +81,27 @@ export const settleParentChild: {
     if (child.parentRunId === undefined) return state
     const parent = state.runs.get(child.parentRunId)
     if (parent === undefined) return state
+    const runs = new Map(state.runs)
+    runs.set(child.runId, { ...child, childReadiness: "settled" })
+    const settledState = { ...state, runs }
     const terminalEvent = child.events.find((event) => event.eventId === terminalEventId)
     const notified =
-      terminalEvent === undefined ? state : yield* admitChildSettlement(state, { parent, child, event: terminalEvent })
+      terminalEvent === undefined
+        ? settledState
+        : yield* admitChildSettlement(settledState, { parent, child, event: terminalEvent })
     if (isTerminal(parent.status)) return notified
     const already = parent.events.some((event) => event._tag === "ChildSettled" && event.childRunId === child.runId)
     if (already) return notified
-    const [, linked] = yield* appendLifecycle(notified, parent.runId, makeChildSettled(child.runId, terminalEventId))
+    const [, readinessChanged] = yield* appendLifecycle(
+      notified,
+      parent.runId,
+      makeChildReadinessChanged(child.runId, "settled"),
+    )
+    const [, linked] = yield* appendLifecycle(
+      readinessChanged,
+      parent.runId,
+      makeChildSettled(child.runId, terminalEventId),
+    )
     const currentParent = linked.runs.get(parent.runId)
     const reconciled =
       currentParent === undefined || terminalEvent === undefined

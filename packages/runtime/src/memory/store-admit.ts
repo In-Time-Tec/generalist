@@ -33,6 +33,7 @@ import { childRunIdFor, fanOutIdFor } from "../fan-out.js"
 import { admitFanOut } from "./store-fan-out.js"
 import { fanOutMemberSessionId } from "../child-session.js"
 import { normalize as normalizeTreePolicy } from "../tree-policy.js"
+import { readinessForAdmission } from "./store-child-capacity.js"
 
 const newRunId = (state: MemoryState): readonly [string, MemoryState] => {
   const runId = `run_${state.nextRunCounter}`
@@ -282,7 +283,9 @@ export const admitStart: {
         ...fanOut,
         parentRunId: receipt.runId,
         fanOutId,
-        concurrency: Math.min(fanOut.concurrency, fanOut.members.length),
+        ...(fanOut.concurrency === undefined
+          ? {}
+          : { concurrency: Math.min(fanOut.concurrency, fanOut.members.length) }),
         members: fanOut.members.map((member, ordinal) => ({
           ordinal,
           key: member.key,
@@ -310,7 +313,13 @@ export const admitStart: {
 
 type AdmitSpawnResult = Effect.Effect<
   readonly [RunReceipt, MemoryState],
-  RunNotFound | RunTerminal | ChildSelectionMissing | IdempotencyConflict | RuntimeUnavailable
+  | RunNotFound
+  | RunTerminal
+  | ChildSelectionMissing
+  | IdempotencyConflict
+  | RuntimeUnavailable
+  | ChildDepthExceeded
+  | ChildLimitExceeded
 >
 
 export const admitSpawn: {
@@ -379,17 +388,18 @@ export const admitSpawn: {
           limit: parent.treePolicy.maxDepth,
         })
       }
-      if (parent.children.length >= parent.treePolicy.maxSubagents) {
+      if (parent.treePolicy.maxSubagents === 0) {
         return yield* ChildLimitExceeded.make({
           parentRunId: parent.runId,
           rootRunId: parent.rootRunId,
           parentDepth: parent.depth,
           depth,
           requested: 1,
-          current: parent.children.length,
+          current: 0,
           limit: parent.treePolicy.maxSubagents,
         })
       }
+      const childReadiness = readinessForAdmission(withId, parent)
       const child: StoredRun = {
         runId,
         status: "queued",
@@ -401,6 +411,7 @@ export const admitSpawn: {
         depth,
         treePolicy: parent.treePolicy,
         parentRunId: parent.runId,
+        childReadiness,
         invocationId: input.invocationId,
         respondedWaitIds: new Set(),
         lastSequence: -1,
@@ -423,6 +434,7 @@ export const admitSpawn: {
         next,
         parent.runId,
         makeChildLinked(runId, input.invocationId, input.selection, input.message.prompt, parent.depth + 1, {
+          readiness: childReadiness,
           ...(input.label === undefined ? {} : { label: input.label }),
           ...(input.origin === undefined ? {} : { origin: input.origin }),
         }),

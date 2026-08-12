@@ -113,7 +113,8 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
       expect(tools.runChild.name).toBe("run_child")
       expect(tools.runChildGroup.name).toBe("run_child_group")
       expect(tools.startChildGroup.name).toBe("start_child_group")
-      expect(tools.startChildGroup.description).toContain("{ members: [{ key, selection, prompt }], concurrency }")
+      expect(tools.startChildGroup.description).toContain("Members beyond the parent Run's active child capacity")
+      expect(tools.startChildGroup.description).toContain("queue durably and promote automatically")
       expect(tools.awaitChildGroup.name).toBe("await_child_group")
     }),
   )

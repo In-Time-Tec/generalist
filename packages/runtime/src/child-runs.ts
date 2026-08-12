@@ -164,7 +164,7 @@ export const make = (store: RunStoreInterface): Interface => {
         fanOutId: groupId,
         parentRunId: input.parentRunId,
         idempotencyKey,
-        concurrency: Math.min(input.concurrency, input.members.length),
+        ...(input.concurrency === undefined ? {} : { concurrency: Math.min(input.concurrency, input.members.length) }),
         join: { _tag: "AllSettled" },
         remainder: "await",
         members: input.members.map((member, ordinal) => ({
@@ -198,6 +198,7 @@ export const make = (store: RunStoreInterface): Interface => {
           ...(member.label === undefined ? {} : { label: member.label }),
           childRunId: member.childRunId,
           depth: member.depth,
+          readiness: member.readiness,
         })),
       }
       return { receipt: result, inspection }

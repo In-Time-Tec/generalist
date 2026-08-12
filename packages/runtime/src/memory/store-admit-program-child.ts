@@ -15,10 +15,17 @@ import type { AdmitProgramChildInput } from "../run-store.js"
 import { appendLifecycle, makeAccepted, makeChildLinked } from "./append.js"
 import { childDigest } from "./digest.js"
 import { idempotencyKey, type MemoryState, type StoredRun } from "./state.js"
+import { readinessForAdmission } from "./store-child-capacity.js"
 
 type AdmitProgramChildResult = Effect.Effect<
   readonly [RunReceipt, MemoryState],
-  RunNotFound | RunTerminal | IdempotencyConflict | RunIdConflict | RuntimeUnavailable
+  | RunNotFound
+  | RunTerminal
+  | IdempotencyConflict
+  | RunIdConflict
+  | RuntimeUnavailable
+  | ChildDepthExceeded
+  | ChildLimitExceeded
 >
 
 export const admitProgramChild: {
@@ -71,17 +78,18 @@ export const admitProgramChild: {
         limit: parent.treePolicy.maxDepth,
       })
     }
-    if (parent.children.length >= parent.treePolicy.maxSubagents) {
+    if (parent.treePolicy.maxSubagents === 0) {
       return yield* ChildLimitExceeded.make({
         parentRunId: parent.runId,
         rootRunId: parent.rootRunId,
         parentDepth: parent.depth,
         depth,
         requested: 1,
-        current: parent.children.length,
+        current: 0,
         limit: parent.treePolicy.maxSubagents,
       })
     }
+    const childReadiness = readinessForAdmission(state, parent)
     const child: StoredRun = {
       runId: input.childRunId,
       status: "queued",
@@ -93,6 +101,7 @@ export const admitProgramChild: {
       depth,
       treePolicy: parent.treePolicy,
       parentRunId: parent.runId,
+      childReadiness,
       invocationId: input.invocationId,
       respondedWaitIds: new Set(),
       lastSequence: -1,
@@ -118,6 +127,7 @@ export const admitProgramChild: {
         input.executableRef.active,
         input.message.prompt,
         parent.depth + 1,
+        { readiness: childReadiness },
       ),
     )
     next = linked

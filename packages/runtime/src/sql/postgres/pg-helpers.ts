@@ -350,12 +350,17 @@ export const settleParent: {
     if (existing.length > 0) return
     yield* sql`
       UPDATE baton_run_links
-      SET terminal_event_id = ${terminalEventId}, settled_at = NOW()
+      SET readiness = 'settled', terminal_event_id = ${terminalEventId}, settled_at = NOW()
       WHERE parent_run_id = ${parent.runId} AND child_run_id = ${child.runId}
     `
     yield* admitChildSettlementFromEventId({ parent, child, terminalEventId })
     if (!isTerminal(parent.status)) {
       yield* appendEvent(hub, parent, {
+        _tag: "ChildReadinessChanged",
+        childRunId: child.runId,
+        readiness: "settled",
+      })
+      yield* appendEvent(hub, (yield* loadRun(parent.runId))!, {
         _tag: "ChildSettled",
         childRunId: child.runId,
         terminalEventId,

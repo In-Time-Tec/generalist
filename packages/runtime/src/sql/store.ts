@@ -76,6 +76,7 @@ import {
 import { ProgramCapabilities } from "@batonfx/core"
 import { settlementNotifications } from "./settlement-notifications.js"
 import { reconcileCancellationRequested, sessionRoots } from "./session-lifecycle.js"
+import { loadChildReadiness } from "./store-child-capacity.js"
 
 export interface SqliteStoreOptions extends LayerOptions {
   readonly filename: string
@@ -181,6 +182,7 @@ export const makeSqliteRunStore = (
             const loaded = yield* loadRun(runId)
             if (loaded === undefined) return yield* RunNotFound.make({ runId })
             const activeWait = yield* loadRunWait(runId, loaded.activeWaitId)
+            const childReadiness = yield* loadChildReadiness(runId)
             return {
               runId: loaded.runId,
               status: loaded.status,
@@ -191,6 +193,7 @@ export const makeSqliteRunStore = (
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
               ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
+              ...(childReadiness === undefined ? {} : { childReadiness }),
               ...(activeWait === undefined ? {} : { wait: activeWait }),
             }
           }),

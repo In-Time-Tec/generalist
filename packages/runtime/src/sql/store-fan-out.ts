@@ -1,4 +1,4 @@
-import { Effect, Function, Schema } from "effect"
+import { Effect, Function } from "effect"
 import { SqlClient } from "effect/unstable/sql"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 import { make as makeAddress } from "../address.js"
@@ -11,9 +11,7 @@ import {
   RuntimeUnavailable,
 } from "../errors.js"
 import {
-  childRunIdFor,
   digestFanOut,
-  fanOutIdFor,
   FanOutJoin,
   FanOutMemberOrigin,
   validateAdmission,
@@ -39,11 +37,10 @@ import { enforceChildAdmission } from "./store-admit-send.js"
 import type { EventHub } from "./subscribers.js"
 import { associateRegistrations, loadRegistrations } from "./executable-registrations.js"
 import { narrow } from "../executable-registration.js"
-import type { AdmitStartInput } from "../run-store.js"
 import { groupIdFromSuspension, resultFromInspection } from "../child-group.js"
 import { WaitResolution } from "../run-wait.js"
-import { fanOutMember } from "../child-session.js"
 import { Prompt } from "effect/unstable/ai"
+import { activeChildCount, promoteChildCapacity } from "./store-child-capacity.js"
 type FanOutEffect = Effect.Effect<
   FanOutReceipt,
   | ChildSelectionMissing
@@ -51,17 +48,6 @@ type FanOutEffect = Effect.Effect<
   | FanOutInvalid
   | RunNotFound
   | RunTerminal
-  | RuntimeUnavailable
-  | import("../errors.js").ChildDepthExceeded
-  | import("../errors.js").ChildLimitExceeded
-  | SqlError,
-  SqlClient.SqlClient
->
-type InitialFanOutsEffect = Effect.Effect<
-  FanOutReceipt[],
-  | ChildSelectionMissing
-  | FanOutConflict
-  | FanOutInvalid
   | RuntimeUnavailable
   | import("../errors.js").ChildDepthExceeded
   | import("../errors.js").ChildLimitExceeded
@@ -133,6 +119,11 @@ export const admitFanOut: {
       return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
     }
     yield* enforceChildAdmission(parent, members.length)
+    const concurrency = Math.min(input.concurrency ?? members.length, members.length, parent.treePolicy.maxSubagents)
+    const readyCount = Math.min(
+      concurrency,
+      Math.max(0, parent.treePolicy.maxSubagents - (yield* activeChildCount(parent.runId))),
+    )
     const created = yield* nowIso
     yield* sql`
       INSERT INTO baton_fan_outs (
@@ -140,11 +131,12 @@ export const admitFanOut: {
         concurrency, status, created_at, updated_at
       ) VALUES (
         ${input.fanOutId}, ${input.parentRunId}, ${input.idempotencyKey}, ${digest},
-        ${encodeJson(FanOutJoin, input.join)}, ${input.remainder}, ${input.concurrency}, 'running', ${created}, ${created}
+        ${encodeJson(FanOutJoin, input.join)}, ${input.remainder}, ${concurrency}, 'running', ${created}, ${created}
       )
     `
     for (const member of members) {
-      const active = member.ordinal < input.concurrency
+      const ready = member.ordinal < readyCount
+      const readiness = ready ? "ready" : "queued"
       const address = makeAddress(`fanout:${input.fanOutId}`)
       const message = makeMessage({
         id: `fanout:${input.fanOutId}:${member.ordinal}`,
@@ -176,8 +168,8 @@ export const admitFanOut: {
       ).pipe(Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })))
       yield* associateRegistrations(member.childRunId, registrations)
       yield* sql`
-        INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, terminal_event_id, created_at, settled_at)
-        VALUES (${parent.runId}, ${member.childRunId}, ${`${input.fanOutId}:${member.key}`}, NULL, ${created}, NULL)
+        INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
+        VALUES (${parent.runId}, ${member.childRunId}, ${`${input.fanOutId}:${member.key}`}, ${readiness}, NULL, ${created}, NULL)
       `
       yield* sql`
         INSERT INTO baton_fan_out_members (
@@ -187,7 +179,7 @@ export const admitFanOut: {
           ${input.fanOutId}, ${member.ordinal}, ${member.key}, ${member.selection}, ${member.label ?? null},
           ${encodeJson(Prompt.Prompt, member.prompt)},
           ${member.origin === undefined ? null : encodeJson(FanOutMemberOrigin, member.origin)},
-          ${member.childRunId}, ${parent.depth + 1}, ${active ? "running" : "pending"}, NULL, NULL
+          ${member.childRunId}, ${parent.depth + 1}, ${ready ? "running" : "pending"}, NULL, NULL
         )
       `
       const currentParent = (yield* loadRun(parent.runId))!
@@ -198,6 +190,7 @@ export const admitFanOut: {
         selection: member.selection,
         prompt: member.prompt,
         childDepth: parent.depth + 1,
+        readiness,
         key: member.key,
         ...(member.label === undefined ? {} : { label: member.label }),
         ...(member.origin === undefined ? {} : { origin: member.origin }),
@@ -210,7 +203,7 @@ export const admitFanOut: {
       _tag: "FanOutAdmitted",
       fanOutId: input.fanOutId,
       memberCount: input.members.length,
-      concurrency: input.concurrency,
+      concurrency,
       join: input.join,
       remainder: input.remainder,
     })
@@ -220,29 +213,6 @@ export const admitFanOut: {
       childRunIds: input.members.map((member) => member.childRunId),
       duplicate: false,
     }
-  }),
-)
-export const admitInitialFanOuts: {
-  (parentRunId: string, fanOuts: AdmitStartInput["initialFanOuts"]): (hub: EventHub) => InitialFanOutsEffect
-  (hub: EventHub, parentRunId: string, fanOuts: AdmitStartInput["initialFanOuts"]): InitialFanOutsEffect
-} = Function.dual(3, (hub: EventHub, parentRunId: string, fanOuts: AdmitStartInput["initialFanOuts"]) =>
-  Effect.forEach(fanOuts, (fanOut) => {
-    const fanOutId = fanOutIdFor(parentRunId, fanOut.idempotencyKey)
-    return admitFanOut(hub, {
-      parentRunId,
-      fanOutId,
-      idempotencyKey: fanOut.idempotencyKey,
-      concurrency: Math.min(fanOut.concurrency, fanOut.members.length),
-      join: fanOut.join,
-      remainder: fanOut.remainder,
-      members: fanOut.members.map((member, ordinal) => fanOutMember({ fanOutId, childRunIdFor, member, ordinal })),
-    }).pipe(
-      Effect.mapError((error) =>
-        Schema.is(RunNotFound)(error) || Schema.is(RunTerminal)(error)
-          ? RuntimeUnavailable.make({ message: "newly admitted root unavailable during initial fan-out admission" })
-          : error,
-      ),
-    )
   }),
 )
 export const reconcileFanOutWith: {
@@ -281,7 +251,21 @@ export const reconcileFanOutWith: {
       const row = (yield* sql<{ fan_out_id: string; status: string }>`
       SELECT fan_out_id, status FROM baton_fan_out_members WHERE child_run_id = ${childRunId}
     `)[0]
-      if (row === undefined || ["succeeded", "failed", "cancelled", "abandoned"].includes(row.status)) return
+      if (row === undefined) {
+        const link = (yield* sql<{ parent_run_id: string }>`
+          SELECT parent_run_id FROM baton_run_links WHERE child_run_id = ${childRunId}
+        `)[0]
+        if (link !== undefined) yield* promoteChildCapacity({ hub, parentRunId: link.parent_run_id, append })
+        return
+      }
+      const parentLink = (yield* sql<{ parent_run_id: string }>`
+        SELECT parent_run_id FROM baton_run_links WHERE child_run_id = ${childRunId}
+      `)[0]
+      if (["succeeded", "failed", "cancelled", "abandoned"].includes(row.status)) {
+        if (parentLink !== undefined)
+          yield* promoteChildCapacity({ hub, parentRunId: parentLink.parent_run_id, append })
+        return
+      }
       const memberStatus =
         event._tag === "RunCompleted" ? "succeeded" : event._tag === "RunFailed" ? "failed" : "cancelled"
       yield* sql`
@@ -290,7 +274,11 @@ export const reconcileFanOutWith: {
       WHERE child_run_id = ${childRunId}
     `
       const loaded = (yield* loadFanOut(row.fan_out_id))!
-      if (loaded.fanOut.status !== "running") return
+      if (loaded.fanOut.status !== "running") {
+        if (parentLink !== undefined)
+          yield* promoteChildCapacity({ hub, parentRunId: parentLink.parent_run_id, append })
+        return
+      }
       const members = loaded.members.map(decodeMember)
       const succeeded = members.filter((member) => member.status === "succeeded").length
       const failed = members.filter((member) => member.status === "failed").length
@@ -366,17 +354,16 @@ export const reconcileFanOutWith: {
         }
       }
       if (joined === undefined) {
-        const active = members.filter((member) => member.status === "running").length
-        const pending = members
-          .filter((member) => member.status === "pending")
-          .slice(0, Math.max(0, Number(loaded.fanOut.concurrency) - active))
-        for (const member of pending) {
-          yield* sql`UPDATE baton_fan_out_members SET status = 'running' WHERE child_run_id = ${member.childRunId} AND status = 'pending'`
+        if (parentLink !== undefined) {
+          yield* promoteChildCapacity({ hub, parentRunId: parentLink.parent_run_id, append })
         }
         return
       }
       const updated = yield* nowIso
       yield* sql`UPDATE baton_fan_outs SET status = ${joined}, updated_at = ${updated} WHERE fan_out_id = ${row.fan_out_id} AND status = 'running'`
+      if (parentLink !== undefined) {
+        yield* promoteChildCapacity({ hub, parentRunId: parentLink.parent_run_id, append })
+      }
       const finalMembers = (yield* loadFanOut(row.fan_out_id))!.members.map(decodeMember)
       const parent = yield* loadRun(loaded.fanOut.parent_run_id)
       if (parent !== undefined && !isTerminal(parent.status)) {

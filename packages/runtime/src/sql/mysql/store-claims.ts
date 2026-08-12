@@ -56,15 +56,14 @@ export const makeMysqlClaims = (input: {
           const candidates = yield* sql<{ run_id: string }>`
             SELECT r.run_id FROM baton_runs r
             WHERE (
-                r.parent_run_id IS NOT NULL
-                OR EXISTS (
+                (r.parent_run_id IS NULL AND EXISTS (
                   SELECT 1 FROM baton_lanes l
                   WHERE JSON_UNQUOTE(JSON_EXTRACT(l.queue_json, '$[0]')) = r.run_id
+                ))
+                OR EXISTS (
+                  SELECT 1 FROM baton_run_links link
+                  WHERE link.child_run_id = r.run_id AND link.readiness = 'ready'
                 )
-              )
-              AND (
-                NOT EXISTS (SELECT 1 FROM baton_fan_out_members fm WHERE fm.child_run_id = r.run_id)
-                OR EXISTS (SELECT 1 FROM baton_fan_out_members fm WHERE fm.child_run_id = r.run_id AND fm.status = 'running')
               )
               AND r.status IN ('queued', 'running', 'cancelling')
               AND r.cancellation_requested = 0

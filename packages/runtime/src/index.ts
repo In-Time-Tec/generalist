@@ -45,6 +45,8 @@ export * as ExecutableRegistration from "./executable-registration.js"
 
 export * as TreePolicy from "./tree-policy.js"
 
+export * as ChildReadiness from "./child-readiness.js"
+
 export * as ExecutableResolver from "./executable-resolver.js"
 
 import {
@@ -211,6 +213,7 @@ export namespace RunEvent {
   export type SteeringDiscardReason = import("./run-event.js").SteeringDiscardReason
   export type OperationUnknown = import("./run-event.js").OperationUnknown
   export type ChildLinked = import("./run-event.js").ChildLinked
+  export type ChildReadinessChanged = import("./run-event.js").ChildReadinessChanged
   export type ChildSettled = import("./run-event.js").ChildSettled
   export type FanOutAdmitted = import("./run-event.js").FanOutAdmitted
   export type FanOutJoined = import("./run-event.js").FanOutJoined

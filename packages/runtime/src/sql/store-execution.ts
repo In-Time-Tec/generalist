@@ -11,6 +11,7 @@ import { encodeExecutableRef, encodeJson } from "./codecs.js"
 import { loadRegistrations } from "./executable-registrations.js"
 import { ExecutionCheckpoint, ExecutionSuspension } from "../execution-state.js"
 import type { EventHub } from "./subscribers.js"
+import { activeChildCount } from "./store-child-capacity.js"
 
 const requireRun = (runId: string) =>
   loadRun(runId).pipe(Effect.flatMap((run) => (run === undefined ? RunNotFound.make({ runId }) : Effect.succeed(run))))
@@ -25,7 +26,7 @@ export const requireExecutionClaim = (input: ExecutionClaim) =>
 
 const executionRecord = (
   run: DecodedRun,
-  directChildCount: number,
+  childCount: number,
   registrations: ExecutionRecord["registrations"],
   resolution?: ExecutionRecord["resolution"],
 ): ExecutionRecord => ({
@@ -33,7 +34,7 @@ const executionRecord = (
   rootRunId: run.rootRunId,
   depth: run.depth,
   treePolicy: run.treePolicy,
-  directChildCount,
+  activeChildCount: childCount,
   ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
   ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
   ...(run.ownerWorkerId === undefined ? {} : { ownerId: run.ownerWorkerId }),
@@ -51,22 +52,12 @@ const executionRecord = (
   registrations,
 })
 
-const loadDirectChildCount = (runId: string) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<{ child_count: number | string }>`
-      SELECT COUNT(*) AS child_count FROM baton_run_links WHERE parent_run_id = ${runId}
-    `
-    return Number(rows[0]?.child_count ?? 0)
-  })
-
 export const loadExecution = (runId: string) =>
   Effect.gen(function* () {
     const run = yield* requireRun(runId)
     const wait = yield* loadRunWait(run.runId, run.activeWaitId)
     const registrations = yield* loadRegistrations(runId)
-    const directChildCount = yield* loadDirectChildCount(runId)
-    return executionRecord(run, directChildCount, registrations, wait?.resolution)
+    return executionRecord(run, yield* activeChildCount(runId), registrations, wait?.resolution)
   })
 
 export const claimExecution: {
@@ -91,11 +82,11 @@ export const claimExecution: {
       if (run.parentRunId === undefined) {
         return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is queued` })
       }
-      const members = yield* sql<{ status: string }>`
-        SELECT status FROM baton_fan_out_members WHERE child_run_id = ${run.runId} LIMIT 1
+      const links = yield* sql<{ readiness: string }>`
+        SELECT readiness FROM baton_run_links WHERE child_run_id = ${run.runId} LIMIT 1
       `
-      if (members[0]?.status !== undefined && members[0].status !== "running") {
-        return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is awaiting fan-out admission` })
+      if (links[0]?.readiness !== "ready") {
+        return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is awaiting child capacity` })
       }
     }
     const nextAttemptFence = run.attemptFence + 1
@@ -122,8 +113,10 @@ export const claimExecution: {
     const started = run.status === "queued" ? yield* requireRun(input.runId) : claimed
     const wait = yield* loadRunWait(started.runId, started.activeWaitId)
     const registrations = yield* loadRegistrations(input.runId)
-    const directChildCount = yield* loadDirectChildCount(input.runId)
-    return { ...executionRecord(started, directChildCount, registrations, wait?.resolution), ownerId: input.ownerId }
+    return {
+      ...executionRecord(started, yield* activeChildCount(input.runId), registrations, wait?.resolution),
+      ownerId: input.ownerId,
+    }
   }),
 )
 

@@ -41,19 +41,14 @@ export const enforceChildAdmission: {
         limit: parent.treePolicy.maxDepth,
       })
     }
-    const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<{ count: number | string }>`
-      SELECT COUNT(*) AS count FROM baton_run_links WHERE parent_run_id = ${parent.runId}
-    `
-    const current = Number(rows[0]?.count ?? 0)
-    if (current + requested > parent.treePolicy.maxSubagents) {
+    if (parent.treePolicy.maxSubagents === 0) {
       return yield* ChildLimitExceeded.make({
         parentRunId: parent.runId,
         rootRunId: parent.rootRunId,
         parentDepth: parent.depth,
         depth,
         requested,
-        current,
+        current: 0,
         limit: parent.treePolicy.maxSubagents,
       })
     }

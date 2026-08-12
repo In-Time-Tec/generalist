@@ -22,6 +22,7 @@ standalone.live("persists and resumes bounded fan-out across SQLite reopen", () 
           sessionId: "sqlite:fan-out",
           idempotencyKey: "parent",
           prompt: "parent",
+          treePolicy: { maxDepth: 1, maxSubagents: 1 },
         })
         const input: Runtime.FanOutInput = {
           parentRunId: parent.runId,
@@ -57,9 +58,13 @@ standalone.live("persists and resumes bounded fan-out across SQLite reopen", () 
         const store = yield* RunStore.RunStore
         const before = yield* runtime.inspectFanOut(admitted.fanOutId)
         expect(before.members.map((member) => member.status)).toEqual(["running", "pending", "pending"])
+        expect(before.members.map((member) => member.readiness)).toEqual(["ready", "queued", "queued"])
         const first = yield* store.claimExecution({ runId: admitted.childRunIds[0]!, ownerId: "first" })
         yield* store.complete({ ...first, result: completedResult("first") })
-        expect((yield* runtime.inspect(admitted.childRunIds[1]!)).status).toBe("queued")
+        expect(yield* runtime.inspect(admitted.childRunIds[1]!)).toMatchObject({
+          status: "queued",
+          childReadiness: "ready",
+        })
       }),
     )
 

@@ -3,6 +3,7 @@ import { Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { ExecutableRef } from "./executable-manifest.js"
 import { RunId } from "./run.js"
+import { ChildReadiness } from "./child-readiness.js"
 
 export const FanOutJoin = Schema.Union([
   Schema.TaggedStruct("AllSuccess", {}),
@@ -51,7 +52,7 @@ export interface FanOutInput {
   readonly parentRunId: string
   readonly idempotencyKey: string
   readonly members: ReadonlyArray<FanOutMemberInput>
-  readonly concurrency: number
+  readonly concurrency?: number
   readonly join: FanOutJoin
   readonly remainder: FanOutRemainder
 }
@@ -65,7 +66,10 @@ export const validateAdmission = (input: AdmitFanOutInput): string | undefined =
   if (input.members.length < 1 || input.members.length > MAX_FAN_OUT_MEMBERS) {
     return `fan-out requires between 1 and ${MAX_FAN_OUT_MEMBERS} members`
   }
-  if (!Number.isSafeInteger(input.concurrency) || input.concurrency < 1 || input.concurrency > input.members.length) {
+  if (
+    input.concurrency !== undefined &&
+    (!Number.isSafeInteger(input.concurrency) || input.concurrency < 1 || input.concurrency > input.members.length)
+  ) {
     return "fan-out concurrency must be a positive safe integer no greater than member count"
   }
   if (new Set(input.members.map((member) => member.key)).size !== input.members.length) {
@@ -105,6 +109,7 @@ export const FanOutMemberResult = Schema.Struct({
   origin: Schema.optionalKey(FanOutMemberOrigin),
   childRunId: RunId,
   depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  readiness: ChildReadiness,
   status: FanOutMemberStatus,
   terminalEventId: Schema.optionalKey(Schema.String),
   result: Schema.optionalKey(Schema.Unknown),
@@ -143,7 +148,7 @@ export interface AdmitFanOutInput {
   readonly parentRunId: string
   readonly idempotencyKey: string
   readonly members: ReadonlyArray<Omit<StoredFanOutMember, "executableRef">>
-  readonly concurrency: number
+  readonly concurrency?: number
   readonly join: FanOutJoin
   readonly remainder: FanOutRemainder
 }
@@ -166,14 +171,14 @@ export const digestFanOut = (input: {
   readonly parentRunId: string
   readonly idempotencyKey: string
   readonly members: ReadonlyArray<StoredFanOutMember>
-  readonly concurrency: number
+  readonly concurrency?: number
   readonly join: FanOutJoin
   readonly remainder: FanOutRemainder
 }): string =>
   Pins.digest({
     parentRunId: input.parentRunId,
     idempotencyKey: input.idempotencyKey,
-    concurrency: input.concurrency,
+    concurrency: input.concurrency ?? null,
     join: input.join,
     remainder: input.remainder,
     members: input.members.map((member) => ({

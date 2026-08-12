@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 export const SCHEMA_META_TABLE = "baton_schema_meta"
 export const MIGRATIONS_TABLE = "baton_sql_migrations"
 export const MIGRATION_LOCK = "baton_runtime_schema"
@@ -115,11 +115,13 @@ export const SCHEMA_STATEMENTS: ReadonlyArray<string> = [
   parent_run_id VARCHAR(255) NOT NULL,
   child_run_id VARCHAR(255) NOT NULL,
   invocation_id VARCHAR(255) NOT NULL,
+  readiness VARCHAR(16) NOT NULL,
   terminal_event_id VARCHAR(255),
   created_at VARCHAR(30) NOT NULL,
   settled_at VARCHAR(30),
   PRIMARY KEY (parent_run_id, child_run_id),
   UNIQUE KEY baton_run_links_child_key (child_run_id),
+  KEY baton_run_links_readiness_idx (parent_run_id, readiness, created_at, child_run_id),
   CONSTRAINT baton_run_links_parent_fk FOREIGN KEY (parent_run_id) REFERENCES baton_runs(run_id),
   CONSTRAINT baton_run_links_child_fk FOREIGN KEY (child_run_id) REFERENCES baton_runs(run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,

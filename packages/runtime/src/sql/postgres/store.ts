@@ -54,6 +54,7 @@ import { settlementNotifications } from "../settlement-notifications.js"
 import { reconcileCancellationRequested, sessionRoots } from "../session-lifecycle.js"
 import { cancelSessionRuns } from "./session-cancellation.js"
 import { makePostgresSessionStore } from "./session-store.js"
+import { loadChildReadiness, readinessForAdmission } from "../store-child-capacity.js"
 export const makePostgresServices = (options: PostgresStoreOptions) =>
   Effect.gen(function* () {
     const source = options.source ?? "postgres"
@@ -139,6 +140,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             }
             const runId = yield* nextId("run")
             yield* enforceChildAdmission(parent, 1)
+            const childReadiness = yield* readinessForAdmission(parent)
             yield* insertRun({
               runId,
               status: "queued",
@@ -155,8 +157,8 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
             })
             yield* associateRegistrations(runId, registrations)
             yield* sql`
-              INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, terminal_event_id, created_at, settled_at)
-              VALUES (${parent.runId}, ${runId}, ${input.invocationId}, NULL, NOW(), NULL)
+              INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
+              VALUES (${parent.runId}, ${runId}, ${input.invocationId}, ${childReadiness}, NULL, NOW(), NULL)
             `
             yield* appendEvent(transactionHub, parent, {
               _tag: "ChildLinked",
@@ -165,6 +167,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               selection: input.selection,
               prompt: input.message.prompt,
               childDepth: parent.depth + 1,
+              readiness: childReadiness,
               ...(input.label === undefined ? {} : { label: input.label }),
               ...(input.origin === undefined ? {} : { origin: input.origin }),
             })
@@ -175,6 +178,9 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               { _tag: "RunAccepted", messageId: input.message.id, address: input.message.to },
               "queued",
             )
+            if (childReadiness !== "ready") {
+              return { runId, messageId: input.message.id, acceptedSequence: 0, duplicate: false }
+            }
             const started = (yield* loadRun(runId))!
             yield* sql`UPDATE baton_runs SET attempt_fence = 1, attempt = 1, status = 'running' WHERE run_id = ${runId}`
             yield* appendEvent(
@@ -323,6 +329,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
           Effect.gen(function* () {
             const loaded = yield* requireRun(runId)
             const wait = yield* loadRunWait(runId, loaded.activeWaitId)
+            const childReadiness = yield* loadChildReadiness(runId)
             return {
               runId: loaded.runId,
               status: loaded.status,
@@ -333,6 +340,7 @@ export const makePostgresServices = (options: PostgresStoreOptions) =>
               lastSequence: loaded.lastSequence,
               durability: "durable" as const,
               ...(loaded.parentRunId === undefined ? {} : { parentRunId: loaded.parentRunId }),
+              ...(childReadiness === undefined ? {} : { childReadiness }),
               ...(wait === undefined ? {} : { wait }),
             }
           }),

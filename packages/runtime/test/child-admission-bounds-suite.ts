@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { AgentEvent } from "@batonfx/core"
 import { Address, ChildAdmission, Errors, Message, Runtime, RunStore } from "../src/index.js"
-import { fanOutIdFor } from "../src/fan-out.js"
 import {
   assistantAddress,
   assistantRef,
@@ -131,31 +130,29 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
       ),
     )
 
-    it.live("charges one lifetime per-parent limit across singleton and exact group paths without refunds", () =>
+    it.live("reuses active capacity after terminal and cancelled children settle", () =>
       provide(
         Effect.gen(function* () {
-          const context = yield* root({ maxDepth: 2, maxSubagents: 3 })
+          const context = yield* root({ maxDepth: 2, maxSubagents: 1 })
           const first = yield* admit(context.children, context.runId, "single")
-          yield* group(context.runtime, context.runId, "pair", 2)
+          const second = yield* admit(context.children, context.runId, "queued")
+          expect(yield* context.runtime.inspect(first.childRunId)).toMatchObject({ childReadiness: "ready" })
+          expect(yield* context.runtime.inspect(second.childRunId)).toMatchObject({ childReadiness: "queued" })
           const claim = yield* context.store.claimExecution({ runId: first.childRunId, ownerId: "bounds" })
           yield* context.store.complete({ ...claim, result: completedResult("done") })
-          const cancelled = yield* root({ maxDepth: 1, maxSubagents: 1 })
-          const cancelledChild = yield* admit(cancelled.children, cancelled.runId, "cancelled")
-          yield* cancelled.children.cancel({ parentRunId: cancelled.runId, childRunId: cancelledChild.childRunId })
-          expect(yield* admit(cancelled.children, cancelled.runId, "after-cancel").pipe(Effect.flip)).toBeInstanceOf(
-            Errors.ChildLimitExceeded,
-          )
-          const failure = yield* admit(context.children, context.runId, "after-terminal").pipe(Effect.flip)
-          expect(failure).toBeInstanceOf(Errors.ChildLimitExceeded)
-          expect(failure).toMatchObject({
-            parentRunId: context.runId,
-            rootRunId: context.runId,
-            parentDepth: 0,
-            depth: 1,
-            requested: 1,
-            current: 3,
-            limit: 3,
-          })
+          expect(yield* context.runtime.inspect(second.childRunId)).toMatchObject({ childReadiness: "ready" })
+          yield* context.children.cancel({ parentRunId: context.runId, childRunId: second.childRunId })
+          const third = yield* admit(context.children, context.runId, "after-cancel")
+          expect(yield* context.runtime.inspect(third.childRunId)).toMatchObject({ childReadiness: "ready" })
+          const history = yield* context.runtime.history({ runId: context.runId, cursor: -1, limit: 100 })
+          expect(
+            history.filter(
+              (event) =>
+                event._tag === "ChildReadinessChanged" &&
+                event.childRunId === second.childRunId &&
+                event.readiness === "ready",
+            ),
+          ).toHaveLength(1)
         }),
       ),
     )
@@ -208,22 +205,34 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
       ),
     )
 
-    it.live("rejects an oversized exact group all-or-nothing with no run or event mutation", () =>
+    it.live("atomically queues a group beyond capacity and promotes in admission order", () =>
       provide(
         Effect.gen(function* () {
-          const context = yield* root({ maxDepth: 1, maxSubagents: 2 })
-          yield* admit(context.children, context.runId, "existing")
-          const beforeChildren = yield* context.children.listDirect(context.runId)
-          const beforeEvents = yield* context.runtime.history({ runId: context.runId, cursor: -1, limit: 100 })
-          const failure = yield* group(context.runtime, context.runId, "rejected-group", 2).pipe(Effect.flip)
-          expect(failure).toBeInstanceOf(Errors.ChildLimitExceeded)
-          expect(failure).toMatchObject({ depth: 1, requested: 2, current: 1, limit: 2 })
-          expect(yield* context.children.listDirect(context.runId)).toEqual(beforeChildren)
-          expect(yield* context.runtime.history({ runId: context.runId, cursor: -1, limit: 100 })).toEqual(beforeEvents)
+          const context = yield* root({ maxDepth: 1, maxSubagents: 4 })
+          const receipt = yield* group(context.runtime, context.runId, "queued-group", 5)
+          const inspection = yield* context.runtime.inspectFanOut(receipt.fanOutId)
+          expect(inspection.members.map((member) => member.readiness)).toEqual([
+            "ready",
+            "ready",
+            "ready",
+            "ready",
+            "queued",
+          ])
           expect(
-            yield* context.runtime.inspectFanOut(fanOutIdFor(context.runId, "rejected-group")).pipe(Effect.option),
-          ).toMatchObject({ _tag: "None" })
-          expect((yield* context.runtime.inspect(context.runId)).wait).toBeUndefined()
+            yield* context.store
+              .claimExecution({ runId: inspection.members[4]!.childRunId, ownerId: "too-early" })
+              .pipe(Effect.flip),
+          ).toBeInstanceOf(Errors.RuntimeUnavailable)
+          const first = yield* context.store.claimExecution({
+            runId: inspection.members[0]!.childRunId,
+            ownerId: "first",
+          })
+          yield* context.store.complete({ ...first, result: completedResult("first") })
+          const promoted = yield* context.runtime.inspectFanOut(receipt.fanOutId)
+          expect(promoted.members[4]).toMatchObject({ readiness: "ready", status: "running" })
+          expect(
+            yield* context.store.claimExecution({ runId: promoted.members[4]!.childRunId, ownerId: "promoted" }),
+          ).toMatchObject({ runId: promoted.members[4]!.childRunId })
         }),
       ),
     )
@@ -253,13 +262,10 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
             treePolicy: { maxDepth: 1, maxSubagents: 1 },
           })
           const children = ChildAdmission.make(yield* RunStore.RunStore)
-          yield* admit(children, receipt.runId, "first")
-          expect(yield* admit(children, receipt.runId, "second").pipe(Effect.flip)).toMatchObject({
-            _tag: "@batonfx/runtime/ChildLimitExceeded",
-            depth: 1,
-            current: 1,
-            limit: 1,
-          })
+          const first = yield* admit(children, receipt.runId, "first")
+          const second = yield* admit(children, receipt.runId, "second")
+          expect(yield* runtime.inspect(first.childRunId)).toMatchObject({ childReadiness: "ready" })
+          expect(yield* runtime.inspect(second.childRunId)).toMatchObject({ childReadiness: "queued" })
         }),
       ),
     )
@@ -275,8 +281,11 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
             ],
             { concurrency: "unbounded" },
           )
-          expect(exits.filter((exit) => exit._tag === "Success")).toHaveLength(1)
-          expect(yield* context.children.listDirect(context.runId)).toHaveLength(exits[0]._tag === "Success" ? 1 : 4)
+          expect(exits.filter((exit) => exit._tag === "Success")).toHaveLength(2)
+          const direct = yield* context.children.listDirect(context.runId)
+          expect(direct).toHaveLength(5)
+          expect(direct.filter((child) => child.readiness === "ready")).toHaveLength(4)
+          expect(direct.filter((child) => child.readiness === "queued")).toHaveLength(1)
         }),
       ),
     )

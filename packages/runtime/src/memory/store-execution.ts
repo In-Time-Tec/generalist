@@ -3,6 +3,7 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import { isTerminal } from "../run.js"
 import type { ExecutionClaim, ExecutionRecord } from "../run-store.js"
 import { StaleClaim } from "../sql/errors.js"
+import { activeChildCount } from "./store-child-capacity.js"
 import type { MemoryState } from "./state.js"
 import { checkpointRef } from "../executable-manifest.js"
 import { appendLifecycle, makeAttemptStarted } from "./append.js"
@@ -14,13 +15,14 @@ const requireRun = (state: MemoryState, runId: string) => {
 }
 
 const executionRecord = (
+  state: MemoryState,
   run: MemoryState["runs"] extends ReadonlyMap<string, infer R> ? R : never,
 ): ExecutionRecord => ({
   runId: run.runId,
   rootRunId: run.rootRunId,
   depth: run.depth,
   treePolicy: run.treePolicy,
-  directChildCount: run.children.length,
+  activeChildCount: activeChildCount(state, run),
   ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
   ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
   ...(run.ownerId === undefined ? {} : { ownerId: run.ownerId }),
@@ -43,7 +45,7 @@ export const loadExecution: {
 } = Function.dual(2, (state: MemoryState, runId: string) =>
   Effect.gen(function* () {
     const run = yield* requireRun(state, runId)
-    return executionRecord(run)
+    return executionRecord(state, run)
   }),
 )
 
@@ -85,11 +87,8 @@ export const claimExecution: {
       if (run.parentRunId === undefined) {
         return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is queued` })
       }
-      const member = [...state.fanOuts.values()]
-        .flatMap((fanOut) => fanOut.members)
-        .find((candidate) => candidate.childRunId === run.runId)
-      if (member !== undefined && member.status !== "running") {
-        return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is awaiting fan-out admission` })
+      if (run.childReadiness !== "ready") {
+        return yield* RuntimeUnavailable.make({ message: `run ${run.runId} is awaiting child capacity` })
       }
     }
     const claimed = {
@@ -107,7 +106,7 @@ export const claimExecution: {
         ? (yield* appendLifecycle(claimedState, run.runId, makeAttemptStarted(claimed.attempt), "running"))[1]
         : claimedState
     const loaded = started.runs.get(run.runId)!
-    return [{ ...executionRecord(loaded), ownerId: input.ownerId }, started] as const
+    return [{ ...executionRecord(started, loaded), ownerId: input.ownerId }, started] as const
   }),
 )
 
@@ -137,7 +136,7 @@ export const retryExecution: {
     }
     const nextAttempt = run.attempt + 1
     const [_, next] = yield* appendLifecycle(state, run.runId, makeAttemptStarted(nextAttempt), "running")
-    return [executionRecord(next.runs.get(run.runId)!), next] as const
+    return [executionRecord(next, next.runs.get(run.runId)!), next] as const
   }),
 )
 

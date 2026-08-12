@@ -27,7 +27,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
   const activate = options.activate ?? (() => Effect.void)
   let sequence = 0
 
-  const parent = (label: string) =>
+  const parent = (label: string, treePolicy?: { readonly maxDepth: number; readonly maxSubagents: number }) =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
       const store = yield* RunStore.RunStore
@@ -37,6 +37,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
         sessionId: id,
         idempotencyKey: id,
         prompt: textPrompt("parent"),
+        ...(treePolicy === undefined ? {} : { treePolicy }),
       })
       yield* activate(receipt.runId)
       return { runtime, store, children: ChildRuns.make(store), runId: receipt.runId }
@@ -356,6 +357,83 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
           expect(history.filter((event) => event._tag === "FanOutAdmitted")).toHaveLength(1)
           expect(history.filter((event) => event._tag === "RunWaiting")).toHaveLength(1)
           expect(history.filter((event) => event._tag === "RunResumed")).toHaveLength(1)
+        }),
+      ),
+    )
+
+    it.live("queues an exact group beyond active capacity and resumes once after automatic promotion", () =>
+      provide(
+        Effect.gen(function* () {
+          const context = yield* parent("active-capacity", { maxDepth: 1, maxSubagents: 2 })
+          const claim = yield* context.store.claimExecution({ runId: context.runId, ownerId: "parent" })
+          const input = {
+            parentRunId: context.runId,
+            toolCallId: "capacity-group",
+            operationKey: "turn:8:capacity-group",
+            members,
+          }
+          const outcome = yield* context.children.runGroup(input)
+          expect(outcome._tag).toBe("Suspend")
+          const groupId = outcome._tag === "Suspend" ? outcome.token : ""
+          let inspection = yield* context.runtime.inspectFanOut(groupId)
+          expect(inspection.concurrency).toBe(2)
+          expect(inspection.members.map((member) => member.readiness)).toEqual(["ready", "ready", "queued"])
+          expect(
+            yield* context.store
+              .claimExecution({ runId: inspection.members[2]!.childRunId, ownerId: "queued" })
+              .pipe(Effect.flip),
+          ).toBeInstanceOf(Errors.RuntimeUnavailable)
+          yield* context.store.suspend({
+            ...claim,
+            wait: openWait({ waitId: input.toolCallId }),
+            suspension: AgentEvent.AgentSuspended.make({
+              token: groupId,
+              reason: "tool-wait",
+              tool_call_id: input.toolCallId,
+              tool_name: ChildRuns.runGroupToolName,
+              tool_params: { members },
+              tool_call_batch: [],
+            }),
+          })
+          yield* context.store.complete({
+            ...(yield* context.store.claimExecution({
+              runId: inspection.members[1]!.childRunId,
+              ownerId: "beta",
+            })),
+            result: completedResult("beta"),
+          })
+          inspection = yield* context.runtime.inspectFanOut(groupId)
+          expect(inspection.members.map((member) => member.readiness)).toEqual(["ready", "settled", "ready"])
+          expect(yield* context.runtime.inspect(context.runId)).toMatchObject({ status: "waiting" })
+          yield* context.store.complete({
+            ...(yield* context.store.claimExecution({
+              runId: inspection.members[2]!.childRunId,
+              ownerId: "gamma",
+            })),
+            result: completedResult("gamma"),
+          })
+          expect(yield* context.runtime.inspect(context.runId)).toMatchObject({ status: "waiting" })
+          yield* context.store.complete({
+            ...(yield* context.store.claimExecution({
+              runId: inspection.members[0]!.childRunId,
+              ownerId: "alpha",
+            })),
+            result: completedResult("alpha"),
+          })
+          expect(yield* context.runtime.inspect(context.runId)).toMatchObject({
+            status: "running",
+            wait: { waitId: input.toolCallId, status: "signaled" },
+          })
+          const history = yield* context.runtime.history({ runId: context.runId, limit: 100 })
+          expect(history.filter((event) => event._tag === "RunResumed")).toHaveLength(1)
+          expect(
+            history.filter(
+              (event) =>
+                event._tag === "ChildReadinessChanged" &&
+                event.childRunId === inspection.members[2]!.childRunId &&
+                event.readiness === "ready",
+            ),
+          ).toHaveLength(1)
         }),
       ),
     )

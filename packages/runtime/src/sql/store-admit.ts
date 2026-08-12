@@ -28,9 +28,10 @@ import { associateRegistrations, loadRegistrations, persistRegistrations } from 
 import { narrow } from "../executable-registration.js"
 import { make as makeAddress } from "../address.js"
 import { make as makeMessage } from "../message.js"
-import { admitInitialFanOuts } from "./store-fan-out.js"
+import { admitInitialFanOuts } from "./store-initial-fan-outs.js"
 import { nextId } from "./store-admit-send.js"
 import { normalize as normalizeTreePolicy } from "../tree-policy.js"
+import { readinessForAdmission } from "./store-child-capacity.js"
 
 type SendReceipt = { runId: string; messageId: string; acceptedSequence: number; duplicate: boolean }
 type StartReceipt = SendReceipt & {
@@ -315,6 +316,7 @@ export const admitSpawn: {
     }
     const runId = yield* nextId("run")
     yield* enforceChildAdmission(parent, 1)
+    const childReadiness = yield* readinessForAdmission(parent)
     yield* insertRun({
       runId,
       status: "queued",
@@ -333,8 +335,8 @@ export const admitSpawn: {
     yield* associateRegistrations(runId, registrations)
     const created = yield* nowIso
     yield* sql`
-      INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, terminal_event_id, created_at, settled_at)
-      VALUES (${parent.runId}, ${runId}, ${input.invocationId}, NULL, ${created}, NULL)
+      INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
+      VALUES (${parent.runId}, ${runId}, ${input.invocationId}, ${childReadiness}, NULL, ${created}, NULL)
     `
     yield* appendEvent(hub, parent, {
       _tag: "ChildLinked",
@@ -343,6 +345,7 @@ export const admitSpawn: {
       selection: input.selection,
       prompt: input.message.prompt,
       childDepth: parent.depth + 1,
+      readiness: childReadiness,
       ...(input.label === undefined ? {} : { label: input.label }),
       ...(input.origin === undefined ? {} : { origin: input.origin }),
     })
@@ -415,6 +418,7 @@ export const admitProgramChild: {
       return yield* RunIdConflict.make({ runId: input.childRunId, existingRunId: byId[0].run_id })
     }
     yield* enforceChildAdmission(parent, 1)
+    const childReadiness = yield* readinessForAdmission(parent)
     yield* insertRun({
       runId: input.childRunId,
       status: "queued",
@@ -433,8 +437,8 @@ export const admitProgramChild: {
     yield* associateRegistrations(input.childRunId, registrations)
     const created = yield* nowIso
     yield* sql`
-      INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, terminal_event_id, created_at, settled_at)
-      VALUES (${parent.runId}, ${input.childRunId}, ${input.invocationId}, NULL, ${created}, NULL)
+      INSERT INTO baton_run_links (parent_run_id, child_run_id, invocation_id, readiness, terminal_event_id, created_at, settled_at)
+      VALUES (${parent.runId}, ${input.childRunId}, ${input.invocationId}, ${childReadiness}, NULL, ${created}, NULL)
     `
     yield* appendEvent(hub, parent, {
       _tag: "ChildLinked",
@@ -443,6 +447,7 @@ export const admitProgramChild: {
       selection: input.executableRef.active,
       prompt: input.message.prompt,
       childDepth: parent.depth + 1,
+      readiness: childReadiness,
     })
     const child = (yield* loadRun(input.childRunId))!
     yield* appendEvent(

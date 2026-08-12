@@ -14,6 +14,7 @@ import type {
 } from "./errors.js"
 import type { RunOutcome, RunStatus } from "./run.js"
 import type { Interface as RunStoreInterface } from "./run-store.js"
+import type { ChildReadiness } from "./child-readiness.js"
 
 /**
  * @experimental A Run addressed a child it does not own.
@@ -54,6 +55,7 @@ export type AdmitReceipt = typeof AdmitReceipt.Type
 export interface ChildInspection {
   readonly childRunId: string
   readonly status: RunStatus
+  readonly readiness: ChildReadiness
   readonly invocationId?: string
   readonly origin?: ChildOrigin
   readonly outcome?: RunOutcome
@@ -193,11 +195,12 @@ export const make = (store: RunStoreInterface): Interface => {
     })
 
   const inspection = (snapshot: {
-    readonly run: { readonly runId: string; readonly status: RunStatus }
+    readonly run: { readonly runId: string; readonly status: RunStatus; readonly childReadiness?: ChildReadiness }
     readonly outcome?: RunOutcome
   }): ChildInspection => ({
     childRunId: snapshot.run.runId,
     status: snapshot.run.status,
+    readiness: snapshot.run.childReadiness ?? "settled",
     ...(snapshot.outcome === undefined ? {} : { outcome: snapshot.outcome }),
   })
 
@@ -244,6 +247,7 @@ export const make = (store: RunStoreInterface): Interface => {
           .map((entry) => ({
             childRunId: entry.run.runId,
             status: entry.run.status,
+            readiness: entry.run.childReadiness ?? "settled",
             ...(entry.invocationId === undefined ? {} : { invocationId: entry.invocationId }),
             ...(entry.invocationId === undefined || originOf(entry.invocationId) === undefined
               ? {}

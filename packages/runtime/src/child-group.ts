@@ -3,6 +3,7 @@ import { Tool } from "effect/unstable/ai"
 import { FanOutMemberStatus, FanOutStatus, MAX_FAN_OUT_MEMBERS, type FanOutInspection } from "./fan-out.js"
 import { ChildDepthExceeded, ChildLimitExceeded } from "./errors.js"
 import type { RunEvent } from "./run-event.js"
+import { ChildReadiness } from "./child-readiness.js"
 
 /** @experimental Exact declared child authority used to constrain model-visible selections. */
 export interface Authority {
@@ -41,7 +42,9 @@ const startGroupParametersFor = (selection: Schema.Codec<string>) =>
         prompt: PromptText,
       }),
     ).check(Schema.isMinLength(1), Schema.isMaxLength(MAX_FAN_OUT_MEMBERS)),
-    concurrency: Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(MAX_FAN_OUT_MEMBERS)),
+    concurrency: Schema.optionalKey(
+      Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(MAX_FAN_OUT_MEMBERS)),
+    ),
   })
 
 /** @experimental Parameters for one dependent child Run. */
@@ -73,6 +76,7 @@ export const GroupChildReceipt = Schema.Struct({
   label: Schema.optionalKey(Label),
   childRunId: Schema.String,
   depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  readiness: ChildReadiness,
 })
 /** @experimental */
 export type GroupChildReceipt = typeof GroupChildReceipt.Type
@@ -102,6 +106,7 @@ export const GroupChildResult = Schema.Struct({
   label: Schema.optionalKey(Label),
   childRunId: Schema.String,
   depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  readiness: ChildReadiness,
   status: FanOutMemberStatus,
   text: Schema.optionalKey(Schema.String),
   turns: Schema.optionalKey(Schema.Finite),
@@ -140,7 +145,7 @@ const makeRunChildTool = (selection: Schema.Codec<string>): Tool.Any =>
 const makeStartGroupTool = (selection: Schema.Codec<string>): Tool.Any =>
   Tool.make(startGroupToolName, {
     description:
-      "Atomically start a bounded group of declared child Agents and return durable receipts immediately. Input: { members: [{ key, selection, prompt }], concurrency }. Pass members as a flat array, not a nested object or JSON string.",
+      "Atomically admit an exact group of declared child Agents and return durable receipts immediately. Members beyond the parent Run's active child capacity queue durably and promote automatically. Optional concurrency may narrow, but never widen, that policy capacity. Pass members as a flat array, not a nested object or JSON string.",
     parameters: startGroupParametersFor(selection),
     success: GroupReceipt,
     failure: Failure,
@@ -149,7 +154,7 @@ const makeStartGroupTool = (selection: Schema.Codec<string>): Tool.Any =>
 const makeRunGroupTool = (selection: Schema.Codec<string>): Tool.Any =>
   Tool.make(runGroupToolName, {
     description:
-      "Atomically admit an exact bounded group of declared child Agents, wait for every member to settle, and return complete results in admission order.",
+      "Atomically admit an exact group of declared child Agents, durably queue members beyond active capacity, wait for every member to settle, and return complete results in admission order. Optional concurrency may narrow, but never widen, the parent Run's tree-policy capacity.",
     parameters: startGroupParametersFor(selection),
     success: GroupResult,
     failure: Failure,
@@ -279,6 +284,7 @@ export const resultFromInspection = (inspection: FanOutInspection): GroupResult 
       ...(member.label === undefined ? {} : { label: member.label }),
       childRunId: member.childRunId,
       depth: member.depth,
+      readiness: member.readiness,
       status: member.status,
       ...(text === undefined ? {} : { text }),
       ...(turns === undefined ? {} : { turns }),

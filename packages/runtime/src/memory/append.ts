@@ -255,7 +255,7 @@ export const makeUnknown = (operationId: string) =>
   }) satisfies Omit<Extract<LifecycleEvent, { _tag: "OperationUnknown" }>, keyof RunEventBase>
 
 type ChildLinked = Omit<Extract<LifecycleEvent, { _tag: "ChildLinked" }>, keyof RunEventBase>
-type ChildLinkedDetails = Pick<ChildLinked, "key" | "label" | "origin">
+type ChildLinkedDetails = Pick<ChildLinked, "readiness" | "key" | "label" | "origin">
 
 export const makeChildLinked: {
   (
@@ -263,7 +263,7 @@ export const makeChildLinked: {
     selection: string,
     prompt: Prompt.Prompt,
     childDepth: number,
-    details?: ChildLinkedDetails,
+    details: ChildLinkedDetails,
   ): (childRunId: string) => ChildLinked
   (
     childRunId: string,
@@ -271,7 +271,7 @@ export const makeChildLinked: {
     selection: string,
     prompt: Prompt.Prompt,
     childDepth: number,
-    details?: ChildLinkedDetails,
+    details: ChildLinkedDetails,
   ): ChildLinked
 } = Function.dual(
   (args) => args.length === 6 || typeof args[2] === "string",
@@ -281,7 +281,7 @@ export const makeChildLinked: {
     selection: string,
     prompt: Prompt.Prompt,
     childDepth: number,
-    details?: ChildLinkedDetails,
+    details: ChildLinkedDetails,
   ): ChildLinked => ({
     _tag: "ChildLinked",
     childRunId,
@@ -291,6 +291,24 @@ export const makeChildLinked: {
     childDepth,
     ...details,
   }),
+)
+
+export const makeChildReadinessChanged: {
+  (
+    readiness: import("../child-readiness.js").ChildReadiness,
+  ): (childRunId: string) => Omit<Extract<LifecycleEvent, { _tag: "ChildReadinessChanged" }>, keyof RunEventBase>
+  (
+    childRunId: string,
+    readiness: import("../child-readiness.js").ChildReadiness,
+  ): Omit<Extract<LifecycleEvent, { _tag: "ChildReadinessChanged" }>, keyof RunEventBase>
+} = Function.dual(
+  2,
+  (childRunId: string, readiness: import("../child-readiness.js").ChildReadiness) =>
+    ({
+      _tag: "ChildReadinessChanged" as const,
+      childRunId,
+      readiness,
+    }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildReadinessChanged" }>, keyof RunEventBase>,
 )
 
 export const makeChildSettled: {
@@ -311,38 +329,17 @@ export const makeChildSettled: {
     }) satisfies Omit<Extract<LifecycleEvent, { _tag: "ChildSettled" }>, keyof RunEventBase>,
 )
 
-export const makeFanOutAdmitted: {
-  (
-    memberCount: number,
-    concurrency: number,
-    join: import("../fan-out.js").FanOutJoin,
-    remainder: import("../fan-out.js").FanOutRemainder,
-  ): (fanOutId: string) => Omit<Extract<LifecycleEvent, { _tag: "FanOutAdmitted" }>, keyof RunEventBase>
-  (
-    fanOutId: string,
-    memberCount: number,
-    concurrency: number,
-    join: import("../fan-out.js").FanOutJoin,
-    remainder: import("../fan-out.js").FanOutRemainder,
-  ): Omit<Extract<LifecycleEvent, { _tag: "FanOutAdmitted" }>, keyof RunEventBase>
-} = Function.dual(
-  5,
-  (
-    fanOutId: string,
-    memberCount: number,
-    concurrency: number,
-    join: import("../fan-out.js").FanOutJoin,
-    remainder: import("../fan-out.js").FanOutRemainder,
-  ) =>
-    ({
-      _tag: "FanOutAdmitted" as const,
-      fanOutId,
-      memberCount,
-      concurrency,
-      join,
-      remainder,
-    }) satisfies Omit<Extract<LifecycleEvent, { _tag: "FanOutAdmitted" }>, keyof RunEventBase>,
-)
+export const makeFanOutAdmitted = (input: {
+  readonly fanOutId: string
+  readonly memberCount: number
+  readonly concurrency: number
+  readonly join: import("../fan-out.js").FanOutJoin
+  readonly remainder: import("../fan-out.js").FanOutRemainder
+}) =>
+  ({
+    _tag: "FanOutAdmitted" as const,
+    ...input,
+  }) satisfies Omit<Extract<LifecycleEvent, { _tag: "FanOutAdmitted" }>, keyof RunEventBase>
 
 export const makeFanOutJoined: {
   (
