@@ -1,7 +1,7 @@
 import {
   AgentManifest as AgentManifestSchema,
   CompactionIdentity,
-  ChildBinding,
+  ChildSelection,
   NamedCapability,
   PinnedContent,
   PolicyIdentity,
@@ -16,6 +16,7 @@ import {
   ExecutableTarget,
   ExecutableManifest as ExecutableManifestSchema,
   ExecutableRef,
+  ProfileBinding,
   decode as decodeExecutableManifest,
   encode as encodeExecutableManifest,
   make as makeExecutableManifest,
@@ -279,7 +280,7 @@ type AgentManifestFacade = typeof import("./durable/agent-manifest.js")
 export const AgentManifest = {
   AgentManifest: AgentManifestSchema,
   CompactionIdentity,
-  ChildBinding,
+  ChildSelection,
   NamedCapability,
   PinnedContent,
   PolicyIdentity,
@@ -293,7 +294,7 @@ export namespace AgentManifest {
   export type PinnedAgent = import("./durable/agent-manifest.js").PinnedAgent
   export type NamedCapability = import("./durable/agent-manifest.js").NamedCapability
   export type PinnedContent = import("./durable/agent-manifest.js").PinnedContent
-  export type ChildBinding = import("./durable/agent-manifest.js").ChildBinding
+  export type ChildSelection = import("./durable/agent-manifest.js").ChildSelection
   export type PolicyIdentity = import("./durable/agent-manifest.js").PolicyIdentity
   export type CompactionIdentity = import("./durable/agent-manifest.js").CompactionIdentity
   export type PortablePolicy = import("./durable/agent-manifest.js").PortablePolicy
@@ -309,6 +310,7 @@ export const ExecutableManifest = {
   ExecutableTarget,
   ExecutableManifest: ExecutableManifestSchema,
   ExecutableRef,
+  ProfileBinding,
   decode: decodeExecutableManifest,
   encode: encodeExecutableManifest,
   make: makeExecutableManifest,
@@ -322,6 +324,7 @@ export namespace ExecutableManifest {
   export type AgentEntry = import("./durable/executable-manifest.js").AgentEntry
   export type ExecutableEntry = import("./durable/executable-manifest.js").ExecutableEntry
   export type ProgramEntry = import("./durable/executable-manifest.js").ProgramEntry
+  export type ProfileBinding = import("./durable/executable-manifest.js").ProfileBinding
   export type ExecutableTarget = import("./durable/executable-manifest.js").ExecutableTarget
 }
 

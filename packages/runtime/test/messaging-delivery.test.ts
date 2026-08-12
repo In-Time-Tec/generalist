@@ -26,15 +26,16 @@ const scriptedAgent = (name: string) => {
   const agent = Agent.make({ name })
   const childAgent = Agent.make({ name: `${name}-researcher` })
   const childPinned = pinnedTestAgent(childAgent, "1")
-  const rootPinned = pinnedTestAgent(agent, "1", [{ selection: "researcher", agent: childPinned.pin }])
+  const rootPinned = pinnedTestAgent(agent, "1", [{ selection: "researcher" }])
   const entries = [rootPinned, childPinned].map((pinned) => ({
     _tag: "Agent" as const,
     pin: pinned.pin,
     manifest: pinned.manifest,
   }))
-  const executable = ExecutableManifest.make({ root: rootPinned.pin, entries })
+  const profiles = [{ selection: "researcher", agent: childPinned.pin }]
+  const executable = ExecutableManifest.make({ root: rootPinned.pin, profiles, entries })
   const ref = { ...executable, ...executable.ref }
-  const childExecutable = ExecutableManifest.make({ root: rootPinned.pin, active: childPinned.pin, entries })
+  const childExecutable = ExecutableManifest.make({ root: rootPinned.pin, active: childPinned.pin, profiles, entries })
   const childRef = { ...childExecutable, ...childExecutable.ref }
   return { agent, childAgent, ref, childRef, address: Address.make(`agent:${name}`) }
 }

@@ -360,6 +360,104 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
       ),
     )
 
+    it.live("nests blocking groups through mutually recursive profiles", () =>
+      provide(
+        Effect.gen(function* () {
+          const context = yield* parent("recursive-groups")
+          const first = yield* context.runtime.spawn({
+            parentRunId: context.runId,
+            invocationId: "recursive-parent",
+            selection: "researcher",
+            prompt: "first profile",
+          })
+          const firstClaim = yield* context.store.claimExecution({ runId: first.runId, ownerId: "first-profile" })
+          const outerInput = {
+            parentRunId: first.runId,
+            toolCallId: "outer-group",
+            concurrency: 2,
+            members: [
+              { key: "left", selection: "analyst", prompt: "left analyst" },
+              { key: "right", selection: "analyst", prompt: "right analyst" },
+            ],
+          }
+          const outer = yield* context.children.runGroup(outerInput)
+          expect(outer._tag).toBe("Suspend")
+          const outerId = outer._tag === "Suspend" ? outer.token : ""
+          const outerInspection = yield* context.runtime.inspectFanOut(outerId)
+          yield* context.store.suspend({
+            ...firstClaim,
+            wait: openWait({ waitId: outerInput.toolCallId }),
+            suspension: AgentEvent.AgentSuspended.make({
+              token: outerId,
+              reason: "tool-wait",
+              tool_call_id: outerInput.toolCallId,
+              tool_name: ChildRuns.runGroupToolName,
+              tool_params: { concurrency: outerInput.concurrency, members: outerInput.members },
+              tool_call_batch: [],
+            }),
+          })
+
+          const left = outerInspection.members[0]!
+          const leftClaim = yield* context.store.claimExecution({ runId: left.childRunId, ownerId: "left-profile" })
+          const innerInput = {
+            parentRunId: left.childRunId,
+            toolCallId: "inner-group",
+            concurrency: 1,
+            members: [{ key: "nested", selection: "researcher", prompt: "nested researcher" }],
+          }
+          const inner = yield* context.children.runGroup(innerInput)
+          expect(inner._tag).toBe("Suspend")
+          const innerId = inner._tag === "Suspend" ? inner.token : ""
+          const innerInspection = yield* context.runtime.inspectFanOut(innerId)
+          yield* context.store.suspend({
+            ...leftClaim,
+            wait: openWait({ waitId: innerInput.toolCallId }),
+            suspension: AgentEvent.AgentSuspended.make({
+              token: innerId,
+              reason: "tool-wait",
+              tool_call_id: innerInput.toolCallId,
+              tool_name: ChildRuns.runGroupToolName,
+              tool_params: { concurrency: innerInput.concurrency, members: innerInput.members },
+              tool_call_batch: [],
+            }),
+          })
+
+          const nested = innerInspection.members[0]!
+          expect(yield* context.runtime.inspect(nested.childRunId)).toMatchObject({
+            parentRunId: left.childRunId,
+            depth: 3,
+          })
+          yield* context.store.complete({
+            ...(yield* context.store.claimExecution({ runId: nested.childRunId, ownerId: "nested-profile" })),
+            result: completedResult("nested complete"),
+          })
+          expect(yield* context.runtime.inspect(left.childRunId)).toMatchObject({ status: "running" })
+          yield* context.store.complete({
+            ...(yield* context.store.claimExecution({ runId: left.childRunId, ownerId: "left-complete" })),
+            result: completedResult("left complete"),
+          })
+          yield* context.store.complete({
+            ...(yield* context.store.claimExecution({
+              runId: outerInspection.members[1]!.childRunId,
+              ownerId: "right-complete",
+            })),
+            result: completedResult("right complete"),
+          })
+          expect(yield* context.runtime.inspect(first.runId)).toMatchObject({ status: "running" })
+          expect(
+            (yield* context.runtime.history({ runId: first.runId, limit: 100 })).filter(
+              (event) => event._tag === "RunResumed",
+            ),
+          ).toHaveLength(1)
+          expect(
+            (yield* context.runtime.history({ runId: left.childRunId, limit: 100 })).filter(
+              (event) => event._tag === "RunResumed",
+            ),
+          ).toHaveLength(1)
+        }),
+      ),
+    )
+
     it.live("preserves an individual group member cancellation reason", () =>
       provide(
         Effect.gen(function* () {

@@ -106,6 +106,31 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
       ),
     )
 
+    it.live("reuses one finite mutually recursive profile registry under a high tree policy", () =>
+      provide(
+        Effect.gen(function* () {
+          const context = yield* root({ maxDepth: 1_024, maxSubagents: 1 })
+          const rootExecution = yield* context.store.loadExecution(context.runId)
+          expect(rootExecution.executableManifest.entries).toHaveLength(3)
+          expect(rootExecution.executableManifest.profiles).toHaveLength(2)
+          let parentRunId = context.runId
+          for (let depth = 1; depth <= 32; depth++) {
+            const selection = depth % 2 === 0 ? "analyst" : "researcher"
+            const child = yield* admit(context.children, parentRunId, `recursive-${depth}`, undefined, selection)
+            const execution = yield* context.store.loadExecution(child.childRunId)
+            expect(execution).toMatchObject({
+              rootRunId: context.runId,
+              depth,
+              executableRef: { executable: rootExecution.executableRef.executable },
+            })
+            expect(execution.executableManifest.entries).toHaveLength(3)
+            expect(execution.executableManifest.profiles).toHaveLength(2)
+            parentRunId = child.childRunId
+          }
+        }),
+      ),
+    )
+
     it.live("charges one lifetime per-parent limit across singleton and exact group paths without refunds", () =>
       provide(
         Effect.gen(function* () {

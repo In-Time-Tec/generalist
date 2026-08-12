@@ -25,6 +25,7 @@ export const requireExecutionClaim = (input: ExecutionClaim) =>
 
 const executionRecord = (
   run: DecodedRun,
+  directChildCount: number,
   registrations: ExecutionRecord["registrations"],
   resolution?: ExecutionRecord["resolution"],
 ): ExecutionRecord => ({
@@ -32,6 +33,7 @@ const executionRecord = (
   rootRunId: run.rootRunId,
   depth: run.depth,
   treePolicy: run.treePolicy,
+  directChildCount,
   ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
   ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
   ...(run.ownerWorkerId === undefined ? {} : { ownerId: run.ownerWorkerId }),
@@ -49,12 +51,22 @@ const executionRecord = (
   registrations,
 })
 
+const loadDirectChildCount = (runId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const rows = yield* sql<{ child_count: number | string }>`
+      SELECT COUNT(*) AS child_count FROM baton_run_links WHERE parent_run_id = ${runId}
+    `
+    return Number(rows[0]?.child_count ?? 0)
+  })
+
 export const loadExecution = (runId: string) =>
   Effect.gen(function* () {
     const run = yield* requireRun(runId)
     const wait = yield* loadRunWait(run.runId, run.activeWaitId)
     const registrations = yield* loadRegistrations(runId)
-    return executionRecord(run, registrations, wait?.resolution)
+    const directChildCount = yield* loadDirectChildCount(runId)
+    return executionRecord(run, directChildCount, registrations, wait?.resolution)
   })
 
 export const claimExecution: {
@@ -110,7 +122,8 @@ export const claimExecution: {
     const started = run.status === "queued" ? yield* requireRun(input.runId) : claimed
     const wait = yield* loadRunWait(started.runId, started.activeWaitId)
     const registrations = yield* loadRegistrations(input.runId)
-    return { ...executionRecord(started, registrations, wait?.resolution), ownerId: input.ownerId }
+    const directChildCount = yield* loadDirectChildCount(input.runId)
+    return { ...executionRecord(started, directChildCount, registrations, wait?.resolution), ownerId: input.ownerId }
   }),
 )
 

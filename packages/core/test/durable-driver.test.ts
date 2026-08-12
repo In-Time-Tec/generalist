@@ -114,14 +114,7 @@ describe("executable identity", () => {
         },
       }),
       base({ budget: { modelCalls: 5 } }),
-      base({
-        children: [
-          {
-            selection: "delegate",
-            agent: Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"d".repeat(64)}`),
-          },
-        ],
-      }),
+      base({ children: [{ selection: "delegate" }] }),
     ]
     for (const changed of dimensions) expect(changed.pin).not.toBe(original.pin)
     const first = Pins.makeCapability({ tool: "first" })
@@ -261,10 +254,24 @@ describe("executable identity", () => {
     expect(() => ExecutableManifest.make({ root: agent.pin, active: missing, entries: [agentEntry(agent)] })).toThrow(
       "Active",
     )
-    const dangling = base({ children: [{ selection: "child", agent: missing }] })
+    const dangling = base({ children: [{ selection: "child" }] })
     expect(() => ExecutableManifest.make({ root: dangling.pin, entries: [agentEntry(dangling)] })).toThrow(
-      "Agent binding",
+      "has no executable profile",
     )
+    expect(() =>
+      ExecutableManifest.make({
+        root: dangling.pin,
+        profiles: [{ selection: "child", agent: missing }],
+        entries: [agentEntry(dangling)],
+      }),
+    ).toThrow("does not resolve to an Agent")
+    expect(() =>
+      ExecutableManifest.make({
+        root: agent.pin,
+        profiles: [{ selection: "undeclared", agent: agent.pin }],
+        entries: [agentEntry(agent)],
+      }),
+    ).toThrow("not declared by an Agent")
     expect(() =>
       ExecutableManifest.make({
         root: missing,
@@ -298,14 +305,20 @@ describe("executable identity", () => {
     }),
   )
 
-  it("pins root and active selection, canonicalizes entries, and rejects cycles", () => {
+  it("pins the finite profile registry independently of recursive selection authority", () => {
     const child = base({ name: "child", tools: [] })
-    const root = base({ children: [{ selection: "delegate", agent: child.pin }] })
-    const left = ExecutableManifest.make({ root: root.pin, entries: [agentEntry(root), agentEntry(child)] })
-    const reordered = ExecutableManifest.make({ root: root.pin, entries: [agentEntry(child), agentEntry(root)] })
+    const root = base({ children: [{ selection: "delegate" }] })
+    const profiles = [{ selection: "delegate", agent: child.pin }]
+    const left = ExecutableManifest.make({ root: root.pin, profiles, entries: [agentEntry(root), agentEntry(child)] })
+    const reordered = ExecutableManifest.make({
+      root: root.pin,
+      profiles,
+      entries: [agentEntry(child), agentEntry(root)],
+    })
     const activeChild = ExecutableManifest.make({
       root: root.pin,
       active: child.pin,
+      profiles,
       entries: [agentEntry(root), agentEntry(child)],
     })
     expect(left.ref.executable).toBe(reordered.ref.executable)
@@ -316,19 +329,37 @@ describe("executable identity", () => {
     const absent = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"d".repeat(64)}`)
     expect(() => ExecutableManifest.validateRef({ ...left.ref, active: absent }, left.manifest)).toThrow()
 
-    const pinA = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"a".repeat(64)}`)
-    const pinB = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"b".repeat(64)}`)
-    const manifestA = { ...base({ name: "a" }).manifest, children: [{ selection: "b", agent: pinB }] }
-    const manifestB = { ...base({ name: "b" }).manifest, children: [{ selection: "a", agent: pinA }] }
-    expect(() =>
-      ExecutableManifest.make({
-        root: pinA,
-        entries: [
-          { _tag: "Agent", pin: pinA, manifest: manifestA },
-          { _tag: "Agent", pin: pinB, manifest: manifestB },
-        ],
-      }),
-    ).toThrow("Cyclic")
+    const recursiveA = base({ name: "a", children: [{ selection: "a" }, { selection: "b" }] })
+    const recursiveB = base({ name: "b", children: [{ selection: "a" }, { selection: "b" }] })
+    const recursive = ExecutableManifest.make({
+      root: recursiveA.pin,
+      profiles: [
+        { selection: "a", agent: recursiveA.pin },
+        { selection: "b", agent: recursiveB.pin },
+      ],
+      entries: [agentEntry(recursiveA), agentEntry(recursiveB)],
+    })
+    expect(recursive.manifest.entries).toHaveLength(2)
+    expect(recursive.manifest.profiles).toHaveLength(2)
+
+    const changedAllowlist = base({ name: "a", children: [{ selection: "b" }] })
+    const changedAuthority = ExecutableManifest.make({
+      root: changedAllowlist.pin,
+      profiles: [
+        { selection: "a", agent: changedAllowlist.pin },
+        { selection: "b", agent: recursiveB.pin },
+      ],
+      entries: [agentEntry(changedAllowlist), agentEntry(recursiveB)],
+    })
+    expect(changedAuthority.ref.executable).not.toBe(recursive.ref.executable)
+
+    const alternate = base({ name: "alternate", tools: [] })
+    const changedRegistry = ExecutableManifest.make({
+      root: root.pin,
+      profiles: [{ selection: "delegate", agent: alternate.pin }],
+      entries: [agentEntry(root), agentEntry(alternate)],
+    })
+    expect(changedRegistry.ref.executable).not.toBe(left.ref.executable)
   })
 
   it("rejects malformed pin kinds, duplicate names and unsupported JSON", () => {
@@ -341,26 +372,11 @@ describe("executable identity", () => {
         ],
       }),
     ).toThrow("Duplicate")
-    const child = Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"e".repeat(64)}`)
     expect(() =>
       base({
-        children: [
-          { selection: "same", agent: child },
-          {
-            selection: "same",
-            agent: Schema.decodeUnknownSync(Pins.AgentPin)(`agent-pin:v1:sha256:${"f".repeat(64)}`),
-          },
-        ],
+        children: [{ selection: "same" }, { selection: "same" }],
       }),
     ).toThrow("Duplicate child selection")
-    expect(() =>
-      base({
-        children: [
-          { selection: "one", agent: child },
-          { selection: "two", agent: child },
-        ],
-      }),
-    ).toThrow("Duplicate child pin")
     expect(() => base({ toolScheduling: { maxConcurrency: 2, parallelSafe: ["missing"] } })).toThrow("undeclared tool")
     expect(() => base({ toolScheduling: { maxConcurrency: 2, parallelSafe: ["weather", "weather"] } })).toThrow(
       "duplicate tool",

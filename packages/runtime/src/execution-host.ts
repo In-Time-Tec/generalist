@@ -33,7 +33,6 @@ export interface Options {
 }
 export interface Interface {
   readonly execute: (claim: ExecutionClaim) => Effect.Effect<void>
-  /** Interrupt a process-local execution that this host owns, recording durable-cancel intent. */
   readonly interrupt: (runId: string) => Effect.Effect<void>
 }
 export class ExecutionHost extends Context.Service<ExecutionHost, Interface>()(
@@ -104,7 +103,10 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
               (entry) => entry._tag === "Agent" && entry.pin === claimed.executableRef.active,
             )
             const childRunTools =
-              activeEntry?._tag === "Agent" && activeEntry.manifest.children.length > 0
+              activeEntry?._tag === "Agent" &&
+              activeEntry.manifest.children.length > 0 &&
+              claimed.depth < claimed.treePolicy.maxDepth &&
+              claimed.directChildCount < claimed.treePolicy.maxSubagents
                 ? makeChildRunTools({ children: activeEntry.manifest.children })
                 : undefined
             const programAuthority = activeEntry?._tag === "Agent" ? activeEntry.manifest.programAuthority : undefined
@@ -494,6 +496,5 @@ export const make = (options: Options): Effect.Effect<Interface, never, RunStore
     const execute = (claim: ExecutionClaim): Effect.Effect<void> => active.run(claim.runId, executeClaim(claim))
     return ExecutionHost.of({ execute, interrupt: (runId) => active.interrupt(runId) })
   })
-
 export const layer = (options: Options): Layer.Layer<ExecutionHost, never, RunStore | ActiveExecutions> =>
   Layer.effect(ExecutionHost, make(options))

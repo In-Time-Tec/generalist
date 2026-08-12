@@ -23,11 +23,12 @@ const finish = (inputTokens: number) =>
     response: undefined,
   })
 
-it("runtime default budget keeps a cumulative total-token safety cap", () => {
+it("runtime default budget keeps resource caps but leaves recursive admission to TreePolicy", () => {
   expect(agentBudget.totalTokens).toBe(1_000_000)
   expect(agentBudget.modelCalls).toBeGreaterThan(0)
   expect(agentBudget.toolCalls).toBeGreaterThan(0)
-  expect(agentBudget.childRuns).toBeGreaterThan(0)
+  expect("childRuns" in agentBudget).toBe(false)
+  expect("depth" in agentBudget).toBe(false)
 })
 
 it.effect(
@@ -44,17 +45,23 @@ it.effect(
     })
     const childPinned = pinnedTestAgent(childAgent)
     const parentAgent = Agent.make({ name: "parent-heavy" })
-    const parentPinned = pinnedTestAgent(parentAgent, "1", [{ selection: "child", agent: childPinned.pin }])
+    const parentPinned = pinnedTestAgent(parentAgent, "1", [{ selection: "child" }])
     const entries = [
       { _tag: "Agent" as const, ...parentPinned },
       { _tag: "Agent" as const, ...childPinned },
     ]
-    const parentExecutable = ExecutableManifest.make({ root: parentPinned.pin, entries })
+    const profiles = [{ selection: "child", agent: childPinned.pin }]
+    const parentExecutable = ExecutableManifest.make({ root: parentPinned.pin, profiles, entries })
     const parentRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
       ...parentExecutable,
       ...parentExecutable.ref,
     }
-    const childExecutable = ExecutableManifest.make({ root: parentPinned.pin, active: childPinned.pin, entries })
+    const childExecutable = ExecutableManifest.make({
+      root: parentPinned.pin,
+      active: childPinned.pin,
+      profiles,
+      entries,
+    })
     const childRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
       ...childExecutable,
       ...childExecutable.ref,

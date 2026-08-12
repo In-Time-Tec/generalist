@@ -176,21 +176,35 @@ const narrowBudget = (
 const closureFor = (
   manifest: ExecutableManifest.ExecutableManifest,
   roots: ReadonlyArray<string>,
-): ReadonlyArray<Extract<ExecutableManifest.ExecutableEntry, { readonly _tag: "Agent" }>> => {
+): {
+  readonly entries: ReadonlyArray<Extract<ExecutableManifest.ExecutableEntry, { readonly _tag: "Agent" }>>
+  readonly profiles: ReadonlyArray<ExecutableManifest.ProfileBinding>
+} => {
   const byPin = new Map<string, ExecutableManifest.ExecutableEntry>(
     manifest.entries.map((entry) => [entry.pin, entry] as const),
   )
+  const bySelection = new Map(manifest.profiles.map((profile) => [profile.selection, profile] as const))
   const entries = new Map<string, Extract<ExecutableManifest.ExecutableEntry, { readonly _tag: "Agent" }>>()
+  const profiles = new Map<string, ExecutableManifest.ProfileBinding>()
   const visit = (pin: string): void => {
     if (entries.has(pin)) return
     const entry = byPin.get(pin)
     if (entry?._tag !== "Agent") throw new TypeError(`Program Agent is not in the parent executable: ${pin}`)
     entries.set(pin, entry)
-    for (const child of [...entry.manifest.children, ...(entry.manifest.programAuthority?.agents ?? [])])
-      visit(child.agent)
+    for (const child of entry.manifest.children) {
+      const profile = bySelection.get(child.selection)
+      if (profile === undefined)
+        throw new TypeError(`Program Agent child profile is not in the parent executable: ${child.selection}`)
+      profiles.set(profile.selection, profile)
+      visit(profile.agent)
+    }
+    for (const child of entry.manifest.programAuthority?.agents ?? []) visit(child.agent)
   }
   for (const root of roots) visit(root)
-  return [...entries.values()]
+  return {
+    entries: [...entries.values()],
+    profiles: [...profiles.values()],
+  }
 }
 
 export interface Interface {
@@ -238,14 +252,20 @@ export const make = (input: {
         capabilities: { tools, agents, steps },
         budget: request.budget,
       })
+      const closure = closureFor(
+        input.claimed.executableManifest,
+        agents.map((agent) => agent.agent),
+      )
       const executable = ExecutableManifest.make({
         root: program.pin,
+        profiles: closure.profiles,
         entries: [
           { _tag: "Program", ...program },
-          ...closureFor(
-            input.claimed.executableManifest,
-            agents.map((agent) => agent.agent),
-          ).map((entry) => ({ _tag: "Agent" as const, pin: entry.pin, manifest: entry.manifest })),
+          ...closure.entries.map((entry) => ({
+            _tag: "Agent" as const,
+            pin: entry.pin,
+            manifest: entry.manifest,
+          })),
         ],
       })
       const registrations = yield* narrowRegistrations(executable, input.claimed.registrations)

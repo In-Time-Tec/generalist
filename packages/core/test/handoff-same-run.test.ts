@@ -54,10 +54,11 @@ layer(Layer.empty)("Handoff same-run", (it) => {
       services: [],
       policy: { _tag: "Portable", policy: { _tag: "Forever" } },
       budget: {},
-      children: [{ selection: "pinned-math", agent: child.pin }],
+      children: [{ selection: "pinned-math" }],
     })
     const executable = ExecutableManifest.make({
       root: root.pin,
+      profiles: [{ selection: "pinned-math", agent: child.pin }],
       entries: [
         { _tag: "Agent", ...root },
         { _tag: "Agent", ...child },

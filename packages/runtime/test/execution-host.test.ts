@@ -14,7 +14,7 @@ import {
   ToolContext,
   ToolExecutor,
 } from "@batonfx/core"
-import { closedTestAgent, testExecutable } from "./identity.js"
+import { closedTestAgent, pinnedTestAgent, testExecutable } from "./identity.js"
 import {
   Address,
   ChildRuns,
@@ -1114,6 +1114,104 @@ describe("ExecutionHost", () => {
       expect(prompts[1]).toContain("second child failed")
       expect(modelCalls).toBe(2)
     })
+  })
+
+  it.effect("advertises recursive child tools only while persisted tree capacity remains", () => {
+    const ordinaryTool = Tool.make("typescript", {
+      parameters: Schema.Struct({ code: Schema.String }),
+      success: Schema.String,
+    })
+    const ordinaryToolkit = Toolkit.make(ordinaryTool)
+    const profile = Agent.make({ name: "recursive-profile", toolkit: ordinaryToolkit })
+    const pinned = pinnedTestAgent(profile, "recursive-profile-v1", [{ selection: "recursive" }])
+    const executable = ExecutableManifest.make({
+      root: pinned.pin,
+      profiles: [{ selection: "recursive", agent: pinned.pin }],
+      entries: [{ _tag: "Agent", ...pinned }],
+    })
+    const advertisedTools: Array<ReadonlyArray<string>> = []
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: (options) => {
+          advertisedTools.push(options.tools.map((tool) => tool.name).toSorted())
+          return Stream.make(finish)
+        },
+      }),
+    )
+    const environment = Layer.merge(
+      model,
+      ordinaryToolkit.toLayer({ typescript: () => Effect.die("typescript must not execute") }),
+    )
+    const runtimeLayer = Runtime.layerMemory({
+      resolver: ExecutableResolver.makeStatic([{ executable, agent: Agent.close(profile, environment) }]),
+      addresses: [],
+      scheduler: { pollInterval: "1 day" },
+    })
+    return Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const host = yield* ExecutionHost.ExecutionHost
+      let sequence = 0
+      const root = (treePolicy: { readonly maxDepth: number; readonly maxSubagents: number }) =>
+        runtime.start({
+          executable,
+          registrations: registrationsFor(executable),
+          sessionId: `recursive-tools:${sequence}`,
+          idempotencyKey: `recursive-tools:${sequence++}`,
+          prompt: "run",
+          treePolicy,
+        })
+      const execute = (runId: string) =>
+        Effect.flatMap(store.claimExecution({ runId, ownerId: `host:${runId}` }), host.execute)
+
+      const allowed = yield* root({ maxDepth: 2, maxSubagents: 2 })
+      const child = yield* runtime.spawn({
+        parentRunId: allowed.runId,
+        invocationId: "depth-1",
+        selection: "recursive",
+        prompt: "depth 1",
+      })
+      const grandchild = yield* runtime.spawn({
+        parentRunId: child.runId,
+        invocationId: "depth-2",
+        selection: "recursive",
+        prompt: "depth 2",
+      })
+      expect(
+        (yield* Effect.forEach([allowed.runId, child.runId, grandchild.runId], store.loadExecution)).map(
+          ({ depth, executableRef }) => ({ depth, active: executableRef.active }),
+        ),
+      ).toEqual([
+        { depth: 0, active: pinned.pin },
+        { depth: 1, active: pinned.pin },
+        { depth: 2, active: pinned.pin },
+      ])
+      yield* execute(allowed.runId)
+      yield* execute(child.runId)
+      yield* execute(grandchild.runId)
+
+      const disabled = yield* root({ maxDepth: 2, maxSubagents: 0 })
+      yield* execute(disabled.runId)
+
+      const exhausted = yield* root({ maxDepth: 2, maxSubagents: 1 })
+      yield* runtime.spawn({
+        parentRunId: exhausted.runId,
+        invocationId: "quota",
+        selection: "recursive",
+        prompt: "use quota",
+      })
+      yield* execute(exhausted.runId)
+
+      expect(advertisedTools).toEqual([
+        ["run_child", "run_child_group", "typescript"],
+        ["run_child", "run_child_group", "typescript"],
+        ["typescript"],
+        ["typescript"],
+        ["typescript"],
+      ])
+    }).pipe((effect) => provideScoped(runtimeLayer, effect), Effect.scoped)
   })
 
   it.effect("persists distinct suspension checkpoints when one turn suspends twice after a resume", () => {

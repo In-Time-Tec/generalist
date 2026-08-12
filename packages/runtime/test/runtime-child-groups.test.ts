@@ -421,6 +421,16 @@ it.live("persists one ordered child-group suspension and result across SQLite re
             status: "waiting",
             wait: { waitId: "sqlite-run-group", status: "open" },
           })
+          const recursive = yield* runtime.spawn({
+            parentRunId: admitted.singletonRunId,
+            invocationId: "reopen-recursive-child",
+            selection: "analyst",
+            prompt: "resolve from reopened profile registry",
+          })
+          expect(yield* runtime.inspect(recursive.runId)).toMatchObject({
+            parentRunId: admitted.singletonRunId,
+            depth: 2,
+          })
           yield* store.complete({
             ...(yield* store.claimExecution({ runId: admitted.receipt.children[2]!.childRunId, ownerId: "third" })),
             result: completedResult("third persisted"),
