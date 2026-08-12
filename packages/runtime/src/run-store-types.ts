@@ -133,6 +133,7 @@ export interface ExecutionRecord {
   readonly rootRunId: string
   readonly depth: number
   readonly treePolicy: TreePolicy
+  readonly directChildCount: number
   readonly parentRunId?: string
   readonly invocationId?: string
   readonly ownerId?: string

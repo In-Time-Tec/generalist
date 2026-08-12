@@ -12,10 +12,9 @@ const compareText = (left: string, right: string): number => (left < right ? -1 
 
 export { NamedCapability, PinnedContent, type NamedCapabilityEncoded }
 
-/** @experimental One named child selection bound to an exact Agent. */
-export interface ChildBinding {
+/** @experimental One child profile name this Agent may select from its executable registry. */
+export interface ChildSelection {
   readonly selection: string
-  readonly agent: AgentPin
 }
 
 export interface PortablePolicy {
@@ -56,7 +55,7 @@ export interface ProgramAuthority {
 
 /** @experimental Closed, reconstructable identity contract for one Agent. */
 export interface AgentManifest {
-  readonly version: "1"
+  readonly version: "2"
   readonly name: string
   readonly instructions?: string
   readonly model: ModelPin
@@ -68,11 +67,7 @@ export interface AgentManifest {
   readonly compaction?: CompactionIdentity
   readonly programAuthority?: ProgramAuthority
   readonly budget: BudgetLimits
-  readonly children: ReadonlyArray<ChildBinding>
-}
-
-export interface ChildBindingEncoded extends Omit<ChildBinding, "agent"> {
-  readonly agent: string
+  readonly children: ReadonlyArray<ChildSelection>
 }
 
 export type PolicyIdentityEncoded =
@@ -105,13 +100,12 @@ export interface AgentManifestEncoded
     readonly steps: ReadonlyArray<NamedCapabilityEncoded>
     readonly budget: typeof ProgramBudget.Encoded
   }
-  readonly children: ReadonlyArray<ChildBindingEncoded>
+  readonly children: ReadonlyArray<ChildSelection>
 }
 
-/** @experimental One named child selection bound to an exact Agent. */
-export const ChildBinding: Schema.Codec<ChildBinding, ChildBindingEncoded> = Schema.Struct({
+/** @experimental One child profile name this Agent may select from its executable registry. */
+export const ChildSelection: Schema.Codec<ChildSelection, ChildSelection> = Schema.Struct({
   selection: Schema.String,
-  agent: AgentPin,
 })
 
 /** @experimental Closed portable turn-policy constructor data. */
@@ -164,7 +158,7 @@ export const ProgramAuthority = Schema.Struct({
 })
 /** @experimental Closed, reconstructable identity contract for one Agent. */
 export const AgentManifest: Schema.Codec<AgentManifest, AgentManifestEncoded> = Schema.Struct({
-  version: Schema.Literal("1"),
+  version: Schema.Literal("2"),
   name: Schema.String,
   instructions: Schema.optionalKey(Schema.String),
   model: ModelPin,
@@ -176,7 +170,7 @@ export const AgentManifest: Schema.Codec<AgentManifest, AgentManifestEncoded> = 
   compaction: Schema.optionalKey(CompactionIdentity),
   programAuthority: Schema.optionalKey(ProgramAuthority),
   budget: BudgetLimits,
-  children: Schema.Array(ChildBinding),
+  children: Schema.Array(ChildSelection),
 })
 /** @experimental An Agent manifest paired with its constructor-owned digest. */
 export interface PinnedAgent {
@@ -206,11 +200,10 @@ const uniqueSorted = <A>(
 
 const capabilityOrder = (value: NamedCapability): string => value.name
 const capabilityIdentity = (value: NamedCapability): string => value.pin
-const childOrder = (value: ChildBinding): string => value.selection
-const childIdentity = (value: ChildBinding): string => value.agent
+const childOrder = (value: ChildSelection): string => value.selection
 
 /** @experimental Construct and pin a canonical closed Agent manifest. */
-export const make = (input: Omit<AgentManifest, "version"> & { readonly version?: "1" }): PinnedAgent => {
+export const make = (input: Omit<AgentManifest, "version"> & { readonly version?: "2" }): PinnedAgent => {
   const invalidToolScheduling = toolSchedulingFailure(
     input.toolScheduling,
     input.tools.map(({ name }) => name),
@@ -218,7 +211,7 @@ export const make = (input: Omit<AgentManifest, "version"> & { readonly version?
   if (invalidToolScheduling !== undefined) throw new TypeError(invalidToolScheduling)
   const manifest = Schema.decodeUnknownSync(AgentManifest, { onExcessProperty: "error" })({
     ...input,
-    version: "1",
+    version: "2",
     toolScheduling: {
       ...input.toolScheduling,
       parallelSafe: [...input.toolScheduling.parallelSafe].toSorted(compareText),
@@ -247,7 +240,7 @@ export const make = (input: Omit<AgentManifest, "version"> & { readonly version?
             ]),
           },
         }),
-    children: uniqueSorted(input.children, childOrder, childIdentity, ["child selection", "child pin"]),
+    children: uniqueSorted(input.children, childOrder, childOrder, ["child selection", "child selection"]),
   })
   return { manifest, pin: makeAgent(manifest) }
 }
@@ -263,7 +256,7 @@ export const fromLiveAgent: {
     readonly compaction?: CompactionIdentity
     readonly programAuthority?: ProgramAuthority
     readonly budget: BudgetLimits
-    readonly children: ReadonlyArray<ChildBinding>
+    readonly children: ReadonlyArray<ChildSelection>
   }): (agent: Agent<Tools, R, PolicyServices, AuthorizationServices>) => PinnedAgent
   <Tools extends Record<string, Tool.Any>, R, PolicyServices, AuthorizationServices>(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices>,
@@ -276,7 +269,7 @@ export const fromLiveAgent: {
       readonly compaction?: CompactionIdentity
       readonly programAuthority?: ProgramAuthority
       readonly budget: BudgetLimits
-      readonly children: ReadonlyArray<ChildBinding>
+      readonly children: ReadonlyArray<ChildSelection>
     },
   ): PinnedAgent
 } = Function.dual(
@@ -292,7 +285,7 @@ export const fromLiveAgent: {
       readonly compaction?: CompactionIdentity
       readonly programAuthority?: ProgramAuthority
       readonly budget: BudgetLimits
-      readonly children: ReadonlyArray<ChildBinding>
+      readonly children: ReadonlyArray<ChildSelection>
     },
   ): PinnedAgent => {
     const actualTools = Object.keys(agent.toolkit.tools).toSorted()

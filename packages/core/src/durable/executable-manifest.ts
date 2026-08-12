@@ -23,15 +23,22 @@ export interface ProgramEntry {
 /** @experimental One exact executable definition in a closed closure. */
 export type ExecutableEntry = AgentEntry | ProgramEntry
 
+/** @experimental One globally pinned child profile available by selection name. */
+export interface ProfileBinding {
+  readonly selection: string
+  readonly agent: AgentPin
+}
+
 /** @experimental Exact active executable within one closed closure. */
 export const ExecutableTarget = Schema.Union([AgentPin, ProgramPin])
 /** @experimental */
 export type ExecutableTarget = typeof ExecutableTarget.Type
 
-/** @experimental Complete closed executable Agent graph. */
+/** @experimental Complete closed executable profile registry and entry closure. */
 export interface ExecutableManifest {
-  readonly version: "1"
+  readonly version: "2"
   readonly root: ExecutableTarget
+  readonly profiles: ReadonlyArray<ProfileBinding>
   readonly entries: ReadonlyArray<ExecutableEntry>
 }
 
@@ -58,8 +65,13 @@ export interface ProgramEntryEncoded extends Omit<ProgramEntry, "pin" | "manifes
 
 export type ExecutableEntryEncoded = AgentEntryEncoded | ProgramEntryEncoded
 
-export interface ExecutableManifestEncoded extends Omit<ExecutableManifest, "root" | "entries"> {
+export interface ProfileBindingEncoded extends Omit<ProfileBinding, "agent"> {
+  readonly agent: string
+}
+
+export interface ExecutableManifestEncoded extends Omit<ExecutableManifest, "root" | "profiles" | "entries"> {
   readonly root: string
+  readonly profiles: ReadonlyArray<ProfileBindingEncoded>
   readonly entries: ReadonlyArray<ExecutableEntryEncoded>
 }
 
@@ -86,10 +98,17 @@ export const ExecutableEntry: Schema.Codec<ExecutableEntry, ExecutableEntryEncod
   ProgramEntry,
 ])
 
-/** @experimental Complete closed executable Agent graph. */
+/** @experimental One globally pinned child profile available by selection name. */
+export const ProfileBinding: Schema.Codec<ProfileBinding, ProfileBindingEncoded> = Schema.Struct({
+  selection: Schema.String,
+  agent: AgentPin,
+})
+
+/** @experimental Complete closed executable profile registry and entry closure. */
 export const ExecutableManifest: Schema.Codec<ExecutableManifest, ExecutableManifestEncoded> = Schema.Struct({
-  version: Schema.Literal("1"),
+  version: Schema.Literal("2"),
   root: ExecutableTarget,
+  profiles: Schema.Array(ProfileBinding),
   entries: Schema.Array(ExecutableEntry),
 })
 
@@ -99,7 +118,29 @@ const validate = (pinned: PinnedExecutable): PinnedExecutable => {
   if (byPin.size !== manifest.entries.length) throw new TypeError("Duplicate executable pin")
   if (manifest.entries.some((entry, index, entries) => index > 0 && entries[index - 1]!.pin > entry.pin))
     throw new TypeError("Executable entries are not uniquely sorted")
+  const profiles = new Map(manifest.profiles.map((profile) => [profile.selection, profile.agent] as const))
+  if (profiles.size !== manifest.profiles.length) throw new TypeError("Duplicate executable profile selection")
+  if (manifest.profiles.some((profile, index, values) => index > 0 && values[index - 1]!.selection > profile.selection))
+    throw new TypeError("Executable profiles are not uniquely sorted")
   if (!byPin.has(manifest.root)) throw new TypeError(`Root executable is not present: ${manifest.root}`)
+  const declaredSelections = new Set<string>()
+  for (const entry of manifest.entries) {
+    if (entry._tag !== "Agent") continue
+    for (const child of entry.manifest.children) {
+      declaredSelections.add(child.selection)
+      if (!profiles.has(child.selection)) {
+        throw new TypeError(`Child selection has no executable profile: ${child.selection}`)
+      }
+    }
+  }
+  for (const profile of manifest.profiles) {
+    if (!declaredSelections.has(profile.selection)) {
+      throw new TypeError(`Executable profile is not declared by an Agent: ${profile.selection}`)
+    }
+    if (byPin.get(profile.agent)?._tag !== "Agent") {
+      throw new TypeError(`Executable profile does not resolve to an Agent: ${profile.selection}`)
+    }
+  }
   const visiting = new Set<string>()
   const reachable = new Set<string>()
   const visit = (pin: ExecutableTarget): void => {
@@ -109,9 +150,7 @@ const validate = (pinned: PinnedExecutable): PinnedExecutable => {
     if (entry === undefined) throw new TypeError(`Dangling executable: ${pin}`)
     visiting.add(pin)
     const children =
-      entry._tag === "Agent"
-        ? [...entry.manifest.children, ...(entry.manifest.programAuthority?.agents ?? [])]
-        : entry.manifest.capabilities.agents
+      entry._tag === "Agent" ? (entry.manifest.programAuthority?.agents ?? []) : entry.manifest.capabilities.agents
     for (const child of children) {
       const target = byPin.get(child.agent)
       if (target?._tag !== "Agent") throw new TypeError(`Agent binding does not resolve to an Agent: ${child.agent}`)
@@ -121,6 +160,7 @@ const validate = (pinned: PinnedExecutable): PinnedExecutable => {
     reachable.add(pin)
   }
   visit(manifest.root)
+  for (const profile of manifest.profiles) visit(profile.agent)
   if (reachable.size !== manifest.entries.length)
     throw new TypeError("Executable closure contains a disconnected executable")
   if (!reachable.has(ref.active)) throw new TypeError(`Active executable is not reachable: ${ref.active}`)
@@ -136,6 +176,7 @@ const validate = (pinned: PinnedExecutable): PinnedExecutable => {
 export const make = (input: {
   readonly root: ExecutableTarget
   readonly active?: ExecutableTarget
+  readonly profiles?: ReadonlyArray<ProfileBinding>
   readonly entries: ReadonlyArray<
     ({ readonly _tag: "Agent" } & PinnedAgent) | ({ readonly _tag: "Program" } & PinnedProgram)
   >
@@ -144,9 +185,11 @@ export const make = (input: {
   const entries = input.entries
     .map(({ _tag, pin, manifest }) => ({ _tag, pin, manifest }) as ExecutableEntry)
     .toSorted((left, right) => compareText(left.pin, right.pin))
+  const profiles = [...(input.profiles ?? [])].toSorted((left, right) => compareText(left.selection, right.selection))
   const manifest = Schema.decodeUnknownSync(ExecutableManifest, { onExcessProperty: "error" })({
-    version: "1",
+    version: "2",
     root: input.root,
+    profiles,
     entries,
   })
   return validate({ manifest, ref: { executable: makeExecutable(manifest), active } })
@@ -168,7 +211,7 @@ export const makeTest: {
     budget: {},
     children: [],
   })
-  return make({ root: agent.pin, entries: [{ _tag: "Agent", ...agent }] })
+  return make({ root: agent.pin, profiles: [], entries: [{ _tag: "Agent", ...agent }] })
 })
 
 /** @experimental Verify that a durable reference is exactly owned by a closure. */

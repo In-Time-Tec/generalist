@@ -37,16 +37,18 @@ export const assistant: Agent.Agent = Agent.make({ name: "assistant" })
 export const researcher: Agent.Agent = Agent.make({ name: "researcher" })
 export const analyst: Agent.Agent = Agent.make({ name: "analyst" })
 
-const analystPinned = pinnedTestAgent(analyst)
-const researcherPinned = pinnedTestAgent(researcher, "1", [{ selection: "analyst", agent: analystPinned.pin }])
-const assistantPinned = pinnedTestAgent(assistant, "1", [
-  { selection: "analyst", agent: analystPinned.pin },
-  { selection: "researcher", agent: researcherPinned.pin },
-])
+const recursiveProfiles = [{ selection: "analyst" }, { selection: "researcher" }]
+const analystPinned = pinnedTestAgent(analyst, "1", recursiveProfiles)
+const researcherPinned = pinnedTestAgent(researcher, "1", recursiveProfiles)
+const assistantPinned = pinnedTestAgent(assistant, "1", [{ selection: "analyst" }, { selection: "researcher" }])
 const entries = (...agents: ReadonlyArray<AgentManifest.PinnedAgent>) =>
   agents.map((agent) => ({ _tag: "Agent" as const, pin: agent.pin, manifest: agent.manifest }))
 const executable = ExecutableManifest.make({
   root: assistantPinned.pin,
+  profiles: [
+    { selection: "analyst", agent: analystPinned.pin },
+    { selection: "researcher", agent: researcherPinned.pin },
+  ],
   entries: entries(assistantPinned, researcherPinned, analystPinned),
 })
 
@@ -58,6 +60,7 @@ export const assistantRef: ExecutableManifest.PinnedExecutable & ExecutableManif
 const researcherExecutable = ExecutableManifest.make({
   root: assistantPinned.pin,
   active: researcherPinned.pin,
+  profiles: executable.manifest.profiles,
   entries: entries(assistantPinned, researcherPinned, analystPinned),
 })
 export const researcherRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
@@ -68,6 +71,7 @@ export const researcherRef: ExecutableManifest.PinnedExecutable & ExecutableMani
 const analystExecutable = ExecutableManifest.make({
   root: assistantPinned.pin,
   active: analystPinned.pin,
+  profiles: executable.manifest.profiles,
   entries: entries(assistantPinned, researcherPinned, analystPinned),
 })
 export const analystRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
@@ -81,11 +85,10 @@ export const researcherAddress = Address.make("agent:researcher")
 export const alternateAssistant: Agent.Agent = Agent.make({ name: "alternate-assistant" })
 const alternateResearcher = Agent.make({ name: "alternate-researcher" })
 const alternateResearcherPinned = pinnedTestAgent(alternateResearcher, "2")
-const alternateAssistantPinned = pinnedTestAgent(alternateAssistant, "2", [
-  { selection: "researcher", agent: alternateResearcherPinned.pin },
-])
+const alternateAssistantPinned = pinnedTestAgent(alternateAssistant, "2", [{ selection: "researcher" }])
 const alternateExecutable = ExecutableManifest.make({
   root: alternateAssistantPinned.pin,
+  profiles: [{ selection: "researcher", agent: alternateResearcherPinned.pin }],
   entries: entries(alternateAssistantPinned, alternateResearcherPinned),
 })
 export const alternateAssistantRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {
@@ -95,6 +98,7 @@ export const alternateAssistantRef: ExecutableManifest.PinnedExecutable & Execut
 const alternateResearcherExecutable = ExecutableManifest.make({
   root: alternateAssistantPinned.pin,
   active: alternateResearcherPinned.pin,
+  profiles: alternateExecutable.manifest.profiles,
   entries: entries(alternateAssistantPinned, alternateResearcherPinned),
 })
 export const alternateResearcherRef: ExecutableManifest.PinnedExecutable & ExecutableManifest.ExecutableRef = {

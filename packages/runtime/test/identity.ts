@@ -60,20 +60,20 @@ export const pinnedTestAgent: {
   <Tools extends Record<string, Tool.Any>, R, P, A>(
     agent: Agent.Agent<Tools, R, P, A>,
     revision?: string,
-    children?: ReadonlyArray<AgentManifest.ChildBinding>,
+    children?: ReadonlyArray<AgentManifest.ChildSelection>,
   ): AgentManifest.PinnedAgent
   <Tools extends Record<string, Tool.Any>, R, P, A>(
     revision?: string,
-    children?: ReadonlyArray<AgentManifest.ChildBinding>,
+    children?: ReadonlyArray<AgentManifest.ChildSelection>,
   ): (agent: Agent.Agent<Tools, R, P, A>) => AgentManifest.PinnedAgent
 } = <Tools extends Record<string, Tool.Any>, R, P, A>(
   agentOrRevision?: Agent.Agent<Tools, R, P, A> | string,
-  maybeRevision?: string | ReadonlyArray<AgentManifest.ChildBinding>,
-  maybeChildren?: ReadonlyArray<AgentManifest.ChildBinding>,
+  maybeRevision?: string | ReadonlyArray<AgentManifest.ChildSelection>,
+  maybeChildren?: ReadonlyArray<AgentManifest.ChildSelection>,
 ): any => {
   if (agentOrRevision === undefined || typeof agentOrRevision === "string") {
     const revision = agentOrRevision
-    const children = maybeRevision as ReadonlyArray<AgentManifest.ChildBinding>
+    const children = maybeRevision as ReadonlyArray<AgentManifest.ChildSelection>
     return (agent: Agent.Agent<Tools, R, P, A>) => pinnedTestAgent(agent, revision, children)
   }
   const agent = agentOrRevision

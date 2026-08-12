@@ -38,6 +38,7 @@ export namespace ExecutableManifest {
   export type ExecutableManifest = import("./executable-manifest.js").ExecutableManifest
   export type ExecutableRef = import("./executable-manifest.js").ExecutableRef
   export type PinnedExecutable = import("./executable-manifest.js").PinnedExecutable
+  export type ProfileBinding = import("./executable-manifest.js").ProfileBinding
 }
 
 export * as ExecutableRegistration from "./executable-registration.js"

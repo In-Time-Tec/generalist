@@ -593,9 +593,10 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
           }),
       },
     })
-    const root = pinnedTestAgent(supervisor.agent, "handoff-a", [{ selection: childAgent.name, agent: child.pin }])
+    const root = pinnedTestAgent(supervisor.agent, "handoff-a", [{ selection: childAgent.name }])
     const admittedExecutable = ExecutableManifest.make({
       root: root.pin,
+      profiles: [{ selection: childAgent.name, agent: child.pin }],
       entries: [
         { _tag: "Agent", ...root },
         { _tag: "Agent", ...child },
@@ -604,6 +605,7 @@ it.live("recovers a committed ExecutionHost handoff through the active Agent aft
     const activeExecutable = ExecutableManifest.make({
       root: root.pin,
       active: child.pin,
+      profiles: admittedExecutable.manifest.profiles,
       entries: [
         { _tag: "Agent", ...root },
         { _tag: "Agent", ...child },

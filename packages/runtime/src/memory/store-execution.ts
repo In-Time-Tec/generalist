@@ -20,6 +20,7 @@ const executionRecord = (
   rootRunId: run.rootRunId,
   depth: run.depth,
   treePolicy: run.treePolicy,
+  directChildCount: run.children.length,
   ...(run.parentRunId === undefined ? {} : { parentRunId: run.parentRunId }),
   ...(run.invocationId === undefined ? {} : { invocationId: run.invocationId }),
   ...(run.ownerId === undefined ? {} : { ownerId: run.ownerId }),

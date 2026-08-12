@@ -2,8 +2,10 @@ import { ExecutableManifest as CoreExecutableManifest } from "@batonfx/core"
 import { Effect, Function, Schema } from "effect"
 import type { ExecutionCheckpoint } from "./execution-state.js"
 
-/** @experimental Complete closed executable Agent graph. */
+/** @experimental Complete closed executable profile registry and entry closure. */
 export interface ExecutableManifest extends CoreExecutableManifest.ExecutableManifest {}
+/** @experimental One globally pinned child profile available by selection name. */
+export type ProfileBinding = CoreExecutableManifest.ProfileBinding
 type AgentEntry = Extract<ExecutableManifest["entries"][number], { readonly _tag: "Agent" }>
 type ProgramEntry = Extract<ExecutableManifest["entries"][number], { readonly _tag: "Program" }>
 /** @experimental Encoded complete closed executable Agent graph. */
@@ -117,7 +119,9 @@ export const resolveChild: {
     const active = manifest.entries.find((entry) => entry.pin === ref.active)
     const child =
       active?._tag === "Agent"
-        ? (active as AgentEntry).manifest.children.find((binding) => binding.selection === selection)?.agent
+        ? (active as AgentEntry).manifest.children.some((binding) => binding.selection === selection)
+          ? manifest.profiles.find((profile) => profile.selection === selection)?.agent
+          : undefined
         : active?._tag === "Program"
           ? (active as ProgramEntry).manifest.capabilities.agents.find((binding) => binding.selection === selection)
               ?.agent

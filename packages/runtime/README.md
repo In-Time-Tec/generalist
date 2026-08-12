@@ -60,17 +60,19 @@ runtime.awaitChildSettlement({ parentRunId, childRunId })
 
 ## Fan-out
 
-`Runtime.spawn` and `Runtime.fanOut` accept semantic child selections declared by the parent Run's active Agent manifest. Admission resolves each selection to an exact Agent pin from the persisted executable closure under the parent lock; address bindings and the executable resolver are not consulted. Fan-out resolves every member atomically, and the resolved refs participate in its idempotency digest. `Runtime.awaitFanOut` waits on committed child events until the durable join decision is available; `Runtime.inspectFanOut` remains the non-blocking inspection operation. Both return member outcomes in input ordinal order.
+`AgentManifest.children` is a selection-name allowlist. `ExecutableManifest.make({ root, active?, profiles, entries })` pins the finite global `profiles: [{ selection, agent }]` registry and each Agent once, allowing mutually recursive profiles without depth unrolling or digest cycles. `Runtime.spawn` and `Runtime.fanOut` authorize against the active allowlist and resolve through that persisted registry under the parent lock. Fan-out is atomic and its await/inspection results preserve member order.
 
 Join modes are `AllSuccess`, `AllSettled`, `FirstSuccess`, `Quorum`, and `BestEffort`. Remainder policies are `await`, `request-cancel`, and `abandon`. `terminate` is rejected until a host can prove that all member effects terminated.
 
-For model-authored work, `ChildRuns.tool` keeps `run_child` blocking for one dependent child. `ChildRuns.runGroupTool` (`run_child_group`) atomically admits an exact group and blocks through one durable parent suspension until all members settle, returning complete outcomes in admission order. `ChildRuns.startGroupTool` and `ChildRuns.awaitGroupTool` remain lower-level detached admission/join operations. `ChildRuns.makeTools` narrows model-facing selections from declared child authority.
+`ChildRuns.tool` (`run_child`) blocks for one child; `ChildRuns.runGroupTool` (`run_child_group`) atomically admits an exact group and blocks one durable parent suspension until every member settles, returning complete ordered outcomes. Start/await tools remain lower-level detached operations. ExecutionHost omits blocking child tools at `maxDepth`, at zero width, or after lifetime quota exhaustion. Store admission remains authoritative under races.
 
 Each root admission may pin `{ maxDepth, maxSubagents }`. Root depth is zero; child depth is derived from its parent. `maxSubagents` is a per-parent lifetime direct-child limit shared by singleton and group paths, not a global depth pool. Replays do not spend quota again, terminal children are never refunded, and an over-limit exact group leaves no partial state.
 
+Core Agent budgets retain `childRuns` and `depth` for inline `AgentTool` nesting, but hosted child tools do not inspect them. `TreePolicy` is their sole recursive admission bound.
+
 ## Testing against PostgreSQL and MySQL
 
-The PostgreSQL and MySQL suites run against a real server and are skipped when no URL is configured. Start both servers, export their URLs, and run the suite:
+The backend contract suites cover Memory, SQLite, PostgreSQL, and MySQL. The live SQL suites provision an isolated schema or database per file and skip when their URL is absent:
 
 ```sh
 docker compose -f packages/runtime/test/docker-compose.yml up -d --wait
@@ -79,12 +81,6 @@ export BATON_MYSQL_URL=mysql://baton:baton@127.0.0.1:33306/baton
 bun --bun vitest run packages/runtime/test
 docker compose -f packages/runtime/test/docker-compose.yml down -v
 ```
-
-`BATON_DATABASE_URL` (or `DATABASE_URL`) selects the PostgreSQL server and `BATON_MYSQL_URL` (or `MYSQL_URL`) selects the MySQL server. Each test file provisions its own PostgreSQL schema or MySQL database from that server, so files never share tables and the suite is safe under Vitest file parallelism.
-
-Nested durable operations, non-blocking child admission, and stranded-message recovery are one suite each, instantiated per backend: `nested-operations.test.ts`, `child-admission.test.ts`, and `messaging-stranded-delivery.test.ts` cover memory and SQLite, and `postgres/runtime-parity.test.ts` and `mysql/runtime-parity.test.ts` run the same cases against real servers. The memory and SQLite Runtimes bundle a `LocalScheduler` that promotes a queued Run itself, so a store-level claim succeeds immediately. The PostgreSQL and MySQL Runtimes expect an external worker, so those suites claim ready work through `RunClaims` before acting on a Run.
-
-Addressed messaging follows the same shape across all four backends. Mailbox admission and bounds, authorization and directory scope, cross-session host policy, delivery idempotence, and the durable `send` operation are one suite each (`messaging-*-suite.ts`), instantiated for memory and SQLite by `messaging-*.test.ts` and for real servers by `postgres/messaging-parity.test.ts` and `mysql/messaging-parity.test.ts`. Mailbox bounds and messaging policy are Runtime construction options, so each backend supplies a Layer factory rather than a Layer and every bound or policy is its own Runtime. Mailbox durability across a close and reopen applies only to the durable backends, so that suite takes a store Layer directly.
 
 ## Errors, requirements, and resources
 

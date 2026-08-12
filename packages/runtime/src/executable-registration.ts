@@ -62,6 +62,7 @@ export const requiredPins = (executable: PinnedExecutable): ReadonlySet<string> 
 /** @experimental Exact pins one active executable requires, independent of the rest of its closure. */
 export const requiredPinsForActiveExecutable = (executable: PinnedExecutable): ReadonlySet<string> => {
   const byPin = new Map(executable.manifest.entries.map((entry) => [entry.pin, entry] as const))
+  const profiles = new Map(executable.manifest.profiles.map((profile) => [profile.selection, profile.agent] as const))
   const pins = new Set<string>()
   const visited = new Set<string>()
   const visit = (pin: PinnedExecutable["ref"]["active"]): void => {
@@ -88,7 +89,10 @@ export const requiredPinsForActiveExecutable = (executable: PinnedExecutable): R
         for (const capability of entry.manifest.programAuthority.agents) pins.add(capability.input)
       }
       const children = [
-        ...entry.manifest.children.map((child) => child.agent),
+        ...entry.manifest.children.flatMap((child) => {
+          const agent = profiles.get(child.selection)
+          return agent === undefined ? [] : [agent]
+        }),
         ...(entry.manifest.programAuthority?.agents ?? []).map((child) => child.agent),
       ].toSorted()
       for (const child of children) visit(child)
