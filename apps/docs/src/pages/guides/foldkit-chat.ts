@@ -76,7 +76,7 @@ export const foldkitChat = definePage({
       "info",
       "Live previews are a separate observer",
       code("Runtime.previews"),
-      " can expose bounded cumulative text and reasoning inside the Runtime process, but those snapshots are lossy, droppable, and absent from transport replay and Chat.Model. A host that chooses to bridge previews to a browser owns a separate route, model field, and stale-preview cleanup policy.",
+      " can expose bounded append frames for text and reasoning inside the Runtime process, but those frames are lossy, droppable, and absent from transport replay and Chat.Model. A host that chooses to bridge previews to a browser owns a separate route, model field, sequence-gap policy, and stale-preview cleanup policy.",
     ),
     p(
       "For richer rendering, ",

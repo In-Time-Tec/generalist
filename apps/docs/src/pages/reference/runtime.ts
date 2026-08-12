@@ -39,11 +39,11 @@ export const runtimeReference = definePage({
     ),
     p(
       code("Runtime.previews({ runId })"),
-      " is a separate process-local observer for cumulative text and reasoning while a provider attempt is live. A preview is bounded to ",
-      code("ModelPreview.MaxCharacters"),
-      ", cadence-limited by ",
+      " is a separate process-local observer for append-only text and reasoning while a provider attempt is live. Each frame and cadence buffer is bounded to ",
+      code("ModelPreview.MaxPayloadCharacters"),
+      " UTF-16 code units and cadence-limited by ",
       code("ModelPreview.MaxCadenceMillis"),
-      ", lossy, conflated, and safe to drop. It is never written to a database, assigned a RunEvent sequence, included in a cursor or checkpoint, replayed, or projected through the transport and FoldKit Chat contracts.",
+      ". Frame sequences and per-channel UTF-16 offsets expose loss to slow or late subscribers. Preview events are lossy, safe to drop, and never written to a database, assigned a RunEvent sequence, included in a cursor or checkpoint, replayed durably, or projected through the transport and FoldKit Chat contracts.",
     ),
     h2("layers", "Runtime layers"),
     p(

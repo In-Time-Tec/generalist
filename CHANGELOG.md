@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.21.4
+
+- Replace cumulative capped model previews with bounded append frames carrying full provider-attempt identity, contiguous sequences, and per-channel UTF-16 offsets. Healthy subscribers can reconstruct output of arbitrary length without retransmission; bounded dropping delivery keeps execution independent while making loss detectable.
+
 ## 0.21.3
 
 - Harden live previews: each Run gets its own conflated memory-only preview lane with a retained cumulative snapshot replayed to late subscribers, and a clear tombstone with a generation guard so a stale preview can never publish after commit or interruption. Subscribers register before replay with an atomic high-water so a large replay cannot overflow a bounded queue, and PostgreSQL/MySQL multi-subscriber polling advances the cursor exactly once.

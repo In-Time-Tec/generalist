@@ -107,7 +107,7 @@ export const serveTransport = definePage({
       [code("Snapshot.get(runId)"), " is a finite inspection resource, separate from the event stream."],
       [
         code("Runtime.previews({ runId })"),
-        " is a bounded, cumulative, lossy process-local observer. It is not transported, persisted, cursor-addressed, checkpointed, or replayed.",
+        " is a bounded, append-only, lossy process-local observer with detectable sequence and offset gaps. It is not transported, persisted, cursor-addressed, checkpointed, or durably replayed.",
       ],
       [
         "Closing SSE or WebSocket never cancels the run. Cancellation is always explicit through ",
